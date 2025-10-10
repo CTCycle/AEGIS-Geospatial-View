@@ -9,12 +9,11 @@ import os
 import gradio as gr
 from fastapi import FastAPI
 
-from AEGIS.app.api.endpoints.agent import router as report_router
-from AEGIS.app.api.endpoints.ollama import router as models_router
-from AEGIS.app.api.endpoints.pharmacology import router as pharma_router
+from AEGIS.app.api.endpoints.maps import router as report_router
+from AEGIS.app.api.endpoints.filters import router as models_router
 from AEGIS.app.client.main import create_interface
 from AEGIS.app.logger import logger
-from AEGIS.app.utils.database.sqlite import database
+from AEGIS.app.utils.repository.database import database
 
 ###############################################################################
 # initialize the database if it has not been created
@@ -31,7 +30,6 @@ app = FastAPI(
 
 app.include_router(report_router)
 app.include_router(models_router)
-app.include_router(pharma_router)
 
 ui_app = create_interface()
 app = gr.mount_gradio_app(app, ui_app, path="/ui", root_path="/ui")
