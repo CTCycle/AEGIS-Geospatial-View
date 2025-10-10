@@ -8,18 +8,13 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
-from AEGIS.app.api.schemas.clinical import (
-    PatientData,
-)
+from AEGIS.app.api.schemas.geo import *
 from AEGIS.app.constants import TASKS_PATH
-from AEGIS.app.configurations import ClientRuntimeConfig
+from AEGIS.app.configurations import Configuration
 from AEGIS.app.logger import logger
-from AEGIS.app.utils.services.clinical import (
-    HepatotoxicityPatternAnalyzer,
-    HepatoxConsultation,
-)
-from AEGIS.app.utils.services.enhancer import ClinicalTextEnhancer
-from AEGIS.app.utils.services.parser import (
+
+from AEGIS.app.utils.services.geographics import ClinicalTextEnhancer
+from AEGIS.app.utils.services.streams import (
     BloodTestParser,
     DrugsParser,
     PatientCase,
