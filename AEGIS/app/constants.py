@@ -16,37 +16,11 @@ LOGS_PATH = join(RSC_PATH, "logs")
 
 # [ENDPOINS]
 ###############################################################################
-API_BASE_URL = "http://127.0.0.1:8000"
-AGENT_API_URL = "/agent"
-BATCH_AGENT_API_URL = "/batch-agent"
+GEO_API_URL = "/maps"
 
 
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
-ATC_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
-LIVERTOX_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/litarch/29/31/"
-LIVERTOX_ARCHIVE = "livertox_NBK547852.tar.gz"
-DEFAULT_LLM_TIMEOUT_SECONDS = 1_800.0
-LIVERTOX_LLM_TIMEOUT_SECONDS = DEFAULT_LLM_TIMEOUT_SECONDS
-LIVERTOX_YIELD_INTERVAL = 25
-LIVERTOX_SKIP_DETERMINISTIC_RATIO = 0.80
-LIVERTOX_MONOGRAPH_MAX_WORKERS = 4
-MAX_EXCERPT_LENGTH = 8000
-LLM_NULL_MATCH_NAMES = {
-    "",
-    "none",
-    "no match",
-    "no matches",
-    "not found",
-    "unknown",
-    "not applicable",
-    "n a",
-}
+NASA_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
 
-
-# [CLINICAL ANALYSIS]
-###############################################################################
-DRUG_SUSPENSION_EXCLUSION_DAYS = 14
-ALT_LABELS = {"ALT", "ALAT"}
-ALP_LABELS = {"ALP"}
 
