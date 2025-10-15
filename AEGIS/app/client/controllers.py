@@ -4,6 +4,7 @@ import base64
 import json
 import os
 from binascii import Error as BinasciiError
+from datetime import date, datetime, time
 from typing import Any
 
 import httpx
@@ -13,6 +14,9 @@ from AEGIS.app.constants import GEO_API_URL
 
 _API_BASE_URL = os.getenv("AEGIS_API_BASE_URL", "http://127.0.0.1:8000")
 _HTTP_TIMEOUT_SECONDS = 30.0
+_DEFAULT_TIMELINE_BACKTRACK = 20
+_SURROUNDING_RANGE = 10
+_MIN_YEAR = 1900
 
 
 ###############################################################################
@@ -41,6 +45,9 @@ async def load_map_image(
     use_coordinates: bool,
     latitude: float | None,
     longitude: float | None,
+    target_date: str | date | None,
+    target_time: str | time | None,
+    timeline_year: int | float | None,
 ) -> tuple[dict[str, Any], str]:
     payload, error_message = build_request_payload(
         filter_name=filter_name,
@@ -49,6 +56,9 @@ async def load_map_image(
         use_coordinates=use_coordinates,
         latitude=latitude,
         longitude=longitude,
+        target_date=target_date,
+        target_time=target_time,
+        timeline_year=timeline_year,
     )
     if error_message:
         return gr_update(value=None), error_message
@@ -100,6 +110,9 @@ def build_request_payload(
     use_coordinates: bool,
     latitude: float | None,
     longitude: float | None,
+    target_date: str | date | None,
+    target_time: str | time | None,
+    timeline_year: int | float | None,
 ) -> tuple[dict[str, Any], str | None]:
     payload: dict[str, Any] = {}
     if filter_name:
@@ -109,16 +122,121 @@ def build_request_payload(
         if latitude is None or longitude is None:
             return {}, "[ERROR] Provide both latitude and longitude to use coordinates."
         payload["coordinates"] = {"latitude": latitude, "longitude": longitude}
-        return payload, None
+    else:
+        if not country and not city:
+            return {}, "[ERROR] Specify at least a country or a city to locate the map."
+        payload["location"] = {
+            "country": country or None,
+            "city": city or None,
+        }
 
-    if not country and not city:
-        return {}, "[ERROR] Specify at least a country or a city to locate the map."
-
-    payload["location"] = {
-        "country": country or None,
-        "city": city or None,
-    }
+    temporal_payload = build_temporal_payload(
+        target_date=target_date,
+        target_time=target_time,
+        timeline_year=timeline_year,
+        use_coordinates=use_coordinates,
+    )
+    payload.update(temporal_payload)
     return payload, None
+
+
+###############################################################################
+def build_temporal_payload(
+    *,
+    target_date: str | date | None,
+    target_time: str | time | None,
+    timeline_year: int | float | None,
+    use_coordinates: bool,
+) -> dict[str, Any]:
+    parsed_date = parse_date_value(target_date)
+    parsed_time = parse_time_value(target_time)
+    timeline = coerce_timeline_year(parsed_date, timeline_year)
+    payload: dict[str, Any] = {
+        "temporal": {
+            "timeline_year": timeline,
+            "reference_date": parsed_date.isoformat() if parsed_date else None,
+            "time_of_day": parsed_time.isoformat() if parsed_time else None,
+        }
+    }
+    payload["mode"] = "coordinates" if use_coordinates else "search"
+    return payload
+
+
+###############################################################################
+def parse_date_value(value: str | date | None) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+###############################################################################
+def parse_time_value(value: str | time | None) -> time | None:
+    if value is None:
+        return None
+    if isinstance(value, time):
+        return value
+    if isinstance(value, str):
+        try:
+            return time.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+###############################################################################
+def coerce_timeline_year(parsed_date: date | None, candidate: int | float | None) -> int:
+    today_year = date.today().year
+    if parsed_date is None:
+        min_year = max(today_year - _DEFAULT_TIMELINE_BACKTRACK, _MIN_YEAR)
+        max_year = today_year
+        value = today_year
+    else:
+        base_year = parsed_date.year
+        min_year = max(base_year - _SURROUNDING_RANGE, _MIN_YEAR)
+        max_year = min(base_year + _SURROUNDING_RANGE, today_year)
+        if min_year > max_year:
+            min_year, max_year = max_year, min_year
+        value = base_year
+    if isinstance(candidate, (int, float)):
+        candidate_int = int(candidate)
+        if candidate_int < min_year:
+            return min_year
+        if candidate_int > max_year:
+            return max_year
+        return candidate_int
+    return int(value)
+
+
+###############################################################################
+def adjust_timeline_slider(target_date: str | date | None) -> dict[str, Any]:
+    parsed_date = parse_date_value(target_date)
+    today_year = date.today().year
+    if parsed_date is None:
+        minimum = max(today_year - _DEFAULT_TIMELINE_BACKTRACK, _MIN_YEAR)
+        maximum = today_year
+        value = today_year
+    else:
+        base_year = parsed_date.year
+        minimum = max(base_year - _SURROUNDING_RANGE, _MIN_YEAR)
+        maximum = min(base_year + _SURROUNDING_RANGE, today_year)
+        if minimum > maximum:
+            minimum, maximum = maximum, minimum
+        value = min(max(base_year, minimum), maximum)
+    return gr_update(minimum=minimum, maximum=maximum, value=value)
+
+
+###############################################################################
+def initiate_authentication() -> str:
+    return "[INFO] Authentication workflow will open in a future release."
 
 
 ###############################################################################
