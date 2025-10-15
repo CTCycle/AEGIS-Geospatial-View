@@ -42,7 +42,7 @@ async def load_map_image(
     latitude: float | None,
     longitude: float | None,
 ) -> tuple[dict[str, Any], str]:
-    payload, error_message = _build_request_payload(
+    payload, error_message = build_request_payload(
         filter_name=filter_name,
         country=country,
         city=city,
@@ -62,7 +62,7 @@ async def load_map_image(
     except httpx.RequestError as exc:
         return gr_update(value=None), f"[ERROR] Unable to reach map service: {exc}"
     except httpx.HTTPStatusError as exc:
-        detail = _extract_error_detail(exc.response)
+        detail = extract_error_detail(exc.response)
         return (
             gr_update(value=None),
             f"[ERROR] Map service error {exc.response.status_code}: {detail}",
@@ -79,7 +79,7 @@ async def load_map_image(
     if not isinstance(data, dict):
         return gr_update(value=None), "[ERROR] Map service returned an unexpected payload."
 
-    image_value, message = _coerce_image_value(data)
+    image_value, message = coerce_image_value(data)
     if image_value is None:
         detail = message or data.get("detail") or data.get("message")
         return gr_update(value=None), f"[ERROR] {detail or 'No imagery available.'}"
@@ -92,7 +92,7 @@ async def load_map_image(
 
 
 ###############################################################################
-def _build_request_payload(
+def build_request_payload(
     *,
     filter_name: str | None,
     country: str | None,
@@ -122,7 +122,7 @@ def _build_request_payload(
 
 
 ###############################################################################
-def _extract_error_detail(response: httpx.Response) -> str:
+def extract_error_detail(response: httpx.Response) -> str:
     try:
         data = response.json()
     except json.JSONDecodeError:
@@ -136,14 +136,14 @@ def _extract_error_detail(response: httpx.Response) -> str:
 
 
 ###############################################################################
-def _coerce_image_value(payload: dict[str, Any]) -> tuple[bytes | str | None, str]:
+def coerce_image_value(payload: dict[str, Any]) -> tuple[bytes | str | None, str]:
     message = ""
     image_value: bytes | str | None = None
 
     image_section = payload.get("image")
     if isinstance(image_section, dict):
-        message = _coerce_message(image_section)
-        image_value = _extract_image_from_dict(image_section)
+        message = coerce_message(image_section)
+        image_value = extract_image_from_dict(image_section)
 
     if image_value is None:
         if isinstance(payload.get("image_url"), str):
@@ -151,11 +151,11 @@ def _coerce_image_value(payload: dict[str, Any]) -> tuple[bytes | str | None, st
         elif isinstance(payload.get("animation_url"), str):
             image_value = payload["animation_url"]
         elif isinstance(payload.get("image_base64"), str):
-            image_value = _decode_base64(payload["image_base64"])
+            image_value = decode_base64(payload["image_base64"])
         elif isinstance(payload.get("image_data"), str):
-            image_value = _decode_base64(payload["image_data"])
+            image_value = decode_base64(payload["image_data"])
         elif isinstance(payload.get("image"), str):
-            decoded = _decode_base64(payload["image"])
+            decoded = decode_base64(payload["image"])
             image_value = decoded if decoded is not None else payload["image"]
 
     if image_value is None:
@@ -163,24 +163,24 @@ def _coerce_image_value(payload: dict[str, Any]) -> tuple[bytes | str | None, st
         if isinstance(frames, list):
             for frame in frames:
                 if isinstance(frame, str):
-                    candidate = _decode_base64(frame)
+                    candidate = decode_base64(frame)
                     if candidate is not None:
                         image_value = candidate
                         break
 
     if not message:
-        message = _coerce_message(payload)
+        message = coerce_message(payload)
 
     return image_value, message
 
 
 ###############################################################################
-def _extract_image_from_dict(data: dict[str, Any]) -> bytes | str | None:
+def extract_image_from_dict(data: dict[str, Any]) -> bytes | str | None:
     if isinstance(data.get("url"), str):
         return data["url"]
     base64_candidate = data.get("base64") or data.get("data")
     if isinstance(base64_candidate, str):
-        decoded = _decode_base64(base64_candidate)
+        decoded = decode_base64(base64_candidate)
         if decoded is not None:
             return decoded
         return base64_candidate
@@ -188,7 +188,7 @@ def _extract_image_from_dict(data: dict[str, Any]) -> bytes | str | None:
 
 
 ###############################################################################
-def _coerce_message(data: dict[str, Any]) -> str:
+def coerce_message(data: dict[str, Any]) -> str:
     for key in ("caption", "message", "detail", "status"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
@@ -197,7 +197,7 @@ def _coerce_message(data: dict[str, Any]) -> str:
 
 
 ###############################################################################
-def _decode_base64(data: str) -> bytes | None:
+def decode_base64(data: str) -> bytes | None:
     try:
         return base64.b64decode(data, validate=True)
     except (ValueError, BinasciiError):

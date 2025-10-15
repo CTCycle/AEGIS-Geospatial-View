@@ -61,10 +61,10 @@ class ClinicalTextEnhancer:
         except (TypeError, ValueError):
             chat_signature = None
         parameters = chat_signature.parameters if chat_signature else {}
-        self._chat_supports_temperature = "temperature" in parameters
-        self._chat_supports_think = "think" in parameters
-        self._chat_supports_options = "options" in parameters
-        self._chat_supports_keep_alive = "keep_alive" in parameters
+        self.chat_supports_temperature = "temperature" in parameters
+        self.chat_supports_think = "think" in parameters
+        self.chat_supports_options = "options" in parameters
+        self.chat_supports_keep_alive = "keep_alive" in parameters
 
     # -------------------------------------------------------------------------
     async def enhance(self, payload: PatientData) -> PatientData:
@@ -81,7 +81,7 @@ class ClinicalTextEnhancer:
         if self.using_ollama:
             for field, config, original in sections:
                 try:
-                    rewritten = await self._rewrite_section(
+                    rewritten = await self.rewrite_section(
                         section_name=config["title"],
                         text=original,
                         instruction=config["instruction"],
@@ -96,7 +96,7 @@ class ClinicalTextEnhancer:
                     updates[field] = cleaned
         else:
             tasks = [
-                self._rewrite_section(
+                self.rewrite_section(
                     section_name=config["title"],
                     text=original,
                     instruction=config["instruction"],
@@ -119,7 +119,7 @@ class ClinicalTextEnhancer:
         return payload.model_copy(update=updates)
 
     # -------------------------------------------------------------------------
-    async def _rewrite_section(
+    async def rewrite_section(
         self, *, section_name: str, text: str, instruction: str
     ) -> str:
         messages = [
@@ -150,13 +150,13 @@ class ClinicalTextEnhancer:
                 ),
             },
         ]
-        chat_kwargs = self._build_chat_kwargs(messages)
+        chat_kwargs = self.build_chat_kwargs(messages)
         raw = await self.client.chat(**chat_kwargs)
-        return self._coerce_chat_text(raw) or text
+        return self.coerce_chat_text(raw) or text
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _coerce_chat_text(raw_response: Any) -> str:
+    def coerce_chat_text(raw_response: Any) -> str:
         if isinstance(raw_response, str):
             return raw_response.strip()
         if isinstance(raw_response, dict):
@@ -176,27 +176,27 @@ class ClinicalTextEnhancer:
         return ""
 
     # -------------------------------------------------------------------------
-    def _build_chat_kwargs(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+    def build_chat_kwargs(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         chat_kwargs: dict[str, Any] = {"model": self.model, "messages": messages}
         options: dict[str, Any] = {}
 
-        if self._chat_supports_temperature:
+        if self.chat_supports_temperature:
             chat_kwargs["temperature"] = self.temperature
         else:
             options["temperature"] = self.temperature
 
-        if self._chat_supports_think:
+        if self.chat_supports_think:
             chat_kwargs["think"] = False
         else:
             options["think"] = False
 
-        if self._chat_supports_keep_alive and self.keep_alive:
+        if self.chat_supports_keep_alive and self.keep_alive:
             chat_kwargs["keep_alive"] = self.keep_alive
 
-        if options and self._chat_supports_options:
+        if options and self.chat_supports_options:
             chat_kwargs["options"] = options
-        elif options and not self._chat_supports_options:
-            if not self._chat_supports_temperature and "temperature" in options:
+        elif options and not self.chat_supports_options:
+            if not self.chat_supports_temperature and "temperature" in options:
                 chat_kwargs["temperature"] = options["temperature"]
 
         return chat_kwargs
