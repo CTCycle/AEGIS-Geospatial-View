@@ -13,18 +13,9 @@ from AEGIS.app.constants import TASKS_PATH
 from AEGIS.app.configurations import Configuration
 from AEGIS.app.logger import logger
 
-from AEGIS.app.utils.services.geographics import ClinicalTextEnhancer
-from AEGIS.app.utils.services.streams import (
-    BloodTestParser,
-    DrugsParser,
-    PatientCase,
-)
- 
-drugs_parser = DrugsParser()
-pattern_analyzer = HepatotoxicityPatternAnalyzer()
+
+
 router = APIRouter(tags=["agent"])
-text_enhancer: ClinicalTextEnhancer | None = None
-text_enhancer_revision = -1  # refresh cached enhancer when runtime config changes
 
 # [ENPOINTS]
 ###############################################################################
