@@ -27,6 +27,11 @@ COUNTRY_CHOICES: Final[list[str]] = [
 ]
 DEFAULT_FILTER: Final[str] = FILTER_CHOICES[0]
 TIMELINE_DEFAULT_RANGE: Final[int] = 20
+GREEN_THEME: Final = gr.themes.Soft(
+    primary_hue="green",
+    secondary_hue="lime",
+    neutral_hue="gray",
+)
 
 
 def _default_timeline_bounds() -> tuple[int, int, int]:
@@ -41,7 +46,7 @@ def create_interface() -> gr.Blocks:
     with gr.Blocks(
         title="AEGIS Geographics",
         analytics_enabled=False,
-        theme="soft",
+        theme=GREEN_THEME,
     ) as demo:
         gr.Markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
 
