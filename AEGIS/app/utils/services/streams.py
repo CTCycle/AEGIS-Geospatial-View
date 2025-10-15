@@ -77,7 +77,7 @@ class PatientCase:
             title.replace(" ", "_").lower(): text[
                 end : (hits[i + 1][1] if i + 1 < len(hits) else len(text))
             ].strip()
-            for i, (title, _start, end) in enumerate(hits)
+            for i, (title, start, end) in enumerate(hits)
         }
 
         exp_lower = {e.lower() for e in self.expected_tags}
