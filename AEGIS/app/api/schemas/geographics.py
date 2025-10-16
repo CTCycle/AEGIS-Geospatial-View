@@ -81,3 +81,28 @@ class MapRequest(BaseModel):
                 raise ValueError("Provide at least a city or country when search mode is selected.")
         return self
 
+
+###############################################################################
+class AgenticMapRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=4000)
+    use_cloud_models: bool = False
+    openai_model: str | None = Field(default=None, max_length=200)
+    agent_model: str = Field(..., min_length=1, max_length=200)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+
+    @field_validator("query", "agent_model", "openai_model", mode="before")
+    @classmethod
+    def normalize_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = str(value).strip()
+        return stripped or None
+
+    @model_validator(mode="after")
+    def validate_openai_requirements(self) -> "AgenticMapRequest":
+        if self.use_cloud_models and not self.openai_model:
+            raise ValueError("An OpenAI model must be specified when cloud models are enabled.")
+        if not self.use_cloud_models:
+            self.openai_model = None
+        return self
+
