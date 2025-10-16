@@ -77,15 +77,14 @@ def create_interface() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column(scale=1, min_width=360):
-                with gr.Group():
-                    gr.Markdown("### Deterministic Map Search")
+                with gr.Box():
+                    gr.Markdown("### Location search")
                     filter_dropdown = gr.Dropdown(
                         label="Imagery Style",
                         choices=FILTER_CHOICES,
                         value=DEFAULT_FILTER,
                         interactive=True,
                     )
-                    gr.Markdown("#### Location Preferences")
                     country_dropdown = gr.Dropdown(
                         label="Country or Region",
                         choices=COUNTRY_CHOICES,
