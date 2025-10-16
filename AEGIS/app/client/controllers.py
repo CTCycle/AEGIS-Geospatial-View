@@ -59,8 +59,6 @@ def set_agentic_mode(
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
 ]:
     if agentic_enabled:
         return (
@@ -68,7 +66,6 @@ def set_agentic_mode(
             gr_update(interactive=False),
             gr_update(interactive=False),
             gr_update(value=use_coordinates, interactive=False),
-            gr_update(interactive=False),
             gr_update(interactive=False),
             gr_update(interactive=False),
             gr_update(interactive=False),
@@ -102,7 +99,6 @@ def set_agentic_mode(
         longitude_update,
         gr_update(interactive=True),
         gr_update(interactive=True),
-        gr_update(interactive=True),
         gr_update(interactive=False),
         gr_update(value=False, interactive=False),
         gr_update(value=None, interactive=False),
@@ -128,8 +124,7 @@ async def load_default_map_image(
     use_coordinates: bool,
     latitude: float | None,
     longitude: float | None,
-    target_date: str | date | None,
-    target_time: str | time | None,
+    target_moment: str | date | datetime | None,
     timeline_year: int | float | None,
 ) -> tuple[dict[str, Any], str]:
     payload, error_message = build_request_payload(
@@ -139,8 +134,7 @@ async def load_default_map_image(
         use_coordinates=use_coordinates,
         latitude=latitude,
         longitude=longitude,
-        target_date=target_date,
-        target_time=target_time,
+        target_moment=target_moment,
         timeline_year=timeline_year,
     )
     if error_message:
@@ -219,8 +213,7 @@ def build_request_payload(
     use_coordinates: bool,
     latitude: float | None,
     longitude: float | None,
-    target_date: str | date | None,
-    target_time: str | time | None,
+    target_moment: str | date | datetime | None,
     timeline_year: int | float | None,
 ) -> tuple[dict[str, Any], str | None]:
     payload: dict[str, Any] = {}
@@ -240,8 +233,7 @@ def build_request_payload(
         }
 
     temporal_payload = build_temporal_payload(
-        target_date=target_date,
-        target_time=target_time,
+        target_moment=target_moment,
         timeline_year=timeline_year,
         use_coordinates=use_coordinates,
     )
@@ -299,13 +291,13 @@ def sanitize_temperature(value: float | int | None) -> float:
 ###############################################################################
 def build_temporal_payload(
     *,
-    target_date: str | date | None,
-    target_time: str | time | None,
+    target_moment: str | date | datetime | None,
     timeline_year: int | float | None,
     use_coordinates: bool,
 ) -> dict[str, Any]:
-    parsed_date = parse_date_value(target_date)
-    parsed_time = parse_time_value(target_time)
+    parsed_datetime = parse_datetime_value(target_moment)
+    parsed_date = parse_date_value(target_moment)
+    parsed_time = parsed_datetime.timetz() if parsed_datetime else None
     timeline = coerce_timeline_year(parsed_date, timeline_year)
     payload: dict[str, Any] = {
         "temporal": {
@@ -319,7 +311,7 @@ def build_temporal_payload(
 
 
 ###############################################################################
-def parse_date_value(value: str | date | None) -> date | None:
+def parse_date_value(value: str | date | datetime | None) -> date | None:
     if value is None:
         return None
     if isinstance(value, date):
@@ -327,24 +319,40 @@ def parse_date_value(value: str | date | None) -> date | None:
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, str):
-        try:
-            return date.fromisoformat(value)
-        except ValueError:
+        candidate = value.strip()
+        if not candidate:
             return None
+        try:
+            return date.fromisoformat(candidate)
+        except ValueError:
+            try:
+                normalized = candidate.replace("Z", "+00:00")
+                return datetime.fromisoformat(normalized).date()
+            except ValueError:
+                return None
     return None
 
 
 ###############################################################################
-def parse_time_value(value: str | time | None) -> time | None:
+def parse_datetime_value(value: str | date | datetime | None) -> datetime | None:
     if value is None:
         return None
-    if isinstance(value, time):
+    if isinstance(value, datetime):
         return value
+    if isinstance(value, date):
+        return datetime.combine(value, time.min)
     if isinstance(value, str):
-        try:
-            return time.fromisoformat(value)
-        except ValueError:
+        candidate = value.strip()
+        if not candidate:
             return None
+        normalized = candidate.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            try:
+                return datetime.fromisoformat(f"{normalized}T00:00:00")
+            except ValueError:
+                return None
     return None
 
 
@@ -373,7 +381,7 @@ def coerce_timeline_year(parsed_date: date | None, candidate: int | float | None
 
 
 ###############################################################################
-def adjust_timeline_slider(target_date: str | date | None) -> dict[str, Any]:
+def adjust_timeline_slider(target_date: str | date | datetime | None) -> dict[str, Any]:
     parsed_date = parse_date_value(target_date)
     today_year = date.today().year
     if parsed_date is None:
