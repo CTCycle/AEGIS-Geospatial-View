@@ -9,6 +9,7 @@ from AEGIS.app.client.controllers import (
     adjust_timeline_slider,
     initiate_authentication,
     load_map_image,
+    set_agentic_mode,
     set_location_mode,
 )
 
@@ -34,7 +35,7 @@ GREEN_THEME: Final = gr.themes.Soft(
 )
 
 
-def _default_timeline_bounds() -> tuple[int, int, int]:
+def default_timeline_bounds() -> tuple[int, int, int]:
     today = date.today()
     min_year = max(today.year - TIMELINE_DEFAULT_RANGE, 1900)
     max_year = today.year
@@ -61,7 +62,7 @@ def create_interface() -> gr.Blocks:
         with gr.Row():
             with gr.Column(scale=1, min_width=360):
                 with gr.Group():
-                    gr.Markdown("### Imagery Parameters")
+                    gr.Markdown("### Deterministic Parameters")
                     filter_dropdown = gr.Dropdown(
                         label="Filter",
                         choices=FILTER_CHOICES,
@@ -108,14 +109,28 @@ def create_interface() -> gr.Blocks:
                             placeholder="HH:MM",
                             lines=1,
                         )
-                    load_button = gr.Button("Load imagery", variant="primary")
-                    status_display = gr.Markdown(
-                        value="Select parameters, then load imagery.",
-                        visible=True,
+
+                with gr.Group():
+                    gr.Markdown("### LLM Exploration")
+                    agentic_search_checkbox = gr.Checkbox(
+                        label="Enable agentic search",
+                        value=False,
+                    )
+                    llm_query_input = gr.Textbox(
+                        label="LLM prompt",
+                        placeholder="Describe the geographic insights you need",
+                        lines=4,
+                        interactive=False,
                     )
 
+                load_button = gr.Button("Load imagery", variant="primary")
+                status_display = gr.Markdown(
+                    value="Select parameters, then load imagery.",
+                    visible=True,
+                )
+
             with gr.Column(scale=3):
-                min_year, max_year, default_year = _default_timeline_bounds()
+                min_year, max_year, default_year = default_timeline_bounds()
                 timeline_slider = gr.Slider(
                     label="Timeline year",
                     minimum=min_year,
@@ -151,6 +166,23 @@ def create_interface() -> gr.Blocks:
             outputs=timeline_slider,
         )
 
+        agentic_search_checkbox.change(
+            fn=set_agentic_mode,
+            inputs=[agentic_search_checkbox, use_coordinates_checkbox],
+            outputs=[
+                filter_dropdown,
+                country_dropdown,
+                city_input,
+                use_coordinates_checkbox,
+                latitude_input,
+                longitude_input,
+                date_input,
+                time_input,
+                timeline_slider,
+                llm_query_input,
+            ],
+        )
+
         load_button.click(
             fn=load_map_image,
             inputs=[
@@ -163,6 +195,8 @@ def create_interface() -> gr.Blocks:
                 date_input,
                 time_input,
                 timeline_slider,
+                agentic_search_checkbox,
+                llm_query_input,
             ],
             outputs=[map_canvas, status_display],
         )
