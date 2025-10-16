@@ -38,6 +38,60 @@ def set_location_mode(use_coordinates: bool) -> tuple[dict[str, Any], dict[str, 
 
 
 ###############################################################################
+def set_agentic_mode(
+    agentic_enabled: bool, use_coordinates: bool
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    if agentic_enabled:
+        return (
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(value=use_coordinates, interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=True),
+        )
+
+    if use_coordinates:
+        country_update = gr_update(interactive=False)
+        city_update = gr_update(interactive=False)
+        latitude_update = gr_update(interactive=True)
+        longitude_update = gr_update(interactive=True)
+    else:
+        country_update = gr_update(interactive=True)
+        city_update = gr_update(interactive=True)
+        latitude_update = gr_update(interactive=False)
+        longitude_update = gr_update(interactive=False)
+
+    return (
+        gr_update(interactive=True),
+        country_update,
+        city_update,
+        gr_update(interactive=True),
+        latitude_update,
+        longitude_update,
+        gr_update(interactive=True),
+        gr_update(interactive=True),
+        gr_update(interactive=True),
+        gr_update(interactive=False),
+    )
+
+
+###############################################################################
 async def load_map_image(
     filter_name: str | None,
     country: str | None,
@@ -48,20 +102,28 @@ async def load_map_image(
     target_date: str | date | None,
     target_time: str | time | None,
     timeline_year: int | float | None,
+    agentic_search: bool,
+    llm_query: str | None,
 ) -> tuple[dict[str, Any], str]:
-    payload, error_message = build_request_payload(
-        filter_name=filter_name,
-        country=country,
-        city=city,
-        use_coordinates=use_coordinates,
-        latitude=latitude,
-        longitude=longitude,
-        target_date=target_date,
-        target_time=target_time,
-        timeline_year=timeline_year,
-    )
-    if error_message:
-        return gr_update(value=None), error_message
+    if agentic_search:
+        prompt = (llm_query or "").strip()
+        if not prompt:
+            return gr_update(value=None), "[ERROR] Provide a prompt for agentic search."
+        payload = {"mode": "agentic", "query": prompt}
+    else:
+        payload, error_message = build_request_payload(
+            filter_name=filter_name,
+            country=country,
+            city=city,
+            use_coordinates=use_coordinates,
+            latitude=latitude,
+            longitude=longitude,
+            target_date=target_date,
+            target_time=target_time,
+            timeline_year=timeline_year,
+        )
+        if error_message:
+            return gr_update(value=None), error_message
 
     try:
         async with httpx.AsyncClient(
