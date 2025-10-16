@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from AEGIS.app.api.schemas.gibs import (
     GIBSImageryPayload,
-    GIBSLayerConfiguration,
+    GIBSLayer,
+    GIBSMapOptions,
+    GIBSMatrixSet,
     GIBSRequest,
     GIBSTileCoordinates,
+    GIBSTimeDomain,
     ResolvedLocation,
     TemporalParameters,
+    TemporalSelection,
+    WMTSRequestOptions,
+    WMSRequestOptions,
 )
 from AEGIS.app.api.schemas.geographics import (
     Coordinates,
@@ -17,11 +23,17 @@ from AEGIS.app.api.schemas.geographics import (
 
 __all__ = [
     "GIBSImageryPayload",
-    "GIBSLayerConfiguration",
+    "GIBSLayer",
+    "GIBSMapOptions",
+    "GIBSMatrixSet",
     "GIBSRequest",
     "GIBSTileCoordinates",
+    "GIBSTimeDomain",
     "ResolvedLocation",
     "TemporalParameters",
+    "TemporalSelection",
+    "WMTSRequestOptions",
+    "WMSRequestOptions",
     "Coordinates",
     "Location",
     "MapRequest",

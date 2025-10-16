@@ -4,6 +4,8 @@ from datetime import date, time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from AEGIS.app.api.schemas.gibs import GIBSMapOptions
+
 MIN_TIMELINE_YEAR = 1900
 
 
@@ -52,6 +54,7 @@ class MapRequest(BaseModel):
     coordinates: Coordinates | None = None
     location: Location | None = None
     temporal: TemporalContext
+    map_options: GIBSMapOptions = Field(default_factory=GIBSMapOptions)
 
     @field_validator("filter", mode="before")
     @classmethod
