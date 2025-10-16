@@ -13,7 +13,7 @@ from AEGIS.app.api.schemas.gibs import (
     ResolvedLocation,
     TemporalParameters,
 )
-from AEGIS.app.api.schemas.map_requests import MapRequest
+from AEGIS.app.api.schemas.geographics import MapRequest
 from AEGIS.app.logger import logger
 
 

@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
-from AEGIS.app.api.schemas.map_requests import MapRequest
+from AEGIS.app.api.schemas.geographics import MapRequest
 from AEGIS.app.utils.services.geographics import GIBSClient
 
 router = APIRouter(tags=["maps"])

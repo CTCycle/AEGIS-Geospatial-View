@@ -8,7 +8,7 @@ from AEGIS.app.api.schemas.gibs import (
     ResolvedLocation,
     TemporalParameters,
 )
-from AEGIS.app.api.schemas.map_requests import (
+from AEGIS.app.api.schemas.geographics import (
     Coordinates,
     Location,
     MapRequest,
