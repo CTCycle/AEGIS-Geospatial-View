@@ -77,7 +77,7 @@ def create_interface() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column(scale=1, min_width=360):
-                with gr.Box():
+                with gr.Group():
                     gr.Markdown("### Location search")
                     filter_dropdown = gr.Dropdown(
                         label="Imagery Style",
