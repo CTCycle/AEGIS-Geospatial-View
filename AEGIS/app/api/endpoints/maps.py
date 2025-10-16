@@ -21,22 +21,34 @@ def build_map_response(
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "kvp_url": payload.kvp_url,
-        "layer": payload.layer.layer_identifier,
-        "tile": {
-            "zoom": payload.tile.zoom,
-            "row": payload.tile.row,
-            "column": payload.tile.column,
-        },
+        "layer": payload.layer.identifier,
+        "title": payload.layer.title,
         "location": {
             "latitude": payload.location.latitude,
             "longitude": payload.location.longitude,
             "source": payload.location.source,
             "reference": payload.location.reference,
         },
-        "projection": payload.request.projection,
-        "tile_matrix_set": payload.request.tile_matrix_set,
+        "projection": payload.projection,
+        "service": payload.request.service,
         "time": payload.request.time,
     }
+    if payload.tile is not None:
+        metadata["tile"] = {
+            "zoom": payload.tile.zoom,
+            "row": payload.tile.row,
+            "column": payload.tile.column,
+            "matrix": payload.tile.tile_matrix,
+            "matrix_set": payload.tile.tile_matrix_set,
+        }
+    if payload.bbox is not None:
+        metadata["bbox"] = payload.bbox.as_list()
+        metadata["axis_order"] = payload.request.axis_order
+        metadata["width"] = payload.request.width
+        metadata["height"] = payload.request.height
+        metadata["wms_version"] = payload.request.wms_version
+    if payload.debug:
+        metadata["debug"] = payload.debug
     image_section: dict[str, Any] = {
         "caption": payload.caption,
         "mime_type": payload.request.mime_type,
