@@ -8,8 +8,10 @@ import gradio as gr
 from AEGIS.app.client.controllers import (
     adjust_timeline_slider,
     initiate_authentication,
-    load_map_image,
+    load_agentic_map_image,
+    load_default_map_image,
     set_agentic_mode,
+    set_cloud_model_mode,
     set_location_mode,
 )
 
@@ -28,10 +30,23 @@ COUNTRY_CHOICES: Final[list[str]] = [
 ]
 DEFAULT_FILTER: Final[str] = FILTER_CHOICES[0]
 TIMELINE_DEFAULT_RANGE: Final[int] = 20
+OPENAI_MODEL_CHOICES: Final[list[str]] = [
+    "gpt-4o-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-3.5-turbo",
+]
+AGENT_MODEL_CHOICES: Final[list[str]] = [
+    "llama3",
+    "mistral",
+    "phi3",
+]
+DEFAULT_AGENT_MODEL: Final[str] = AGENT_MODEL_CHOICES[0]
+DEFAULT_AGENTIC_TEMPERATURE: Final[float] = 0.7
 GREEN_THEME: Final = gr.themes.Soft(
-    primary_hue="green",
-    secondary_hue="lime",
-    neutral_hue="gray",
+    primary_hue="emerald",
+    secondary_hue="green",
+    neutral_hue="slate",
 )
 
 
@@ -52,94 +67,128 @@ def create_interface() -> gr.Blocks:
         gr.Markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
 
         with gr.Row():
-            gr.Markdown("**Authentication**")
-            auth_button = gr.Button(
-                "Authenticate",
-                variant="secondary",
-                size="sm",
-            )
+            with gr.Column(scale=1, min_width=240):
+                gr.Markdown("**Authentication**")
+                auth_button = gr.Button(
+                    "Authenticate",
+                    variant="secondary",
+                    size="sm",
+                )
 
         with gr.Row():
             with gr.Column(scale=1, min_width=360):
-                with gr.Group():
-                    gr.Markdown("### Deterministic Parameters")
+                with gr.Box():
+                    gr.Markdown("### Location search")
                     filter_dropdown = gr.Dropdown(
-                        label="Filter",
+                        label="Imagery Style",
                         choices=FILTER_CHOICES,
                         value=DEFAULT_FILTER,
                         interactive=True,
                     )
-                    gr.Markdown("#### Location search")
                     country_dropdown = gr.Dropdown(
-                        label="Country",
+                        label="Country or Region",
                         choices=COUNTRY_CHOICES,
                         value=None,
                         allow_custom_value=True,
                         interactive=True,
                     )
                     city_input = gr.Textbox(
-                        label="City",
-                        placeholder="Enter a city name",
+                        label="City Name",
+                        placeholder="Enter a city or locale",
                         lines=1,
                     )
                     use_coordinates_checkbox = gr.Checkbox(
-                        label="Use coordinates instead",
+                        label="Provide precise coordinates",
                         value=False,
                     )
                     latitude_input = gr.Number(
-                        label="Latitude",
+                        label="Latitude (°)",
                         value=None,
                         interactive=False,
                         precision=6,
                     )
                     longitude_input = gr.Number(
-                        label="Longitude",
+                        label="Longitude (°)",
                         value=None,
                         interactive=False,
                         precision=6,
                     )
                     with gr.Row():
                         date_input = gr.Textbox(
-                            label="Target date",
+                            label="Reference Date",
                             placeholder="YYYY-MM-DD",
                             lines=1,
                         )
                         time_input = gr.Textbox(
-                            label="Day time",
+                            label="Local Time",
                             placeholder="HH:MM",
                             lines=1,
                         )
+                    search_button = gr.Button(
+                        "Search Imagery",
+                        variant="primary",
+                    )
 
                 with gr.Group():
-                    gr.Markdown("### LLM Exploration")
+                    gr.Markdown("### Agentic Search")
                     agentic_search_checkbox = gr.Checkbox(
-                        label="Enable agentic search",
+                        label="Activate agentic assistant",
                         value=False,
                     )
                     llm_query_input = gr.Textbox(
-                        label="LLM prompt",
+                        label="Agent Prompt",
                         placeholder="Describe the geographic insights you need",
                         lines=4,
                         interactive=False,
                     )
+                    with gr.Accordion("Model configuration", open=False):
+                        use_cloud_models_checkbox = gr.Checkbox(
+                            label="Leverage OpenAI cloud models",
+                            value=False,
+                            interactive=False,
+                        )
+                        openai_model_dropdown = gr.Dropdown(
+                            label="OpenAI model choice",
+                            choices=OPENAI_MODEL_CHOICES,
+                            value=None,
+                            allow_custom_value=False,
+                            interactive=False,
+                        )
+                        with gr.Group():
+                            agent_model_selector = gr.Dropdown(
+                                label="Ollama agent model",
+                                choices=AGENT_MODEL_CHOICES,
+                                value=DEFAULT_AGENT_MODEL,
+                                interactive=False,
+                            )
+                        temperature_input = gr.Number(
+                            label="Sampling temperature",
+                            value=DEFAULT_AGENTIC_TEMPERATURE,
+                            interactive=False,
+                            precision=2,
+                        )
 
-                load_button = gr.Button("Load imagery", variant="primary")
+                    agentic_button = gr.Button(
+                        "Run agentic search",
+                        variant="secondary",
+                        interactive=False,
+                    )
                 status_display = gr.Markdown(
-                    value="Select parameters, then load imagery.",
+                    value="Adjust the parameters above, then fetch map imagery.",
                     visible=True,
                 )
 
             with gr.Column(scale=3):
                 min_year, max_year, default_year = default_timeline_bounds()
                 timeline_slider = gr.Slider(
-                    label="Timeline year",
+                    label="Historical Timeline",
                     minimum=min_year,
                     maximum=max_year,
                     value=default_year,
                     step=1,
                 )
                 map_canvas = gr.Image(
-                    label="Geographic Canvas",
+                    label="Map Preview",
                     height=512,
                     show_download_button=True,
                 )
@@ -180,11 +229,23 @@ def create_interface() -> gr.Blocks:
                 time_input,
                 timeline_slider,
                 llm_query_input,
+                use_cloud_models_checkbox,
+                openai_model_dropdown,
+                agent_model_selector,
+                temperature_input,
+                search_button,
+                agentic_button,
             ],
         )
 
-        load_button.click(
-            fn=load_map_image,
+        use_cloud_models_checkbox.change(
+            fn=set_cloud_model_mode,
+            inputs=use_cloud_models_checkbox,
+            outputs=openai_model_dropdown,
+        )
+
+        search_button.click(
+            fn=load_default_map_image,
             inputs=[
                 filter_dropdown,
                 country_dropdown,
@@ -195,8 +256,18 @@ def create_interface() -> gr.Blocks:
                 date_input,
                 time_input,
                 timeline_slider,
-                agentic_search_checkbox,
+            ],
+            outputs=[map_canvas, status_display],
+        )
+
+        agentic_button.click(
+            fn=load_agentic_map_image,
+            inputs=[
                 llm_query_input,
+                use_cloud_models_checkbox,
+                openai_model_dropdown,
+                agent_model_selector,
+                temperature_input,
             ],
             outputs=[map_canvas, status_display],
         )
