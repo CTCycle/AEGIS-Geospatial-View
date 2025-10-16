@@ -8,7 +8,7 @@ from AEGIS.app.api.schemas.map_requests import MapRequest
 
 router = APIRouter(tags=["maps"])
 
-_PLACEHOLDER_IMAGE_BASE64 = (
+PLACEHOLDER_IMAGE_BASE64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGOUm/CfARtgwio6aCUAUgQBvfoD/rAAAAAASUVORK5CYII="
 )
 
@@ -47,7 +47,7 @@ async def render_map(request: MapRequest) -> dict[str, Any]:
     message = "Map imagery generated successfully."
     return {
         "image": {
-            "data": _PLACEHOLDER_IMAGE_BASE64,
+            "data": PLACEHOLDER_IMAGE_BASE64,
             "caption": caption,
         },
         "message": message,

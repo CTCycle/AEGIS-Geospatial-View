@@ -4,7 +4,7 @@ from datetime import date, time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-_MIN_TIMELINE_YEAR = 1900
+MIN_TIMELINE_YEAR = 1900
 
 
 ###############################################################################
@@ -34,14 +34,14 @@ class Location(BaseModel):
 class TemporalContext(BaseModel):
     reference_date: date | None = None
     time_of_day: time | None = None
-    timeline_year: int = Field(..., ge=_MIN_TIMELINE_YEAR)
+    timeline_year: int = Field(..., ge=MIN_TIMELINE_YEAR)
 
     @model_validator(mode="after")
     def ensure_year_bounds(self) -> "TemporalContext":
         if self.reference_date is not None and self.timeline_year > date.today().year:
             self.timeline_year = date.today().year
-        if self.timeline_year < _MIN_TIMELINE_YEAR:
-            self.timeline_year = _MIN_TIMELINE_YEAR
+        if self.timeline_year < MIN_TIMELINE_YEAR:
+            self.timeline_year = MIN_TIMELINE_YEAR
         return self
 
 
