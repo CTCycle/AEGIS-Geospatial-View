@@ -18,7 +18,7 @@ from AEGIS.app.constants import (
 type JobPayload = dict[str, Any]
 type JobCoroutine = Callable[..., Awaitable[JobPayload]]
 
-_RESULT_SENTINEL = object()
+RESULT_SENTINEL = object()
 
 
 ###############################################################################

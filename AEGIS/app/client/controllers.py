@@ -12,11 +12,11 @@ from gradio import update as gr_update
 
 from AEGIS.app.constants import GEO_API_URL
 
-_API_BASE_URL = os.getenv("AEGIS_API_BASE_URL", "http://127.0.0.1:8000")
-_HTTP_TIMEOUT_SECONDS = 30.0
-_DEFAULT_TIMELINE_BACKTRACK = 20
-_SURROUNDING_RANGE = 10
-_MIN_YEAR = 1900
+API_BASE_URL = os.getenv("AEGIS_API_BASE_URL", "http://127.0.0.1:8000")
+HTTP_TIMEOUT_SECONDS = 30.0
+DEFAULT_TIMELINE_BACKTRACK = 20
+SURROUNDING_RANGE = 10
+MIN_YEAR = 1900
 
 
 ###############################################################################
@@ -38,6 +38,60 @@ def set_location_mode(use_coordinates: bool) -> tuple[dict[str, Any], dict[str, 
 
 
 ###############################################################################
+def set_agentic_mode(
+    agentic_enabled: bool, use_coordinates: bool
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    if agentic_enabled:
+        return (
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(value=use_coordinates, interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=True),
+        )
+
+    if use_coordinates:
+        country_update = gr_update(interactive=False)
+        city_update = gr_update(interactive=False)
+        latitude_update = gr_update(interactive=True)
+        longitude_update = gr_update(interactive=True)
+    else:
+        country_update = gr_update(interactive=True)
+        city_update = gr_update(interactive=True)
+        latitude_update = gr_update(interactive=False)
+        longitude_update = gr_update(interactive=False)
+
+    return (
+        gr_update(interactive=True),
+        country_update,
+        city_update,
+        gr_update(interactive=True),
+        latitude_update,
+        longitude_update,
+        gr_update(interactive=True),
+        gr_update(interactive=True),
+        gr_update(interactive=True),
+        gr_update(interactive=False),
+    )
+
+
+###############################################################################
 async def load_map_image(
     filter_name: str | None,
     country: str | None,
@@ -48,24 +102,32 @@ async def load_map_image(
     target_date: str | date | None,
     target_time: str | time | None,
     timeline_year: int | float | None,
+    agentic_search: bool,
+    llm_query: str | None,
 ) -> tuple[dict[str, Any], str]:
-    payload, error_message = build_request_payload(
-        filter_name=filter_name,
-        country=country,
-        city=city,
-        use_coordinates=use_coordinates,
-        latitude=latitude,
-        longitude=longitude,
-        target_date=target_date,
-        target_time=target_time,
-        timeline_year=timeline_year,
-    )
-    if error_message:
-        return gr_update(value=None), error_message
+    if agentic_search:
+        prompt = (llm_query or "").strip()
+        if not prompt:
+            return gr_update(value=None), "[ERROR] Provide a prompt for agentic search."
+        payload = {"mode": "agentic", "query": prompt}
+    else:
+        payload, error_message = build_request_payload(
+            filter_name=filter_name,
+            country=country,
+            city=city,
+            use_coordinates=use_coordinates,
+            latitude=latitude,
+            longitude=longitude,
+            target_date=target_date,
+            target_time=target_time,
+            timeline_year=timeline_year,
+        )
+        if error_message:
+            return gr_update(value=None), error_message
 
     try:
         async with httpx.AsyncClient(
-            base_url=_API_BASE_URL, timeout=_HTTP_TIMEOUT_SECONDS
+            base_url=API_BASE_URL, timeout=HTTP_TIMEOUT_SECONDS
         ) as client:
             response = await client.post(GEO_API_URL, json=payload)
         response.raise_for_status()
@@ -196,13 +258,13 @@ def parse_time_value(value: str | time | None) -> time | None:
 def coerce_timeline_year(parsed_date: date | None, candidate: int | float | None) -> int:
     today_year = date.today().year
     if parsed_date is None:
-        min_year = max(today_year - _DEFAULT_TIMELINE_BACKTRACK, _MIN_YEAR)
+        min_year = max(today_year - DEFAULT_TIMELINE_BACKTRACK, MIN_YEAR)
         max_year = today_year
         value = today_year
     else:
         base_year = parsed_date.year
-        min_year = max(base_year - _SURROUNDING_RANGE, _MIN_YEAR)
-        max_year = min(base_year + _SURROUNDING_RANGE, today_year)
+        min_year = max(base_year - SURROUNDING_RANGE, MIN_YEAR)
+        max_year = min(base_year + SURROUNDING_RANGE, today_year)
         if min_year > max_year:
             min_year, max_year = max_year, min_year
         value = base_year
@@ -221,13 +283,13 @@ def adjust_timeline_slider(target_date: str | date | None) -> dict[str, Any]:
     parsed_date = parse_date_value(target_date)
     today_year = date.today().year
     if parsed_date is None:
-        minimum = max(today_year - _DEFAULT_TIMELINE_BACKTRACK, _MIN_YEAR)
+        minimum = max(today_year - DEFAULT_TIMELINE_BACKTRACK, MIN_YEAR)
         maximum = today_year
         value = today_year
     else:
         base_year = parsed_date.year
-        minimum = max(base_year - _SURROUNDING_RANGE, _MIN_YEAR)
-        maximum = min(base_year + _SURROUNDING_RANGE, today_year)
+        minimum = max(base_year - SURROUNDING_RANGE, MIN_YEAR)
+        maximum = min(base_year + SURROUNDING_RANGE, today_year)
         if minimum > maximum:
             minimum, maximum = maximum, minimum
         value = min(max(base_year, minimum), maximum)
