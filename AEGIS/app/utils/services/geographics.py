@@ -5,6 +5,8 @@ from datetime import date
 from typing import Final
 from urllib.parse import urlencode
 
+import httpx
+
 from AEGIS.app.api.schemas.gibs import (
     GIBSImageryPayload,
     GIBSLayerConfiguration,
@@ -23,6 +25,7 @@ QUALITY_SEGMENT: Final[str] = "best"
 SERVICE_SEGMENT: Final[str] = "wmts"
 DEFAULT_PROJECTION: Final[str] = "epsg3857"
 MAX_LATITUDE: Final[float] = 85.051128
+IMAGERY_TIMEOUT_SECONDS: Final[float] = 20.0
 
 COUNTRY_PRESETS: Final[dict[str, tuple[float, float]]] = {
     "italy": (41.8719, 12.5674),
@@ -266,4 +269,65 @@ class GIBSClient:
         pieces.append(f"Timeline year: {temporal.timeline_year}")
         pieces.append(f"Tile z/x/y: {tile.zoom}/{tile.column}/{tile.row}")
         return " | ".join(pieces)
+
+    async def download_imagery(self, request: GIBSRequest) -> bytes:
+        headers = {"Accept": request.mime_type}
+        restful_error: str | None = None
+        async with httpx.AsyncClient(timeout=IMAGERY_TIMEOUT_SECONDS) as client:
+            try:
+                response = await client.get(request.restful_url, headers=headers)
+                response.raise_for_status()
+                return response.content
+            except httpx.HTTPStatusError as exc:
+                restful_error = self.parse_error_detail(exc.response)
+                logger.debug(
+                    "GIBS RESTful imagery request failed",
+                    extra={
+                        "status": exc.response.status_code,
+                        "detail": restful_error,
+                        "url": request.restful_url,
+                    },
+                )
+            except httpx.RequestError as exc:
+                restful_error = str(exc)
+                logger.debug(
+                    "GIBS RESTful imagery request error",
+                    extra={"error": restful_error, "url": request.restful_url},
+                )
+
+            try:
+                response = await client.get(
+                    request.kvp_endpoint,
+                    params=request.kvp_parameters,
+                    headers=headers,
+                )
+                response.raise_for_status()
+                return response.content
+            except httpx.HTTPStatusError as exc:
+                detail = self.parse_error_detail(exc.response)
+                if restful_error:
+                    detail = f"{detail} (RESTful fallback failed: {restful_error})"
+                raise ValueError(detail) from exc
+            except httpx.RequestError as exc:
+                message = f"Unable to reach NASA GIBS service: {exc}"
+                if restful_error:
+                    message = f"{message} (RESTful fallback failed: {restful_error})"
+                raise ValueError(message) from exc
+
+    def parse_error_detail(self, response: httpx.Response) -> str:
+        try:
+            data = response.json()
+        except ValueError:
+            text = response.text.strip()
+            return text or f"HTTP {response.status_code}"
+
+        if isinstance(data, dict):
+            for key in ("detail", "message", "error", "errors"):
+                value = data.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        text = response.text.strip()
+        if text:
+            return text
+        return f"HTTP {response.status_code}"
 

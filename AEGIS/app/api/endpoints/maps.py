@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -16,7 +17,7 @@ agentic_planner = AgenticMapPlanner()
 
 ###############################################################################
 def build_map_response(
-    payload: GIBSImageryPayload, message: str | None = None
+    payload: GIBSImageryPayload, imagery: bytes | None, message: str | None = None
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {
         "kvp_url": payload.kvp_url,
@@ -36,11 +37,17 @@ def build_map_response(
         "tile_matrix_set": payload.request.tile_matrix_set,
         "time": payload.request.time,
     }
+    image_section: dict[str, Any] = {
+        "caption": payload.caption,
+        "mime_type": payload.request.mime_type,
+    }
+    if imagery is not None:
+        image_section["base64"] = base64.b64encode(imagery).decode("ascii")
+        image_section["url"] = payload.image_url
+    else:
+        image_section["url"] = payload.image_url
     return {
-        "image": {
-            "url": payload.image_url,
-            "caption": payload.caption,
-        },
+        "image": image_section,
         "request": payload.request.model_dump(),
         "message": message or payload.message,
         "metadata": metadata,
@@ -53,9 +60,10 @@ def build_map_response(
 async def render_map(request: MapRequest) -> dict[str, Any]:
     try:
         payload = gibs_client.build_imagery_payload(request)
+        imagery = await gibs_client.download_imagery(payload.request)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    return build_map_response(payload)
+    return build_map_response(payload, imagery)
 
 
 ###############################################################################
@@ -64,11 +72,12 @@ async def render_agentic_map(request: AgenticMapRequest) -> dict[str, Any]:
     try:
         plan = agentic_planner.build_plan(request)
         payload = gibs_client.build_imagery_payload(plan.map_request)
+        imagery = await gibs_client.download_imagery(payload.request)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     message = agentic_planner.compose_status_message(request, payload.message, plan.notes)
-    response = build_map_response(payload, message)
+    response = build_map_response(payload, imagery, message)
     metadata = response.setdefault("metadata", {})
     metadata["agentic"] = {
         "query": request.query,
