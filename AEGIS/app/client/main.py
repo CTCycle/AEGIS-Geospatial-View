@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Final
 
 import gradio as gr
@@ -113,19 +113,13 @@ def create_interface() -> gr.Blocks:
                         interactive=False,
                         precision=6,
                     )
-                    with gr.Row():
-                        date_input = gr.DateTime(
-                            label="Reference Date",
-                            value=date.today().isoformat(),
-                            include_time=False,
-                            type="string",
-                            interactive=True,
-                        )
-                        time_input = gr.Textbox(
-                            label="Local Time",
-                            placeholder="HH:MM",
-                            lines=1,
-                        )
+                    date_input = gr.DateTime(
+                        label="Reference Moment",
+                        value=datetime.now(),
+                        include_time=True,
+                        type="datetime",
+                        interactive=True,
+                    )
                     search_button = gr.Button(
                         "Search Imagery",
                         variant="primary",
@@ -228,7 +222,6 @@ def create_interface() -> gr.Blocks:
                 latitude_input,
                 longitude_input,
                 date_input,
-                time_input,
                 timeline_slider,
                 llm_query_input,
                 use_cloud_models_checkbox,
@@ -256,7 +249,6 @@ def create_interface() -> gr.Blocks:
                 latitude_input,
                 longitude_input,
                 date_input,
-                time_input,
                 timeline_slider,
             ],
             outputs=[map_canvas, status_display],
