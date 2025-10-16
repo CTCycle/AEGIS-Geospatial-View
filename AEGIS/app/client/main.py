@@ -114,10 +114,12 @@ def create_interface() -> gr.Blocks:
                         precision=6,
                     )
                     with gr.Row():
-                        date_input = gr.Textbox(
+                        date_input = gr.DateTime(
                             label="Reference Date",
-                            placeholder="YYYY-MM-DD",
-                            lines=1,
+                            value=date.today().isoformat(),
+                            include_time=False,
+                            type="string",
+                            interactive=True,
                         )
                         time_input = gr.Textbox(
                             label="Local Time",
