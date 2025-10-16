@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import os
 from binascii import Error as BinasciiError
 from datetime import date, datetime, time
@@ -10,13 +11,16 @@ from typing import Any
 import httpx
 from gradio import update as gr_update
 
-from AEGIS.app.constants import GEO_API_URL
+from AEGIS.app.constants import GEO_AGENTIC_URL, GEO_SEARCH_URL
 
 API_BASE_URL = os.getenv("AEGIS_API_BASE_URL", "http://127.0.0.1:8000")
 HTTP_TIMEOUT_SECONDS = 30.0
 DEFAULT_TIMELINE_BACKTRACK = 20
 SURROUNDING_RANGE = 10
 MIN_YEAR = 1900
+DEFAULT_AGENTIC_TEMPERATURE = 0.7
+MIN_AGENTIC_TEMPERATURE = 0.0
+MAX_AGENTIC_TEMPERATURE = 2.0
 
 
 ###############################################################################
@@ -51,6 +55,12 @@ def set_agentic_mode(
     dict[str, Any],
     dict[str, Any],
     dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
 ]:
     if agentic_enabled:
         return (
@@ -62,6 +72,12 @@ def set_agentic_mode(
             gr_update(interactive=False),
             gr_update(interactive=False),
             gr_update(interactive=False),
+            gr_update(interactive=False),
+            gr_update(interactive=True),
+            gr_update(interactive=True),
+            gr_update(interactive=False),
+            gr_update(interactive=True),
+            gr_update(interactive=True),
             gr_update(interactive=False),
             gr_update(interactive=True),
         )
@@ -88,11 +104,24 @@ def set_agentic_mode(
         gr_update(interactive=True),
         gr_update(interactive=True),
         gr_update(interactive=False),
+        gr_update(value=False, interactive=False),
+        gr_update(value=None, interactive=False),
+        gr_update(interactive=False),
+        gr_update(value=DEFAULT_AGENTIC_TEMPERATURE, interactive=False),
+        gr_update(interactive=True),
+        gr_update(interactive=False),
     )
 
 
 ###############################################################################
-async def load_map_image(
+def set_cloud_model_mode(use_cloud: bool) -> dict[str, Any]:
+    if use_cloud:
+        return gr_update(interactive=True)
+    return gr_update(value=None, interactive=False)
+
+
+###############################################################################
+async def load_default_map_image(
     filter_name: str | None,
     country: str | None,
     city: str | None,
@@ -102,34 +131,52 @@ async def load_map_image(
     target_date: str | date | None,
     target_time: str | time | None,
     timeline_year: int | float | None,
-    agentic_search: bool,
-    llm_query: str | None,
 ) -> tuple[dict[str, Any], str]:
-    if agentic_search:
-        prompt = (llm_query or "").strip()
-        if not prompt:
-            return gr_update(value=None), "[ERROR] Provide a prompt for agentic search."
-        payload = {"mode": "agentic", "query": prompt}
-    else:
-        payload, error_message = build_request_payload(
-            filter_name=filter_name,
-            country=country,
-            city=city,
-            use_coordinates=use_coordinates,
-            latitude=latitude,
-            longitude=longitude,
-            target_date=target_date,
-            target_time=target_time,
-            timeline_year=timeline_year,
-        )
-        if error_message:
-            return gr_update(value=None), error_message
+    payload, error_message = build_request_payload(
+        filter_name=filter_name,
+        country=country,
+        city=city,
+        use_coordinates=use_coordinates,
+        latitude=latitude,
+        longitude=longitude,
+        target_date=target_date,
+        target_time=target_time,
+        timeline_year=timeline_year,
+    )
+    if error_message:
+        return gr_update(value=None), error_message
+    return await execute_map_request(GEO_SEARCH_URL, payload)
 
+
+###############################################################################
+async def load_agentic_map_image(
+    llm_query: str | None,
+    use_cloud_models: bool,
+    openai_model: str | None,
+    agent_model: str | None,
+    temperature: float | int | None,
+) -> tuple[dict[str, Any], str]:
+    payload, error_message = build_agentic_request_payload(
+        query=llm_query,
+        use_cloud_models=use_cloud_models,
+        openai_model=openai_model,
+        agent_model=agent_model,
+        temperature=temperature,
+    )
+    if error_message:
+        return gr_update(value=None), error_message
+    return await execute_map_request(GEO_AGENTIC_URL, payload)
+
+
+###############################################################################
+async def execute_map_request(
+    endpoint: str, payload: dict[str, Any]
+) -> tuple[dict[str, Any], str]:
     try:
         async with httpx.AsyncClient(
             base_url=API_BASE_URL, timeout=HTTP_TIMEOUT_SECONDS
         ) as client:
-            response = await client.post(GEO_API_URL, json=payload)
+            response = await client.post(endpoint, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
         return gr_update(value=None), f"[ERROR] Unable to reach map service: {exc}"
@@ -200,6 +247,53 @@ def build_request_payload(
     )
     payload.update(temporal_payload)
     return payload, None
+
+
+###############################################################################
+def build_agentic_request_payload(
+    *,
+    query: str | None,
+    use_cloud_models: bool,
+    openai_model: str | None,
+    agent_model: str | None,
+    temperature: float | int | None,
+) -> tuple[dict[str, Any], str | None]:
+    prompt = (query or "").strip()
+    if not prompt:
+        return {}, "[ERROR] Provide a prompt for agentic search."
+
+    agent_candidate = (agent_model or "").strip()
+    if not agent_candidate:
+        return {}, "[ERROR] Select an agent model before running agentic search."
+
+    payload: dict[str, Any] = {
+        "query": prompt,
+        "agent_model": agent_candidate,
+        "use_cloud_models": bool(use_cloud_models),
+        "temperature": sanitize_temperature(temperature),
+    }
+
+    if payload["use_cloud_models"]:
+        provider_model = (openai_model or "").strip()
+        if not provider_model:
+            return {}, "[ERROR] Choose an OpenAI model when cloud models are enabled."
+        payload["openai_model"] = provider_model
+    else:
+        payload["openai_model"] = None
+
+    return payload, None
+
+
+###############################################################################
+def sanitize_temperature(value: float | int | None) -> float:
+    if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        return DEFAULT_AGENTIC_TEMPERATURE
+    temperature = float(value)
+    if temperature < MIN_AGENTIC_TEMPERATURE:
+        return MIN_AGENTIC_TEMPERATURE
+    if temperature > MAX_AGENTIC_TEMPERATURE:
+        return MAX_AGENTIC_TEMPERATURE
+    return temperature
 
 
 ###############################################################################

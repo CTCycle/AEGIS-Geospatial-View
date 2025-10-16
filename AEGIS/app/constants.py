@@ -16,7 +16,8 @@ LOGS_PATH = join(RSC_PATH, "logs")
 
 # [ENDPOINS]
 ###############################################################################
-GEO_API_URL = "/maps"
+GEO_SEARCH_URL = "/maps/search"
+GEO_AGENTIC_URL = "/maps/agentic"
 
 
 # [EXTERNAL DATA SOURCES]
