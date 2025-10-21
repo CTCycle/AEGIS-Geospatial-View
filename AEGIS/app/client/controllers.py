@@ -6,10 +6,10 @@ import math
 import os
 from binascii import Error as BinasciiError
 from datetime import date, datetime, time
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Final
 
 import httpx
-from gradio import update as gr_update
 
 from AEGIS.app.constants import GEO_AGENTIC_URL, GEO_SEARCH_URL
 
@@ -22,98 +22,93 @@ DEFAULT_AGENTIC_TEMPERATURE = 0.7
 MIN_AGENTIC_TEMPERATURE = 0.0
 MAX_AGENTIC_TEMPERATURE = 2.0
 
+NO_UPDATE: Final = object()
+
+
+@dataclass
+class ComponentState:
+    value: Any = NO_UPDATE
+    enabled: bool | None = None
+    minimum: int | float | None = None
+    maximum: int | float | None = None
+
 
 ###############################################################################
-def set_location_mode(use_coordinates: bool) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+def set_location_mode(use_coordinates: bool) -> dict[str, ComponentState]:
     if use_coordinates:
-        return (
-            gr_update(value=None, interactive=False),
-            gr_update(value="", interactive=False),
-            gr_update(value=None, interactive=True),
-            gr_update(value=None, interactive=True),
-        )
+        return {
+            "country": ComponentState(value=None, enabled=False),
+            "city": ComponentState(value="", enabled=False),
+            "latitude": ComponentState(value=None, enabled=True),
+            "longitude": ComponentState(value=None, enabled=True),
+        }
 
-    return (
-        gr_update(interactive=True),
-        gr_update(interactive=True),
-        gr_update(value=None, interactive=False),
-        gr_update(value=None, interactive=False),
-    )
+    return {
+        "country": ComponentState(enabled=True),
+        "city": ComponentState(enabled=True),
+        "latitude": ComponentState(value=None, enabled=False),
+        "longitude": ComponentState(value=None, enabled=False),
+    }
 
 
 ###############################################################################
 def set_agentic_mode(
     agentic_enabled: bool, use_coordinates: bool
-) -> tuple[
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-]:
+) -> dict[str, ComponentState]:
     if agentic_enabled:
-        return (
-            gr_update(interactive=False),
-            gr_update(interactive=False),
-            gr_update(interactive=False),
-            gr_update(value=use_coordinates, interactive=False),
-            gr_update(interactive=False),
-            gr_update(interactive=False),
-            gr_update(interactive=False),
-            gr_update(interactive=False),
-            gr_update(interactive=True),
-            gr_update(interactive=True),
-            gr_update(interactive=False),
-            gr_update(interactive=True),
-            gr_update(interactive=True),
-            gr_update(interactive=False),
-            gr_update(interactive=True),
-        )
+        return {
+            "filter": ComponentState(enabled=False),
+            "country": ComponentState(enabled=False),
+            "city": ComponentState(enabled=False),
+            "use_coordinates": ComponentState(value=use_coordinates, enabled=False),
+            "latitude": ComponentState(enabled=False),
+            "longitude": ComponentState(enabled=False),
+            "date": ComponentState(enabled=False),
+            "timeline": ComponentState(enabled=False),
+            "llm_query": ComponentState(enabled=True),
+            "use_cloud": ComponentState(enabled=True),
+            "openai_model": ComponentState(enabled=False),
+            "agent_model": ComponentState(enabled=True),
+            "temperature": ComponentState(enabled=True),
+            "search": ComponentState(enabled=False),
+            "agentic": ComponentState(enabled=True),
+        }
 
     if use_coordinates:
-        country_update = gr_update(interactive=False)
-        city_update = gr_update(interactive=False)
-        latitude_update = gr_update(interactive=True)
-        longitude_update = gr_update(interactive=True)
+        country_state = ComponentState(enabled=False)
+        city_state = ComponentState(enabled=False)
+        latitude_state = ComponentState(enabled=True)
+        longitude_state = ComponentState(enabled=True)
     else:
-        country_update = gr_update(interactive=True)
-        city_update = gr_update(interactive=True)
-        latitude_update = gr_update(interactive=False)
-        longitude_update = gr_update(interactive=False)
+        country_state = ComponentState(enabled=True)
+        city_state = ComponentState(enabled=True)
+        latitude_state = ComponentState(value=None, enabled=False)
+        longitude_state = ComponentState(value=None, enabled=False)
 
-    return (
-        gr_update(interactive=True),
-        country_update,
-        city_update,
-        gr_update(interactive=True),
-        latitude_update,
-        longitude_update,
-        gr_update(interactive=True),
-        gr_update(interactive=True),
-        gr_update(interactive=False),
-        gr_update(value=False, interactive=False),
-        gr_update(value=None, interactive=False),
-        gr_update(interactive=False),
-        gr_update(value=DEFAULT_AGENTIC_TEMPERATURE, interactive=False),
-        gr_update(interactive=True),
-        gr_update(interactive=False),
-    )
+    return {
+        "filter": ComponentState(enabled=True),
+        "country": country_state,
+        "city": city_state,
+        "use_coordinates": ComponentState(enabled=True),
+        "latitude": latitude_state,
+        "longitude": longitude_state,
+        "date": ComponentState(enabled=True),
+        "timeline": ComponentState(enabled=True),
+        "llm_query": ComponentState(enabled=False),
+        "use_cloud": ComponentState(value=False, enabled=False),
+        "openai_model": ComponentState(value=None, enabled=False),
+        "agent_model": ComponentState(enabled=False),
+        "temperature": ComponentState(value=DEFAULT_AGENTIC_TEMPERATURE, enabled=False),
+        "search": ComponentState(enabled=True),
+        "agentic": ComponentState(enabled=False),
+    }
 
 
 ###############################################################################
-def set_cloud_model_mode(use_cloud: bool) -> dict[str, Any]:
+def set_cloud_model_mode(use_cloud: bool) -> ComponentState:
     if use_cloud:
-        return gr_update(interactive=True)
-    return gr_update(value=None, interactive=False)
+        return ComponentState(enabled=True)
+    return ComponentState(value=None, enabled=False)
 
 
 ###############################################################################
@@ -126,7 +121,7 @@ async def load_default_map_image(
     longitude: float | None,
     target_moment: str | date | datetime | None,
     timeline_year: int | float | None,
-) -> tuple[dict[str, Any], str]:
+) -> tuple[bytes | str | None, str]:
     payload, error_message = build_request_payload(
         filter_name=filter_name,
         country=country,
@@ -138,7 +133,7 @@ async def load_default_map_image(
         timeline_year=timeline_year,
     )
     if error_message:
-        return gr_update(value=None), error_message
+        return None, error_message
     return await execute_map_request(GEO_SEARCH_URL, payload)
 
 
@@ -149,7 +144,7 @@ async def load_agentic_map_image(
     openai_model: str | None,
     agent_model: str | None,
     temperature: float | int | None,
-) -> tuple[dict[str, Any], str]:
+) -> tuple[bytes | str | None, str]:
     payload, error_message = build_agentic_request_payload(
         query=llm_query,
         use_cloud_models=use_cloud_models,
@@ -158,14 +153,14 @@ async def load_agentic_map_image(
         temperature=temperature,
     )
     if error_message:
-        return gr_update(value=None), error_message
+        return None, error_message
     return await execute_map_request(GEO_AGENTIC_URL, payload)
 
 
 ###############################################################################
 async def execute_map_request(
     endpoint: str, payload: dict[str, Any]
-) -> tuple[dict[str, Any], str]:
+) -> tuple[bytes | str | None, str]:
     try:
         async with httpx.AsyncClient(
             base_url=API_BASE_URL, timeout=HTTP_TIMEOUT_SECONDS
@@ -173,35 +168,29 @@ async def execute_map_request(
             response = await client.post(endpoint, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
-        return gr_update(value=None), f"[ERROR] Unable to reach map service: {exc}"
+        return None, f"[ERROR] Unable to reach map service: {exc}"
     except httpx.HTTPStatusError as exc:
         detail = extract_error_detail(exc.response)
-        return (
-            gr_update(value=None),
-            f"[ERROR] Map service error {exc.response.status_code}: {detail}",
-        )
+        return None, f"[ERROR] Map service error {exc.response.status_code}: {detail}"
 
     try:
         data = response.json()
     except json.JSONDecodeError as exc:
-        return (
-            gr_update(value=None),
-            f"[ERROR] Invalid response received from map service: {exc}",
-        )
+        return None, f"[ERROR] Invalid response received from map service: {exc}"
 
     if not isinstance(data, dict):
-        return gr_update(value=None), "[ERROR] Map service returned an unexpected payload."
+        return None, "[ERROR] Map service returned an unexpected payload."
 
     image_value, message = coerce_image_value(data)
     if image_value is None:
         detail = message or data.get("detail") or data.get("message")
-        return gr_update(value=None), f"[ERROR] {detail or 'No imagery available.'}"
+        return None, f"[ERROR] {detail or 'No imagery available.'}"
 
     status_message = message or data.get("message") or data.get("detail")
     if not status_message:
         status_message = "Map imagery loaded successfully."
 
-    return gr_update(value=image_value), status_message
+    return image_value, status_message
 
 
 ###############################################################################
@@ -381,7 +370,7 @@ def coerce_timeline_year(parsed_date: date | None, candidate: int | float | None
 
 
 ###############################################################################
-def adjust_timeline_slider(target_date: str | date | datetime | None) -> dict[str, Any]:
+def adjust_timeline_slider(target_date: str | date | datetime | None) -> ComponentState:
     parsed_date = parse_date_value(target_date)
     today_year = date.today().year
     if parsed_date is None:
@@ -395,7 +384,7 @@ def adjust_timeline_slider(target_date: str | date | datetime | None) -> dict[st
         if minimum > maximum:
             minimum, maximum = maximum, minimum
         value = min(max(base_year, minimum), maximum)
-    return gr_update(minimum=minimum, maximum=maximum, value=value)
+    return ComponentState(minimum=minimum, maximum=maximum, value=value)
 
 
 ###############################################################################

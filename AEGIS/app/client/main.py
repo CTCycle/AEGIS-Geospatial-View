@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
+from binascii import Error as BinasciiError
 from datetime import date, datetime
-from typing import Final
+from typing import Any, Final
 
-import gradio as gr
+from nicegui import events, ui
 
 from AEGIS.app.client.controllers import (
+    NO_UPDATE,
+    ComponentState,
     adjust_timeline_slider,
     initiate_authentication,
     load_agentic_map_image,
@@ -43,13 +47,11 @@ AGENT_MODEL_CHOICES: Final[list[str]] = [
 ]
 DEFAULT_AGENT_MODEL: Final[str] = AGENT_MODEL_CHOICES[0]
 DEFAULT_AGENTIC_TEMPERATURE: Final[float] = 0.7
-GREEN_THEME: Final = gr.themes.Soft(
-    primary_hue="emerald",
-    secondary_hue="green",
-    neutral_hue="slate",
-)
+
+COMPONENTS: dict[str, Any] = {}
 
 
+###############################################################################
 def default_timeline_bounds() -> tuple[int, int, int]:
     today = date.today()
     min_year = max(today.year - TIMELINE_DEFAULT_RANGE, 1900)
@@ -58,224 +60,358 @@ def default_timeline_bounds() -> tuple[int, int, int]:
 
 
 ###############################################################################
-def create_interface() -> gr.Blocks:
-    with gr.Blocks(
-        title="AEGIS Geographics",
-        analytics_enabled=False,
-        theme=GREEN_THEME,
-    ) as demo:
-        gr.Markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
+def get_component(name: str) -> Any | None:
+    return COMPONENTS.get(name)
 
-        with gr.Row():
-            with gr.Column(scale=1, min_width=240):
-                gr.Markdown("**Authentication**")
-                auth_button = gr.Button(
-                    "Authenticate",
-                    variant="secondary",
-                    size="sm",
-                )
 
-        with gr.Row():
-            with gr.Column(scale=1, min_width=360):
-                with gr.Group():
-                    gr.Markdown("### Location search")
-                    filter_dropdown = gr.Dropdown(
-                        label="Imagery Style",
-                        choices=FILTER_CHOICES,
+###############################################################################
+def apply_component_state(name: str, state: ComponentState) -> None:
+    component = get_component(name)
+    if component is None:
+        return
+    if state.value is not NO_UPDATE:
+        if hasattr(component, "set_value"):
+            component.set_value(state.value)
+        elif hasattr(component, "set_content"):
+            component.set_content(state.value)
+        else:
+            component.value = state.value
+    if state.enabled is not None:
+        if state.enabled:
+            component.enable()
+        else:
+            component.disable()
+    if state.minimum is not None and hasattr(component, "props"):
+        component.props["min"] = state.minimum
+    if state.maximum is not None and hasattr(component, "props"):
+        component.props["max"] = state.maximum
+    component.update()
+
+
+###############################################################################
+def apply_component_states(states: dict[str, ComponentState]) -> None:
+    for name, state in states.items():
+        apply_component_state(name, state)
+
+
+###############################################################################
+def sanitized_text(value: Any) -> str | None:
+    if isinstance(value, str):
+        candidate = value.strip()
+        return candidate or None
+    return None
+
+
+###############################################################################
+def encode_image_source(image_data: bytes | str | None) -> str | None:
+    if image_data is None:
+        return None
+    if isinstance(image_data, bytes):
+        encoded = base64.b64encode(image_data).decode("ascii")
+        return f"data:image/png;base64,{encoded}"
+    candidate = image_data.strip()
+    if not candidate:
+        return None
+    if candidate.startswith("data:") or candidate.startswith("http://") or candidate.startswith("https://"):
+        return candidate
+    try:
+        base64.b64decode(candidate, validate=True)
+    except (ValueError, BinasciiError):
+        return candidate
+    return f"data:image/png;base64,{candidate}"
+
+
+###############################################################################
+def update_map_image(image_data: bytes | str | None) -> None:
+    image_component = get_component("map")
+    if image_component is None:
+        return
+    source = encode_image_source(image_data)
+    if source is None:
+        image_component.set_source("")
+    else:
+        image_component.set_source(source)
+
+
+###############################################################################
+def update_status_message(message: str) -> None:
+    status_component = get_component("status")
+    if status_component is None:
+        return
+    status_component.set_content(message)
+
+
+###############################################################################
+def get_datetime_default_value() -> str:
+    current = datetime.now().replace(second=0, microsecond=0)
+    return current.isoformat(timespec="minutes")
+
+
+###############################################################################
+async def handle_use_coordinates_change(event: events.ValueChangeEvent) -> None:
+    states = set_location_mode(bool(event.value))
+    apply_component_states(states)
+
+
+###############################################################################
+async def handle_agentic_toggle(event: events.ValueChangeEvent) -> None:
+    agentic_enabled = bool(event.value)
+    use_coordinates_component = get_component("use_coordinates")
+    use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
+    states = set_agentic_mode(agentic_enabled, use_coordinates)
+    apply_component_states(states)
+
+
+###############################################################################
+async def handle_cloud_models_change(event: events.ValueChangeEvent) -> None:
+    state = set_cloud_model_mode(bool(event.value))
+    apply_component_state("openai_model", state)
+
+
+###############################################################################
+def handle_date_change(event: events.ValueChangeEvent) -> None:
+    state = adjust_timeline_slider(event.value)
+    apply_component_state("timeline", state)
+
+
+###############################################################################
+def gather_search_parameters() -> dict[str, Any]:
+    filter_component = get_component("filter")
+    country_component = get_component("country")
+    city_component = get_component("city")
+    use_coordinates_component = get_component("use_coordinates")
+    latitude_component = get_component("latitude")
+    longitude_component = get_component("longitude")
+    date_component = get_component("date")
+    timeline_component = get_component("timeline")
+
+    filter_value = filter_component.value if filter_component else None
+    country_value = sanitized_text(country_component.value if country_component else None)
+    city_value = sanitized_text(city_component.value if city_component else None)
+    use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
+    latitude_value = latitude_component.value if latitude_component else None
+    longitude_value = longitude_component.value if longitude_component else None
+    date_value = date_component.value if date_component else None
+    timeline_value = timeline_component.value if timeline_component else None
+
+    return {
+        "filter": filter_value,
+        "country": country_value,
+        "city": city_value,
+        "use_coordinates": use_coordinates,
+        "latitude": latitude_value,
+        "longitude": longitude_value,
+        "date": date_value,
+        "timeline": timeline_value,
+    }
+
+
+###############################################################################
+def gather_agentic_parameters() -> dict[str, Any]:
+    llm_query_component = get_component("llm_query")
+    use_cloud_component = get_component("use_cloud")
+    openai_model_component = get_component("openai_model")
+    agent_model_component = get_component("agent_model")
+    temperature_component = get_component("temperature")
+
+    llm_query_value = llm_query_component.value if llm_query_component else None
+    use_cloud_models = bool(use_cloud_component.value) if use_cloud_component else False
+    openai_model_value = openai_model_component.value if openai_model_component else None
+    agent_model_value = agent_model_component.value if agent_model_component else None
+    temperature_value = temperature_component.value if temperature_component else None
+
+    return {
+        "llm_query": llm_query_value,
+        "use_cloud_models": use_cloud_models,
+        "openai_model": openai_model_value,
+        "agent_model": agent_model_value,
+        "temperature": temperature_value,
+    }
+
+
+###############################################################################
+async def handle_search_click() -> None:
+    parameters = gather_search_parameters()
+    image_data, message = await load_default_map_image(
+        filter_name=parameters["filter"],
+        country=parameters["country"],
+        city=parameters["city"],
+        use_coordinates=parameters["use_coordinates"],
+        latitude=parameters["latitude"],
+        longitude=parameters["longitude"],
+        target_moment=parameters["date"],
+        timeline_year=parameters["timeline"],
+    )
+    update_map_image(image_data)
+    update_status_message(message)
+
+
+###############################################################################
+async def handle_agentic_click() -> None:
+    parameters = gather_agentic_parameters()
+    image_data, message = await load_agentic_map_image(
+        llm_query=parameters["llm_query"],
+        use_cloud_models=parameters["use_cloud_models"],
+        openai_model=parameters["openai_model"],
+        agent_model=parameters["agent_model"],
+        temperature=parameters["temperature"],
+    )
+    update_map_image(image_data)
+    update_status_message(message)
+
+
+###############################################################################
+def handle_authenticate_click() -> None:
+    message = initiate_authentication()
+    update_status_message(message)
+
+
+###############################################################################
+def configure_interface() -> None:
+    COMPONENTS.clear()
+    ui.page_title("AEGIS Geographics")
+    ui.markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
+
+    with ui.row().classes("w-full gap-8 flex-wrap"):
+        with ui.column().classes("max-w-md gap-4"):
+            ui.markdown("**Authentication**")
+            auth_button = ui.button("Authenticate", on_click=handle_authenticate_click)
+            auth_button.props("color=secondary")
+            auth_button.props("size=sm")
+            COMPONENTS["auth_button"] = auth_button
+
+        with ui.column().classes("max-w-2xl gap-4"):
+            with ui.row().classes("w-full gap-6 flex-wrap"):
+                with ui.column().classes("min-w-[320px] max-w-md gap-3"):
+                    ui.markdown("### Location search")
+                    filter_select = ui.select(
+                        FILTER_CHOICES,
                         value=DEFAULT_FILTER,
-                        interactive=True,
+                        label="Imagery Style",
                     )
-                    country_dropdown = gr.Dropdown(
+                    filter_select.classes("w-full")
+                    COMPONENTS["filter"] = filter_select
+
+                    country_select = ui.select(
+                        COUNTRY_CHOICES,
                         label="Country or Region",
-                        choices=COUNTRY_CHOICES,
-                        value=None,
-                        allow_custom_value=True,
-                        interactive=True,
+                        with_input=True,
                     )
-                    city_input = gr.Textbox(
+                    country_select.classes("w-full")
+                    COMPONENTS["country"] = country_select
+
+                    city_input = ui.input(
                         label="City Name",
                         placeholder="Enter a city or locale",
-                        lines=1,
                     )
-                    use_coordinates_checkbox = gr.Checkbox(
-                        label="Provide precise coordinates",
-                        value=False,
-                    )
-                    latitude_input = gr.Number(
-                        label="Latitude (°)",
-                        value=None,
-                        interactive=False,
-                        precision=6,
-                    )
-                    longitude_input = gr.Number(
-                        label="Longitude (°)",
-                        value=None,
-                        interactive=False,
-                        precision=6,
-                    )
-                    date_input = gr.DateTime(
-                        label="Reference Moment",
-                        value=datetime.now(),
-                        include_time=True,
-                        type="datetime",
-                        interactive=True,
-                    )
-                    search_button = gr.Button(
-                        "Search Imagery",
-                        variant="primary",
-                    )
+                    city_input.classes("w-full")
+                    COMPONENTS["city"] = city_input
 
-                with gr.Group():
-                    gr.Markdown("### Agentic Search")
-                    agentic_search_checkbox = gr.Checkbox(
-                        label="Activate agentic assistant",
-                        value=False,
+                    use_coordinates_checkbox = ui.checkbox("Provide precise coordinates")
+                    COMPONENTS["use_coordinates"] = use_coordinates_checkbox
+
+                    latitude_input = ui.number(
+                        label="Latitude (°)",
+                        format="%.6f",
+                        step=0.000001,
                     )
-                    llm_query_input = gr.Textbox(
+                    COMPONENTS["latitude"] = latitude_input
+
+                    longitude_input = ui.number(
+                        label="Longitude (°)",
+                        format="%.6f",
+                        step=0.000001,
+                    )
+                    COMPONENTS["longitude"] = longitude_input
+
+                    date_input = ui.input(label="Reference Moment")
+                    date_input.props["type"] = "datetime-local"
+                    date_input.set_value(get_datetime_default_value())
+                    COMPONENTS["date"] = date_input
+
+                    search_button = ui.button("Search Imagery", on_click=handle_search_click)
+                    search_button.props("color=primary")
+                    COMPONENTS["search"] = search_button
+
+                with ui.column().classes("min-w-[320px] max-w-md gap-3"):
+                    ui.markdown("### Agentic Search")
+                    agentic_checkbox = ui.checkbox("Activate agentic assistant")
+                    COMPONENTS["agentic_toggle"] = agentic_checkbox
+
+                    llm_query_input = ui.textarea(
                         label="Agent Prompt",
                         placeholder="Describe the geographic insights you need",
-                        lines=4,
-                        interactive=False,
                     )
-                    with gr.Accordion("Model configuration", open=False):
-                        use_cloud_models_checkbox = gr.Checkbox(
-                            label="Leverage OpenAI cloud models",
-                            value=False,
-                            interactive=False,
-                        )
-                        openai_model_dropdown = gr.Dropdown(
+                    llm_query_input.classes("w-full")
+                    COMPONENTS["llm_query"] = llm_query_input
+
+                    with ui.expansion("Model configuration", icon="settings"):
+                        use_cloud_checkbox = ui.checkbox("Leverage OpenAI cloud models")
+                        COMPONENTS["use_cloud"] = use_cloud_checkbox
+
+                        openai_model_dropdown = ui.select(
+                            OPENAI_MODEL_CHOICES,
                             label="OpenAI model choice",
-                            choices=OPENAI_MODEL_CHOICES,
-                            value=None,
-                            allow_custom_value=False,
-                            interactive=False,
                         )
-                        with gr.Group():
-                            agent_model_selector = gr.Dropdown(
-                                label="Ollama agent model",
-                                choices=AGENT_MODEL_CHOICES,
-                                value=DEFAULT_AGENT_MODEL,
-                                interactive=False,
-                            )
-                        temperature_input = gr.Number(
+                        openai_model_dropdown.classes("w-full")
+                        COMPONENTS["openai_model"] = openai_model_dropdown
+
+                        agent_model_dropdown = ui.select(
+                            AGENT_MODEL_CHOICES,
+                            value=DEFAULT_AGENT_MODEL,
+                            label="Ollama agent model",
+                        )
+                        agent_model_dropdown.classes("w-full")
+                        COMPONENTS["agent_model"] = agent_model_dropdown
+
+                        temperature_input = ui.number(
                             label="Sampling temperature",
                             value=DEFAULT_AGENTIC_TEMPERATURE,
-                            interactive=False,
-                            precision=2,
+                            step=0.1,
+                            format="%.2f",
                         )
+                        COMPONENTS["temperature"] = temperature_input
 
-                    agentic_button = gr.Button(
-                        "Run agentic search",
-                        variant="secondary",
-                        interactive=False,
+                    agentic_button = ui.button("Run agentic search", on_click=handle_agentic_click)
+                    agentic_button.props("color=secondary")
+                    COMPONENTS["agentic"] = agentic_button
+
+                    status_display = ui.markdown(
+                        "Adjust the parameters above, then fetch map imagery."
                     )
-                status_display = gr.Markdown(
-                    value="Adjust the parameters above, then fetch map imagery.",
-                    visible=True,
-                )
+                    COMPONENTS["status"] = status_display
 
-            with gr.Column(scale=3):
+            with ui.column().classes("min-w-[360px] flex-1 gap-3"):
+                ui.markdown("### Historical Timeline")
                 min_year, max_year, default_year = default_timeline_bounds()
-                timeline_slider = gr.Slider(
-                    label="Historical Timeline",
-                    minimum=min_year,
-                    maximum=max_year,
-                    value=default_year,
-                    step=1,
-                )
-                map_canvas = gr.Image(
-                    label="Map Preview",
-                    height=512,
-                    show_download_button=True,
-                )
+                timeline_slider = ui.slider(min=min_year, max=max_year, step=1)
+                timeline_slider.set_value(default_year)
+                COMPONENTS["timeline"] = timeline_slider
 
-        use_coordinates_checkbox.change(
-            fn=set_location_mode,
-            inputs=use_coordinates_checkbox,
-            outputs=[
-                country_dropdown,
-                city_input,
-                latitude_input,
-                longitude_input,
-            ],
-        )
+                map_canvas = ui.image()
+                map_canvas.classes("w-full max-h-[512px] object-contain bg-slate-100")
+                COMPONENTS["map"] = map_canvas
 
-        auth_button.click(
-            fn=initiate_authentication,
-            outputs=status_display,
-        )
+    use_coordinates_checkbox.on_value_change(handle_use_coordinates_change)
+    agentic_checkbox.on_value_change(handle_agentic_toggle)
+    use_cloud_checkbox.on_value_change(handle_cloud_models_change)
+    date_input.on_value_change(handle_date_change)
 
-        date_input.change(
-            fn=adjust_timeline_slider,
-            inputs=date_input,
-            outputs=timeline_slider,
-        )
+    apply_component_states(set_location_mode(False))
+    apply_component_states(set_agentic_mode(False, False))
+    apply_component_state("openai_model", set_cloud_model_mode(False))
+    update_status_message("Adjust the parameters above, then fetch map imagery.")
 
-        agentic_search_checkbox.change(
-            fn=set_agentic_mode,
-            inputs=[agentic_search_checkbox, use_coordinates_checkbox],
-            outputs=[
-                filter_dropdown,
-                country_dropdown,
-                city_input,
-                use_coordinates_checkbox,
-                latitude_input,
-                longitude_input,
-                date_input,
-                timeline_slider,
-                llm_query_input,
-                use_cloud_models_checkbox,
-                openai_model_dropdown,
-                agent_model_selector,
-                temperature_input,
-                search_button,
-                agentic_button,
-            ],
-        )
 
-        use_cloud_models_checkbox.change(
-            fn=set_cloud_model_mode,
-            inputs=use_cloud_models_checkbox,
-            outputs=openai_model_dropdown,
-        )
-
-        search_button.click(
-            fn=load_default_map_image,
-            inputs=[
-                filter_dropdown,
-                country_dropdown,
-                city_input,
-                use_coordinates_checkbox,
-                latitude_input,
-                longitude_input,
-                date_input,
-                timeline_slider,
-            ],
-            outputs=[map_canvas, status_display],
-        )
-
-        agentic_button.click(
-            fn=load_agentic_map_image,
-            inputs=[
-                llm_query_input,
-                use_cloud_models_checkbox,
-                openai_model_dropdown,
-                agent_model_selector,
-                temperature_input,
-            ],
-            outputs=[map_canvas, status_display],
-        )
-
-    return demo
+###############################################################################
+def create_interface() -> None:
+    configure_interface()
 
 
 ###############################################################################
 def launch_interface() -> None:
-    create_interface().queue(max_size=32).launch(
-        server_name="127.0.0.1",
-        server_port=7861,
-        inbrowser=True,
-    )
+    create_interface()
+    ui.run(host="127.0.0.1", port=7861, title="AEGIS Geographics", reload=False)
 
 
 if __name__ == "__main__":
