@@ -5,7 +5,16 @@ from typing import Any
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import Column, Float, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Float,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -60,6 +69,30 @@ class LiverToxData(Base):
     __table_args__ = (
         UniqueConstraint("drug_name", "ingredient", "brand_name"),
     )
+
+
+###############################################################################
+class GeonamesRecord(Base):
+    __tablename__ = "GEONAMES"
+    geonameid = Column(BigInteger, primary_key=True)
+    name = Column(String(200))
+    asciiname = Column(String(200))
+    alternatenames = Column(Text)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    feature_class = Column(String(1))
+    feature_code = Column(String(10))
+    country_code = Column(String(2))
+    cc2 = Column(String(200))
+    admin1_code = Column(String(20))
+    admin2_code = Column(String(80))
+    admin3_code = Column(String(20))
+    admin4_code = Column(String(20))
+    population = Column(BigInteger)
+    elevation = Column(Integer)
+    dem = Column(Integer)
+    timezone = Column(String(40))
+    modification_date = Column(String(10))
 
 
 # [DATABASE]
