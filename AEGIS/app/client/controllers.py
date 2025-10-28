@@ -113,26 +113,39 @@ def set_cloud_model_mode(use_cloud: bool) -> ComponentState:
 
 
 ###############################################################################
-async def load_default_map_image(
-    filter_name: str | None,
-    country: str | None,
-    city: str | None,
-    use_coordinates: bool,
-    latitude: float | None,
-    longitude: float | None,
-    target_moment: str | date | datetime | None,
-    timeline_year: int | float | None,
-) -> tuple[bytes | str | None, str]:
-    payload, error_message = build_request_payload(
-        filter_name=filter_name,
-        country=country,
-        city=city,
-        use_coordinates=use_coordinates,
-        latitude=latitude,
-        longitude=longitude,
-        target_moment=target_moment,
-        timeline_year=timeline_year,
-    )
+def sanitize_text(value: Any) -> str | None:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None
+
+
+###############################################################################
+def extract_coordinates(parameters: dict[str, Any]) -> tuple[float | None, float | None]:
+    latitude = parameters.get("latitude")
+    longitude = parameters.get("longitude")
+    coordinates = parameters.get("coordinates")
+    if isinstance(coordinates, dict):
+        latitude = coordinates.get("latitude", latitude)
+        longitude = coordinates.get("longitude", longitude)
+    return coerce_float(latitude), coerce_float(longitude)
+
+
+###############################################################################
+def coerce_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+###############################################################################
+async def load_default_map_image(parameters: dict[str, Any]) -> tuple[bytes | str | None, str]:
+    payload, error_message = build_request_payload(parameters)
     if error_message:
         return None, error_message
     return await execute_map_request(GEO_SEARCH_URL, payload)
@@ -195,37 +208,35 @@ async def execute_map_request(
 
 
 ###############################################################################
-def build_request_payload(
-    *,
-    filter_name: str | None,
-    country: str | None,
-    city: str | None,
-    use_coordinates: bool,
-    latitude: float | None,
-    longitude: float | None,
-    target_moment: str | date | datetime | None,
-    timeline_year: int | float | None,
-) -> tuple[dict[str, Any], str | None]:
-    payload: dict[str, Any] = {}
+def build_request_payload(parameters: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    filter_name = sanitize_text(parameters.get("filter"))
+    country = sanitize_text(parameters.get("country"))
+    city = sanitize_text(parameters.get("city"))
+    use_coordinates = bool(parameters.get("use_coordinates"))
+    latitude, longitude = extract_coordinates(parameters)
+
+    payload: dict[str, Any] = {
+        "use_coordinates": use_coordinates,
+        "mode": "coordinates" if use_coordinates else "search",
+    }
+
     if filter_name:
         payload["filter"] = filter_name
 
     if use_coordinates:
         if latitude is None or longitude is None:
             return {}, "[ERROR] Provide both latitude and longitude to use coordinates."
-        payload["coordinates"] = {"latitude": latitude, "longitude": longitude}
+        payload["latitude"] = latitude
+        payload["longitude"] = longitude
     else:
         if not country and not city:
             return {}, "[ERROR] Specify at least a country or a city to locate the map."
-        payload["location"] = {
-            "country": country or None,
-            "city": city or None,
-        }
+        payload["country"] = country
+        payload["city"] = city
 
     temporal_payload = build_temporal_payload(
-        target_moment=target_moment,
-        timeline_year=timeline_year,
-        use_coordinates=use_coordinates,
+        target_moment=parameters.get("datetime") or parameters.get("date"),
+        timeline_year=parameters.get("timeline_year") or parameters.get("timeline"),
     )
     payload.update(temporal_payload)
     return payload, None
@@ -283,21 +294,19 @@ def build_temporal_payload(
     *,
     target_moment: str | date | datetime | None,
     timeline_year: int | float | None,
-    use_coordinates: bool,
 ) -> dict[str, Any]:
     parsed_datetime = parse_datetime_value(target_moment)
     parsed_date = parse_date_value(target_moment)
+    if parsed_datetime and parsed_date is None:
+        parsed_date = parsed_datetime.date()
     parsed_time = parsed_datetime.timetz() if parsed_datetime else None
     timeline = coerce_timeline_year(parsed_date, timeline_year)
-    payload: dict[str, Any] = {
-        "temporal": {
-            "timeline_year": timeline,
-            "reference_date": parsed_date.isoformat() if parsed_date else None,
-            "time_of_day": parsed_time.isoformat() if parsed_time else None,
-        }
+    return {
+        "timeline_year": timeline,
+        "datetime": parsed_datetime.isoformat() if parsed_datetime else None,
+        "reference_date": parsed_date.isoformat() if parsed_date else None,
+        "time_of_day": parsed_time.isoformat() if parsed_time else None,
     }
-    payload["mode"] = "coordinates" if use_coordinates else "search"
-    return payload
 
 
 ###############################################################################
