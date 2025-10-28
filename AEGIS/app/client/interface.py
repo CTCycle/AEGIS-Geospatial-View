@@ -20,13 +20,6 @@ FILTER_CHOICES: Final[list[str]] = [
     "Population Density",
     "Weather Overlay",
 ]
-COUNTRY_CHOICES: Final[list[str]] = [
-    "Italy",
-    "United States",
-    "United Kingdom",
-    "Canada",
-    "Australia",
-]
 DEFAULT_FILTER: Final[str] = FILTER_CHOICES[0]
 TIMELINE_DEFAULT_RANGE: Final[int] = 20
 OPENAI_MODEL_CHOICES: Final[list[str]] = [
@@ -204,13 +197,12 @@ def configure_interface() -> None:
                     filter_select.classes("w-full")
                     COMPONENTS["filter"] = filter_select
 
-                    country_select = ui.select(
-                        COUNTRY_CHOICES,
+                    country_input = ui.input(
                         label="Country or Region",
-                        with_input=True,
+                        placeholder="Enter a country or region",
                     )
-                    country_select.classes("w-full")
-                    COMPONENTS["country"] = country_select
+                    country_input.classes("w-full")
+                    COMPONENTS["country"] = country_input
 
                     city_input = ui.input(
                         label="City Name",
