@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from datetime import date, datetime
 from typing import Any, Final
 
@@ -9,12 +8,10 @@ from nicegui import ui
 from AEGIS.app.client.controllers import (
     NO_UPDATE,
     ComponentState,
-    adjust_timeline_slider,
-    load_agentic_map_image,
-    load_default_map_image,
     set_agentic_mode,
     set_cloud_model_mode,
     set_location_mode,
+    submit_location_search,
 )
 
 FILTER_CHOICES: Final[list[str]] = [
@@ -167,46 +164,10 @@ def gather_search_parameters() -> dict[str, Any]:
 
 
 ###############################################################################
-def gather_agentic_parameters() -> dict[str, Any]:
-    llm_query_component = get_component("llm_query")
-    use_cloud_component = get_component("use_cloud")
-    openai_model_component = get_component("openai_model")
-    agent_model_component = get_component("agent_model")
-    temperature_component = get_component("temperature")
-
-    llm_query_value = llm_query_component.value if llm_query_component else None
-    use_cloud_models = bool(use_cloud_component.value) if use_cloud_component else False
-    openai_model_value = openai_model_component.value if openai_model_component else None
-    agent_model_value = agent_model_component.value if agent_model_component else None
-    temperature_value = temperature_component.value if temperature_component else None
-
-    return {
-        "llm_query": llm_query_value,
-        "use_cloud_models": use_cloud_models,
-        "openai_model": openai_model_value,
-        "agent_model": agent_model_value,
-        "temperature": temperature_value,
-    }
-
-
-###############################################################################
 async def handle_search_click() -> None:
     parameters = gather_search_parameters()
-    image_data, message = await load_default_map_image(parameters)
-    update_status_message(message or "Map imagery request completed.")
-
-    map_component = get_component("map")
-    if map_component is None:
-        return
-
-    if isinstance(image_data, bytes):
-        encoded = base64.b64encode(image_data).decode("utf-8")
-        map_component.set_source(f"data:image/png;base64,{encoded}")
-    elif isinstance(image_data, str):
-        map_component.set_source(image_data)
-    else:
-        map_component.set_source("")
-    map_component.update()
+    _, message = await submit_location_search(parameters)
+    update_status_message(message or "Location search payload submitted.")
   
 
 
@@ -346,7 +307,7 @@ def configure_interface() -> None:
 
                     map_canvas = ui.image()
                     map_canvas.classes(
-                        "w-full max-h-[512px] object-contain bg-slate-100"
+                        "w-full min-h-[360px] max-h-[640px] object-contain bg-slate-100"
                     )
                     COMPONENTS["map"] = map_canvas
     
