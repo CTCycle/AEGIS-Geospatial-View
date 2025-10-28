@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from AEGIS.app.variables import EnvironmentVariables
-
-EV = EnvironmentVariables()
+from AEGIS.app.variables import env_variables
 
 import os
-
 import gradio as gr
 from fastapi import FastAPI
 
-from AEGIS.app.api.endpoints.maps import router as report_router
+from AEGIS.app.api.endpoints.search import router as report_router
 from AEGIS.app.api.endpoints.filters import router as models_router
-from AEGIS.app.client.main import create_interface
+from AEGIS.app.client.interface import create_interface
 from AEGIS.app.logger import logger
 from AEGIS.app.utils.repository.database import database
 

@@ -11,19 +11,20 @@ from typing import Any, Final
 
 import httpx
 
-from AEGIS.app.constants import GEO_AGENTIC_URL, GEO_SEARCH_URL
-
-API_BASE_URL = os.getenv("AEGIS_API_BASE_URL", "http://127.0.0.1:8000")
-HTTP_TIMEOUT_SECONDS = 30.0
-DEFAULT_TIMELINE_BACKTRACK = 20
-SURROUNDING_RANGE = 10
-MIN_YEAR = 1900
-DEFAULT_AGENTIC_TEMPERATURE = 0.7
-MIN_AGENTIC_TEMPERATURE = 0.0
-MAX_AGENTIC_TEMPERATURE = 2.0
+from AEGIS.app.constants import (
+    GEO_AGENTIC_URL, 
+    GEO_SEARCH_URL,
+    API_BASE_URL,
+    HTTP_TIMEOUT_SECONDS,   
+    DEFAULT_TIMELINE_BACKTRACK,
+    SURROUNDING_RANGE,
+    MIN_YEAR,
+    DEFAULT_AGENTIC_TEMPERATURE,
+    MIN_AGENTIC_TEMPERATURE,
+    MAX_AGENTIC_TEMPERATURE,
+)
 
 NO_UPDATE: Final = object()
-
 
 @dataclass
 class ComponentState:
@@ -385,11 +386,6 @@ def adjust_timeline_slider(target_date: str | date | datetime | None) -> Compone
             minimum, maximum = maximum, minimum
         value = min(max(base_year, minimum), maximum)
     return ComponentState(minimum=minimum, maximum=maximum, value=value)
-
-
-###############################################################################
-def initiate_authentication() -> str:
-    return "[INFO] Authentication workflow will open in a future release."
 
 
 ###############################################################################
