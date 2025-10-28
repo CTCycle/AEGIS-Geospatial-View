@@ -17,8 +17,8 @@ from AEGIS.app.logger import logger
 GEONAMES_BASE_URL = "https://download.geonames.org/export/dump"
 DEFAULT_DATASET = "allCountries.zip"
 
-downloader_logger = logger.getChild("GeonamesDatasetDownloader")
-parser_logger = logger.getChild("GeonamesArchiveParser")
+logger = logger.getChild("GeonamesDatasetDownloader")
+logger = logger.getChild("GeonamesArchiveParser")
 updater_logger = logger.getChild("GeonamesUpdater")
 
 
@@ -35,17 +35,21 @@ class GeonamesDatasetDownloader:
         self.dataset = dataset
         self.target_dir = target_dir
         self.chunk_size = chunk_size
+        self._last_logged_percentage = -1
 
     # -----------------------------------------------------------------------------
-    def download(self) -> str:
+    def download(self) -> str | None:
         os.makedirs(self.target_dir, exist_ok=True)
         archive_path = os.path.join(self.target_dir, self.dataset)
         url = f"{self.base_url}/{self.dataset}"
-        downloader_logger.info(
+        logger.info(
             "Starting download of %s from %s", self.dataset, self.base_url
         )
         with urllib.request.urlopen(url) as response, open(archive_path, "wb") as file:
             total_size = int(response.headers.get("content-length", "0"))
+            if total_size == 0:
+                return None
+            
             downloaded = 0
             while True:
                 chunk = response.read(self.chunk_size)
@@ -53,28 +57,23 @@ class GeonamesDatasetDownloader:
                     break
                 file.write(chunk)
                 downloaded += len(chunk)
-                self.display_progress(downloaded, total_size)
-        self.display_progress(downloaded, total_size, finished=True)
-        downloader_logger.info(
+                self.display_progress(downloaded, total_size)        
+        logger.info(
             "Finished downloading %s to %s", self.dataset, archive_path
         )
         return archive_path
 
     # -----------------------------------------------------------------------------
-    def display_progress(self, downloaded: int, total_size: int, finished: bool = False) -> None:
-        if total_size > 0:
-            percentage = min(int(downloaded * 100 / total_size), 100)
+    def display_progress(self, downloaded: int, total_size: int) -> None:        
+        percentage = min(int(downloaded * 100 / total_size), 100)
+        if (percentage % 10 == 0 and percentage != self._last_logged_percentage):
             message = (
                 f"Downloading {self.dataset}: {percentage}% "
                 f"({downloaded}/{total_size} bytes)"
             )
-        else:
-            message = f"Downloading {self.dataset}: {downloaded} bytes"
-        if finished:
-            downloader_logger.info(message)
-        else:
-            downloader_logger.debug(message)
-
+            logger.info(message)
+            self._last_logged_percentage = percentage
+       
 
 ###############################################################################
 class GeonamesArchiveReader:
@@ -113,7 +112,7 @@ class GeonamesArchiveParser:
         reader = GeonamesArchiveReader(archive_path)
         batch: list[dict[str, Any]] = []
         total_records = 0
-        parser_logger.info("Parsing geonames archive %s", archive_path)
+        logger.info("Parsing geonames archive")
         for line in reader.iterate_lines():
             record = self.create_record(line)
             if record is None:
@@ -123,10 +122,10 @@ class GeonamesArchiveParser:
             if len(batch) >= self.batch_size:
                 self.flush_batch(batch)
                 batch.clear()
-                parser_logger.debug("Stored %s geonames records", total_records)
+                logger.info("Stored %s geonames records", total_records)
         if batch:
             self.flush_batch(batch)
-        parser_logger.info("Stored %s geonames records", total_records)
+        logger.info("Stored %s geonames records", total_records)
 
     # -----------------------------------------------------------------------------
     def flush_batch(self, batch: list[dict[str, Any]]) -> None:
@@ -210,10 +209,7 @@ class GeonamesUpdater:
         self.batch_size = batch_size
 
     # -----------------------------------------------------------------------------
-    def update(self) -> None:
-        updater_logger.info(
-            "Starting geonames updater for dataset %s", self.dataset
-        )
+    def update(self) -> None:        
         downloader = GeonamesDatasetDownloader(
             base_url=self.base_url,
             dataset=self.dataset,
@@ -224,8 +220,13 @@ class GeonamesUpdater:
             self.serializer,
             batch_size=self.batch_size,
         )
-        parser.parse(archive_path)
-        updater_logger.info(
-            "Completed geonames updater for dataset %s", self.dataset
-        )
+        if archive_path is not None:
+            parser.parse(archive_path)
+            updater_logger.info(
+                "Completed geonames updater for dataset %s", self.dataset
+            )
+        else:
+            updater_logger.error(
+                "Failed to download geonames dataset %s", self.dataset
+            )
 
