@@ -136,8 +136,7 @@ REM ============================================================================
 :load_env
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
-set "RELOAD=true"
-
+set "RELOAD=false"
 if exist "%DOTENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
     set "line=%%L"
@@ -157,8 +156,9 @@ if exist "%DOTENV%" (
   echo [INFO] No .env overrides found at "%DOTENV%". Using defaults.
 )
 
-echo [INFO] FASTAPI_HOST=!FASTAPI_HOST! FASTAPI_PORT=!FASTAPI_PORT! RELOAD=!RELOAD!
 set "UI_URL=http://!FASTAPI_HOST!:!FASTAPI_PORT!/ui"
+echo [INFO] FASTAPI_HOST=!FASTAPI_HOST! FASTAPI_PORT=!FASTAPI_PORT! RELOAD=!RELOAD!
+echo [INFO] UI_URL=!UI_URL!
 set "RELOAD_FLAG="
 if /i "!RELOAD!"=="true" set "RELOAD_FLAG=--reload"
 
