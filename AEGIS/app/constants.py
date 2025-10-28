@@ -23,7 +23,7 @@ GEO_AGENTIC_URL = "/maps/agentic"
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
 NASA_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
-API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = "http://127.0.0.1:8002"
 HTTP_TIMEOUT_SECONDS = 1800.0
 DEFAULT_TIMELINE_BACKTRACK = 20
 SURROUNDING_RANGE = 10
