@@ -25,53 +25,6 @@ Base = declarative_base()
 
 
 ###############################################################################
-class Documents(Base):
-    __tablename__ = "DOCUMENTS"
-    id = Column(String, primary_key=True)
-    text = Column(String)
-    __table_args__ = (UniqueConstraint("id"),)
-
-
-###############################################################################
-class Patients(Base):
-    __tablename__ = "PATIENTS"
-    name = Column(String, primary_key=True)
-    anamnesis = Column(String)
-    symptoms = Column(String)
-    ALT = Column(Float)
-    ALT_max = Column(Float)
-    ALP = Column(Float)
-    ALP_max = Column(Float)
-    additional_tests = Column(String)
-    drugs = Column(String)
-    __table_args__ = (UniqueConstraint("name"),)
-
-
-###############################################################################
-class LiverToxData(Base):
-    __tablename__ = "LIVERTOX_DATA"
-    drug_name = Column(String, primary_key=True)
-    ingredient = Column(String, primary_key=True)
-    brand_name = Column(String, primary_key=True)
-    nbk_id = Column(String)
-    excerpt = Column(Text)
-    synonyms = Column(Text)
-    likelihood_score = Column(String)
-    last_update = Column(String)
-    reference_count = Column(String)
-    year_approved = Column(String)
-    agent_classification = Column(String)
-    primary_classification = Column(String)
-    secondary_classification = Column(String)
-    include_in_livertox = Column(String)
-    source_url = Column(String)
-    source_last_modified = Column(String)
-    __table_args__ = (
-        UniqueConstraint("drug_name", "ingredient", "brand_name"),
-    )
-
-
-###############################################################################
 class GeonamesRecord(Base):
     __tablename__ = "GEONAMES"
     geonameid = Column(BigInteger, primary_key=True)
@@ -123,24 +76,24 @@ class AEGISDatabase:
         table = table_cls.__table__
         session = self.Session()
         try:
-            unique_cols = []
-            for uc in table.constraints:
-                if isinstance(uc, UniqueConstraint):
-                    unique_cols = uc.columns.keys()
+            unique_cols: list[str] = []
+            for constraint in table.constraints:
+                if isinstance(constraint, UniqueConstraint):
+                    unique_cols = list(constraint.columns.keys())
                     break
             if not unique_cols:
-                raise ValueError(f"No unique constraint found for {table_cls.__name__}")
+                unique_cols = list(table.primary_key.columns.keys())
+            if not unique_cols:
+                raise ValueError(f"No unique columns found for {table_cls.__name__}")
 
-            # Batch insertions for speed
             records = df.to_dict(orient="records")
             for i in range(0, len(records), self.insert_batch_size):
                 batch = records[i : i + self.insert_batch_size]
                 stmt = insert(table).values(batch)
-                # Columns to update on conflict
                 update_cols = {
-                    c: getattr(stmt.excluded, c)  # type: ignore
-                    for c in batch[0]
-                    if c not in unique_cols
+                    column: getattr(stmt.excluded, column)  # type: ignore[attr-defined]
+                    for column in batch[0]
+                    if column not in unique_cols
                 }
                 stmt = stmt.on_conflict_do_update(
                     index_elements=unique_cols, set_=update_cols
