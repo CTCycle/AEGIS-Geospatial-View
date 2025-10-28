@@ -3,8 +3,8 @@ from __future__ import annotations
 from AEGIS.app.variables import env_variables
 
 import os
-import gradio as gr
 from fastapi import FastAPI
+from nicegui import ui
 
 from AEGIS.app.api.endpoints.search import router as report_router
 from AEGIS.app.api.endpoints.filters import router as models_router
@@ -28,5 +28,5 @@ app = FastAPI(
 app.include_router(report_router)
 app.include_router(models_router)
 
-ui_app = create_interface()
-app = gr.mount_gradio_app(app, ui_app, path="/ui", root_path="/ui")
+create_interface()
+ui.run_with(app, mount_path="/ui", title="AEGIS Geographics")
