@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time
+import datetime as dt
+from datetime import date, time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -33,7 +34,7 @@ class Location(BaseModel):
 
 ###############################################################################
 class LocationSearchRequest(BaseModel):
-    datetime: datetime | None = Field(default=None)
+    datetime: dt.datetime | None = Field(default=None)
     reference_date: date | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(default=None, ge=MIN_TIMELINE_YEAR)
