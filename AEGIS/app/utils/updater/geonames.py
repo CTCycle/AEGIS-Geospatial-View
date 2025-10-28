@@ -12,9 +12,14 @@ from AEGIS.app.utils.repository.serializer import (
     DataSerializer,
     GEONAMES_COLUMNS,
 )
+from AEGIS.app.logger import logger
 
 GEONAMES_BASE_URL = "https://download.geonames.org/export/dump"
 DEFAULT_DATASET = "allCountries.zip"
+
+downloader_logger = logger.getChild("GeonamesDatasetDownloader")
+parser_logger = logger.getChild("GeonamesArchiveParser")
+updater_logger = logger.getChild("GeonamesUpdater")
 
 
 ###############################################################################
@@ -36,6 +41,9 @@ class GeonamesDatasetDownloader:
         os.makedirs(self.target_dir, exist_ok=True)
         archive_path = os.path.join(self.target_dir, self.dataset)
         url = f"{self.base_url}/{self.dataset}"
+        downloader_logger.info(
+            "Starting download of %s from %s", self.dataset, self.base_url
+        )
         with urllib.request.urlopen(url) as response, open(archive_path, "wb") as file:
             total_size = int(response.headers.get("content-length", "0"))
             downloaded = 0
@@ -47,6 +55,9 @@ class GeonamesDatasetDownloader:
                 downloaded += len(chunk)
                 self.display_progress(downloaded, total_size)
         self.display_progress(downloaded, total_size, finished=True)
+        downloader_logger.info(
+            "Finished downloading %s to %s", self.dataset, archive_path
+        )
         return archive_path
 
     # -----------------------------------------------------------------------------
@@ -59,8 +70,10 @@ class GeonamesDatasetDownloader:
             )
         else:
             message = f"Downloading {self.dataset}: {downloaded} bytes"
-        end_char = "\n" if finished else "\r"
-        print(message, end=end_char, flush=True)
+        if finished:
+            downloader_logger.info(message)
+        else:
+            downloader_logger.debug(message)
 
 
 ###############################################################################
@@ -87,7 +100,11 @@ class GeonamesArchiveReader:
 
 ###############################################################################
 class GeonamesArchiveParser:
-    def __init__(self, serializer: DataSerializer, batch_size: int = 5000) -> None:
+    def __init__(
+        self,
+        serializer: DataSerializer,
+        batch_size: int = 5000,
+    ) -> None:
         self.serializer = serializer
         self.batch_size = batch_size
 
@@ -96,6 +113,7 @@ class GeonamesArchiveParser:
         reader = GeonamesArchiveReader(archive_path)
         batch: list[dict[str, Any]] = []
         total_records = 0
+        parser_logger.info("Parsing geonames archive %s", archive_path)
         for line in reader.iterate_lines():
             record = self.create_record(line)
             if record is None:
@@ -105,10 +123,10 @@ class GeonamesArchiveParser:
             if len(batch) >= self.batch_size:
                 self.flush_batch(batch)
                 batch.clear()
-                print(f"Stored {total_records} geonames records", end="\r", flush=True)
+                parser_logger.debug("Stored %s geonames records", total_records)
         if batch:
             self.flush_batch(batch)
-        print(f"Stored {total_records} geonames records", flush=True)
+        parser_logger.info("Stored %s geonames records", total_records)
 
     # -----------------------------------------------------------------------------
     def flush_batch(self, batch: list[dict[str, Any]]) -> None:
@@ -193,12 +211,21 @@ class GeonamesUpdater:
 
     # -----------------------------------------------------------------------------
     def update(self) -> None:
+        updater_logger.info(
+            "Starting geonames updater for dataset %s", self.dataset
+        )
         downloader = GeonamesDatasetDownloader(
             base_url=self.base_url,
             dataset=self.dataset,
             target_dir=self.storage_dir,
         )
         archive_path = downloader.download()
-        parser = GeonamesArchiveParser(self.serializer, batch_size=self.batch_size)
+        parser = GeonamesArchiveParser(
+            self.serializer,
+            batch_size=self.batch_size,
+        )
         parser.parse(archive_path)
+        updater_logger.info(
+            "Completed geonames updater for dataset %s", self.dataset
+        )
 
