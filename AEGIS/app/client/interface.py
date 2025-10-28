@@ -410,7 +410,8 @@ def render_interface_page() -> None:
 
 ###############################################################################
 def create_interface() -> None:
-    return None
+    # kept for compatibility: page registration happens via decorator
+    pass
 
 
 ###############################################################################
