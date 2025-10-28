@@ -11,9 +11,6 @@ from AEGIS.app.constants import (
     API_BASE_URL,
     GEO_SEARCH_URL,
     HTTP_TIMEOUT_SECONDS,
-    DEFAULT_TIMELINE_BACKTRACK,
-    SURROUNDING_RANGE,
-    MIN_YEAR,
     DEFAULT_AGENTIC_TEMPERATURE,
 )
 
@@ -58,7 +55,6 @@ def set_agentic_mode(
             "latitude": ComponentState(enabled=False),
             "longitude": ComponentState(enabled=False),
             "date": ComponentState(enabled=False),
-            "timeline": ComponentState(enabled=False),
             "llm_query": ComponentState(enabled=True),
             "use_cloud": ComponentState(enabled=True),
             "openai_model": ComponentState(enabled=False),
@@ -87,7 +83,6 @@ def set_agentic_mode(
         "latitude": latitude_state,
         "longitude": longitude_state,
         "date": ComponentState(enabled=True),
-        "timeline": ComponentState(enabled=True),
         "llm_query": ComponentState(enabled=False),
         "use_cloud": ComponentState(value=False, enabled=False),
         "openai_model": ComponentState(value=None, enabled=False),
@@ -206,7 +201,6 @@ def build_request_payload(parameters: dict[str, Any]) -> tuple[dict[str, Any], s
 
     temporal_payload = build_temporal_payload(
         target_moment=parameters.get("datetime") or parameters.get("date"),
-        timeline_year=parameters.get("timeline_year") or parameters.get("timeline"),
     )
     payload.update(temporal_payload)
     return payload, None
@@ -216,16 +210,13 @@ def build_request_payload(parameters: dict[str, Any]) -> tuple[dict[str, Any], s
 def build_temporal_payload(
     *,
     target_moment: str | date | datetime | None,
-    timeline_year: int | float | None,
 ) -> dict[str, Any]:
     parsed_datetime = parse_datetime_value(target_moment)
     parsed_date = parse_date_value(target_moment)
     if parsed_datetime and parsed_date is None:
         parsed_date = parsed_datetime.date()
     parsed_time = parsed_datetime.timetz() if parsed_datetime else None
-    timeline = coerce_timeline_year(parsed_date, timeline_year)
     return {
-        "timeline_year": timeline,
         "datetime": parsed_datetime.isoformat() if parsed_datetime else None,
         "reference_date": parsed_date.isoformat() if parsed_date else None,
         "time_of_day": parsed_time.isoformat() if parsed_time else None,
@@ -276,30 +267,6 @@ def parse_datetime_value(value: str | date | datetime | None) -> datetime | None
             except ValueError:
                 return None
     return None
-
-
-###############################################################################
-def coerce_timeline_year(parsed_date: date | None, candidate: int | float | None) -> int:
-    today_year = date.today().year
-    if parsed_date is None:
-        min_year = max(today_year - DEFAULT_TIMELINE_BACKTRACK, MIN_YEAR)
-        max_year = today_year
-        value = today_year
-    else:
-        base_year = parsed_date.year
-        min_year = max(base_year - SURROUNDING_RANGE, MIN_YEAR)
-        max_year = min(base_year + SURROUNDING_RANGE, today_year)
-        if min_year > max_year:
-            min_year, max_year = max_year, min_year
-        value = base_year
-    if isinstance(candidate, (int, float)):
-        candidate_int = int(candidate)
-        if candidate_int < min_year:
-            return min_year
-        if candidate_int > max_year:
-            return max_year
-        return candidate_int
-    return int(value)
 
 
 ###############################################################################
