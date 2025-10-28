@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import base64
-from binascii import Error as BinasciiError
 from datetime import date, datetime
 from typing import Any, Final
 
-from nicegui import events, ui
+from nicegui import ui
 
 from AEGIS.app.client.controllers import (
     NO_UPDATE,
@@ -135,17 +134,34 @@ def gather_search_parameters() -> dict[str, Any]:
     use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
     latitude_value = latitude_component.value if latitude_component else None
     longitude_value = longitude_component.value if longitude_component else None
-    date_value = date_component.value if date_component else None
-    timeline_value = timeline_component.value if timeline_component else None
+    date_value = sanitized_text(date_component.value if date_component else None)
+    timeline_raw = timeline_component.value if timeline_component else None
+    if isinstance(timeline_raw, (int, float)):
+        timeline_value: int | None = int(timeline_raw)
+    elif isinstance(timeline_raw, str) and timeline_raw.strip():
+        try:
+            timeline_value = int(float(timeline_raw))
+        except ValueError:
+            timeline_value = None
+    else:
+        timeline_value = None
+
+    coordinates = {
+        "latitude": latitude_value if latitude_value is not None else None,
+        "longitude": longitude_value if longitude_value is not None else None,
+    }
 
     return {
         "filter": filter_value,
         "country": country_value,
         "city": city_value,
         "use_coordinates": use_coordinates,
+        "coordinates": coordinates,
         "latitude": latitude_value,
         "longitude": longitude_value,
+        "datetime": date_value,
         "date": date_value,
+        "timeline_year": timeline_value,
         "timeline": timeline_value,
     }
 
@@ -176,16 +192,21 @@ def gather_agentic_parameters() -> dict[str, Any]:
 ###############################################################################
 async def handle_search_click() -> None:
     parameters = gather_search_parameters()
-    image_data, message = await load_default_map_image(
-        filter_name=parameters["filter"],
-        country=parameters["country"],
-        city=parameters["city"],
-        use_coordinates=parameters["use_coordinates"],
-        latitude=parameters["latitude"],
-        longitude=parameters["longitude"],
-        target_moment=parameters["date"],
-        timeline_year=parameters["timeline"],
-    )
+    image_data, message = await load_default_map_image(parameters)
+    update_status_message(message or "Map imagery request completed.")
+
+    map_component = get_component("map")
+    if map_component is None:
+        return
+
+    if isinstance(image_data, bytes):
+        encoded = base64.b64encode(image_data).decode("utf-8")
+        map_component.set_source(f"data:image/png;base64,{encoded}")
+    elif isinstance(image_data, str):
+        map_component.set_source(image_data)
+    else:
+        map_component.set_source("")
+    map_component.update()
   
 
 
