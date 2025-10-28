@@ -101,35 +101,8 @@ def sanitized_text(value: Any) -> str | None:
     return None
 
 
-###############################################################################
-def encode_image_source(image_data: bytes | str | None) -> str | None:
-    if image_data is None:
-        return None
-    if isinstance(image_data, bytes):
-        encoded = base64.b64encode(image_data).decode("ascii")
-        return f"data:image/png;base64,{encoded}"
-    candidate = image_data.strip()
-    if not candidate:
-        return None
-    if candidate.startswith("data:") or candidate.startswith("http://") or candidate.startswith("https://"):
-        return candidate
-    try:
-        base64.b64decode(candidate, validate=True)
-    except (ValueError, BinasciiError):
-        return candidate
-    return f"data:image/png;base64,{candidate}"
 
 
-###############################################################################
-def update_map_image(image_data: bytes | str | None) -> None:
-    image_component = get_component("map")
-    if image_component is None:
-        return
-    source = encode_image_source(image_data)
-    if source is None:
-        image_component.set_source("")
-    else:
-        image_component.set_source(source)
 
 
 ###############################################################################
@@ -144,34 +117,6 @@ def update_status_message(message: str) -> None:
 def get_datetime_default_value() -> str:
     current = datetime.now().replace(second=0, microsecond=0)
     return current.isoformat(timespec="minutes")
-
-
-###############################################################################
-async def handle_use_coordinates_change(event: events.ValueChangeEvent) -> None:
-    states = set_location_mode(bool(event.value))
-    apply_component_states(states)
-
-
-###############################################################################
-async def handle_agentic_toggle(event: events.ValueChangeEvent) -> None:
-    agentic_enabled = bool(event.value)
-    use_coordinates_component = get_component("use_coordinates")
-    use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
-    states = set_agentic_mode(agentic_enabled, use_coordinates)
-    apply_component_states(states)
-
-
-###############################################################################
-async def handle_cloud_models_change(event: events.ValueChangeEvent) -> None:
-    state = set_cloud_model_mode(bool(event.value))
-    apply_component_state("openai_model", state)
-
-
-###############################################################################
-def handle_date_change(event: events.ValueChangeEvent) -> None:
-    state = adjust_timeline_slider(event.value)
-    apply_component_state("timeline", state)
-
 
 ###############################################################################
 def gather_search_parameters() -> dict[str, Any]:
@@ -241,28 +186,10 @@ async def handle_search_click() -> None:
         target_moment=parameters["date"],
         timeline_year=parameters["timeline"],
     )
-    update_map_image(image_data)
-    update_status_message(message)
+  
 
 
-###############################################################################
-async def handle_agentic_click() -> None:
-    parameters = gather_agentic_parameters()
-    image_data, message = await load_agentic_map_image(
-        llm_query=parameters["llm_query"],
-        use_cloud_models=parameters["use_cloud_models"],
-        openai_model=parameters["openai_model"],
-        agent_model=parameters["agent_model"],
-        temperature=parameters["temperature"],
-    )
-    update_map_image(image_data)
-    update_status_message(message)
 
-
-###############################################################################
-def handle_authenticate_click() -> None:
-    message = initiate_authentication()
-    update_status_message(message)
 
 
 ###############################################################################
@@ -277,7 +204,7 @@ def configure_interface() -> None:
                 with ui.column().classes("gap-4"):
                     ui.markdown("**Authentication**")
                     auth_button = ui.button(
-                        "Authenticate", on_click=handle_authenticate_click
+                        "Authenticate", on_click=None
                     )
                     auth_button.props("color=secondary")
                     auth_button.props("size=sm")
@@ -378,9 +305,7 @@ def configure_interface() -> None:
                         )
                         COMPONENTS["temperature"] = temperature_input
 
-                    agentic_button = ui.button(
-                        "Run agentic search", on_click=handle_agentic_click
-                    )
+                    agentic_button = ui.button("Run agentic search", on_click=None)
                     agentic_button.props("color=secondary")
                     COMPONENTS["agentic"] = agentic_button
 
@@ -403,12 +328,7 @@ def configure_interface() -> None:
                         "w-full max-h-[512px] object-contain bg-slate-100"
                     )
                     COMPONENTS["map"] = map_canvas
-
-    use_coordinates_checkbox.on_value_change(handle_use_coordinates_change)
-    agentic_checkbox.on_value_change(handle_agentic_toggle)
-    use_cloud_checkbox.on_value_change(handle_cloud_models_change)
-    date_input.on_value_change(handle_date_change)
-
+    
     apply_component_states(set_location_mode(False))
     apply_component_states(set_agentic_mode(False, False))
     apply_component_state("openai_model", set_cloud_model_mode(False))
