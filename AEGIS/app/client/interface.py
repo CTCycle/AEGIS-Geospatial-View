@@ -271,17 +271,21 @@ def configure_interface() -> None:
     ui.page_title("AEGIS Geographics")
     ui.markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
 
-    with ui.row().classes("w-full gap-8 flex-wrap"):
-        with ui.column().classes("max-w-md gap-4"):
-            ui.markdown("**Authentication**")
-            auth_button = ui.button("Authenticate", on_click=handle_authenticate_click)
-            auth_button.props("color=secondary")
-            auth_button.props("size=sm")
-            COMPONENTS["auth_button"] = auth_button
+    with ui.column().classes("w-full gap-8"):
+        with ui.row().classes("w-full flex-wrap justify-start"):
+            with ui.card().classes("w-full max-w-md"):
+                with ui.column().classes("gap-4"):
+                    ui.markdown("**Authentication**")
+                    auth_button = ui.button(
+                        "Authenticate", on_click=handle_authenticate_click
+                    )
+                    auth_button.props("color=secondary")
+                    auth_button.props("size=sm")
+                    COMPONENTS["auth_button"] = auth_button
 
-        with ui.column().classes("max-w-2xl gap-4"):
-            with ui.row().classes("w-full gap-6 flex-wrap"):
-                with ui.column().classes("min-w-[320px] max-w-md gap-3"):
+        with ui.row().classes("w-full gap-6 items-start flex-wrap"):
+            with ui.card().classes("flex-1 min-w-[320px]"):
+                with ui.column().classes("gap-3"):
                     ui.markdown("### Location search")
                     filter_select = ui.select(
                         FILTER_CHOICES,
@@ -328,11 +332,14 @@ def configure_interface() -> None:
                     date_input.set_value(get_datetime_default_value())
                     COMPONENTS["date"] = date_input
 
-                    search_button = ui.button("Search Imagery", on_click=handle_search_click)
+                    search_button = ui.button(
+                        "Search Imagery", on_click=handle_search_click
+                    )
                     search_button.props("color=primary")
                     COMPONENTS["search"] = search_button
 
-                with ui.column().classes("min-w-[320px] max-w-md gap-3"):
+            with ui.card().classes("flex-1 min-w-[320px]"):
+                with ui.column().classes("gap-3"):
                     ui.markdown("### Agentic Search")
                     agentic_checkbox = ui.checkbox("Activate agentic assistant")
                     COMPONENTS["agentic_toggle"] = agentic_checkbox
@@ -371,7 +378,9 @@ def configure_interface() -> None:
                         )
                         COMPONENTS["temperature"] = temperature_input
 
-                    agentic_button = ui.button("Run agentic search", on_click=handle_agentic_click)
+                    agentic_button = ui.button(
+                        "Run agentic search", on_click=handle_agentic_click
+                    )
                     agentic_button.props("color=secondary")
                     COMPONENTS["agentic"] = agentic_button
 
@@ -380,16 +389,20 @@ def configure_interface() -> None:
                     )
                     COMPONENTS["status"] = status_display
 
-            with ui.column().classes("min-w-[360px] flex-1 gap-3"):
-                ui.markdown("### Historical Timeline")
-                min_year, max_year, default_year = default_timeline_bounds()
-                timeline_slider = ui.slider(min=min_year, max=max_year, step=1)
-                timeline_slider.set_value(default_year)
-                COMPONENTS["timeline"] = timeline_slider
+        with ui.row().classes("w-full items-stretch"):
+            with ui.card().classes("w-full"):
+                with ui.column().classes("gap-3"):
+                    ui.markdown("### Historical Timeline")
+                    min_year, max_year, default_year = default_timeline_bounds()
+                    timeline_slider = ui.slider(min=min_year, max=max_year, step=1)
+                    timeline_slider.set_value(default_year)
+                    COMPONENTS["timeline"] = timeline_slider
 
-                map_canvas = ui.image()
-                map_canvas.classes("w-full max-h-[512px] object-contain bg-slate-100")
-                COMPONENTS["map"] = map_canvas
+                    map_canvas = ui.image()
+                    map_canvas.classes(
+                        "w-full max-h-[512px] object-contain bg-slate-100"
+                    )
+                    COMPONENTS["map"] = map_canvas
 
     use_coordinates_checkbox.on_value_change(handle_use_coordinates_change)
     agentic_checkbox.on_value_change(handle_agentic_toggle)
