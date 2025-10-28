@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import base64
-from binascii import Error as BinasciiError
 from datetime import date, datetime
 from typing import Any, Final
 
-from nicegui import events, ui
+from nicegui import ui
 
 from AEGIS.app.client.controllers import (
     NO_UPDATE,
     ComponentState,
-    adjust_timeline_slider,
-    load_agentic_map_image,
-    load_default_map_image,
     set_agentic_mode,
     set_cloud_model_mode,
     set_location_mode,
+    submit_location_search,
 )
 
 FILTER_CHOICES: Final[list[str]] = [
@@ -135,57 +131,43 @@ def gather_search_parameters() -> dict[str, Any]:
     use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
     latitude_value = latitude_component.value if latitude_component else None
     longitude_value = longitude_component.value if longitude_component else None
-    date_value = date_component.value if date_component else None
-    timeline_value = timeline_component.value if timeline_component else None
+    date_value = sanitized_text(date_component.value if date_component else None)
+    timeline_raw = timeline_component.value if timeline_component else None
+    if isinstance(timeline_raw, (int, float)):
+        timeline_value: int | None = int(timeline_raw)
+    elif isinstance(timeline_raw, str) and timeline_raw.strip():
+        try:
+            timeline_value = int(float(timeline_raw))
+        except ValueError:
+            timeline_value = None
+    else:
+        timeline_value = None
+
+    coordinates = {
+        "latitude": latitude_value if latitude_value is not None else None,
+        "longitude": longitude_value if longitude_value is not None else None,
+    }
 
     return {
         "filter": filter_value,
         "country": country_value,
         "city": city_value,
         "use_coordinates": use_coordinates,
+        "coordinates": coordinates,
         "latitude": latitude_value,
         "longitude": longitude_value,
+        "datetime": date_value,
         "date": date_value,
+        "timeline_year": timeline_value,
         "timeline": timeline_value,
-    }
-
-
-###############################################################################
-def gather_agentic_parameters() -> dict[str, Any]:
-    llm_query_component = get_component("llm_query")
-    use_cloud_component = get_component("use_cloud")
-    openai_model_component = get_component("openai_model")
-    agent_model_component = get_component("agent_model")
-    temperature_component = get_component("temperature")
-
-    llm_query_value = llm_query_component.value if llm_query_component else None
-    use_cloud_models = bool(use_cloud_component.value) if use_cloud_component else False
-    openai_model_value = openai_model_component.value if openai_model_component else None
-    agent_model_value = agent_model_component.value if agent_model_component else None
-    temperature_value = temperature_component.value if temperature_component else None
-
-    return {
-        "llm_query": llm_query_value,
-        "use_cloud_models": use_cloud_models,
-        "openai_model": openai_model_value,
-        "agent_model": agent_model_value,
-        "temperature": temperature_value,
     }
 
 
 ###############################################################################
 async def handle_search_click() -> None:
     parameters = gather_search_parameters()
-    image_data, message = await load_default_map_image(
-        filter_name=parameters["filter"],
-        country=parameters["country"],
-        city=parameters["city"],
-        use_coordinates=parameters["use_coordinates"],
-        latitude=parameters["latitude"],
-        longitude=parameters["longitude"],
-        target_moment=parameters["date"],
-        timeline_year=parameters["timeline"],
-    )
+    _, message = await submit_location_search(parameters)
+    update_status_message(message or "Location search payload submitted.")
   
 
 
@@ -325,7 +307,7 @@ def configure_interface() -> None:
 
                     map_canvas = ui.image()
                     map_canvas.classes(
-                        "w-full max-h-[512px] object-contain bg-slate-100"
+                        "w-full min-h-[360px] max-h-[640px] object-contain bg-slate-100"
                     )
                     COMPONENTS["map"] = map_canvas
     
