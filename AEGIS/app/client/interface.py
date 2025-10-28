@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Final
 
 from nicegui import ui
@@ -21,7 +21,6 @@ FILTER_CHOICES: Final[list[str]] = [
     "Weather Overlay",
 ]
 DEFAULT_FILTER: Final[str] = FILTER_CHOICES[0]
-TIMELINE_DEFAULT_RANGE: Final[int] = 20
 OPENAI_MODEL_CHOICES: Final[list[str]] = [
     "gpt-4o-mini",
     "gpt-4.1",
@@ -39,15 +38,6 @@ DEFAULT_AGENTIC_TEMPERATURE: Final[float] = 0.7
 COMPONENTS: dict[str, Any] = {}
 
 
-###############################################################################
-def default_timeline_bounds() -> tuple[int, int, int]:
-    today = date.today()
-    min_year = max(today.year - TIMELINE_DEFAULT_RANGE, 1900)
-    max_year = today.year
-    return min_year, max_year, today.year
-
-
-###############################################################################
 def get_component(name: str) -> Any | None:
     return COMPONENTS.get(name)
 
@@ -116,7 +106,6 @@ def gather_search_parameters() -> dict[str, Any]:
     latitude_component = get_component("latitude")
     longitude_component = get_component("longitude")
     date_component = get_component("date")
-    timeline_component = get_component("timeline")
 
     filter_value = filter_component.value if filter_component else None
     country_value = sanitized_text(country_component.value if country_component else None)
@@ -125,16 +114,6 @@ def gather_search_parameters() -> dict[str, Any]:
     latitude_value = latitude_component.value if latitude_component else None
     longitude_value = longitude_component.value if longitude_component else None
     date_value = sanitized_text(date_component.value if date_component else None)
-    timeline_raw = timeline_component.value if timeline_component else None
-    if isinstance(timeline_raw, (int, float)):
-        timeline_value: int | None = int(timeline_raw)
-    elif isinstance(timeline_raw, str) and timeline_raw.strip():
-        try:
-            timeline_value = int(float(timeline_raw))
-        except ValueError:
-            timeline_value = None
-    else:
-        timeline_value = None
 
     coordinates = {
         "latitude": latitude_value if latitude_value is not None else None,
@@ -151,8 +130,6 @@ def gather_search_parameters() -> dict[str, Any]:
         "longitude": longitude_value,
         "datetime": date_value,
         "date": date_value,
-        "timeline_year": timeline_value,
-        "timeline": timeline_value,
     }
 
 
@@ -291,11 +268,7 @@ def configure_interface() -> None:
         with ui.row().classes("w-full items-stretch"):
             with ui.card().classes("w-full"):
                 with ui.column().classes("gap-3"):
-                    ui.markdown("### Historical Timeline")
-                    min_year, max_year, default_year = default_timeline_bounds()
-                    timeline_slider = ui.slider(min=min_year, max=max_year, step=1)
-                    timeline_slider.set_value(default_year)
-                    COMPONENTS["timeline"] = timeline_slider
+                    ui.markdown("### Map Preview")
 
                     map_canvas = ui.image()
                     map_canvas.classes(
