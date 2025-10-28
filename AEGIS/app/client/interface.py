@@ -403,8 +403,15 @@ def configure_interface() -> None:
 
 
 ###############################################################################
-def create_interface() -> None:
+@ui.page("/")
+def render_interface_page() -> None:
     configure_interface()
+
+
+###############################################################################
+def create_interface() -> None:
+    # kept for compatibility: page registration happens via decorator
+    pass
 
 
 ###############################################################################
