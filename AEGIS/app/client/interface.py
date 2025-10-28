@@ -11,7 +11,6 @@ from AEGIS.app.client.controllers import (
     NO_UPDATE,
     ComponentState,
     adjust_timeline_slider,
-    initiate_authentication,
     load_agentic_map_image,
     load_default_map_image,
     set_agentic_mode,
