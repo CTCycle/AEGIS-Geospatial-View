@@ -5,8 +5,11 @@ from datetime import date, time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from AEGIS.app.configurations import Configuration
 
-MIN_TIMELINE_YEAR = 1900
+
+configuration = Configuration().get_configuration()
+MIN_TIMELINE_YEAR = int(configuration["MIN_YEAR"])
 
 
 ###############################################################################

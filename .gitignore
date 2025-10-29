@@ -9,6 +9,7 @@ __pycache__
 *.log
 *.docx
 *.json
+!AEGIS/app/configurations/data/configurations.json
 *.xlsx
 *.pdf
 *.csv   

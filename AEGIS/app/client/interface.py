@@ -13,6 +13,7 @@ from AEGIS.app.client.controllers import (
     set_location_mode,
     submit_location_search,
 )
+from AEGIS.app.configurations import Configuration
 
 FILTER_CHOICES: Final[list[str]] = [
     "Natural Color",
@@ -33,7 +34,11 @@ AGENT_MODEL_CHOICES: Final[list[str]] = [
     "phi3",
 ]
 DEFAULT_AGENT_MODEL: Final[str] = AGENT_MODEL_CHOICES[0]
-DEFAULT_AGENTIC_TEMPERATURE: Final[float] = 0.7
+
+configuration = Configuration().get_configuration()
+DEFAULT_AGENTIC_TEMPERATURE: Final[float] = configuration["DEFAULT_AGENTIC_TEMPERATURE"]
+MIN_AGENTIC_TEMPERATURE: Final[float] = configuration["MIN_AGENTIC_TEMPERATURE"]
+MAX_AGENTIC_TEMPERATURE: Final[float] = configuration["MAX_AGENTIC_TEMPERATURE"]
 
 COMPONENTS: dict[str, Any] = {}
 
@@ -254,6 +259,8 @@ def configure_interface() -> None:
                             step=0.1,
                             format="%.2f",
                         )
+                        temperature_input.props["min"] = MIN_AGENTIC_TEMPERATURE
+                        temperature_input.props["max"] = MAX_AGENTIC_TEMPERATURE
                         COMPONENTS["temperature"] = temperature_input
 
                     agentic_button = ui.button("Run agentic search", on_click=None)

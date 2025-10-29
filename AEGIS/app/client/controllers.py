@@ -7,14 +7,16 @@ from typing import Any, Final
 
 import httpx
 
-from AEGIS.app.constants import (
-    API_BASE_URL,
-    GEO_SEARCH_URL,
-    HTTP_TIMEOUT_SECONDS,
-    DEFAULT_AGENTIC_TEMPERATURE,
-)
+from AEGIS.app.configurations import Configuration
+from AEGIS.app.constants import API_BASE_URL, GEO_SEARCH_URL
 
 NO_UPDATE: Final = object()
+
+configuration = Configuration().get_configuration()
+HTTP_TIMEOUT_SECONDS: float = configuration["HTTP_TIMEOUT_SECONDS"]
+DEFAULT_AGENTIC_TEMPERATURE: float = configuration["DEFAULT_AGENTIC_TEMPERATURE"]
+MIN_AGENTIC_TEMPERATURE: float = configuration["MIN_AGENTIC_TEMPERATURE"]
+MAX_AGENTIC_TEMPERATURE: float = configuration["MAX_AGENTIC_TEMPERATURE"]
 
 @dataclass
 class ComponentState:
@@ -47,6 +49,12 @@ def set_agentic_mode(
     agentic_enabled: bool, use_coordinates: bool
 ) -> dict[str, ComponentState]:
     if agentic_enabled:
+        temperature_state = ComponentState(
+            value=DEFAULT_AGENTIC_TEMPERATURE,
+            enabled=True,
+            minimum=MIN_AGENTIC_TEMPERATURE,
+            maximum=MAX_AGENTIC_TEMPERATURE,
+        )
         return {
             "filter": ComponentState(enabled=False),
             "country": ComponentState(enabled=False),
@@ -59,7 +67,7 @@ def set_agentic_mode(
             "use_cloud": ComponentState(enabled=True),
             "openai_model": ComponentState(enabled=False),
             "agent_model": ComponentState(enabled=True),
-            "temperature": ComponentState(enabled=True),
+            "temperature": temperature_state,
             "search": ComponentState(enabled=False),
             "agentic": ComponentState(enabled=True),
         }
@@ -87,7 +95,12 @@ def set_agentic_mode(
         "use_cloud": ComponentState(value=False, enabled=False),
         "openai_model": ComponentState(value=None, enabled=False),
         "agent_model": ComponentState(enabled=False),
-        "temperature": ComponentState(value=DEFAULT_AGENTIC_TEMPERATURE, enabled=False),
+        "temperature": ComponentState(
+            value=DEFAULT_AGENTIC_TEMPERATURE,
+            enabled=False,
+            minimum=MIN_AGENTIC_TEMPERATURE,
+            maximum=MAX_AGENTIC_TEMPERATURE,
+        ),
         "search": ComponentState(enabled=True),
         "agentic": ComponentState(enabled=False),
     }
