@@ -160,6 +160,34 @@ def configure_interface() -> None:
     ui.page_title("AEGIS Geographics")
     ui.markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
 
+    ui.add_css(
+        """
+        .q-table__container {
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 28px -18px rgba(15, 23, 42, 0.25);
+        }
+
+        .q-table thead th {
+            background-color: #f8fafc;
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .q-table tbody td {
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .q-table tbody tr:nth-child(even) td {
+            background-color: #f9fafb;
+        }
+
+        .q-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        """
+    )
+
     with ui.column().classes("w-full gap-8"):
         with ui.row().classes("w-full flex-wrap justify-start"):
             with ui.card().classes("w-full max-w-md"):
@@ -182,78 +210,134 @@ def configure_interface() -> None:
                         "w-full gap-4 items-stretch flex-wrap lg:flex-nowrap"
                     ):
                         with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-lg border border-gray-200 "
-                            "p-4 bg-white shadow-sm flex flex-col gap-3"
+                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
+                            "p-4 bg-white shadow-sm flex flex-col"
                         ):
-                            country_input = ui.input(
-                                label="Country or Region",
-                                placeholder="Enter a country or region",
-                            )
-                            country_input.classes("w-full")
-                            COMPONENTS["country"] = country_input
+                            with ui.column().classes("gap-3 h-full"):
+                                with ui.row().classes(
+                                    "items-center gap-2 text-slate-700"
+                                ):
+                                    ui.icon("location_on").classes("text-primary")
+                                    ui.label("Location").classes(
+                                        "text-base font-semibold"
+                                    )
 
-                            city_input = ui.input(
-                                label="City Name",
-                                placeholder="Enter a city or locale",
-                            )
-                            city_input.classes("w-full")
-                            COMPONENTS["city"] = city_input
+                                country_input = ui.input(
+                                    label="Country or Region",
+                                    placeholder="Enter a country or region",
+                                )
+                                country_input.classes("w-full")
+                                COMPONENTS["country"] = country_input
 
-                            address_input = ui.input(
-                                label="Street Address",
-                                placeholder="Enter the specific address",
-                            )
-                            address_input.classes("w-full")
-                            address_input.props("required")
-                            COMPONENTS["address"] = address_input
+                                city_input = ui.input(
+                                    label="City Name",
+                                    placeholder="Enter a city or locale",
+                                )
+                                city_input.classes("w-full")
+                                COMPONENTS["city"] = city_input
+
+                                address_input = ui.input(
+                                    label="Street Address",
+                                    placeholder="Enter the specific address",
+                                )
+                                address_input.classes("w-full")
+                                address_input.props("required")
+                                COMPONENTS["address"] = address_input
 
                         with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-lg border border-gray-200 "
-                            "p-4 bg-white shadow-sm flex flex-col gap-3"
+                            "flex-1 min-w-[200px] rounded-xl border border-slate-200 "
+                            "p-4 bg-white shadow-sm flex flex-col"
                         ):
-                            filter_select = ui.select(
-                                FILTER_CHOICES,
-                                value=DEFAULT_FILTER,
-                                label="Imagery Style",
-                            )
-                            filter_select.classes("w-full")
-                            COMPONENTS["filter"] = filter_select
-
-                            date_input = ui.input(label="Reference Moment")
-                            date_input.props["type"] = "datetime-local"
-                            date_input.set_value(get_datetime_default_value())
-                            COMPONENTS["date"] = date_input
-
-                            use_coordinates_checkbox = ui.checkbox(
-                                "Provide precise coordinates"
-                            )
-                            COMPONENTS["use_coordinates"] = use_coordinates_checkbox
-
-                            with ui.expansion(
-                                "Coordinate details", icon="my_location"
-                            ) as coordinate_expansion:
-                                coordinate_expansion.bind_visibility_from(
-                                    use_coordinates_checkbox, "value"
-                                )
-                                coordinate_expansion.bind_value_from(
-                                    use_coordinates_checkbox, "value"
-                                )
-                                with ui.row().classes("w-full gap-3 flex-wrap"):
-                                    latitude_input = ui.number(
-                                        label="Latitude (°)",
-                                        format="%.6f",
-                                        step=0.000001,
+                            with ui.column().classes("gap-3 h-full"):
+                                with ui.row().classes(
+                                    "items-center gap-2 text-slate-700"
+                                ):
+                                    ui.icon("schedule").classes("text-primary")
+                                    ui.label("Time").classes(
+                                        "text-base font-semibold"
                                     )
-                                    latitude_input.classes("flex-1 min-w-[160px]")
-                                    COMPONENTS["latitude"] = latitude_input
 
-                                    longitude_input = ui.number(
-                                        label="Longitude (°)",
-                                        format="%.6f",
-                                        step=0.000001,
+                                date_input = ui.input(label="Reference Moment")
+                                date_input.props["type"] = "datetime-local"
+                                date_input.set_value(get_datetime_default_value())
+                                COMPONENTS["date"] = date_input
+
+                        with ui.element("div").classes(
+                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
+                            "p-4 bg-white shadow-sm flex flex-col"
+                        ):
+                            with ui.column().classes("gap-3 h-full"):
+                                with ui.row().classes(
+                                    "items-center gap-2 text-slate-700"
+                                ):
+                                    ui.icon("layers").classes("text-primary")
+                                    ui.label("Filters").classes(
+                                        "text-base font-semibold"
                                     )
-                                    longitude_input.classes("flex-1 min-w-[160px]")
-                                    COMPONENTS["longitude"] = longitude_input
+
+                                filter_select = ui.select(
+                                    FILTER_CHOICES,
+                                    value=DEFAULT_FILTER,
+                                    label="Imagery Style",
+                                )
+                                filter_select.classes("w-full")
+                                COMPONENTS["filter"] = filter_select
+
+                                with ui.expansion().classes(
+                                    "rounded-lg border border-slate-200"
+                                ) as coordinate_expansion:
+                                    with ui.row().props("slot=header").classes(
+                                        "items-center justify-between w-full gap-3"
+                                    ):
+                                        with ui.row().classes(
+                                            "items-center gap-2 text-slate-700"
+                                        ):
+                                            ui.icon("my_location").classes(
+                                                "text-primary"
+                                            )
+                                            ui.label("Coordinate details").classes(
+                                                "text-sm font-medium"
+                                            )
+
+                                        use_coordinates_switch = ui.switch(
+                                            "Use coordinates"
+                                        )
+                                        use_coordinates_switch.props("color=primary")
+                                        COMPONENTS["use_coordinates"] = (
+                                            use_coordinates_switch
+                                        )
+
+                                    coordinate_expansion.bind_value(
+                                        use_coordinates_switch, "value"
+                                    )
+                                    use_coordinates_switch.bind_value_to(
+                                        coordinate_expansion, "value"
+                                    )
+
+                                    with ui.row().classes(
+                                        "w-full gap-3 flex-wrap"
+                                    ):
+                                        latitude_input = ui.number(
+                                            label="Latitude (°)",
+                                            format="%.6f",
+                                            step=0.000001,
+                                        )
+                                        latitude_input.classes(
+                                            "flex-1 min-w-[160px]"
+                                        )
+                                        COMPONENTS["latitude"] = latitude_input
+
+                                        longitude_input = ui.number(
+                                            label="Longitude (°)",
+                                            format="%.6f",
+                                            step=0.000001,
+                                        )
+                                        longitude_input.classes(
+                                            "flex-1 min-w-[160px]"
+                                        )
+                                        COMPONENTS["longitude"] = (
+                                            longitude_input
+                                        )
 
                     with ui.row().classes("w-full justify-end mt-4"):
                         search_button = ui.button(
