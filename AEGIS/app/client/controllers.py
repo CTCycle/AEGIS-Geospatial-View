@@ -30,6 +30,7 @@ def set_location_mode(use_coordinates: bool) -> dict[str, ComponentState]:
         return {
             "country": ComponentState(value=None, enabled=False),
             "city": ComponentState(value="", enabled=False),
+            "address": ComponentState(value="", enabled=False),
             "latitude": ComponentState(value=None, enabled=True),
             "longitude": ComponentState(value=None, enabled=True),
         }
@@ -37,6 +38,7 @@ def set_location_mode(use_coordinates: bool) -> dict[str, ComponentState]:
     return {
         "country": ComponentState(enabled=True),
         "city": ComponentState(enabled=True),
+        "address": ComponentState(enabled=True),
         "latitude": ComponentState(value=None, enabled=False),
         "longitude": ComponentState(value=None, enabled=False),
     }
@@ -51,6 +53,7 @@ def set_agentic_mode(
             "filter": ComponentState(enabled=False),
             "country": ComponentState(enabled=False),
             "city": ComponentState(enabled=False),
+            "address": ComponentState(enabled=False),
             "use_coordinates": ComponentState(value=use_coordinates, enabled=False),
             "latitude": ComponentState(enabled=False),
             "longitude": ComponentState(enabled=False),
@@ -67,11 +70,13 @@ def set_agentic_mode(
     if use_coordinates:
         country_state = ComponentState(enabled=False)
         city_state = ComponentState(enabled=False)
+        address_state = ComponentState(enabled=False)
         latitude_state = ComponentState(enabled=True)
         longitude_state = ComponentState(enabled=True)
     else:
         country_state = ComponentState(enabled=True)
         city_state = ComponentState(enabled=True)
+        address_state = ComponentState(enabled=True)
         latitude_state = ComponentState(value=None, enabled=False)
         longitude_state = ComponentState(value=None, enabled=False)
 
@@ -79,6 +84,7 @@ def set_agentic_mode(
         "filter": ComponentState(enabled=True),
         "country": country_state,
         "city": city_state,
+        "address": address_state,
         "use_coordinates": ComponentState(enabled=True),
         "latitude": latitude_state,
         "longitude": longitude_state,
@@ -138,18 +144,16 @@ async def submit_location_search(
     payload, error_message = build_request_payload(parameters)
     if error_message:
         return None, error_message
-    return await execute_map_request(GEO_SEARCH_URL, payload)
+    return await search_maps(payload)
 
 
 ###############################################################################
-async def execute_map_request(
-    endpoint: str, payload: dict[str, Any]
-) -> tuple[dict[str, Any] | None, str]:
+async def search_maps(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
     try:
         async with httpx.AsyncClient(
             base_url=API_BASE_URL, timeout=HTTP_TIMEOUT_SECONDS
         ) as client:
-            response = await client.post(endpoint, json=payload)
+            response = await client.post(GEO_SEARCH_URL, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
         return None, f"[ERROR] Unable to reach map service: {exc}"
@@ -177,6 +181,7 @@ def build_request_payload(parameters: dict[str, Any]) -> tuple[dict[str, Any], s
     filter_name = sanitize_text(parameters.get("filter"))
     country = sanitize_text(parameters.get("country"))
     city = sanitize_text(parameters.get("city"))
+    address = sanitize_text(parameters.get("address"))
     use_coordinates = bool(parameters.get("use_coordinates"))
     latitude, longitude = extract_coordinates(parameters)
 
@@ -194,10 +199,13 @@ def build_request_payload(parameters: dict[str, Any]) -> tuple[dict[str, Any], s
         payload["latitude"] = latitude
         payload["longitude"] = longitude
     else:
-        if not country and not city:
-            return {}, "[ERROR] Specify at least a country or a city to locate the map."
-        payload["country"] = country
-        payload["city"] = city
+        if not address:
+            return {}, "[ERROR] Provide an address to locate the map."
+        payload["address"] = address
+        if country:
+            payload["country"] = country
+        if city:
+            payload["city"] = city
 
     temporal_payload = build_temporal_payload(
         target_moment=parameters.get("datetime") or parameters.get("date"),

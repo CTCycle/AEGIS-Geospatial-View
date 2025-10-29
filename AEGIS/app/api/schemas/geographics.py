@@ -19,8 +19,9 @@ class Coordinates(BaseModel):
 class Location(BaseModel):
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
+    address: str | None = Field(default=None, max_length=400)
 
-    @field_validator("country", "city", mode="before")
+    @field_validator("country", "city", "address", mode="before")
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -29,7 +30,7 @@ class Location(BaseModel):
         return stripped or None
 
     def has_any_value(self) -> bool:
-        return bool(self.country or self.city)
+        return bool(self.country or self.city or self.address)
 
 
 ###############################################################################
@@ -40,12 +41,13 @@ class LocationSearchRequest(BaseModel):
     timeline_year: int | None = Field(default=None, ge=MIN_TIMELINE_YEAR)
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
+    address: str | None = Field(default=None, max_length=400)
     use_coordinates: bool = Field(default=False)
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     filter: str | None = Field(default=None, max_length=200)
 
-    @field_validator("country", "city", "filter", mode="before")
+    @field_validator("country", "city", "address", "filter", mode="before")
     @classmethod
     def strip_location_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -60,8 +62,9 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError(
                     "Provide both latitude and longitude when use_coordinates is enabled."
                 )
-        elif not (self.country or self.city):
-            raise ValueError("Specify at least a country or a city when not using coordinates.")
+        else:
+            if not self.address:
+                raise ValueError("Provide an address when not using coordinates.")
         return self
 
     def as_query_payload(self) -> dict[str, object]:
