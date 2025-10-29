@@ -200,18 +200,19 @@ def configure_interface() -> None:
                     auth_button.props("size=sm")
                     COMPONENTS["auth_button"] = auth_button
 
-        with ui.row().classes("w-full gap-6 items-stretch flex-wrap"):
+        with ui.row().classes("w-full gap-6 items-start flex-wrap"):
             with ui.card().classes(
-                "flex-1 min-w-[320px] flex flex-col justify-between"
+                "flex-1 min-w-[320px] w-full flex flex-col justify-between"
             ):
                 with ui.column().classes("gap-4 grow"):
                     ui.markdown("### Location search")
                     with ui.row().classes(
-                        "w-full gap-4 items-stretch flex-wrap lg:flex-nowrap"
+                        "w-full gap-4 items-stretch flex-wrap"
                     ):
                         with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
+                            "basis-full lg:flex-1 lg:min-w-[260px] "
+                            "rounded-xl border border-slate-200 p-4 bg-white "
+                            "shadow-sm flex flex-col"
                         ):
                             with ui.column().classes("gap-3 h-full"):
                                 with ui.row().classes(
@@ -244,9 +245,54 @@ def configure_interface() -> None:
                                 address_input.props("required")
                                 COMPONENTS["address"] = address_input
 
+                                with ui.expansion(
+                                    "Coordinate details",
+                                    icon="my_location",
+                                ).classes(
+                                    "rounded-xl border border-slate-200"
+                                    " bg-white shadow-sm overflow-hidden"
+                                ) as coordinate_expansion:
+                                    coordinate_expansion.props(
+                                        "switch-toggle dense expand-icon=keyboard_arrow_down "
+                                        "toggle-color=primary "
+                                        "header-class=px-4 header-class=py-3 header-class=gap-3 "
+                                        "header-class=items-center header-class=text-slate-700 "
+                                        "header-class=font-semibold header-class=bg-slate-50"
+                                    )
+                                    COMPONENTS["use_coordinates"] = coordinate_expansion
+
+                                    with ui.column().classes(
+                                        "gap-3 px-4 pb-4 pt-2 bg-white"
+                                    ):
+                                        with ui.row().classes(
+                                            "w-full gap-3 flex-wrap"
+                                        ):
+                                            latitude_input = ui.number(
+                                                label="Latitude (°)",
+                                                format="%.6f",
+                                                step=0.000001,
+                                            )
+                                            latitude_input.classes(
+                                                "flex-1 min-w-[160px]"
+                                            )
+                                            COMPONENTS["latitude"] = latitude_input
+
+                                            longitude_input = ui.number(
+                                                label="Longitude (°)",
+                                                format="%.6f",
+                                                step=0.000001,
+                                            )
+                                            longitude_input.classes(
+                                                "flex-1 min-w-[160px]"
+                                            )
+                                            COMPONENTS["longitude"] = (
+                                                longitude_input
+                                            )
+
                         with ui.element("div").classes(
-                            "flex-1 min-w-[200px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
+                            "basis-full lg:flex-1 lg:min-w-[220px] "
+                            "rounded-xl border border-slate-200 p-4 bg-white "
+                            "shadow-sm flex flex-col"
                         ):
                             with ui.column().classes("gap-3 h-full"):
                                 with ui.row().classes(
@@ -263,8 +309,9 @@ def configure_interface() -> None:
                                 COMPONENTS["date"] = date_input
 
                         with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
+                            "basis-full lg:flex-1 lg:min-w-[240px] "
+                            "rounded-xl border border-slate-200 p-4 bg-white "
+                            "shadow-sm flex flex-col"
                         ):
                             with ui.column().classes("gap-3 h-full"):
                                 with ui.row().classes(
@@ -283,68 +330,7 @@ def configure_interface() -> None:
                                 filter_select.classes("w-full")
                                 COMPONENTS["filter"] = filter_select
 
-                                with ui.expansion().classes(
-                                    "rounded-lg border border-slate-200"
-                                ) as coordinate_expansion:
-                                    with ui.row().props("slot=header").classes(
-                                        "items-center justify-between w-full gap-3"
-                                    ):
-                                        with ui.row().classes(
-                                            "items-center gap-2 text-slate-700"
-                                        ):
-                                            ui.icon("my_location").classes(
-                                                "text-primary"
-                                            )
-                                            ui.label("Coordinate details").classes(
-                                                "text-sm font-medium"
-                                            )
-
-                                        use_coordinates_switch = ui.switch(
-                                            "Use coordinates"
-                                        )
-                                        use_coordinates_switch.props("color=primary")
-                                        COMPONENTS["use_coordinates"] = (
-                                            use_coordinates_switch
-                                        )
-
-                                    coordinate_expansion.bind_value(
-                                        use_coordinates_switch, "value"
-                                    )
-                                    use_coordinates_switch.bind_value_to(
-                                        coordinate_expansion, "value"
-                                    )
-
-                                    with ui.row().classes(
-                                        "w-full gap-3 flex-wrap"
-                                    ):
-                                        latitude_input = ui.number(
-                                            label="Latitude (°)",
-                                            format="%.6f",
-                                            step=0.000001,
-                                        )
-                                        latitude_input.classes(
-                                            "flex-1 min-w-[160px]"
-                                        )
-                                        COMPONENTS["latitude"] = latitude_input
-
-                                        longitude_input = ui.number(
-                                            label="Longitude (°)",
-                                            format="%.6f",
-                                            step=0.000001,
-                                        )
-                                        longitude_input.classes(
-                                            "flex-1 min-w-[160px]"
-                                        )
-                                        COMPONENTS["longitude"] = (
-                                            longitude_input
-                                        )
-
-                    with ui.row().classes("w-full justify-end mt-4"):
-                        date_input = ui.input(label="Date and Time")
-                        date_input.props["type"] = "datetime-local"
-                        date_input.set_value(get_datetime_default_value())
-                        COMPONENTS["date"] = date_input
-
+                    with ui.row().classes("w-full justify-start mt-4"):
                         search_button = ui.button(
                             "Start search", on_click=handle_search_click
                         )
@@ -352,7 +338,7 @@ def configure_interface() -> None:
                         COMPONENTS["search"] = search_button
 
             with ui.card().classes(
-                "flex-1 min-w-[320px] flex flex-col justify-between"
+                "flex-1 min-w-[320px] w-full flex flex-col justify-between"
             ):
                 with ui.column().classes("gap-3 grow"):
                     ui.markdown("### Agentic Search")
