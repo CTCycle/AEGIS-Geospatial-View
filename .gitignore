@@ -20,4 +20,4 @@ __pycache__
 *.egg-info
 *.gz
 !.gitkeep
-!DILIGENT/setup/configurations.json
+!AEGIS/setup/configurations.json
