@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -13,6 +15,7 @@ from AEGIS.app.utils.repository.database import GeonamesRecord, database
 ###############################################################################
 class GeonameProperties:
     settings_cache: dict[str, Any] | None = None
+    token_splitter = re.compile(r"[^0-9a-z]+")
 
     def __init__(
         self,
@@ -20,9 +23,13 @@ class GeonameProperties:
         city: str | None,
         address: str | None,
     ) -> None:
+        database.initialize_database()
         self.country = self.normalize_value(country)
         self.city = self.normalize_value(city)
         self.address = self.normalize_value(address)
+        self.target_country_codes: set[str] = set()
+        self.address_components = self.extract_address_components(self.address)
+        self.queries = self.build_queries()
         settings = self.get_settings()
         self.max_results = settings["max_results"]
         self.partial_limit = settings["partial_limit"]
@@ -30,19 +37,34 @@ class GeonameProperties:
 
     # -------------------------------------------------------------------------
     def lookup(self) -> list[dict[str, Any]]:
-        if not self.country:
+        if not self.queries:
             return []
         with database.Session() as session:
-            return self.match_country(session)
+            self.target_country_codes = self.resolve_country_codes(session)
+            candidates: dict[int, dict[str, Any]] = {}
+            for query in self.queries:
+                self.match_query(session, query, candidates)
+                if len(candidates) >= self.max_results:
+                    break
+            return self.serialize_candidates(candidates)
 
     # -------------------------------------------------------------------------
-    def match_country(self, session: Session) -> list[dict[str, Any]]:
-        candidates: dict[int, dict[str, Any]] = {}
+    def match_query(
+        self,
+        session: Session,
+        query: dict[str, Any],
+        candidates: dict[int, dict[str, Any]],
+    ) -> None:
+        value = query["value"]
+        if not value:
+            return
+        weight = query["weight"]
+        context = query["context"]
         for column_name in ("name", "asciiname", "alternatenames"):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
-                .where(func.lower(column) == self.country)
+                .where(func.lower(column) == value)
                 .order_by(GeonamesRecord.population.desc().nullslast())
                 .limit(self.max_results)
             )
@@ -50,17 +72,16 @@ class GeonameProperties:
                 self.store_candidate(
                     candidates,
                     record,
-                    1.0,
+                    1.0 * weight,
                     "exact",
                     column_name,
+                    context,
+                    value,
                 )
             if len(candidates) >= self.max_results:
-                break
+                return
 
-        if len(candidates) >= self.max_results:
-            return self.serialize_candidates(candidates)
-
-        partial_value = f"%{self.country}%"
+        partial_value = f"%{value}%"
         for column_name in ("name", "asciiname", "alternatenames"):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
@@ -70,16 +91,77 @@ class GeonameProperties:
                 .limit(self.partial_limit)
             )
             for record in session.execute(stmt).scalars():
-                score, match_type = self.evaluate_record(record, column_name)
+                score, match_type = self.evaluate_record(record, column_name, value)
+                if score <= 0.0:
+                    continue
                 self.store_candidate(
                     candidates,
                     record,
-                    score,
+                    score * weight,
                     match_type,
                     column_name,
+                    context,
+                    value,
                 )
+                if len(candidates) >= self.max_results:
+                    return
 
-        return self.serialize_candidates(candidates)
+    # -------------------------------------------------------------------------
+    def resolve_country_codes(self, session: Session) -> set[str]:
+        if not self.country:
+            return set()
+        codes: set[str] = set()
+        value = self.country
+        base_filters = (GeonamesRecord.feature_class == "A",)
+        for column_name in ("name", "asciiname"):
+            column = getattr(GeonamesRecord, column_name)
+            stmt = (
+                select(GeonamesRecord.country_code)
+                .where(func.lower(column) == value, *base_filters)
+                .limit(10)
+            )
+            codes.update(
+                code for code in session.execute(stmt).scalars() if code
+            )
+        if codes:
+            return codes
+        pattern = f"%{value}%"
+        for column_name in ("name", "asciiname", "alternatenames"):
+            column = getattr(GeonamesRecord, column_name)
+            stmt = (
+                select(GeonamesRecord.country_code)
+                .where(func.lower(column).like(pattern), *base_filters)
+                .limit(25)
+            )
+            codes.update(
+                code for code in session.execute(stmt).scalars() if code
+            )
+        if codes:
+            return codes
+        tokens = self.tokenize_value(value)
+        for token in tokens:
+            pattern = f"%{token}%"
+            for column_name in ("name", "asciiname", "alternatenames"):
+                column = getattr(GeonamesRecord, column_name)
+                stmt = (
+                    select(GeonamesRecord.country_code)
+                    .where(func.lower(column).like(pattern), *base_filters)
+                    .limit(25)
+                )
+                codes.update(
+                    code for code in session.execute(stmt).scalars() if code
+                )
+            if codes:
+                break
+        return codes
+
+    # -------------------------------------------------------------------------
+    def compute_country_boost(self, record: GeonamesRecord) -> float:
+        if not self.target_country_codes:
+            return 0.0
+        if record.country_code and record.country_code in self.target_country_codes:
+            return 0.1
+        return 0.0
 
     # -------------------------------------------------------------------------
     def serialize_candidates(self, candidates: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -104,7 +186,19 @@ class GeonameProperties:
                     "longitude": record.longitude,
                     "match_type": item["match_type"],
                     "match_score": round(item["score"], 4),
+                    "base_score": round(item["raw_score"], 4),
+                    "country_match": item["country_match"],
                     "matched_column": item["column"],
+                    "matched_context": item["context"],
+                    "matched_value": item["value"],
+                    "feature_class": record.feature_class,
+                    "feature_code": record.feature_code,
+                    "population": record.population,
+                    "admin1_code": record.admin1_code,
+                    "admin2_code": record.admin2_code,
+                    "admin3_code": record.admin3_code,
+                    "admin4_code": record.admin4_code,
+                    "timezone": record.timezone,
                 }
             )
         return results
@@ -117,26 +211,39 @@ class GeonameProperties:
         score: float,
         match_type: str,
         column: str,
+        context: str,
+        value: str,
     ) -> None:
         if score <= 0.0 or not match_type:
             return
+        boost = self.compute_country_boost(record)
+        total_score = score + boost
         existing = candidates.get(record.geonameid)
-        if existing and existing["score"] >= score:
+        if existing and existing["score"] >= total_score:
             return
         candidates[record.geonameid] = {
             "record": record,
-            "score": score,
+            "score": total_score,
+            "raw_score": score,
+            "country_match": bool(boost),
             "match_type": match_type,
             "column": column,
+            "context": context,
+            "value": value,
         }
 
     # -------------------------------------------------------------------------
-    def evaluate_record(self, record: GeonamesRecord, column: str) -> tuple[float, str]:
+    def evaluate_record(
+        self,
+        record: GeonamesRecord,
+        column: str,
+        query_value: str,
+    ) -> tuple[float, str]:
         values = self.extract_column_values(record, column)
         best_score = 0.0
         best_type = ""
         for value in values:
-            score, match_type = self.evaluate_value(value)
+            score, match_type = self.evaluate_value(value, query_value)
             if score > best_score:
                 best_score = score
                 best_type = match_type
@@ -150,15 +257,15 @@ class GeonameProperties:
         return [raw_value.lower()]
 
     # -------------------------------------------------------------------------
-    def evaluate_value(self, value: str) -> tuple[float, str]:
-        if not self.country or not value:
+    def evaluate_value(self, value: str, query_value: str) -> tuple[float, str]:
+        if not query_value or not value:
             return 0.0, ""
-        if value == self.country:
+        if value == query_value:
             return 1.0, "exact"
-        if self.country in value or value in self.country:
-            ratio = SequenceMatcher(None, self.country, value).ratio()
+        if query_value in value or value in query_value:
+            ratio = SequenceMatcher(None, query_value, value).ratio()
             return ratio, "partial"
-        ratio = SequenceMatcher(None, self.country, value).ratio()
+        ratio = SequenceMatcher(None, query_value, value).ratio()
         if ratio >= self.fuzzy_threshold:
             return ratio, "fuzzy"
         return 0.0, ""
@@ -167,8 +274,93 @@ class GeonameProperties:
     def normalize_value(self, value: str | None) -> str | None:
         if value is None:
             return None
-        stripped = value.strip().lower()
+        normalized = unicodedata.normalize("NFKD", value)
+        ascii_normalized = "".join(
+            character
+            for character in normalized
+            if not unicodedata.combining(character)
+        )
+        stripped = ascii_normalized.strip().lower()
         return stripped or None
+
+    # -------------------------------------------------------------------------
+    def extract_address_components(self, address: str | None) -> list[str]:
+        if not address:
+            return []
+        components: list[str] = []
+        tokens = self.tokenize_value(address)
+        components.extend(tokens)
+        for index in range(len(tokens) - 1):
+            combined = f"{tokens[index]} {tokens[index + 1]}"
+            if combined not in components:
+                components.append(combined)
+        normalized_address = self.normalize_value(address)
+        if (
+            normalized_address
+            and normalized_address not in components
+            and len(normalized_address) >= 3
+        ):
+            components.append(normalized_address)
+        unique_components: list[str] = []
+        for value in components:
+            if value not in unique_components:
+                unique_components.append(value)
+        return unique_components
+
+    # -------------------------------------------------------------------------
+    def build_queries(self) -> list[dict[str, Any]]:
+        queries: list[dict[str, Any]] = []
+        if self.city:
+            queries.append(
+                {
+                    "context": "city",
+                    "value": self.city,
+                    "weight": 1.0,
+                }
+            )
+        for component in self.address_components:
+            queries.append(
+                {
+                    "context": "address",
+                    "value": component,
+                    "weight": 0.85 if " " in component else 0.9,
+                }
+            )
+        if self.country:
+            queries.append(
+                {
+                    "context": "country",
+                    "value": self.country,
+                    "weight": 0.65,
+                }
+            )
+        seen: set[str] = set()
+        unique_queries: list[dict[str, Any]] = []
+        for query in queries:
+            key = f"{query['context']}::{query['value']}"
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_queries.append(query)
+        return unique_queries
+
+    # -------------------------------------------------------------------------
+    def tokenize_value(self, value: str) -> list[str]:
+        if not value:
+            return []
+        normalized = self.normalize_value(value)
+        if not normalized:
+            return []
+        tokens = [
+            token
+            for token in self.token_splitter.split(normalized)
+            if token and len(token) >= 3
+        ]
+        unique_tokens: list[str] = []
+        for token in tokens:
+            if token not in unique_tokens:
+                unique_tokens.append(token)
+        return unique_tokens
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> dict[str, Any]:

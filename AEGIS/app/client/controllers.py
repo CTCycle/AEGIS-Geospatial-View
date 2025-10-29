@@ -170,8 +170,6 @@ async def search_maps(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, s
         return None, "[ERROR] Map service returned an unexpected payload."
 
     status_message = extract_status_message(data)
-    if not status_message:
-        status_message = "Map search request submitted."
 
     formatted_status = (
         f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
@@ -297,8 +295,8 @@ def extract_error_detail(response: httpx.Response) -> str:
 
 ###############################################################################
 def extract_status_message(data: dict[str, Any]) -> str:
-    for key in ("message", "detail", "status"):
+    for key in ("status_message", "message", "detail", "status"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
-    return ""
+    return "Map search request submitted."
