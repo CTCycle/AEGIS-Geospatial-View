@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -13,6 +15,7 @@ from AEGIS.app.utils.repository.database import GeonamesRecord, database
 ###############################################################################
 class GeonameProperties:
     settings_cache: dict[str, Any] | None = None
+    token_splitter = re.compile(r"[^0-9a-z]+")
 
     def __init__(
         self,
@@ -20,9 +23,11 @@ class GeonameProperties:
         city: str | None,
         address: str | None,
     ) -> None:
+        database.initialize_database()
         self.country = self.normalize_value(country)
         self.city = self.normalize_value(city)
         self.address = self.normalize_value(address)
+        self.target_country_codes: set[str] = set()
         self.address_components = self.extract_address_components(self.address)
         self.queries = self.build_queries()
         settings = self.get_settings()
@@ -35,6 +40,7 @@ class GeonameProperties:
         if not self.queries:
             return []
         with database.Session() as session:
+            self.target_country_codes = self.resolve_country_codes(session)
             candidates: dict[int, dict[str, Any]] = {}
             for query in self.queries:
                 self.match_query(session, query, candidates)
@@ -101,6 +107,63 @@ class GeonameProperties:
                     return
 
     # -------------------------------------------------------------------------
+    def resolve_country_codes(self, session: Session) -> set[str]:
+        if not self.country:
+            return set()
+        codes: set[str] = set()
+        value = self.country
+        base_filters = (GeonamesRecord.feature_class == "A",)
+        for column_name in ("name", "asciiname"):
+            column = getattr(GeonamesRecord, column_name)
+            stmt = (
+                select(GeonamesRecord.country_code)
+                .where(func.lower(column) == value, *base_filters)
+                .limit(10)
+            )
+            codes.update(
+                code for code in session.execute(stmt).scalars() if code
+            )
+        if codes:
+            return codes
+        pattern = f"%{value}%"
+        for column_name in ("name", "asciiname", "alternatenames"):
+            column = getattr(GeonamesRecord, column_name)
+            stmt = (
+                select(GeonamesRecord.country_code)
+                .where(func.lower(column).like(pattern), *base_filters)
+                .limit(25)
+            )
+            codes.update(
+                code for code in session.execute(stmt).scalars() if code
+            )
+        if codes:
+            return codes
+        tokens = self.tokenize_value(value)
+        for token in tokens:
+            pattern = f"%{token}%"
+            for column_name in ("name", "asciiname", "alternatenames"):
+                column = getattr(GeonamesRecord, column_name)
+                stmt = (
+                    select(GeonamesRecord.country_code)
+                    .where(func.lower(column).like(pattern), *base_filters)
+                    .limit(25)
+                )
+                codes.update(
+                    code for code in session.execute(stmt).scalars() if code
+                )
+            if codes:
+                break
+        return codes
+
+    # -------------------------------------------------------------------------
+    def compute_country_boost(self, record: GeonamesRecord) -> float:
+        if not self.target_country_codes:
+            return 0.0
+        if record.country_code and record.country_code in self.target_country_codes:
+            return 0.1
+        return 0.0
+
+    # -------------------------------------------------------------------------
     def serialize_candidates(self, candidates: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
         ordered = sorted(
             candidates.values(),
@@ -123,12 +186,18 @@ class GeonameProperties:
                     "longitude": record.longitude,
                     "match_type": item["match_type"],
                     "match_score": round(item["score"], 4),
+                    "base_score": round(item["raw_score"], 4),
+                    "country_match": item["country_match"],
                     "matched_column": item["column"],
                     "matched_context": item["context"],
                     "matched_value": item["value"],
                     "feature_class": record.feature_class,
                     "feature_code": record.feature_code,
                     "population": record.population,
+                    "admin1_code": record.admin1_code,
+                    "admin2_code": record.admin2_code,
+                    "admin3_code": record.admin3_code,
+                    "admin4_code": record.admin4_code,
                     "timezone": record.timezone,
                 }
             )
@@ -147,12 +216,16 @@ class GeonameProperties:
     ) -> None:
         if score <= 0.0 or not match_type:
             return
+        boost = self.compute_country_boost(record)
+        total_score = score + boost
         existing = candidates.get(record.geonameid)
-        if existing and existing["score"] >= score:
+        if existing and existing["score"] >= total_score:
             return
         candidates[record.geonameid] = {
             "record": record,
-            "score": score,
+            "score": total_score,
+            "raw_score": score,
+            "country_match": bool(boost),
             "match_type": match_type,
             "column": column,
             "context": context,
@@ -201,7 +274,13 @@ class GeonameProperties:
     def normalize_value(self, value: str | None) -> str | None:
         if value is None:
             return None
-        stripped = value.strip().lower()
+        normalized = unicodedata.normalize("NFKD", value)
+        ascii_normalized = "".join(
+            character
+            for character in normalized
+            if not unicodedata.combining(character)
+        )
+        stripped = ascii_normalized.strip().lower()
         return stripped or None
 
     # -------------------------------------------------------------------------
@@ -209,14 +288,23 @@ class GeonameProperties:
         if not address:
             return []
         components: list[str] = []
-        for part in address.split(","):
-            normalized = part.strip().lower()
-            if len(normalized) >= 3:
-                components.append(normalized)
+        tokens = self.tokenize_value(address)
+        components.extend(tokens)
+        for index in range(len(tokens) - 1):
+            combined = f"{tokens[index]} {tokens[index + 1]}"
+            if combined not in components:
+                components.append(combined)
+        normalized_address = self.normalize_value(address)
+        if (
+            normalized_address
+            and normalized_address not in components
+            and len(normalized_address) >= 3
+        ):
+            components.append(normalized_address)
         unique_components: list[str] = []
-        for item in components:
-            if item not in unique_components:
-                unique_components.append(item)
+        for value in components:
+            if value not in unique_components:
+                unique_components.append(value)
         return unique_components
 
     # -------------------------------------------------------------------------
@@ -235,15 +323,7 @@ class GeonameProperties:
                 {
                     "context": "address",
                     "value": component,
-                    "weight": 0.85,
-                }
-            )
-        if self.address and self.address not in self.address_components:
-            queries.append(
-                {
-                    "context": "address",
-                    "value": self.address,
-                    "weight": 0.75,
+                    "weight": 0.85 if " " in component else 0.9,
                 }
             )
         if self.country:
@@ -263,6 +343,24 @@ class GeonameProperties:
             seen.add(key)
             unique_queries.append(query)
         return unique_queries
+
+    # -------------------------------------------------------------------------
+    def tokenize_value(self, value: str) -> list[str]:
+        if not value:
+            return []
+        normalized = self.normalize_value(value)
+        if not normalized:
+            return []
+        tokens = [
+            token
+            for token in self.token_splitter.split(normalized)
+            if token and len(token) >= 3
+        ]
+        unique_tokens: list[str] = []
+        for token in tokens:
+            if token not in unique_tokens:
+                unique_tokens.append(token)
+        return unique_tokens
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> dict[str, Any]:
