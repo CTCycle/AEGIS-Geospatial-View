@@ -165,7 +165,7 @@ async def handle_search_click(components: ClientComponents, event: Any) -> None:
 
 
 ###############################################################################
-def configure_interface() -> None:
+def main_page() -> None:
     ui.page_title("AEGIS Geographics")
     ui.markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
 
@@ -377,21 +377,20 @@ def configure_interface() -> None:
 
 
 ###############################################################################
-@ui.page("/")
-def render_interface_page() -> None:
-    configure_interface()
-
-
-###############################################################################
 def create_interface() -> None:
-    pass
+    ui.page("/")(main_page)
 
 
 ###############################################################################
 def launch_interface() -> None:
     create_interface()
-    ui.run(host="127.0.0.1", port=7861, title="AEGIS Geographics", reload=False)
+    ui.run(
+        host="0.0.0.0",
+        port=7861,
+        title="DILIGENT Clinical Copilot",
+        show_welcome_message=False,
+    )
 
 
-if __name__ == "__main__":
+if __name__ in {"__main__", "__mp_main__"}:
     launch_interface()
