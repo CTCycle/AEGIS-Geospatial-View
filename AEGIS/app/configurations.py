@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from DILIGENT.app.constants import SETUP_DIR, CLOUD_MODEL_CHOICES
 
@@ -22,26 +22,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
         "default_ollama_temperature": 0.7,
         "default_ollama_reasoning": False,
     },
-    "rag": {
-        "vector_collection_name": "documents",
-        "chunk_size": 1024,
-        "chunk_overlap": 128,
-        "embedding_backend": "ollama",
-        "ollama_base_url": "http://localhost:11434",
-        "ollama_embedding_model": "nomic-embed-text",
-        "hf_embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-        "vector_index_metric": "cosine",
-        "vector_index_type": "IVF_FLAT",
-        "reset_vector_collection": True,
-    },
     "external_data": {
         "default_llm_timeout_seconds": 3600.0,
-        "livertox_llm_timeout_seconds": 3600.0,
-        "livertox_archive": "livertox_NBK547852.tar.gz",
-        "livertox_yield_interval": 25,
-        "livertox_skip_deterministic_ratio": 0.8,
-        "livertox_monograph_max_workers": 4,
-        "max_excerpt_length": 8000,
         "llm_null_match_names": [
             "",
             "none",
@@ -52,10 +34,6 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
             "not applicable",
             "n a",
         ],
-    },
-    "clinical_analysis": {
-        "alt_labels": ["ALT", "ALAT"],
-        "alp_labels": ["ALP"],
     },
 }
 
