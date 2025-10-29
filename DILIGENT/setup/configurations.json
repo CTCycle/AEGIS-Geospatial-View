@@ -1,8 +1,0 @@
-{
-  "model": "gpt-3.5-turbo",
-  "geonames": {
-    "max_results": 5,
-    "partial_limit": 50,
-    "fuzzy_threshold": 0.72
-  }
-}
