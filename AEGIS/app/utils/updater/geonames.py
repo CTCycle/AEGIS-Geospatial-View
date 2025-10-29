@@ -58,9 +58,7 @@ class GeonamesDatasetDownloader:
                 file.write(chunk)
                 downloaded += len(chunk)
                 self.display_progress(downloaded, total_size)        
-        logger.info(
-            "Finished downloading %s to %s", self.dataset, archive_path
-        )
+        logger.info("Finished downloading %s", self.dataset)
         return archive_path
 
     # -----------------------------------------------------------------------------
@@ -138,7 +136,7 @@ class GeonamesArchiveParser:
                 self.flush_batch(batch)
                 batch.clear()
                 percentage = min(int(processed_lines * 100 / total_lines), 100)
-                logger.info("Stored %s geonames records (%s%)", processed_lines, percentage)
+                logger.info("Stored %s geonames records (%s%%)", processed_lines, percentage)
             
         if batch:
             self.flush_batch(batch)
