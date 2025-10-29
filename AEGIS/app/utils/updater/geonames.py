@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import urllib.request
 import zipfile
 from collections.abc import Iterator
@@ -156,9 +157,9 @@ class GeonamesArchiveParser:
             return None
         record: dict[str, Any] = {
             "geonameid": geoname_id,
-            "name": self.parse_text(values[1]),
-            "asciiname": self.parse_text(values[2]),
-            "alternatenames": self.parse_nullable_text(values[3]),
+            "name": self.parse_name(values[1]),
+            "asciiname": self.parse_name(values[2]),
+            "alternatenames": self.parse_alternate_names(values[3]),
             "latitude": self.parse_float(values[4]),
             "longitude": self.parse_float(values[5]),
             "feature_class": self.parse_text(values[6]),
@@ -205,6 +206,38 @@ class GeonamesArchiveParser:
     # -----------------------------------------------------------------------------
     def parse_nullable_text(self, value: str) -> str | None:
         return self.parse_text(value)
+
+    # -----------------------------------------------------------------------------
+    def parse_name(self, value: str) -> str | None:
+        parsed = self.parse_text(value)
+        if parsed is None:
+            return None
+        sanitized = self.sanitize_name(parsed)
+        return sanitized or None
+
+    # -----------------------------------------------------------------------------
+    def parse_alternate_names(self, value: str) -> str | None:
+        parsed = self.parse_text(value)
+        if parsed is None:
+            return None
+        names = []
+        for entry in parsed.split(","):
+            sanitized = self.sanitize_name(entry)
+            if sanitized:
+                names.append(sanitized)
+        if not names:
+            return None
+        return ",".join(names)
+
+    # -----------------------------------------------------------------------------
+    def sanitize_name(self, value: str) -> str:
+        sanitized = value.strip()
+        sanitized = re.sub(r"^[#?!&$]+\s*", "", sanitized)
+        sanitized = sanitized.strip("“” ")
+        match = re.fullmatch(r"\(\(\s*(.*?)\s*\)\)", sanitized)
+        if match:
+            sanitized = match.group(1)
+        return sanitized.strip("“” ")
 
 
 ###############################################################################
