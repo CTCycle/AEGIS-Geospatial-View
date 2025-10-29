@@ -200,18 +200,19 @@ def configure_interface() -> None:
                     auth_button.props("size=sm")
                     COMPONENTS["auth_button"] = auth_button
 
-        with ui.row().classes("w-full gap-6 items-stretch flex-wrap"):
+        with ui.row().classes("w-full gap-6 items-start flex-wrap"):
             with ui.card().classes(
-                "flex-1 min-w-[320px] flex flex-col justify-between"
+                "flex-1 min-w-[320px] w-full flex flex-col justify-between"
             ):
                 with ui.column().classes("gap-4 grow"):
                     ui.markdown("### Location search")
                     with ui.row().classes(
-                        "w-full gap-4 items-stretch flex-wrap lg:flex-nowrap"
+                        "w-full gap-4 items-stretch flex-wrap"
                     ):
                         with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
+                            "basis-full lg:flex-1 lg:min-w-[260px] "
+                            "rounded-xl border border-slate-200 p-4 bg-white "
+                            "shadow-sm flex flex-col"
                         ):
                             with ui.column().classes("gap-3 h-full"):
                                 with ui.row().classes(
@@ -289,8 +290,9 @@ def configure_interface() -> None:
                                             )
 
                         with ui.element("div").classes(
-                            "flex-1 min-w-[200px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
+                            "basis-full lg:flex-1 lg:min-w-[220px] "
+                            "rounded-xl border border-slate-200 p-4 bg-white "
+                            "shadow-sm flex flex-col"
                         ):
                             with ui.column().classes("gap-3 h-full"):
                                 with ui.row().classes(
@@ -307,8 +309,9 @@ def configure_interface() -> None:
                                 COMPONENTS["date"] = date_input
 
                         with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
+                            "basis-full lg:flex-1 lg:min-w-[240px] "
+                            "rounded-xl border border-slate-200 p-4 bg-white "
+                            "shadow-sm flex flex-col"
                         ):
                             with ui.column().classes("gap-3 h-full"):
                                 with ui.row().classes(
@@ -327,12 +330,7 @@ def configure_interface() -> None:
                                 filter_select.classes("w-full")
                                 COMPONENTS["filter"] = filter_select
 
-                    with ui.row().classes("w-full justify-end mt-4"):
-                        date_input = ui.input(label="Date and Time")
-                        date_input.props["type"] = "datetime-local"
-                        date_input.set_value(get_datetime_default_value())
-                        COMPONENTS["date"] = date_input
-
+                    with ui.row().classes("w-full justify-start mt-4"):
                         search_button = ui.button(
                             "Start search", on_click=handle_search_click
                         )
@@ -340,7 +338,7 @@ def configure_interface() -> None:
                         COMPONENTS["search"] = search_button
 
             with ui.card().classes(
-                "flex-1 min-w-[320px] flex flex-col justify-between"
+                "flex-1 min-w-[320px] w-full flex flex-col justify-between"
             ):
                 with ui.column().classes("gap-3 grow"):
                     ui.markdown("### Agentic Search")
