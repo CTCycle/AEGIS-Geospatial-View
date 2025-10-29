@@ -4,13 +4,13 @@ import json
 import os
 from typing import Any
 
-from AEGIS.app.constants import RSC_PATH
+from AEGIS.app.constants import CONFIGURATION_PATH
 
 
 ###############################################################################
 class Configuration:
     def __init__(self) -> None:
-        self.config_path = os.path.join(RSC_PATH, "configuration.json")
+        self.config_path = CONFIGURATION_PATH
         self.configuration = self.load_configuration()
 
     # -------------------------------------------------------------------------

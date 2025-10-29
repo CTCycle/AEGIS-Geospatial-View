@@ -7,6 +7,8 @@ from os.path import abspath, join
 ROOT_DIR = abspath(join(__file__, "../../.."))
 PROJECT_DIR = join(ROOT_DIR, "AEGIS")
 RSC_PATH = join(PROJECT_DIR, "resources")
+SETUP_PATH = join(ROOT_DIR, "DILIGENT", "setup")
+CONFIGURATION_PATH = join(SETUP_PATH, "configurations.json")
 MODELS_PATH = join(RSC_PATH, "models")
 DATA_PATH = join(RSC_PATH, "database")
 DOCS_PATH = join(DATA_PATH, "documents")
