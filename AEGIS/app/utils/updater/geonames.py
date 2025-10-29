@@ -18,9 +18,14 @@ from AEGIS.app.logger import logger
 GEONAMES_BASE_URL = "https://download.geonames.org/export/dump"
 DEFAULT_DATASET = "allCountries.zip"
 
-logger = logger.getChild("GeonamesDatasetDownloader")
-logger = logger.getChild("GeonamesArchiveParser")
-updater_logger = logger.getChild("GeonamesUpdater")
+geonames_logger = logger.getChild("Geonames")
+downloader_logger = geonames_logger.getChild("DatasetDownloader")
+parser_logger = geonames_logger.getChild("ArchiveParser")
+updater_logger = geonames_logger.getChild("Updater")
+
+LEADING_SYMBOLS_PATTERN = re.compile(r"^[#?!&$]+\s*")
+DOUBLE_PARENS_PATTERN = re.compile(r"\(\(\s*(.*?)\s*\)\)")
+QUOTE_CHARS = '"“”'
 
 
 ###############################################################################
@@ -43,7 +48,7 @@ class GeonamesDatasetDownloader:
         os.makedirs(self.target_dir, exist_ok=True)
         archive_path = os.path.join(self.target_dir, self.dataset)
         url = f"{self.base_url}/{self.dataset}"
-        logger.info(
+        downloader_logger.info(
             "Starting download of %s from %s", self.dataset, self.base_url
         )
         with urllib.request.urlopen(url) as response, open(archive_path, "wb") as file:
@@ -59,7 +64,7 @@ class GeonamesDatasetDownloader:
                 file.write(chunk)
                 downloaded += len(chunk)
                 self.display_progress(downloaded, total_size)        
-        logger.info("Finished downloading %s", self.dataset)
+        downloader_logger.info("Finished downloading %s", self.dataset)
         return archive_path
 
     # -----------------------------------------------------------------------------
@@ -70,7 +75,7 @@ class GeonamesDatasetDownloader:
                 f"Downloading {self.dataset}: {percentage}% "
                 f"({downloaded}/{total_size} bytes)"
             )
-            logger.info(message)
+            downloader_logger.info(message)
             self._last_logged_percentage = percentage
        
 
@@ -125,7 +130,7 @@ class GeonamesArchiveParser:
         total_lines = reader.count_lines()
         processed_lines = 0
         last_logged_percentage = -1
-        logger.info("Parsing geonames archive with %s total lines", total_lines)       
+        parser_logger.info("Parsing geonames archive with %s total lines", total_lines)
         for line in reader.iterate_lines():
             processed_lines += 1
             record = self.create_record(line)
@@ -137,11 +142,13 @@ class GeonamesArchiveParser:
                 self.flush_batch(batch)
                 batch.clear()
                 percentage = min(int(processed_lines * 100 / total_lines), 100)
-                logger.info("Stored %s geonames records (%s%%)", processed_lines, percentage)
+                parser_logger.info(
+                    "Stored %s geonames records (%s%%)", processed_lines, percentage
+                )
             
         if batch:
             self.flush_batch(batch)
-        logger.info("Stored %s geonames records", total_records)
+        parser_logger.info("Stored %s geonames records", total_records)
 
     # -----------------------------------------------------------------------------
     def flush_batch(self, batch: list[dict[str, Any]]) -> None:
@@ -232,12 +239,14 @@ class GeonamesArchiveParser:
     # -----------------------------------------------------------------------------
     def sanitize_name(self, value: str) -> str:
         sanitized = value.strip()
-        sanitized = re.sub(r"^[#?!&$]+\s*", "", sanitized)
-        sanitized = sanitized.strip("“” ")
-        match = re.fullmatch(r"\(\(\s*(.*?)\s*\)\)", sanitized)
+        sanitized = sanitized.strip(QUOTE_CHARS)
+        sanitized = LEADING_SYMBOLS_PATTERN.sub("", sanitized)
+        match = DOUBLE_PARENS_PATTERN.fullmatch(sanitized)
         if match:
-            sanitized = match.group(1)
-        return sanitized.strip("“” ")
+            sanitized = match.group(1).strip()
+        sanitized = sanitized.strip(QUOTE_CHARS)
+        sanitized = LEADING_SYMBOLS_PATTERN.sub("", sanitized)
+        return sanitized.strip()
 
 
 ###############################################################################
