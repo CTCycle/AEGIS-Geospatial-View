@@ -244,45 +244,6 @@ def configure_interface() -> None:
                                 address_input.props("required")
                                 COMPONENTS["address"] = address_input
 
-                        with ui.element("div").classes(
-                            "flex-1 min-w-[200px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
-                        ):
-                            with ui.column().classes("gap-3 h-full"):
-                                with ui.row().classes(
-                                    "items-center gap-2 text-slate-700"
-                                ):
-                                    ui.icon("schedule").classes("text-primary")
-                                    ui.label("Time").classes(
-                                        "text-base font-semibold"
-                                    )
-
-                                date_input = ui.input(label="Reference Moment")
-                                date_input.props["type"] = "datetime-local"
-                                date_input.set_value(get_datetime_default_value())
-                                COMPONENTS["date"] = date_input
-
-                        with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
-                            "p-4 bg-white shadow-sm flex flex-col"
-                        ):
-                            with ui.column().classes("gap-3 h-full"):
-                                with ui.row().classes(
-                                    "items-center gap-2 text-slate-700"
-                                ):
-                                    ui.icon("layers").classes("text-primary")
-                                    ui.label("Filters").classes(
-                                        "text-base font-semibold"
-                                    )
-
-                                filter_select = ui.select(
-                                    FILTER_CHOICES,
-                                    value=DEFAULT_FILTER,
-                                    label="Imagery Style",
-                                )
-                                filter_select.classes("w-full")
-                                COMPONENTS["filter"] = filter_select
-
                                 with ui.expansion().classes(
                                     "rounded-lg border border-slate-200"
                                 ) as coordinate_expansion:
@@ -338,6 +299,45 @@ def configure_interface() -> None:
                                         COMPONENTS["longitude"] = (
                                             longitude_input
                                         )
+
+                        with ui.element("div").classes(
+                            "flex-1 min-w-[200px] rounded-xl border border-slate-200 "
+                            "p-4 bg-white shadow-sm flex flex-col"
+                        ):
+                            with ui.column().classes("gap-3 h-full"):
+                                with ui.row().classes(
+                                    "items-center gap-2 text-slate-700"
+                                ):
+                                    ui.icon("schedule").classes("text-primary")
+                                    ui.label("Time").classes(
+                                        "text-base font-semibold"
+                                    )
+
+                                date_input = ui.input(label="Reference Moment")
+                                date_input.props["type"] = "datetime-local"
+                                date_input.set_value(get_datetime_default_value())
+                                COMPONENTS["date"] = date_input
+
+                        with ui.element("div").classes(
+                            "flex-1 min-w-[220px] rounded-xl border border-slate-200 "
+                            "p-4 bg-white shadow-sm flex flex-col"
+                        ):
+                            with ui.column().classes("gap-3 h-full"):
+                                with ui.row().classes(
+                                    "items-center gap-2 text-slate-700"
+                                ):
+                                    ui.icon("layers").classes("text-primary")
+                                    ui.label("Filters").classes(
+                                        "text-base font-semibold"
+                                    )
+
+                                filter_select = ui.select(
+                                    FILTER_CHOICES,
+                                    value=DEFAULT_FILTER,
+                                    label="Imagery Style",
+                                )
+                                filter_select.classes("w-full")
+                                COMPONENTS["filter"] = filter_select
 
                     with ui.row().classes("w-full justify-end mt-4"):
                         date_input = ui.input(label="Date and Time")
