@@ -207,23 +207,6 @@ def configure_interface() -> None:
                             address_input.props("required")
                             COMPONENTS["address"] = address_input
 
-                        with ui.element("div").classes(
-                            "flex-1 min-w-[220px] rounded-lg border border-gray-200 "
-                            "p-4 bg-white shadow-sm flex flex-col gap-3"
-                        ):
-                            filter_select = ui.select(
-                                FILTER_CHOICES,
-                                value=DEFAULT_FILTER,
-                                label="Imagery Style",
-                            )
-                            filter_select.classes("w-full")
-                            COMPONENTS["filter"] = filter_select
-
-                            date_input = ui.input(label="Reference Moment")
-                            date_input.props["type"] = "datetime-local"
-                            date_input.set_value(get_datetime_default_value())
-                            COMPONENTS["date"] = date_input
-
                             use_coordinates_checkbox = ui.checkbox(
                                 "Provide precise coordinates"
                             )
@@ -255,9 +238,26 @@ def configure_interface() -> None:
                                     longitude_input.classes("flex-1 min-w-[160px]")
                                     COMPONENTS["longitude"] = longitude_input
 
+                        with ui.element("div").classes(
+                            "flex-1 min-w-[220px] rounded-lg border border-gray-200 "
+                            "p-4 bg-white shadow-sm flex flex-col gap-3"
+                        ):
+                            filter_select = ui.select(
+                                FILTER_CHOICES,
+                                value=DEFAULT_FILTER,
+                                label="Imagery Style",
+                            )
+                            filter_select.classes("w-full")
+                            COMPONENTS["filter"] = filter_select                            
+
                     with ui.row().classes("w-full justify-end mt-4"):
+                        date_input = ui.input(label="Date and Time")
+                        date_input.props["type"] = "datetime-local"
+                        date_input.set_value(get_datetime_default_value())
+                        COMPONENTS["date"] = date_input
+
                         search_button = ui.button(
-                            "Search Imagery", on_click=handle_search_click
+                            "Start search", on_click=handle_search_click
                         )
                         search_button.props("color=primary")
                         COMPONENTS["search"] = search_button
