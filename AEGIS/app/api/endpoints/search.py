@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, status
 
 from AEGIS.app.api.schemas.geographics import LocationSearchRequest
+from AEGIS.app.utils.services.geonames import GeonameProperties
 
 
 router = APIRouter(prefix="/maps", tags=["search"])
@@ -13,9 +14,18 @@ router = APIRouter(prefix="/maps", tags=["search"])
 ###############################################################################
 @router.post("/search", status_code=status.HTTP_200_OK)
 async def search_by_location(payload: LocationSearchRequest) -> dict[str, Any]:
+    geonames_matches: list[dict[str, Any]] = []
+    if not payload.use_coordinates:
+        geoname_service = GeonameProperties(
+            country=payload.country,
+            city=payload.city,
+            address=payload.address,
+        )
+        geonames_matches = geoname_service.lookup()
     return {
         "message": "Location search request received.",
         "payload": payload.as_query_payload(),
+        "geonames_matches": geonames_matches,
     }
 
 
