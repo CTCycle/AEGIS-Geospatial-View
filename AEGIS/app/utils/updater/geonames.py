@@ -126,12 +126,7 @@ class GeonamesArchiveParser:
         total_lines = reader.count_lines()
         processed_lines = 0
         last_logged_percentage = -1
-        if total_lines > 0:
-            logger.info(
-                "Parsing geonames archive with %s total lines", total_lines
-            )
-        else:
-            logger.info("Parsing geonames archive")
+        logger.info("Parsing geonames archive with %s total lines", total_lines)       
         for line in reader.iterate_lines():
             processed_lines += 1
             record = self.create_record(line)
@@ -142,20 +137,9 @@ class GeonamesArchiveParser:
             if len(batch) >= self.batch_size:
                 self.flush_batch(batch)
                 batch.clear()
-                logger.info("Stored %s geonames records", total_records)
-            if total_lines > 0:
                 percentage = min(int(processed_lines * 100 / total_lines), 100)
-                if (
-                    percentage % 10 == 0
-                    and percentage != last_logged_percentage
-                ):
-                    logger.info(
-                        "Parsing geonames archive: %s%% (%s/%s lines)",
-                        percentage,
-                        processed_lines,
-                        total_lines,
-                    )
-                    last_logged_percentage = percentage
+                logger.info("Stored %s geonames records (%s%)", processed_lines, percentage)
+            
         if batch:
             self.flush_batch(batch)
         logger.info("Stored %s geonames records", total_records)
