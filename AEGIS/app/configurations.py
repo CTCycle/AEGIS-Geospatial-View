@@ -4,8 +4,9 @@ import json
 from typing import Any
 from os import path
 
+from AEGIS.app.constants import SETUP_DIR
 CONFIGURATION_CACHE: dict[str, Any] | None = None
-CONFIGURATION_FILE = path.join(path.dirname(__file__), "data", "configurations.json")
+CONFIGURATION_FILE = path.join(SETUP_DIR, "configurations.json")
 
 
 ###############################################################################

@@ -9,7 +9,6 @@ __pycache__
 *.log
 *.docx
 *.json
-!AEGIS/app/configurations/data/configurations.json
 *.xlsx
 *.pdf
 *.csv   
@@ -21,3 +20,5 @@ __pycache__
 *.egg-info
 *.gz
 !.gitkeep
+
+!AEGIS/setup/*.json
