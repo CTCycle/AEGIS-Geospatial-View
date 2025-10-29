@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any, Final
 
@@ -102,6 +103,7 @@ def gather_search_parameters() -> dict[str, Any]:
     filter_component = get_component("filter")
     country_component = get_component("country")
     city_component = get_component("city")
+    address_component = get_component("address")
     use_coordinates_component = get_component("use_coordinates")
     latitude_component = get_component("latitude")
     longitude_component = get_component("longitude")
@@ -110,6 +112,7 @@ def gather_search_parameters() -> dict[str, Any]:
     filter_value = filter_component.value if filter_component else None
     country_value = sanitized_text(country_component.value if country_component else None)
     city_value = sanitized_text(city_component.value if city_component else None)
+    address_value = sanitized_text(address_component.value if address_component else None)
     use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
     latitude_value = latitude_component.value if latitude_component else None
     longitude_value = longitude_component.value if longitude_component else None
@@ -124,6 +127,7 @@ def gather_search_parameters() -> dict[str, Any]:
         "filter": filter_value,
         "country": country_value,
         "city": city_value,
+        "address": address_value,
         "use_coordinates": use_coordinates,
         "coordinates": coordinates,
         "latitude": latitude_value,
@@ -136,8 +140,14 @@ def gather_search_parameters() -> dict[str, Any]:
 ###############################################################################
 async def handle_search_click() -> None:
     parameters = gather_search_parameters()
-    _, message = await submit_location_search(parameters)
-    update_status_message(message or "Location search payload submitted.")
+    data, message = await submit_location_search(parameters)
+    status_message = message or "Location search payload submitted."
+    if isinstance(data, dict):
+        payload = data.get("payload")
+        if isinstance(payload, dict):
+            serialized = json.dumps(payload, indent=2, sort_keys=True)
+            status_message = f"{status_message}\n\n```json\n{serialized}\n```"
+    update_status_message(status_message)
   
 
 
@@ -187,6 +197,14 @@ def configure_interface() -> None:
                     )
                     city_input.classes("w-full")
                     COMPONENTS["city"] = city_input
+
+                    address_input = ui.input(
+                        label="Street Address",
+                        placeholder="Enter the specific address",
+                    )
+                    address_input.classes("w-full")
+                    address_input.props("required")
+                    COMPONENTS["address"] = address_input
 
                     use_coordinates_checkbox = ui.checkbox("Provide precise coordinates")
                     COMPONENTS["use_coordinates"] = use_coordinates_checkbox
