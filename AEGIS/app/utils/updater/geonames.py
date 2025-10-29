@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import urllib.request
 import zipfile
 from collections.abc import Iterator
@@ -17,9 +18,9 @@ from AEGIS.app.logger import logger
 GEONAMES_BASE_URL = "https://download.geonames.org/export/dump"
 DEFAULT_DATASET = "allCountries.zip"
 
-logger = logger.getChild("GeonamesDatasetDownloader")
-logger = logger.getChild("GeonamesArchiveParser")
-updater_logger = logger.getChild("GeonamesUpdater")
+LEADING_SYMBOLS_PATTERN = re.compile(r"^[#?!&$]+\s*")
+DOUBLE_PARENS_PATTERN = re.compile(r"\(\(\s*(.*?)\s*\)\)")
+QUOTE_CHARS = '"“”'
 
 
 ###############################################################################
@@ -43,7 +44,9 @@ class GeonamesDatasetDownloader:
         archive_path = os.path.join(self.target_dir, self.dataset)
         url = f"{self.base_url}/{self.dataset}"
         logger.info(
-            "Starting download of %s from %s", self.dataset, self.base_url
+            "[Geonames][DatasetDownloader] Starting download of %s from %s",
+            self.dataset,
+            self.base_url,
         )
         with urllib.request.urlopen(url) as response, open(archive_path, "wb") as file:
             total_size = int(response.headers.get("content-length", "0"))
@@ -58,7 +61,10 @@ class GeonamesDatasetDownloader:
                 file.write(chunk)
                 downloaded += len(chunk)
                 self.display_progress(downloaded, total_size)        
-        logger.info("Finished downloading %s", self.dataset)
+        logger.info(
+            "[Geonames][DatasetDownloader] Finished downloading %s",
+            self.dataset,
+        )
         return archive_path
 
     # -----------------------------------------------------------------------------
@@ -69,7 +75,7 @@ class GeonamesDatasetDownloader:
                 f"Downloading {self.dataset}: {percentage}% "
                 f"({downloaded}/{total_size} bytes)"
             )
-            logger.info(message)
+            logger.info("[Geonames][DatasetDownloader] %s", message)
             self._last_logged_percentage = percentage
        
 
@@ -123,8 +129,10 @@ class GeonamesArchiveParser:
         total_records = 0
         total_lines = reader.count_lines()
         processed_lines = 0
-        last_logged_percentage = -1
-        logger.info("Parsing geonames archive with %s total lines", total_lines)       
+        logger.info(
+            "[Geonames][ArchiveParser] Parsing geonames archive with %s total lines",
+            total_lines,
+        )
         for line in reader.iterate_lines():
             processed_lines += 1
             record = self.create_record(line)
@@ -136,11 +144,17 @@ class GeonamesArchiveParser:
                 self.flush_batch(batch)
                 batch.clear()
                 percentage = min(int(processed_lines * 100 / total_lines), 100)
-                logger.info("Stored %s geonames records (%s%%)", processed_lines, percentage)
+                logger.info(
+                    "[Geonames][ArchiveParser] Stored %s geonames records (%s%%)",
+                    processed_lines,
+                    percentage,
+                )
             
         if batch:
             self.flush_batch(batch)
-        logger.info("Stored %s geonames records", total_records)
+        logger.info(
+            "[Geonames][ArchiveParser] Stored %s geonames records", total_records
+        )
 
     # -----------------------------------------------------------------------------
     def flush_batch(self, batch: list[dict[str, Any]]) -> None:
@@ -156,9 +170,9 @@ class GeonamesArchiveParser:
             return None
         record: dict[str, Any] = {
             "geonameid": geoname_id,
-            "name": self.parse_text(values[1]),
-            "asciiname": self.parse_text(values[2]),
-            "alternatenames": self.parse_nullable_text(values[3]),
+            "name": self.parse_name(values[1]),
+            "asciiname": self.parse_name(values[2]),
+            "alternatenames": self.parse_alternate_names(values[3]),
             "latitude": self.parse_float(values[4]),
             "longitude": self.parse_float(values[5]),
             "feature_class": self.parse_text(values[6]),
@@ -206,6 +220,40 @@ class GeonamesArchiveParser:
     def parse_nullable_text(self, value: str) -> str | None:
         return self.parse_text(value)
 
+    # -----------------------------------------------------------------------------
+    def parse_name(self, value: str) -> str | None:
+        parsed = self.parse_text(value)
+        if parsed is None:
+            return None
+        sanitized = self.sanitize_name(parsed)
+        return sanitized or None
+
+    # -----------------------------------------------------------------------------
+    def parse_alternate_names(self, value: str) -> str | None:
+        parsed = self.parse_text(value)
+        if parsed is None:
+            return None
+        names = []
+        for entry in parsed.split(","):
+            sanitized = self.sanitize_name(entry)
+            if sanitized:
+                names.append(sanitized)
+        if not names:
+            return None
+        return ",".join(names)
+
+    # -----------------------------------------------------------------------------
+    def sanitize_name(self, value: str) -> str:
+        sanitized = value.strip()
+        sanitized = sanitized.strip(QUOTE_CHARS)
+        sanitized = LEADING_SYMBOLS_PATTERN.sub("", sanitized)
+        match = DOUBLE_PARENS_PATTERN.fullmatch(sanitized)
+        if match:
+            sanitized = match.group(1).strip()
+        sanitized = sanitized.strip(QUOTE_CHARS)
+        sanitized = LEADING_SYMBOLS_PATTERN.sub("", sanitized)
+        return sanitized.strip()
+
 
 ###############################################################################
 class GeonamesUpdater:
@@ -237,11 +285,13 @@ class GeonamesUpdater:
         )
         if archive_path is not None:
             parser.parse(archive_path)
-            updater_logger.info(
-                "Completed geonames updater for dataset %s", self.dataset
+            logger.info(
+                "[Geonames][Updater] Completed geonames updater for dataset %s",
+                self.dataset,
             )
         else:
-            updater_logger.error(
-                "Failed to download geonames dataset %s", self.dataset
+            logger.error(
+                "[Geonames][Updater] Failed to download geonames dataset %s",
+                self.dataset,
             )
 
