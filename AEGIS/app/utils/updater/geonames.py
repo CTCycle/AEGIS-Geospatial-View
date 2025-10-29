@@ -96,13 +96,24 @@ class GeonamesArchiveReader:
                 return member
         return archive.namelist()[0]
 
+    # -----------------------------------------------------------------------------
+    def count_lines(self) -> int:
+        with zipfile.ZipFile(self.archive_path) as archive:
+            member_name = self.get_primary_member(archive)
+            with archive.open(member_name) as binary_stream:
+                with io.TextIOWrapper(binary_stream, encoding="utf-8") as text_stream:
+                    total = 0
+                    for _ in text_stream:
+                        total += 1
+        return total
+
 
 ###############################################################################
 class GeonamesArchiveParser:
     def __init__(
         self,
         serializer: DataSerializer,
-        batch_size: int = 5000,
+        batch_size: int = 10000,
     ) -> None:
         self.serializer = serializer
         self.batch_size = batch_size
@@ -112,8 +123,17 @@ class GeonamesArchiveParser:
         reader = GeonamesArchiveReader(archive_path)
         batch: list[dict[str, Any]] = []
         total_records = 0
-        logger.info("Parsing geonames archive")
+        total_lines = reader.count_lines()
+        processed_lines = 0
+        last_logged_percentage = -1
+        if total_lines > 0:
+            logger.info(
+                "Parsing geonames archive with %s total lines", total_lines
+            )
+        else:
+            logger.info("Parsing geonames archive")
         for line in reader.iterate_lines():
+            processed_lines += 1
             record = self.create_record(line)
             if record is None:
                 continue
@@ -123,6 +143,19 @@ class GeonamesArchiveParser:
                 self.flush_batch(batch)
                 batch.clear()
                 logger.info("Stored %s geonames records", total_records)
+            if total_lines > 0:
+                percentage = min(int(processed_lines * 100 / total_lines), 100)
+                if (
+                    percentage % 10 == 0
+                    and percentage != last_logged_percentage
+                ):
+                    logger.info(
+                        "Parsing geonames archive: %s%% (%s/%s lines)",
+                        percentage,
+                        processed_lines,
+                        total_lines,
+                    )
+                    last_logged_percentage = percentage
         if batch:
             self.flush_batch(batch)
         logger.info("Stored %s geonames records", total_records)
@@ -200,7 +233,7 @@ class GeonamesUpdater:
         base_url: str = GEONAMES_BASE_URL,
         dataset: str = DEFAULT_DATASET,
         storage_dir: str | None = None,
-        batch_size: int = 5000,
+        batch_size: int = 10000,
     ) -> None:
         self.serializer = serializer or DataSerializer()
         self.base_url = base_url
