@@ -138,18 +138,16 @@ async def submit_location_search(
     payload, error_message = build_request_payload(parameters)
     if error_message:
         return None, error_message
-    return await execute_map_request(GEO_SEARCH_URL, payload)
+    return await search_maps(payload)
 
 
 ###############################################################################
-async def execute_map_request(
-    endpoint: str, payload: dict[str, Any]
-) -> tuple[dict[str, Any] | None, str]:
+async def search_maps(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
     try:
         async with httpx.AsyncClient(
             base_url=API_BASE_URL, timeout=HTTP_TIMEOUT_SECONDS
         ) as client:
-            response = await client.post(endpoint, json=payload)
+            response = await client.post(GEO_SEARCH_URL, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
         return None, f"[ERROR] Unable to reach map service: {exc}"

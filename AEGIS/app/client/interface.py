@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any, Final
 
@@ -136,8 +137,14 @@ def gather_search_parameters() -> dict[str, Any]:
 ###############################################################################
 async def handle_search_click() -> None:
     parameters = gather_search_parameters()
-    _, message = await submit_location_search(parameters)
-    update_status_message(message or "Location search payload submitted.")
+    data, message = await submit_location_search(parameters)
+    status_message = message or "Location search payload submitted."
+    if isinstance(data, dict):
+        payload = data.get("payload")
+        if isinstance(payload, dict):
+            serialized = json.dumps(payload, indent=2, sort_keys=True)
+            status_message = f"{status_message}\n\n```json\n{serialized}\n```"
+    update_status_message(status_message)
   
 
 
