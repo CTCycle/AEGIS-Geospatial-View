@@ -278,21 +278,35 @@ def configure_interface() -> None:
                     agentic_button.props("color=secondary")
                     COMPONENTS["agentic"] = agentic_button
 
-                    status_display = ui.markdown(
-                        "Adjust the parameters above, then fetch map imagery."
-                    )
-                    COMPONENTS["status"] = status_display
-
-        with ui.row().classes("w-full items-stretch"):
-            with ui.card().classes("w-full"):
-                with ui.column().classes("gap-3"):
+        with ui.row().classes(
+            "w-full gap-4 items-stretch flex-wrap md:flex-nowrap"
+        ):
+            with ui.card().classes("flex-1 basis-[80%] min-w-[320px]"):
+                with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Map Preview")
 
                     map_canvas = ui.image()
                     map_canvas.classes(
-                        "w-full min-h-[360px] max-h-[640px] object-contain bg-slate-100"
+                        "w-full h-full min-h-[360px] max-h-[640px] object-contain bg-slate-100"
                     )
                     COMPONENTS["map"] = map_canvas
+
+            with ui.card().classes(
+                "basis-[20%] grow-0 min-w-[240px] max-w-[360px]"
+            ):
+                with ui.column().classes("gap-3 h-full"):
+                    ui.markdown("### Endpoint Output")
+
+                    with ui.scroll_area().classes(
+                        "w-full h-full max-h-[640px]"
+                    ):
+                        status_display = ui.markdown(
+                            "Adjust the parameters above, then fetch map imagery."
+                        )
+                        status_display.classes(
+                            "text-sm whitespace-pre-wrap font-mono"
+                        )
+                        COMPONENTS["status"] = status_display
     
     apply_component_states(set_location_mode(False))
     apply_component_states(set_agentic_mode(False, False))
