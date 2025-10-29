@@ -172,70 +172,96 @@ def configure_interface() -> None:
                     auth_button.props("size=sm")
                     COMPONENTS["auth_button"] = auth_button
 
-        with ui.row().classes("w-full gap-6 items-start flex-wrap"):
-            with ui.card().classes("flex-1 min-w-[320px]"):
-                with ui.column().classes("gap-3"):
+        with ui.row().classes("w-full gap-6 items-stretch flex-wrap"):
+            with ui.card().classes("flex-1 min-w-[320px] h-full"):
+                with ui.column().classes("gap-4 h-full"):
                     ui.markdown("### Location search")
-                    filter_select = ui.select(
-                        FILTER_CHOICES,
-                        value=DEFAULT_FILTER,
-                        label="Imagery Style",
-                    )
-                    filter_select.classes("w-full")
-                    COMPONENTS["filter"] = filter_select
+                    with ui.row().classes(
+                        "w-full gap-4 items-stretch flex-wrap lg:flex-nowrap"
+                    ):
+                        with ui.element("div").classes(
+                            "flex-1 min-w-[220px] rounded-lg border border-gray-200 "
+                            "p-4 bg-white shadow-sm"
+                        ):
+                            with ui.column().classes("gap-3"):
+                                country_input = ui.input(
+                                    label="Country or Region",
+                                    placeholder="Enter a country or region",
+                                )
+                                country_input.classes("w-full")
+                                COMPONENTS["country"] = country_input
 
-                    country_input = ui.input(
-                        label="Country or Region",
-                        placeholder="Enter a country or region",
-                    )
-                    country_input.classes("w-full")
-                    COMPONENTS["country"] = country_input
+                                city_input = ui.input(
+                                    label="City Name",
+                                    placeholder="Enter a city or locale",
+                                )
+                                city_input.classes("w-full")
+                                COMPONENTS["city"] = city_input
 
-                    city_input = ui.input(
-                        label="City Name",
-                        placeholder="Enter a city or locale",
-                    )
-                    city_input.classes("w-full")
-                    COMPONENTS["city"] = city_input
+                                address_input = ui.input(
+                                    label="Street Address",
+                                    placeholder="Enter the specific address",
+                                )
+                                address_input.classes("w-full")
+                                address_input.props("required")
+                                COMPONENTS["address"] = address_input
 
-                    address_input = ui.input(
-                        label="Street Address",
-                        placeholder="Enter the specific address",
-                    )
-                    address_input.classes("w-full")
-                    address_input.props("required")
-                    COMPONENTS["address"] = address_input
+                        with ui.element("div").classes(
+                            "flex-1 min-w-[220px] rounded-lg border border-gray-200 "
+                            "p-4 bg-white shadow-sm"
+                        ):
+                            with ui.column().classes("gap-3"):
+                                filter_select = ui.select(
+                                    FILTER_CHOICES,
+                                    value=DEFAULT_FILTER,
+                                    label="Imagery Style",
+                                )
+                                filter_select.classes("w-full")
+                                COMPONENTS["filter"] = filter_select
 
-                    use_coordinates_checkbox = ui.checkbox("Provide precise coordinates")
-                    COMPONENTS["use_coordinates"] = use_coordinates_checkbox
+                                date_input = ui.input(label="Reference Moment")
+                                date_input.props["type"] = "datetime-local"
+                                date_input.set_value(get_datetime_default_value())
+                                COMPONENTS["date"] = date_input
 
-                    latitude_input = ui.number(
-                        label="Latitude (°)",
-                        format="%.6f",
-                        step=0.000001,
-                    )
-                    COMPONENTS["latitude"] = latitude_input
+                                use_coordinates_checkbox = ui.checkbox(
+                                    "Provide precise coordinates"
+                                )
+                                COMPONENTS["use_coordinates"] = use_coordinates_checkbox
 
-                    longitude_input = ui.number(
-                        label="Longitude (°)",
-                        format="%.6f",
-                        step=0.000001,
-                    )
-                    COMPONENTS["longitude"] = longitude_input
+                                with ui.expansion("Coordinate details", icon="my_location") as coordinate_expansion:
+                                    coordinate_expansion.bind_visibility_from(
+                                        use_coordinates_checkbox, "value"
+                                    )
+                                    coordinate_expansion.bind_value_from(
+                                        use_coordinates_checkbox, "value"
+                                    )
+                                    with ui.row().classes("w-full gap-3 flex-wrap"):
+                                        latitude_input = ui.number(
+                                            label="Latitude (°)",
+                                            format="%.6f",
+                                            step=0.000001,
+                                        )
+                                        latitude_input.classes("flex-1 min-w-[160px]")
+                                        COMPONENTS["latitude"] = latitude_input
 
-                    date_input = ui.input(label="Reference Moment")
-                    date_input.props["type"] = "datetime-local"
-                    date_input.set_value(get_datetime_default_value())
-                    COMPONENTS["date"] = date_input
+                                        longitude_input = ui.number(
+                                            label="Longitude (°)",
+                                            format="%.6f",
+                                            step=0.000001,
+                                        )
+                                        longitude_input.classes("flex-1 min-w-[160px]")
+                                        COMPONENTS["longitude"] = longitude_input
 
-                    search_button = ui.button(
-                        "Search Imagery", on_click=handle_search_click
-                    )
-                    search_button.props("color=primary")
-                    COMPONENTS["search"] = search_button
+                    with ui.row().classes("w-full justify-end mt-auto"):
+                        search_button = ui.button(
+                            "Search Imagery", on_click=handle_search_click
+                        )
+                        search_button.props("color=primary")
+                        COMPONENTS["search"] = search_button
 
-            with ui.card().classes("flex-1 min-w-[320px]"):
-                with ui.column().classes("gap-3"):
+            with ui.card().classes("flex-1 min-w-[320px] h-full"):
+                with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Agentic Search")
                     agentic_checkbox = ui.checkbox("Activate agentic assistant")
                     COMPONENTS["agentic_toggle"] = agentic_checkbox
@@ -281,18 +307,18 @@ def configure_interface() -> None:
         with ui.row().classes(
             "w-full gap-4 items-stretch flex-wrap md:flex-nowrap"
         ):
-            with ui.card().classes("flex-1 basis-[80%] min-w-[320px]"):
+            with ui.card().classes("flex-1 basis-[65%] min-w-[320px]"):
                 with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Map Preview")
 
                     map_canvas = ui.image()
                     map_canvas.classes(
-                        "w-full h-full min-h-[360px] max-h-[640px] object-contain bg-slate-100"
+                        "w-full h-full min-h-[480px] max-h-[720px] object-contain bg-slate-100"
                     )
                     COMPONENTS["map"] = map_canvas
 
             with ui.card().classes(
-                "basis-[20%] grow-0 min-w-[240px] max-w-[360px]"
+                "basis-[35%] grow-0 min-w-[280px] max-w-[480px]"
             ):
                 with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Endpoint Output")
