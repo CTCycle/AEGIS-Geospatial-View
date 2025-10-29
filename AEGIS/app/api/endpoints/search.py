@@ -37,9 +37,8 @@ async def search_by_location(payload: LocationSearchRequest) -> dict[str, Any]:
         )
         geonames_matches = geoname_service.lookup()
     return {
-        "message": "Location search request received.",
         "payload": payload.as_query_payload(),
-        "geonames_matches": geonames_matches,
+        "geonames_candidates": geonames_matches,
     }
 
 
