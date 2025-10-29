@@ -5,12 +5,10 @@ from AEGIS.app.utils.updater import GeonamesUpdater
 
 from AEGIS.app.logger import logger
 
-script_logger = logger.getChild("update_geonames_script")
-
 
 ###############################################################################
 if __name__ == "__main__":
-    script_logger.info("Starting sanitized geonames update process")
+    logger.info("Starting sanitized geonames update process")
     database.initialize_database()
     updater = GeonamesUpdater()
     updater.update()
