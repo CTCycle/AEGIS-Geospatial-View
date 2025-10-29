@@ -1,76 +1,83 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Final
+from functools import partial
+from typing import Any
 
 from nicegui import ui
 
 from AEGIS.app.client.controllers import (
-    NO_UPDATE,
-    ComponentState,
+    ComponentUpdate,
+    MISSING,
     set_agentic_mode,
     set_cloud_model_mode,
     set_location_mode,
     submit_location_search,
 )
+from AEGIS.app.configurations import ClientRuntimeConfig
 
-FILTER_CHOICES: Final[list[str]] = [
-    "Natural Color",
-    "Topographic",
-    "Population Density",
-    "Weather Overlay",
-]
-DEFAULT_FILTER: Final[str] = FILTER_CHOICES[0]
-OPENAI_MODEL_CHOICES: Final[list[str]] = [
-    "gpt-4o-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-3.5-turbo",
-]
-AGENT_MODEL_CHOICES: Final[list[str]] = [
-    "llama3",
-    "mistral",
-    "phi3",
-]
-DEFAULT_AGENT_MODEL: Final[str] = AGENT_MODEL_CHOICES[0]
-DEFAULT_AGENTIC_TEMPERATURE: Final[float] = 0.7
-
-COMPONENTS: dict[str, Any] = {}
-
-
-def get_component(name: str) -> Any | None:
-    return COMPONENTS.get(name)
+client_config = ClientRuntimeConfig()
 
 
 ###############################################################################
-def apply_component_state(name: str, state: ComponentState) -> None:
-    component = get_component(name)
+@dataclass
+class ClientComponents:
+    auth_button: Any
+    country: Any
+    city: Any
+    address: Any
+    use_coordinates: Any
+    latitude: Any
+    longitude: Any
+    date: Any
+    filter: Any
+    search: Any
+    agentic_toggle: Any
+    llm_query: Any
+    use_cloud: Any
+    openai_model: Any
+    agent_model: Any
+    temperature: Any
+    agentic: Any
+    status: Any
+    map_display: Any
+
+
+###############################################################################
+def apply_component_update(component: Any, update: ComponentUpdate) -> None:
     if component is None:
         return
-    if state.value is not NO_UPDATE:
+    if update.value is not MISSING:
         if hasattr(component, "set_value"):
-            component.set_value(state.value)
+            component.set_value(update.value)
         elif hasattr(component, "set_content"):
-            component.set_content(state.value)
+            component.set_content(update.value)
         else:
-            component.value = state.value
-    if state.enabled is not None:
-        if state.enabled:
+            component.value = update.value
+    if update.enabled is not None:
+        if update.enabled and hasattr(component, "enable"):
             component.enable()
-        else:
+        elif not update.enabled and hasattr(component, "disable"):
             component.disable()
-    if state.minimum is not None and hasattr(component, "props"):
-        component.props["min"] = state.minimum
-    if state.maximum is not None and hasattr(component, "props"):
-        component.props["max"] = state.maximum
-    component.update()
+    if update.visible is not None and hasattr(component, "visible"):
+        component.visible = update.visible
+    if update.minimum is not None and hasattr(component, "props"):
+        component.props["min"] = update.minimum
+    if update.maximum is not None and hasattr(component, "props"):
+        component.props["max"] = update.maximum
+    if hasattr(component, "update"):
+        component.update()
 
 
 ###############################################################################
-def apply_component_states(states: dict[str, ComponentState]) -> None:
-    for name, state in states.items():
-        apply_component_state(name, state)
+def apply_component_updates(
+    components: ClientComponents, updates: dict[str, ComponentUpdate]
+) -> None:
+    for name, update in updates.items():
+        component = getattr(components, name, None)
+        apply_component_update(component, update)
 
 
 ###############################################################################
@@ -81,16 +88,9 @@ def sanitized_text(value: Any) -> str | None:
     return None
 
 
-
-
-
-
 ###############################################################################
-def update_status_message(message: str) -> None:
-    status_component = get_component("status")
-    if status_component is None:
-        return
-    status_component.set_content(message)
+def update_status_message(components: ClientComponents, message: str) -> None:
+    apply_component_update(components.status, ComponentUpdate(value=message))
 
 
 ###############################################################################
@@ -98,65 +98,74 @@ def get_datetime_default_value() -> str:
     current = datetime.now().replace(second=0, microsecond=0)
     return current.isoformat(timespec="minutes")
 
+
 ###############################################################################
-def gather_search_parameters() -> dict[str, Any]:
-    filter_component = get_component("filter")
-    country_component = get_component("country")
-    city_component = get_component("city")
-    address_component = get_component("address")
-    use_coordinates_component = get_component("use_coordinates")
-    latitude_component = get_component("latitude")
-    longitude_component = get_component("longitude")
-    date_component = get_component("date")
-
-    filter_value = filter_component.value if filter_component else None
-    country_value = sanitized_text(country_component.value if country_component else None)
-    city_value = sanitized_text(city_component.value if city_component else None)
-    address_value = sanitized_text(address_component.value if address_component else None)
-    use_coordinates = bool(use_coordinates_component.value) if use_coordinates_component else False
-    latitude_value = latitude_component.value if latitude_component else None
-    longitude_value = longitude_component.value if longitude_component else None
-    date_value = sanitized_text(date_component.value if date_component else None)
-
+def gather_search_parameters(components: ClientComponents) -> dict[str, Any]:
     coordinates = {
-        "latitude": latitude_value if latitude_value is not None else None,
-        "longitude": longitude_value if longitude_value is not None else None,
+        "latitude": components.latitude.value,
+        "longitude": components.longitude.value,
     }
-
     return {
-        "filter": filter_value,
-        "country": country_value,
-        "city": city_value,
-        "address": address_value,
-        "use_coordinates": use_coordinates,
+        "filter": components.filter.value,
+        "country": sanitized_text(components.country.value),
+        "city": sanitized_text(components.city.value),
+        "address": sanitized_text(components.address.value),
+        "use_coordinates": bool(components.use_coordinates.value),
         "coordinates": coordinates,
-        "latitude": latitude_value,
-        "longitude": longitude_value,
-        "datetime": date_value,
-        "date": date_value,
+        "latitude": components.latitude.value,
+        "longitude": components.longitude.value,
+        "datetime": sanitized_text(components.date.value),
+        "date": sanitized_text(components.date.value),
     }
 
 
 ###############################################################################
-async def handle_search_click() -> None:
-    parameters = gather_search_parameters()
+def format_status_output(
+    data: dict[str, Any] | None, message: str
+) -> str:
+    if not data:
+        return message
+    payload = data.get("payload") if isinstance(data, dict) else None
+    if isinstance(payload, dict):
+        serialized = json.dumps(payload, indent=2, sort_keys=True)
+        return f"{message}\n\n```json\n{serialized}\n```"
+    return message
+
+
+###############################################################################
+async def handle_use_coordinates_change(
+    components: ClientComponents, event: Any
+) -> None:
+    use_coordinates = bool(event.value)
+    updates = set_location_mode(use_coordinates)
+    apply_component_updates(components, updates)
+
+
+###############################################################################
+async def handle_agentic_toggle(components: ClientComponents, event: Any) -> None:
+    agentic_enabled = bool(event.value)
+    use_coordinates = bool(components.use_coordinates.value)
+    updates = set_agentic_mode(agentic_enabled, use_coordinates)
+    apply_component_updates(components, updates)
+
+
+###############################################################################
+async def handle_cloud_toggle(components: ClientComponents, event: Any) -> None:
+    update = set_cloud_model_mode(bool(event.value))
+    apply_component_update(components.openai_model, update)
+
+
+###############################################################################
+async def handle_search_click(components: ClientComponents, event: Any) -> None:
+    parameters = gather_search_parameters(components)
     data, message = await submit_location_search(parameters)
-    status_message = message or "Location search payload submitted."
-    if isinstance(data, dict):
-        payload = data.get("payload")
-        if isinstance(payload, dict):
-            serialized = json.dumps(payload, indent=2, sort_keys=True)
-            status_message = f"{status_message}\n\n```json\n{serialized}\n```"
-    update_status_message(status_message)
-  
-
-
-
+    base_message = message or "Location search payload submitted."
+    status_message = format_status_output(data, base_message)
+    update_status_message(components, status_message)
 
 
 ###############################################################################
 def configure_interface() -> None:
-    COMPONENTS.clear()
     ui.page_title("AEGIS Geographics")
     ui.markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
 
@@ -193,196 +202,111 @@ def configure_interface() -> None:
             with ui.card().classes("w-full max-w-md"):
                 with ui.column().classes("gap-4"):
                     ui.markdown("**Authentication**")
-                    auth_button = ui.button(
-                        "Authenticate", on_click=None
-                    )
+                    auth_button = ui.button("Authenticate", on_click=None)
                     auth_button.props("color=secondary")
                     auth_button.props("size=sm")
-                    COMPONENTS["auth_button"] = auth_button
 
         with ui.row().classes("w-full gap-6 items-start flex-wrap"):
             with ui.card().classes(
                 "flex-1 min-w-[320px] w-full flex flex-col justify-between"
             ):
-                with ui.column().classes("gap-4 grow"):
+                with ui.column().classes("gap-4"):
                     ui.markdown("### Location search")
-                    with ui.row().classes(
-                        "w-full gap-4 items-stretch flex-wrap"
-                    ):
-                        with ui.element("div").classes(
-                            "basis-full lg:flex-1 lg:min-w-[260px] "
-                            "rounded-xl border border-slate-200 p-4 bg-white "
-                            "shadow-sm flex flex-col"
-                        ):
-                            with ui.column().classes("gap-3 h-full"):
-                                with ui.row().classes(
-                                    "items-center gap-2 text-slate-700"
-                                ):
-                                    ui.icon("location_on").classes("text-primary")
-                                    ui.label("Location").classes(
-                                        "text-base font-semibold"
-                                    )
+                    with ui.column().classes("gap-3"):
+                        use_coordinates_switch = ui.switch("Provide latitude and longitude")
+                        use_coordinates_switch.props("color=primary")
 
-                                country_input = ui.input(
-                                    label="Country or Region",
-                                    placeholder="Enter a country or region",
-                                )
-                                country_input.classes("w-full")
-                                COMPONENTS["country"] = country_input
-
-                                city_input = ui.input(
-                                    label="City Name",
-                                    placeholder="Enter a city or locale",
-                                )
-                                city_input.classes("w-full")
-                                COMPONENTS["city"] = city_input
-
-                                address_input = ui.input(
-                                    label="Street Address",
-                                    placeholder="Enter the specific address",
-                                )
-                                address_input.classes("w-full")
-                                address_input.props("required")
-                                COMPONENTS["address"] = address_input
-
-                                with ui.expansion(
-                                    "Coordinate details",
-                                    icon="my_location",
-                                ).classes(
-                                    "rounded-xl border border-slate-200"
-                                    " bg-white shadow-sm overflow-hidden"
-                                ) as coordinate_expansion:
-                                    coordinate_expansion.props(
-                                        "switch-toggle dense expand-icon=keyboard_arrow_down "
-                                        "toggle-color=primary "
-                                        "header-class=px-4 header-class=py-3 header-class=gap-3 "
-                                        "header-class=items-center header-class=text-slate-700 "
-                                        "header-class=font-semibold header-class=bg-slate-50"
-                                    )
-                                    COMPONENTS["use_coordinates"] = coordinate_expansion
-
-                                    with ui.column().classes(
-                                        "gap-3 px-4 pb-4 pt-2 bg-white"
-                                    ):
-                                        with ui.row().classes(
-                                            "w-full gap-3 flex-wrap"
-                                        ):
-                                            latitude_input = ui.number(
-                                                label="Latitude (°)",
-                                                format="%.6f",
-                                                step=0.000001,
-                                            )
-                                            latitude_input.classes(
-                                                "flex-1 min-w-[160px]"
-                                            )
-                                            COMPONENTS["latitude"] = latitude_input
-
-                                            longitude_input = ui.number(
-                                                label="Longitude (°)",
-                                                format="%.6f",
-                                                step=0.000001,
-                                            )
-                                            longitude_input.classes(
-                                                "flex-1 min-w-[160px]"
-                                            )
-                                            COMPONENTS["longitude"] = (
-                                                longitude_input
-                                            )
-
-                        with ui.element("div").classes(
-                            "basis-full lg:flex-1 lg:min-w-[220px] "
-                            "rounded-xl border border-slate-200 p-4 bg-white "
-                            "shadow-sm flex flex-col"
-                        ):
-                            with ui.column().classes("gap-3 h-full"):
-                                with ui.row().classes(
-                                    "items-center gap-2 text-slate-700"
-                                ):
-                                    ui.icon("schedule").classes("text-primary")
-                                    ui.label("Time").classes(
-                                        "text-base font-semibold"
-                                    )
-
-                                date_input = ui.input(label="Reference Moment")
-                                date_input.props["type"] = "datetime-local"
-                                date_input.set_value(get_datetime_default_value())
-                                COMPONENTS["date"] = date_input
-
-                        with ui.element("div").classes(
-                            "basis-full lg:flex-1 lg:min-w-[240px] "
-                            "rounded-xl border border-slate-200 p-4 bg-white "
-                            "shadow-sm flex flex-col"
-                        ):
-                            with ui.column().classes("gap-3 h-full"):
-                                with ui.row().classes(
-                                    "items-center gap-2 text-slate-700"
-                                ):
-                                    ui.icon("layers").classes("text-primary")
-                                    ui.label("Filters").classes(
-                                        "text-base font-semibold"
-                                    )
-
-                                filter_select = ui.select(
-                                    FILTER_CHOICES,
-                                    value=DEFAULT_FILTER,
-                                    label="Imagery Style",
-                                )
-                                filter_select.classes("w-full")
-                                COMPONENTS["filter"] = filter_select
-
-                    with ui.row().classes("w-full justify-start mt-4"):
-                        search_button = ui.button(
-                            "Start search", on_click=handle_search_click
+                        country_input = ui.input(
+                            label="Country or Region",
+                            placeholder="Enter a country or region",
                         )
-                        search_button.props("color=primary")
-                        COMPONENTS["search"] = search_button
+                        country_input.classes("w-full")
+
+                        city_input = ui.input(
+                            label="City Name",
+                            placeholder="Enter a city or locale",
+                        )
+                        city_input.classes("w-full")
+
+                        address_input = ui.input(
+                            label="Street Address",
+                            placeholder="Enter the specific address",
+                        )
+                        address_input.classes("w-full")
+                        address_input.props("required")
+
+                        with ui.row().classes("w-full gap-3 flex-wrap"):
+                            latitude_input = ui.number(
+                                label="Latitude (°)",
+                                format="%.6f",
+                                step=0.000001,
+                            )
+                            latitude_input.classes("flex-1 min-w-[160px]")
+
+                            longitude_input = ui.number(
+                                label="Longitude (°)",
+                                format="%.6f",
+                                step=0.000001,
+                            )
+                            longitude_input.classes("flex-1 min-w-[160px]")
+
+                        date_input = ui.input(label="Reference Moment")
+                        date_input.props["type"] = "datetime-local"
+                        date_input.set_value(get_datetime_default_value())
+
+                        filter_select = ui.select(
+                            client_config.filter_choices,
+                            value=client_config.default_filter,
+                            label="Imagery Style",
+                        )
+                        filter_select.classes("w-full")
+
+                    search_button = ui.button(
+                        "Start search",
+                        on_click=None,
+                    )
+                    search_button.props("color=primary")
 
             with ui.card().classes(
                 "flex-1 min-w-[320px] w-full flex flex-col justify-between"
             ):
-                with ui.column().classes("gap-3 grow"):
+                with ui.column().classes("gap-3"):
                     ui.markdown("### Agentic Search")
                     agentic_checkbox = ui.checkbox("Activate agentic assistant")
-                    COMPONENTS["agentic_toggle"] = agentic_checkbox
 
                     llm_query_input = ui.textarea(
                         label="Agent Prompt",
                         placeholder="Describe the geographic insights you need",
                     )
                     llm_query_input.classes("w-full")
-                    COMPONENTS["llm_query"] = llm_query_input
 
                     with ui.expansion("Model configuration", icon="settings"):
                         use_cloud_checkbox = ui.checkbox("Leverage OpenAI cloud models")
-                        COMPONENTS["use_cloud"] = use_cloud_checkbox
 
                         openai_model_dropdown = ui.select(
-                            OPENAI_MODEL_CHOICES,
+                            client_config.openai_model_choices,
                             label="OpenAI model choice",
                         )
                         openai_model_dropdown.classes("w-full")
-                        COMPONENTS["openai_model"] = openai_model_dropdown
 
                         agent_model_dropdown = ui.select(
-                            AGENT_MODEL_CHOICES,
-                            value=DEFAULT_AGENT_MODEL,
+                            client_config.agent_model_choices,
+                            value=client_config.default_agent_model,
                             label="Ollama agent model",
                         )
                         agent_model_dropdown.classes("w-full")
-                        COMPONENTS["agent_model"] = agent_model_dropdown
 
                         temperature_input = ui.number(
                             label="Sampling temperature",
-                            value=DEFAULT_AGENTIC_TEMPERATURE,
+                            value=client_config.agentic_temperature_default,
                             step=0.1,
                             format="%.2f",
                         )
-                        COMPONENTS["temperature"] = temperature_input
+                        temperature_input.props["min"] = client_config.agentic_temperature_min
+                        temperature_input.props["max"] = client_config.agentic_temperature_max
 
-                with ui.row().classes("w-full justify-end mt-4"):
-                    agentic_button = ui.button("Run agentic search", on_click=None)
-                    agentic_button.props("color=secondary")
-                    COMPONENTS["agentic"] = agentic_button
+                agentic_button = ui.button("Run agentic search", on_click=None)
+                agentic_button.props("color=secondary")
 
         with ui.row().classes(
             "w-full gap-4 items-stretch flex-wrap md:flex-nowrap"
@@ -390,19 +314,16 @@ def configure_interface() -> None:
             with ui.card().classes("flex-1 basis-[60%] min-w-[320px]"):
                 with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Map Preview")
-
                     map_canvas = ui.image()
                     map_canvas.classes(
                         "w-full h-full min-h-[560px] max-h-[800px] object-contain bg-slate-100"
                     )
-                    COMPONENTS["map"] = map_canvas
 
             with ui.card().classes(
                 "basis-[40%] grow-0 min-w-[300px] max-w-[520px]"
             ):
                 with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Endpoint Output")
-
                     with ui.scroll_area().classes(
                         "w-full h-full max-h-[640px]"
                     ):
@@ -412,12 +333,47 @@ def configure_interface() -> None:
                         status_display.classes(
                             "text-sm whitespace-pre-wrap font-mono"
                         )
-                        COMPONENTS["status"] = status_display
-    
-    apply_component_states(set_location_mode(False))
-    apply_component_states(set_agentic_mode(False, False))
-    apply_component_state("openai_model", set_cloud_model_mode(False))
-    update_status_message("Adjust the parameters above, then fetch map imagery.")
+
+    components = ClientComponents(
+        auth_button=auth_button,
+        country=country_input,
+        city=city_input,
+        address=address_input,
+        use_coordinates=use_coordinates_switch,
+        latitude=latitude_input,
+        longitude=longitude_input,
+        date=date_input,
+        filter=filter_select,
+        search=search_button,
+        agentic_toggle=agentic_checkbox,
+        llm_query=llm_query_input,
+        use_cloud=use_cloud_checkbox,
+        openai_model=openai_model_dropdown,
+        agent_model=agent_model_dropdown,
+        temperature=temperature_input,
+        agentic=agentic_button,
+        status=status_display,
+        map_display=map_canvas,
+    )
+
+    use_coordinates_switch.on_value_change(
+        partial(handle_use_coordinates_change, components)
+    )
+    agentic_checkbox.on_value_change(
+        partial(handle_agentic_toggle, components)
+    )
+    use_cloud_checkbox.on_value_change(
+        partial(handle_cloud_toggle, components)
+    )
+    search_button.on_click(partial(handle_search_click, components))
+
+    apply_component_updates(components, set_location_mode(False))
+    apply_component_updates(components, set_agentic_mode(False, False))
+    apply_component_update(components.openai_model, set_cloud_model_mode(False))
+    update_status_message(
+        components,
+        "Adjust the parameters above, then fetch map imagery.",
+    )
 
 
 ###############################################################################
@@ -428,7 +384,6 @@ def render_interface_page() -> None:
 
 ###############################################################################
 def create_interface() -> None:
-    # kept for compatibility: page registration happens via decorator
     pass
 
 

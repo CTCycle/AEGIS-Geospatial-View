@@ -34,4 +34,26 @@ DEFAULT_AGENTIC_TEMPERATURE = 0.7
 MIN_AGENTIC_TEMPERATURE = 0.0
 MAX_AGENTIC_TEMPERATURE = 2.0
 
+# [CLIENT OPTIONS]
+###############################################################################
+FILTER_CHOICES = [
+    "Natural Color",
+    "Topographic",
+    "Population Density",
+    "Weather Overlay",
+]
+DEFAULT_FILTER = FILTER_CHOICES[0]
+OPENAI_MODEL_CHOICES = [
+    "gpt-4o-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-3.5-turbo",
+]
+AGENT_MODEL_CHOICES = [
+    "llama3",
+    "mistral",
+    "phi3",
+]
+DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
+
 
