@@ -173,7 +173,11 @@ async def search_maps(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, s
     if not status_message:
         status_message = "Map search request submitted."
 
-    return data, status_message
+    formatted_status = (
+        f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
+    )
+
+    return data, formatted_status
 
 
 ###############################################################################
