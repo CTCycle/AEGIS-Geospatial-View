@@ -44,7 +44,7 @@ class GeonamesDatasetDownloader:
         archive_path = os.path.join(self.target_dir, self.dataset)
         url = f"{self.base_url}/{self.dataset}"
         logger.info(
-            "[Geonames][DatasetDownloader] Starting download of %s from %s",
+            "Starting download of %s from %s",
             self.dataset,
             self.base_url,
         )
@@ -62,7 +62,7 @@ class GeonamesDatasetDownloader:
                 downloaded += len(chunk)
                 self.display_progress(downloaded, total_size)        
         logger.info(
-            "[Geonames][DatasetDownloader] Finished downloading %s",
+            "Finished downloading %s",
             self.dataset,
         )
         return archive_path
@@ -75,7 +75,7 @@ class GeonamesDatasetDownloader:
                 f"Downloading {self.dataset}: {percentage}% "
                 f"({downloaded}/{total_size} bytes)"
             )
-            logger.info("[Geonames][DatasetDownloader] %s", message)
+            logger.info("%s", message)
             self._last_logged_percentage = percentage
        
 
@@ -130,7 +130,7 @@ class GeonamesArchiveParser:
         total_lines = reader.count_lines()
         processed_lines = 0
         logger.info(
-            "[Geonames][ArchiveParser] Parsing geonames archive with %s total lines",
+            "Parsing geonames archive with %s total lines",
             total_lines,
         )
         for line in reader.iterate_lines():
@@ -145,7 +145,7 @@ class GeonamesArchiveParser:
                 batch.clear()
                 percentage = min(int(processed_lines * 100 / total_lines), 100)
                 logger.info(
-                    "[Geonames][ArchiveParser] Stored %s geonames records (%s%%)",
+                    "Stored %s geonames records (%s%%)",
                     processed_lines,
                     percentage,
                 )
@@ -153,7 +153,7 @@ class GeonamesArchiveParser:
         if batch:
             self.flush_batch(batch)
         logger.info(
-            "[Geonames][ArchiveParser] Stored %s geonames records", total_records
+            "Stored %s geonames records", total_records
         )
 
     # -----------------------------------------------------------------------------
@@ -286,12 +286,12 @@ class GeonamesUpdater:
         if archive_path is not None:
             parser.parse(archive_path)
             logger.info(
-                "[Geonames][Updater] Completed geonames updater for dataset %s",
+                "Completed geonames updater for dataset %s",
                 self.dataset,
             )
         else:
             logger.error(
-                "[Geonames][Updater] Failed to download geonames dataset %s",
+                "Failed to download geonames dataset %s",
                 self.dataset,
             )
 
