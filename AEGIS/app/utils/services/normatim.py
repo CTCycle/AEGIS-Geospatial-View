@@ -141,7 +141,7 @@ class NormatimService:
     ) -> float | None:
         importance_score = self.derive_importance_score(data.get("importance"))
         text_score = self.derive_text_match_score(
-            data.get("display_name"),
+            data,
             address=address,
             city=city,
             country_name=country_name,
@@ -152,8 +152,8 @@ class NormatimService:
         bounding_box = data.get("boundingbox")
         bbox_score = self.derive_bbox_score(bounding_box) if bounding_box else 0.5
         combined = (
-            (importance_score * 0.4)
-            + (text_score * 0.3)
+            (importance_score * 0.25)
+            + (text_score * 0.45)
             + (granularity_score * 0.2)
             + (bbox_score * 0.1)
         )
@@ -180,7 +180,7 @@ class NormatimService:
     #-----------------------------------------------------------------------------
     def derive_text_match_score(
         self,
-        display_name: Any,
+        data: dict[str, Any],
         *,
         address: str,
         city: str | None,
@@ -188,21 +188,33 @@ class NormatimService:
         country_code: str | None,
         query: str,
     ) -> float:
-        components: list[str] = []
-        for value in (address, city, country_name, country_code, query):
-            if value:
-                components.append(self.normalize_component(value))
-        if not components:
+        normalized_display = self.normalize_component(str(data.get("display_name", "")))
+        display_tokens = normalized_display.split()
+        address_tokens = self.tokenize(address)
+        city_tokens = self.tokenize(city)
+        query_tokens = self.tokenize(query)
+        address_weight = 0.6 if address_tokens else 0.0
+        city_weight = 0.25 if city_tokens else 0.0
+        country_weight = 0.15 if country_name or country_code else 0.0
+        query_weight = 0.1 if query_tokens and not address_tokens else 0.0
+        total_weight = address_weight + city_weight + country_weight + query_weight
+        if total_weight == 0.0:
             return 0.5
-        normalized_display = self.normalize_component(str(display_name)) if display_name else ""
-        matches = 0
-        for component in components:
-            if component and component in normalized_display:
-                matches += 1
-        if matches == 0 and normalized_display:
-            overlap = self.compute_overlap_ratio(components[0], normalized_display)
-            return max(0.2, min(1.0, overlap))
-        return matches / len(components)
+        score = 0.0
+        if address_weight:
+            score += self.compute_token_overlap(address_tokens, display_tokens) * address_weight
+        if city_weight:
+            score += self.compute_city_alignment(city_tokens, data, display_tokens) * city_weight
+        if country_weight:
+            score += self.compute_country_alignment(
+                country_name,
+                country_code,
+                data,
+                normalized_display,
+            ) * country_weight
+        if query_weight:
+            score += self.compute_token_overlap(query_tokens, display_tokens) * query_weight
+        return score / total_weight
 
     #-----------------------------------------------------------------------------
     def derive_granularity_score(self, place_class: Any, place_type: Any) -> float:
@@ -266,6 +278,102 @@ class NormatimService:
         if area <= 0.05:
             return 0.5
         return 0.35
+
+    #-----------------------------------------------------------------------------
+    def tokenize(self, value: str | None) -> list[str]:
+        if not value:
+            return []
+        normalized_value = self.normalize_component(value)
+        if not normalized_value:
+            return []
+        return [token for token in normalized_value.split() if token]
+
+    #-----------------------------------------------------------------------------
+    def compute_token_overlap(
+        self,
+        tokens: list[str],
+        reference_tokens: list[str],
+    ) -> float:
+        if not tokens:
+            return 0.0
+        if not reference_tokens:
+            return 0.5
+        token_set = set(tokens)
+        reference_set = set(reference_tokens)
+        matches = len(token_set & reference_set)
+        if matches:
+            return matches / len(token_set)
+        overlap = self.compute_overlap_ratio(" ".join(tokens), " ".join(reference_tokens))
+        if overlap <= 0.0:
+            return 0.2
+        return max(0.2, min(1.0, overlap))
+
+    #-----------------------------------------------------------------------------
+    def compute_city_alignment(
+        self,
+        city_tokens: list[str],
+        data: dict[str, Any],
+        display_tokens: list[str],
+    ) -> float:
+        if not city_tokens:
+            return 0.5
+        normalized_city = " ".join(city_tokens)
+        address_data = data.get("address")
+        if not isinstance(address_data, dict):
+            address_data = {}
+        for key in (
+            "city",
+            "town",
+            "village",
+            "hamlet",
+            "municipality",
+            "county",
+            "state_district",
+            "suburb",
+        ):
+            candidate = address_data.get(key)
+            if candidate and self.normalize_component(str(candidate)) == normalized_city:
+                return 1.0
+        display_set = set(display_tokens)
+        city_set = set(city_tokens)
+        intersection = city_set & display_set
+        if intersection:
+            return len(intersection) / len(city_set)
+        overlap = self.compute_overlap_ratio(normalized_city, " ".join(display_tokens))
+        if overlap <= 0.0:
+            return 0.2
+        return max(0.2, min(1.0, overlap))
+
+    #-----------------------------------------------------------------------------
+    def compute_country_alignment(
+        self,
+        country_name: str | None,
+        country_code: str | None,
+        data: dict[str, Any],
+        normalized_display: str,
+    ) -> float:
+        address_data = data.get("address")
+        if not isinstance(address_data, dict):
+            address_data = {}
+        expected_code = (country_code or "").lower()
+        result_code = str(address_data.get("country_code", "")).lower()
+        if expected_code and result_code:
+            if expected_code == result_code:
+                return 1.0
+            return 0.35
+        normalized_country = self.normalize_component(country_name) if country_name else ""
+        if normalized_country:
+            candidate = address_data.get("country")
+            if candidate and self.normalize_component(str(candidate)) == normalized_country:
+                return 0.9
+        if normalized_country and normalized_country in normalized_display:
+            return 0.8
+        if normalized_country:
+            overlap = self.compute_overlap_ratio(normalized_country, normalized_display)
+            if overlap <= 0.0:
+                return 0.2
+            return max(0.2, min(1.0, overlap))
+        return 0.5
 
     #-----------------------------------------------------------------------------
     def normalize_component(self, value: str) -> str:
