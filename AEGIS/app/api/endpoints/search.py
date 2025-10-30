@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import date, datetime, time
 from typing import Any
 
@@ -10,34 +9,40 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from AEGIS.app.api.schemas.geographics import LocationSearchRequest
+from AEGIS.app.utils.services.normatim import NormatimService
+from AEGIS.app.utils.services.sanitization import LocationSanitizationService
 
 router = APIRouter(prefix="/maps", tags=["search"])
 
-
-###############################################################################
-def normalize_location_value(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    if not stripped:
-        return None
-    normalized = " ".join(stripped.split())
-    return normalized.lower()
+sanitization_service = LocationSanitizationService()
+normatim_service = NormatimService()
 
 
 ###############################################################################
 async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
     geonames_matches: list[dict[str, Any]] = []
-    normalized_country = normalize_location_value(payload.country)
-    normalized_city = normalize_location_value(payload.city)
-    normalized_address = normalize_location_value(payload.address)
-    
-    if not payload.use_coordinates:        
-        pass
+    sanitized_location: dict[str, str | None] | None = None
+    normatim_candidate: dict[str, Any] | None = None
+
+    if not payload.use_coordinates:
+        sanitized_location = sanitization_service.sanitize_location_inputs(
+            address=payload.address or "",
+            city=payload.city,
+            country=payload.country,
+        )
+        normatim_candidate = await normatim_service.extract_coordinates(
+            address=sanitized_location["address"] or "",
+            city=sanitized_location["city"],
+            country_name=sanitized_location["country"],
+            country_code=sanitized_location["country_code"],
+        )
+
     return {
         "status_message": "Map search request submitted.",
         "payload": payload.as_query_payload(),
         "geonames_candidates": geonames_matches,
+        "sanitized_location": sanitized_location,
+        "normatim_candidate": normatim_candidate,
     }
 
 
