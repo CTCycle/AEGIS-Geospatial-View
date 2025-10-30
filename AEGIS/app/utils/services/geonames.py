@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import re
 import unicodedata
 from difflib import SequenceMatcher
@@ -37,11 +36,7 @@ class GeonameProperties:
         self.fuzzy_threshold = settings["fuzzy_threshold"]
 
     # -------------------------------------------------------------------------
-    async def lookup(self) -> list[dict[str, Any]]:
-        return await asyncio.to_thread(self.execute_lookup)
-
-    # -------------------------------------------------------------------------
-    def execute_lookup(self) -> list[dict[str, Any]]:
+    def lookup(self) -> list[dict[str, Any]]:
         if not self.queries:
             return []
         with database.Session() as session:
