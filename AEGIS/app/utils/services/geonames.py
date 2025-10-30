@@ -3,11 +3,21 @@ from __future__ import annotations
 import re
 import unicodedata
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from AEGIS.app.constants import (
+    GEONAMES_ADDRESS_FULL_WEIGHT,
+    GEONAMES_ADDRESS_MULTI_COMPONENT_WEIGHT,
+    GEONAMES_ADDRESS_SINGLE_COMPONENT_WEIGHT,
+    GEONAMES_FUZZY_WEIGHT_FACTOR,
+    GEONAMES_QUERY_ADDRESS_MULTI_WEIGHT,
+    GEONAMES_QUERY_ADDRESS_SINGLE_WEIGHT,
+    GEONAMES_QUERY_CITY_WEIGHT,
+    GEONAMES_QUERY_COUNTRY_WEIGHT,
+)
 from AEGIS.app.configurations import Configuration
 from AEGIS.app.utils.repository.database import GeonamesRecord, database
 
@@ -16,6 +26,15 @@ from AEGIS.app.utils.repository.database import GeonamesRecord, database
 class GeonameProperties:
     settings_cache: dict[str, Any] | None = None
     token_splitter = re.compile(r"[^0-9a-z]+")
+    search_columns = (
+        "name",
+        "asciiname",
+        "alternatenames",
+        "admin1_code",
+        "admin2_code",
+        "admin3_code",
+        "admin4_code",
+    )
 
     def __init__(
         self,
@@ -37,16 +56,241 @@ class GeonameProperties:
 
     # -------------------------------------------------------------------------
     def lookup(self) -> list[dict[str, Any]]:
-        if not self.queries:
-            return []
         with database.Session() as session:
             self.target_country_codes = self.resolve_country_codes(session)
             candidates: dict[int, dict[str, Any]] = {}
+            address_checked = False
+            if self.address or self.address_components:
+                address_checked = self.search_address(session, candidates)
+                if address_checked:
+                    refined_candidates = self.refine_candidates_by_location(candidates)
+                    if refined_candidates:
+                        return self.serialize_candidates(refined_candidates)
+                    if candidates:
+                        return self.serialize_candidates(candidates)
+                    candidates.clear()
+            if not address_checked:
+                self.search_without_address(session, candidates)
+            return self.serialize_candidates(candidates)
+
+    # -------------------------------------------------------------------------
+    def search_address(
+        self,
+        session: Session,
+        candidates: dict[int, dict[str, Any]],
+    ) -> bool:
+        values: list[tuple[str, float]] = []
+        if self.address:
+            values.append((self.address, GEONAMES_ADDRESS_FULL_WEIGHT))
+        for component in self.address_components:
+            if any(component == value for value, _ in values):
+                continue
+            weight = (
+                GEONAMES_ADDRESS_MULTI_COMPONENT_WEIGHT
+                if " " in component
+                else GEONAMES_ADDRESS_SINGLE_COMPONENT_WEIGHT
+            )
+            values.append((component, weight))
+        if not values:
+            return False
+        values.sort(key=lambda item: len(item[0]), reverse=True)
+        found_exact = False
+        for value, weight in values:
+            if len(candidates) >= self.max_results:
+                return True
+            if self.search_value_exact(session, value, weight, "address", candidates):
+                found_exact = True
+        if found_exact:
+            return True
+        found_partial = False
+        for value, weight in values:
+            if len(candidates) >= self.max_results:
+                return True
+            if self.search_value_partial(session, value, weight, "address", candidates):
+                found_partial = True
+        if found_partial:
+            return True
+        fuzzy_found = False
+        for value, weight in values:
+            if len(candidates) >= self.max_results:
+                break
+            if self.search_value_fuzzy(session, value, weight, "address", candidates):
+                fuzzy_found = True
+        return fuzzy_found
+
+    # -------------------------------------------------------------------------
+    def search_without_address(
+        self,
+        session: Session,
+        candidates: dict[int, dict[str, Any]],
+    ) -> None:
+        if not self.queries:
+            return
+        for context in ("city", "country"):
             for query in self.queries:
+                if query["context"] != context:
+                    continue
                 self.match_query(session, query, candidates)
                 if len(candidates) >= self.max_results:
-                    break
-            return self.serialize_candidates(candidates)
+                    return
+
+    # -------------------------------------------------------------------------
+    def get_search_columns(self, context: str) -> tuple[str, ...]:
+        if context == "country":
+            return ("name", "asciiname", "alternatenames", "country_code")
+        return self.search_columns
+
+    # -------------------------------------------------------------------------
+    def search_value_exact(
+        self,
+        session: Session,
+        value: str,
+        weight: float,
+        context: str,
+        candidates: dict[int, dict[str, Any]],
+    ) -> bool:
+        matched = False
+        for column_name in self.get_search_columns(context):
+            column = getattr(GeonamesRecord, column_name)
+            stmt = (
+                select(GeonamesRecord)
+                .where(func.lower(column) == value)
+                .order_by(GeonamesRecord.population.desc().nullslast())
+                .limit(self.max_results)
+            )
+            for record in session.execute(stmt).scalars():
+                self.store_candidate(
+                    candidates,
+                    record,
+                    1.0 * weight,
+                    "exact",
+                    column_name,
+                    context,
+                    value,
+                )
+                matched = True
+                if len(candidates) >= self.max_results:
+                    return True
+        return matched
+
+    # -------------------------------------------------------------------------
+    def search_value_partial(
+        self,
+        session: Session,
+        value: str,
+        weight: float,
+        context: str,
+        candidates: dict[int, dict[str, Any]],
+    ) -> bool:
+        matched = False
+        pattern = f"%{value}%"
+        for column_name in self.get_search_columns(context):
+            column = getattr(GeonamesRecord, column_name)
+            stmt = (
+                select(GeonamesRecord)
+                .where(func.lower(column).like(pattern))
+                .order_by(GeonamesRecord.population.desc().nullslast())
+                .limit(self.partial_limit)
+            )
+            for record in session.execute(stmt).scalars():
+                score, match_type = self.evaluate_record(record, column_name, value)
+                if score <= 0.0:
+                    continue
+                self.store_candidate(
+                    candidates,
+                    record,
+                    score * weight,
+                    match_type,
+                    column_name,
+                    context,
+                    value,
+                )
+                matched = True
+                if len(candidates) >= self.max_results:
+                    return True
+        return matched
+
+    # -------------------------------------------------------------------------
+    def search_value_fuzzy(
+        self,
+        session: Session,
+        value: str,
+        weight: float,
+        context: str,
+        candidates: dict[int, dict[str, Any]],
+    ) -> bool:
+        tokens = self.tokenize_value(value)
+        if not tokens:
+            return False
+        matched = False
+        for token in tokens:
+            pattern = f"%{token}%"
+            for column_name in self.get_search_columns(context):
+                column = getattr(GeonamesRecord, column_name)
+                stmt = (
+                    select(GeonamesRecord)
+                    .where(func.lower(column).like(pattern))
+                    .order_by(GeonamesRecord.population.desc().nullslast())
+                    .limit(self.partial_limit)
+                )
+                for record in session.execute(stmt).scalars():
+                    base_score, base_type = self.evaluate_record(record, column_name, value)
+                    token_score, token_type = self.evaluate_record(record, column_name, token)
+                    if token_score > base_score:
+                        base_score = token_score
+                        base_type = token_type
+                    if base_score <= 0.0:
+                        continue
+                    self.store_candidate(
+                        candidates,
+                        record,
+                        base_score * (weight * GEONAMES_FUZZY_WEIGHT_FACTOR),
+                        base_type or "fuzzy",
+                        column_name,
+                        context,
+                        value,
+                    )
+                    matched = True
+                    if len(candidates) >= self.max_results:
+                        return True
+        return matched
+
+    # -------------------------------------------------------------------------
+    def refine_candidates_by_location(
+        self,
+        candidates: dict[int, dict[str, Any]],
+    ) -> dict[int, dict[str, Any]]:
+        if not candidates:
+            return {}
+        refined: dict[int, dict[str, Any]] = candidates
+        if self.target_country_codes:
+            filtered: dict[int, dict[str, Any]] = {}
+            for key, item in refined.items():
+                record: GeonamesRecord = item["record"]
+                country_code = cast(str | None, record.country_code)
+                if country_code and country_code in self.target_country_codes:
+                    filtered[key] = item
+            if filtered:
+                refined = filtered
+        if self.city:
+            city_filtered: dict[int, dict[str, Any]] = {}
+            for key, item in refined.items():
+                record = item["record"]
+                if self.record_matches_city(record):
+                    city_filtered[key] = item
+            if city_filtered:
+                refined = city_filtered
+        return refined
+
+    # -------------------------------------------------------------------------
+    def record_matches_city(self, record: GeonamesRecord) -> bool:
+        if not self.city:
+            return False
+        for column_name in self.get_search_columns("city"):
+            score, _ = self.evaluate_record(record, column_name, self.city)
+            if score > 0.0:
+                return True
+        return False
 
     # -------------------------------------------------------------------------
     def match_query(
@@ -60,7 +304,7 @@ class GeonameProperties:
             return
         weight = query["weight"]
         context = query["context"]
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns(context):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
@@ -82,7 +326,7 @@ class GeonameProperties:
                 return
 
         partial_value = f"%{value}%"
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns(context):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
@@ -315,15 +559,20 @@ class GeonameProperties:
                 {
                     "context": "city",
                     "value": self.city,
-                    "weight": 1.0,
+                    "weight": GEONAMES_QUERY_CITY_WEIGHT,
                 }
             )
         for component in self.address_components:
+            weight = (
+                GEONAMES_QUERY_ADDRESS_MULTI_WEIGHT
+                if " " in component
+                else GEONAMES_QUERY_ADDRESS_SINGLE_WEIGHT
+            )
             queries.append(
                 {
                     "context": "address",
                     "value": component,
-                    "weight": 0.85 if " " in component else 0.9,
+                    "weight": weight,
                 }
             )
         if self.country:
@@ -331,7 +580,7 @@ class GeonameProperties:
                 {
                     "context": "country",
                     "value": self.country,
-                    "weight": 0.65,
+                    "weight": GEONAMES_QUERY_COUNTRY_WEIGHT,
                 }
             )
         seen: set[str] = set()
