@@ -6,6 +6,7 @@ import logging
 import math
 import socket
 import unicodedata
+from difflib import SequenceMatcher
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -157,6 +158,15 @@ class NormatimService:
             + (granularity_score * 0.2)
             + (bbox_score * 0.1)
         )
+        combined = self.apply_quality_boosts(
+            combined,
+            text_score=text_score,
+            granularity_score=granularity_score,
+            bbox_score=bbox_score,
+            importance_score=importance_score,
+            address=address,
+            data=data,
+        )
         if not math.isfinite(combined):
             return None
         if combined < 0.0:
@@ -190,6 +200,7 @@ class NormatimService:
     ) -> float:
         normalized_display = self.normalize_component(str(data.get("display_name", "")))
         display_tokens = normalized_display.split()
+        structured_tokens = self.collect_address_tokens(data)
         address_tokens = self.tokenize(address)
         city_tokens = self.tokenize(city)
         query_tokens = self.tokenize(query)
@@ -202,7 +213,15 @@ class NormatimService:
             return 0.5
         score = 0.0
         if address_weight:
-            score += self.compute_token_overlap(address_tokens, display_tokens) * address_weight
+            display_alignment = self.compute_token_overlap(address_tokens, display_tokens)
+            structured_alignment = self.compute_token_overlap(address_tokens, structured_tokens)
+            if structured_alignment > max(display_alignment, 0.65):
+                blended_alignment = (
+                    (display_alignment * 0.4) + (structured_alignment * 0.6)
+                )
+                score += blended_alignment * address_weight
+            else:
+                score += display_alignment * address_weight
         if city_weight:
             score += self.compute_city_alignment(city_tokens, data, display_tokens) * city_weight
         if country_weight:
@@ -289,6 +308,31 @@ class NormatimService:
         return [token for token in normalized_value.split() if token]
 
     #-----------------------------------------------------------------------------
+    def collect_address_tokens(self, data: dict[str, Any]) -> list[str]:
+        address_data = data.get("address")
+        if not isinstance(address_data, dict):
+            return []
+        tokens: list[str] = []
+        for key in (
+            "house_number",
+            "road",
+            "pedestrian",
+            "footway",
+            "residential",
+            "neighbourhood",
+            "suburb",
+            "city",
+            "town",
+            "village",
+            "state",
+            "county",
+        ):
+            value = address_data.get(key)
+            if value:
+                tokens.extend(self.tokenize(str(value)))
+        return tokens
+
+    #-----------------------------------------------------------------------------
     def compute_token_overlap(
         self,
         tokens: list[str],
@@ -298,15 +342,104 @@ class NormatimService:
             return 0.0
         if not reference_tokens:
             return 0.5
-        token_set = set(tokens)
-        reference_set = set(reference_tokens)
-        matches = len(token_set & reference_set)
-        if matches:
-            return matches / len(token_set)
-        overlap = self.compute_overlap_ratio(" ".join(tokens), " ".join(reference_tokens))
-        if overlap <= 0.0:
+        direct_matches = len(set(tokens) & set(reference_tokens))
+        if direct_matches == len(tokens):
+            return 1.0
+        available_references = list(reference_tokens)
+        fuzzy_matches = 0.0
+        for token in tokens:
+            best_ratio = 0.0
+            best_index = -1
+            for index, reference in enumerate(available_references):
+                ratio = self.compute_similarity_ratio(token, reference)
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_index = index
+            if best_ratio >= 0.95:
+                fuzzy_matches += 1.0
+            elif best_ratio >= 0.7:
+                fuzzy_matches += best_ratio
+            if best_index >= 0:
+                available_references.pop(best_index)
+        direct_ratio = direct_matches / len(tokens)
+        fuzzy_ratio = fuzzy_matches / len(tokens)
+        aggregate_ratio = self.compute_similarity_ratio(
+            " ".join(tokens), " ".join(reference_tokens)
+        )
+        score = max(direct_ratio, fuzzy_ratio, aggregate_ratio)
+        if score <= 0.0:
+            overlap = self.compute_overlap_ratio(
+                " ".join(tokens), " ".join(reference_tokens)
+            )
+            score = max(score, overlap)
+        if score <= 0.0:
             return 0.2
-        return max(0.2, min(1.0, overlap))
+        if score > 1.0:
+            return 1.0
+        return max(0.2, score)
+
+    #-----------------------------------------------------------------------------
+    def derive_structured_alignment_score(
+        self,
+        address: str,
+        data: dict[str, Any],
+    ) -> float:
+        address_tokens = self.tokenize(address)
+        if not address_tokens:
+            return 0.0
+        structured_tokens = self.collect_address_tokens(data)
+        if not structured_tokens:
+            return 0.0
+        return self.compute_token_overlap(address_tokens, structured_tokens)
+
+    #-----------------------------------------------------------------------------
+    def derive_house_number_score(self, address: str, data: dict[str, Any]) -> float:
+        address_tokens = self.tokenize(address)
+        number_tokens = [token for token in address_tokens if token.isdigit()]
+        if not number_tokens:
+            return 0.5
+        address_data = data.get("address")
+        if not isinstance(address_data, dict):
+            return 0.2
+        candidate = address_data.get("house_number")
+        if not candidate:
+            return 0.2
+        normalized_candidate = self.normalize_component(str(candidate))
+        if not normalized_candidate:
+            return 0.2
+        for token in number_tokens:
+            if token == normalized_candidate:
+                return 1.0
+            if self.compute_similarity_ratio(token, normalized_candidate) >= 0.9:
+                return 1.0
+        return 0.2
+
+    #-----------------------------------------------------------------------------
+    def apply_quality_boosts(
+        self,
+        combined: float,
+        *,
+        text_score: float,
+        granularity_score: float,
+        bbox_score: float,
+        importance_score: float,
+        address: str,
+        data: dict[str, Any],
+    ) -> float:
+        adjusted = combined
+        structured_score = self.derive_structured_alignment_score(address, data)
+        house_score = self.derive_house_number_score(address, data)
+        if structured_score >= 0.75 and bbox_score >= 0.85:
+            adjusted = max(adjusted, 0.78)
+        if structured_score >= 0.85 and house_score >= 0.9:
+            adjusted = max(adjusted, 0.86)
+        if bbox_score >= 0.95 and granularity_score >= 0.8 and house_score >= 0.9:
+            adjusted = max(adjusted, 0.9)
+        if text_score >= 0.7 and bbox_score >= 0.85:
+            adjusted = max(adjusted, 0.82)
+        if importance_score <= 0.1 and structured_score >= 0.9 and bbox_score >= 0.85:
+            adjusted = max(adjusted, 0.88)
+        return adjusted
 
     #-----------------------------------------------------------------------------
     def compute_city_alignment(
@@ -339,7 +472,11 @@ class NormatimService:
         intersection = city_set & display_set
         if intersection:
             return len(intersection) / len(city_set)
-        overlap = self.compute_overlap_ratio(normalized_city, " ".join(display_tokens))
+        display_string = " ".join(display_tokens)
+        similarity = self.compute_similarity_ratio(normalized_city, display_string)
+        if similarity > 0.0:
+            return max(0.2, min(1.0, similarity))
+        overlap = self.compute_overlap_ratio(normalized_city, display_string)
         if overlap <= 0.0:
             return 0.2
         return max(0.2, min(1.0, overlap))
@@ -369,6 +506,11 @@ class NormatimService:
         if normalized_country and normalized_country in normalized_display:
             return 0.8
         if normalized_country:
+            similarity = self.compute_similarity_ratio(
+                normalized_country, normalized_display
+            )
+            if similarity > 0.0:
+                return max(0.2, min(1.0, similarity))
             overlap = self.compute_overlap_ratio(normalized_country, normalized_display)
             if overlap <= 0.0:
                 return 0.2
@@ -380,6 +522,16 @@ class NormatimService:
         normalized = unicodedata.normalize("NFKD", value)
         ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
         return " ".join(ascii_text.lower().split())
+
+    #-----------------------------------------------------------------------------
+    def compute_similarity_ratio(self, source: str, target: str) -> float:
+        normalized_source = self.normalize_component(source)
+        normalized_target = self.normalize_component(target)
+        if not normalized_source or not normalized_target:
+            return 0.0
+        if normalized_source == normalized_target:
+            return 1.0
+        return SequenceMatcher(a=normalized_source, b=normalized_target).ratio()
 
     #-----------------------------------------------------------------------------
     def compute_overlap_ratio(self, source: str, target: str) -> float:
