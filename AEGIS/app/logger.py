@@ -30,7 +30,7 @@ LOG_CONFIG: dict[str, Any] = {
     "disable_existing_loggers": False,
     "filters": {
         "exclude_access_paths": {
-            "()": "AEGIS.app.logger.AccessPathFilter",
+            "()": AccessPathFilter,
         },
     },
     "formatters": {
