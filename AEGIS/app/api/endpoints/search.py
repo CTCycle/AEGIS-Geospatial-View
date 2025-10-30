@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import date, datetime, time
 from typing import Any
 
@@ -10,34 +9,51 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from AEGIS.app.api.schemas.geographics import LocationSearchRequest
+from AEGIS.app.utils.services.normatim import NormatimService
+from AEGIS.app.utils.services.sanitization import LocationSanitizationService
 
 router = APIRouter(prefix="/maps", tags=["search"])
 
-
-###############################################################################
-def normalize_location_value(value: str | None) -> str | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    if not stripped:
-        return None
-    normalized = " ".join(stripped.split())
-    return normalized.lower()
+sanitization_service = LocationSanitizationService()
+normatim_service = NormatimService()
 
 
 ###############################################################################
 async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
-    geonames_matches: list[dict[str, Any]] = []
-    normalized_country = normalize_location_value(payload.country)
-    normalized_city = normalize_location_value(payload.city)
-    normalized_address = normalize_location_value(payload.address)
-    
-    if not payload.use_coordinates:        
-        pass
+    response_payload = payload.as_query_payload()
+
+    if not payload.use_coordinates:
+        sanitized_location = sanitization_service.sanitize_location_inputs(
+            address=payload.address or "",
+            city=payload.city,
+            country=payload.country,
+        )
+        response_payload["sanitized_location"] = sanitized_location
+        normatim_candidate = await normatim_service.extract_coordinates(
+            address=sanitized_location["address"] or "",
+            city=sanitized_location["city"],
+            country_name=sanitized_location["country"],
+            country_code=sanitized_location["country_code"],
+        )
+        if normatim_candidate:
+            response_payload["coordinates"] = {
+                "latitude": normatim_candidate.get("lat"),
+                "longitude": normatim_candidate.get("lon"),
+            }
+            if normatim_candidate.get("bbox"):
+                response_payload["bbox"] = normatim_candidate["bbox"]
+            if normatim_candidate.get("confidence") is not None:
+                response_payload["confidence"] = normatim_candidate["confidence"]
+    else:
+        if payload.latitude is not None and payload.longitude is not None:
+            response_payload["coordinates"] = {
+                "latitude": payload.latitude,
+                "longitude": payload.longitude,
+            }
+
     return {
         "status_message": "Map search request submitted.",
-        "payload": payload.as_query_payload(),
-        "geonames_candidates": geonames_matches,
+        "payload": response_payload,
     }
 
 
