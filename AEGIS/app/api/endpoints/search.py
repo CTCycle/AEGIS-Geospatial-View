@@ -10,7 +10,6 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from AEGIS.app.api.schemas.geographics import LocationSearchRequest
-from AEGIS.app.utils.services.geonames import GeonameProperties
 
 router = APIRouter(prefix="/maps", tags=["search"])
 
@@ -27,23 +26,15 @@ def normalize_location_value(value: str | None) -> str | None:
 
 
 ###############################################################################
-def build_geonames_matches(payload: LocationSearchRequest) -> list[dict[str, Any]]:
+async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
+    geonames_matches: list[dict[str, Any]] = []
     normalized_country = normalize_location_value(payload.country)
     normalized_city = normalize_location_value(payload.city)
     normalized_address = normalize_location_value(payload.address)
-    geoname_service = GeonameProperties(
-        country=normalized_country,
-        city=normalized_city,
-        address=normalized_address,
-    )
-    return geoname_service.lookup()
-
-
-###############################################################################
-async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
-    geonames_matches: list[dict[str, Any]] = []
+    
     if not payload.use_coordinates:
-        geonames_matches = await asyncio.to_thread(build_geonames_matches, payload)
+        # add normalization
+        pass
     return {
         "status_message": "Map search request submitted.",
         "payload": payload.as_query_payload(),
