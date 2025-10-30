@@ -5,6 +5,7 @@ from datetime import date, datetime, time
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from AEGIS.app.api.schemas.geographics import LocationSearchRequest
@@ -58,7 +59,7 @@ async def search_by_location(
     latitude: float | None = Body(default=None),
     longitude: float | None = Body(default=None),
     filter_value: str | None = Body(default=None, alias="filter"),
-) -> dict[str, Any]:
+) -> JSONResponse:
     try:
         payload_data: dict[str, Any] = {
             "datetime": datetime_value,
@@ -80,7 +81,8 @@ async def search_by_location(
             detail=exc.errors(),
         ) from exc
 
-    return await process_location_search(payload)
+    response_payload = await process_location_search(payload)
+    return JSONResponse(content=response_payload)
 
 
 ###############################################################################
