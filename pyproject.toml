@@ -4,24 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "AEGIS"
-version = "1.5"
+version = "1.6"
 requires-python = ">=3.12,<3.13"
 
 dependencies = [
     "fastapi==0.118.0",
-    "nicegui==3.0.4",
-    "torch==2.8.0+cu128",
+    "nicegui==3.0.4",    
     "numpy==2.3.2",
     "pandas==2.3.3",
-    "tqdm==4.67.1",
-    "pdfminer.six==20250506",
-    "pypdf==6.1.1",
+    "tqdm==4.67.1",    
     "SQLAlchemy==2.0.43",
-    "python-dotenv==1.1.0",
-    "langchain==0.3.27",
-    "lancedb==0.24.1",
-    "openpyxl==3.1.5",
-    "pyproj==3.6.1",
+    "python-dotenv==1.1.0",    
     "pytest==8.3.3",
 
 ]
@@ -29,12 +22,3 @@ dependencies = [
 [tool.hatch.build.targets.wheel]
 packages = ["AEGIS"] 
 
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true 
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu128" }
-# torchvision = { index = "pytorch-cu128" }
-# torchaudio  = { index = "pytorch-cu128" }
