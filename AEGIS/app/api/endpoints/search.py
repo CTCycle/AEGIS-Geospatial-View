@@ -31,13 +31,33 @@ async def process_location_search(payload: LocationSearchRequest) -> dict[str, A
     normalized_country = normalize_location_value(payload.country)
     normalized_city = normalize_location_value(payload.city)
     normalized_address = normalize_location_value(payload.address)
-    
+
     if not payload.use_coordinates:
-        # add normalization
-        pass
+        normalized_values = {
+            "country": normalized_country,
+            "city": normalized_city,
+            "address": normalized_address,
+        }
+        payload = payload.model_copy(update=normalized_values)
+        standardized_parts = [
+            value
+            for value in (
+                normalized_address,
+                normalized_city,
+                normalized_country,
+            )
+            if value
+        ]
+        standardized_location = ", ".join(standardized_parts)
+    else:
+        standardized_location = None
+
+    query_payload = payload.as_query_payload()
+    if standardized_location:
+        query_payload["standardized_location"] = standardized_location
     return {
         "status_message": "Map search request submitted.",
-        "payload": payload.as_query_payload(),
+        "payload": query_payload,
         "geonames_candidates": geonames_matches,
     }
 
