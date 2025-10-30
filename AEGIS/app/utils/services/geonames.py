@@ -8,6 +8,16 @@ from typing import Any, cast
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from AEGIS.app.constants import (
+    GEONAMES_ADDRESS_FULL_WEIGHT,
+    GEONAMES_ADDRESS_MULTI_COMPONENT_WEIGHT,
+    GEONAMES_ADDRESS_SINGLE_COMPONENT_WEIGHT,
+    GEONAMES_FUZZY_WEIGHT_FACTOR,
+    GEONAMES_QUERY_ADDRESS_MULTI_WEIGHT,
+    GEONAMES_QUERY_ADDRESS_SINGLE_WEIGHT,
+    GEONAMES_QUERY_CITY_WEIGHT,
+    GEONAMES_QUERY_COUNTRY_WEIGHT,
+)
 from AEGIS.app.configurations import Configuration
 from AEGIS.app.utils.repository.database import GeonamesRecord, database
 
@@ -16,6 +26,15 @@ from AEGIS.app.utils.repository.database import GeonamesRecord, database
 class GeonameProperties:
     settings_cache: dict[str, Any] | None = None
     token_splitter = re.compile(r"[^0-9a-z]+")
+    search_columns = (
+        "name",
+        "asciiname",
+        "alternatenames",
+        "admin1_code",
+        "admin2_code",
+        "admin3_code",
+        "admin4_code",
+    )
 
     def __init__(
         self,
@@ -37,8 +56,6 @@ class GeonameProperties:
 
     # -------------------------------------------------------------------------
     def lookup(self) -> list[dict[str, Any]]:
-        if not (self.address or self.city or self.country):
-            return []
         with database.Session() as session:
             self.target_country_codes = self.resolve_country_codes(session)
             candidates: dict[int, dict[str, Any]] = {}
@@ -64,11 +81,15 @@ class GeonameProperties:
     ) -> bool:
         values: list[tuple[str, float]] = []
         if self.address:
-            values.append((self.address, 1.3))
+            values.append((self.address, GEONAMES_ADDRESS_FULL_WEIGHT))
         for component in self.address_components:
             if any(component == value for value, _ in values):
                 continue
-            weight = 1.15 if " " in component else 1.05
+            weight = (
+                GEONAMES_ADDRESS_MULTI_COMPONENT_WEIGHT
+                if " " in component
+                else GEONAMES_ADDRESS_SINGLE_COMPONENT_WEIGHT
+            )
             values.append((component, weight))
         if not values:
             return False
@@ -114,6 +135,12 @@ class GeonameProperties:
                     return
 
     # -------------------------------------------------------------------------
+    def get_search_columns(self, context: str) -> tuple[str, ...]:
+        if context == "country":
+            return ("name", "asciiname", "alternatenames", "country_code")
+        return self.search_columns
+
+    # -------------------------------------------------------------------------
     def search_value_exact(
         self,
         session: Session,
@@ -123,7 +150,7 @@ class GeonameProperties:
         candidates: dict[int, dict[str, Any]],
     ) -> bool:
         matched = False
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns(context):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
@@ -157,7 +184,7 @@ class GeonameProperties:
     ) -> bool:
         matched = False
         pattern = f"%{value}%"
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns(context):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
@@ -198,7 +225,7 @@ class GeonameProperties:
         matched = False
         for token in tokens:
             pattern = f"%{token}%"
-            for column_name in ("name", "asciiname", "alternatenames"):
+            for column_name in self.get_search_columns(context):
                 column = getattr(GeonamesRecord, column_name)
                 stmt = (
                     select(GeonamesRecord)
@@ -217,7 +244,7 @@ class GeonameProperties:
                     self.store_candidate(
                         candidates,
                         record,
-                        base_score * (weight * 0.95),
+                        base_score * (weight * GEONAMES_FUZZY_WEIGHT_FACTOR),
                         base_type or "fuzzy",
                         column_name,
                         context,
@@ -259,7 +286,7 @@ class GeonameProperties:
     def record_matches_city(self, record: GeonamesRecord) -> bool:
         if not self.city:
             return False
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns("city"):
             score, _ = self.evaluate_record(record, column_name, self.city)
             if score > 0.0:
                 return True
@@ -277,7 +304,7 @@ class GeonameProperties:
             return
         weight = query["weight"]
         context = query["context"]
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns(context):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
@@ -299,7 +326,7 @@ class GeonameProperties:
                 return
 
         partial_value = f"%{value}%"
-        for column_name in ("name", "asciiname", "alternatenames"):
+        for column_name in self.get_search_columns(context):
             column = getattr(GeonamesRecord, column_name)
             stmt = (
                 select(GeonamesRecord)
@@ -532,15 +559,20 @@ class GeonameProperties:
                 {
                     "context": "city",
                     "value": self.city,
-                    "weight": 1.0,
+                    "weight": GEONAMES_QUERY_CITY_WEIGHT,
                 }
             )
         for component in self.address_components:
+            weight = (
+                GEONAMES_QUERY_ADDRESS_MULTI_WEIGHT
+                if " " in component
+                else GEONAMES_QUERY_ADDRESS_SINGLE_WEIGHT
+            )
             queries.append(
                 {
                     "context": "address",
                     "value": component,
-                    "weight": 0.85 if " " in component else 0.9,
+                    "weight": weight,
                 }
             )
         if self.country:
@@ -548,7 +580,7 @@ class GeonameProperties:
                 {
                     "context": "country",
                     "value": self.country,
-                    "weight": 0.65,
+                    "weight": GEONAMES_QUERY_COUNTRY_WEIGHT,
                 }
             )
         seen: set[str] = set()
