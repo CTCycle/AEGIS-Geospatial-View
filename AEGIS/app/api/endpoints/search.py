@@ -5,6 +5,7 @@ from datetime import date, datetime, time
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -82,7 +83,8 @@ async def search_by_location(
         ) from exc
 
     response_payload = await process_location_search(payload)
-    return JSONResponse(content=response_payload)
+    serialized_payload = jsonable_encoder(response_payload)
+    return JSONResponse(content=serialized_payload)
 
 
 ###############################################################################
