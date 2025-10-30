@@ -32,8 +32,7 @@ async def process_location_search(payload: LocationSearchRequest) -> dict[str, A
     normalized_city = normalize_location_value(payload.city)
     normalized_address = normalize_location_value(payload.address)
     
-    if not payload.use_coordinates:
-        # add normalization
+    if not payload.use_coordinates:        
         pass
     return {
         "status_message": "Map search request submitted.",
