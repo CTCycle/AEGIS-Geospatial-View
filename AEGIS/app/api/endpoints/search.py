@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import date, datetime, time
 from typing import Any
 
@@ -37,7 +36,7 @@ async def process_location_search(payload: LocationSearchRequest) -> dict[str, A
             city=normalized_city,
             address=normalized_address,
         )
-        geonames_matches = await asyncio.to_thread(geoname_service.lookup)
+        geonames_matches = await geoname_service.lookup()
     return {
         "status_message": "Map search request submitted.",
         "payload": payload.as_query_payload(),
