@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from typing import Any
+from collections.abc import Callable  
 
 from nicegui import ui
 
@@ -17,6 +18,7 @@ from AEGIS.app.client.controllers import (
     submit_location_search,
 )
 from AEGIS.app.configurations import ClientRuntimeConfig
+
 
 client_config = ClientRuntimeConfig()
 
@@ -44,9 +46,19 @@ class ClientComponents:
     status: Any
     map_display: Any
 
-
+# HELPERS
 ###############################################################################
-def apply_component_update(component: Any, update: ComponentUpdate) -> None:
+def sanitized_text(value: Any) -> str:    
+    return str(value or "").strip()
+
+# -----------------------------------------------------------------------------
+def get_datetime_default_value() -> str:
+    current = datetime.now().replace(second=0, microsecond=0)
+    return current.isoformat(timespec="minutes")
+
+# UPDATES
+###############################################################################
+def apply_component_update(component: Any, update: ComponentUpdate) -> None:    
     if component is None:
         return
     if update.value is not MISSING:
@@ -70,59 +82,8 @@ def apply_component_update(component: Any, update: ComponentUpdate) -> None:
     if hasattr(component, "update"):
         component.update()
 
-
-###############################################################################
-def apply_component_updates(
-    components: ClientComponents, updates: dict[str, ComponentUpdate]
-) -> None:
-    for name, update in updates.items():
-        component = getattr(components, name, None)
-        apply_component_update(component, update)
-
-
-###############################################################################
-def sanitized_text(value: Any) -> str | None:
-    if isinstance(value, str):
-        candidate = value.strip()
-        return candidate or None
-    return None
-
-
-###############################################################################
-def update_status_message(components: ClientComponents, message: str) -> None:
-    apply_component_update(components.status, ComponentUpdate(value=message))
-
-
-###############################################################################
-def get_datetime_default_value() -> str:
-    current = datetime.now().replace(second=0, microsecond=0)
-    return current.isoformat(timespec="minutes")
-
-
-###############################################################################
-def gather_search_parameters(components: ClientComponents) -> dict[str, Any]:
-    coordinates = {
-        "latitude": components.latitude.value,
-        "longitude": components.longitude.value,
-    }
-    return {
-        "filter": components.filter.value,
-        "country": sanitized_text(components.country.value),
-        "city": sanitized_text(components.city.value),
-        "address": sanitized_text(components.address.value),
-        "use_coordinates": bool(components.use_coordinates.value),
-        "coordinates": coordinates,
-        "latitude": components.latitude.value,
-        "longitude": components.longitude.value,
-        "datetime": sanitized_text(components.date.value),
-        "date": sanitized_text(components.date.value),
-    }
-
-
-###############################################################################
-def format_status_output(
-    data: dict[str, Any] | None, message: str
-) -> str:
+# -----------------------------------------------------------------------------
+def format_status_output(data: dict[str, Any] | None, message: str) -> str:
     if not data:
         return message
     payload = data.get("payload") if isinstance(data, dict) else None
@@ -131,39 +92,53 @@ def format_status_output(
         return f"{message}\n\n```json\n{serialized}\n```"
     return message
 
-
-###############################################################################
-async def handle_use_coordinates_change(
-    components: ClientComponents, event: Any
-) -> None:
+# -----------------------------------------------------------------------------
+async def handle_use_coordinates_change(components: ClientComponents, event: Any) -> None:
     use_coordinates = bool(event.value)
     updates = set_location_mode(use_coordinates)
-    apply_component_updates(components, updates)
+    apply_component_update(components.country, updates["country"])
+    apply_component_update(components.city, updates["city"])
+    apply_component_update(components.address, updates["address"])
+    apply_component_update(components.latitude, updates["latitude"])
+    apply_component_update(components.longitude, updates["longitude"])
 
 
-###############################################################################
-async def handle_agentic_toggle(components: ClientComponents, event: Any) -> None:
+# -----------------------------------------------------------------------------
+async def handle_agentic_toggle(components: ClientComponents, event: Any) -> None:    
     agentic_enabled = bool(event.value)
     use_coordinates = bool(components.use_coordinates.value)
     updates = set_agentic_mode(agentic_enabled, use_coordinates)
-    apply_component_updates(components, updates)
+    apply_component_update(components.llm_query, updates["llm_query"])
+    apply_component_update(components.use_cloud, updates["use_cloud"])
+    apply_component_update(components.openai_model, updates["openai_model"])
+    apply_component_update(components.agent_model, updates["agent_model"])
+    apply_component_update(components.temperature, updates["temperature"])
+    apply_component_update(components.agentic, updates["agentic"])
 
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_cloud_toggle(components: ClientComponents, event: Any) -> None:
     update = set_cloud_model_mode(bool(event.value))
     apply_component_update(components.openai_model, update)
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 async def handle_search_click(components: ClientComponents, event: Any) -> None:
-    parameters = gather_search_parameters(components)
-    data, message = await submit_location_search(parameters)
-    base_message = message or "Location search payload submitted."
-    status_message = format_status_output(data, base_message)
-    update_status_message(components, status_message)
+    data, message = await submit_location_search(
+        components.filter.value,
+        sanitized_text(components.country.value),
+        sanitized_text(components.city.value),
+        sanitized_text(components.address.value),
+        bool(components.use_coordinates.value),
+        components.latitude.value,
+        components.longitude.value,
+        sanitized_text(components.date.value),
+    )
+
+    status_message = format_status_output(data, message or "Location search payload submitted.")
+    apply_component_update(components.status, ComponentUpdate(value=status_message))
 
 
+# MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
     ui.page_title("AEGIS Geographics")
@@ -356,6 +331,7 @@ def main_page() -> None:
         map_display=map_canvas,
     )
 
+    # Wire events (targeted updates)
     use_coordinates_switch.on_value_change(
         partial(handle_use_coordinates_change, components)
     )
@@ -365,32 +341,26 @@ def main_page() -> None:
     use_cloud_checkbox.on_value_change(
         partial(handle_cloud_toggle, components)
     )
-    search_button.on_click(partial(handle_search_click, components))
-
-    apply_component_updates(components, set_location_mode(False))
-    apply_component_updates(components, set_agentic_mode(False, False))
-    apply_component_update(components.openai_model, set_cloud_model_mode(False))
-    update_status_message(
-        components,
-        "Adjust the parameters above, then fetch map imagery.",
-    )
+    search_button.on_click(partial(handle_search_click, components))   
 
 
+# MOUNT AND LAUNCH
 ###############################################################################
 def create_interface() -> None:
     ui.page("/")(main_page)
 
 
-###############################################################################
+# -----------------------------------------------------------------------------
 def launch_interface() -> None:
     create_interface()
     ui.run(
         host="0.0.0.0",
         port=7861,
-        title="DILIGENT Clinical Copilot",
+        title="AEGIS Geographics",
         show_welcome_message=False,
     )
 
 
+# -----------------------------------------------------------------------------
 if __name__ in {"__main__", "__mp_main__"}:
     launch_interface()
