@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from AEGIS.app.api.schemas.geographics import LocationSearchRequest
 from AEGIS.app.utils.services.normatim import NormatimService
-from AEGIS.app.utils.services.sanitization import LocationSanitizationService
+from AEGIS.app.utils.services.location import LocationSanitizationService
 
 router = APIRouter(prefix="/maps", tags=["search"])
 
