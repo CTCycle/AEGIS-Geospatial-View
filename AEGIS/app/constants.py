@@ -6,6 +6,7 @@ from os.path import abspath, join
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../.."))
 PROJECT_DIR = join(ROOT_DIR, "AEGIS")
+SETUP_DIR = join(PROJECT_DIR, "setup")
 RSC_PATH = join(PROJECT_DIR, "resources")
 SETUP_PATH = join(ROOT_DIR, "DILIGENT", "setup")
 CONFIGURATION_PATH = join(SETUP_PATH, "configurations.json")
@@ -25,7 +26,7 @@ GEO_AGENTIC_URL = "/maps/agentic"
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
 NASA_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
-API_BASE_URL = "http://127.0.0.1:8002"
+API_BASE_URL = "http://127.0.0.1:800"
 HTTP_TIMEOUT_SECONDS = 1800.0
 DEFAULT_TIMELINE_BACKTRACK = 20
 SURROUNDING_RANGE = 10
@@ -42,23 +43,35 @@ FILTER_CHOICES = [
     "Population Density",
     "Weather Overlay",
 ]
-DEFAULT_FILTER = FILTER_CHOICES[0]
-OPENAI_MODEL_CHOICES = [
-    "gpt-4o-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-3.5-turbo",
+
+OPENAI_CLOUD_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]
+GEMINI_CLOUD_MODELS = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro",
+    "gemini-1.5-pro-latest",
+    "gemini-1.0-pro",
+    "gemini-1.0-pro-vision",
 ]
+
 AGENT_MODEL_CHOICES = [
-    "llama3",
-    "mistral",
-    "phi3",
+    "gpt-oss:20b",
+    "llama3.1:8b",
+    "llama3.1:70b",
+    "phi3.5:mini",
+    "phi3.5:moe",
+    "deepseek-r1:14b",
+    "gemma3:27b",
 ]
-DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
+
+CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
+    "openai": OPENAI_CLOUD_MODELS,
+    "gemini": GEMINI_CLOUD_MODELS,
+}
 
 
-# [GEONAMES]
-###############################################################################
+
+
 
 
 
