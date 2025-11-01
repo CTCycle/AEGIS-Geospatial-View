@@ -7,8 +7,11 @@ from functools import partial
 from typing import Any
 from collections.abc import Callable  
 
+from DILIGENT.app.constants import OPENAI_CLOUD_MODELS
 from nicegui import ui
 
+from AEGIS.app.client.layouts import INTERFACE_THEME_CSS, PAGE_CONTAINER_CLASSES
+from AEGIS.app.configurations import ClientRuntimeConfig
 from AEGIS.app.client.controllers import (
     ComponentUpdate,
     MISSING,
@@ -17,11 +20,9 @@ from AEGIS.app.client.controllers import (
     set_location_mode,
     submit_location_search,
 )
-from AEGIS.app.configurations import ClientRuntimeConfig
+from AEGIS.app.constants import AGENT_MODEL_CHOICES, FILTER_CHOICES, CLOUD_MODEL_CHOICES
 
-
-client_config = ClientRuntimeConfig()
-
+CLOUD_PROVIDERS : list[str] = [k for k in CLOUD_MODEL_CHOICES.keys()]
 
 ###############################################################################
 @dataclass
@@ -102,7 +103,6 @@ async def handle_use_coordinates_change(components: ClientComponents, event: Any
     apply_component_update(components.latitude, updates["latitude"])
     apply_component_update(components.longitude, updates["longitude"])
 
-
 # -----------------------------------------------------------------------------
 async def handle_agentic_toggle(components: ClientComponents, event: Any) -> None:    
     agentic_enabled = bool(event.value)
@@ -119,7 +119,6 @@ async def handle_agentic_toggle(components: ClientComponents, event: Any) -> Non
 async def handle_cloud_toggle(components: ClientComponents, event: Any) -> None:
     update = set_cloud_model_mode(bool(event.value))
     apply_component_update(components.openai_model, update)
-
 
 # -----------------------------------------------------------------------------
 async def handle_search_click(components: ClientComponents, event: Any) -> None:
@@ -141,38 +140,23 @@ async def handle_search_click(components: ClientComponents, event: Any) -> None:
 # MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
+    provider = ClientRuntimeConfig.get_llm_provider()
+    cloud_models = CLOUD_MODEL_CHOICES.get(provider, [])
+    selected_cloud_model = ClientRuntimeConfig.get_cloud_model()
+    if selected_cloud_model not in cloud_models:
+        selected_cloud_model = cloud_models[0] if cloud_models else ""
+        ClientRuntimeConfig.set_cloud_model(selected_cloud_model)
+
+    cloud_enabled = ClientRuntimeConfig.is_cloud_enabled()
+
     ui.page_title("AEGIS Geographics")
-    ui.markdown("# AEGIS Geographics\nVisualize geographic data overlays in real time.")
-
-    ui.add_css(
-        """
-        .q-table__container {
-            border-radius: 14px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 10px 28px -18px rgba(15, 23, 42, 0.25);
-        }
-
-        .q-table thead th {
-            background-color: #f8fafc;
-            color: #1f2937;
-            font-weight: 500;
-        }
-
-        .q-table tbody td {
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .q-table tbody tr:nth-child(even) td {
-            background-color: #f9fafb;
-        }
-
-        .q-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-        """
-    )
-
-    with ui.column().classes("w-full gap-8"):
+    ui.add_head_html(f"<style>{INTERFACE_THEME_CSS}</style>")
+    #ui.add_css(INTERFACE_THEME_CSS)
+   
+    with ui.column().classes(PAGE_CONTAINER_CLASSES):
+        ui.markdown("## AEGIS Geographics\nVisualize geographic data overlays in real time").classes(
+            "text-3xl font-semibold text-slate-800 dark:text-slate-100"
+        )
         with ui.row().classes("w-full flex-wrap justify-start"):
             with ui.card().classes("w-full max-w-md"):
                 with ui.column().classes("gap-4"):
@@ -230,8 +214,7 @@ def main_page() -> None:
                         date_input.set_value(get_datetime_default_value())
 
                         filter_select = ui.select(
-                            client_config.filter_choices,
-                            value=client_config.default_filter,
+                            FILTER_CHOICES,                            
                             label="Imagery Style",
                         )
                         filter_select.classes("w-full")
@@ -257,28 +240,29 @@ def main_page() -> None:
 
                     with ui.expansion("Model configuration", icon="settings"):
                         use_cloud_checkbox = ui.checkbox("Leverage OpenAI cloud models")
-
                         openai_model_dropdown = ui.select(
-                            client_config.openai_model_choices,
+                            OPENAI_CLOUD_MODELS,
                             label="OpenAI model choice",
                         )
                         openai_model_dropdown.classes("w-full")
-
                         agent_model_dropdown = ui.select(
-                            client_config.agent_model_choices,
-                            value=client_config.default_agent_model,
+                            AGENT_MODEL_CHOICES,
+                            value=ClientRuntimeConfig.set_agent_model,
                             label="Ollama agent model",
                         )
                         agent_model_dropdown.classes("w-full")
 
                         temperature_input = ui.number(
-                            label="Sampling temperature",
-                            value=client_config.agentic_temperature_default,
-                            step=0.1,
-                            format="%.2f",
-                        )
-                        temperature_input.props["min"] = client_config.agentic_temperature_min
-                        temperature_input.props["max"] = client_config.agentic_temperature_max
+                                label="Temperature",
+                                value=ClientRuntimeConfig.get_ollama_temperature(),
+                                min=0.0,
+                                max=2.0,
+                                step=0.1,
+                            ).classes("w-full")
+                        reasoning_checkbox = ui.checkbox(
+                                "Enable reasoning (think)",
+                                value=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+                            )
 
                 agentic_button = ui.button("Run agentic search", on_click=None)
                 agentic_button.props("color=secondary")
@@ -349,7 +333,6 @@ def main_page() -> None:
 def create_interface() -> None:
     ui.page("/")(main_page)
 
-
 # -----------------------------------------------------------------------------
 def launch_interface() -> None:
     create_interface()
@@ -359,7 +342,6 @@ def launch_interface() -> None:
         title="AEGIS Geographics",
         show_welcome_message=False,
     )
-
 
 # -----------------------------------------------------------------------------
 if __name__ in {"__main__", "__mp_main__"}:
