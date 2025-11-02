@@ -11,5 +11,3 @@ from sqlalchemy.orm import Session
 from AEGIS.app.constants import DATA_PATH
 from AEGIS.app.configurations import Configuration
 from AEGIS.app.utils.repository.database import GeonamesRecord, database
-
-

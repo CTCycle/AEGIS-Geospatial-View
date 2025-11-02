@@ -13,10 +13,11 @@ ACCESS_LOG_BLOCKLIST = ["/_nicegui/"]
 
 ###############################################################################
 class AccessPathFilter(logging.Filter):
-#-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
         return not any(blocked in message for blocked in ACCESS_LOG_BLOCKLIST)
+
 
 # Generate timestamp for the log filename
 ###############################################################################

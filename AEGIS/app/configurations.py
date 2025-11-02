@@ -12,6 +12,7 @@ from AEGIS.app.constants import SETUP_DIR
 CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
+
 ###############################################################################
 def load_configuration_file() -> dict[str, Any] | None:
     if os.path.exists(CONFIGURATION_FILE):
@@ -22,10 +23,12 @@ def load_configuration_file() -> dict[str, Any] | None:
             raise RuntimeError(
                 f"Unable to load configuration from {CONFIGURATION_FILE}"
             ) from exc
-             
+
 
 # -----------------------------------------------------------------------------
-def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
+def get_nested_value(
+    data: dict[str, Any], *keys: str, default: Any | None = None
+) -> Any:
     current: Any = data
     for key in keys:
         if isinstance(current, dict) and key in current:
@@ -34,12 +37,15 @@ def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = Non
             return default
     return current
 
+
 # -----------------------------------------------------------------------------
 CONFIGURATION_DATA = load_configuration_file()
+
 
 def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
     configuration = CONFIGURATION_DATA if CONFIGURATION_DATA is not None else {}
     return get_nested_value(configuration, *keys, default=default)
+
 
 ###############################################################################
 DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
@@ -51,13 +57,15 @@ DEFAULT_OLLAMA_TEMPERATURE = 0.7
 DEFAULT_OLLAMA_REASONING = False
 
 OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
-DEFAULT_LLM_TIMEOUT_SECONDS = CONFIGURATION_DATA.get("default_llm_timeout_seconds", 3600.0)
+DEFAULT_LLM_TIMEOUT_SECONDS = CONFIGURATION_DATA.get(
+    "default_llm_timeout_seconds", 3600.0
+)
 
 
 ###############################################################################
 @dataclass
 class ClientRuntimeConfig:
-    agent_model: str = DEFAULT_AGENT_MODEL    
+    agent_model: str = DEFAULT_AGENT_MODEL
     llm_provider: str = "openai"
     cloud_model: str = DEFAULT_CLOUD_MODEL
     use_cloud_services: bool = False
@@ -78,7 +86,7 @@ class ClientRuntimeConfig:
             cls.agent_model = value
             cls.touch_revision()
         return cls.agent_model
-    
+
     # -------------------------------------------------------------------------
     @classmethod
     def set_llm_provider(cls, provider: str) -> str:
@@ -147,7 +155,7 @@ class ClientRuntimeConfig:
     @classmethod
     def get_agent_model(cls) -> str:
         return cls.agent_model
-   
+
     # -------------------------------------------------------------------------
     @classmethod
     def get_llm_provider(cls) -> str:
@@ -176,7 +184,7 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def reset_defaults(cls) -> None:
-        cls.agent_model = DEFAULT_AGENT_MODEL      
+        cls.agent_model = DEFAULT_AGENT_MODEL
         cls.llm_provider = "openai"
         cls.cloud_model = DEFAULT_CLOUD_MODEL
         cls.use_cloud_services = False
@@ -191,16 +199,14 @@ class ClientRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def resolve_provider_and_model(
-        cls, purpose: Literal["agent"]
-    ) -> tuple[str, str]:
+    def resolve_provider_and_model(cls, purpose: Literal["agent"]) -> tuple[str, str]:
         if cls.is_cloud_enabled():
             provider = cls.get_llm_provider()
             model = cls.get_cloud_model().strip()
             if not model:
-                model = cls.get_agent_model()              
+                model = cls.get_agent_model()
         else:
             provider = "ollama"
             model = cls.get_agent_model()
-            
+
         return provider, model.strip()
