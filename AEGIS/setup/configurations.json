@@ -1,39 +1,6 @@
 {
   "ollama_host_default": "http://localhost:11434",  
-  "client_defaults": {
-    "default_agent_model": "qwen3:8b",    
-    "default_cloud_provider": "openai",
-    "default_cloud_model": "gpt-4.1-mini",    
-    "default_use_cloud_services": false,
-    "default_ollama_temperature": 0.7,
-    "default_ollama_reasoning": false
-  },
-  "external_data": {
-    "default_llm_timeout_seconds": 3600.0   
-  },
-  "geographics": {
-    "filter_choices": [
-      "Natural Color",
-      "Topographic",
-      "Population Density",
-      "Weather Overlay"
-    ],
-    "default_filter": "Natural Color",
-    "openai_model_choices": [
-      "gpt-4o-mini",
-      "gpt-4.1",
-      "gpt-4.1-mini",
-      "gpt-3.5-turbo"
-    ],
-    "agent_model_choices": [
-      "llama3",
-      "mistral",
-      "phi3"
-    ],
-    "default_agent_model": "llama3",
-    "default_use_cloud": false,
-    "default_agentic_temperature": 0.7,
-    "min_agentic_temperature": 0.0,
-    "max_agentic_temperature": 2.0
-  }
+  "default_llm_timeout_seconds": 3600.0
+  
 }
+

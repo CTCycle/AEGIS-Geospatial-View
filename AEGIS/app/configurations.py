@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from DILIGENT.app.constants import CLOUD_MODEL_CHOICES
+from AEGIS.app.constants import CLOUD_MODEL_CHOICES, AGENT_MODEL_CHOICES
 
 from AEGIS.app.constants import SETUP_DIR
 
@@ -13,56 +13,7 @@ CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
 ###############################################################################
-DEFAULT_CONFIGURATION: dict[str, Any] = {
-    "ollama_host_default": "http://localhost:11434",    
-    "client_defaults": {
-        "default_agent_model": "qwen3:8b",
-        "default_clinical_model": "gpt-oss:20b",
-        "default_cloud_provider": "openai",
-        "default_cloud_model": "gpt-4.1-mini",
-        "default_cloud_embedding_model": "text-embedding-3-large",
-        "default_use_cloud_services": False,
-        "default_ollama_temperature": 0.7,
-        "default_ollama_reasoning": False,
-    },
-    "external_data": {
-        "default_llm_timeout_seconds": 3600.0,
-        "llm_null_match_names": [
-            "",
-            "none",
-            "no match",
-            "no matches",
-            "not found",
-            "unknown",
-            "not applicable",
-            "n a",
-        ],
-    },
-    "geographics": {
-        "filter_choices": [
-            "Natural Color",
-            "Topographic",
-            "Population Density",
-            "Weather Overlay",
-        ],
-        "default_filter": "Natural Color",
-        "openai_model_choices": [
-            "gpt-4o-mini",
-            "gpt-4.1",
-            "gpt-4.1-mini",
-            "gpt-3.5-turbo",
-        ],
-        "agent_model_choices": ["llama3", "mistral", "phi3"],
-        "default_agent_model": "llama3",
-        "default_use_cloud": False,
-        "default_agentic_temperature": 0.7,
-        "min_agentic_temperature": 0.0,
-        "max_agentic_temperature": 2.0,
-    },
-}
-
-###############################################################################
-def load_configuration_file() -> dict[str, Any]:
+def load_configuration_file() -> dict[str, Any] | None:
     if os.path.exists(CONFIGURATION_FILE):
         try:
             with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
@@ -71,7 +22,7 @@ def load_configuration_file() -> dict[str, Any]:
             raise RuntimeError(
                 f"Unable to load configuration from {CONFIGURATION_FILE}"
             ) from exc
-    return json.loads(json.dumps(DEFAULT_CONFIGURATION))
+             
 
 # -----------------------------------------------------------------------------
 def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = None) -> Any:
@@ -83,78 +34,36 @@ def get_nested_value(data: dict[str, Any], *keys: str, default: Any | None = Non
             return default
     return current
 
-###############################################################################
+# -----------------------------------------------------------------------------
 CONFIGURATION_DATA = load_configuration_file()
 
-# -----------------------------------------------------------------------------
-def get_configuration() -> dict[str, Any]:
-    return CONFIGURATION_DATA
-
-# -----------------------------------------------------------------------------
 def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
-    return get_nested_value(CONFIGURATION_DATA, *keys, default=default)
+    configuration = CONFIGURATION_DATA if CONFIGURATION_DATA is not None else {}
+    return get_nested_value(configuration, *keys, default=default)
 
 ###############################################################################
-CLIENT_DEFAULTS = get_configuration_value("client_defaults", default={})
-DEFAULT_AGENT_MODEL = CLIENT_DEFAULTS.get("default_agent_model", "")
-DEFAULT_CLOUD_PROVIDER = CLIENT_DEFAULTS.get("default_cloud_provider", "")
-DEFAULT_CLOUD_MODEL = CLIENT_DEFAULTS.get("default_cloud_model", "")
-DEFAULT_CLOUD_EMBEDDING_MODEL = CLIENT_DEFAULTS.get(
-    "default_cloud_embedding_model", ""
-)
-DEFAULT_USE_CLOUD_SERVICES = CLIENT_DEFAULTS.get("default_use_cloud_services", False)
-DEFAULT_OLLAMA_TEMPERATURE = CLIENT_DEFAULTS.get("default_ollama_temperature", 0.7)
-DEFAULT_OLLAMA_REASONING = CLIENT_DEFAULTS.get("default_ollama_reasoning", False)
+DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
+DEFAULT_CLOUD_PROVIDER = CLOUD_MODEL_CHOICES["openai"]
+DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES["openai"][0]
 
-cloud_models = CLOUD_MODEL_CHOICES.get(DEFAULT_CLOUD_PROVIDER, [])
-if DEFAULT_CLOUD_MODEL not in cloud_models:
-    DEFAULT_CLOUD_MODEL = cloud_models[0] if cloud_models else ""
+DEFAULT_CLOUD_EMBEDDING_MODEL = ""
+DEFAULT_OLLAMA_TEMPERATURE = 0.7
+DEFAULT_OLLAMA_REASONING = False
 
 OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
-
-EXTERNAL_DATA_CONFIGURATION = get_configuration_value("external_data", default={})
-DEFAULT_LLM_TIMEOUT_SECONDS = EXTERNAL_DATA_CONFIGURATION.get(
-    "default_llm_timeout_seconds", 3600.0
-)
-
-GEOGRAPHICS_CONFIGURATION = get_configuration_value("geographics", default={})
-GEOGRAPHICS_FILTER_CHOICES = list(GEOGRAPHICS_CONFIGURATION.get("filter_choices", []))
-GEOGRAPHICS_DEFAULT_FILTER = GEOGRAPHICS_CONFIGURATION.get("default_filter", "")
-GEOGRAPHICS_OPENAI_MODEL_CHOICES = list(
-    GEOGRAPHICS_CONFIGURATION.get("openai_model_choices", [])
-)
-GEOGRAPHICS_AGENT_MODEL_CHOICES = list(
-    GEOGRAPHICS_CONFIGURATION.get("agent_model_choices", [])
-)
-GEOGRAPHICS_DEFAULT_AGENT_MODEL = GEOGRAPHICS_CONFIGURATION.get(
-    "default_agent_model", ""
-)
-GEOGRAPHICS_DEFAULT_USE_CLOUD = GEOGRAPHICS_CONFIGURATION.get(
-    "default_use_cloud", False
-)
-GEOGRAPHICS_DEFAULT_AGENTIC_TEMPERATURE = GEOGRAPHICS_CONFIGURATION.get(
-    "default_agentic_temperature", 0.7
-)
-GEOGRAPHICS_MIN_AGENTIC_TEMPERATURE = GEOGRAPHICS_CONFIGURATION.get(
-    "min_agentic_temperature", 0.0
-)
-GEOGRAPHICS_MAX_AGENTIC_TEMPERATURE = GEOGRAPHICS_CONFIGURATION.get(
-    "max_agentic_temperature", 2.0
-)
+DEFAULT_LLM_TIMEOUT_SECONDS = CONFIGURATION_DATA.get("default_llm_timeout_seconds", 3600.0)
 
 
 ###############################################################################
 @dataclass
 class ClientRuntimeConfig:
-    filter_choices: list[str]
-    default_filter: str
-    openai_model_choices: list[str]
-    agent_model_choices: list[str]
-    default_agent_model: str
-    default_use_cloud: bool
-    agentic_temperature_default: float
-    agentic_temperature_min: float
-    agentic_temperature_max: float
+    agent_model: str = DEFAULT_AGENT_MODEL    
+    llm_provider: str = "openai"
+    cloud_model: str = DEFAULT_CLOUD_MODEL
+    use_cloud_services: bool = False
+    ollama_temperature: float = DEFAULT_OLLAMA_TEMPERATURE
+    ollama_reasoning: bool = DEFAULT_OLLAMA_REASONING
+    revision: int = 0
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -169,7 +78,7 @@ class ClientRuntimeConfig:
             cls.agent_model = value
             cls.touch_revision()
         return cls.agent_model
-
+    
     # -------------------------------------------------------------------------
     @classmethod
     def set_llm_provider(cls, provider: str) -> str:
@@ -237,8 +146,8 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_agent_model(cls) -> str:
-        return cls.agent_model   
-
+        return cls.agent_model
+   
     # -------------------------------------------------------------------------
     @classmethod
     def get_llm_provider(cls) -> str:
@@ -267,10 +176,10 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def reset_defaults(cls) -> None:
-        cls.agent_model = DEFAULT_AGENT_MODEL 
-        cls.llm_provider = DEFAULT_CLOUD_PROVIDER
+        cls.agent_model = DEFAULT_AGENT_MODEL      
+        cls.llm_provider = "openai"
         cls.cloud_model = DEFAULT_CLOUD_MODEL
-        cls.use_cloud_services = DEFAULT_USE_CLOUD_SERVICES
+        cls.use_cloud_services = False
         cls.ollama_temperature = DEFAULT_OLLAMA_TEMPERATURE
         cls.ollama_reasoning = DEFAULT_OLLAMA_REASONING
         cls.revision = 0
@@ -283,14 +192,15 @@ class ClientRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def resolve_provider_and_model(
-        cls, _: Literal["agent"]
+        cls, purpose: Literal["agent"]
     ) -> tuple[str, str]:
         if cls.is_cloud_enabled():
             provider = cls.get_llm_provider()
-            model = cls.get_cloud_model().strip()            
+            model = cls.get_cloud_model().strip()
+            if not model:
+                model = cls.get_agent_model()              
         else:
             provider = "ollama"
-            model = cls.get_agent_model().strip()   
+            model = cls.get_agent_model()
             
         return provider, model.strip()
-

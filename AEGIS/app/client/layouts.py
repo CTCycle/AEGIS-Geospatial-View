@@ -31,3 +31,4 @@ INTERFACE_THEME_CSS: Final = """
 
 
 PAGE_CONTAINER_CLASSES: Final = "aegis-page-container flex flex-col gap-6"
+CARD_BASE_CLASSES: Final = "aegis-card w-full flex flex-col gap-4"
