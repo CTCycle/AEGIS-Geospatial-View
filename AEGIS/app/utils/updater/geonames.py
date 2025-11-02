@@ -52,7 +52,7 @@ class GeonamesDatasetDownloader:
             total_size = int(response.headers.get("content-length", "0"))
             if total_size == 0:
                 return None
-            
+
             downloaded = 0
             while True:
                 chunk = response.read(self.chunk_size)
@@ -60,7 +60,7 @@ class GeonamesDatasetDownloader:
                     break
                 file.write(chunk)
                 downloaded += len(chunk)
-                self.display_progress(downloaded, total_size)        
+                self.display_progress(downloaded, total_size)
         logger.info(
             "Finished downloading %s",
             self.dataset,
@@ -68,16 +68,16 @@ class GeonamesDatasetDownloader:
         return archive_path
 
     # -----------------------------------------------------------------------------
-    def display_progress(self, downloaded: int, total_size: int) -> None:        
+    def display_progress(self, downloaded: int, total_size: int) -> None:
         percentage = min(int(downloaded * 100 / total_size), 100)
-        if (percentage % 10 == 0 and percentage != self._last_logged_percentage):
+        if percentage % 10 == 0 and percentage != self._last_logged_percentage:
             message = (
                 f"Downloading {self.dataset}: {percentage}% "
                 f"({downloaded}/{total_size} bytes)"
             )
             logger.info("%s", message)
             self._last_logged_percentage = percentage
-       
+
 
 ###############################################################################
 class GeonamesArchiveReader:
@@ -149,12 +149,10 @@ class GeonamesArchiveParser:
                     processed_lines,
                     percentage,
                 )
-            
+
         if batch:
             self.flush_batch(batch)
-        logger.info(
-            "Stored %s geonames records", total_records
-        )
+        logger.info("Stored %s geonames records", total_records)
 
     # -----------------------------------------------------------------------------
     def flush_batch(self, batch: list[dict[str, Any]]) -> None:
@@ -272,7 +270,7 @@ class GeonamesUpdater:
         self.batch_size = batch_size
 
     # -----------------------------------------------------------------------------
-    def update(self) -> None:        
+    def update(self) -> None:
         downloader = GeonamesDatasetDownloader(
             base_url=self.base_url,
             dataset=self.dataset,
@@ -294,4 +292,3 @@ class GeonamesUpdater:
                 "Failed to download geonames dataset %s",
                 self.dataset,
             )
-

@@ -36,6 +36,7 @@ ui.run_with(
     reconnect_timeout=180,
 )
 
+
 @app.get("/")
 def redirect_to_ui() -> RedirectResponse:
     return RedirectResponse(url="/ui")

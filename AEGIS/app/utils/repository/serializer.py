@@ -45,5 +45,3 @@ class DataSerializer:
         frame = frame.reindex(columns=GEONAMES_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
         database.upsert_into_database(frame, "GEONAMES")
-
-    

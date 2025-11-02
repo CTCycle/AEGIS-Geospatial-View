@@ -71,5 +71,3 @@ class LocationSearchRequest(BaseModel):
         payload = self.model_dump(exclude_none=True)
         payload["mode"] = "coordinates" if self.use_coordinates else "search"
         return payload
-
-

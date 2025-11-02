@@ -252,7 +252,7 @@ COUNTRY_NAME_TO_ISO2 = {
     "Yemen": "YE",
     "Zambia": "ZM",
     "Zimbabwe": "ZW",
-    "Åland Islands": "AX"
+    "Åland Islands": "AX",
 }
 
 COUNTRY_SYNONYMS = {
@@ -318,16 +318,18 @@ COUNTRY_SYNONYMS = {
     "United States America": "United States",
     "United States of America": "United States",
     "Vatican": "Vatican City",
-    "Viet Nam": "Vietnam"
+    "Viet Nam": "Vietnam",
 }
+
 
 ###############################################################################
 class LocationSanitizationService:
     COUNTRY_NAME_TO_ISO2 = COUNTRY_NAME_TO_ISO2
+
     def __init__(self) -> None:
         self.country_lookup = self.build_country_lookup()
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def build_country_lookup(self) -> dict[str, str]:
         lookup: dict[str, str] = {}
         for name, code in self.COUNTRY_NAME_TO_ISO2.items():
@@ -337,15 +339,11 @@ class LocationSanitizationService:
         for alias, target in COUNTRY_SYNONYMS.items():
             normalized_alias = self.normalize_country_key(alias)
             normalized_target = self.normalize_country_key(target)
-            if (
-                normalized_alias
-                and normalized_target
-                and normalized_target in lookup
-            ):
+            if normalized_alias and normalized_target and normalized_target in lookup:
                 lookup.setdefault(normalized_alias, lookup[normalized_target])
         return lookup
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def normalize_whitespace(self, value: str | None) -> str | None:
         if value is None:
             return None
@@ -354,7 +352,7 @@ class LocationSanitizationService:
             return None
         return " ".join(stripped.split())
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def normalize_country_key(self, value: str | None) -> str:
         if value is None:
             return ""
@@ -375,7 +373,7 @@ class LocationSanitizationService:
             normalized = normalized[4:]
         return normalized
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def normalize_country(self, value: str | None) -> str | None:
         normalized = self.normalize_whitespace(value)
         if not normalized:
@@ -389,13 +387,13 @@ class LocationSanitizationService:
             return self.country_lookup[key]
         return None
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def classify_query(self, value: str) -> str:
         if re.search(r"\d", value):
             return "address"
         return "place"
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def sanitize_location_inputs(
         self,
         address: str,

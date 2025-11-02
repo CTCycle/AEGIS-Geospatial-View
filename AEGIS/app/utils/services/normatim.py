@@ -14,9 +14,11 @@ from urllib.request import Request, urlopen
 
 LOGGER = logging.getLogger(__name__)
 
+
 ###############################################################################
 class NormatimService:
     base_url = "https://nominatim.openstreetmap.org/search"
+
     def __init__(self, user_agent: str | None = None, timeout: float = 10.0) -> None:
         self.user_agent = (
             user_agent
@@ -24,7 +26,7 @@ class NormatimService:
         )
         self.timeout = timeout
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     async def extract_coordinates(
         self,
         address: str,
@@ -56,8 +58,10 @@ class NormatimService:
         )
         return formatted
 
-    #-----------------------------------------------------------------------------
-    def compose_query(self, address: str, city: str | None, country_name: str | None) -> str:
+    # -----------------------------------------------------------------------------
+    def compose_query(
+        self, address: str, city: str | None, country_name: str | None
+    ) -> str:
         components = [address]
         if city and city.lower() not in address.lower():
             components.append(city)
@@ -67,7 +71,7 @@ class NormatimService:
                 components.append(country_name)
         return ", ".join(component for component in components if component)
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def perform_request(self, params: dict[str, str]) -> list[dict[str, Any]]:
         url = f"{self.base_url}?{urlencode(params)}"
         request = Request(url, headers={"User-Agent": self.user_agent})
@@ -86,7 +90,7 @@ class NormatimService:
             return []
         return [item for item in data if isinstance(item, dict)]
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def format_result(
         self,
         data: dict[str, Any],
@@ -129,7 +133,7 @@ class NormatimService:
             result["confidence"] = confidence
         return result
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def compute_confidence(
         self,
         *,
@@ -149,7 +153,9 @@ class NormatimService:
             country_code=country_code,
             query=query,
         )
-        granularity_score = self.derive_granularity_score(data.get("class"), data.get("type"))
+        granularity_score = self.derive_granularity_score(
+            data.get("class"), data.get("type")
+        )
         bounding_box = data.get("boundingbox")
         bbox_score = self.derive_bbox_score(bounding_box) if bounding_box else 0.5
         combined = (
@@ -175,7 +181,7 @@ class NormatimService:
             return 1.0
         return round(combined, 4)
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def derive_importance_score(self, importance: Any) -> float:
         try:
             value = float(importance)
@@ -185,9 +191,9 @@ class NormatimService:
             return 0.05
         if value >= 1.0:
             return 1.0
-        return max(0.05, min(1.0, value ** 0.3))
+        return max(0.05, min(1.0, value**0.3))
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def derive_text_match_score(
         self,
         data: dict[str, Any],
@@ -213,29 +219,41 @@ class NormatimService:
             return 0.5
         score = 0.0
         if address_weight:
-            display_alignment = self.compute_token_overlap(address_tokens, display_tokens)
-            structured_alignment = self.compute_token_overlap(address_tokens, structured_tokens)
+            display_alignment = self.compute_token_overlap(
+                address_tokens, display_tokens
+            )
+            structured_alignment = self.compute_token_overlap(
+                address_tokens, structured_tokens
+            )
             if structured_alignment > max(display_alignment, 0.65):
-                blended_alignment = (
-                    (display_alignment * 0.4) + (structured_alignment * 0.6)
+                blended_alignment = (display_alignment * 0.4) + (
+                    structured_alignment * 0.6
                 )
                 score += blended_alignment * address_weight
             else:
                 score += display_alignment * address_weight
         if city_weight:
-            score += self.compute_city_alignment(city_tokens, data, display_tokens) * city_weight
+            score += (
+                self.compute_city_alignment(city_tokens, data, display_tokens)
+                * city_weight
+            )
         if country_weight:
-            score += self.compute_country_alignment(
-                country_name,
-                country_code,
-                data,
-                normalized_display,
-            ) * country_weight
+            score += (
+                self.compute_country_alignment(
+                    country_name,
+                    country_code,
+                    data,
+                    normalized_display,
+                )
+                * country_weight
+            )
         if query_weight:
-            score += self.compute_token_overlap(query_tokens, display_tokens) * query_weight
+            score += (
+                self.compute_token_overlap(query_tokens, display_tokens) * query_weight
+            )
         return score / total_weight
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def derive_granularity_score(self, place_class: Any, place_type: Any) -> float:
         class_name = str(place_class or "").lower()
         type_name = str(place_type or "").lower()
@@ -270,7 +288,7 @@ class NormatimService:
             return 0.4
         return 0.55
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def derive_bbox_score(self, bounding_box: Any) -> float:
         if not isinstance(bounding_box, list) or len(bounding_box) != 4:
             return 0.5
@@ -298,7 +316,7 @@ class NormatimService:
             return 0.5
         return 0.35
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def tokenize(self, value: str | None) -> list[str]:
         if not value:
             return []
@@ -307,7 +325,7 @@ class NormatimService:
             return []
         return [token for token in normalized_value.split() if token]
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def collect_address_tokens(self, data: dict[str, Any]) -> list[str]:
         address_data = data.get("address")
         if not isinstance(address_data, dict):
@@ -332,7 +350,7 @@ class NormatimService:
                 tokens.extend(self.tokenize(str(value)))
         return tokens
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def compute_token_overlap(
         self,
         tokens: list[str],
@@ -378,7 +396,7 @@ class NormatimService:
             return 1.0
         return max(0.2, score)
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def derive_structured_alignment_score(
         self,
         address: str,
@@ -392,7 +410,7 @@ class NormatimService:
             return 0.0
         return self.compute_token_overlap(address_tokens, structured_tokens)
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def derive_house_number_score(self, address: str, data: dict[str, Any]) -> float:
         address_tokens = self.tokenize(address)
         number_tokens = [token for token in address_tokens if token.isdigit()]
@@ -414,7 +432,7 @@ class NormatimService:
                 return 1.0
         return 0.2
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def apply_quality_boosts(
         self,
         combined: float,
@@ -441,7 +459,7 @@ class NormatimService:
             adjusted = max(adjusted, 0.88)
         return adjusted
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def compute_city_alignment(
         self,
         city_tokens: list[str],
@@ -465,7 +483,10 @@ class NormatimService:
             "suburb",
         ):
             candidate = address_data.get(key)
-            if candidate and self.normalize_component(str(candidate)) == normalized_city:
+            if (
+                candidate
+                and self.normalize_component(str(candidate)) == normalized_city
+            ):
                 return 1.0
         display_set = set(display_tokens)
         city_set = set(city_tokens)
@@ -481,7 +502,7 @@ class NormatimService:
             return 0.2
         return max(0.2, min(1.0, overlap))
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def compute_country_alignment(
         self,
         country_name: str | None,
@@ -498,10 +519,15 @@ class NormatimService:
             if expected_code == result_code:
                 return 1.0
             return 0.35
-        normalized_country = self.normalize_component(country_name) if country_name else ""
+        normalized_country = (
+            self.normalize_component(country_name) if country_name else ""
+        )
         if normalized_country:
             candidate = address_data.get("country")
-            if candidate and self.normalize_component(str(candidate)) == normalized_country:
+            if (
+                candidate
+                and self.normalize_component(str(candidate)) == normalized_country
+            ):
                 return 0.9
         if normalized_country and normalized_country in normalized_display:
             return 0.8
@@ -517,13 +543,13 @@ class NormatimService:
             return max(0.2, min(1.0, overlap))
         return 0.5
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def normalize_component(self, value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)
         ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
         return " ".join(ascii_text.lower().split())
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def compute_similarity_ratio(self, source: str, target: str) -> float:
         normalized_source = self.normalize_component(source)
         normalized_target = self.normalize_component(target)
@@ -533,7 +559,7 @@ class NormatimService:
             return 1.0
         return SequenceMatcher(a=normalized_source, b=normalized_target).ratio()
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     def compute_overlap_ratio(self, source: str, target: str) -> float:
         normalized_source = self.normalize_component(source)
         normalized_target = self.normalize_component(target)

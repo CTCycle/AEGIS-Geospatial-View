@@ -28,15 +28,17 @@ class ComponentUpdate:
     visible: bool | None = None
     download_path: str | None = None
 
+
 # -----------------------------------------------------------------------------
 @dataclass
 class RuntimeSettings:
     use_cloud_services: bool
     provider: str
     cloud_model: str
-    agent_model: str    
+    agent_model: str
     temperature: float | None
     reasoning: bool
+
 
 # [HELPERS]
 ###############################################################################
@@ -65,11 +67,13 @@ def extract_text(result: Any) -> str:
         return str(result)
     return f"```json\n{formatted}\n```"
 
+
 # -----------------------------------------------------------------------------
 def build_json_output(payload: dict[str, Any] | list[Any] | None) -> ComponentUpdate:
     if payload is None:
         return ComponentUpdate(value=None, visible=False)
     return ComponentUpdate(value=payload, visible=True)
+
 
 # [LLM CLIENT CONTROLLERS]
 ###############################################################################
@@ -85,6 +89,7 @@ def resolve_cloud_selection(
         normalized_model = models[0] if models else ""
     return normalized_provider, models, normalized_model or None
 
+
 # -----------------------------------------------------------------------------
 def get_runtime_settings() -> RuntimeSettings:
     return RuntimeSettings(
@@ -96,10 +101,12 @@ def get_runtime_settings() -> RuntimeSettings:
         reasoning=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
     )
 
+
 # -----------------------------------------------------------------------------
 def reset_runtime_settings() -> RuntimeSettings:
     ClientRuntimeConfig.reset_defaults()
     return get_runtime_settings()
+
 
 # -----------------------------------------------------------------------------
 def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
@@ -107,17 +114,18 @@ def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
     provider = ClientRuntimeConfig.set_llm_provider(settings.provider)
     ClientRuntimeConfig.set_cloud_model(settings.cloud_model)
     agent_model = ClientRuntimeConfig.set_agent_model(settings.agent_model)
-   
+
     temperature = ClientRuntimeConfig.set_ollama_temperature(settings.temperature)
     reasoning = ClientRuntimeConfig.set_ollama_reasoning(settings.reasoning)
     return RuntimeSettings(
         use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
         provider=provider,
         cloud_model=ClientRuntimeConfig.get_cloud_model(),
-        agent_model=agent_model,    
+        agent_model=agent_model,
         temperature=temperature,
         reasoning=reasoning,
     )
+
 
 # -----------------------------------------------------------------------------
 def toggle_cloud_services(
@@ -146,6 +154,7 @@ def toggle_cloud_services(
         "clinical": clinical_update,
     }
 
+
 # -----------------------------------------------------------------------------
 def sync_cloud_model_options(
     provider: str | None, current_model: str | None
@@ -155,6 +164,7 @@ def sync_cloud_model_options(
     )
     model_update = ComponentUpdate(value=normalized_model, options=models)
     return normalized_provider, model_update
+
 
 # [SEARCH PANELS]
 ###############################################################################
@@ -202,10 +212,9 @@ async def trigger_search_maps(
         return None, "[ERROR] Map service returned an unexpected payload."
 
     status_message = extract_status_message(data)
-    formatted_status = (
-        f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
-    )
+    formatted_status = f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
     return data, formatted_status
+
 
 # -----------------------------------------------------------------------------
 def extract_error_detail(response: httpx.Response) -> str:
@@ -220,6 +229,7 @@ def extract_error_detail(response: httpx.Response) -> str:
             return detail.strip()
     return "Unexpected error"
 
+
 # -----------------------------------------------------------------------------
 def extract_status_message(data: dict[str, Any]) -> str:
     for key in ("status_message", "message", "detail", "status"):
@@ -227,6 +237,7 @@ def extract_status_message(data: dict[str, Any]) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return "Map search request submitted."
+
 
 # -----------------------------------------------------------------------------
 async def submit_location_search(
@@ -240,20 +251,17 @@ async def submit_location_search(
     date: str | None,
 ) -> tuple[dict[str, Any] | None, str]:
     cleaned_payload = sanitize_search_payload(
-            filter_val = filter_val,
-            country = country,
-            city = city,
-            address = address,
-            use_coordinates = use_coordinates,
-            latitude = latitude,
-            longitude = longitude,
-            date = date,
-        )
-    
+        filter_val=filter_val,
+        country=country,
+        city=city,
+        address=address,
+        use_coordinates=use_coordinates,
+        latitude=latitude,
+        longitude=longitude,
+        date=date,
+    )
+
     url = f"{API_BASE_URL}{GEO_SEARCH_URL}"
     data, message = await trigger_search_maps(url, cleaned_payload)
     normalized_message = (message or "").strip()
     return data, normalized_message
-
-
-
