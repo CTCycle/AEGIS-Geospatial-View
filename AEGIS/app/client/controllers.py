@@ -28,7 +28,6 @@ class ComponentUpdate:
     visible: bool | None = None
     download_path: str | None = None
 
-
 # -----------------------------------------------------------------------------
 @dataclass
 class RuntimeSettings:
@@ -89,7 +88,6 @@ def resolve_cloud_selection(
         normalized_model = models[0] if models else ""
     return normalized_provider, models, normalized_model or None
 
-
 # -----------------------------------------------------------------------------
 def get_runtime_settings() -> RuntimeSettings:
     return RuntimeSettings(
@@ -101,12 +99,10 @@ def get_runtime_settings() -> RuntimeSettings:
         reasoning=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
     )
 
-
 # -----------------------------------------------------------------------------
 def reset_runtime_settings() -> RuntimeSettings:
     ClientRuntimeConfig.reset_defaults()
     return get_runtime_settings()
-
 
 # -----------------------------------------------------------------------------
 def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
@@ -125,7 +121,6 @@ def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
         temperature=temperature,
         reasoning=reasoning,
     )
-
 
 # -----------------------------------------------------------------------------
 def toggle_cloud_services(
@@ -154,7 +149,6 @@ def toggle_cloud_services(
         "clinical": clinical_update,
     }
 
-
 # -----------------------------------------------------------------------------
 def sync_cloud_model_options(
     provider: str | None, current_model: str | None
@@ -168,7 +162,7 @@ def sync_cloud_model_options(
 
 # [SEARCH PANELS]
 ###############################################################################
-def set_location_mode(use_coordinates: bool) -> dict[str, ComponentUpdate]:
+def set_coordinates_as_input(use_coordinates: bool) -> dict[str, ComponentUpdate]:
     if use_coordinates:
         return {
             "country": ComponentUpdate(value=None, enabled=False),
@@ -215,7 +209,6 @@ async def trigger_search_maps(
     formatted_status = f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
     return data, formatted_status
 
-
 # -----------------------------------------------------------------------------
 def extract_error_detail(response: httpx.Response) -> str:
     try:
@@ -229,7 +222,6 @@ def extract_error_detail(response: httpx.Response) -> str:
             return detail.strip()
     return "Unexpected error"
 
-
 # -----------------------------------------------------------------------------
 def extract_status_message(data: dict[str, Any]) -> str:
     for key in ("status_message", "message", "detail", "status"):
@@ -237,7 +229,6 @@ def extract_status_message(data: dict[str, Any]) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return "Map search request submitted."
-
 
 # -----------------------------------------------------------------------------
 async def submit_location_search(
