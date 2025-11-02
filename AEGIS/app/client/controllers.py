@@ -1,25 +1,21 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, time
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import HTTPException, status
 import httpx
 
-from AEGIS.app.utils.services.payload import coerce_float, sanitize_search_payload
+from AEGIS.app.utils.services.payload import sanitize_search_payload
 
 from AEGIS.app.configurations import ClientRuntimeConfig
 from AEGIS.app.constants import (
     API_BASE_URL,
+    CLOUD_MODEL_CHOICES,
     GEO_SEARCH_URL,
     HTTP_TIMEOUT_SECONDS,
 )
 
-runtime_config = ClientRuntimeConfig()
-
-###############################################################################
 MISSING = object()
 
 
@@ -27,13 +23,140 @@ MISSING = object()
 @dataclass
 class ComponentUpdate:
     value: Any = MISSING
+    options: list[Any] | None = None
     enabled: bool | None = None
-    minimum: int | float | None = None
-    maximum: int | float | None = None
     visible: bool | None = None
+    download_path: str | None = None
 
+# -----------------------------------------------------------------------------
+@dataclass
+class RuntimeSettings:
+    use_cloud_services: bool
+    provider: str
+    cloud_model: str
+    agent_model: str    
+    temperature: float | None
+    reasoning: bool
 
 # [HELPERS]
+###############################################################################
+def extract_text(result: Any) -> str:
+    if isinstance(result, dict):
+        for key in ("output", "result", "text", "message", "response"):
+            val = result.get(key)
+            if isinstance(val, str) and val.strip():
+                return val
+        try:
+            formatted = json.dumps(result, ensure_ascii=False, indent=2)
+        except Exception:  # noqa: BLE001
+            return str(result)
+        return f"```json\n{formatted}\n```"
+    if isinstance(result, str):
+        return result
+    if isinstance(result, (list, tuple)):
+        try:
+            formatted = json.dumps(result, ensure_ascii=False, indent=2)
+        except Exception:  # noqa: BLE001
+            return str(result)
+        return f"```json\n{formatted}\n```"
+    try:
+        formatted = json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception:  # noqa: BLE001
+        return str(result)
+    return f"```json\n{formatted}\n```"
+
+# -----------------------------------------------------------------------------
+def build_json_output(payload: dict[str, Any] | list[Any] | None) -> ComponentUpdate:
+    if payload is None:
+        return ComponentUpdate(value=None, visible=False)
+    return ComponentUpdate(value=payload, visible=True)
+
+# [LLM CLIENT CONTROLLERS]
+###############################################################################
+def resolve_cloud_selection(
+    provider: str | None, cloud_model: str | None
+) -> tuple[str, list[str], str | None]:
+    normalized_provider = (provider or "").strip().lower()
+    if normalized_provider not in CLOUD_MODEL_CHOICES:
+        normalized_provider = next(iter(CLOUD_MODEL_CHOICES), "")
+    models = CLOUD_MODEL_CHOICES.get(normalized_provider, [])
+    normalized_model = (cloud_model or "").strip()
+    if normalized_model not in models:
+        normalized_model = models[0] if models else ""
+    return normalized_provider, models, normalized_model or None
+
+# -----------------------------------------------------------------------------
+def get_runtime_settings() -> RuntimeSettings:
+    return RuntimeSettings(
+        use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
+        provider=ClientRuntimeConfig.get_llm_provider(),
+        cloud_model=ClientRuntimeConfig.get_cloud_model(),
+        agent_model=ClientRuntimeConfig.get_agent_model(),
+        temperature=ClientRuntimeConfig.get_ollama_temperature(),
+        reasoning=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
+    )
+
+# -----------------------------------------------------------------------------
+def reset_runtime_settings() -> RuntimeSettings:
+    ClientRuntimeConfig.reset_defaults()
+    return get_runtime_settings()
+
+# -----------------------------------------------------------------------------
+def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
+    ClientRuntimeConfig.set_use_cloud_services(settings.use_cloud_services)
+    provider = ClientRuntimeConfig.set_llm_provider(settings.provider)
+    ClientRuntimeConfig.set_cloud_model(settings.cloud_model)
+    agent_model = ClientRuntimeConfig.set_agent_model(settings.agent_model)
+   
+    temperature = ClientRuntimeConfig.set_ollama_temperature(settings.temperature)
+    reasoning = ClientRuntimeConfig.set_ollama_reasoning(settings.reasoning)
+    return RuntimeSettings(
+        use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
+        provider=provider,
+        cloud_model=ClientRuntimeConfig.get_cloud_model(),
+        agent_model=agent_model,    
+        temperature=temperature,
+        reasoning=reasoning,
+    )
+
+# -----------------------------------------------------------------------------
+def toggle_cloud_services(
+    enabled: bool, *, provider: str | None, cloud_model: str | None
+) -> dict[str, ComponentUpdate]:
+    normalized_provider, models, normalized_model = resolve_cloud_selection(
+        provider, cloud_model
+    )
+    provider_update = ComponentUpdate(value=normalized_provider, enabled=enabled)
+    model_update = ComponentUpdate(
+        value=normalized_model,
+        options=models,
+        enabled=enabled,
+    )
+    button_update = ComponentUpdate(enabled=not enabled)
+    temperature_update = ComponentUpdate(enabled=not enabled)
+    reasoning_update = ComponentUpdate(enabled=not enabled)
+    clinical_update = ComponentUpdate(enabled=not enabled)
+
+    return {
+        "provider": provider_update,
+        "model": model_update,
+        "button": button_update,
+        "temperature": temperature_update,
+        "reasoning": reasoning_update,
+        "clinical": clinical_update,
+    }
+
+# -----------------------------------------------------------------------------
+def sync_cloud_model_options(
+    provider: str | None, current_model: str | None
+) -> tuple[str, ComponentUpdate]:
+    normalized_provider, models, normalized_model = resolve_cloud_selection(
+        provider, current_model
+    )
+    model_update = ComponentUpdate(value=normalized_model, options=models)
+    return normalized_provider, model_update
+
+# [SEARCH PANELS]
 ###############################################################################
 def set_location_mode(use_coordinates: bool) -> dict[str, ComponentUpdate]:
     if use_coordinates:
@@ -53,111 +176,15 @@ def set_location_mode(use_coordinates: bool) -> dict[str, ComponentUpdate]:
         "longitude": ComponentUpdate(value=None, enabled=False),
     }
 
-# -----------------------------------------------------------------------------
-def set_agentic_mode(
-    agentic_enabled: bool, use_coordinates: bool
-) -> dict[str, ComponentUpdate]:
-    if agentic_enabled:
-        openai_enabled = runtime_config.default_use_cloud
-        openai_default = (
-            runtime_config.openai_model_choices[0]
-            if openai_enabled and runtime_config.openai_model_choices
-            else None
-        )
-        return {
-            "filter": ComponentUpdate(enabled=False),
-            "country": ComponentUpdate(enabled=False),
-            "city": ComponentUpdate(enabled=False),
-            "address": ComponentUpdate(enabled=False),
-            "use_coordinates": ComponentUpdate(value=use_coordinates, enabled=False),
-            "latitude": ComponentUpdate(enabled=False),
-            "longitude": ComponentUpdate(enabled=False),
-            "date": ComponentUpdate(enabled=False),
-            "llm_query": ComponentUpdate(enabled=True),
-            "use_cloud": ComponentUpdate(
-                value=openai_enabled,
-                enabled=True,
-            ),
-            "openai_model": ComponentUpdate(
-                value=openai_default,
-                enabled=openai_enabled,
-            ),
-            "agent_model": ComponentUpdate(enabled=True),
-            "temperature": ComponentUpdate(
-                enabled=True,
-                minimum=runtime_config.agentic_temperature_min,
-                maximum=runtime_config.agentic_temperature_max,
-            ),
-            "search": ComponentUpdate(enabled=False),
-            "agentic": ComponentUpdate(enabled=True),
-        }
 
-    if use_coordinates:
-        country_state = ComponentUpdate(enabled=False)
-        city_state = ComponentUpdate(enabled=False)
-        address_state = ComponentUpdate(enabled=False)
-        latitude_state = ComponentUpdate(enabled=True)
-        longitude_state = ComponentUpdate(enabled=True)
-    else:
-        country_state = ComponentUpdate(enabled=True)
-        city_state = ComponentUpdate(enabled=True)
-        address_state = ComponentUpdate(enabled=True)
-        latitude_state = ComponentUpdate(value=None, enabled=False)
-        longitude_state = ComponentUpdate(value=None, enabled=False)
-
-    return {
-        "filter": ComponentUpdate(enabled=True),
-        "country": country_state,
-        "city": city_state,
-        "address": address_state,
-        "use_coordinates": ComponentUpdate(enabled=True),
-        "latitude": latitude_state,
-        "longitude": longitude_state,
-        "date": ComponentUpdate(enabled=True),
-        "llm_query": ComponentUpdate(enabled=False),
-        "use_cloud": ComponentUpdate(value=False, enabled=False),
-        "openai_model": ComponentUpdate(value=None, enabled=False),
-        "agent_model": ComponentUpdate(enabled=False),
-        "temperature": ComponentUpdate(
-            value=runtime_config.agentic_temperature_default,
-            enabled=False,
-            minimum=runtime_config.agentic_temperature_min,
-            maximum=runtime_config.agentic_temperature_max,
-        ),
-        "search": ComponentUpdate(enabled=True),
-        "agentic": ComponentUpdate(enabled=False),
-    }
-
-# -----------------------------------------------------------------------------
-def set_cloud_model_mode(use_cloud: bool) -> ComponentUpdate:
-    if use_cloud:
-        default_model = (
-            runtime_config.openai_model_choices[0]
-            if runtime_config.openai_model_choices
-            else None
-        )
-        return ComponentUpdate(value=default_model, enabled=True)
-    return ComponentUpdate(value=None, enabled=False)
-
-# -----------------------------------------------------------------------------
-def extract_coordinates(parameters: dict[str, Any]) -> tuple[float | None, float | None]:
-    latitude = parameters.get("latitude")
-    longitude = parameters.get("longitude")
-    coordinates = parameters.get("coordinates")
-    if isinstance(coordinates, dict):
-        latitude = coordinates.get("latitude", latitude)
-        longitude = coordinates.get("longitude", longitude)
-    return coerce_float(latitude), coerce_float(longitude)
-
-
+###############################################################################
+# trigger function to start the location based search on button click
 ###############################################################################
 async def trigger_search_maps(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[dict[str, Any] | None, str]:
     try:
-        async with httpx.AsyncClient(
-            base_url=API_BASE_URL, timeout=HTTP_TIMEOUT_SECONDS
-        ) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
             response = await client.post(url, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
@@ -180,7 +207,7 @@ async def trigger_search_maps(
     )
     return data, formatted_status
 
-###############################################################################
+# -----------------------------------------------------------------------------
 def extract_error_detail(response: httpx.Response) -> str:
     try:
         data = response.json()
@@ -193,7 +220,6 @@ def extract_error_detail(response: httpx.Response) -> str:
             return detail.strip()
     return "Unexpected error"
 
-
 # -----------------------------------------------------------------------------
 def extract_status_message(data: dict[str, Any]) -> str:
     for key in ("status_message", "message", "detail", "status"):
@@ -202,9 +228,7 @@ def extract_status_message(data: dict[str, Any]) -> str:
             return value.strip()
     return "Map search request submitted."
 
-
-
-###############################################################################
+# -----------------------------------------------------------------------------
 async def submit_location_search(
     filter_val: Any,
     country: str | None,
