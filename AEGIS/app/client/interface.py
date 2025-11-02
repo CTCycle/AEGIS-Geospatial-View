@@ -18,7 +18,7 @@ from AEGIS.app.client.layouts import (
 from AEGIS.app.client.controllers import (
     ComponentUpdate,
     MISSING,
-    set_location_mode,
+    set_coordinates_as_input,
     submit_location_search,
     get_runtime_settings,
     sync_cloud_model_options,
@@ -106,7 +106,7 @@ async def handle_use_coordinates_change(
     components: ClientComponents, event: Any
 ) -> None:
     use_coordinates = bool(event.value)
-    updates = set_location_mode(use_coordinates)
+    updates = set_coordinates_as_input(use_coordinates)
     apply_component_update(components.country, updates["country"])
     apply_component_update(components.city, updates["city"])
     apply_component_update(components.address, updates["address"])
