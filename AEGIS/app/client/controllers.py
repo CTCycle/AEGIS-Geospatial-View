@@ -16,13 +16,12 @@ from AEGIS.app.constants import (
     HTTP_TIMEOUT_SECONDS,
 )
 
-
 ###############################################################################
 @dataclass
 class RuntimeSettings:
     use_cloud_services: bool
     provider: str
-    cloud_model: str | None
+    cloud_model: str
     agent_model: str
     temperature: float | None
     reasoning: bool
@@ -30,37 +29,14 @@ class RuntimeSettings:
 
 # [HELPERS]
 ###############################################################################
-def extract_text(result: Any) -> str:
-    if isinstance(result, dict):
-        for key in ("output", "result", "text", "message", "response"):
-            val = result.get(key)
-            if isinstance(val, str) and val.strip():
-                return val
-        try:
-            formatted = json.dumps(result, ensure_ascii=False, indent=2)
-        except Exception:  # noqa: BLE001
-            return str(result)
-        return f"```json\n{formatted}\n```"
-    if isinstance(result, str):
-        return result
-    if isinstance(result, (list, tuple)):
-        try:
-            formatted = json.dumps(result, ensure_ascii=False, indent=2)
-        except Exception:  # noqa: BLE001
-            return str(result)
-        return f"```json\n{formatted}\n```"
-    try:
-        formatted = json.dumps(result, ensure_ascii=False, indent=2)
-    except Exception:  # noqa: BLE001
-        return str(result)
-    return f"```json\n{formatted}\n```"
+# None right now
 
 
 # [LLM CLIENT CONTROLLERS]
 ###############################################################################
 def resolve_cloud_selection(
     provider: str | None, cloud_model: str | None
-) -> dict[str, str | list[str] | None]:
+) -> dict[str, Any]:
     normalized_provider = (provider or "").strip().lower()
     if normalized_provider not in CLOUD_MODEL_CHOICES:
         normalized_provider = next(iter(CLOUD_MODEL_CHOICES), "")
@@ -111,7 +87,6 @@ def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
         reasoning=reasoning,
     )
 
-# -----------------------------------------------------------------------------
 ###############################################################################
 # trigger function to start the location based search on button click
 ###############################################################################
