@@ -16,24 +16,13 @@ from AEGIS.app.constants import (
     HTTP_TIMEOUT_SECONDS,
 )
 
-MISSING = object()
-
 
 ###############################################################################
-@dataclass
-class ComponentUpdate:
-    value: Any = MISSING
-    options: list[Any] | None = None
-    enabled: bool | None = None
-    visible: bool | None = None
-    download_path: str | None = None
-
-# -----------------------------------------------------------------------------
 @dataclass
 class RuntimeSettings:
     use_cloud_services: bool
     provider: str
-    cloud_model: str
+    cloud_model: str | None
     agent_model: str
     temperature: float | None
     reasoning: bool
@@ -67,18 +56,11 @@ def extract_text(result: Any) -> str:
     return f"```json\n{formatted}\n```"
 
 
-# -----------------------------------------------------------------------------
-def build_json_output(payload: dict[str, Any] | list[Any] | None) -> ComponentUpdate:
-    if payload is None:
-        return ComponentUpdate(value=None, visible=False)
-    return ComponentUpdate(value=payload, visible=True)
-
-
 # [LLM CLIENT CONTROLLERS]
 ###############################################################################
 def resolve_cloud_selection(
     provider: str | None, cloud_model: str | None
-) -> tuple[str, list[str], str | None]:
+) -> dict[str, str | list[str] | None]:
     normalized_provider = (provider or "").strip().lower()
     if normalized_provider not in CLOUD_MODEL_CHOICES:
         normalized_provider = next(iter(CLOUD_MODEL_CHOICES), "")
@@ -86,14 +68,20 @@ def resolve_cloud_selection(
     normalized_model = (cloud_model or "").strip()
     if normalized_model not in models:
         normalized_model = models[0] if models else ""
-    return normalized_provider, models, normalized_model or None
+    return {
+        "provider": normalized_provider,
+        "models": models,
+        "model": normalized_model or None,
+    }
 
 # -----------------------------------------------------------------------------
 def get_runtime_settings() -> RuntimeSettings:
+    provider = ClientRuntimeConfig.get_llm_provider()
+    selection = resolve_cloud_selection(provider, ClientRuntimeConfig.get_cloud_model())
     return RuntimeSettings(
         use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
-        provider=ClientRuntimeConfig.get_llm_provider(),
-        cloud_model=ClientRuntimeConfig.get_cloud_model(),
+        provider=selection["provider"],
+        cloud_model=selection["model"],
         agent_model=ClientRuntimeConfig.get_agent_model(),
         temperature=ClientRuntimeConfig.get_ollama_temperature(),
         reasoning=ClientRuntimeConfig.is_ollama_reasoning_enabled(),
@@ -113,74 +101,17 @@ def apply_runtime_settings(settings: RuntimeSettings) -> RuntimeSettings:
 
     temperature = ClientRuntimeConfig.set_ollama_temperature(settings.temperature)
     reasoning = ClientRuntimeConfig.set_ollama_reasoning(settings.reasoning)
+    selection = resolve_cloud_selection(provider, ClientRuntimeConfig.get_cloud_model())
     return RuntimeSettings(
         use_cloud_services=ClientRuntimeConfig.is_cloud_enabled(),
-        provider=provider,
-        cloud_model=ClientRuntimeConfig.get_cloud_model(),
+        provider=selection["provider"],
+        cloud_model=selection["model"],
         agent_model=agent_model,
         temperature=temperature,
         reasoning=reasoning,
     )
 
 # -----------------------------------------------------------------------------
-def toggle_cloud_services(
-    enabled: bool, *, provider: str | None, cloud_model: str | None
-) -> dict[str, ComponentUpdate]:
-    normalized_provider, models, normalized_model = resolve_cloud_selection(
-        provider, cloud_model
-    )
-    provider_update = ComponentUpdate(value=normalized_provider, enabled=enabled)
-    model_update = ComponentUpdate(
-        value=normalized_model,
-        options=models,
-        enabled=enabled,
-    )
-    button_update = ComponentUpdate(enabled=not enabled)
-    temperature_update = ComponentUpdate(enabled=not enabled)
-    reasoning_update = ComponentUpdate(enabled=not enabled)
-    clinical_update = ComponentUpdate(enabled=not enabled)
-
-    return {
-        "provider": provider_update,
-        "model": model_update,
-        "button": button_update,
-        "temperature": temperature_update,
-        "reasoning": reasoning_update,
-        "clinical": clinical_update,
-    }
-
-# -----------------------------------------------------------------------------
-def sync_cloud_model_options(
-    provider: str | None, current_model: str | None
-) -> tuple[str, ComponentUpdate]:
-    normalized_provider, models, normalized_model = resolve_cloud_selection(
-        provider, current_model
-    )
-    model_update = ComponentUpdate(value=normalized_model, options=models)
-    return normalized_provider, model_update
-
-
-# [SEARCH PANELS]
-###############################################################################
-def set_coordinates_as_input(use_coordinates: bool) -> dict[str, ComponentUpdate]:
-    if use_coordinates:
-        return {
-            "country": ComponentUpdate(value=None, enabled=False),
-            "city": ComponentUpdate(value="", enabled=False),
-            "address": ComponentUpdate(value="", enabled=False),
-            "latitude": ComponentUpdate(value=None, enabled=True),
-            "longitude": ComponentUpdate(value=None, enabled=True),
-        }
-
-    return {
-        "country": ComponentUpdate(enabled=True),
-        "city": ComponentUpdate(enabled=True),
-        "address": ComponentUpdate(enabled=True),
-        "latitude": ComponentUpdate(value=None, enabled=False),
-        "longitude": ComponentUpdate(value=None, enabled=False),
-    }
-
-
 ###############################################################################
 # trigger function to start the location based search on button click
 ###############################################################################
@@ -240,7 +171,7 @@ async def submit_location_search(
     latitude: Any,
     longitude: Any,
     date: str | None,
-) -> tuple[dict[str, Any] | None, str]:
+) -> dict[str, Any | None]:
     cleaned_payload = sanitize_search_payload(
         filter_val=filter_val,
         country=country,
@@ -255,4 +186,4 @@ async def submit_location_search(
     url = f"{API_BASE_URL}{GEO_SEARCH_URL}"
     data, message = await trigger_search_maps(url, cleaned_payload)
     normalized_message = (message or "").strip()
-    return data, normalized_message
+    return {"json": data, "message": normalized_message or None}
