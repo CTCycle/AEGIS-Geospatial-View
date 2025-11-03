@@ -27,6 +27,7 @@ app = FastAPI(
 
 app.include_router(search_router)
 
+###############################################################################
 create_interface()
 ui.run_with(
     app,
@@ -35,7 +36,6 @@ ui.run_with(
     show_welcome_message=False,
     reconnect_timeout=180,
 )
-
 
 @app.get("/")
 def redirect_to_ui() -> RedirectResponse:
