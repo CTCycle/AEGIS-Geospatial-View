@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from typing import Any
-from collections.abc import Callable
 
-from AEGIS.app.constants import OPENAI_CLOUD_MODELS
 from nicegui import ui
 
 from AEGIS.app.client.layouts import (
@@ -16,131 +13,170 @@ from AEGIS.app.client.layouts import (
     PAGE_CONTAINER_CLASSES,
 )
 from AEGIS.app.client.controllers import (
-    ComponentUpdate,
-    MISSING,
-    set_coordinates_as_input,
-    submit_location_search,
     get_runtime_settings,
-    sync_cloud_model_options,
+    resolve_cloud_selection,
+    submit_location_search,
 )
-from AEGIS.app.constants import AGENT_MODEL_CHOICES, FILTER_CHOICES, CLOUD_MODEL_CHOICES
-
-CLOUD_PROVIDERS: list[str] = [k for k in CLOUD_MODEL_CHOICES.keys()]
+from AEGIS.app.constants import AGENT_MODEL_CHOICES, FILTER_CHOICES
 
 
-# [COMPONENTS DATACLASS]
 ###############################################################################
-@dataclass
-class ClientComponents:
-    auth_button: Any
-    country: Any
-    city: Any
-    address: Any
-    use_coordinates: Any
-    latitude: Any
-    longitude: Any
-    date: Any
-    filter: Any
-    search: Any
-    agentic_toggle: Any
-    llm_query: Any
-    use_cloud: Any
-    cloud_model: Any
-    agent_model: Any
-    temperature: Any
-    agentic_search: Any
-    status: Any
-    map_display: Any
-
-
 # HELPERS
 ###############################################################################
-
-
-
-# UPDATES
-###############################################################################
-def apply_component_update(component: Any, update: ComponentUpdate) -> None:
-    if update.value is not MISSING and hasattr(component, "value"):
-        value_to_set = update.value
-        if value_to_set == "" and hasattr(component, "set_options"):
-            value_to_set = None
-        component.value = value_to_set
-        if hasattr(component, "update"):
-            component.update()
-    if update.options is not None and hasattr(component, "set_options"):
-        component.set_options(update.options)
-        if hasattr(component, "update"):
-            component.update()
-    if update.enabled is not None:
-        if update.enabled and hasattr(component, "enable"):
-            component.enable()
-        elif not update.enabled and hasattr(component, "disable"):
-            component.disable()
-    if update.visible is not None and hasattr(component, "visible"):
-        component.visible = update.visible
-
-# -----------------------------------------------------------------------------
-def update_status(components: ClientComponents, data: dict[str, Any] | None, message: str) -> None:
-    """Format and display status output strictly in the status component."""
-    if not data:
-        content = message or ""
-    else:
-        payload = data.get("payload") if isinstance(data, dict) else None
-        if isinstance(payload, dict):
-            serialized = json.dumps(payload, indent=2, sort_keys=True)
-            content = f"{message}\n\n```json\n{serialized}\n```"
-        else:
-            content = message or ""
-
-    components.status.set_content(content)
-    components.status.update()
-
 # -----------------------------------------------------------------------------
 def get_datetime_default_value() -> str:
     current = datetime.now().replace(second=0, microsecond=0)
     return current.isoformat(timespec="minutes")
 
+
 # -----------------------------------------------------------------------------
-async def handle_use_coordinates_change(
-    components: ClientComponents, event: Any
+def set_location_mode(
+    use_coordinates: bool,
+    *,
+    country_input: Any,
+    city_input: Any,
+    address_input: Any,
+    latitude_input: Any,
+    longitude_input: Any,
 ) -> None:
-    use_coordinates = bool(event.value)
-    updates = set_coordinates_as_input(use_coordinates)
-    apply_component_update(components.country, updates["country"])
-    apply_component_update(components.city, updates["city"])
-    apply_component_update(components.address, updates["address"])
-    apply_component_update(components.latitude, updates["latitude"])
-    apply_component_update(components.longitude, updates["longitude"])
+    if use_coordinates:
+        country_input.value = ""
+        city_input.value = ""
+        address_input.value = ""
+        country_input.disable()
+        city_input.disable()
+        address_input.disable()
+        latitude_input.enable()
+        longitude_input.enable()
+    else:
+        country_input.enable()
+        city_input.enable()
+        address_input.enable()
+        latitude_input.value = None
+        longitude_input.value = None
+        latitude_input.disable()
+        longitude_input.disable()
 
 
-# ACTIONS
+# -----------------------------------------------------------------------------
+def apply_cloud_toggle_state(
+    cloud_enabled: bool,
+    *,
+    cloud_model_dropdown: Any,
+    agent_model_dropdown: Any,
+    temperature_input: Any,
+    reasoning_checkbox: Any,
+) -> None:
+    if cloud_enabled:
+        cloud_model_dropdown.enable()
+        agent_model_dropdown.disable()
+        temperature_input.disable()
+        reasoning_checkbox.disable()
+    else:
+        cloud_model_dropdown.disable()
+        agent_model_dropdown.enable()
+        temperature_input.enable()
+        reasoning_checkbox.enable()
+
+
+# -----------------------------------------------------------------------------
+def update_json_card(json_card: Any, json_output: Any, payload: Any) -> None:
+    if payload is not None:
+        formatted = json.dumps(payload, indent=2, sort_keys=True, default=str)
+        json_output.set_content(f"```json\n{formatted}\n```")
+        json_card.visible = True
+    else:
+        json_output.set_content("")
+        json_card.visible = False
+
+
 ###############################################################################
-async def handle_search_click(components: ClientComponents, event: Any) -> None:
-    data, message = await submit_location_search(
-        components.filter.value,
-        components.country.value,
-        components.city.value,
-        components.address.value,
-        components.use_coordinates.value,
-        components.latitude.value,
-        components.longitude.value,
-        components.date.value,
+# EVENT HANDLERS
+###############################################################################
+# -----------------------------------------------------------------------------
+async def on_use_coordinates_change(
+    event: Any,
+    *,
+    country_input: Any,
+    city_input: Any,
+    address_input: Any,
+    latitude_input: Any,
+    longitude_input: Any,
+) -> None:
+    use_coordinates = bool(getattr(event, "value", event))
+    set_location_mode(
+        use_coordinates,
+        country_input=country_input,
+        city_input=city_input,
+        address_input=address_input,
+        latitude_input=latitude_input,
+        longitude_input=longitude_input,
     )
-    message = message if message else "Location search payload submitted."
-    update_status(components, data, message)
-    
 
 
+# -----------------------------------------------------------------------------
+async def on_search_click(
+    event: Any,
+    *,
+    filter_select: Any,
+    country_input: Any,
+    city_input: Any,
+    address_input: Any,
+    use_coordinates_switch: Any,
+    latitude_input: Any,
+    longitude_input: Any,
+    date_input: Any,
+    status_display: Any,
+    json_card: Any,
+    json_output: Any,
+) -> None:
+    del event
+    result = await submit_location_search(
+        filter_select.value,
+        country_input.value,
+        city_input.value,
+        address_input.value,
+        bool(use_coordinates_switch.value),
+        latitude_input.value,
+        longitude_input.value,
+        date_input.value,
+    )
+    message = result.get("message") or "Location search payload submitted."
+    status_display.set_content(message)
+    update_json_card(json_card, json_output, result.get("json"))
+
+
+# -----------------------------------------------------------------------------
+def on_cloud_toggle(
+    event: Any,
+    *,
+    cloud_model_dropdown: Any,
+    agent_model_dropdown: Any,
+    temperature_input: Any,
+    reasoning_checkbox: Any,
+) -> None:
+    cloud_enabled = bool(getattr(event, "value", event))
+    apply_cloud_toggle_state(
+        cloud_enabled,
+        cloud_model_dropdown=cloud_model_dropdown,
+        agent_model_dropdown=agent_model_dropdown,
+        temperature_input=temperature_input,
+        reasoning_checkbox=reasoning_checkbox,
+    )
+
+
+###############################################################################
 # MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
     current_settings = get_runtime_settings()
-    provider, model_update = sync_cloud_model_options(
+    cloud_selection = resolve_cloud_selection(
         current_settings.provider, current_settings.cloud_model
     )
-    cloud_models = model_update.options or []
-    selected_cloud_model = model_update.value
+    cloud_models = cloud_selection["models"] or []
+    selected_cloud_model = cloud_selection["model"] or (
+        cloud_models[0] if cloud_models else None
+    )
     cloud_enabled = current_settings.use_cloud_services
 
     ui.page_title("AEGIS Geographics")
@@ -159,7 +195,6 @@ def main_page() -> None:
                     auth_button.props("size=sm")
 
         with ui.row().classes("w-full gap-6 items-stretch flex-wrap md:flex-nowrap"):
-            # LOCATION SEARCH (left)
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 w-full md:w-1/2"):
                 with ui.column().classes("gap-4 h-full"):
                     ui.markdown("### Location search")
@@ -209,12 +244,11 @@ def main_page() -> None:
                             label="Imagery Style",
                         ).classes("w-full")
 
-                    ui.space()  # push button to bottom
+                    ui.space()
                     search_button = ui.button("Start search", on_click=None).props(
                         "color=primary"
                     )
 
-            # AGENTIC SEARCH (right)
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 w-full md:w-1/2"):
                 with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Agentic Search")
@@ -229,7 +263,7 @@ def main_page() -> None:
                             "Leverage OpenAI cloud models", value=cloud_enabled
                         )
                         cloud_model_dropdown = ui.select(
-                            OPENAI_CLOUD_MODELS,
+                            cloud_models,
                             label="OpenAI model choice",
                             value=selected_cloud_model,
                         ).classes("w-full")
@@ -270,43 +304,72 @@ def main_page() -> None:
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"):
                 with ui.column().classes("gap-3 h-full"):
                     ui.markdown("### Endpoint Output")
-                    with ui.scroll_area().classes("w-full h-full max-h-[640px] min-w-0"):
+                    with ui.scroll_area().classes("w-full h-full max-h-[360px] min-w-0"):
                         status_display = ui.markdown("Waiting for response...")
                         status_display.classes("status-output w-full text-sm font-mono")
+                    with ui.expansion("JSON payload", icon="data_object") as json_card:
+                        json_output = ui.markdown("")
 
-    components = ClientComponents(
-        auth_button=auth_button,
-        country=country_input,
-        city=city_input,
-        address=address_input,
-        use_coordinates=use_coordinates_switch,
-        latitude=latitude_input,
-        longitude=longitude_input,
-        date=date_input,
-        filter=filter_select,
-        search=search_button,
-        agentic_toggle=agentic_checkbox,
-        llm_query=llm_query_input,
-        use_cloud=use_cloud_checkbox,
-        cloud_model=cloud_model_dropdown,
-        agent_model=agent_model_dropdown,
-        temperature=temperature_input,
-        agentic_search=agentic_button,
-        status=status_display,
-        map_display=map_canvas,
+    set_location_mode(
+        bool(use_coordinates_switch.value),
+        country_input=country_input,
+        city_input=city_input,
+        address_input=address_input,
+        latitude_input=latitude_input,
+        longitude_input=longitude_input,
     )
+    apply_cloud_toggle_state(
+        cloud_enabled,
+        cloud_model_dropdown=cloud_model_dropdown,
+        agent_model_dropdown=agent_model_dropdown,
+        temperature_input=temperature_input,
+        reasoning_checkbox=reasoning_checkbox,
+    )
+    json_card.visible = False
 
-    # Wire events (targeted updates)
     use_coordinates_switch.on_value_change(
-        partial(handle_use_coordinates_change, components)
+        partial(
+            on_use_coordinates_change,
+            country_input=country_input,
+            city_input=city_input,
+            address_input=address_input,
+            latitude_input=latitude_input,
+            longitude_input=longitude_input,
+        )
     )
-    search_button.on_click(partial(handle_search_click, components))
+    search_button.on_click(
+        partial(
+            on_search_click,
+            filter_select=filter_select,
+            country_input=country_input,
+            city_input=city_input,
+            address_input=address_input,
+            use_coordinates_switch=use_coordinates_switch,
+            latitude_input=latitude_input,
+            longitude_input=longitude_input,
+            date_input=date_input,
+            status_display=status_display,
+            json_card=json_card,
+            json_output=json_output,
+        )
+    )
+    use_cloud_checkbox.on_value_change(
+        partial(
+            on_cloud_toggle,
+            cloud_model_dropdown=cloud_model_dropdown,
+            agent_model_dropdown=agent_model_dropdown,
+            temperature_input=temperature_input,
+            reasoning_checkbox=reasoning_checkbox,
+        )
+    )
 
 
+###############################################################################
 # MOUNT AND LAUNCH
 ###############################################################################
 def create_interface() -> None:
     ui.page("/")(main_page)
+
 
 # -----------------------------------------------------------------------------
 def launch_interface() -> None:
