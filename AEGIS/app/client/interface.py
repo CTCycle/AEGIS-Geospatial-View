@@ -28,57 +28,6 @@ def get_datetime_default_value() -> str:
     current = datetime.now().replace(second=0, microsecond=0)
     return current.isoformat(timespec="minutes")
 
-
-# -----------------------------------------------------------------------------
-def set_location_mode(
-    use_coordinates: bool,
-    *,
-    country_input: Any,
-    city_input: Any,
-    address_input: Any,
-    latitude_input: Any,
-    longitude_input: Any,
-) -> None:
-    if use_coordinates:
-        country_input.value = ""
-        city_input.value = ""
-        address_input.value = ""
-        country_input.disable()
-        city_input.disable()
-        address_input.disable()
-        latitude_input.enable()
-        longitude_input.enable()
-    else:
-        country_input.enable()
-        city_input.enable()
-        address_input.enable()
-        latitude_input.value = None
-        longitude_input.value = None
-        latitude_input.disable()
-        longitude_input.disable()
-
-# -----------------------------------------------------------------------------
-def update_cloud_controls(
-    enabled: bool,
-    llm_provider_dropdown: Any,
-    cloud_model_dropdown: Any,
-    agent_model_dropdown: Any,    
-    temperature_input: Any,
-    reasoning_checkbox: Any,  
-) -> None:
-    if enabled:
-        llm_provider_dropdown.enable()
-        cloud_model_dropdown.enable()        
-        agent_model_dropdown.disable()        
-        temperature_input.disable()
-        reasoning_checkbox.disable()
-    else:
-        llm_provider_dropdown.disable()
-        cloud_model_dropdown.disable()
-        agent_model_dropdown.enable() 
-        temperature_input.enable()
-        reasoning_checkbox.enable()
-
 # -----------------------------------------------------------------------------
 async def handle_toggle_cloud_services(
     llm_provider_dropdown: Any,
@@ -98,14 +47,18 @@ async def handle_toggle_cloud_services(
     cloud_model_dropdown.set_options(selection["models"])
     cloud_model_dropdown.value = selection["model"]
     cloud_model_dropdown.update()
-    update_cloud_controls(
-        enabled,
-        llm_provider_dropdown,
-        cloud_model_dropdown,
-        agent_model_dropdown,       
-        temperature_input,
-        reasoning_checkbox,        
-    )
+    if enabled:
+        llm_provider_dropdown.enable()
+        cloud_model_dropdown.enable()        
+        agent_model_dropdown.disable()        
+        temperature_input.disable()
+        reasoning_checkbox.disable()
+    else:
+        llm_provider_dropdown.disable()
+        cloud_model_dropdown.disable()
+        agent_model_dropdown.enable() 
+        temperature_input.enable()
+        reasoning_checkbox.enable()
 
 # -----------------------------------------------------------------------------
 async def handle_cloud_provider_change(
@@ -135,10 +88,7 @@ def update_status_with_json(status_display: Any, message: str, payload: Any) -> 
     content = "\n\n".join(parts) if parts else "Waiting for response..."
     status_display.set_content(content)
 
-
-###############################################################################
-# EVENT HANDLERS
-###############################################################################
+# -----------------------------------------------------------------------------
 async def on_use_coordinates_change(
     event: Any,
     *,
@@ -148,15 +98,25 @@ async def on_use_coordinates_change(
     latitude_input: Any,
     longitude_input: Any,
 ) -> None:
-    use_coordinates = bool(getattr(event, "value", event))
-    set_location_mode(
-        use_coordinates,
-        country_input=country_input,
-        city_input=city_input,
-        address_input=address_input,
-        latitude_input=latitude_input,
-        longitude_input=longitude_input,
-    )
+    use_coordinates = getattr(event, "value", event)
+    if use_coordinates:
+        country_input.value = ""
+        city_input.value = ""
+        address_input.value = ""
+        country_input.disable()
+        city_input.disable()
+        address_input.disable()
+        latitude_input.enable()
+        longitude_input.enable()
+    else:
+        country_input.enable()
+        city_input.enable()
+        address_input.enable()
+        latitude_input.value = None
+        longitude_input.value = None
+        latitude_input.disable()
+        longitude_input.disable()
+
 
 # -----------------------------------------------------------------------------
 async def on_search_click(
@@ -178,7 +138,7 @@ async def on_search_click(
         country_input.value,
         city_input.value,
         address_input.value,
-        bool(use_coordinates_switch.value),
+        use_coordinates_switch.value,
         latitude_input.value,
         longitude_input.value,
         date_input.value,
@@ -340,15 +300,7 @@ def main_page() -> None:
                         status_display = ui.markdown("Waiting for response...")
                         status_display.classes("status-output w-full text-sm font-mono")
 
-    update_cloud_controls(
-        cloud_enabled,
-        llm_provider_dropdown,
-        cloud_model_dropdown,
-        agent_model_dropdown,        
-        temperature_input,
-        reasoning_checkbox,       
-    )
-
+    
     use_cloud_services.on_value_change(
         partial(
             handle_toggle_cloud_services,
@@ -364,16 +316,7 @@ def main_page() -> None:
             handle_cloud_provider_change, 
             llm_provider_dropdown, 
             cloud_model_dropdown)
-    )
-
-    set_location_mode(
-        bool(use_coordinates_switch.value),
-        country_input=country_input,
-        city_input=city_input,
-        address_input=address_input,
-        latitude_input=latitude_input,
-        longitude_input=longitude_input,
-    )
+    )   
    
     use_coordinates_switch.on_value_change(
         partial(
