@@ -17,13 +17,13 @@ from AEGIS.app.client.controllers import (
     resolve_cloud_selection,
     submit_location_search,
 )
-from AEGIS.app.constants import AGENT_MODEL_CHOICES, FILTER_CHOICES
+from AEGIS.app.constants import AGENT_MODEL_CHOICES, FILTER_CHOICES, CLOUD_MODEL_CHOICES
 
+CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
 
 ###############################################################################
 # HELPERS
 ###############################################################################
-# -----------------------------------------------------------------------------
 def get_datetime_default_value() -> str:
     current = datetime.now().replace(second=0, microsecond=0)
     return current.isoformat(timespec="minutes")
@@ -57,43 +57,88 @@ def set_location_mode(
         latitude_input.disable()
         longitude_input.disable()
 
-
 # -----------------------------------------------------------------------------
-def apply_cloud_toggle_state(
-    cloud_enabled: bool,
-    *,
+def update_cloud_controls(
+    enabled: bool,
+    llm_provider_dropdown: Any,
     cloud_model_dropdown: Any,
-    agent_model_dropdown: Any,
+    agent_model_dropdown: Any,    
     temperature_input: Any,
-    reasoning_checkbox: Any,
+    reasoning_checkbox: Any,  
 ) -> None:
-    if cloud_enabled:
-        cloud_model_dropdown.enable()
-        agent_model_dropdown.disable()
+    if enabled:
+        llm_provider_dropdown.enable()
+        cloud_model_dropdown.enable()        
+        agent_model_dropdown.disable()        
         temperature_input.disable()
         reasoning_checkbox.disable()
     else:
+        llm_provider_dropdown.disable()
         cloud_model_dropdown.disable()
-        agent_model_dropdown.enable()
+        agent_model_dropdown.enable() 
         temperature_input.enable()
         reasoning_checkbox.enable()
 
+# -----------------------------------------------------------------------------
+async def handle_toggle_cloud_services(
+    llm_provider_dropdown: Any,
+    cloud_model_dropdown: Any,
+    agent_model_dropdown: Any,    
+    temperature_input: Any,
+    reasoning_checkbox: Any,  
+    event: Any,
+) -> None:
+    enabled = bool(event.value)
+    selection = resolve_cloud_selection(
+        str(llm_provider_dropdown.value or ""),
+        str(cloud_model_dropdown.value or ""),
+    )
+    llm_provider_dropdown.value = selection["provider"]
+    llm_provider_dropdown.update()
+    cloud_model_dropdown.set_options(selection["models"])
+    cloud_model_dropdown.value = selection["model"]
+    cloud_model_dropdown.update()
+    update_cloud_controls(
+        enabled,
+        llm_provider_dropdown,
+        cloud_model_dropdown,
+        agent_model_dropdown,       
+        temperature_input,
+        reasoning_checkbox,        
+    )
 
 # -----------------------------------------------------------------------------
-def update_json_card(json_card: Any, json_output: Any, payload: Any) -> None:
+async def handle_cloud_provider_change(
+    llm_provider_dropdown: Any,
+    cloud_model_dropdown: Any,
+    event: Any,
+) -> None:
+    selection = resolve_cloud_selection(
+        str(event.value or ""),
+        str(cloud_model_dropdown.value or ""),
+    )
+    llm_provider_dropdown.value = selection["provider"]
+    llm_provider_dropdown.update()
+    cloud_model_dropdown.set_options(selection["models"])
+    cloud_model_dropdown.value = selection["model"]
+    cloud_model_dropdown.update()
+
+# -----------------------------------------------------------------------------
+def update_status_with_json(status_display: Any, message: str, payload: Any) -> None:
+    # Build a single Markdown block with status + pretty JSON (if present).
+    parts: list[str] = []
+    if message:
+        parts.append(message.strip())
     if payload is not None:
         formatted = json.dumps(payload, indent=2, sort_keys=True, default=str)
-        json_output.set_content(f"```json\n{formatted}\n```")
-        json_card.visible = True
-    else:
-        json_output.set_content("")
-        json_card.visible = False
+        parts.append(f"```json\n{formatted}\n```")
+    content = "\n\n".join(parts) if parts else "Waiting for response..."
+    status_display.set_content(content)
 
 
 ###############################################################################
 # EVENT HANDLERS
 ###############################################################################
-# -----------------------------------------------------------------------------
 async def on_use_coordinates_change(
     event: Any,
     *,
@@ -113,7 +158,6 @@ async def on_use_coordinates_change(
         longitude_input=longitude_input,
     )
 
-
 # -----------------------------------------------------------------------------
 async def on_search_click(
     event: Any,
@@ -127,8 +171,6 @@ async def on_search_click(
     longitude_input: Any,
     date_input: Any,
     status_display: Any,
-    json_card: Any,
-    json_output: Any,
 ) -> None:
     del event
     result = await submit_location_search(
@@ -142,41 +184,20 @@ async def on_search_click(
         date_input.value,
     )
     message = result.get("message") or "Location search payload submitted."
-    status_display.set_content(message)
-    update_json_card(json_card, json_output, result.get("json"))
-
-
-# -----------------------------------------------------------------------------
-def on_cloud_toggle(
-    event: Any,
-    *,
-    cloud_model_dropdown: Any,
-    agent_model_dropdown: Any,
-    temperature_input: Any,
-    reasoning_checkbox: Any,
-) -> None:
-    cloud_enabled = bool(getattr(event, "value", event))
-    apply_cloud_toggle_state(
-        cloud_enabled,
-        cloud_model_dropdown=cloud_model_dropdown,
-        agent_model_dropdown=agent_model_dropdown,
-        temperature_input=temperature_input,
-        reasoning_checkbox=reasoning_checkbox,
-    )
-
+    # Push both status and JSON directly into the status display panel
+    update_status_with_json(status_display, message, result.get("json"))
 
 ###############################################################################
 # MAIN UI PAGE
 ###############################################################################
 def main_page() -> None:
     current_settings = get_runtime_settings()
-    cloud_selection = resolve_cloud_selection(
+    selection = resolve_cloud_selection(
         current_settings.provider, current_settings.cloud_model
     )
-    cloud_models = cloud_selection["models"] or []
-    selected_cloud_model = cloud_selection["model"] or (
-        cloud_models[0] if cloud_models else None
-    )
+    provider = selection["provider"]
+    cloud_models = selection["models"]
+    selected_cloud_model = selection["model"]
     cloud_enabled = current_settings.use_cloud_services
 
     ui.page_title("AEGIS Geographics")
@@ -258,34 +279,45 @@ def main_page() -> None:
                         placeholder="Describe the geographic insights you need",
                     ).classes("w-full")
 
-                    with ui.expansion("Model configuration", icon="settings"):
-                        use_cloud_checkbox = ui.checkbox(
-                            "Leverage OpenAI cloud models", value=cloud_enabled
-                        )
-                        cloud_model_dropdown = ui.select(
-                            cloud_models,
-                            label="OpenAI model choice",
-                            value=selected_cloud_model,
-                        ).classes("w-full")
-
-                        agent_model_dropdown = ui.select(
-                            AGENT_MODEL_CHOICES,
-                            value=current_settings.agent_model,
-                            label="Ollama agent model",
-                        ).classes("w-full")
-
-                        temperature_input = ui.number(
-                            label="Temperature",
-                            value=current_settings.temperature,
-                            min=0.0,
-                            max=2.0,
-                            step=0.1,
-                        ).classes("w-full")
-
-                        reasoning_checkbox = ui.checkbox(
-                            "Enable reasoning (think)",
-                            value=current_settings.reasoning,
-                        )
+                    with ui.expansion("Models Configuration").classes("w-full"):
+                        ui.label("Configuration").classes("aegis-card-title")                        
+                        use_cloud_services = ui.checkbox(
+                            "Use Cloud Services",
+                            value=cloud_enabled,
+                        ).classes("pt-2")
+                        with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
+                            with ui.column().classes("w-full gap-3"):
+                                ui.label("Cloud Configuration").classes("aegis-subtitle")
+                                llm_provider_dropdown = ui.select(
+                                    CLOUD_PROVIDERS,
+                                    label="Cloud Service",
+                                    value=provider,
+                                ).classes("w-full")
+                                cloud_model_dropdown = ui.select(
+                                    cloud_models,
+                                    label="Cloud Model",
+                                    value=selected_cloud_model or None,
+                                ).classes("w-full")
+                            with ui.column().classes("w-full gap-3"):
+                                ui.label("Ollama Configuration").classes(
+                                    "aegis-subtitle"
+                                )
+                                agent_model_dropdown = ui.select(
+                                    AGENT_MODEL_CHOICES,
+                                    label="Parsing Model",
+                                    value=current_settings.agent_model,
+                                ).classes("w-full")                                
+                                temperature_input = ui.number(
+                                    label="Temperature",
+                                    value=current_settings.temperature,
+                                    min=0.0,
+                                    max=5.0,
+                                    step=0.1,
+                                ).classes("w-full")
+                                reasoning_checkbox = ui.checkbox(
+                                    "Enable reasoning (think)",
+                                    value=current_settings.reasoning,
+                                )                                
 
                     ui.space()
                     agentic_button = ui.button(
@@ -307,8 +339,32 @@ def main_page() -> None:
                     with ui.scroll_area().classes("w-full h-full max-h-[360px] min-w-0"):
                         status_display = ui.markdown("Waiting for response...")
                         status_display.classes("status-output w-full text-sm font-mono")
-                    with ui.expansion("JSON payload", icon="data_object") as json_card:
-                        json_output = ui.markdown("")
+
+    update_cloud_controls(
+        cloud_enabled,
+        llm_provider_dropdown,
+        cloud_model_dropdown,
+        agent_model_dropdown,        
+        temperature_input,
+        reasoning_checkbox,       
+    )
+
+    use_cloud_services.on_value_change(
+        partial(
+            handle_toggle_cloud_services,
+            llm_provider_dropdown,
+            cloud_model_dropdown,
+            agent_model_dropdown,           
+            temperature_input,
+            reasoning_checkbox,           
+        )
+    )
+    llm_provider_dropdown.on_value_change(
+        partial(
+            handle_cloud_provider_change, 
+            llm_provider_dropdown, 
+            cloud_model_dropdown)
+    )
 
     set_location_mode(
         bool(use_coordinates_switch.value),
@@ -318,15 +374,7 @@ def main_page() -> None:
         latitude_input=latitude_input,
         longitude_input=longitude_input,
     )
-    apply_cloud_toggle_state(
-        cloud_enabled,
-        cloud_model_dropdown=cloud_model_dropdown,
-        agent_model_dropdown=agent_model_dropdown,
-        temperature_input=temperature_input,
-        reasoning_checkbox=reasoning_checkbox,
-    )
-    json_card.visible = False
-
+   
     use_coordinates_switch.on_value_change(
         partial(
             on_use_coordinates_change,
@@ -349,27 +397,15 @@ def main_page() -> None:
             longitude_input=longitude_input,
             date_input=date_input,
             status_display=status_display,
-            json_card=json_card,
-            json_output=json_output,
         )
     )
-    use_cloud_checkbox.on_value_change(
-        partial(
-            on_cloud_toggle,
-            cloud_model_dropdown=cloud_model_dropdown,
-            agent_model_dropdown=agent_model_dropdown,
-            temperature_input=temperature_input,
-            reasoning_checkbox=reasoning_checkbox,
-        )
-    )
-
+    
 
 ###############################################################################
 # MOUNT AND LAUNCH
 ###############################################################################
 def create_interface() -> None:
     ui.page("/")(main_page)
-
 
 # -----------------------------------------------------------------------------
 def launch_interface() -> None:
@@ -380,7 +416,6 @@ def launch_interface() -> None:
         title="AEGIS Geographics",
         show_welcome_message=False,
     )
-
 
 # -----------------------------------------------------------------------------
 if __name__ in {"__main__", "__mp_main__"}:
