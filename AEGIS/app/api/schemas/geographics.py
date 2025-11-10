@@ -46,8 +46,18 @@ class LocationSearchRequest(BaseModel):
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     filter: str | None = Field(default=None, max_length=200)
+    satellite_style: str | None = Field(default=None, max_length=200)
+    geospatial_filter: str | None = Field(default=None, max_length=200)
 
-    @field_validator("country", "city", "address", "filter", mode="before")
+    @field_validator(
+        "country",
+        "city",
+        "address",
+        "filter",
+        "satellite_style",
+        "geospatial_filter",
+        mode="before",
+    )
     @classmethod
     def strip_location_text(cls, value: str | None) -> str | None:
         if value is None:

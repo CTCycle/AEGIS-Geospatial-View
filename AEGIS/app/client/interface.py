@@ -17,7 +17,13 @@ from AEGIS.app.client.controllers import (
     resolve_cloud_selection,
     submit_location_search,
 )
-from AEGIS.app.constants import AGENT_MODEL_CHOICES, FILTER_CHOICES, CLOUD_MODEL_CHOICES
+from AEGIS.app.configurations import UI_RUNTIME_SETTINGS
+from AEGIS.app.constants import (
+    AGENT_MODEL_CHOICES,
+    CLOUD_MODEL_CHOICES,
+    GEOSPATIAL_LAYER_CHOICES,
+    SATELLITE_STYLE_CHOICES,
+)
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
 
@@ -122,7 +128,8 @@ async def on_use_coordinates_change(
 async def on_search_click(
     event: Any,
     *,
-    filter_select: Any,
+    satellite_select: Any,
+    geospatial_select: Any,
     country_input: Any,
     city_input: Any,
     address_input: Any,
@@ -134,7 +141,8 @@ async def on_search_click(
 ) -> None:
     del event
     result = await submit_location_search(
-        filter_select.value,
+        satellite_select.value,
+        geospatial_select.value,
         country_input.value,
         city_input.value,
         address_input.value,
@@ -165,7 +173,7 @@ def main_page() -> None:
 
     with ui.column().classes(PAGE_CONTAINER_CLASSES):
         ui.markdown(
-            "## AEGIS Geographics\nVisualize geographic data overlays in real time"
+            "### AEGIS Geographics\nVisualize geographic data overlays in real time"
         ).classes("text-3xl font-semibold text-slate-800 dark:text-slate-100")
         with ui.row().classes("w-full flex-wrap justify-start"):
             with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
@@ -220,9 +228,13 @@ def main_page() -> None:
                         date_input.props["type"] = "datetime-local"
                         date_input.set_value(get_datetime_default_value())
 
-                        filter_select = ui.select(
-                            FILTER_CHOICES,
-                            label="Imagery Style",
+                        satellite_select = ui.select(
+                            SATELLITE_STYLE_CHOICES,
+                            label="Satellite Imagery",
+                        ).classes("w-full")
+                        geospatial_select = ui.select(
+                            GEOSPATIAL_LAYER_CHOICES,
+                            label="Geospatial Filter",
                         ).classes("w-full")
 
                     ui.space()
@@ -287,7 +299,7 @@ def main_page() -> None:
         with ui.row().classes("w-full gap-4 items-stretch flex-wrap md:flex-nowrap"):
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"):
                 with ui.column().classes("gap-3 h-full w-full items-stretch"):
-                    ui.markdown("### Map Preview")
+                    ui.markdown("#### Map Preview")
                     map_canvas = ui.image()
                     map_canvas.classes(
                         "w-full h-full min-h-[560px] max-h-[800px] "
@@ -296,7 +308,7 @@ def main_page() -> None:
 
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"):
                 with ui.column().classes("gap-3 h-full w-full items-stretch"):
-                    ui.markdown("### Endpoint Output")
+                    ui.markdown("#### Endpoint Output")
                     with ui.scroll_area().classes(
                         "w-full h-full max-h-[360px] min-w-0 grow rounded-lg"
                     ):
@@ -334,7 +346,8 @@ def main_page() -> None:
     search_button.on_click(
         partial(
             on_search_click,
-            filter_select=filter_select,
+            satellite_select=satellite_select,
+            geospatial_select=geospatial_select,
             country_input=country_input,
             city_input=city_input,
             address_input=address_input,
@@ -357,10 +370,10 @@ def create_interface() -> None:
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host="0.0.0.0",
-        port=7861,
-        title="AEGIS Geographics",
-        show_welcome_message=False,
+        host=UI_RUNTIME_SETTINGS.host,
+        port=UI_RUNTIME_SETTINGS.port,
+        title=UI_RUNTIME_SETTINGS.title,
+        show_welcome_message=UI_RUNTIME_SETTINGS.show_welcome_message,
     )
 
 # -----------------------------------------------------------------------------
