@@ -286,17 +286,20 @@ def main_page() -> None:
 
         with ui.row().classes("w-full gap-4 items-stretch flex-wrap md:flex-nowrap"):
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"):
-                with ui.column().classes("gap-3 h-full"):
+                with ui.column().classes("gap-3 h-full w-full items-stretch"):
                     ui.markdown("### Map Preview")
                     map_canvas = ui.image()
                     map_canvas.classes(
-                        "w-full h-full min-h-[560px] max-h-[800px] object-contain bg-slate-100"
+                        "w-full h-full min-h-[560px] max-h-[800px] "
+                        "object-contain bg-slate-100 rounded-lg"
                     )
 
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"):
-                with ui.column().classes("gap-3 h-full"):
+                with ui.column().classes("gap-3 h-full w-full items-stretch"):
                     ui.markdown("### Endpoint Output")
-                    with ui.scroll_area().classes("w-full h-full max-h-[360px] min-w-0"):
+                    with ui.scroll_area().classes(
+                        "w-full h-full max-h-[360px] min-w-0 grow rounded-lg"
+                    ):
                         status_display = ui.markdown("Waiting for response...")
                         status_display.classes("status-output w-full text-sm font-mono")
 
