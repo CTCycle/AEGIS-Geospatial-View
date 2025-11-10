@@ -20,4 +20,6 @@ __pycache__
 *.egg-info
 *.gz
 !.gitkeep
+
 !AEGIS/setup/configurations.json
+AGENTS.md
