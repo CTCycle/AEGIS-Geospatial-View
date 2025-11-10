@@ -18,7 +18,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from AEGIS.app.constants import DATA_PATH
+from AEGIS.app.configurations import DATABASE_SETTINGS
+from AEGIS.app.constants import DATA_PATH, DATABASE_FILENAME
 from AEGIS.app.utils.singleton import singleton
 
 Base = declarative_base()
@@ -53,12 +54,12 @@ class GeonamesRecord(Base):
 @singleton
 class AEGISDatabase:
     def __init__(self) -> None:
-        self.db_path = os.path.join(DATA_PATH, "database.db")
+        self.db_path = os.path.join(DATA_PATH, DATABASE_FILENAME)
         self.engine = create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
         self.Session = sessionmaker(bind=self.engine, future=True)
-        self.insert_batch_size = 1000
+        self.insert_batch_size = DATABASE_SETTINGS.insert_batch_size
 
     # -------------------------------------------------------------------------
     def initialize_database(self) -> None:

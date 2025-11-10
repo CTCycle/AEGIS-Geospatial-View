@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
-from datetime import datetime, date
+
 from fastapi import HTTPException, status
 
 
@@ -12,6 +12,13 @@ def sanitize_field(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+# -----------------------------------------------------------------------------
+def sanitize_choice(value: Any) -> str | None:
+    if value is None:
+        return None
+    return sanitize_field(str(value))
 
 
 # -----------------------------------------------------------------------------
@@ -29,7 +36,8 @@ def coerce_float(value: Any) -> float | None:
 ##############################################################################
 def sanitize_search_payload(
     *,
-    filter_val: Any,
+    satellite_style: Any,
+    geospatial_filter: Any,
     country: str | None,
     city: str | None,
     address: str | None,
@@ -53,14 +61,13 @@ def sanitize_search_payload(
         )
 
     payload: dict[str, Any] = {
-        "filter": filter_val,
+        "satellite_style": sanitize_choice(satellite_style),
+        "geospatial_filter": sanitize_choice(geospatial_filter),
+        "filter": sanitize_choice(geospatial_filter),
         "country": sanitize_field(country),
         "city": sanitize_field(city),
         "address": sanitize_field(address),
         "use_coordinates": bool(use_coordinates),
-        "coordinates": (
-            {"latitude": latitude, "longitude": longitude} if use_coordinates else None
-        ),
         "latitude": latitude if use_coordinates else None,
         "longitude": longitude if use_coordinates else None,
         "date": sanitize_field(date),

@@ -8,13 +8,12 @@ import httpx
 
 from AEGIS.app.utils.services.payload import sanitize_search_payload
 
-from AEGIS.app.configurations import ClientRuntimeConfig
-from AEGIS.app.constants import (
-    API_BASE_URL,
-    CLOUD_MODEL_CHOICES,
-    GEO_SEARCH_URL,
-    HTTP_TIMEOUT_SECONDS,
+from AEGIS.app.configurations import (
+    API_SETTINGS,
+    ClientRuntimeConfig,
+    HTTP_SETTINGS,
 )
+from AEGIS.app.constants import CLOUD_MODEL_CHOICES, GEO_SEARCH_URL
 
 ###############################################################################
 @dataclass
@@ -94,7 +93,7 @@ async def trigger_search_maps(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[dict[str, Any] | None, str]:
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=HTTP_SETTINGS.timeout_seconds) as client:
             response = await client.post(url, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
@@ -138,7 +137,8 @@ def extract_status_message(data: dict[str, Any]) -> str:
 
 # -----------------------------------------------------------------------------
 async def submit_location_search(
-    filter_val: Any,
+    satellite_style: Any,
+    geospatial_filter: Any,
     country: str | None,
     city: str | None,
     address: str | None,
@@ -148,7 +148,8 @@ async def submit_location_search(
     date: str | None,
 ) -> dict[str, Any | None]:
     cleaned_payload = sanitize_search_payload(
-        filter_val=filter_val,
+        satellite_style=satellite_style,
+        geospatial_filter=geospatial_filter,
         country=country,
         city=city,
         address=address,
@@ -158,7 +159,7 @@ async def submit_location_search(
         date=date,
     )
 
-    url = f"{API_BASE_URL}{GEO_SEARCH_URL}"
+    url = f"{API_SETTINGS.base_url}{GEO_SEARCH_URL}"
     data, message = await trigger_search_maps(url, cleaned_payload)
     normalized_message = (message or "").strip()
     return {"json": data, "message": normalized_message or None}

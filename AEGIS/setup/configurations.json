@@ -1,6 +1,35 @@
 {
-  "ollama_host_default": "http://localhost:11434",  
-  "default_llm_timeout_seconds": 3600.0
-  
+  "ollama_host_default": "http://localhost:11434",
+  "default_llm_timeout_seconds": 3600.0,
+  "http": {
+    "timeout_seconds": 1800.0
+  },
+  "api": {
+    "base_url": "http://127.0.0.1:8000"
+  },
+  "server": {
+    "fastapi": {
+      "title": "AEGIS Geospatial Search Backend",
+      "description": "FastAPI backend",
+      "version": "0.1.0"
+    },
+    "ui": {
+      "host": "0.0.0.0",
+      "port": 7861,
+      "title": "AEGIS Geographics",
+      "mount_path": "/ui",
+      "redirect_path": "/ui",
+      "show_welcome_message": false,
+      "reconnect_timeout_seconds": 180
+    }
+  },
+  "database": {
+    "insert_batch_size": 1000
+  },
+  "nominatim": {
+    "base_url": "https://nominatim.openstreetmap.org/search",
+    "user_agent": "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)",
+    "timeout_seconds": 10.0
+  }
 }
 

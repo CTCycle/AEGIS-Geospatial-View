@@ -71,6 +71,8 @@ async def search_by_location(
     latitude: float | None = Body(default=None),
     longitude: float | None = Body(default=None),
     filter_value: str | None = Body(default=None, alias="filter"),
+    satellite_style: str | None = Body(default=None),
+    geospatial_filter: str | None = Body(default=None),
 ) -> JSONResponse:
     try:
         payload_data: dict[str, Any] = {
@@ -85,6 +87,8 @@ async def search_by_location(
             "latitude": latitude,
             "longitude": longitude,
             "filter": filter_value,
+            "satellite_style": satellite_style,
+            "geospatial_filter": geospatial_filter,
         }
         payload = LocationSearchRequest.model_validate(payload_data)
     except ValidationError as exc:

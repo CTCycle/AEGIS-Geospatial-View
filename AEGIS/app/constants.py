@@ -16,6 +16,7 @@ DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
+DATABASE_FILENAME = "database.db"
 
 # [ENDPOINS]
 ###############################################################################
@@ -26,8 +27,6 @@ GEO_AGENTIC_URL = "/maps/agentic"
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
 NASA_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
-API_BASE_URL = "http://127.0.0.1:8000"
-HTTP_TIMEOUT_SECONDS = 1800.0
 DEFAULT_TIMELINE_BACKTRACK = 20
 SURROUNDING_RANGE = 10
 MIN_YEAR = 1900
@@ -37,13 +36,6 @@ MAX_AGENTIC_TEMPERATURE = 2.0
 
 # [CLIENT OPTIONS]
 ###############################################################################
-FILTER_CHOICES = [
-    "Natural Color",
-    "Topographic",
-    "Population Density",
-    "Weather Overlay",
-]
-
 OPENAI_CLOUD_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]
 GEMINI_CLOUD_MODELS = [
     "gemini-1.5-flash",
@@ -68,3 +60,18 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "openai": OPENAI_CLOUD_MODELS,
     "gemini": GEMINI_CLOUD_MODELS,
 }
+
+SATELLITE_STYLE_CHOICES = [
+    "Hybrid (Map + Satellite)",
+    "Street Map",
+    "Pure Satellite",
+    "Terrain Emphasis",
+]
+
+GEOSPATIAL_LAYER_CHOICES = [
+    "Land Cover (NLCD)",
+    "Digital Elevation Model (SRTM)",
+    "Population Density (GPW)",
+    "Hydrology (HydroSHEDS)",
+    "Weather Radar (NEXRAD)",
+]

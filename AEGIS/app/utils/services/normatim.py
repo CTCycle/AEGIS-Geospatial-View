@@ -12,19 +12,21 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from AEGIS.app.configurations import NOMINATIM_SETTINGS
+
 LOGGER = logging.getLogger(__name__)
 
 
 ###############################################################################
 class NormatimService:
-    base_url = "https://nominatim.openstreetmap.org/search"
+    base_url = NOMINATIM_SETTINGS.base_url
 
-    def __init__(self, user_agent: str | None = None, timeout: float = 10.0) -> None:
-        self.user_agent = (
-            user_agent
-            or "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)"
-        )
-        self.timeout = timeout
+    def __init__(
+        self, user_agent: str | None = None, timeout: float | None = None
+    ) -> None:
+        self.user_agent = user_agent or NOMINATIM_SETTINGS.user_agent
+        default_timeout = NOMINATIM_SETTINGS.timeout_seconds
+        self.timeout = timeout if timeout is not None else default_timeout
 
     # -----------------------------------------------------------------------------
     async def extract_coordinates(

@@ -5,16 +5,15 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from AEGIS.app.constants import CLOUD_MODEL_CHOICES, AGENT_MODEL_CHOICES
-
-from AEGIS.app.constants import SETUP_DIR
+from AEGIS.app.constants import AGENT_MODEL_CHOICES, CLOUD_MODEL_CHOICES, SETUP_DIR
+from AEGIS.app.utils.types import coerce_bool, coerce_float, coerce_int
 
 CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")
 
 
 ###############################################################################
-def load_configuration_file() -> dict[str, Any] | None:
+def load_configuration_file() -> dict[str, Any]:
     if os.path.exists(CONFIGURATION_FILE):
         try:
             with open(CONFIGURATION_FILE, "r", encoding="utf-8") as handle:
@@ -23,6 +22,7 @@ def load_configuration_file() -> dict[str, Any] | None:
             raise RuntimeError(
                 f"Unable to load configuration from {CONFIGURATION_FILE}"
             ) from exc
+    return {}
 
 
 # -----------------------------------------------------------------------------
@@ -48,6 +48,145 @@ def get_configuration_value(*keys: str, default: Any | None = None) -> Any:
 
 
 ###############################################################################
+@dataclass(frozen=True)
+class FastAPISettings:
+    title: str
+    description: str
+    version: str
+
+
+###############################################################################
+@dataclass(frozen=True)
+class UIRuntimeSettings:
+    host: str
+    port: int
+    title: str
+    mount_path: str
+    redirect_path: str
+    show_welcome_message: bool
+    reconnect_timeout_seconds: int
+
+
+###############################################################################
+@dataclass(frozen=True)
+class APISettings:
+    base_url: str
+
+
+###############################################################################
+@dataclass(frozen=True)
+class HTTPSettings:
+    timeout_seconds: float
+
+
+###############################################################################
+@dataclass(frozen=True)
+class DatabaseSettings:
+    insert_batch_size: int
+
+
+###############################################################################
+@dataclass(frozen=True)
+class NominatimSettings:
+    base_url: str
+    user_agent: str
+    timeout_seconds: float
+
+
+FASTAPI_SETTINGS = FastAPISettings(
+    title=str(
+        get_configuration_value(
+            "server", "fastapi", "title", default="AEGIS Geospatial Search Backend"
+        )
+    ),
+    description=str(
+        get_configuration_value(
+            "server",
+            "fastapi",
+            "description",
+            default="FastAPI backend",
+        )
+    ),
+    version=str(
+        get_configuration_value(
+            "server",
+            "fastapi",
+            "version",
+            default="0.1.0",
+        )
+    ),
+)
+
+UI_RUNTIME_SETTINGS = UIRuntimeSettings(
+    host=str(get_configuration_value("server", "ui", "host", default="0.0.0.0")),
+    port=coerce_int(get_configuration_value("server", "ui", "port", default=7861), 7861),
+    title=str(get_configuration_value("server", "ui", "title", default="AEGIS Geographics")),
+    mount_path=str(
+        get_configuration_value("server", "ui", "mount_path", default="/ui")
+    ),
+    redirect_path=str(
+        get_configuration_value("server", "ui", "redirect_path", default="/ui")
+    ),
+    show_welcome_message=coerce_bool(
+        get_configuration_value(
+            "server",
+            "ui",
+            "show_welcome_message",
+            default=False,
+        ),
+        False,
+    ),
+    reconnect_timeout_seconds=coerce_int(
+        get_configuration_value(
+            "server",
+            "ui",
+            "reconnect_timeout_seconds",
+            default=180,
+        ),
+        180,
+    ),
+)
+
+API_SETTINGS = APISettings(
+    base_url=str(
+        get_configuration_value("api", "base_url", default="http://127.0.0.1:8000")
+    )
+)
+
+HTTP_SETTINGS = HTTPSettings(
+    timeout_seconds=coerce_float(
+        get_configuration_value("http", "timeout_seconds", default=1800.0), 1800.0
+    )
+)
+
+DATABASE_SETTINGS = DatabaseSettings(
+    insert_batch_size=coerce_int(
+        get_configuration_value("database", "insert_batch_size", default=1000), 1000
+    )
+)
+
+NOMINATIM_SETTINGS = NominatimSettings(
+    base_url=str(
+        get_configuration_value(
+            "nominatim",
+            "base_url",
+            default="https://nominatim.openstreetmap.org/search",
+        )
+    ),
+    user_agent=str(
+        get_configuration_value(
+            "nominatim",
+            "user_agent",
+            default="AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)",
+        )
+    ),
+    timeout_seconds=coerce_float(
+        get_configuration_value("nominatim", "timeout_seconds", default=10.0), 10.0
+    ),
+)
+
+
+###############################################################################
 DEFAULT_AGENT_MODEL = AGENT_MODEL_CHOICES[0]
 DEFAULT_CLOUD_PROVIDER = CLOUD_MODEL_CHOICES["openai"]
 DEFAULT_CLOUD_MODEL = CLOUD_MODEL_CHOICES["openai"][0]
@@ -56,9 +195,11 @@ DEFAULT_CLOUD_EMBEDDING_MODEL = ""
 DEFAULT_OLLAMA_TEMPERATURE = 0.7
 DEFAULT_OLLAMA_REASONING = False
 
-OLLAMA_HOST_DEFAULT = get_configuration_value("ollama_host_default", default="")
-DEFAULT_LLM_TIMEOUT_SECONDS = CONFIGURATION_DATA.get(
-    "default_llm_timeout_seconds", 3600.0
+OLLAMA_HOST_DEFAULT = str(
+    get_configuration_value("ollama_host_default", default="http://localhost:11434")
+)
+DEFAULT_LLM_TIMEOUT_SECONDS = coerce_float(
+    get_configuration_value("default_llm_timeout_seconds", default=3600.0), 3600.0
 )
 
 
