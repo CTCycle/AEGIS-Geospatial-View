@@ -25,7 +25,7 @@ class NormatimService:
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
         self.user_agent = user_agent or NOMINATIM_SETTINGS.user_agent
-        default_timeout = NOMINATIM_SETTINGS.timeout_seconds
+        default_timeout = NOMINATIM_SETTINGS.timeout
         self.timeout = timeout if timeout is not None else default_timeout
 
     # -----------------------------------------------------------------------------

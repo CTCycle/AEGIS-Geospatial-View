@@ -93,7 +93,7 @@ async def trigger_search_maps(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[dict[str, Any] | None, str]:
     try:
-        async with httpx.AsyncClient(timeout=HTTP_SETTINGS.timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=HTTP_SETTINGS.timeout) as client:
             response = await client.post(url, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:

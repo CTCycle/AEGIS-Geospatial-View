@@ -64,7 +64,7 @@ class UIRuntimeSettings:
     mount_path: str
     redirect_path: str
     show_welcome_message: bool
-    reconnect_timeout_seconds: int
+    reconnect_timeout: int
 
 
 ###############################################################################
@@ -76,7 +76,7 @@ class APISettings:
 ###############################################################################
 @dataclass(frozen=True)
 class HTTPSettings:
-    timeout_seconds: float
+    timeout: float
 
 
 ###############################################################################
@@ -90,7 +90,7 @@ class DatabaseSettings:
 class NominatimSettings:
     base_url: str
     user_agent: str
-    timeout_seconds: float
+    timeout: float
 
 
 FASTAPI_SETTINGS = FastAPISettings(
@@ -136,11 +136,11 @@ UI_RUNTIME_SETTINGS = UIRuntimeSettings(
         ),
         False,
     ),
-    reconnect_timeout_seconds=coerce_int(
+    reconnect_timeout=coerce_int(
         get_configuration_value(
             "server",
             "ui",
-            "reconnect_timeout_seconds",
+            "reconnect_timeout",
             default=180,
         ),
         180,
@@ -154,8 +154,8 @@ API_SETTINGS = APISettings(
 )
 
 HTTP_SETTINGS = HTTPSettings(
-    timeout_seconds=coerce_float(
-        get_configuration_value("http", "timeout_seconds", default=1800.0), 1800.0
+    timeout=coerce_float(
+        get_configuration_value("http", "timeout", default=1800.0), 1800.0
     )
 )
 
@@ -180,8 +180,8 @@ NOMINATIM_SETTINGS = NominatimSettings(
             default="AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)",
         )
     ),
-    timeout_seconds=coerce_float(
-        get_configuration_value("nominatim", "timeout_seconds", default=10.0), 10.0
+    timeout=coerce_float(
+        get_configuration_value("nominatim", "timeout", default=10.0), 10.0
     ),
 )
 
@@ -199,7 +199,7 @@ OLLAMA_HOST_DEFAULT = str(
     get_configuration_value("ollama_host_default", default="http://localhost:11434")
 )
 DEFAULT_LLM_TIMEOUT_SECONDS = coerce_float(
-    get_configuration_value("default_llm_timeout_seconds", default=3600.0), 3600.0
+    get_configuration_value("default_llm_timeout", default=3600.0), 3600.0
 )
 
 
