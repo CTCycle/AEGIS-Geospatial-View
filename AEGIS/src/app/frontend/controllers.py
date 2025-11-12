@@ -13,7 +13,11 @@ from AEGIS.src.packages.configurations import (
     ClientRuntimeConfig,
     HTTP_SETTINGS,
 )
-from AEGIS.src.packages.constants import CLOUD_MODEL_CHOICES, GEO_SEARCH_URL
+from AEGIS.src.packages.constants import (
+    CLOUD_MODEL_CHOICES,
+    DEFAULT_SATELLITE_STYLE,
+    GEO_SEARCH_URL,
+)
 
 ###############################################################################
 @dataclass
@@ -137,7 +141,6 @@ def extract_status_message(data: dict[str, Any]) -> str:
 
 # -----------------------------------------------------------------------------
 async def submit_location_search(
-    satellite_style: Any,
     geospatial_filter: Any,
     country: str | None,
     city: str | None,
@@ -148,7 +151,7 @@ async def submit_location_search(
     date: str | None,
 ) -> dict[str, Any | None]:
     cleaned_payload = sanitize_search_payload(
-        satellite_style=satellite_style,
+        satellite_style=DEFAULT_SATELLITE_STYLE,
         geospatial_filter=geospatial_filter,
         country=country,
         city=city,

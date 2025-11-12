@@ -4,6 +4,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from AEGIS.src.packages.constants import DEFAULT_SATELLITE_STYLE
+
 
 # HELPERS
 ###############################################################################
@@ -18,7 +20,10 @@ def sanitize_field(value: str | None) -> str | None:
 def sanitize_choice(value: Any) -> str | None:
     if value is None:
         return None
-    return sanitize_field(str(value))
+    normalized = sanitize_field(str(value))
+    if normalized and normalized.lower() == "none":
+        return None
+    return normalized
 
 
 # -----------------------------------------------------------------------------
@@ -60,6 +65,8 @@ def sanitize_search_payload(
             detail="Provide an address/city/country or enable coordinates.",
         )
 
+    sanitized_satellite_style = sanitize_choice(satellite_style) or DEFAULT_SATELLITE_STYLE
+
     payload: dict[str, Any] = {
         "satellite_style": sanitize_choice(satellite_style),
         "geospatial_filter": sanitize_choice(geospatial_filter),
@@ -72,6 +79,8 @@ def sanitize_search_payload(
         "longitude": longitude if use_coordinates else None,
         "date": sanitize_field(date),
         "datetime": sanitize_field(date),
+        "fetch_satellite_imagery": True,
     }
+    payload["satellite_style"] = sanitized_satellite_style
 
     return payload

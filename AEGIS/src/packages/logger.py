@@ -8,17 +8,6 @@ from typing import Any
 
 from AEGIS.src.packages.constants import LOGS_PATH
 
-ACCESS_LOG_BLOCKLIST = ["/_nicegui/"]
-
-
-###############################################################################
-class AccessPathFilter(logging.Filter):
-    # -----------------------------------------------------------------------------
-    def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        return not any(blocked in message for blocked in ACCESS_LOG_BLOCKLIST)
-
-
 # Generate timestamp for the log filename
 ###############################################################################
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -29,11 +18,6 @@ log_filename = os.path.join(LOGS_PATH, f"AEGIS_{current_timestamp}.log")
 LOG_CONFIG: dict[str, Any] = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {
-        "exclude_access_paths": {
-            "()": AccessPathFilter,
-        },
-    },
     "formatters": {
         "default": {
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -62,7 +46,6 @@ LOG_CONFIG: dict[str, Any] = {
             "level": "INFO",
             "handlers": ["console", "file"],
             "propagate": False,
-            "filters": ["exclude_access_paths"],
         },
         "matplotlib": {
             "level": "WARNING",
