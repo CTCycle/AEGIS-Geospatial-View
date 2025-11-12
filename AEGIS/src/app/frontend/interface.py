@@ -22,7 +22,6 @@ from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     GEOSPATIAL_LAYER_CHOICES,
-    SATELLITE_STYLE_CHOICES,
 )
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
@@ -128,7 +127,6 @@ async def on_use_coordinates_change(
 async def on_search_click(
     event: Any,
     *,
-    satellite_select: Any,
     geospatial_select: Any,
     country_input: Any,
     city_input: Any,
@@ -138,10 +136,8 @@ async def on_search_click(
     longitude_input: Any,
     date_input: Any,
     status_display: Any,
-) -> None:
-    del event
+) -> None:    
     result = await submit_location_search(
-        satellite_select.value,
         geospatial_select.value,
         country_input.value,
         city_input.value,
@@ -218,23 +214,23 @@ def main_page() -> None:
                                 format="%.6f",
                                 step=0.000001,
                             ).classes("flex-1 min-w-[160px]")
+                            latitude_input.disable()
                             longitude_input = ui.number(
                                 label="Longitude (°)",
                                 format="%.6f",
                                 step=0.000001,
                             ).classes("flex-1 min-w-[160px]")
+                            longitude_input.disable()
 
                         date_input = ui.input(label="Reference Moment")
                         date_input.props["type"] = "datetime-local"
                         date_input.set_value(get_datetime_default_value())
 
-                        satellite_select = ui.select(
-                            SATELLITE_STYLE_CHOICES,
-                            label="Satellite Imagery",
-                        ).classes("w-full")
+                        geospatial_filter_options = ["None", *GEOSPATIAL_LAYER_CHOICES]
                         geospatial_select = ui.select(
-                            GEOSPATIAL_LAYER_CHOICES,
+                            geospatial_filter_options,
                             label="Geospatial Filter",
+                            value="None",
                         ).classes("w-full")
 
                     ui.space()
@@ -346,7 +342,6 @@ def main_page() -> None:
     search_button.on_click(
         partial(
             on_search_click,
-            satellite_select=satellite_select,
             geospatial_select=geospatial_select,
             country_input=country_input,
             city_input=city_input,

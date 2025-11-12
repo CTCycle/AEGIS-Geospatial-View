@@ -67,6 +67,7 @@ SATELLITE_STYLE_CHOICES = [
     "Pure Satellite",
     "Terrain Emphasis",
 ]
+DEFAULT_SATELLITE_STYLE = "Pure Satellite"
 
 GEOSPATIAL_LAYER_CHOICES = [
     "Land Cover (NLCD)",
@@ -75,3 +76,12 @@ GEOSPATIAL_LAYER_CHOICES = [
     "Hydrology (HydroSHEDS)",
     "Weather Radar (NEXRAD)",
 ]
+
+# [GEOSPATIAL NORMALIZATION]
+###############################################################################
+MIN_TIMELINE_YEAR = 1900
+MAX_LAT = 90.0
+MIN_LAT = -90.0
+MAX_LON = 180.0
+MIN_LON = -180.0
+MAX_MERCATOR_EXTENT = 20037508.3427892
