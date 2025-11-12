@@ -9,19 +9,17 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from AEGIS.src.app.backend.schemas.geographics import LocationSearchRequest
-from AEGIS.src.packages.utils.services.normatim import NormatimService
-from AEGIS.src.packages.utils.services.location import LocationSanitizationService
+from AEGIS.src.packages.utils.services.geospatial.normatim import NormatimService
+from AEGIS.src.packages.utils.services.sanitization import LocationSanitizationService
 
 router = APIRouter(prefix="/maps", tags=["search"])
 
 sanitization_service = LocationSanitizationService()
 normatim_service = NormatimService()
 
-
 ###############################################################################
-async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
-    response_payload = payload.as_query_payload()
-
+async def get_location_coordinates(payload: LocationSearchRequest) -> dict[str, object]:
+    response_payload = payload.model_dump()
     if not payload.use_coordinates:
         sanitized_location = sanitization_service.sanitize_location_inputs(
             address=payload.address or "",
@@ -36,10 +34,8 @@ async def process_location_search(payload: LocationSearchRequest) -> dict[str, A
             country_code=sanitized_location["country_code"],
         )
         if normatim_candidate:
-            response_payload["coordinates"] = {
-                "latitude": normatim_candidate.get("lat"),
-                "longitude": normatim_candidate.get("lon"),
-            }
+            response_payload["latitude"] = normatim_candidate.get("lat"),
+            response_payload["longitude"] = normatim_candidate.get("lon"),            
             if normatim_candidate.get("bbox"):
                 response_payload["bbox"] = normatim_candidate["bbox"]
             if normatim_candidate.get("confidence") is not None:
@@ -51,9 +47,16 @@ async def process_location_search(payload: LocationSearchRequest) -> dict[str, A
                 "longitude": payload.longitude,
             }
 
+    return response_payload
+
+
+###############################################################################
+async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
+    search_payload = await get_location_coordinates(payload)
+
     return {
         "status_message": "Map search request submitted.",
-        "payload": response_payload,
+        "payload": search_payload,
     }
 
 

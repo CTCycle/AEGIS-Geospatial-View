@@ -76,8 +76,3 @@ class LocationSearchRequest(BaseModel):
             if not self.address:
                 raise ValueError("Provide an address when not using coordinates.")
         return self
-
-    def as_query_payload(self) -> dict[str, object]:
-        payload = self.model_dump(exclude_none=True)
-        payload["mode"] = "coordinates" if self.use_coordinates else "search"
-        return payload
