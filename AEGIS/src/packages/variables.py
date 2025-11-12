@@ -4,8 +4,8 @@ import os
 
 from dotenv import load_dotenv
 
-from AEGIS.app.constants import PROJECT_DIR
-from AEGIS.app.logger import logger
+from AEGIS.src.packages.constants import PROJECT_DIR
+from AEGIS.src.packages.logger import logger
 
 
 # [IMPORT CUSTOM MODULES]

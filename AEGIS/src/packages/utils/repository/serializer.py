@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from AEGIS.app.utils.repository.database import database
+from AEGIS.src.packages.utils.repository.database import database
 
 
 # [DATA SERIALIZATION]

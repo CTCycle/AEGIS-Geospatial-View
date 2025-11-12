@@ -8,9 +8,9 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from AEGIS.app.api.schemas.geographics import LocationSearchRequest
-from AEGIS.app.utils.services.normatim import NormatimService
-from AEGIS.app.utils.services.location import LocationSanitizationService
+from AEGIS.src.app.backend.schemas.geographics import LocationSearchRequest
+from AEGIS.src.packages.utils.services.normatim import NormatimService
+from AEGIS.src.packages.utils.services.location import LocationSanitizationService
 
 router = APIRouter(prefix="/maps", tags=["search"])
 

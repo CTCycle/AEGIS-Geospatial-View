@@ -5,8 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from AEGIS.app.constants import AGENT_MODEL_CHOICES, CLOUD_MODEL_CHOICES, SETUP_DIR
-from AEGIS.app.utils.types import coerce_bool, coerce_float, coerce_int
+from AEGIS.src.packages.constants import AGENT_MODEL_CHOICES, CLOUD_MODEL_CHOICES, SETUP_DIR
+from AEGIS.src.packages.types import coerce_bool, coerce_float, coerce_int
 
 CONFIGURATION_CACHE: dict[str, Any] | None = None
 CONFIGURATION_FILE = os.path.join(SETUP_DIR, "configurations.json")

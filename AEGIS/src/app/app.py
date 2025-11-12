@@ -6,12 +6,11 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from nicegui import ui
 
-from AEGIS.app.api.endpoints.search import router as search_router
-from AEGIS.app.client.interface import create_interface
-from AEGIS.app.configurations import FASTAPI_SETTINGS, UI_RUNTIME_SETTINGS
-from AEGIS.app.logger import logger
-from AEGIS.app.utils.repository.database import database
-from AEGIS.app.variables import env_variables
+from AEGIS.src.app.backend.endpoints.search import router as search_router
+from AEGIS.src.app.frontend.interface import create_interface
+from AEGIS.src.packages.configurations import FASTAPI_SETTINGS, UI_RUNTIME_SETTINGS
+from AEGIS.src.packages.logger import logger
+from AEGIS.src.packages.utils.repository.database import database
 
 ###############################################################################
 # initialize the database if it has not been created

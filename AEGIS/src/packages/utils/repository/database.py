@@ -18,9 +18,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from AEGIS.app.configurations import DATABASE_SETTINGS
-from AEGIS.app.constants import DATA_PATH, DATABASE_FILENAME
-from AEGIS.app.utils.singleton import singleton
+from AEGIS.src.packages.configurations import DATABASE_SETTINGS
+from AEGIS.src.packages.constants import DATA_PATH, DATABASE_FILENAME
+from AEGIS.src.packages.utils.singleton import singleton
 
 Base = declarative_base()
 

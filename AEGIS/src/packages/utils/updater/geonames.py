@@ -8,12 +8,12 @@ import zipfile
 from collections.abc import Iterator
 from typing import Any
 
-from AEGIS.app.constants import SOURCES_PATH
-from AEGIS.app.utils.repository.serializer import (
+from AEGIS.src.packages.constants import SOURCES_PATH
+from AEGIS.src.packages.utils.repository.serializer import (
     DataSerializer,
     GEONAMES_COLUMNS,
 )
-from AEGIS.app.logger import logger
+from AEGIS.src.packages.logger import logger
 
 GEONAMES_BASE_URL = "https://download.geonames.org/export/dump"
 DEFAULT_DATASET = "allCountries.zip"
