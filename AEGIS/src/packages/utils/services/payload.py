@@ -4,9 +4,6 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from AEGIS.src.packages.constants import DEFAULT_SATELLITE_STYLE
-
-
 # HELPERS
 ###############################################################################
 def sanitize_field(value: str | None) -> str | None:
@@ -41,7 +38,6 @@ def coerce_float(value: Any) -> float | None:
 ##############################################################################
 def sanitize_search_payload(
     *,
-    satellite_style: Any,
     geospatial_filter: Any,
     country: str | None,
     city: str | None,
@@ -65,12 +61,11 @@ def sanitize_search_payload(
             detail="Provide an address/city/country or enable coordinates.",
         )
 
-    sanitized_satellite_style = sanitize_choice(satellite_style) or DEFAULT_SATELLITE_STYLE
+    sanitized_filter = sanitize_choice(geospatial_filter)
 
     payload: dict[str, Any] = {
-        "satellite_style": sanitize_choice(satellite_style),
-        "geospatial_filter": sanitize_choice(geospatial_filter),
-        "filter": sanitize_choice(geospatial_filter),
+        "geospatial_filter": sanitized_filter,
+        "filter": sanitized_filter,
         "country": sanitize_field(country),
         "city": sanitize_field(city),
         "address": sanitize_field(address),
@@ -79,8 +74,6 @@ def sanitize_search_payload(
         "longitude": longitude if use_coordinates else None,
         "date": sanitize_field(date),
         "datetime": sanitize_field(date),
-        "fetch_satellite_imagery": True,
     }
-    payload["satellite_style"] = sanitized_satellite_style
 
     return payload

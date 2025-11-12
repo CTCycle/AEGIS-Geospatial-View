@@ -93,6 +93,17 @@ class NominatimSettings:
     timeout: float
 
 
+###############################################################################
+@dataclass(frozen=True)
+class GeospatialSettings:
+    min_timeline_year: int
+    max_lat: float
+    min_lat: float
+    max_lon: float
+    min_lon: float
+    max_mercator_extent: float
+
+
 FASTAPI_SETTINGS = FastAPISettings(
     title=str(
         get_configuration_value(
@@ -182,6 +193,30 @@ NOMINATIM_SETTINGS = NominatimSettings(
     ),
     timeout=coerce_float(
         get_configuration_value("nominatim", "timeout", default=10.0), 10.0
+    ),
+)
+
+GEOSPATIAL_SETTINGS = GeospatialSettings(
+    min_timeline_year=coerce_int(
+        get_configuration_value("geospatial", "min_timeline_year", default=1900), 1900
+    ),
+    max_lat=coerce_float(
+        get_configuration_value("geospatial", "max_lat", default=90.0), 90.0
+    ),
+    min_lat=coerce_float(
+        get_configuration_value("geospatial", "min_lat", default=-90.0), -90.0
+    ),
+    max_lon=coerce_float(
+        get_configuration_value("geospatial", "max_lon", default=180.0), 180.0
+    ),
+    min_lon=coerce_float(
+        get_configuration_value("geospatial", "min_lon", default=-180.0), -180.0
+    ),
+    max_mercator_extent=coerce_float(
+        get_configuration_value(
+            "geospatial", "max_mercator_extent", default=20037508.3427892
+        ),
+        20037508.3427892,
     ),
 )
 
