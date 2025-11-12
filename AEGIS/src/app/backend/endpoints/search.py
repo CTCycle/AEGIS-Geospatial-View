@@ -28,6 +28,7 @@ gibs_service = GIBSService()
 
 type CoordinatePair = tuple[float, float]
 type EncodingStrategy = Callable[[bytes], str]
+DEFAULT_GIBS_LAYER = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
 
 ###############################################################################
 async def get_location_coordinates(payload: LocationSearchRequest) -> dict[str, object]:
@@ -83,6 +84,22 @@ def resolve_imagery_date(payload: LocationSearchRequest) -> str:
 
 
 ###############################################################################
+def resolve_imagery_layer(payload: LocationSearchRequest) -> str:
+    layer_candidates = (
+        payload.filter,
+        payload.geospatial_filter,
+    )
+    for candidate in layer_candidates:
+        if candidate is None:
+            continue
+        normalized = str(candidate).strip()
+        if not normalized or normalized.lower() == "none":
+            continue
+        return normalized
+    return DEFAULT_GIBS_LAYER
+
+
+###############################################################################
 def extract_coordinate_pair(
     payload: LocationSearchRequest, response_payload: dict[str, Any]
 ) -> CoordinatePair | None:
@@ -117,14 +134,15 @@ async def fetch_satellite_imagery(
         )
     lon = coordinate_pair[0] if coordinate_pair else None
     lat = coordinate_pair[1] if coordinate_pair else None
-    imagery_date = resolve_imagery_date(payload)    
+    imagery_date = resolve_imagery_date(payload)
+    layer = resolve_imagery_layer(payload)
     gibs_arguments = {
         "lon": lon,
         "lat": lat,
         "bbox": bbox,
         "radius_m": payload.radius_m,
         "date": imagery_date,
-        "layer": payload.filter,
+        "layer": layer,
         "width": payload.image_width,
         "height": payload.image_height,
         "crs": payload.image_crs,

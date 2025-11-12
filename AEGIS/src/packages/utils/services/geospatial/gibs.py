@@ -77,7 +77,7 @@ class Capabilities:
 
 
 ###############################################################################
-class _CapabilitiesCache:
+class CapabilitiesCache:
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
         self.store: dict[str, Capabilities] = {}
@@ -101,7 +101,7 @@ class _CapabilitiesCache:
 
 
 ###############################################################################
-class _ResponseCache:
+class ResponseCache:
     def __init__(self, max_entries: int) -> None:
         self.max_entries = max_entries
         self.cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -138,8 +138,8 @@ class GIBSService:
     ) -> None:
         self.user_agent = user_agent
         self.timeout_s = timeout_s
-        self.capabilities_cache = _CapabilitiesCache(capabilities_ttl_s)
-        self.response_cache = _ResponseCache(MAX_CACHE_ENTRIES)
+        self.capabilities_cache = CapabilitiesCache(capabilities_ttl_s)
+        self.response_cache = ResponseCache(MAX_CACHE_ENTRIES)
 
     # -------------------------------------------------------------------------
     def fetch_image(
@@ -159,19 +159,18 @@ class GIBSService:
         timeout_s: int | None = None,
     ) -> dict[str, Any]:
         request_crs = crs.upper()
-        normalized_bbox = self._normalize_bbox(
+        normalized_bbox = self.normalize_bbox(
             bbox=bbox,
             lon=lon,
             lat=lat,
             radius_m=radius_m,
             target_crs=request_crs,
-        )
-        imagery_date = self._normalize_date(date)
-        self._validate_dimensions(width, height)
+        )        
+        self.validate_dimensions(width, height)
         format_lower = format.lower()
-        cache_key = self._build_cache_key(
+        cache_key = self.build_cache_key(
             layer=layer,
-            imagery_date=imagery_date,
+            imagery_date=date,
             bbox=normalized_bbox,
             crs=request_crs,
             width=width,
@@ -181,35 +180,36 @@ class GIBSService:
         cached = self.response_cache.get(cache_key)
         if cached:
             return dict(cached)
-        capabilities = self._load_capabilities(request_crs, wms_version)
-        layer_meta = self._extract_layer(layer, capabilities)
-        actual_crs = self._resolve_layer_crs(layer_meta, request_crs)
+        capabilities = self.load_capabilities(request_crs, wms_version)
+        layer_meta = self.extract_layer(layer, capabilities)
+        actual_crs = self.resolve_layer_crs(layer_meta, request_crs)
         bbox_for_request = (
             normalized_bbox
             if actual_crs == request_crs
-            else self._reproject_bbox(normalized_bbox, actual_crs)
+            else self.reproject_bbox(normalized_bbox, actual_crs)
         )
-        self._validate_format(format_lower, layer_meta, capabilities)
-        self._validate_time(imagery_date, layer_meta)
-        query = self._build_query(
-            base_url=self._resolve_base_url(actual_crs),
+        self.validate_format(format_lower, layer_meta, capabilities)
+        imagery_date_value = self.parse_imagery_date(date)
+        self.ensure_layer_temporal_support(imagery_date_value, layer_meta)
+        query = self.build_query(
+            base_url=self.resolve_base_url(actual_crs),
             bbox=bbox_for_request,
             crs=actual_crs,
             width=width,
             height=height,
             layer=layer,
-            imagery_date=imagery_date,
+            imagery_date=date,
             format_value=format_lower,
             wms_version=wms_version,
         )
         timeout = timeout_s or self.timeout_s
-        image_bytes, mime, final_url = self._execute_request(query, timeout)
+        image_bytes, mime, final_url = self.execute_request(query, timeout)
         response = {
             "image_bytes": image_bytes,
             "mime": mime,
             "bbox": bbox_for_request,
             "crs": actual_crs,
-            "date": imagery_date,
+            "date": date,
             "layer": layer,
             "width": width,
             "height": height,
@@ -220,7 +220,7 @@ class GIBSService:
         return response
 
     # -------------------------------------------------------------------------
-    def _normalize_bbox(
+    def normalize_bbox(
         self,
         *,
         bbox: BBox | tuple[float, float, float, float] | None,
@@ -231,7 +231,7 @@ class GIBSService:
     ) -> BBox:
         if bbox:
             normalized = [float(value) for value in bbox]
-            self._validate_bbox_values(normalized, target_crs)
+            self.validate_bbox_values(normalized, target_crs)
             return normalized
         if lon is None or lat is None:
             raise GIBSValidationError(
@@ -241,23 +241,23 @@ class GIBSService:
         if radius <= 0:
             raise GIBSValidationError("radius_m must be greater than zero.")
         if target_crs == "EPSG:3857":
-            center_x, center_y = self._lonlat_to_mercator(lon, lat)
+            center_x, center_y = self.lonlat_to_mercator(lon, lat)
             bbox_mercator = [
                 center_x - radius,
                 center_y - radius,
                 center_x + radius,
                 center_y + radius,
             ]
-            self._validate_bbox_values(bbox_mercator, target_crs)
+            self.validate_bbox_values(bbox_mercator, target_crs)
             return bbox_mercator
         if target_crs == "EPSG:4326":
-            bbox_geographic = self._compute_geographic_bbox(lon, lat, radius)
-            self._validate_bbox_values(bbox_geographic, target_crs)
+            bbox_geographic = self.compute_geographic_bbox(lon, lat, radius)
+            self.validate_bbox_values(bbox_geographic, target_crs)
             return bbox_geographic
         raise GIBSValidationError(f"Unsupported target CRS '{target_crs}'.")
 
     # -------------------------------------------------------------------------
-    def _validate_bbox_values(self, bbox: BBox, crs: str) -> None:
+    def validate_bbox_values(self, bbox: BBox, crs: str) -> None:
         minx, miny, maxx, maxy = bbox
         if minx >= maxx or miny >= maxy:
             raise GIBSValidationError("BBox min values must be smaller than max values.")
@@ -274,7 +274,7 @@ class GIBSService:
                 raise GIBSValidationError("Latitude must be within [-90, 90].")
 
     # -------------------------------------------------------------------------
-    def _normalize_date(self, value: str) -> str:
+    def normalize_date(self, value: str) -> str:
         try:
             parsed = date.fromisoformat(value)
         except ValueError as exc:
@@ -284,7 +284,7 @@ class GIBSService:
         return parsed.isoformat()
 
     # -------------------------------------------------------------------------
-    def _build_cache_key(
+    def build_cache_key(
         self,
         *,
         layer: str,
@@ -302,12 +302,12 @@ class GIBSService:
         )
 
     # -------------------------------------------------------------------------
-    def _load_capabilities(self, crs: str, version: str) -> Capabilities:
+    def load_capabilities(self, crs: str, version: str) -> Capabilities:
         cache_key = f"{crs}:{version}"
         cached = self.capabilities_cache.get(cache_key)
         if cached:
             return cached
-        base_url = self._resolve_base_url(crs)
+        base_url = self.resolve_base_url(crs)
         query = f"{base_url}?{urlencode(CAPABILITIES_QUERY)}"
         LOGGER.debug("Fetching GIBS capabilities: url=%s", query)
         request = Request(query, headers={"User-Agent": self.user_agent})
@@ -316,26 +316,26 @@ class GIBSService:
                 xml_payload = response.read()
         except (HTTPError, URLError, TimeoutError) as exc:
             raise GIBSRequestError(f"Failed to fetch GetCapabilities: {exc}") from exc
-        capabilities = self._parse_capabilities(xml_payload)
+        capabilities = self.parse_capabilities(xml_payload)
         self.capabilities_cache.set(cache_key, capabilities)
         return capabilities
 
     # -------------------------------------------------------------------------
-    def _resolve_base_url(self, crs: str) -> str:
+    def resolve_base_url(self, crs: str) -> str:
         base_url = WMS_BASE_ENDPOINTS.get(crs)
         if not base_url:
             raise GIBSValidationError(f"No WMS endpoint configured for '{crs}'.")
         return base_url
 
     # -------------------------------------------------------------------------
-    def _parse_capabilities(self, payload: bytes) -> Capabilities:
+    def parse_capabilities(self, payload: bytes) -> Capabilities:
         try:
             document = ElementTree.fromstring(payload)
         except ElementTree.ParseError as exc:
             raise GIBSRequestError(f"Unable to parse GetCapabilities XML: {exc}") from exc
-        namespace = self._detect_namespace(document)
-        request_formats = self._extract_request_formats(document, namespace)
-        layers = self._extract_layers(document, namespace)
+        namespace = self.detect_namespace(document)
+        request_formats = self.extract_request_formats(document, namespace)
+        layers = self.extract_layers(document, namespace)
         return Capabilities(
             layers=layers,
             supported_formats=frozenset(request_formats),
@@ -343,14 +343,14 @@ class GIBSService:
         )
 
     # -------------------------------------------------------------------------
-    def _detect_namespace(self, document: ElementTree.Element) -> str:
+    def detect_namespace(self, document: ElementTree.Element) -> str:
         if document.tag.startswith("{"):
             namespace = document.tag.split("}")[0].strip("{")
             return f"{{{namespace}}}"
         return ""
 
     # -------------------------------------------------------------------------
-    def _extract_request_formats(
+    def extract_request_formats(
         self, document: ElementTree.Element, namespace: str
     ) -> set[str]:
         formats: set[str] = set()
@@ -361,7 +361,7 @@ class GIBSService:
         return formats
 
     # -------------------------------------------------------------------------
-    def _extract_layers(
+    def extract_layers(
         self, document: ElementTree.Element, namespace: str
     ) -> LayerStore:
         capability = document.find(f"{namespace}Capability")
@@ -371,7 +371,7 @@ class GIBSService:
         if root_layer is None:
             raise GIBSRequestError("Capabilities document missing Layer element.")
         layers: LayerStore = {}
-        self._walk_layers(
+        self.walk_layers(
             layer=root_layer,
             namespace=namespace,
             accumulator=layers,
@@ -384,7 +384,7 @@ class GIBSService:
         return layers
 
     # -------------------------------------------------------------------------
-    def _walk_layers(
+    def walk_layers(
         self,
         *,
         layer: ElementTree.Element,
@@ -402,7 +402,7 @@ class GIBSService:
         for node in layer.findall(f"{namespace}Format"):
             if node.text:
                 local_formats.add(node.text.strip().lower())
-        time_extent = self._extract_time_extent(layer, namespace) or inherited_time
+        time_extent = self.extract_time_extent(layer, namespace) or inherited_time
         name_node = layer.find(f"{namespace}Name")
         if name_node is not None and name_node.text:
             name = name_node.text.strip()
@@ -414,7 +414,7 @@ class GIBSService:
             )
             accumulator[name] = metadata
         for child in layer.findall(f"{namespace}Layer"):
-            self._walk_layers(
+            self.walk_layers(
                 layer=child,
                 namespace=namespace,
                 accumulator=accumulator,
@@ -424,7 +424,7 @@ class GIBSService:
             )
 
     # -------------------------------------------------------------------------
-    def _extract_time_extent(
+    def extract_time_extent(
         self, layer: ElementTree.Element, namespace: str
     ) -> str | None:
         targets = [
@@ -438,14 +438,14 @@ class GIBSService:
         return None
 
     # -------------------------------------------------------------------------
-    def _extract_layer(self, name: str, capabilities: Capabilities) -> LayerMetadata:
+    def extract_layer(self, name: str, capabilities: Capabilities) -> LayerMetadata:
         try:
             return capabilities.layers[name]
         except KeyError as exc:
             raise GIBSValidationError(f"Layer '{name}' not found in capabilities.") from exc
 
     # -------------------------------------------------------------------------
-    def _resolve_layer_crs(self, metadata: LayerMetadata, requested_crs: str) -> str:
+    def resolve_layer_crs(self, metadata: LayerMetadata, requested_crs: str) -> str:
         supported = metadata.supported_crs or frozenset({"EPSG:3857"})
         if requested_crs in supported:
             return requested_crs
@@ -458,7 +458,7 @@ class GIBSService:
         )
 
     # -------------------------------------------------------------------------
-    def _validate_format(
+    def validate_format(
         self,
         format_value: str,
         metadata: LayerMetadata,
@@ -471,36 +471,65 @@ class GIBSService:
             )
 
     # -------------------------------------------------------------------------
-    def _validate_time(self, imagery_date: str, metadata: LayerMetadata) -> None:
+    def parse_imagery_date(self, imagery_date: str) -> date:
+        try:
+            return date.fromisoformat(imagery_date)
+        except ValueError as exc:
+            raise GIBSValidationError(
+                "Imagery date must follow ISO format YYYY-MM-DD."
+            ) from exc
+
+    # -------------------------------------------------------------------------
+    def ensure_layer_temporal_support(
+        self, imagery_date: date, metadata: LayerMetadata
+    ) -> None:
         if not metadata.time_extent:
             return
-        target = date.fromisoformat(imagery_date)
         expressions = [expr.strip() for expr in metadata.time_extent.split(",") if expr.strip()]
+        min_supported: date | None = None
+        max_supported: date | None = None
         for expression in expressions:
             if "/" in expression:
                 parts = expression.split("/")
                 if len(parts) >= 2:
-                    start = self._safe_parse_date(parts[0])
-                    end = self._safe_parse_date(parts[1])
-                    if start and end and start <= target <= end:
+                    start = self.safe_parse_date(parts[0])
+                    end = self.safe_parse_date(parts[1])
+                    if start and (min_supported is None or start < min_supported):
+                        min_supported = start
+                    if end and (max_supported is None or end > max_supported):
+                        max_supported = end
+                    if start and end and start <= imagery_date <= end:
                         return
             else:
-                literal = self._safe_parse_date(expression)
-                if literal and literal == target:
-                    return
+                literal = self.safe_parse_date(expression)
+                if literal:
+                    if min_supported is None or literal < min_supported:
+                        min_supported = literal
+                    if max_supported is None or literal > max_supported:
+                        max_supported = literal
+                    if literal == imagery_date:
+                        return
+        if min_supported and max_supported:
+            raise GIBSValidationError(
+                (
+                    f"Layer '{metadata.name}' supports imagery between "
+                    f"{min_supported.isoformat()} and {max_supported.isoformat()}; "
+                    f"requested {imagery_date.isoformat()}."
+                )
+            )
         raise GIBSValidationError(
-            f"No imagery for '{metadata.name}' on {imagery_date}."
+            f"No imagery for '{metadata.name}' on {imagery_date.isoformat()}."
         )
 
     # -------------------------------------------------------------------------
-    def _safe_parse_date(self, value: str) -> date | None:
+    def safe_parse_date(self, value: str) -> date | None:
         try:
             return date.fromisoformat(value)
         except ValueError:
             return None
 
     # -------------------------------------------------------------------------
-    def _build_query(
+    def build_query(
         self,
         *,
         base_url: str,
@@ -513,7 +542,7 @@ class GIBSService:
         format_value: str,
         wms_version: str,
     ) -> str:
-        bbox_payload = self._format_bbox(bbox, crs, wms_version)
+        bbox_payload = self.format_bbox(bbox, crs, wms_version)
         params = {
             "SERVICE": "WMS",
             "REQUEST": "GetMap",
@@ -530,7 +559,7 @@ class GIBSService:
         return f"{base_url}?{query}"
 
     # -------------------------------------------------------------------------
-    def _format_bbox(self, bbox: BBox, crs: str, version: str) -> str:
+    def format_bbox(self, bbox: BBox, crs: str, version: str) -> str:
         minx, miny, maxx, maxy = bbox
         if crs == "EPSG:4326" and version == "1.3.0":
             values = (miny, minx, maxy, maxx)
@@ -539,7 +568,7 @@ class GIBSService:
         return ",".join(f"{value:.{BBOX_PRECISION}f}" for value in values)
 
     # -------------------------------------------------------------------------
-    def _execute_request(
+    def execute_request(
         self, url: str, timeout_s: int
     ) -> tuple[bytes, str, str]:
         for attempt in range(2):
@@ -578,7 +607,7 @@ class GIBSService:
         raise GIBSRequestError("GIBS GetMap failed after retries.")
 
     # -------------------------------------------------------------------------
-    def _lonlat_to_mercator(self, lon: float, lat: float) -> tuple[float, float]:
+    def lonlat_to_mercator(self, lon: float, lat: float) -> tuple[float, float]:
         clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lon_clamped = clamp(lon, MIN_LONGITUDE, MAX_LONGITUDE)
         lat_clamped = clamp(lat, MIN_MERCATOR_LAT, MAX_MERCATOR_LAT)
@@ -588,7 +617,7 @@ class GIBSService:
         return x, y
 
     # -------------------------------------------------------------------------
-    def _compute_geographic_bbox(
+    def compute_geographic_bbox(
         self, lon: float, lat: float, radius_m: float
     ) -> BBox:
         earth_radius = 6378137.0
@@ -607,21 +636,21 @@ class GIBSService:
         return [min_lon, min_lat, max_lon, max_lat]
 
     # -------------------------------------------------------------------------
-    def _reproject_bbox(self, bbox: BBox, target_crs: str) -> BBox:
+    def reproject_bbox(self, bbox: BBox, target_crs: str) -> BBox:
         if target_crs == "EPSG:3857":
             min_lon, min_lat, max_lon, max_lat = bbox
-            min_x, min_y = self._lonlat_to_mercator(min_lon, min_lat)
-            max_x, max_y = self._lonlat_to_mercator(max_lon, max_lat)
+            min_x, min_y = self.lonlat_to_mercator(min_lon, min_lat)
+            max_x, max_y = self.lonlat_to_mercator(max_lon, max_lat)
             return [min_x, min_y, max_x, max_y]
         if target_crs == "EPSG:4326":
             min_x, min_y, max_x, max_y = bbox
-            min_lon, min_lat = self._mercator_to_lonlat(min_x, min_y)
-            max_lon, max_lat = self._mercator_to_lonlat(max_x, max_y)
+            min_lon, min_lat = self.mercator_to_lonlat(min_x, min_y)
+            max_lon, max_lat = self.mercator_to_lonlat(max_x, max_y)
             return [min_lon, min_lat, max_lon, max_lat]
         raise GIBSValidationError(f"Unable to reproject bbox to '{target_crs}'.")
 
     # -------------------------------------------------------------------------
-    def _mercator_to_lonlat(self, x: float, y: float) -> tuple[float, float]:
+    def mercator_to_lonlat(self, x: float, y: float) -> tuple[float, float]:
         lon = (x / ORIGIN_SHIFT) * 180.0
         lat = (y / ORIGIN_SHIFT) * 180.0
         lat = 180.0 / math.pi * (
@@ -630,7 +659,7 @@ class GIBSService:
         return lon, lat
 
     # -------------------------------------------------------------------------
-    def _validate_dimensions(self, width: int, height: int) -> None:
+    def validate_dimensions(self, width: int, height: int) -> None:
         if not (512 <= width <= 2048):
             raise GIBSValidationError("Width must be between 512 and 2048 pixels.")
         if not (512 <= height <= 2048):
