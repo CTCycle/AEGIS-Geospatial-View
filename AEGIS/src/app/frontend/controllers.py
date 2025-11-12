@@ -15,7 +15,6 @@ from AEGIS.src.packages.configurations import (
 )
 from AEGIS.src.packages.constants import (
     CLOUD_MODEL_CHOICES,
-    DEFAULT_SATELLITE_STYLE,
     GEO_SEARCH_URL,
 )
 
@@ -151,7 +150,6 @@ async def submit_location_search(
     date: str | None,
 ) -> dict[str, Any | None]:
     cleaned_payload = sanitize_search_payload(
-        satellite_style=DEFAULT_SATELLITE_STYLE,
         geospatial_filter=geospatial_filter,
         country=country,
         city=city,

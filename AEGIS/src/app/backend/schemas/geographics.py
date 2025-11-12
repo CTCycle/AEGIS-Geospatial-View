@@ -6,14 +6,7 @@ from datetime import date, time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from AEGIS.src.packages.constants import (
-    MAX_LAT,
-    MAX_LON,
-    MAX_MERCATOR_EXTENT,
-    MIN_LAT,
-    MIN_LON,
-    MIN_TIMELINE_YEAR,
-)
+from AEGIS.src.packages.configurations import GEOSPATIAL_SETTINGS
 
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
@@ -48,7 +41,9 @@ class LocationSearchRequest(BaseModel):
     datetime: dt.datetime | None = Field(default=None)
     reference_date: date | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
-    timeline_year: int | None = Field(default=None, ge=MIN_TIMELINE_YEAR)
+    timeline_year: int | None = Field(
+        default=None, ge=GEOSPATIAL_SETTINGS.min_timeline_year
+    )
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
     address: str | None = Field(default=None, max_length=400)
@@ -56,9 +51,7 @@ class LocationSearchRequest(BaseModel):
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     filter: str | None = Field(default=None, max_length=200)
-    satellite_style: str | None = Field(default=None, max_length=200)
     geospatial_filter: str | None = Field(default=None, max_length=200)
-    fetch_satellite_imagery: bool = Field(default=False)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
     image_width: int = Field(default=1024, ge=512, le=2048)
@@ -71,7 +64,6 @@ class LocationSearchRequest(BaseModel):
         "city",
         "address",
         "filter",
-        "satellite_style",
         "geospatial_filter",
         mode="before",
     )
@@ -120,50 +112,50 @@ class LocationSearchRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_location(self) -> "LocationSearchRequest":
+        location = Location(
+            country=self.country,
+            city=self.city,
+            address=self.address,
+        )
         if self.use_coordinates:
             if self.latitude is None or self.longitude is None:
                 raise ValueError(
                     "Provide both latitude and longitude when use_coordinates is enabled."
                 )
         else:
-            location = Location(
-                country=self.country,
-                city=self.city,
-                address=self.address,
-            )
             if not location.has_any_value():
                 raise ValueError(
                     "Provide a country, city, or address when not using coordinates."
                 )
-        if self.fetch_satellite_imagery:
-            if not self.satellite_style:
-                raise ValueError(
-                    "Provide satellite_style when requesting satellite imagery."
-                )
-            if not (self.reference_date or self.datetime):
-                raise ValueError(
-                    "Provide reference_date or datetime to determine imagery date."
-                )
-            if self.bbox is None and (
-                self.latitude is None or self.longitude is None
-            ):
+        if not (self.reference_date or self.datetime):
+            raise ValueError(
+                "Provide reference_date or datetime to determine imagery date."
+            )
+        if self.bbox is None and self.use_coordinates:
+            if self.latitude is None or self.longitude is None:
                 raise ValueError(
                     "Provide either bbox or coordinates for satellite imagery."
                 )
-            if self.bbox:
-                minx, miny, maxx, maxy = self.bbox
-                comparator: RangeComparator = lambda lower, upper: lower < upper
-                if not comparator(minx, maxx) or not comparator(miny, maxy):
-                    raise ValueError("BBox min values must be smaller than max values.")
+        if self.bbox:
+            minx, miny, maxx, maxy = self.bbox
+            comparator: RangeComparator = lambda lower, upper: lower < upper
+            if not comparator(minx, maxx) or not comparator(miny, maxy):
+                raise ValueError("BBox min values must be smaller than max values.")
                 if self.image_crs == "EPSG:3857":
                     for value in (minx, maxx, miny, maxy):
-                        if abs(value) > MAX_MERCATOR_EXTENT:
+                        if abs(value) > GEOSPATIAL_SETTINGS.max_mercator_extent:
                             raise ValueError(
                                 "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
                             )
                 elif self.image_crs == "EPSG:4326":
-                    if miny < MIN_LAT or maxy > MAX_LAT:
+                    if (
+                        miny < GEOSPATIAL_SETTINGS.min_lat
+                        or maxy > GEOSPATIAL_SETTINGS.max_lat
+                    ):
                         raise ValueError("Latitude values must be within [-90, 90].")
-                    if minx < MIN_LON or maxx > MAX_LON:
+                    if (
+                        minx < GEOSPATIAL_SETTINGS.min_lon
+                        or maxx > GEOSPATIAL_SETTINGS.max_lon
+                    ):
                         raise ValueError("Longitude values must be within [-180, 180].")
         return self

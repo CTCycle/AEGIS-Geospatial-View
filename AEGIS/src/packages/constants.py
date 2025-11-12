@@ -61,27 +61,11 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "gemini": GEMINI_CLOUD_MODELS,
 }
 
-SATELLITE_STYLE_CHOICES = [
-    "Hybrid (Map + Satellite)",
-    "Street Map",
-    "Pure Satellite",
-    "Terrain Emphasis",
-]
-DEFAULT_SATELLITE_STYLE = "Pure Satellite"
-
 GEOSPATIAL_LAYER_CHOICES = [
+    "None",
     "Land Cover (NLCD)",
     "Digital Elevation Model (SRTM)",
     "Population Density (GPW)",
     "Hydrology (HydroSHEDS)",
     "Weather Radar (NEXRAD)",
 ]
-
-# [GEOSPATIAL NORMALIZATION]
-###############################################################################
-MIN_TIMELINE_YEAR = 1900
-MAX_LAT = 90.0
-MIN_LAT = -90.0
-MAX_LON = 180.0
-MIN_LON = -180.0
-MAX_MERCATOR_EXTENT = 20037508.3427892

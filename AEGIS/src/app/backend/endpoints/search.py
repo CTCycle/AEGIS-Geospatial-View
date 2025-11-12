@@ -110,21 +110,21 @@ async def fetch_satellite_imagery(
     payload: LocationSearchRequest, response_payload: dict[str, Any]
 ) -> dict[str, Any]:
     coordinate_pair = extract_coordinate_pair(payload, response_payload)
-    bbox = payload.bbox
+    bbox = payload.bbox or response_payload.get("bbox")
     if not bbox and not coordinate_pair:
         raise GIBSValidationError(
             "Provide coordinates or bbox for satellite imagery requests."
         )
     lon = coordinate_pair[0] if coordinate_pair else None
     lat = coordinate_pair[1] if coordinate_pair else None
-    imagery_date = resolve_imagery_date(payload)
+    imagery_date = resolve_imagery_date(payload)    
     gibs_arguments = {
         "lon": lon,
         "lat": lat,
         "bbox": bbox,
         "radius_m": payload.radius_m,
         "date": imagery_date,
-        "layer": payload.satellite_style or "",
+        "layer": payload.filter,
         "width": payload.image_width,
         "height": payload.image_height,
         "crs": payload.image_crs,
@@ -142,20 +142,19 @@ async def fetch_satellite_imagery(
 ###############################################################################
 async def process_location_search(payload: LocationSearchRequest) -> dict[str, Any]:
     search_payload = await get_location_coordinates(payload)
-    if payload.fetch_satellite_imagery and payload.satellite_style:
-        try:
-            satellite_payload = await fetch_satellite_imagery(payload, search_payload)
-        except GIBSValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        except GIBSRequestError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
-            ) from exc
-        search_payload["satellite_imagery"] = satellite_payload
+    try:
+        satellite_payload = await fetch_satellite_imagery(payload, search_payload)
+    except GIBSValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except GIBSRequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    search_payload["satellite_imagery"] = satellite_payload
 
     return {
         "status_message": "Map search request submitted.",
@@ -177,9 +176,7 @@ async def search_by_location(
     latitude: float | None = Body(default=None),
     longitude: float | None = Body(default=None),
     filter_value: str | None = Body(default=None, alias="filter"),
-    satellite_style: str | None = Body(default=None),
     geospatial_filter: str | None = Body(default=None),
-    fetch_satellite_imagery: bool = Body(default=False),
     bbox: list[float] | None = Body(default=None),
     radius_m: float | None = Body(default=None),
     image_width: int | None = Body(default=None),
@@ -200,9 +197,7 @@ async def search_by_location(
             "latitude": latitude,
             "longitude": longitude,
             "filter": filter_value,
-            "satellite_style": satellite_style,
             "geospatial_filter": geospatial_filter,
-            "fetch_satellite_imagery": fetch_satellite_imagery,
             "bbox": bbox,
         }
         if radius_m is not None:
