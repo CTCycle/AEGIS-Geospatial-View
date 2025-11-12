@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from AEGIS.app.utils.repository.database import database
-from AEGIS.app.utils.updater import GeonamesUpdater
+from AEGIS.src.packages.utils.repository.database import database
+from AEGIS.src.packages.utils.updater import GeonamesUpdater
 
-from AEGIS.app.logger import logger
+from AEGIS.src.packages.logger import logger
 
 
 ###############################################################################

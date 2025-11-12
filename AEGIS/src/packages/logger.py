@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from AEGIS.app.constants import LOGS_PATH
+from AEGIS.src.packages.constants import LOGS_PATH
 
 ACCESS_LOG_BLOCKLIST = ["/_nicegui/"]
 

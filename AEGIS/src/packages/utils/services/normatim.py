@@ -12,7 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.app.configurations import NOMINATIM_SETTINGS
+from AEGIS.src.packages.configurations import NOMINATIM_SETTINGS
 
 LOGGER = logging.getLogger(__name__)
 

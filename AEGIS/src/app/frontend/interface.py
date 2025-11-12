@@ -7,18 +7,18 @@ from typing import Any
 
 from nicegui import ui
 
-from AEGIS.app.client.layouts import (
+from AEGIS.src.app.frontend.layouts import (
     CARD_BASE_CLASSES,
     INTERFACE_THEME_CSS,
     PAGE_CONTAINER_CLASSES,
 )
-from AEGIS.app.client.controllers import (
+from AEGIS.src.app.frontend.controllers import (
     get_runtime_settings,
     resolve_cloud_selection,
     submit_location_search,
 )
-from AEGIS.app.configurations import UI_RUNTIME_SETTINGS
-from AEGIS.app.constants import (
+from AEGIS.src.packages.configurations import UI_RUNTIME_SETTINGS
+from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     GEOSPATIAL_LAYER_CHOICES,
