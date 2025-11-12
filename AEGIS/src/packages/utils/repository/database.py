@@ -20,7 +20,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from AEGIS.src.packages.configurations import DATABASE_SETTINGS
 from AEGIS.src.packages.constants import DATA_PATH, DATABASE_FILENAME
-from AEGIS.src.packages.utils.singleton import singleton
+from AEGIS.src.packages.singleton import singleton
 
 Base = declarative_base()
 
