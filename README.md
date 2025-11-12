@@ -6,10 +6,10 @@ AEGIS is a LLM-powered solution to perform Drug induced liver injury (DILI) anal
 It makes use of Ollama to interact with local models and keep the entire process compliant with high privacy standard and completely free, even though it is optionally possible to use online LLM services such as ChatGPT and Gemini as well.
 
 ## 2. Installation 
-The installation process for Windows is fully automated. Simply run the script *start_on_windows.bat* to begin. During its initial execution, the script installs portable Python, necessary dependencies, minimizing user interaction and ensuring all components are ready for local use.  
+The installation process for Windows is fully automated. Simply run the script `start_on_windows.bat` to begin. During its initial execution, the script installs portable Python, necessary dependencies, minimizing user interaction and ensuring all components are ready for local use.  
 
 ## 3. How to use
-On Windows, run *start_on_windows.bat* to launch the application. Please note that some antivirus software, such as Avast, may flag or quarantine python.exe when called by the .bat file. If you encounter unusual behavior, consider adding an exception in your antivirus settings.
+On Windows, run `start_on_windows.bat` to launch the application. Please note that some antivirus software, such as Avast, may flag or quarantine python.exe when called by the .bat file. If you encounter unusual behavior, consider adding an exception in your antivirus settings.
 
 The intuitive interface facilitates easy interactions with the AEGIS core functionalities.
 
