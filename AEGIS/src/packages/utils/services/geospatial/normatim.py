@@ -61,6 +61,35 @@ class NormatimService:
         return formatted
 
     # -----------------------------------------------------------------------------
+    async def extract_bbox_from_coordinates(
+        self,
+        latitude: float,
+        longitude: float,
+    ) -> list[float] | None:
+        params = {
+            "lat": f"{latitude:.8f}",
+            "lon": f"{longitude:.8f}",
+            "format": "jsonv2",
+            "zoom": "18",
+            "polygon_geojson": "0",
+            "addressdetails": "0",
+        }
+        response = await asyncio.to_thread(self.perform_reverse_request, params)
+        if not response:
+            return None
+        bounding_box = response.get("boundingbox")
+        if not isinstance(bounding_box, list) or len(bounding_box) != 4:
+            return None
+        try:
+            south = float(bounding_box[0])
+            north = float(bounding_box[1])
+            west = float(bounding_box[2])
+            east = float(bounding_box[3])
+        except (TypeError, ValueError):
+            return None
+        return [south, west, north, east]
+
+    # -----------------------------------------------------------------------------
     def compose_query(
         self, address: str, city: str | None, country_name: str | None
     ) -> str:
@@ -91,6 +120,26 @@ class NormatimService:
         if not isinstance(data, list):
             return []
         return [item for item in data if isinstance(item, dict)]
+
+    # -----------------------------------------------------------------------------
+    def perform_reverse_request(self, params: dict[str, str]) -> dict[str, Any] | None:
+        reverse_url = self.resolve_reverse_url()
+        url = f"{reverse_url}?{urlencode(params)}"
+        request = Request(url, headers={"User-Agent": self.user_agent})
+        try:
+            with urlopen(request, timeout=self.timeout) as response:
+                payload = response.read()
+        except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
+            LOGGER.warning("Normatim reverse request failed: %s", exc)
+            return None
+        try:
+            data = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            LOGGER.warning("Normatim reverse response parsing failed: %s", exc)
+            return None
+        if isinstance(data, dict):
+            return data
+        return None
 
     # -----------------------------------------------------------------------------
     def format_result(
@@ -572,3 +621,10 @@ class NormatimService:
         if normalized_target in normalized_source:
             return len(normalized_target) / len(normalized_source)
         return 0.0
+
+    # -----------------------------------------------------------------------------
+    def resolve_reverse_url(self) -> str:
+        normalized = self.base_url.rstrip("/")
+        if normalized.endswith("/search"):
+            return f"{normalized[:-6]}reverse"
+        return f"{normalized}/reverse"
