@@ -6,7 +6,7 @@ from os.path import abspath, join
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../../.."))
 PROJECT_DIR = join(ROOT_DIR, "AEGIS")
-SETUP_DIR = join(PROJECT_DIR, "setup")
+SETUP_PATH = join(PROJECT_DIR, "setup")
 RSC_PATH = join(PROJECT_DIR, "resources")
 SETUP_PATH = join(ROOT_DIR, "DILIGENT", "setup")
 CONFIGURATION_PATH = join(SETUP_PATH, "configurations.json")
@@ -16,12 +16,13 @@ DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 TASKS_PATH = join(DATA_PATH, "tasks")
 LOGS_PATH = join(RSC_PATH, "logs")
-DATABASE_FILENAME = "database.db"
+CONFIGURATION_FILE = join(SETUP_PATH, "configurations.json")
 
 # [ENDPOINS]
 ###############################################################################
 GEO_SEARCH_URL = "/maps/search"
 GEO_AGENTIC_URL = "/maps/agentic"
+DATABASE_FILENAME = "database.db"
 
 
 # [EXTERNAL DATA SOURCES]

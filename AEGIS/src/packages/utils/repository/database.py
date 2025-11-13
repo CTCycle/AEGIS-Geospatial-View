@@ -18,11 +18,12 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from AEGIS.src.packages.configurations import DATABASE_SETTINGS
+from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
 from AEGIS.src.packages.constants import DATA_PATH, DATABASE_FILENAME
 from AEGIS.src.packages.singleton import singleton
 
 Base = declarative_base()
+APP_CONFIG = APP_CONFIGURATIONS
 
 
 ###############################################################################
@@ -69,7 +70,7 @@ class AEGISDatabase:
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
         self.Session = sessionmaker(bind=self.engine, future=True)
-        self.insert_batch_size = DATABASE_SETTINGS.insert_batch_size
+        self.insert_batch_size = APP_CONFIG.database.insert_batch_size
 
     # -------------------------------------------------------------------------
     def initialize_database(self) -> None:
