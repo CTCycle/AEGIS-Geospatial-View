@@ -49,6 +49,16 @@ class GeonamesRecord(Base):
     modification_date = Column(String(10))
 
 
+###############################################################################
+class GibsLayerRecord(Base):
+    __tablename__ = "GIBS_LAYERS"
+    layer_id = Column(String(256), primary_key=True)
+    title = Column(String(512))
+    abstract = Column(Text)
+    projections = Column(Text)
+    source_urls = Column(Text)
+
+
 # [DATABASE]
 ###############################################################################
 @singleton
