@@ -65,9 +65,15 @@ async def get_location_coordinates(payload: LocationSearchRequest) -> dict[str, 
             if normatim_candidate.get("confidence") is not None:
                 response_payload["confidence"] = normatim_candidate["confidence"]
     else:
-        if payload.latitude is not None and payload.longitude is not None:         
+        if payload.latitude is not None and payload.longitude is not None:
             response_payload["latitude"] = payload.latitude
             response_payload["longitude"] = payload.longitude
+            bbox = await normatim_service.extract_bbox_from_coordinates(
+                latitude=payload.latitude,
+                longitude=payload.longitude,
+            )
+            if bbox:
+                response_payload["bbox"] = bbox
 
     return response_payload
 
