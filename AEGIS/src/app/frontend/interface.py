@@ -17,7 +17,7 @@ from AEGIS.src.app.frontend.controllers import (
     resolve_cloud_selection,
     submit_location_search,
 )
-from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
+from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
@@ -25,7 +25,7 @@ from AEGIS.src.packages.constants import (
 )
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
-UI_RUNTIME = APP_CONFIGURATIONS.ui_runtime
+UI_RUNTIME = configurations.ui_runtime
 
 ###############################################################################
 # HELPERS

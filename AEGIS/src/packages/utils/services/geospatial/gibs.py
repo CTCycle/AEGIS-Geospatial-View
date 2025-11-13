@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import math
 import threading
 import time
@@ -14,8 +13,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
+from AEGIS.src.packages.logger import logger
 
-LOGGER = logging.getLogger(__name__)
 ORIGIN_SHIFT = 20037508.342789244
 MAX_WEB_MERCATOR = 20037508.342789244
 MAX_MERCATOR_LAT = 85.05112878
@@ -309,7 +308,7 @@ class GIBSService:
             return cached
         base_url = self.resolve_base_url(crs)
         query = f"{base_url}?{urlencode(CAPABILITIES_QUERY)}"
-        LOGGER.debug("Fetching GIBS capabilities: url=%s", query)
+        logger.debug("Fetching GIBS capabilities: url=%s", query)
         request = Request(query, headers={"User-Agent": self.user_agent})
         try:
             with urlopen(request, timeout=self.timeout_s) as response:
@@ -592,7 +591,7 @@ class GIBSService:
                         raise GIBSRequestError(
                             "GIBS GetMap returned a suspiciously small payload."
                         )
-                    LOGGER.info("Fetched GIBS image: url=%s size=%s", url, len(payload))
+                    logger.info("Fetched GIBS image: url=%s size=%s", url, len(payload))
                     return payload, content_type, url
             except HTTPError as exc:
                 if 500 <= exc.code < 600 and attempt == 0:

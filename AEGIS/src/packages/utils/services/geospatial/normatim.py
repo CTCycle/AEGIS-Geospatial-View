@@ -12,11 +12,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
+from AEGIS.src.packages.logger import logger
+from AEGIS.src.packages.configurations import configurations
 
-NOMINATIM = APP_CONFIGURATIONS.nominatim
+NOMINATIM = configurations.nominatim
 
-LOGGER = logging.getLogger(__name__)
+
 
 
 ###############################################################################
@@ -112,12 +113,12 @@ class NormatimService:
             with urlopen(request, timeout=self.timeout) as response:
                 payload = response.read()
         except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
-            LOGGER.warning("Normatim request failed: %s", exc)
+            logger.warning("Normatim request failed: %s", exc)
             return []
         try:
             data = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            LOGGER.warning("Normatim response parsing failed: %s", exc)
+            logger.warning("Normatim response parsing failed: %s", exc)
             return []
         if not isinstance(data, list):
             return []
@@ -132,12 +133,12 @@ class NormatimService:
             with urlopen(request, timeout=self.timeout) as response:
                 payload = response.read()
         except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
-            LOGGER.warning("Normatim reverse request failed: %s", exc)
+            logger.warning("Normatim reverse request failed: %s", exc)
             return None
         try:
             data = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            LOGGER.warning("Normatim reverse response parsing failed: %s", exc)
+            logger.warning("Normatim reverse response parsing failed: %s", exc)
             return None
         if isinstance(data, dict):
             return data

@@ -1,63 +1,59 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import (
-    BigInteger,
-    Column,
-    Float,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-    create_engine,
-)
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
-from AEGIS.src.packages.constants import DATA_PATH, DATABASE_FILENAME
+from AEGIS.src.packages.utils.repository.sqlite import SQLiteRepository
+from AEGIS.src.packages.configurations import DatabaseSettings, configurations
+from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.singleton import singleton
 
 Base = declarative_base()
-APP_CONFIG = APP_CONFIGURATIONS
-
 
 ###############################################################################
-class GeonamesRecord(Base):
-    __tablename__ = "GEONAMES"
-    geonameid = Column(BigInteger, primary_key=True)
-    name = Column(String(200))
-    asciiname = Column(String(200))
-    alternatenames = Column(Text)
-    latitude = Column(Float)
-    longitude = Column(Float)
-    feature_class = Column(String(1))
-    feature_code = Column(String(10))
-    country_code = Column(String(2))
-    cc2 = Column(String(200))
-    admin1_code = Column(String(20))
-    admin2_code = Column(String(80))
-    admin3_code = Column(String(20))
-    admin4_code = Column(String(20))
-    population = Column(BigInteger)
-    elevation = Column(Integer)
-    dem = Column(Integer)
-    timezone = Column(String(40))
-    modification_date = Column(String(10))
+class DatabaseBackend(Protocol):
+    db_path: str | None
+
+    # -------------------------------------------------------------------------
+    def initialize_database(self) -> None:
+        ...
+
+    # -------------------------------------------------------------------------
+    def load_from_database(self, table_name: str) -> pd.DataFrame:
+        ...
+
+    # -------------------------------------------------------------------------
+    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+        ...
+
+    # -------------------------------------------------------------------------
+    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+        ...
+
+    # -------------------------------------------------------------------------
+    def count_rows(self, table_name: str) -> int:
+        ...
 
 
-###############################################################################
-class GibsLayerRecord(Base):
-    __tablename__ = "GIBS_LAYERS"
-    layer_id = Column(String(256), primary_key=True)
-    title = Column(String(512))
-    abstract = Column(Text)
-    projections = Column(Text)
-    source_urls = Column(Text)
+BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
+
+
+# -----------------------------------------------------------------------------
+def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:    
+    return SQLiteRepository(settings)
+
+
+BACKEND_FACTORIES: dict[str, BackendFactory] = {
+    "sqlite": build_sqlite_backend,
+}
+
 
 
 # [DATABASE]
@@ -65,81 +61,42 @@ class GibsLayerRecord(Base):
 @singleton
 class AEGISDatabase:
     def __init__(self) -> None:
-        self.db_path = os.path.join(DATA_PATH, DATABASE_FILENAME)
-        self.engine = create_engine(
-            f"sqlite:///{self.db_path}", echo=False, future=True
-        )
-        self.Session = sessionmaker(bind=self.engine, future=True)
-        self.insert_batch_size = APP_CONFIG.database.insert_batch_size
+        self.settings = configurations.database
+        self.backend = self._build_backend(self.settings.selected_database)
+
+    # -------------------------------------------------------------------------
+    def _build_backend(self, backend_name: str) -> DatabaseBackend:
+        key = backend_name.strip().lower()
+        if key not in BACKEND_FACTORIES:
+            raise RuntimeError(f"Unsupported database backend requested: {backend_name}")
+        logger.info("Initializing %s database backend", key)
+        factory = BACKEND_FACTORIES[key]
+        return factory(self.settings)
+
+    # -------------------------------------------------------------------------
+    @property
+    def db_path(self) -> str | None:
+        return getattr(self.backend, "db_path", None)
 
     # -------------------------------------------------------------------------
     def initialize_database(self) -> None:
-        Base.metadata.create_all(self.engine)
+        self.backend.initialize_database()
 
     # -------------------------------------------------------------------------
-    def get_table_class(self, table_name: str) -> Any:
-        for cls in Base.__subclasses__():
-            if hasattr(cls, "__tablename__") and cls.__tablename__ == table_name:
-                return cls
-        raise ValueError(f"No table class found for name {table_name}")
-
-    # -------------------------------------------------------------------------
-    def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
-        table = table_cls.__table__
-        session = self.Session()
-        try:
-            unique_cols: list[str] = []
-            for constraint in table.constraints:
-                if isinstance(constraint, UniqueConstraint):
-                    unique_cols = list(constraint.columns.keys())
-                    break
-            if not unique_cols:
-                unique_cols = list(table.primary_key.columns.keys())
-            if not unique_cols:
-                raise ValueError(f"No unique columns found for {table_cls.__name__}")
-
-            records = df.to_dict(orient="records")
-            for i in range(0, len(records), self.insert_batch_size):
-                batch = records[i : i + self.insert_batch_size]
-                stmt = insert(table).values(batch)
-                update_cols = {
-                    column: getattr(stmt.excluded, column)  # type: ignore[attr-defined]
-                    for column in batch[0]
-                    if column not in unique_cols
-                }
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=unique_cols, set_=update_cols
-                )
-                session.execute(stmt)
-            session.commit()
-        finally:
-            session.close()
-
-    # -----------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
-        query = f'SELECT * FROM "{table_name}"'
-        with database.engine.connect() as connection:
-            return pd.read_sql_query(query, connection)
+        return self.backend.load_from_database(table_name)
 
     # -------------------------------------------------------------------------
     def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        with self.engine.begin() as conn:
-            conn.execute(sqlalchemy.text(f'DELETE FROM "{table_name}"'))
-            df.to_sql(table_name, conn, if_exists="append", index=False)
+        self.backend.save_into_database(df, table_name)
 
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        table_cls = self.get_table_class(table_name)
-        self.upsert_dataframe(df, table_cls)
+        self.backend.upsert_into_database(df, table_name)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
-        with self.engine.connect() as conn:
-            result = conn.execute(
-                sqlalchemy.text(f'SELECT COUNT(*) FROM "{table_name}"')
-            )
-            value = result.scalar() or 0
-        return int(value)
+        return self.backend.count_rows(table_name)
 
 
 # -----------------------------------------------------------------------------

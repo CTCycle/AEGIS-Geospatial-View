@@ -6,9 +6,9 @@ from datetime import date, time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
+from AEGIS.src.packages.configurations import configurations
 
-GEOSPATIAL_SETTINGS = APP_CONFIGURATIONS.geospatial
+GEOSPATIAL_SETTINGS = configurations.geospatial
 
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
