@@ -43,6 +43,19 @@
     "min_lon": -180.0,
     "max_mercator_extent": 20037508.3427892
   },
+  "gibs": {
+    "user_agent": "AEGIS-GIBS/1.0",
+    "timeout": 20.0,
+    "capabilities_ttl_s": 21600.0,
+    "max_cache_entries": 24,
+    "bbox_precision": 6,
+    "nasa_attribution": "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), operated by the NASA/GSFC Earth Science Data and Information System (ESDIS) project.",
+    "wms_base_endpoints": {
+      "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+      "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
+    },
+    "retry_backoff_s": 2.0
+  },
   "client_runtime_defaults": {
     "agent_model": "llama3.1:8b",
     "llm_provider": "openai",

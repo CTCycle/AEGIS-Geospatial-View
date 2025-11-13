@@ -13,30 +13,22 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from AEGIS.src.packages.logger import logger
-
-ORIGIN_SHIFT = 20037508.342789244
-MAX_WEB_MERCATOR = 20037508.342789244
-MAX_MERCATOR_LAT = 85.05112878
-MIN_MERCATOR_LAT = -85.05112878
-MAX_GEO_LAT = 90.0
-MIN_GEO_LAT = -90.0
-MAX_LONGITUDE = 180.0
-MIN_LONGITUDE = -180.0
-DEFAULT_USER_AGENT = "AEGIS-GIBS/1.0"
-DEFAULT_TIMEOUT = 20
-CAPABILITIES_TTL_S = 6 * 60 * 60
-MAX_CACHE_ENTRIES = 24
-NASA_ATTRIBUTION = (
-    "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), operated by the "
-    "NASA/GSFC Earth Science Data and Information System (ESDIS) project."
+from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.constants import (
+    CAPABILITIES_QUERY,
+    EARTH_RADIUS_M,
+    GIBS_MAX_IMAGE_DIMENSION,
+    GIBS_MIN_IMAGE_DIMENSION,
+    MAX_GEO_LAT,
+    MAX_LONGITUDE,
+    MAX_MERCATOR_LAT,
+    MAX_WEB_MERCATOR,
+    MIN_GEO_LAT,
+    MIN_LONGITUDE,
+    MIN_MERCATOR_LAT,
+    ORIGIN_SHIFT,
 )
-WMS_BASE_ENDPOINTS = {
-    "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
-    "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
-}
-CAPABILITIES_QUERY = {"SERVICE": "WMS", "REQUEST": "GetCapabilities"}
-BBOX_PRECISION = 6
+from AEGIS.src.packages.logger import logger
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
@@ -126,19 +118,37 @@ class ResponseCache:
 
 ###############################################################################
 class GIBSService:
-    retry_backoff_s = 2.0
-
     def __init__(
         self,
         *,
-        user_agent: str = DEFAULT_USER_AGENT,
-        timeout_s: int = DEFAULT_TIMEOUT,
-        capabilities_ttl_s: float = CAPABILITIES_TTL_S,
+        user_agent: str | None = None,
+        timeout_s: float | None = None,
+        capabilities_ttl_s: float | None = None,
+        cache_entries: int | None = None,
+        retry_backoff_s: float | None = None,
+        bbox_precision: int | None = None,
     ) -> None:
-        self.user_agent = user_agent
-        self.timeout_s = timeout_s
-        self.capabilities_cache = CapabilitiesCache(capabilities_ttl_s)
-        self.response_cache = ResponseCache(MAX_CACHE_ENTRIES)
+        settings = configurations.gibs
+        self.user_agent = user_agent or settings.user_agent
+        self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
+        ttl_value = (
+            capabilities_ttl_s
+            if capabilities_ttl_s is not None
+            else settings.capabilities_ttl_s
+        )
+        self.capabilities_cache = CapabilitiesCache(ttl_value)
+        cache_size = (
+            cache_entries if cache_entries is not None else settings.max_cache_entries
+        )
+        self.response_cache = ResponseCache(cache_size)
+        self.retry_backoff_s = (
+            retry_backoff_s if retry_backoff_s is not None else settings.retry_backoff_s
+        )
+        self.bbox_precision = (
+            bbox_precision if bbox_precision is not None else settings.bbox_precision
+        )
+        self.wms_base_endpoints = dict(settings.wms_base_endpoints)
+        self.nasa_attribution = settings.nasa_attribution
 
     # -------------------------------------------------------------------------
     def fetch_image(
@@ -213,7 +223,7 @@ class GIBSService:
             "width": width,
             "height": height,
             "wms_url": final_url,
-            "attribution": NASA_ATTRIBUTION,
+            "attribution": self.nasa_attribution,
         }
         self.response_cache.set(cache_key, dict(response))
         return response
@@ -321,7 +331,8 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def resolve_base_url(self, crs: str) -> str:
-        base_url = WMS_BASE_ENDPOINTS.get(crs)
+        key = crs.upper()
+        base_url = self.wms_base_endpoints.get(key)
         if not base_url:
             raise GIBSValidationError(f"No WMS endpoint configured for '{crs}'.")
         return base_url
@@ -564,7 +575,7 @@ class GIBSService:
             values = (miny, minx, maxy, maxx)
         else:
             values = (minx, miny, maxx, maxy)
-        return ",".join(f"{value:.{BBOX_PRECISION}f}" for value in values)
+        return ",".join(f"{value:.{self.bbox_precision}f}" for value in values)
 
     # -------------------------------------------------------------------------
     def execute_request(
@@ -619,15 +630,14 @@ class GIBSService:
     def compute_geographic_bbox(
         self, lon: float, lat: float, radius_m: float
     ) -> BBox:
-        earth_radius = 6378137.0
         clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lat_clamped = clamp(lat, MIN_GEO_LAT, MAX_GEO_LAT)
         lat_rad = math.radians(lat_clamped)
         cos_lat = math.cos(lat_rad)
         if abs(cos_lat) < 1e-6:
             cos_lat = 1e-6 if cos_lat >= 0 else -1e-6
-        d_lat = (radius_m / earth_radius) * (180.0 / math.pi)
-        d_lon = (radius_m / (earth_radius * cos_lat)) * (180.0 / math.pi)
+        d_lat = (radius_m / EARTH_RADIUS_M) * (180.0 / math.pi)
+        d_lon = (radius_m / (EARTH_RADIUS_M * cos_lat)) * (180.0 / math.pi)
         min_lon = clamp(lon - d_lon, MIN_LONGITUDE, MAX_LONGITUDE)
         max_lon = clamp(lon + d_lon, MIN_LONGITUDE, MAX_LONGITUDE)
         min_lat = clamp(lat_clamped - d_lat, MIN_GEO_LAT, MAX_GEO_LAT)
@@ -659,7 +669,11 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def validate_dimensions(self, width: int, height: int) -> None:
-        if not (512 <= width <= 2048):
-            raise GIBSValidationError("Width must be between 512 and 2048 pixels.")
-        if not (512 <= height <= 2048):
-            raise GIBSValidationError("Height must be between 512 and 2048 pixels.")
+        if not (GIBS_MIN_IMAGE_DIMENSION <= width <= GIBS_MAX_IMAGE_DIMENSION):
+            raise GIBSValidationError(
+                f"Width must be between {GIBS_MIN_IMAGE_DIMENSION} and {GIBS_MAX_IMAGE_DIMENSION} pixels."
+            )
+        if not (GIBS_MIN_IMAGE_DIMENSION <= height <= GIBS_MAX_IMAGE_DIMENSION):
+            raise GIBSValidationError(
+                f"Height must be between {GIBS_MIN_IMAGE_DIMENSION} and {GIBS_MAX_IMAGE_DIMENSION} pixels."
+            )
