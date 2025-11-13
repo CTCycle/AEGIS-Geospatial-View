@@ -4,40 +4,11 @@ from typing import Any
 
 import pandas as pd
 
+from AEGIS.src.packages.constants import (
+    GEONAMES_COLUMNS,
+    GIBS_LAYER_COLUMNS,    
+)
 from AEGIS.src.packages.utils.repository.database import database
-
-
-# [DATA SERIALIZATION]
-###############################################################################
-GEONAMES_COLUMNS = [
-    "geonameid",
-    "name",
-    "asciiname",
-    "alternatenames",
-    "latitude",
-    "longitude",
-    "feature_class",
-    "feature_code",
-    "country_code",
-    "cc2",
-    "admin1_code",
-    "admin2_code",
-    "admin3_code",
-    "admin4_code",
-    "population",
-    "elevation",
-    "dem",
-    "timezone",
-    "modification_date",
-]
-
-GIBS_LAYER_COLUMNS = [
-    "layer_id",
-    "title",
-    "abstract",
-    "projections",
-    "source_urls",
-]
 
 ###############################################################################
 class DataSerializer:

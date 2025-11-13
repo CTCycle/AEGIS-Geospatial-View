@@ -85,6 +85,20 @@ class GeospatialSettings:
     min_lon: float
     max_mercator_extent: float
 
+
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True)
+class GIBSSettings:
+    user_agent: str
+    timeout: float
+    capabilities_ttl_s: float
+    max_cache_entries: int
+    bbox_precision: int
+    wms_base_endpoints: dict[str, str]
+    nasa_attribution: str
+    retry_backoff_s: float
+
+
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ClientRuntimeDefaults:
@@ -106,6 +120,7 @@ class AppConfigurations:
     database: DatabaseSettings
     nominatim: NominatimSettings
     geospatial: GeospatialSettings
+    gibs: GIBSSettings
     client_runtime: ClientRuntimeDefaults
     ollama_host_default: str
 
@@ -207,6 +222,42 @@ def build_geospatial_settings(data: dict[str, Any]) -> GeospatialSettings:
 
 
 # -----------------------------------------------------------------------------
+def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
+    payload = ensure_mapping(data)
+    endpoints_payload = ensure_mapping(payload.get("wms_base_endpoints"))
+    normalized_endpoints: dict[str, str] = {}
+    for crs, url in endpoints_payload.items():
+        crs_key = coerce_str(crs, "").upper()
+        endpoint = coerce_str(url, "")
+        if crs_key and endpoint:
+            normalized_endpoints[crs_key] = endpoint
+    if not normalized_endpoints:
+        normalized_endpoints = {
+            "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+            "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
+        }
+    return GIBSSettings(
+        user_agent=coerce_str(payload.get("user_agent"), "AEGIS-GIBS/1.0"),
+        timeout=coerce_float(payload.get("timeout"), 20.0, minimum=1.0),
+        capabilities_ttl_s=coerce_float(
+            payload.get("capabilities_ttl_s"), 6 * 60 * 60, minimum=60.0
+        ),
+        max_cache_entries=coerce_int(payload.get("max_cache_entries"), 24, minimum=1),
+        bbox_precision=coerce_int(payload.get("bbox_precision"), 6, minimum=0),
+        wms_base_endpoints=normalized_endpoints,
+        nasa_attribution=coerce_str(
+            payload.get("nasa_attribution"),
+            (
+                "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), "
+                "operated by the NASA/GSFC Earth Science Data and Information System "
+                "(ESDIS) project."
+            ),
+        ),
+        retry_backoff_s=coerce_float(payload.get("retry_backoff_s"), 2.0, minimum=0.1),
+    )
+
+
+# -----------------------------------------------------------------------------
 def build_client_runtime_defaults(data: dict[str, Any]) -> ClientRuntimeDefaults:
     agent_default = AGENT_MODEL_CHOICES[0] if AGENT_MODEL_CHOICES else ""    
     provider_default = coerce_str(data.get("llm_provider"), "openai").lower()
@@ -233,6 +284,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     db_payload = ensure_mapping(data.get("database"))
     nominatim_payload = ensure_mapping(data.get("nominatim"))
     geospatial_payload = ensure_mapping(data.get("geospatial"))
+    gibs_payload = ensure_mapping(data.get("gibs"))
     client_payload = ensure_mapping(data.get("client_runtime_defaults"))
     ollama_host_default = coerce_str(data.get("ollama_host_default"), "http://localhost:11434")
 
@@ -243,6 +295,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     database_settings = build_database_settings(db_payload)
     nominatim_settings = build_nominatim_settings(nominatim_payload)
     geospatial_settings = build_geospatial_settings(geospatial_payload)
+    gibs_settings = build_gibs_settings(gibs_payload)
     client_defaults = build_client_runtime_defaults(client_payload)
 
     app_config = AppConfigurations(
@@ -253,6 +306,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
         database=database_settings,
         nominatim=nominatim_settings,
         geospatial=geospatial_settings,
+        gibs=gibs_settings,
         client_runtime=client_defaults,
         ollama_host_default=ollama_host_default,
     )
@@ -445,6 +499,7 @@ __all__ = [
     "BackendSettings",
     "ClientRuntimeConfig",
     "ClientRuntimeDefaults",
+    "GIBSSettings",
     "DatabaseSettings",    
     "HTTPSettings",   
     "UIRuntimeSettings",
