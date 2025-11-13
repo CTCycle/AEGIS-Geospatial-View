@@ -31,6 +31,13 @@ GEONAMES_COLUMNS = [
     "modification_date",
 ]
 
+GIBS_LAYER_COLUMNS = [
+    "layer_id",
+    "title",
+    "abstract",
+    "projections",
+    "source_urls",
+]
 
 ###############################################################################
 class DataSerializer:
@@ -45,3 +52,12 @@ class DataSerializer:
         frame = frame.reindex(columns=GEONAMES_COLUMNS)
         frame = frame.where(pd.notnull(frame), None)
         database.upsert_into_database(frame, "GEONAMES")
+
+    # -----------------------------------------------------------------------------
+    def upsert_gibs_layers(self, layers: list[dict[str, Any]]) -> None:
+        if not layers:
+            return
+        frame = pd.DataFrame.from_records(layers)
+        frame = frame.reindex(columns=GIBS_LAYER_COLUMNS)
+        frame = frame.where(pd.notnull(frame), None)
+        database.upsert_into_database(frame, "GIBS_LAYERS")
