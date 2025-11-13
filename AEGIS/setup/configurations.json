@@ -1,6 +1,5 @@
 {
   "ollama_host_default": "http://localhost:11434",
-  "default_llm_timeout": 3600.0,
   "http": {
     "timeout": 1800.0
   },
@@ -20,11 +19,15 @@
       "mount_path": "/ui",
       "redirect_path": "/ui",
       "show_welcome_message": false,
-      "reconnect_timeout": 3600.0
+      "reconnect_timeout": 3600
     }
   },
   "database": {
     "selected_database": "sqlite",
+    "database_address": null,
+    "database_name": null,
+    "username": null,
+    "password": null,
     "insert_batch_size": 1000
   },
   "nominatim": {
@@ -39,6 +42,14 @@
     "max_lon": 180.0,
     "min_lon": -180.0,
     "max_mercator_extent": 20037508.3427892
+  },
+  "client_runtime_defaults": {
+    "agent_model": "llama3.1:8b",
+    "llm_provider": "openai",
+    "cloud_model": "gpt-4o-mini",
+    "use_cloud_services": false,
+    "ollama_temperature": 0.7,
+    "ollama_reasoning": false
   }
 }
 

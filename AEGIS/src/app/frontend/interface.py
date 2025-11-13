@@ -17,7 +17,7 @@ from AEGIS.src.app.frontend.controllers import (
     resolve_cloud_selection,
     submit_location_search,
 )
-from AEGIS.src.packages.configurations import UI_RUNTIME_SETTINGS
+from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
 from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
@@ -25,6 +25,7 @@ from AEGIS.src.packages.constants import (
 )
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
+UI_RUNTIME = APP_CONFIGURATIONS.ui_runtime
 
 ###############################################################################
 # HELPERS
@@ -365,10 +366,10 @@ def create_interface() -> None:
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host=UI_RUNTIME_SETTINGS.host,
-        port=UI_RUNTIME_SETTINGS.port,
-        title=UI_RUNTIME_SETTINGS.title,
-        show_welcome_message=UI_RUNTIME_SETTINGS.show_welcome_message,
+        host=UI_RUNTIME.host,
+        port=UI_RUNTIME.port,
+        title=UI_RUNTIME.title,
+        show_welcome_message=UI_RUNTIME.show_welcome_message,
     )
 
 # -----------------------------------------------------------------------------

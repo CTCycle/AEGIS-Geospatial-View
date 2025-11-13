@@ -9,14 +9,15 @@ import httpx
 from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
 
 from AEGIS.src.packages.configurations import (
-    API_SETTINGS,
+    APP_CONFIGURATIONS,
     ClientRuntimeConfig,
-    HTTP_SETTINGS,
 )
 from AEGIS.src.packages.constants import (
     CLOUD_MODEL_CHOICES,
     GEO_SEARCH_URL,
 )
+
+APP_CONFIG = APP_CONFIGURATIONS
 
 ###############################################################################
 @dataclass
@@ -96,7 +97,7 @@ async def trigger_search_maps(
     url: str, payload: dict[str, Any] | None = None
 ) -> tuple[dict[str, Any] | None, str]:
     try:
-        async with httpx.AsyncClient(timeout=HTTP_SETTINGS.timeout) as client:
+        async with httpx.AsyncClient(timeout=APP_CONFIG.http.timeout) as client:
             response = await client.post(url, json=payload)
         response.raise_for_status()
     except httpx.RequestError as exc:
@@ -160,7 +161,7 @@ async def submit_location_search(
         date=date,
     )
 
-    url = f"{API_SETTINGS.base_url}{GEO_SEARCH_URL}"
+    url = f"{APP_CONFIG.api.base_url}{GEO_SEARCH_URL}"
     data, message = await trigger_search_maps(url, cleaned_payload)
     normalized_message = (message or "").strip()
     return {"json": data, "message": normalized_message or None}

@@ -12,20 +12,22 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.src.packages.configurations import NOMINATIM_SETTINGS
+from AEGIS.src.packages.configurations import APP_CONFIGURATIONS
+
+NOMINATIM = APP_CONFIGURATIONS.nominatim
 
 LOGGER = logging.getLogger(__name__)
 
 
 ###############################################################################
 class NormatimService:
-    base_url = NOMINATIM_SETTINGS.base_url
+    base_url = NOMINATIM.base_url
 
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
-        self.user_agent = user_agent or NOMINATIM_SETTINGS.user_agent
-        default_timeout = NOMINATIM_SETTINGS.timeout
+        self.user_agent = user_agent or NOMINATIM.user_agent
+        default_timeout = NOMINATIM.timeout
         self.timeout = timeout if timeout is not None else default_timeout
 
     # -----------------------------------------------------------------------------
