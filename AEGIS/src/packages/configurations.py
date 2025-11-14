@@ -97,6 +97,7 @@ class GIBSSettings:
     wms_base_endpoints: dict[str, str]
     nasa_attribution: str
     retry_backoff_s: float
+    min_visual_radius_m: float
 
 
 # -----------------------------------------------------------------------------
@@ -254,6 +255,11 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
             ),
         ),
         retry_backoff_s=coerce_float(payload.get("retry_backoff_s"), 2.0, minimum=0.1),
+        min_visual_radius_m=coerce_float(
+            payload.get("min_visual_radius_m"),
+            20000.0,
+            minimum=1000.0,
+        ),
     )
 
 
