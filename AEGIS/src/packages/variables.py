@@ -6,10 +6,12 @@ from dotenv import load_dotenv
 
 from AEGIS.src.packages.constants import PROJECT_DIR
 from AEGIS.src.packages.logger import logger
+from AEGIS.src.packages.singleton import singleton
 
 
-# [IMPORT CUSTOM MODULES]
+# [LOAD ENVIRONMENT VARIABLES]
 ###############################################################################
+@singleton
 class EnvironmentVariables:
     def __init__(self) -> None:
         self.env_path = os.path.join(PROJECT_DIR, "setup", ".env")

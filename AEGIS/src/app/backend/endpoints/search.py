@@ -34,10 +34,11 @@ DEFAULT_GIBS_LAYER = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
 async def get_location_coordinates(payload: LocationSearchRequest) -> dict[str, object]:
     response_payload = payload.model_dump()
     if not payload.use_coordinates:
-        sanitized_location = sanitization_service.sanitize_location_inputs(
-            address=payload.address or "",
-            city=payload.city,
-            country=payload.country,
+        sanitized_location = await asyncio.to_thread(
+            sanitization_service.sanitize_location_inputs,
+            payload.address or "",
+            payload.city,
+            payload.country,
         )
         response_payload["sanitized_location"] = sanitized_location
         normatim_candidate = await normatim_service.extract_coordinates(
@@ -129,11 +130,61 @@ def extract_coordinate_pair(
 
 
 ###############################################################################
+def parse_bbox_values(candidate: Any) -> list[float] | None:
+    if isinstance(candidate, (list, tuple)) and len(candidate) == 4:
+        parsed: list[float] = []
+        try:
+            for value in candidate:
+                parsed.append(float(value))
+        except (TypeError, ValueError):
+            return None
+        return parsed
+    return None
+
+
+###############################################################################
+def resolve_bbox_candidate(
+    payload: LocationSearchRequest, response_payload: dict[str, Any]
+) -> tuple[list[float] | None, str | None]:
+    if payload.bbox:
+        normalized = parse_bbox_values(payload.bbox)
+        if normalized:
+            return normalized, payload.image_crs
+    inherited = parse_bbox_values(response_payload.get("bbox"))
+    if inherited:
+        return inherited, "EPSG:4326"
+    return None, None
+
+
+###############################################################################
+def harmonize_bbox_crs(
+    bbox: list[float] | None, *, source_crs: str | None, target_crs: str
+) -> list[float] | None:
+    if bbox is None:
+        return None
+    target = (target_crs or "").upper()
+    if not target:
+        raise GIBSValidationError("Satellite imagery CRS is required.")
+    source = (source_crs or target).upper()
+    if source == target:
+        return bbox
+    supported = {"EPSG:4326", "EPSG:3857"}
+    if source not in supported or target not in supported:
+        raise GIBSValidationError(
+            f"Unsupported bbox reprojection from {source} to {target}."
+        )
+    return gibs_service.reproject_bbox(bbox, target)
+
+
+###############################################################################
 async def fetch_satellite_imagery(
     payload: LocationSearchRequest, response_payload: dict[str, Any]
 ) -> dict[str, Any]:
     coordinate_pair = extract_coordinate_pair(payload, response_payload)
-    bbox = payload.bbox or response_payload.get("bbox")
+    bbox_candidate, bbox_source_crs = resolve_bbox_candidate(payload, response_payload)
+    bbox = harmonize_bbox_crs(
+        bbox_candidate, source_crs=bbox_source_crs, target_crs=payload.image_crs
+    )
     if not bbox and not coordinate_pair:
         raise GIBSValidationError(
             "Provide coordinates or bbox for satellite imagery requests."
@@ -234,7 +285,9 @@ async def search_by_location(
             payload_data["image_crs"] = image_crs
         if image_format is not None:
             payload_data["image_format"] = image_format
-        payload = LocationSearchRequest.model_validate(payload_data)
+        payload = await asyncio.to_thread(
+            LocationSearchRequest.model_validate, payload_data
+        )
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -242,7 +295,7 @@ async def search_by_location(
         ) from exc
 
     response_payload = await process_location_search(payload)
-    serialized_payload = jsonable_encoder(response_payload)
+    serialized_payload = await asyncio.to_thread(jsonable_encoder, response_payload)
     return JSONResponse(content=serialized_payload)
 
 
