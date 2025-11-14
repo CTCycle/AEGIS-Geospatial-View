@@ -132,6 +132,7 @@ class GIBSService:
         cache_entries: int | None = None,
         retry_backoff_s: float | None = None,
         bbox_precision: int | None = None,
+        min_visual_radius_m: float | None = None,
     ) -> None:
         settings = configurations.gibs
         self.user_agent = user_agent or settings.user_agent
@@ -152,6 +153,11 @@ class GIBSService:
         self.bbox_precision = (
             bbox_precision if bbox_precision is not None else settings.bbox_precision
         )
+        self.min_visual_radius_m = (
+            min_visual_radius_m
+            if min_visual_radius_m is not None
+            else settings.min_visual_radius_m
+        )
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
@@ -169,17 +175,20 @@ class GIBSService:
         height: int = 1024,
         crs: str = "EPSG:3857",
         format: str = "image/png",
+        style: str | None = None,
         wms_version: str = "1.3.0",
         timeout_s: int | None = None,
     ) -> dict[str, Any]:
         request_crs = crs.upper()
+        effective_radius = self.resolve_effective_radius(radius_m)
+        style_value = self.normalize_style(style)
         normalized_bbox = self.normalize_bbox(
             bbox=bbox,
             lon=lon,
             lat=lat,
-            radius_m=radius_m,
+            radius_m=effective_radius,
             target_crs=request_crs,
-        )        
+        )
         self.validate_dimensions(width, height)
         format_lower = format.lower()
         cache_key = self.build_cache_key(
@@ -190,6 +199,7 @@ class GIBSService:
             width=width,
             height=height,
             format_value=format_lower,
+            style_value=style_value,
         )
         cached = self.response_cache.get(cache_key)
         if cached:
@@ -214,6 +224,7 @@ class GIBSService:
             layer=layer,
             imagery_date=date,
             format_value=format_lower,
+            style_value=style_value,
             wms_version=wms_version,
         )
         timeout = timeout_s or self.timeout_s
@@ -315,11 +326,12 @@ class GIBSService:
         width: int,
         height: int,
         format_value: str,
+        style_value: str,
     ) -> str:
         bbox_token = ",".join(f"{value:.4f}" for value in bbox)
         return (
             f"{layer}|{imagery_date}|{crs}|{width}x{height}"
-            f"|{format_value}|{bbox_token}"
+            f"|{format_value}|{style_value}|{bbox_token}"
         )
 
     # -------------------------------------------------------------------------
@@ -562,6 +574,7 @@ class GIBSService:
         layer: str,
         imagery_date: str,
         format_value: str,
+        style_value: str,
         wms_version: str,
     ) -> str:
         bbox_payload = self.format_bbox(bbox, crs, wms_version)
@@ -571,6 +584,7 @@ class GIBSService:
             "VERSION": wms_version,
             "LAYERS": layer,
             "CRS": crs,
+            "STYLES": style_value,
             "BBOX": bbox_payload,
             "WIDTH": str(width),
             "HEIGHT": str(height),
@@ -758,6 +772,18 @@ class GIBSService:
             max_lon, max_lat = self.mercator_to_lonlat(max_x, max_y)
             return [min_lon, min_lat, max_lon, max_lat]
         raise GIBSValidationError(f"Unable to reproject bbox to '{target_crs}'.")
+
+    # -------------------------------------------------------------------------
+    def resolve_effective_radius(self, radius_m: float | None) -> float:
+        base = radius_m if radius_m and radius_m > 0 else 2500.0
+        return max(base, self.min_visual_radius_m)
+
+    # -------------------------------------------------------------------------
+    def normalize_style(self, style: str | None) -> str:
+        if not style:
+            return "default"
+        normalized = str(style).strip()
+        return normalized or "default"
 
     # -------------------------------------------------------------------------
     def mercator_to_lonlat(self, x: float, y: float) -> tuple[float, float]:
