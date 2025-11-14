@@ -90,7 +90,7 @@ class NormatimService:
             east = float(bounding_box[3])
         except (TypeError, ValueError):
             return None
-        return [south, west, north, east]
+        return [west, south, east, north]
 
     # -----------------------------------------------------------------------------
     def compose_query(
@@ -172,7 +172,7 @@ class NormatimService:
                 north = float(bounding_box[1])
                 west = float(bounding_box[2])
                 east = float(bounding_box[3])
-                result["bbox"] = [south, west, north, east]
+                result["bbox"] = [west, south, east, north]
             except (TypeError, ValueError):
                 pass
         confidence = self.compute_confidence(

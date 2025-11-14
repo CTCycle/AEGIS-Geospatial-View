@@ -51,6 +51,11 @@ class GIBSRequestError(GIBSServiceError):
 
 
 ###############################################################################
+class GIBSPayloadIntegrityError(GIBSRequestError):
+    """Raised when NASA returns incomplete imagery payloads."""
+
+
+###############################################################################
 @dataclass(frozen=True)
 class LayerMetadata:
     name: str
@@ -581,7 +586,8 @@ class GIBSService:
     def execute_request(
         self, url: str, timeout_s: int
     ) -> tuple[bytes, str, str]:
-        for attempt in range(2):
+        max_attempts = 3
+        for attempt in range(max_attempts):
             request = Request(
                 url,
                 headers={
@@ -602,19 +608,62 @@ class GIBSService:
                         raise GIBSRequestError(
                             "GIBS GetMap returned a suspiciously small payload."
                         )
+                    declared_length = self.extract_content_length(response.headers)
+                    self.ensure_payload_integrity(payload, content_type, declared_length)
                     logger.info("Fetched GIBS image: url=%s size=%s", url, len(payload))
                     return payload, content_type, url
+            except GIBSPayloadIntegrityError:
+                if attempt < max_attempts - 1:
+                    time.sleep(self.compute_backoff_delay(attempt))
+                    continue
+                raise
             except HTTPError as exc:
-                if 500 <= exc.code < 600 and attempt == 0:
-                    time.sleep(self.retry_backoff_s)
+                if 500 <= exc.code < 600 and attempt < max_attempts - 1:
+                    time.sleep(self.compute_backoff_delay(attempt))
                     continue
                 raise GIBSRequestError(f"GIBS GetMap failed: HTTP {exc.code}") from exc
             except (URLError, TimeoutError) as exc:
-                if attempt == 0:
-                    time.sleep(self.retry_backoff_s)
+                if attempt < max_attempts - 1:
+                    time.sleep(self.compute_backoff_delay(attempt))
                     continue
                 raise GIBSRequestError(f"GIBS GetMap failed: {exc}") from exc
         raise GIBSRequestError("GIBS GetMap failed after retries.")
+
+    # -------------------------------------------------------------------------
+    def extract_content_length(self, headers: Any) -> int | None:
+        value = headers.get("Content-Length")
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    # -------------------------------------------------------------------------
+    def ensure_payload_integrity(
+        self, payload: bytes, content_type: str, declared_length: int | None
+    ) -> None:
+        if declared_length is not None and len(payload) < declared_length:
+            raise GIBSPayloadIntegrityError(
+                "GIBS GetMap payload shorter than declared Content-Length."
+            )
+        if content_type == "image/png" and not self.png_has_terminal_chunk(payload):
+            raise GIBSPayloadIntegrityError(
+                "GIBS GetMap returned PNG missing terminal IEND chunk."
+            )
+
+    # -------------------------------------------------------------------------
+    def png_has_terminal_chunk(self, payload: bytes) -> bool:
+        if len(payload) < 12:
+            return False
+        png_signature = b"\x89PNG\r\n\x1a\n"
+        if payload.startswith(png_signature) and payload.endswith(b"\x00\x00\x00\x00IEND\xaeB`\x82"):
+            return True
+        return not payload.startswith(png_signature)
+
+    # -------------------------------------------------------------------------
+    def compute_backoff_delay(self, attempt: int) -> float:
+        return self.retry_backoff_s * (2 ** attempt)
 
     # -------------------------------------------------------------------------
     def lonlat_to_mercator(self, lon: float, lat: float) -> tuple[float, float]:

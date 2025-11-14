@@ -11,12 +11,12 @@ from AEGIS.src.app.frontend.interface import create_interface
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.database import database
+from AEGIS.src.packages.variables import env_variables
 
-configurations = configurations
 
 ###############################################################################
 # initialize the database if it has not been created
-if not os.path.exists(database.db_path):
+if database.db_path and not os.path.exists(database.db_path):
     logger.info("Database not found, creating instance and making all tables")
     database.initialize_database()
     logger.info("AEGIS database has been initialized successfully.")

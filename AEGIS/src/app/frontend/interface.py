@@ -125,6 +125,47 @@ async def on_use_coordinates_change(
 
 
 # -----------------------------------------------------------------------------
+def resolve_map_image_source(response: Any) -> str | None:
+    if not isinstance(response, dict):
+        return None
+    payload = response.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    imagery = payload.get("satellite_imagery")
+    if not isinstance(imagery, dict):
+        return None
+    encoded = str(imagery.get("image_base64") or "").strip()
+    normalized_payload = encoded.replace("\n", "").replace("\r", "")
+    if normalized_payload:
+        mime_candidate = str(
+            imagery.get("mime") or imagery.get("format") or "image/png"
+        )
+        normalized_mime = mime_candidate.strip().lower()
+        if not normalized_mime.startswith("image/"):
+            normalized_mime = f"image/{normalized_mime.split('/')[-1]}"
+        return f"data:{normalized_mime};base64,{normalized_payload}"
+    direct_source = str(
+        imagery.get("image_url") or imagery.get("wms_url") or ""
+    ).strip()
+    if direct_source:
+        return direct_source
+    return None
+
+
+# -----------------------------------------------------------------------------
+def update_map_canvas(map_canvas: Any, response: Any) -> None:
+    if map_canvas is None:
+        return
+    source = resolve_map_image_source(response)
+    if not source:
+        map_canvas.set_source("")
+        return
+    if getattr(map_canvas, "source", None) == source:
+        return
+    map_canvas.set_source(source)
+
+
+# -----------------------------------------------------------------------------
 async def on_search_click(
     event: Any,
     *,
@@ -137,6 +178,7 @@ async def on_search_click(
     longitude_input: Any,
     date_input: Any,
     status_display: Any,
+    map_canvas: Any,
 ) -> None:    
     result = await submit_location_search(
         geospatial_select.value,
@@ -151,6 +193,7 @@ async def on_search_click(
     message = result.get("message") or "Location search payload submitted."
     # Push both status and JSON directly into the status display panel
     update_status_with_json(status_display, message, result.get("json"))
+    update_map_canvas(map_canvas, result.get("json"))
 
 ###############################################################################
 # MAIN UI PAGE
@@ -300,7 +343,7 @@ def main_page() -> None:
                     map_canvas = ui.image()
                     map_canvas.classes(
                         "w-full h-full min-h-[560px] max-h-[800px] "
-                        "object-contain bg-slate-100 rounded-lg"
+                        "object-contain bg-slate-100 rounded-lg aspect-square"
                     )
 
             with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"):
@@ -352,6 +395,7 @@ def main_page() -> None:
             longitude_input=longitude_input,
             date_input=date_input,
             status_display=status_display,
+            map_canvas=map_canvas,
         )
     )
     
