@@ -246,6 +246,13 @@ class GIBSService:
         if bbox:
             normalized = [float(value) for value in bbox]
             self.validate_bbox_values(normalized, target_crs)
+            if self.bbox_requires_radius_expansion(normalized, target_crs, radius_m):
+                normalized = self.expand_bbox_to_radius(
+                    normalized,
+                    target_crs,
+                    radius_m,
+                )
+                self.validate_bbox_values(normalized, target_crs)
             return normalized
         if lon is None or lat is None:
             raise GIBSValidationError(
@@ -692,6 +699,51 @@ class GIBSService:
         min_lat = clamp(lat_clamped - d_lat, MIN_GEO_LAT, MAX_GEO_LAT)
         max_lat = clamp(lat_clamped + d_lat, MIN_GEO_LAT, MAX_GEO_LAT)
         return [min_lon, min_lat, max_lon, max_lat]
+
+    # -------------------------------------------------------------------------
+    def bbox_span_in_meters(self, bbox: BBox, crs: str) -> tuple[float, float]:
+        if crs == "EPSG:3857":
+            min_x, min_y, max_x, max_y = bbox
+            return abs(max_x - min_x), abs(max_y - min_y)
+        if crs == "EPSG:4326":
+            min_lon, min_lat, max_lon, max_lat = bbox
+            min_x, min_y = self.lonlat_to_mercator(min_lon, min_lat)
+            max_x, max_y = self.lonlat_to_mercator(max_lon, max_lat)
+            return abs(max_x - min_x), abs(max_y - min_y)
+        raise GIBSValidationError(f"Unable to compute bbox span for '{crs}'.")
+
+    # -------------------------------------------------------------------------
+    def bbox_requires_radius_expansion(
+        self, bbox: BBox, crs: str, radius_m: float | None
+    ) -> bool:
+        if radius_m is None or radius_m <= 0:
+            return False
+        span_x, span_y = self.bbox_span_in_meters(bbox, crs)
+        minimum_span = max(radius_m, 500.0)
+        return span_x < minimum_span or span_y < minimum_span
+
+    # -------------------------------------------------------------------------
+    def expand_bbox_to_radius(
+        self, bbox: BBox, crs: str, radius_m: float | None
+    ) -> BBox:
+        if radius_m is None or radius_m <= 0:
+            return bbox
+        if crs == "EPSG:3857":
+            min_x, min_y, max_x, max_y = bbox
+            center_x = (min_x + max_x) / 2.0
+            center_y = (min_y + max_y) / 2.0
+            return [
+                center_x - radius_m,
+                center_y - radius_m,
+                center_x + radius_m,
+                center_y + radius_m,
+            ]
+        if crs == "EPSG:4326":
+            min_lon, min_lat, max_lon, max_lat = bbox
+            center_lon = (min_lon + max_lon) / 2.0
+            center_lat = (min_lat + max_lat) / 2.0
+            return self.compute_geographic_bbox(center_lon, center_lat, radius_m)
+        raise GIBSValidationError(f"Unable to expand bbox for '{crs}'.")
 
     # -------------------------------------------------------------------------
     def reproject_bbox(self, bbox: BBox, target_crs: str) -> BBox:
