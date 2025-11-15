@@ -98,6 +98,7 @@ class GIBSSettings:
     nasa_attribution: str
     retry_backoff_s: float
     min_visual_radius_m: float
+    default_layer: str
 
 
 # -----------------------------------------------------------------------------
@@ -259,6 +260,10 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
             payload.get("min_visual_radius_m"),
             20000.0,
             minimum=1000.0,
+        ),
+        default_layer=coerce_str(
+            payload.get("default_layer"),
+            "VIIRS_SNPP_CorrectedReflectance_TrueColor",
         ),
     )
 

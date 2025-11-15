@@ -54,7 +54,8 @@
       "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
       "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
     },
-    "retry_backoff_s": 2.0
+    "retry_backoff_s": 2.0,
+    "default_layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor"
   },
   "client_runtime_defaults": {
     "agent_model": "llama3.1:8b",
