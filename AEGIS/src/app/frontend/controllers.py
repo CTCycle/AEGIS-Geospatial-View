@@ -152,7 +152,7 @@ class GeoSearchController:
     # -------------------------------------------------------------------------
     async def submit_location_search(
         self,
-        geospatial_filter: Any,
+        geospatial_filters: list[str],
         country: str | None,
         city: str | None,
         address: str | None,
@@ -162,7 +162,7 @@ class GeoSearchController:
         date: str | None,
     ) -> dict[str, Any | None]:
         cleaned_payload = sanitize_search_payload(
-            geospatial_filter=geospatial_filter,
+            geospatial_filters=geospatial_filters,
             country=country,
             city=city,
             address=address,

@@ -24,6 +24,21 @@ def sanitize_choice(value: Any) -> str | None:
 
 
 # -----------------------------------------------------------------------------
+def sanitize_choice_list(values: list[Any] | None) -> list[str]:
+    if values is None:
+        return []
+    normalized_values: list[str] = []
+    for value in values:
+        normalized = sanitize_choice(value)
+        if normalized is None:
+            continue
+        if normalized in normalized_values:
+            continue
+        normalized_values.append(normalized)
+    return normalized_values
+
+
+# -----------------------------------------------------------------------------
 def coerce_float(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
@@ -38,7 +53,7 @@ def coerce_float(value: Any) -> float | None:
 ##############################################################################
 def sanitize_search_payload(
     *,
-    geospatial_filter: Any,
+    geospatial_filters: list[Any],
     country: str | None,
     city: str | None,
     address: str | None,
@@ -58,14 +73,15 @@ def sanitize_search_payload(
     if not use_coordinates and not any([address, city, country]):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Provide an address/city/country or enable coordinates.",
-        )
+        detail="Provide an address/city/country or enable coordinates.",
+    )
 
-    sanitized_filter = sanitize_choice(geospatial_filter)
+    sanitized_filters = sanitize_choice_list(geospatial_filters)
+    primary_filter = sanitized_filters[0] if sanitized_filters else None
 
     payload: dict[str, Any] = {
-        "geospatial_filter": sanitized_filter,
-        "filter": sanitized_filter,
+        "filters": sanitized_filters,
+        "geospatial_filter": primary_filter,
         "country": sanitize_field(country),
         "city": sanitize_field(city),
         "address": sanitize_field(address),

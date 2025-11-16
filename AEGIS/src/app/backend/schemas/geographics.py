@@ -8,8 +8,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from AEGIS.src.packages.configurations import configurations
 
-GEOSPATIAL_SETTINGS = configurations.geospatial
-
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
 
@@ -26,6 +24,7 @@ class Location(BaseModel):
     city: str | None = Field(default=None, max_length=200)
     address: str | None = Field(default=None, max_length=400)
 
+    # -------------------------------------------------------------------------
     @field_validator("country", "city", "address", mode="before")
     @classmethod
     def strip_text(cls, value: str | None) -> str | None:
@@ -44,7 +43,7 @@ class LocationSearchRequest(BaseModel):
     reference_date: date | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(
-        default=None, ge=GEOSPATIAL_SETTINGS.min_timeline_year
+        default=None, ge=configurations.geospatial.min_timeline_year
     )
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
@@ -52,7 +51,7 @@ class LocationSearchRequest(BaseModel):
     use_coordinates: bool = Field(default=False)
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
-    filter: str | None = Field(default=None, max_length=200)
+    filters: list[str] = Field(default_factory=list)
     geospatial_filter: str | None = Field(default=None, max_length=200)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
@@ -65,10 +64,11 @@ class LocationSearchRequest(BaseModel):
         "country",
         "city",
         "address",
-        "filter",
         "geospatial_filter",
         mode="before",
     )
+
+    # -------------------------------------------------------------------------
     @classmethod
     def strip_location_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -76,6 +76,28 @@ class LocationSearchRequest(BaseModel):
         stripped = str(value).strip()
         return stripped or None
 
+    # -------------------------------------------------------------------------
+    @field_validator("filters", mode="before")
+    @classmethod
+    def normalize_filters(
+        cls, value: list[str] | tuple[str, ...] | str | None
+    ) -> list[str]:
+        if value is None:
+            return []
+        candidates: list[str] = []
+        values = [value] if isinstance(value, str) else list(value)
+        for candidate in values:
+            normalized = cls.strip_location_text(candidate)
+            if normalized is None:
+                continue
+            if normalized.lower() == "none":
+                continue
+            if normalized in candidates:
+                continue
+            candidates.append(normalized)
+        return candidates
+
+    # -------------------------------------------------------------------------
     @field_validator("bbox", mode="before")
     @classmethod
     def normalize_bbox(cls, value: BBox | tuple[float, ...] | str | None) -> BBox | None:
@@ -98,6 +120,7 @@ class LocationSearchRequest(BaseModel):
             raise ValueError("BBox must contain four values [minx,miny,maxx,maxy].")
         return parsed
 
+    # -------------------------------------------------------------------------
     @field_validator("image_crs", mode="before")
     @classmethod
     def normalize_crs(cls, value: str) -> str:
@@ -105,6 +128,7 @@ class LocationSearchRequest(BaseModel):
             return "EPSG:3857"
         return str(value).upper()
 
+    # -------------------------------------------------------------------------
     @field_validator("image_format", mode="before")
     @classmethod
     def normalize_format(cls, value: str) -> str:
@@ -112,6 +136,7 @@ class LocationSearchRequest(BaseModel):
             return "image/png"
         return str(value).lower()
 
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_location(self) -> "LocationSearchRequest":
         location = Location(
@@ -143,21 +168,21 @@ class LocationSearchRequest(BaseModel):
             comparator: RangeComparator = lambda lower, upper: lower < upper
             if not comparator(minx, maxx) or not comparator(miny, maxy):
                 raise ValueError("BBox min values must be smaller than max values.")
-                if self.image_crs == "EPSG:3857":
-                    for value in (minx, maxx, miny, maxy):
-                        if abs(value) > GEOSPATIAL_SETTINGS.max_mercator_extent:
-                            raise ValueError(
-                                "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
-                            )
-                elif self.image_crs == "EPSG:4326":
-                    if (
-                        miny < GEOSPATIAL_SETTINGS.min_lat
-                        or maxy > GEOSPATIAL_SETTINGS.max_lat
-                    ):
-                        raise ValueError("Latitude values must be within [-90, 90].")
-                    if (
-                        minx < GEOSPATIAL_SETTINGS.min_lon
-                        or maxx > GEOSPATIAL_SETTINGS.max_lon
-                    ):
-                        raise ValueError("Longitude values must be within [-180, 180].")
+            if self.image_crs == "EPSG:3857":
+                for value in (minx, maxx, miny, maxy):
+                    if abs(value) > configurations.geospatial.max_mercator_extent:
+                        raise ValueError(
+                            "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
+                        )
+            elif self.image_crs == "EPSG:4326":
+                if (
+                    miny < configurations.geospatial.min_lat
+                    or maxy > configurations.geospatial.max_lat
+                ):
+                    raise ValueError("Latitude values must be within [-90, 90].")
+                if (
+                    minx < configurations.geospatial.min_lon
+                    or maxx > configurations.geospatial.max_lon
+                ):
+                    raise ValueError("Longitude values must be within [-180, 180].")
         return self
