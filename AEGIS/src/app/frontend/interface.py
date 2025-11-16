@@ -82,6 +82,14 @@ class InterfaceToolkit:
             return
         map_canvas.set_source(source)
 
+    def normalize_filter_candidate(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized or normalized.lower() == "none":
+            return None
+        return normalized
+
 
 ###############################################################################
 class InterfaceController:
@@ -172,11 +180,76 @@ class InterfaceController:
             latitude_input.disable()
             longitude_input.disable()
 
+    # -------------------------------------------------------------------------
+    def refresh_geospatial_chips(
+        self,
+        chip_container: Any,
+        selected_filters: list[str],
+        geospatial_select: Any,
+    ) -> None:
+        chip_container.clear()
+        with chip_container:
+            if not selected_filters:
+                ui.label("No filters selected").classes("text-sm text-gray-500")
+                return
+            for filter_value in selected_filters:
+                ui.chip(
+                    filter_value,
+                    on_click=partial(
+                        self.on_remove_geospatial_filter,
+                        filter_value=filter_value,
+                        selected_filters=selected_filters,
+                        chip_container=chip_container,
+                        geospatial_select=geospatial_select,
+                    ),
+                ).props("color=primary outline clickable")
+
+    # -------------------------------------------------------------------------
+    def on_geospatial_filter_select(
+        self,
+        event: Any,
+        *,
+        selected_filters: list[str],
+        chip_container: Any,
+        geospatial_select: Any,
+    ) -> None:
+        candidate = getattr(event, "value", event)
+        normalized = self.toolkit.normalize_filter_candidate(candidate)
+        geospatial_select.value = None
+        geospatial_select.update()
+        if normalized is None or normalized in selected_filters:
+            return
+        selected_filters.append(normalized)
+        self.refresh_geospatial_chips(
+            chip_container=chip_container,
+            selected_filters=selected_filters,
+            geospatial_select=geospatial_select,
+        )
+
+    # -------------------------------------------------------------------------
+    def on_remove_geospatial_filter(
+        self,
+        event: Any,
+        *,
+        filter_value: str,
+        selected_filters: list[str],
+        chip_container: Any,
+        geospatial_select: Any,
+    ) -> None:
+        filtered = [value for value in selected_filters if value != filter_value]
+        selected_filters[:] = filtered
+        geospatial_select.update()
+        self.refresh_geospatial_chips(
+            chip_container=chip_container,
+            selected_filters=selected_filters,
+            geospatial_select=geospatial_select,
+        )
+
     async def on_search_click(
         self,
         event: Any,
         *,
-        geospatial_select: Any,
+        geospatial_filters: list[str],
         country_input: Any,
         city_input: Any,
         address_input: Any,
@@ -188,7 +261,7 @@ class InterfaceController:
         map_canvas: Any,
     ) -> None:
         result = await self.geo_search_controller.submit_location_search(
-            geospatial_select.value,
+            geospatial_filters,
             country_input.value,
             city_input.value,
             address_input.value,
@@ -289,14 +362,25 @@ class InterfaceStructure:
                             )
 
                             geospatial_filter_options = [
-                                "None",
                                 *GEOSPATIAL_LAYER_CHOICES,
                             ]
+                            geospatial_selected_filters: list[str] = []
                             geospatial_select = ui.select(
                                 geospatial_filter_options,
                                 label="Geospatial Filter",
-                                value="None",
+                                value=None,
                             ).classes("w-full")
+                            geospatial_chip_container = (
+                                ui.row()
+                                .classes("w-full gap-2 flex-wrap")
+                                .style("min-height: 32px;")
+                            )
+                            self.controller.refresh_geospatial_chips(
+                                chip_container=geospatial_chip_container,
+                                selected_filters=geospatial_selected_filters,
+                                geospatial_select=geospatial_select,
+                            )
+                            ui.separator().classes("w-full opacity-60")
 
                         ui.space()
                         search_button = ui.button(
@@ -401,6 +485,14 @@ class InterfaceStructure:
                 cloud_model_dropdown,
             )
         )
+        geospatial_select.on_value_change(
+            partial(
+                self.controller.on_geospatial_filter_select,
+                selected_filters=geospatial_selected_filters,
+                chip_container=geospatial_chip_container,
+                geospatial_select=geospatial_select,
+            )
+        )
         use_coordinates_switch.on_value_change(
             partial(
                 self.controller.on_use_coordinates_change,
@@ -414,7 +506,7 @@ class InterfaceStructure:
         search_button.on_click(
             partial(
                 self.controller.on_search_click,
-                geospatial_select=geospatial_select,
+                geospatial_filters=geospatial_selected_filters,
                 country_input=country_input,
                 city_input=city_input,
                 address_input=address_input,

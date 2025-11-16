@@ -39,6 +39,16 @@ class MapSearchToolkit:
         self.default_layer = default_layer
 
     # -------------------------------------------------------------------------
+    def select_primary_filter(self, filters: list[str]) -> str | None:
+        if not isinstance(filters, list):
+            return None
+        for value in filters:
+            normalized = str(value).strip()
+            if normalized and normalized.lower() != "none":
+                return normalized
+        return None
+
+    # -------------------------------------------------------------------------
     def resolve_imagery_date(self, payload: LocationSearchRequest) -> str:
         if payload.reference_date:
             return payload.reference_date.isoformat()
@@ -51,7 +61,7 @@ class MapSearchToolkit:
     # -------------------------------------------------------------------------
     def resolve_imagery_layer(self, payload: LocationSearchRequest) -> str:
         layer_candidates = (
-            payload.filter,
+            self.select_primary_filter(payload.filters),
             payload.geospatial_filter,
         )
         for candidate in layer_candidates:
@@ -278,8 +288,8 @@ class MapSearchEndpoint:
         use_coordinates: bool = Body(default=False),
         latitude: float | None = Body(default=None),
         longitude: float | None = Body(default=None),
-        filter_value: str | None = Body(default=None, alias="filter"),
         geospatial_filter: str | None = Body(default=None),
+        filters: list[str] = Body(default_factory=list),
         bbox: list[float] | None = Body(default=None),
         radius_m: float | None = Body(default=None),
         image_width: int | None = Body(default=None),
@@ -299,8 +309,8 @@ class MapSearchEndpoint:
                 "use_coordinates": use_coordinates,
                 "latitude": latitude,
                 "longitude": longitude,
-                "filter": filter_value,
                 "geospatial_filter": geospatial_filter,
+                "filters": filters,
                 "bbox": bbox,
             }
             if radius_m is not None:
