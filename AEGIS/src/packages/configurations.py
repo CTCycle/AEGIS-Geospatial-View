@@ -11,6 +11,8 @@ from AEGIS.src.packages.constants import (
     CLOUD_MODEL_CHOICES,
     CONFIGURATION_FILE,
     DEFAULT_AGENTIC_TEMPERATURE,
+    GIBS_MAX_IMAGE_DIMENSION,
+    GIBS_MIN_IMAGE_DIMENSION,
     MAX_AGENTIC_TEMPERATURE,
     MIN_AGENTIC_TEMPERATURE,
 )
@@ -98,6 +100,8 @@ class GIBSSettings:
     nasa_attribution: str
     retry_backoff_s: float
     min_visual_radius_m: float
+    image_width: int
+    image_height: int
     default_layer: str
     capabilities_endpoints: dict[str, str]
     ows_namespaces: dict[str, str]
@@ -287,6 +291,18 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
             payload.get("min_visual_radius_m"),
             20000.0,
             minimum=1000.0,
+        ),
+        image_width=coerce_int(
+            payload.get("image_width"),
+            1024,
+            minimum=GIBS_MIN_IMAGE_DIMENSION,
+            maximum=GIBS_MAX_IMAGE_DIMENSION,
+        ),
+        image_height=coerce_int(
+            payload.get("image_height"),
+            1024,
+            minimum=GIBS_MIN_IMAGE_DIMENSION,
+            maximum=GIBS_MAX_IMAGE_DIMENSION,
         ),
         default_layer=coerce_str(
             payload.get("default_layer"),
