@@ -14,7 +14,24 @@ from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.serializer import DataSerializer
 
 
-type LayerPayload = dict[str, str | None]
+TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
+    "15.625m": 15.625,
+    "31.25m": 31.25,
+    "250m": 250.0,
+    "500m": 500.0,
+    "1km": 1000.0,
+    "1.5km": 1500.0,
+    "2km": 2000.0,
+    "GoogleMapsCompatible_Level6": 2445.98490512564,
+    "GoogleMapsCompatible_Level7": 1222.99245256282,
+    "GoogleMapsCompatible_Level8": 611.49622628141,
+    "GoogleMapsCompatible_Level9": 305.748113140705,
+    "GoogleMapsCompatible_Level12": 38.21851414258813,
+    "GoogleMapsCompatible_Level13": 19.109257071294063,
+}
+
+
+type LayerPayload = dict[str, str | None | list[str] | list[float]]
 
 
 ###############################################################################
@@ -30,6 +47,7 @@ class LayerAggregate:
     abstract: str | None
     projections: set[str]
     source_urls: set[str]
+    tile_matrix_sets: set[str]
 
 
 ###############################################################################
@@ -76,6 +94,7 @@ class GIBSLayersUpdater:
                         abstract=layer["abstract"],
                         projections=set(),
                         source_urls=set(),
+                        tile_matrix_sets=set(),
                     )
                     aggregated[layer_id] = entry
                 if layer["title"] and entry.title == entry.layer_id:
@@ -84,9 +103,11 @@ class GIBSLayersUpdater:
                     entry.abstract = layer["abstract"]
                 entry.projections.add(projection)
                 entry.source_urls.add(url)
+                entry.tile_matrix_sets.update(layer["tile_matrix_sets"])
 
         normalized: list[LayerPayload] = []
         for snapshot in aggregated.values():
+            resolutions = self.resolve_meters_per_pixel(snapshot.tile_matrix_sets)
             normalized.append(
                 {
                     "layer_id": snapshot.layer_id,
@@ -94,9 +115,22 @@ class GIBSLayersUpdater:
                     "abstract": snapshot.abstract,
                     "projections": json.dumps(sorted(snapshot.projections)),
                     "source_urls": json.dumps(sorted(snapshot.source_urls)),
+                    "tile_matrix_sets": json.dumps(sorted(snapshot.tile_matrix_sets)),
+                    "meters_per_pixel": (
+                        json.dumps(resolutions) if resolutions else None
+                    ),
                 }
             )
         return normalized
+
+    # -------------------------------------------------------------------------
+    def resolve_meters_per_pixel(self, tile_matrix_sets: set[str]) -> list[float]:
+        resolutions: list[float] = []
+        for tile_matrix in sorted(tile_matrix_sets):
+            resolved = TILE_MATRIX_SET_TO_RESOLUTION_M.get(tile_matrix)
+            if resolved is not None:
+                resolutions.append(resolved)
+        return resolutions
 
     # -------------------------------------------------------------------------
     def fetch_capabilities(self, url: str) -> bytes:
@@ -123,11 +157,24 @@ class GIBSLayersUpdater:
                 continue
             title = layer.findtext("ows:Title", namespaces=self.ows_namespaces)
             abstract = layer.findtext("ows:Abstract", namespaces=self.ows_namespaces)
+            tile_matrix_sets = self.parse_tile_matrix_sets(layer)
             layers.append(
                 {
                     "layer_id": identifier.strip(),
                     "title": (title or identifier).strip(),
                     "abstract": abstract.strip() if abstract else None,
+                    "tile_matrix_sets": tile_matrix_sets,
                 }
             )
         return layers
+
+    # -------------------------------------------------------------------------
+    def parse_tile_matrix_sets(self, layer: ElementTree.Element) -> list[str]:
+        matrix_sets: set[str] = set()
+        for entry in layer.findall(".//{*}TileMatrixSetLink/{*}TileMatrixSet"):
+            if not entry.text:
+                continue
+            identifier = entry.text.strip()
+            if identifier:
+                matrix_sets.add(identifier)
+        return sorted(matrix_sets)

@@ -105,6 +105,8 @@ GIBS_LAYER_COLUMNS = [
     "abstract",
     "projections",
     "source_urls",
+    "tile_matrix_sets",
+    "meters_per_pixel",
 ]
 
 

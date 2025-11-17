@@ -50,4 +50,6 @@ class GibsLayerRecord(Base):
     abstract = Column(Text)
     projections = Column(Text)
     source_urls = Column(Text)
+    tile_matrix_sets = Column(Text)
+    meters_per_pixel = Column(Text)
     __table_args__ = (UniqueConstraint("layer_id"),)
