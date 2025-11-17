@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import threading
 import time
@@ -27,8 +28,10 @@ from AEGIS.src.packages.constants import (
     MIN_LONGITUDE,
     MIN_MERCATOR_LAT,
     ORIGIN_SHIFT,
+    GIBS_LAYERS_TABLE,
 )
 from AEGIS.src.packages.logger import logger
+from AEGIS.src.packages.utils.repository.database import database
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
@@ -62,6 +65,14 @@ class LayerMetadata:
     supported_crs: frozenset[str]
     formats: frozenset[str]
     time_extent: str | None
+
+
+###############################################################################
+@dataclass(frozen=True)
+class LayerCatalogEntry:
+    name: str
+    projections: frozenset[str]
+    meters_per_pixel: tuple[float, ...]
 
 
 ###############################################################################
@@ -158,11 +169,86 @@ class GIBSService:
             if min_visual_radius_m is not None
             else settings.min_visual_radius_m
         )
+        self.layer_catalog = self.load_layer_catalog()
         self.layer_native_resolution_m = {
             "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
         }
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
+
+    # -------------------------------------------------------------------------
+    def load_layer_catalog(self) -> dict[str, LayerCatalogEntry]:
+        try:
+            frame = database.load_from_database(GIBS_LAYERS_TABLE)
+        except Exception as exc:  # pragma: no cover - database access failures
+            logger.warning("Unable to load GIBS layer metadata: %s", exc)
+            return {}
+        if frame.empty:
+            return {}
+        catalog: dict[str, LayerCatalogEntry] = {}
+        for _, row in frame.iterrows():
+            layer_id = str(row.get("layer_id") or "").strip()
+            if not layer_id:
+                continue
+            projections = self.parse_projection_entries(row.get("projections"))
+            meters_per_pixel = self.parse_meters_per_pixel(row.get("meters_per_pixel"))
+            catalog[layer_id] = LayerCatalogEntry(
+                name=layer_id,
+                projections=frozenset(projections),
+                meters_per_pixel=tuple(meters_per_pixel),
+            )
+        return catalog
+
+    # -------------------------------------------------------------------------
+    def parse_projection_entries(self, payload: Any) -> list[str]:
+        entries = self.parse_sequence(payload)
+        projections: list[str] = []
+        for value in entries:
+            normalized = str(value).strip().upper()
+            if normalized:
+                projections.append(normalized)
+        return projections
+
+    # -------------------------------------------------------------------------
+    def parse_meters_per_pixel(self, payload: Any) -> list[float]:
+        entries = self.parse_sequence(payload)
+        resolutions: list[float] = []
+        for value in entries:
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError):
+                continue
+            if parsed > 0:
+                resolutions.append(parsed)
+        return resolutions
+
+    # -------------------------------------------------------------------------
+    def parse_sequence(self, payload: Any) -> list[Any]:
+        if payload is None:
+            return []
+        if isinstance(payload, str):
+            try:
+                parsed = json.loads(payload)
+            except json.JSONDecodeError:
+                return []
+            if isinstance(parsed, list):
+                return list(parsed)
+            return []
+        if isinstance(payload, (list, tuple)):
+            return list(payload)
+        return []
+
+    # -------------------------------------------------------------------------
+    def get_layer_metadata(self, layer: str) -> LayerCatalogEntry | None:
+        return self.layer_catalog.get(layer)
+
+    # -------------------------------------------------------------------------
+    def resolve_layer_meters_per_pixel(self, layer: str) -> tuple[float, ...]:
+        metadata = self.get_layer_metadata(layer)
+        if metadata and metadata.meters_per_pixel:
+            return metadata.meters_per_pixel
+        fallback = self.layer_native_resolution_m.get(layer)
+        return (fallback,) if fallback else tuple()
 
     # -------------------------------------------------------------------------
     def fetch_image(
@@ -174,8 +260,8 @@ class GIBSService:
         radius_m: float | None,
         date: str,
         layer: str,
-        width: int = 1024,
-        height: int = 1024,
+        width: int = configurations.gibs.image_width,
+        height: int = configurations.gibs.image_height,
         crs: str = "EPSG:3857",
         format: str = "image/png",
         style: str | None = None,
@@ -218,7 +304,9 @@ class GIBSService:
             if actual_crs == request_crs
             else self.reproject_bbox(normalized_bbox, actual_crs)
         )
-        self.ensure_bbox_resolution(layer, bbox_for_request, actual_crs)
+        bbox_for_request = self.ensure_bbox_resolution(
+            layer, bbox_for_request, actual_crs, width, height
+        )
         meters_per_pixel = self.compute_meters_per_pixel(
             bbox_for_request, actual_crs, width, height
         )
@@ -752,18 +840,54 @@ class GIBSService:
         }
 
     # -------------------------------------------------------------------------
-    def ensure_bbox_resolution(self, layer: str, bbox: BBox, crs: str) -> None:
-        native_resolution = self.layer_native_resolution_m.get(layer)
-        if native_resolution is None:
-            return
+    def ensure_bbox_resolution(
+        self, layer: str, bbox: BBox, crs: str, width: int, height: int
+    ) -> BBox:
+        meters_per_pixel = self.resolve_layer_meters_per_pixel(layer)
+        if not meters_per_pixel:
+            return bbox
+        target_meter_span = max(meters_per_pixel)
         span_x, span_y = self.bbox_span_in_meters(bbox, crs)
-        if span_x < native_resolution or span_y < native_resolution:
-            raise GIBSValidationError(
-                (
-                    f"BBox too small for layer '{layer}': width={span_x:.2f}m, "
-                    f"height={span_y:.2f}m; minimum span is {native_resolution:.0f} meters."
-                )
-            )
+        min_span_x = target_meter_span * float(width)
+        min_span_y = target_meter_span * float(height)
+        if span_x >= min_span_x and span_y >= min_span_y:
+            return bbox
+        return self.expand_bbox_to_span(bbox, crs, min_span_x, min_span_y)
+
+    # -------------------------------------------------------------------------
+    def expand_bbox_to_span(
+        self, bbox: BBox, crs: str, span_x_m: float, span_y_m: float
+    ) -> BBox:
+        min_x, min_y, max_x, max_y = bbox
+        if crs == "EPSG:3857":
+            center_x = (min_x + max_x) / 2.0
+            center_y = (min_y + max_y) / 2.0
+            half_span_x = span_x_m / 2.0
+            half_span_y = span_y_m / 2.0
+            expanded_bbox = [
+                center_x - half_span_x,
+                center_y - half_span_y,
+                center_x + half_span_x,
+                center_y + half_span_y,
+            ]
+            self.validate_bbox_values(expanded_bbox, crs)
+            return expanded_bbox
+        if crs == "EPSG:4326":
+            center_lon = (min_x + max_x) / 2.0
+            center_lat = (min_y + max_y) / 2.0
+            center_x, center_y = self.lonlat_to_mercator(center_lon, center_lat)
+            half_span_x = span_x_m / 2.0
+            half_span_y = span_y_m / 2.0
+            expanded_mercator = [
+                center_x - half_span_x,
+                center_y - half_span_y,
+                center_x + half_span_x,
+                center_y + half_span_y,
+            ]
+            expanded = self.reproject_bbox(expanded_mercator, "EPSG:4326")
+            self.validate_bbox_values(expanded, crs)
+            return expanded
+        raise GIBSValidationError(f"Unable to expand bbox for '{crs}'.")
 
     # -------------------------------------------------------------------------
     def reproject_bbox(self, bbox: BBox, target_crs: str) -> BBox:

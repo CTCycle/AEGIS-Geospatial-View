@@ -49,6 +49,8 @@
       "capabilities_ttl_s": 21600.0,
       "max_cache_entries": 24,
       "bbox_precision": 6,
+      "image_width": 1024,
+      "image_height": 1024,
       "capabilities_endpoints": {
         "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
         "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",

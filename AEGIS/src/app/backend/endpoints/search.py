@@ -227,6 +227,18 @@ class MapSearchEndpoint:
         lat = coordinate_pair[1] if coordinate_pair else None
         imagery_date = self.toolkit.resolve_imagery_date(payload)
         layer = self.toolkit.resolve_imagery_layer(payload)
+        layer_metadata = self.gibs_service.get_layer_metadata(layer)
+        imagery_crs = payload.image_crs
+        if layer_metadata and layer_metadata.projections:
+            if imagery_crs not in layer_metadata.projections:
+                raise GIBSValidationError(
+                    (
+                        f"Layer '{layer}' does not support projection "
+                        f"{imagery_crs}."
+                    )
+                )
+        image_width = configurations.gibs.image_width
+        image_height = configurations.gibs.image_height
         gibs_arguments = {
             "lon": lon,
             "lat": lat,
@@ -234,9 +246,9 @@ class MapSearchEndpoint:
             "radius_m": payload.radius_m,
             "date": imagery_date,
             "layer": layer,
-            "width": payload.image_width,
-            "height": payload.image_height,
-            "crs": payload.image_crs,
+            "width": image_width,
+            "height": image_height,
+            "crs": imagery_crs,
             "format": payload.image_format,
         }
         gibs_response = await asyncio.to_thread(
@@ -313,12 +325,10 @@ class MapSearchEndpoint:
                 "filters": filters,
                 "bbox": bbox,
             }
+            payload_data["image_width"] = configurations.gibs.image_width
+            payload_data["image_height"] = configurations.gibs.image_height
             if radius_m is not None:
                 payload_data["radius_m"] = radius_m
-            if image_width is not None:
-                payload_data["image_width"] = image_width
-            if image_height is not None:
-                payload_data["image_height"] = image_height
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:
