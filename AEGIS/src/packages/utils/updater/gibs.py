@@ -1,24 +1,18 @@
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
+from tqdm import tqdm
+
+from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.serializer import DataSerializer
 
-
-GIBS_CAPABILITIES_ENDPOINTS = {
-    "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
-    "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
-    "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
-    "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml",
-}
-OWS_NAMESPACES = {"ows": "http://www.opengis.net/ows/1.1"}
-USER_AGENT = "AEGIS-GIBS-LayerSync/1.0"
-REQUEST_TIMEOUT = 30
 
 type LayerPayload = dict[str, str | None]
 
@@ -44,9 +38,20 @@ class GIBSLayersUpdater:
         self,
         serializer: DataSerializer | None = None,
         endpoints: dict[str, str] | None = None,
+        user_agent: str | None = None,
+        ows_namespaces: dict[str, str] | None = None,
+        request_timeout: float | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
-        self.endpoints = endpoints or GIBS_CAPABILITIES_ENDPOINTS
+        settings = configurations.gibs
+        self.endpoints = copy.deepcopy(
+            endpoints or settings.capabilities_endpoints
+        )
+        self.ows_namespaces = copy.deepcopy(
+            ows_namespaces or settings.ows_namespaces
+        )
+        self.user_agent = user_agent or settings.layer_sync_user_agent
+        self.request_timeout = request_timeout or settings.layer_sync_timeout
 
     # -------------------------------------------------------------------------
     def update(self) -> None:
@@ -57,7 +62,7 @@ class GIBSLayersUpdater:
     # -------------------------------------------------------------------------
     def collect_layers(self) -> list[LayerPayload]:
         aggregated: dict[str, LayerAggregate] = {}
-        for projection, url in self.endpoints.items():
+        for projection, url in tqdm(self.endpoints.items()):
             payload = self.fetch_capabilities(url)
             for layer in self.parse_layers(payload):
                 layer_id = layer["layer_id"]
@@ -95,9 +100,9 @@ class GIBSLayersUpdater:
 
     # -------------------------------------------------------------------------
     def fetch_capabilities(self, url: str) -> bytes:
-        request = Request(url, headers={"User-Agent": USER_AGENT})
+        request = Request(url, headers={"User-Agent": self.user_agent})
         try:
-            with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+            with urlopen(request, timeout=self.request_timeout) as response:
                 return response.read()
         except (HTTPError, URLError) as exc:  # pragma: no cover - network failures
             raise LayerHarvestError(f"Failed to download capabilities at {url}") from exc
@@ -111,11 +116,13 @@ class GIBSLayersUpdater:
 
         layers: list[LayerPayload] = []
         for layer in root.findall(".//{*}Layer"):
-            identifier = layer.findtext("ows:Identifier", namespaces=OWS_NAMESPACES)
+            identifier = layer.findtext(
+                "ows:Identifier", namespaces=self.ows_namespaces
+            )
             if not identifier:
                 continue
-            title = layer.findtext("ows:Title", namespaces=OWS_NAMESPACES)
-            abstract = layer.findtext("ows:Abstract", namespaces=OWS_NAMESPACES)
+            title = layer.findtext("ows:Title", namespaces=self.ows_namespaces)
+            abstract = layer.findtext("ows:Abstract", namespaces=self.ows_namespaces)
             layers.append(
                 {
                     "layer_id": identifier.strip(),

@@ -99,6 +99,10 @@ class GIBSSettings:
     retry_backoff_s: float
     min_visual_radius_m: float
     default_layer: str
+    capabilities_endpoints: dict[str, str]
+    ows_namespaces: dict[str, str]
+    layer_sync_user_agent: str
+    layer_sync_timeout: float
 
 
 # -----------------------------------------------------------------------------
@@ -238,6 +242,29 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
             "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
             "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
         }
+    capabilities_payload = ensure_mapping(payload.get("capabilities_endpoints"))
+    capabilities_endpoints: dict[str, str] = {}
+    for crs, url in capabilities_payload.items():
+        crs_key = coerce_str(crs, "").upper()
+        endpoint = coerce_str(url, "")
+        if crs_key and endpoint:
+            capabilities_endpoints[crs_key] = endpoint
+    if not capabilities_endpoints:
+        capabilities_endpoints = {
+            "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
+            "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
+            "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
+            "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml",
+        }
+    namespaces_payload = ensure_mapping(payload.get("ows_namespaces"))
+    ows_namespaces: dict[str, str] = {}
+    for key, value in namespaces_payload.items():
+        prefix = coerce_str(key, "")
+        namespace = coerce_str(value, "")
+        if prefix and namespace:
+            ows_namespaces[prefix] = namespace
+    if not ows_namespaces:
+        ows_namespaces = {"ows": "http://www.opengis.net/ows/1.1"}
     return GIBSSettings(
         user_agent=coerce_str(payload.get("user_agent"), "AEGIS-GIBS/1.0"),
         timeout=coerce_float(payload.get("timeout"), 20.0, minimum=1.0),
@@ -264,6 +291,15 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         default_layer=coerce_str(
             payload.get("default_layer"),
             "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+        ),
+        capabilities_endpoints=capabilities_endpoints,
+        ows_namespaces=ows_namespaces,
+        layer_sync_user_agent=coerce_str(
+            payload.get("layer_sync_user_agent"),
+            "AEGIS-GIBS-LayerSync/1.0",
+        ),
+        layer_sync_timeout=coerce_float(
+            payload.get("layer_sync_timeout"), 30.0, minimum=1.0
         ),
     )
 
