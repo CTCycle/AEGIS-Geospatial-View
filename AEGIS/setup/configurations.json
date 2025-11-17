@@ -43,17 +43,28 @@
     "min_lon": -180.0,
     "max_mercator_extent": 20037508.3427892
   },
-  "gibs": {
-    "user_agent": "AEGIS-GIBS/1.0",
-    "timeout": 20.0,
-    "capabilities_ttl_s": 21600.0,
-    "max_cache_entries": 24,
-    "bbox_precision": 6,
-    "nasa_attribution": "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), operated by the NASA/GSFC Earth Science Data and Information System (ESDIS) project.",
-    "wms_base_endpoints": {
-      "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
-      "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
-    },
+    "gibs": {
+      "user_agent": "AEGIS-GIBS/1.0",
+      "timeout": 20.0,
+      "capabilities_ttl_s": 21600.0,
+      "max_cache_entries": 24,
+      "bbox_precision": 6,
+      "capabilities_endpoints": {
+        "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
+        "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
+        "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
+        "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml"
+      },
+      "ows_namespaces": {
+        "ows": "http://www.opengis.net/ows/1.1"
+      },
+      "layer_sync_user_agent": "AEGIS-GIBS-LayerSync/1.0",
+      "layer_sync_timeout": 30.0,
+      "nasa_attribution": "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), operated by the NASA/GSFC Earth Science Data and Information System (ESDIS) project.",
+      "wms_base_endpoints": {
+        "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+        "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
+      },
     "retry_backoff_s": 2.0,
     "default_layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor"
   },
