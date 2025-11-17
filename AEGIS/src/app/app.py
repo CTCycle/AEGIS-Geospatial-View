@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from nicegui import ui
@@ -10,7 +9,6 @@ from AEGIS.src.app.frontend.interface import create_interface
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.database import database
-
 
 ###############################################################################
 if database.requires_sqlite_initialization():

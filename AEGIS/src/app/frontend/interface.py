@@ -7,14 +7,14 @@ from typing import Any
 
 from nicegui import ui
 
+from AEGIS.src.app.frontend.controllers import (
+    GeoSearchController,
+    SettingsController,
+)
 from AEGIS.src.app.frontend.layouts import (
     CARD_BASE_CLASSES,
     INTERFACE_THEME_CSS,
     PAGE_CONTAINER_CLASSES,
-)
-from AEGIS.src.app.frontend.controllers import (
-    GeoSearchController,
-    SettingsController,
 )
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.constants import (

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import os
-
 from collections.abc import Callable
 from typing import Protocol
 
 import pandas as pd
 from sqlalchemy.orm import declarative_base
 
-from AEGIS.src.packages.utils.repository.sqlite import SQLiteRepository
 from AEGIS.src.packages.configurations import DatabaseSettings, configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.singleton import singleton
+from AEGIS.src.packages.utils.repository.sqlite import SQLiteRepository
 
 Base = declarative_base()
 

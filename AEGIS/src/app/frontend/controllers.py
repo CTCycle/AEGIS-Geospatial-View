@@ -6,16 +6,15 @@ from typing import Any
 
 import httpx
 
-from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
-
 from AEGIS.src.packages.configurations import (
-    configurations,
     ClientRuntimeConfig,
+    configurations,
 )
 from AEGIS.src.packages.constants import (
     CLOUD_MODEL_CHOICES,
     GEO_SEARCH_URL,
 )
+from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
 
 configurations = configurations
 
