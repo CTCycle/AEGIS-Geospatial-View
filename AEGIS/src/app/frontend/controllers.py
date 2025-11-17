@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +19,7 @@ from AEGIS.src.packages.constants import (
 
 configurations = configurations
 
+
 ###############################################################################
 @dataclass
 class RuntimeSettings:
@@ -33,8 +33,9 @@ class RuntimeSettings:
 
 ###############################################################################
 class SettingsController:
-
-    def __init__(self, runtime_config: type[ClientRuntimeConfig] = ClientRuntimeConfig) -> None:
+    def __init__(
+        self, runtime_config: type[ClientRuntimeConfig] = ClientRuntimeConfig
+    ) -> None:
         self.runtime_config = runtime_config
 
     # -------------------------------------------------------------------------
@@ -98,7 +99,6 @@ class SettingsController:
 
 ###############################################################################
 class GeoSearchController:
-    
     def __init__(self, config: Any = configurations) -> None:
         self.config = config
 
@@ -114,7 +114,10 @@ class GeoSearchController:
             return None, f"[ERROR] Unable to reach map service: {exc}"
         except httpx.HTTPStatusError as exc:
             detail = self.extract_error_detail(exc.response)
-            return None, f"[ERROR] Map service error {exc.response.status_code}: {detail}"
+            return (
+                None,
+                f"[ERROR] Map service error {exc.response.status_code}: {detail}",
+            )
 
         try:
             data = response.json()
@@ -125,7 +128,9 @@ class GeoSearchController:
             return None, "[ERROR] Map service returned an unexpected payload."
 
         status_message = self.extract_status_message(data)
-        formatted_status = f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
+        formatted_status = (
+            f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
+        )
         return data, formatted_status
 
     # -------------------------------------------------------------------------

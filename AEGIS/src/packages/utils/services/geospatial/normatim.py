@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import math
 import socket
 import unicodedata
@@ -16,8 +15,6 @@ from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.configurations import configurations
 
 NOMINATIM = configurations.nominatim
-
-
 
 
 ###############################################################################

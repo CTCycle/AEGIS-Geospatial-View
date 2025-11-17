@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+
 # HELPERS
 ###############################################################################
 def sanitize_field(value: str | None) -> str | None:
@@ -73,8 +74,8 @@ def sanitize_search_payload(
     if not use_coordinates and not any([address, city, country]):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail="Provide an address/city/country or enable coordinates.",
-    )
+            detail="Provide an address/city/country or enable coordinates.",
+        )
 
     sanitized_filters = sanitize_choice_list(geospatial_filters)
     primary_filter = sanitized_filters[0] if sanitized_filters else None

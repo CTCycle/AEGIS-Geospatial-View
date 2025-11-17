@@ -62,12 +62,8 @@ class GIBSLayersUpdater:
     ) -> None:
         self.serializer = serializer or DataSerializer()
         settings = configurations.gibs
-        self.endpoints = copy.deepcopy(
-            endpoints or settings.capabilities_endpoints
-        )
-        self.ows_namespaces = copy.deepcopy(
-            ows_namespaces or settings.ows_namespaces
-        )
+        self.endpoints = copy.deepcopy(endpoints or settings.capabilities_endpoints)
+        self.ows_namespaces = copy.deepcopy(ows_namespaces or settings.ows_namespaces)
         self.user_agent = user_agent or settings.layer_sync_user_agent
         self.request_timeout = request_timeout or settings.layer_sync_timeout
 
@@ -139,7 +135,9 @@ class GIBSLayersUpdater:
             with urlopen(request, timeout=self.request_timeout) as response:
                 return response.read()
         except (HTTPError, URLError) as exc:  # pragma: no cover - network failures
-            raise LayerHarvestError(f"Failed to download capabilities at {url}") from exc
+            raise LayerHarvestError(
+                f"Failed to download capabilities at {url}"
+            ) from exc
 
     # -------------------------------------------------------------------------
     def parse_layers(self, payload: bytes) -> list[LayerPayload]:
