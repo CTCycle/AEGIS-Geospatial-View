@@ -31,9 +31,9 @@ type CoordinatePair = tuple[float, float]
 type EncodingStrategy = Callable[[bytes], str]
 __all__ = ["router", "MapSearchToolkit", "MapSearchEndpoint"]
 
+
 ###############################################################################
 class MapSearchToolkit:
-
     def __init__(self, gibs_service: GIBSService, *, default_layer: str) -> None:
         self.gibs_service = gibs_service
         self.default_layer = default_layer
@@ -91,7 +91,9 @@ class MapSearchToolkit:
                 return float(lon_candidate), float(lat_candidate)
         lat_literal = response_payload.get("latitude")
         lon_literal = response_payload.get("longitude")
-        if isinstance(lat_literal, (int, float)) and isinstance(lon_literal, (int, float)):
+        if isinstance(lat_literal, (int, float)) and isinstance(
+            lon_literal, (int, float)
+        ):
             return float(lon_literal), float(lat_literal)
         return None
 
@@ -142,7 +144,6 @@ class MapSearchToolkit:
 
 ###############################################################################
 class MapSearchEndpoint:
-
     def __init__(
         self,
         router: APIRouter,
@@ -212,7 +213,9 @@ class MapSearchEndpoint:
     async def fetch_satellite_imagery(
         self, payload: LocationSearchRequest, response_payload: dict[str, Any]
     ) -> dict[str, Any]:
-        coordinate_pair = self.toolkit.extract_coordinate_pair(payload, response_payload)
+        coordinate_pair = self.toolkit.extract_coordinate_pair(
+            payload, response_payload
+        )
         bbox_candidate, bbox_source_crs = self.toolkit.resolve_bbox_candidate(
             payload, response_payload
         )
@@ -232,10 +235,7 @@ class MapSearchEndpoint:
         if layer_metadata and layer_metadata.projections:
             if imagery_crs not in layer_metadata.projections:
                 raise GIBSValidationError(
-                    (
-                        f"Layer '{layer}' does not support projection "
-                        f"{imagery_crs}."
-                    )
+                    (f"Layer '{layer}' does not support projection {imagery_crs}.")
                 )
         image_width = configurations.gibs.image_width
         image_height = configurations.gibs.image_height

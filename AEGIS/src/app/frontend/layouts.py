@@ -45,4 +45,3 @@ INTERFACE_THEME_CSS: Final = """
 PAGE_CONTAINER_CLASSES = "w-full max-w-screen-2xl mx-auto px-4 md:px-6 space-y-6"
 CARD_BASE_CLASSES = "rounded-xl shadow-sm p-4 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800"
 ROW_WRAP_CLASSES = "w-full gap-6 items-stretch flex-wrap"
-

@@ -55,12 +55,8 @@ class LocationSearchRequest(BaseModel):
     geospatial_filter: str | None = Field(default=None, max_length=200)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
-    image_width: int = Field(
-        default=configurations.gibs.image_width, ge=512, le=2048
-    )
-    image_height: int = Field(
-        default=configurations.gibs.image_height, ge=512, le=2048
-    )
+    image_width: int = Field(default=configurations.gibs.image_width, ge=512, le=2048)
+    image_height: int = Field(default=configurations.gibs.image_height, ge=512, le=2048)
     image_crs: str = Field(default="EPSG:3857")
     image_format: str = Field(default="image/png")
 
@@ -71,7 +67,6 @@ class LocationSearchRequest(BaseModel):
         "geospatial_filter",
         mode="before",
     )
-
     # -------------------------------------------------------------------------
     @classmethod
     def strip_location_text(cls, value: str | None) -> str | None:
@@ -104,7 +99,9 @@ class LocationSearchRequest(BaseModel):
     # -------------------------------------------------------------------------
     @field_validator("bbox", mode="before")
     @classmethod
-    def normalize_bbox(cls, value: BBox | tuple[float, ...] | str | None) -> BBox | None:
+    def normalize_bbox(
+        cls, value: BBox | tuple[float, ...] | str | None
+    ) -> BBox | None:
         if value is None or value == "":
             return None
         if isinstance(value, str):

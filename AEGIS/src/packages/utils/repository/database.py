@@ -3,12 +3,10 @@ from __future__ import annotations
 import os
 
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Protocol
 
 import pandas as pd
-import sqlalchemy
-from sqlalchemy.dialects.sqlite import insert
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base
 
 from AEGIS.src.packages.utils.repository.sqlite import SQLiteRepository
 from AEGIS.src.packages.configurations import DatabaseSettings, configurations
@@ -17,43 +15,38 @@ from AEGIS.src.packages.singleton import singleton
 
 Base = declarative_base()
 
+
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
 
     # -------------------------------------------------------------------------
-    def initialize_database(self) -> None:
-        ...
+    def initialize_database(self) -> None: ...
 
     # -------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> pd.DataFrame:
-        ...
+    def load_from_database(self, table_name: str) -> pd.DataFrame: ...
 
     # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        ...
+    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None: ...
 
     # -------------------------------------------------------------------------
-    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        ...
+    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None: ...
 
     # -------------------------------------------------------------------------
-    def count_rows(self, table_name: str) -> int:
-        ...
+    def count_rows(self, table_name: str) -> int: ...
 
 
 BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
 
 
 # -----------------------------------------------------------------------------
-def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:    
+def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
     return SQLiteRepository(settings)
 
 
 BACKEND_FACTORIES: dict[str, BackendFactory] = {
     "sqlite": build_sqlite_backend,
 }
-
 
 
 # [DATABASE]
@@ -68,7 +61,9 @@ class AEGISDatabase:
     def _build_backend(self, backend_name: str) -> DatabaseBackend:
         key = backend_name.strip().lower()
         if key not in BACKEND_FACTORIES:
-            raise RuntimeError(f"Unsupported database backend requested: {backend_name}")
+            raise RuntimeError(
+                f"Unsupported database backend requested: {backend_name}"
+            )
         logger.info("Initializing %s database backend", key)
         factory = BACKEND_FACTORIES[key]
         return factory(self.settings)
@@ -81,6 +76,14 @@ class AEGISDatabase:
     # -------------------------------------------------------------------------
     def initialize_database(self) -> None:
         self.backend.initialize_database()
+
+    # -------------------------------------------------------------------------
+    def requires_sqlite_initialization(self) -> bool:
+        if self.settings.selected_database != "sqlite":
+            return False
+        if not self.db_path:
+            return False
+        return not os.path.exists(self.db_path)
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:

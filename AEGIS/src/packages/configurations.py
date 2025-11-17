@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -10,7 +9,6 @@ from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
     CONFIGURATION_FILE,
-    DEFAULT_AGENTIC_TEMPERATURE,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
     MAX_AGENTIC_TEMPERATURE,
@@ -134,6 +132,7 @@ class AppConfigurations:
     client_runtime: ClientRuntimeDefaults
     ollama_host_default: str
 
+
 ###############################################################################
 def ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
@@ -159,9 +158,7 @@ def load_configuration_data(path: str) -> dict[str, Any]:
 def build_backend_settings(data: dict[str, Any]) -> BackendSettings:
     payload = ensure_mapping(data)
     return BackendSettings(
-        title=coerce_str(
-            payload.get("title"), "AEGIS Geospatial Search Backend"
-        ),
+        title=coerce_str(payload.get("title"), "AEGIS Geospatial Search Backend"),
         version=coerce_str(payload.get("version"), "0.1.0"),
         description=coerce_str(payload.get("description"), "FastAPI backend"),
     )
@@ -179,14 +176,18 @@ def build_ui_runtime_settings(data: dict[str, Any]) -> UIRuntimeSettings:
         reconnect_timeout=coerce_positive_int(data.get("reconnect_timeout"), 180),
     )
 
+
 # -----------------------------------------------------------------------------
 def build_api_settings(data: dict[str, Any]) -> APISettings:
-    return APISettings(base_url=coerce_str(data.get("base_url"), "http://127.0.0.1:8000"))
+    return APISettings(
+        base_url=coerce_str(data.get("base_url"), "http://127.0.0.1:8000")
+    )
 
 
 # -----------------------------------------------------------------------------
 def build_http_settings(data: dict[str, Any]) -> HTTPSettings:
     return HTTPSettings(timeout=coerce_float(data.get("timeout"), 3_600.0))
+
 
 # -----------------------------------------------------------------------------
 def build_database_settings(data: dict[str, Any]) -> DatabaseSettings:
@@ -322,12 +323,12 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
 
 # -----------------------------------------------------------------------------
 def build_client_runtime_defaults(data: dict[str, Any]) -> ClientRuntimeDefaults:
-    agent_default = AGENT_MODEL_CHOICES[0] if AGENT_MODEL_CHOICES else ""    
+    agent_default = AGENT_MODEL_CHOICES[0] if AGENT_MODEL_CHOICES else ""
     provider_default = coerce_str(data.get("llm_provider"), "openai").lower()
     provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
     cloud_default = provider_models[0] if provider_models else ""
     return ClientRuntimeDefaults(
-        agent_model=coerce_str(data.get("agent_model"), agent_default),        
+        agent_model=coerce_str(data.get("agent_model"), agent_default),
         llm_provider=provider_default,
         cloud_model=coerce_str(data.get("cloud_model"), cloud_default),
         use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
@@ -339,7 +340,7 @@ def build_client_runtime_defaults(data: dict[str, Any]) -> ClientRuntimeDefaults
 # -----------------------------------------------------------------------------
 def get_configurations(config_path: str | None = None) -> AppConfigurations:
     path = config_path or CONFIGURATION_FILE
-    data = load_configuration_data(path)    
+    data = load_configuration_data(path)
     backend_payload = ensure_mapping(data.get("backend"))
     ui_payload = ensure_mapping(data.get("ui_runtime") or data.get("ui"))
     api_payload = ensure_mapping(data.get("api"))
@@ -349,7 +350,9 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     geospatial_payload = ensure_mapping(data.get("geospatial"))
     gibs_payload = ensure_mapping(data.get("gibs"))
     client_payload = ensure_mapping(data.get("client_runtime_defaults"))
-    ollama_host_default = coerce_str(data.get("ollama_host_default"), "http://localhost:11434")
+    ollama_host_default = coerce_str(
+        data.get("ollama_host_default"), "http://localhost:11434"
+    )
 
     backend_settings = build_backend_settings(backend_payload)
     ui_settings = build_ui_runtime_settings(ui_payload)
@@ -377,7 +380,6 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     ClientRuntimeConfig.configure(app_config.client_runtime)
 
     return app_config
-
 
 
 ###############################################################################
@@ -538,9 +540,7 @@ class ClientRuntimeConfig:
 
     # -------------------------------------------------------------------------
     @classmethod
-    def resolve_provider_and_model(
-        cls, purpose: Literal["agent"]
-    ) -> tuple[str, str]:
+    def resolve_provider_and_model(cls, purpose: Literal["agent"]) -> tuple[str, str]:
         if cls.is_cloud_enabled():
             provider = cls.get_llm_provider()
             model = cls.get_cloud_model().strip()
@@ -550,7 +550,6 @@ class ClientRuntimeConfig:
             provider = "ollama"
             model = cls.get_agent_model()
         return provider, model.strip()
-
 
 
 configurations = get_configurations()
@@ -563,8 +562,8 @@ __all__ = [
     "ClientRuntimeConfig",
     "ClientRuntimeDefaults",
     "GIBSSettings",
-    "DatabaseSettings",    
-    "HTTPSettings",   
+    "DatabaseSettings",
+    "HTTPSettings",
     "UIRuntimeSettings",
-    "get_configurations",    
+    "get_configurations",
 ]
