@@ -78,6 +78,11 @@ Ollama or a specific cloud provider, plus metadata about the schema used for
 structured responses. No additional code changes are required beyond setting
 the environment variables.
 
+## 3.3 GIBS imagery resolution
+- VIIRS Corrected Reflectance and similar GIBS layers have native resolutions in the 375-500 meter range; WMS requests cannot exceed that ground detail.
+- Very small bounding boxes paired with large WIDTH/HEIGHT values will only interpolate pixels rather than reveal finer features.
+- Satellite imagery responses now preserve the exact harmonized bbox and include a `meters_per_pixel` field so clients can gauge the effective resolution for a request.
+
 ## 4. License
 This project is licensed under the terms of the MIT license. See the LICENSE file for details.
 
