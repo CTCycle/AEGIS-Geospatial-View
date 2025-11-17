@@ -158,6 +158,9 @@ class GIBSService:
             if min_visual_radius_m is not None
             else settings.min_visual_radius_m
         )
+        self.layer_native_resolution_m = {
+            "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
+        }
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
@@ -180,7 +183,10 @@ class GIBSService:
         timeout_s: int | None = None,
     ) -> dict[str, Any]:
         request_crs = crs.upper()
-        effective_radius = self.resolve_effective_radius(radius_m)
+        bbox_provided = bbox is not None
+        effective_radius = (
+            None if bbox_provided else self.resolve_effective_radius(radius_m)
+        )
         style_value = self.normalize_style(style)
         normalized_bbox = self.normalize_bbox(
             bbox=bbox,
@@ -212,6 +218,10 @@ class GIBSService:
             if actual_crs == request_crs
             else self.reproject_bbox(normalized_bbox, actual_crs)
         )
+        self.ensure_bbox_resolution(layer, bbox_for_request, actual_crs)
+        meters_per_pixel = self.compute_meters_per_pixel(
+            bbox_for_request, actual_crs, width, height
+        )
         self.validate_format(format_lower, layer_meta, capabilities)
         imagery_date_value = self.parse_imagery_date(date)
         self.ensure_layer_temporal_support(imagery_date_value, layer_meta)
@@ -240,6 +250,7 @@ class GIBSService:
             "height": height,
             "wms_url": final_url,
             "attribution": self.nasa_attribution,
+            "meters_per_pixel": meters_per_pixel,
         }
         self.response_cache.set(cache_key, dict(response))
         return response
@@ -254,22 +265,19 @@ class GIBSService:
         radius_m: float | None,
         target_crs: str,
     ) -> BBox:
-        if bbox:
+        if bbox is not None:
+            if len(bbox) != 4:
+                raise GIBSValidationError(
+                    "BBox must include four values [minx, miny, maxx, maxy]."
+                )
             normalized = [float(value) for value in bbox]
             self.validate_bbox_values(normalized, target_crs)
-            if self.bbox_requires_radius_expansion(normalized, target_crs, radius_m):
-                normalized = self.expand_bbox_to_radius(
-                    normalized,
-                    target_crs,
-                    radius_m,
-                )
-                self.validate_bbox_values(normalized, target_crs)
             return normalized
         if lon is None or lat is None:
             raise GIBSValidationError(
                 "Coordinates are required when bbox is not provided."
             )
-        radius = radius_m or 2500.0
+        radius = radius_m if radius_m is not None else 2500.0
         if radius <= 0:
             raise GIBSValidationError("radius_m must be greater than zero.")
         if target_crs == "EPSG:3857":
@@ -290,6 +298,13 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def validate_bbox_values(self, bbox: BBox, crs: str) -> None:
+        if len(bbox) != 4:
+            raise GIBSValidationError(
+                "BBox must include four values [minx, miny, maxx, maxy]."
+            )
+        for value in bbox:
+            if not math.isfinite(value):
+                raise GIBSValidationError("BBox values must be finite numbers.")
         minx, miny, maxx, maxy = bbox
         if minx >= maxx or miny >= maxy:
             raise GIBSValidationError("BBox min values must be smaller than max values.")
@@ -727,37 +742,28 @@ class GIBSService:
         raise GIBSValidationError(f"Unable to compute bbox span for '{crs}'.")
 
     # -------------------------------------------------------------------------
-    def bbox_requires_radius_expansion(
-        self, bbox: BBox, crs: str, radius_m: float | None
-    ) -> bool:
-        if radius_m is None or radius_m <= 0:
-            return False
+    def compute_meters_per_pixel(
+        self, bbox: BBox, crs: str, width: int, height: int
+    ) -> dict[str, float]:
         span_x, span_y = self.bbox_span_in_meters(bbox, crs)
-        minimum_span = max(radius_m, 500.0)
-        return span_x < minimum_span or span_y < minimum_span
+        return {
+            "x": span_x / float(width),
+            "y": span_y / float(height),
+        }
 
     # -------------------------------------------------------------------------
-    def expand_bbox_to_radius(
-        self, bbox: BBox, crs: str, radius_m: float | None
-    ) -> BBox:
-        if radius_m is None or radius_m <= 0:
-            return bbox
-        if crs == "EPSG:3857":
-            min_x, min_y, max_x, max_y = bbox
-            center_x = (min_x + max_x) / 2.0
-            center_y = (min_y + max_y) / 2.0
-            return [
-                center_x - radius_m,
-                center_y - radius_m,
-                center_x + radius_m,
-                center_y + radius_m,
-            ]
-        if crs == "EPSG:4326":
-            min_lon, min_lat, max_lon, max_lat = bbox
-            center_lon = (min_lon + max_lon) / 2.0
-            center_lat = (min_lat + max_lat) / 2.0
-            return self.compute_geographic_bbox(center_lon, center_lat, radius_m)
-        raise GIBSValidationError(f"Unable to expand bbox for '{crs}'.")
+    def ensure_bbox_resolution(self, layer: str, bbox: BBox, crs: str) -> None:
+        native_resolution = self.layer_native_resolution_m.get(layer)
+        if native_resolution is None:
+            return
+        span_x, span_y = self.bbox_span_in_meters(bbox, crs)
+        if span_x < native_resolution or span_y < native_resolution:
+            raise GIBSValidationError(
+                (
+                    f"BBox too small for layer '{layer}': width={span_x:.2f}m, "
+                    f"height={span_y:.2f}m; minimum span is {native_resolution:.0f} meters."
+                )
+            )
 
     # -------------------------------------------------------------------------
     def reproject_bbox(self, bbox: BBox, target_crs: str) -> BBox:
