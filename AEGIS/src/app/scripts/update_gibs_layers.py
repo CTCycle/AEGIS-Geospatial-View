@@ -4,7 +4,6 @@ from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.database import database
 from AEGIS.src.packages.utils.updater import GIBSLayersUpdater
 
-
 ###############################################################################
 if __name__ == "__main__":
     if database.requires_sqlite_initialization():

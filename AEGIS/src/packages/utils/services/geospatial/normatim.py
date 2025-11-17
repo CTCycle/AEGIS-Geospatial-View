@@ -11,8 +11,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.logger import logger
 
 NOMINATIM = configurations.nominatim
 

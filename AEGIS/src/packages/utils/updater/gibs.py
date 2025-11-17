@@ -13,7 +13,6 @@ from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.serializer import DataSerializer
 
-
 TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
     "15.625m": 15.625,
     "31.25m": 31.25,

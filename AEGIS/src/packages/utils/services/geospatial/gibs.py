@@ -18,6 +18,7 @@ from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
+    GIBS_LAYERS_TABLE,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
     MAX_GEO_LAT,
@@ -28,7 +29,6 @@ from AEGIS.src.packages.constants import (
     MIN_LONGITUDE,
     MIN_MERCATOR_LAT,
     ORIGIN_SHIFT,
-    GIBS_LAYERS_TABLE,
 )
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.database import database

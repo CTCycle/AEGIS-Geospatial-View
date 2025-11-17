@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Final
 
-
 INTERFACE_THEME_CSS: Final = """
         .q-table__container {
             border-radius: 14px;
