@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 from datetime import datetime
 from functools import partial
@@ -71,16 +72,44 @@ class InterfaceToolkit:
             return direct_source
         return None
 
+    def resolve_map_render_payload(self, response: Any) -> dict[str, str] | None:
+        if not isinstance(response, dict):
+            return None
+        payload = response.get("payload")
+        if not isinstance(payload, dict):
+            return None
+        imagery = payload.get("satellite_imagery")
+        if not isinstance(imagery, dict):
+            return None
+        map_html = str(imagery.get("map_html") or "").strip()
+        if map_html:
+            return {"mode": "html", "value": map_html}
+        source = self.resolve_map_image_source(response)
+        if source:
+            return {"mode": "img", "value": source}
+        return None
+
     def update_map_canvas(self, map_canvas: Any, response: Any) -> None:
         if map_canvas is None:
             return
-        source = self.resolve_map_image_source(response)
-        if not source:
-            map_canvas.set_source("")
+        render_payload = self.resolve_map_render_payload(response)
+        if not render_payload:
+            map_canvas.set_content("")
             return
-        if getattr(map_canvas, "source", None) == source:
+        if render_payload["mode"] == "html":
+            escaped_html = html.escape(render_payload["value"], quote=True)
+            map_canvas.set_content(
+                "<iframe "
+                'class="w-full h-full min-h-[480px] max-h-[800px] bg-slate-100 '
+                'rounded-lg overflow-hidden" '
+                'style="border:0;" '
+                f'srcdoc="{escaped_html}"></iframe>'
+            )
             return
-        map_canvas.set_source(source)
+        image_source = render_payload["value"]
+        map_canvas.set_content(
+            f'<img src="{image_source}" class="w-full h-full object-contain rounded-lg" />'
+        )
 
     def normalize_filter_candidate(self, value: Any) -> str | None:
         if value is None:
@@ -379,14 +408,6 @@ class InterfaceStructure:
             ui.markdown(
                 "### AEGIS Geographics\nVisualize geographic data overlays in real time"
             ).classes("text-3xl font-semibold text-slate-800 dark:text-slate-100")
-            with ui.row().classes("w-full flex-wrap justify-start"):
-                with ui.card().classes(f"{CARD_BASE_CLASSES} w-full"):
-                    with ui.column().classes("gap-4"):
-                        ui.markdown("**Authentication**")
-                        auth_button = ui.button("Authenticate", on_click=None)
-                        auth_button.props("color=secondary")
-                        auth_button.props("size=sm")
-
             with ui.row().classes(
                 "w-full gap-6 items-start flex-wrap xl:flex-nowrap"
             ):
@@ -507,10 +528,10 @@ class InterfaceStructure:
                     ):
                         with ui.column().classes("gap-3 h-full w-full items-stretch"):
                             ui.markdown("#### Map Preview")
-                            map_canvas = ui.image()
+                            map_canvas = ui.html("", sanitize=False)
                             map_canvas.classes(
                                 "w-full h-full min-h-[480px] max-h-[800px] "
-                                "object-contain bg-slate-100 rounded-lg aspect-square"
+                                "bg-slate-100 rounded-lg aspect-square overflow-hidden"
                             )
 
                     with ui.card().classes(

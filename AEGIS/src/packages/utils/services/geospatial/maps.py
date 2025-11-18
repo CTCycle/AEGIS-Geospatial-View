@@ -153,12 +153,20 @@ class MapService:
         map_object = folium.Map(
             location=[center_lat, center_lon],
             zoom_start=17,
-            tiles=(tiles or self.tiles),
+            tiles=None,
             width=width_value,
             height=height_value,
             control_scale=True,
-            zoom_control=False,
+            zoom_control=True,
         )
+        base_tiles = tiles or self.tiles
+        folium.TileLayer(
+            base_tiles,
+            name="Base Map",
+            attr=self.attribution,
+            control=True,
+        ).add_to(map_object)
+        folium.LayerControl(position="topright", collapsed=False).add_to(map_object)
         map_object.fit_bounds(
             [[map_bbox[1], map_bbox[0]], [map_bbox[3], map_bbox[2]]]
         )
@@ -168,6 +176,7 @@ class MapService:
         except Exception as exc:  # noqa: BLE001
             raise MapRequestError("Unable to render map image.") from exc
         render_time_s = round(time.perf_counter() - start_ts, 3)
+        map_html = map_object.get_root().render()
         return {
             "image_bytes": image_bytes,
             "mime": "image/png",
@@ -175,9 +184,10 @@ class MapService:
             "crs": "EPSG:4326",
             "width": width_value,
             "height": height_value,
-            "tiles": tiles or self.tiles,
+            "tiles": base_tiles,
             "attribution": self.attribution,
             "map_size_m": map_size_value,
             "center": {"longitude": center_lon, "latitude": center_lat},
             "render_time_s": render_time_s,
+            "map_html": map_html,
         }
