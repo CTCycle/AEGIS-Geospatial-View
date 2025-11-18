@@ -18,6 +18,11 @@ from AEGIS.src.packages.utils.services.geospatial.gibs import (
     GIBSService,
     GIBSValidationError,
 )
+from AEGIS.src.packages.utils.services.geospatial.maps import (
+    MapRequestError,
+    MapService,
+    MapValidationError,
+)
 from AEGIS.src.packages.utils.services.geospatial.normatim import NormatimService
 from AEGIS.src.packages.utils.services.sanitization import LocationSanitizationService
 
@@ -26,6 +31,7 @@ router = APIRouter(prefix="/maps", tags=["search"])
 sanitization_service = LocationSanitizationService()
 normatim_service = NormatimService()
 gibs_service = GIBSService()
+map_service = MapService()
 
 type CoordinatePair = tuple[float, float]
 type EncodingStrategy = Callable[[bytes], str]
@@ -150,11 +156,13 @@ class MapSearchEndpoint:
         sanitization_service: LocationSanitizationService,
         normatim_service: NormatimService,
         gibs_service: GIBSService,
+        map_service: MapService,
     ) -> None:
         self.router = router
         self.sanitization_service = sanitization_service
         self.normatim_service = normatim_service
         self.gibs_service = gibs_service
+        self.map_service = map_service
         self.toolkit = MapSearchToolkit(
             gibs_service, default_layer=configurations.gibs.default_layer
         )
@@ -220,46 +228,34 @@ class MapSearchEndpoint:
             payload, response_payload
         )
         bbox = self.toolkit.harmonize_bbox_crs(
-            bbox_candidate, source_crs=bbox_source_crs, target_crs=payload.image_crs
+            bbox_candidate, source_crs=bbox_source_crs, target_crs="EPSG:4326"
         )
         if not bbox and not coordinate_pair:
-            raise GIBSValidationError(
+            raise MapValidationError(
                 "Provide coordinates or bbox for satellite imagery requests."
             )
         lon = coordinate_pair[0] if coordinate_pair else None
         lat = coordinate_pair[1] if coordinate_pair else None
-        imagery_date = self.toolkit.resolve_imagery_date(payload)
-        layer = self.toolkit.resolve_imagery_layer(payload)
-        layer_metadata = self.gibs_service.get_layer_metadata(layer)
-        imagery_crs = payload.image_crs
-        if layer_metadata and layer_metadata.projections:
-            if imagery_crs not in layer_metadata.projections:
-                raise GIBSValidationError(
-                    (f"Layer '{layer}' does not support projection {imagery_crs}.")
-                )
-        image_width = configurations.gibs.image_width
-        image_height = configurations.gibs.image_height
-        gibs_arguments = {
+        map_arguments = {
             "lon": lon,
             "lat": lat,
             "bbox": bbox,
-            "radius_m": payload.radius_m,
-            "date": imagery_date,
-            "layer": layer,
-            "width": image_width,
-            "height": image_height,
-            "crs": imagery_crs,
-            "format": payload.image_format,
+            "map_size_m": payload.map_size_m,
+            "width": payload.image_width or configurations.gibs.image_width,
+            "height": payload.image_height or configurations.gibs.image_height,
+            "tiles": None,
         }
-        gibs_response = await asyncio.to_thread(
-            self.gibs_service.fetch_image, **gibs_arguments
+        map_response = await asyncio.to_thread(
+            self.map_service.fetch_map_image, **map_arguments
         )
-        image_bytes = gibs_response.pop("image_bytes", b"")
+        image_bytes = map_response.pop("image_bytes", b"")
         encoder: EncodingStrategy = lambda data: base64.b64encode(data).decode("ascii")
         encoded_image = encoder(image_bytes)
-        gibs_response["image_base64"] = encoded_image
-        gibs_response["mime"] = gibs_response.get("mime", payload.image_format)
-        return gibs_response
+        map_response["image_base64"] = encoded_image
+        map_response["mime"] = map_response.get("mime", payload.image_format)
+        map_response["layer"] = self.toolkit.resolve_imagery_layer(payload)
+        map_response["date"] = self.toolkit.resolve_imagery_date(payload)
+        return map_response
 
     # -------------------------------------------------------------------------
     async def process_location_search(
@@ -270,12 +266,12 @@ class MapSearchEndpoint:
             satellite_payload = await self.fetch_satellite_imagery(
                 payload, search_payload
             )
-        except GIBSValidationError as exc:
+        except (GIBSValidationError, MapValidationError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
             ) from exc
-        except GIBSRequestError as exc:
+        except (GIBSRequestError, MapRequestError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(exc),
@@ -304,6 +300,7 @@ class MapSearchEndpoint:
         filters: list[str] = Body(default_factory=list),
         bbox: list[float] | None = Body(default=None),
         radius_m: float | None = Body(default=None),
+        map_size_m: float | None = Body(default=None),
         image_width: int | None = Body(default=None),
         image_height: int | None = Body(default=None),
         image_crs: str | None = Body(default=None),
@@ -329,6 +326,9 @@ class MapSearchEndpoint:
             payload_data["image_height"] = configurations.gibs.image_height
             if radius_m is not None:
                 payload_data["radius_m"] = radius_m
+            payload_data["map_size_m"] = configurations.maps.default_size_m
+            if map_size_m is not None:
+                payload_data["map_size_m"] = map_size_m
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:
@@ -371,5 +371,6 @@ endpoint = MapSearchEndpoint(
     sanitization_service=sanitization_service,
     normatim_service=normatim_service,
     gibs_service=gibs_service,
+    map_service=map_service,
 )
 endpoint.register_routes()
