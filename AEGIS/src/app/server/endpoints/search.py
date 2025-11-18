@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 from collections.abc import Callable
-from datetime import date, datetime, time
+from datetime import datetime, time
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -56,12 +56,10 @@ class MapSearchToolkit:
 
     # -------------------------------------------------------------------------
     def resolve_imagery_date(self, payload: LocationSearchRequest) -> str:
-        if payload.reference_date:
-            return payload.reference_date.isoformat()
         if payload.datetime:
             return payload.datetime.date().isoformat()
         raise GIBSValidationError(
-            "Provide reference_date or datetime to determine imagery date."
+            "Provide datetime to determine imagery date."
         )
 
     # -------------------------------------------------------------------------
@@ -235,7 +233,7 @@ class MapSearchEndpoint:
             "map_size_m": map_size_value,
             "width": configurations.gibs.image_width,
             "height": configurations.gibs.image_height,
-            "tiles": None,
+            "tiles": payload.map_tiles or configurations.maps.tiles,
         }
         map_response = await asyncio.to_thread(
             self.map_service.fetch_map_image, **map_arguments
@@ -279,7 +277,6 @@ class MapSearchEndpoint:
     async def search_by_location(
         self,
         datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
-        reference_date: date | str | None = Body(default=None),
         time_of_day: time | str | None = Body(default=None),
         timeline_year: int | None = Body(default=None),
         country: str | None = Body(default=None),
@@ -292,6 +289,7 @@ class MapSearchEndpoint:
         bbox: list[float] | None = Body(default=None),
         radius_m: float | None = Body(default=None),
         map_size_m: float | None = Body(default=None),
+        map_tiles: str | None = Body(default=None),
         image_width: int | None = Body(default=None),
         image_height: int | None = Body(default=None),
         image_crs: str | None = Body(default=None),
@@ -300,7 +298,6 @@ class MapSearchEndpoint:
         try:
             payload_data: dict[str, Any] = {
                 "datetime": datetime_value,
-                "reference_date": reference_date,
                 "time_of_day": time_of_day,
                 "timeline_year": timeline_year,
                 "country": country,
@@ -319,6 +316,7 @@ class MapSearchEndpoint:
             payload_data["map_size_m"] = configurations.maps.default_size_m
             if map_size_m is not None:
                 payload_data["map_size_m"] = map_size_m
+            payload_data["map_tiles"] = map_tiles or configurations.maps.tiles
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:

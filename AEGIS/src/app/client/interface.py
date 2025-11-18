@@ -279,26 +279,31 @@ class InterfaceController:
         event: Any,
         *,
         geospatial_filters: list[str],
+        map_tile_dropdown: Any,
         country_input: Any,
         city_input: Any,
         address_input: Any,
         use_coordinates_switch: Any,
         latitude_input: Any,
         longitude_input: Any,
-        date_input: Any,
         agentic_checkbox: Any,
         status_display: Any,
         map_canvas: Any,
     ) -> None:
+        reference_datetime = self.toolkit.get_datetime_default_value()
+        selected_map_tiles = self.settings_controller.resolve_map_tiles(
+            map_tile_dropdown.value
+        )
         result = await self.geo_search_controller.submit_location_search(
             geospatial_filters,
+            selected_map_tiles,
             country_input.value,
             city_input.value,
             address_input.value,
             use_coordinates_switch.value,
             latitude_input.value,
             longitude_input.value,
-            date_input.value,
+            reference_datetime,
             bool(agentic_checkbox.value),
         )
         message = result.get("message") or "Location search payload submitted."
@@ -345,6 +350,9 @@ class InterfaceStructure:
         cloud_models = selection["models"]
         selected_cloud_model = selection["model"]
         cloud_enabled = current_settings.use_cloud_services
+        map_tile_options, default_map_tiles = (
+            self.settings_controller.get_map_tile_options()
+        )
 
         ui.page_title("AEGIS Geographics")
         ui.add_head_html(f"<style>{INTERFACE_THEME_CSS}</style>")
@@ -455,25 +463,30 @@ class InterfaceStructure:
                                 ).classes("flex-1 min-w-[160px]")
                                 longitude_input.disable()
 
-                            date_input = ui.input(label="Reference Moment")
-                            date_input.props["type"] = "datetime-local"
-                            date_input.set_value(
-                                self.toolkit.get_datetime_default_value()
-                            )
-
                             geospatial_filter_options = [
                                 *GEOSPATIAL_LAYER_CHOICES,
                             ]
                             geospatial_selected_filters: list[str] = []
-                            geospatial_select = ui.select(
-                                geospatial_filter_options,
-                                label="Geospatial Filter",
-                                value=None,
-                            ).classes("w-full")
+                            with ui.row().classes("w-full gap-3 flex-wrap"):
+                                map_tile_dropdown = ui.select(
+                                    map_tile_options,
+                                    label="Base Map",
+                                    value=self.settings_controller.resolve_map_tiles(
+                                        current_settings.map_tiles
+                                    ),
+                                ).classes("flex-1 min-w-[200px]")
+                                geospatial_select = ui.select(
+                                    geospatial_filter_options,
+                                    label="Geospatial Layer",
+                                    value=None,
+                                ).classes("flex-1 min-w-[200px]")
                             geospatial_chip_container = (
                                 ui.row()
-                                .classes("w-full gap-2 flex-wrap")
-                                .style("min-height: 32px;")
+                                .classes(
+                                    "w-full gap-2 flex-wrap border border-primary/30 "
+                                    "rounded-md px-2 py-1 bg-slate-50/60"
+                                )
+                                .style("min-height: 36px;")
                             )
                             self.controller.refresh_geospatial_chips(
                                 chip_container=geospatial_chip_container,
@@ -592,13 +605,13 @@ class InterfaceStructure:
             partial(
                 self.controller.on_search_click,
                 geospatial_filters=geospatial_selected_filters,
+                map_tile_dropdown=map_tile_dropdown,
                 country_input=country_input,
                 city_input=city_input,
                 address_input=address_input,
                 use_coordinates_switch=use_coordinates_switch,
                 latitude_input=latitude_input,
                 longitude_input=longitude_input,
-                date_input=date_input,
                 agentic_checkbox=agentic_checkbox,
                 status_display=status_display,
                 map_canvas=map_canvas,

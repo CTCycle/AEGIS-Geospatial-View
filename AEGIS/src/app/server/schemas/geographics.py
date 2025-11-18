@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Callable
-from datetime import date, time
+from datetime import time
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -40,7 +40,6 @@ class Location(BaseModel):
 ###############################################################################
 class LocationSearchRequest(BaseModel):
     datetime: dt.datetime | None = Field(default=None)
-    reference_date: date | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(
         default=None, ge=configurations.geospatial.min_timeline_year
@@ -56,6 +55,7 @@ class LocationSearchRequest(BaseModel):
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
     map_size_m: float = Field(default=configurations.maps.default_size_m, gt=0)
+    map_tiles: str | None = Field(default=configurations.maps.tiles, max_length=200)
     image_width: int = Field(default=configurations.gibs.image_width, ge=512, le=2048)
     image_height: int = Field(default=configurations.gibs.image_height, ge=512, le=2048)
     image_crs: str = Field(default="EPSG:3857")
@@ -66,6 +66,7 @@ class LocationSearchRequest(BaseModel):
         "city",
         "address",
         "geospatial_filter",
+        "map_tiles",
         mode="before",
     )
     # -------------------------------------------------------------------------
@@ -139,6 +140,15 @@ class LocationSearchRequest(BaseModel):
         return str(value).lower()
 
     # -------------------------------------------------------------------------
+    @field_validator("map_tiles", mode="before")
+    @classmethod
+    def normalize_map_tiles(cls, value: str | None) -> str:
+        if value is None:
+            return configurations.maps.tiles
+        normalized = str(value).strip()
+        return normalized or configurations.maps.tiles
+
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_location(self) -> "LocationSearchRequest":
         location = Location(
@@ -156,10 +166,8 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError(
                     "Provide a country, city, or address when not using coordinates."
                 )
-        if not (self.reference_date or self.datetime):
-            raise ValueError(
-                "Provide reference_date or datetime to determine imagery date."
-            )
+        if not self.datetime:
+            raise ValueError("Provide datetime to determine imagery date.")
         if self.bbox is None and self.use_coordinates:
             if self.latitude is None or self.longitude is None:
                 raise ValueError(

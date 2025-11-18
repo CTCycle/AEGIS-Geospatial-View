@@ -69,6 +69,16 @@ GEOSPATIAL_LAYER_CHOICES = [
     "Weather Radar (NEXRAD)",
 ]
 
+COMMON_FOLIUM_MAPS = [
+    "OpenStreetMap",
+    "OpenTopoMap",   
+    "CartoDB Positron",
+    "CartoDB Dark_Matter",
+    "Esri WorldImagery",
+    "Esri NatGeoWorldMap",
+    "Esri OceanBasemap",
+]
+
 # [DATABASE TABLES]
 ###############################################################################
 GEONAMES_TABLE = "GEONAMES"

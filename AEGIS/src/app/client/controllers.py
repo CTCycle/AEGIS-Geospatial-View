@@ -14,6 +14,7 @@ from AEGIS.src.packages.constants import (
     CLOUD_MODEL_CHOICES,
     GEO_SEARCH_URL,
 )
+from AEGIS.src.packages.utils.services.geospatial.maps import get_map_tile_options
 from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
 
 configurations = configurations
@@ -28,6 +29,7 @@ class RuntimeSettings:
     agent_model: str
     temperature: float | None
     reasoning: bool
+    map_tiles: str
 
 
 ###############################################################################
@@ -55,6 +57,22 @@ class SettingsController:
         }
 
     # -------------------------------------------------------------------------
+    def get_map_tile_options(self) -> tuple[list[str], str]:
+        default_tiles = configurations.maps.tiles
+        options = get_map_tile_options(default_tiles)
+        return options, default_tiles
+
+    # -------------------------------------------------------------------------
+    def resolve_map_tiles(self, selection: str | None) -> str:
+        options, default_tiles = self.get_map_tile_options()
+        candidate = (selection or "").strip()
+        if candidate:
+            for choice in options:
+                if candidate.lower() == choice.lower():
+                    return choice
+        return default_tiles
+
+    # -------------------------------------------------------------------------
     def get_runtime_settings(self) -> RuntimeSettings:
         provider = self.runtime_config.get_llm_provider()
         selection = self.resolve_cloud_selection(
@@ -67,6 +85,7 @@ class SettingsController:
             agent_model=self.runtime_config.get_agent_model(),
             temperature=self.runtime_config.get_ollama_temperature(),
             reasoning=self.runtime_config.is_ollama_reasoning_enabled(),
+            map_tiles=configurations.maps.tiles,
         )
 
     # -------------------------------------------------------------------------
@@ -83,6 +102,7 @@ class SettingsController:
 
         temperature = self.runtime_config.set_ollama_temperature(settings.temperature)
         reasoning = self.runtime_config.set_ollama_reasoning(settings.reasoning)
+        map_tiles = self.resolve_map_tiles(settings.map_tiles)
         selection = self.resolve_cloud_selection(
             provider, self.runtime_config.get_cloud_model()
         )
@@ -93,6 +113,7 @@ class SettingsController:
             agent_model=agent_model,
             temperature=temperature,
             reasoning=reasoning,
+            map_tiles=map_tiles,
         )
 
 
@@ -157,6 +178,7 @@ class GeoSearchController:
     async def submit_location_search(
         self,
         geospatial_filters: list[str],
+        map_tiles: str | None,
         country: str | None,
         city: str | None,
         address: str | None,
@@ -168,6 +190,7 @@ class GeoSearchController:
     ) -> dict[str, Any | None]:
         cleaned_payload = sanitize_search_payload(
             geospatial_filters=geospatial_filters,
+            map_tiles=map_tiles,
             country=country,
             city=city,
             address=address,
