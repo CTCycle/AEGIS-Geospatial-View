@@ -164,6 +164,7 @@ class GeoSearchController:
         latitude: Any,
         longitude: Any,
         date: str | None,
+        agentic_enabled: bool,
     ) -> dict[str, Any | None]:
         cleaned_payload = sanitize_search_payload(
             geospatial_filters=geospatial_filters,
@@ -174,6 +175,7 @@ class GeoSearchController:
             latitude=latitude,
             longitude=longitude,
             date=date,
+            agentic_enabled=agentic_enabled,
         )
 
         url = f"{self.config.api.base_url}{GEO_SEARCH_URL}"
