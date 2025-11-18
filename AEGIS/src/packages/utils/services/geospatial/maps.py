@@ -13,10 +13,28 @@ from AEGIS.src.packages.constants import (
     MAX_LONGITUDE,
     MIN_GEO_LAT,
     MIN_LONGITUDE,
+    COMMON_FOLIUM_MAPS
 )
 
 type BBox = list[float]
-__all__ = ["MapServiceError", "MapValidationError", "MapRequestError", "MapService"]
+
+__all__ = [
+    "get_map_tile_options",
+    "COMMON_FOLIUM_MAPS",
+    "MapServiceError",
+    "MapValidationError",
+    "MapRequestError",
+    "MapService",
+]
+
+
+# ----------------------------------------------------------------------------- 
+def get_map_tile_options(default_tiles: str | None = None) -> list[str]:
+    default_value = (default_tiles or "").strip()
+    options = [value for value in COMMON_FOLIUM_MAPS if value.strip()]
+    if default_value and default_value not in options:
+        options.insert(0, default_value)
+    return options
 
 
 ###############################################################################
