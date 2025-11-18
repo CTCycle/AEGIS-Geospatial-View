@@ -62,6 +62,7 @@ def sanitize_search_payload(
     latitude: Any,
     longitude: Any,
     date: str | None,
+    agentic_enabled: bool,
 ) -> dict[str, Any]:
     # If coordinates mode is on, lat/lon must be present
     if use_coordinates and (latitude is None or longitude is None):
@@ -91,6 +92,7 @@ def sanitize_search_payload(
         "longitude": longitude if use_coordinates else None,
         "date": sanitize_field(date),
         "datetime": sanitize_field(date),
+        "agentic_enabled": bool(agentic_enabled),
     }
 
     return payload

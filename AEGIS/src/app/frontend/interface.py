@@ -257,6 +257,7 @@ class InterfaceController:
         latitude_input: Any,
         longitude_input: Any,
         date_input: Any,
+        agentic_checkbox: Any,
         status_display: Any,
         map_canvas: Any,
     ) -> None:
@@ -269,12 +270,29 @@ class InterfaceController:
             latitude_input.value,
             longitude_input.value,
             date_input.value,
+            bool(agentic_checkbox.value),
         )
         message = result.get("message") or "Location search payload submitted."
         self.toolkit.update_status_with_json(
             status_display, message, result.get("json")
         )
         self.toolkit.update_map_canvas(map_canvas, result.get("json"))
+
+    # -------------------------------------------------------------------------
+    def on_agent_prompt_toggle(
+        self,
+        event: Any,
+        *,
+        agent_prompt_accordion: Any,
+        agent_prompt_input: Any,
+    ) -> None:
+        is_enabled = bool(getattr(event, "value", event))
+        agent_prompt_accordion.set_value(is_enabled)
+        if is_enabled:
+            agent_prompt_input.enable()
+        else:
+            agent_prompt_input.value = ""
+            agent_prompt_input.disable()
 
 
 ###############################################################################
@@ -302,6 +320,61 @@ class InterfaceStructure:
         ui.page_title("AEGIS Geographics")
         ui.add_head_html(f"<style>{INTERFACE_THEME_CSS}</style>")
 
+        config_toolbar = ui.left_drawer(value=False, fixed=True).props(
+            "width=320 elevated overlay bordered"
+        )
+        with config_toolbar:
+            with ui.column().classes("gap-4 p-4"):
+                ui.label("Models Configuration").classes("aegis-card-title")
+                ui.label("Configuration").classes("aegis-subtitle")
+                use_cloud_services = ui.checkbox(
+                    "Use Cloud Services",
+                    value=cloud_enabled,
+                )
+                with ui.grid(columns=1).classes("w-full gap-5 lg:grid-cols-2"):
+                    with ui.column().classes("w-full gap-3"):
+                        ui.label("Cloud Configuration").classes("aegis-subtitle")
+                        llm_provider_dropdown = ui.select(
+                            CLOUD_PROVIDERS,
+                            label="Cloud Service",
+                            value=provider,
+                        ).classes("w-full")
+                        cloud_model_dropdown = ui.select(
+                            cloud_models,
+                            label="Cloud Model",
+                            value=selected_cloud_model or None,
+                        ).classes("w-full")
+                    with ui.column().classes("w-full gap-3"):
+                        ui.label("Ollama Configuration").classes("aegis-subtitle")
+                        agent_model_dropdown = ui.select(
+                            AGENT_MODEL_CHOICES,
+                            label="Parsing Model",
+                            value=current_settings.agent_model,
+                        ).classes("w-full")
+                        temperature_input = ui.number(
+                            label="Temperature",
+                            value=current_settings.temperature,
+                            min=0.0,
+                            max=5.0,
+                            step=0.1,
+                            ).classes("w-full")
+                        reasoning_checkbox = ui.checkbox(
+                            "Enable reasoning (think)",
+                            value=current_settings.reasoning,
+                        )
+            ui.button(
+                icon="chevron_left",
+                on_click=lambda _: config_toolbar.set_value(False),
+            ).props("flat color=primary").classes("self-start mt-auto mb-2 no-outline")
+
+        ui.element("div").classes(
+            "fixed left-0 top-40 z-40 bg-primary cursor-pointer "
+            "rounded-r-lg opacity-70 hover:opacity-100 transition-all duration-300"
+        ).style("width:16px; height:120px;").on(
+            "click",
+            lambda _: config_toolbar.set_value(True),
+        )
+
         with ui.column().classes(PAGE_CONTAINER_CLASSES):
             ui.markdown(
                 "### AEGIS Geographics\nVisualize geographic data overlays in real time"
@@ -315,9 +388,11 @@ class InterfaceStructure:
                         auth_button.props("size=sm")
 
             with ui.row().classes(
-                "w-full gap-6 items-stretch flex-wrap md:flex-nowrap"
+                "w-full gap-6 items-start flex-wrap xl:flex-nowrap"
             ):
-                with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 w-full md:w-1/2"):
+                with ui.card().classes(
+                    f"{CARD_BASE_CLASSES} flex-1 w-full min-w-[420px]"
+                ):
                     with ui.column().classes("gap-4 h-full"):
                         ui.markdown("### Location search")
 
@@ -347,13 +422,13 @@ class InterfaceStructure:
 
                             with ui.row().classes("w-full gap-3 flex-wrap"):
                                 latitude_input = ui.number(
-                                    label="Latitude (�)",
+                                    label="Latitude (?)",
                                     format="%.6f",
                                     step=0.000001,
                                 ).classes("flex-1 min-w-[160px]")
                                 latitude_input.disable()
                                 longitude_input = ui.number(
-                                    label="Longitude (�)",
+                                    label="Longitude (?)",
                                     format="%.6f",
                                     step=0.000001,
                                 ).classes("flex-1 min-w-[160px]")
@@ -387,94 +462,75 @@ class InterfaceStructure:
                             ui.separator().classes("w-full opacity-60")
 
                         ui.space()
-                        search_button = ui.button("Start search", on_click=None).props(
-                            "color=primary"
-                        )
-
-                with ui.card().classes(f"{CARD_BASE_CLASSES} flex-1 w-full md:w-1/2"):
-                    with ui.column().classes("gap-3 h-full"):
-                        ui.markdown("### Agentic Search")
-                        agentic_checkbox = ui.checkbox("Activate agentic assistant")
-                        llm_query_input = ui.textarea(
-                            label="Agent Prompt",
-                            placeholder="Describe the geographic insights you need",
+                        ui.separator().classes("w-full opacity-60")                        
+                        agentic_expansion = ui.expansion(
+                            "", value=False
                         ).classes("w-full")
-
-                        with ui.expansion("Models Configuration").classes("w-full"):
-                            ui.label("Configuration").classes("aegis-card-title")
-                            use_cloud_services = ui.checkbox(
-                                "Use Cloud Services",
-                                value=cloud_enabled,
-                            ).classes("pt-2")
-                            with ui.grid(columns=1).classes(
-                                "w-full gap-5 lg:grid-cols-2"
-                            ):
-                                with ui.column().classes("w-full gap-3"):
-                                    ui.label("Cloud Configuration").classes(
-                                        "aegis-subtitle"
+                        with agentic_expansion:
+                            with agentic_expansion.add_slot("header"):
+                                with ui.row().classes("items-center gap-2"):
+                                    agentic_checkbox = ui.checkbox(
+                                        "Activate agentic assistant",
+                                        value=False,
                                     )
-                                    llm_provider_dropdown = ui.select(
-                                        CLOUD_PROVIDERS,
-                                        label="Cloud Service",
-                                        value=provider,
-                                    ).classes("w-full")
-                                    cloud_model_dropdown = ui.select(
-                                        cloud_models,
-                                        label="Cloud Model",
-                                        value=selected_cloud_model or None,
-                                    ).classes("w-full")
-                                with ui.column().classes("w-full gap-3"):
-                                    ui.label("Ollama Configuration").classes(
-                                        "aegis-subtitle"
-                                    )
-                                    agent_model_dropdown = ui.select(
-                                        AGENT_MODEL_CHOICES,
-                                        label="Parsing Model",
-                                        value=current_settings.agent_model,
-                                    ).classes("w-full")
-                                    temperature_input = ui.number(
-                                        label="Temperature",
-                                        value=current_settings.temperature,
-                                        min=0.0,
-                                        max=5.0,
-                                        step=0.1,
-                                    ).classes("w-full")
-                                    reasoning_checkbox = ui.checkbox(
-                                        "Enable reasoning (think)",
-                                        value=current_settings.reasoning,
-                                    )
+                                    
+                            llm_query_input = ui.textarea(
+                                label="Agent Prompt",
+                                placeholder="Describe the geographic insights you need",
+                            ).classes("w-full")
+                            llm_query_input.disable()
+                        agentic_checkbox.on_value_change(
+                            lambda e: (
+                                (
+                                    agentic_expansion.set_value(True),
+                                    llm_query_input.enable(),
+                                )
+                                if bool(getattr(e, "value", False))
+                                else (
+                                    agentic_expansion.set_value(False),
+                                    llm_query_input.disable(),
+                                )
+                            )
+                        )
 
                         ui.space()
-                        agentic_button = ui.button(
-                            "Run agentic search", on_click=None
-                        ).props("color=secondary")
+                        search_button = ui.button(
+                            "Run search",
+                            on_click=None,
+                        ).props("color=primary size=lg").classes("w-full")
 
-            with ui.row().classes(
-                "w-full gap-4 items-stretch flex-wrap md:flex-nowrap"
-            ):
-                with ui.card().classes(
-                    f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"
+                with ui.column().classes(
+                    "flex-1 min-w-[360px] gap-4 w-full xl:w-1/2"
                 ):
-                    with ui.column().classes("gap-3 h-full w-full items-stretch"):
-                        ui.markdown("#### Map Preview")
-                        map_canvas = ui.image()
-                        map_canvas.classes(
-                            "w-full h-full min-h-[560px] max-h-[800px] "
-                            "object-contain bg-slate-100 rounded-lg aspect-square"
-                        )
-
-                with ui.card().classes(
-                    f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full md:w-1/2"
-                ):
-                    with ui.column().classes("gap-3 h-full w-full items-stretch"):
-                        ui.markdown("#### Endpoint Output")
-                        with ui.scroll_area().classes(
-                            "w-full h-full max-h-[360px] min-w-0 grow rounded-lg"
-                        ):
-                            status_display = ui.markdown("Waiting for response...")
-                            status_display.classes(
-                                "status-output w-full text-sm font-mono"
+                    with ui.card().classes(
+                        f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full"
+                    ):
+                        with ui.column().classes("gap-3 h-full w-full items-stretch"):
+                            ui.markdown("#### Map Preview")
+                            map_canvas = ui.image()
+                            map_canvas.classes(
+                                "w-full h-full min-h-[480px] max-h-[800px] "
+                                "object-contain bg-slate-100 rounded-lg aspect-square"
                             )
+
+                    with ui.card().classes(
+                        f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full"
+                    ):
+                        with ui.column().classes("gap-3 h-full w-full items-stretch"):
+                            output_accordion = ui.expansion(
+                                "Endpoint Output",
+                                value=False,
+                            ).classes("w-full")
+                            with output_accordion:
+                                with ui.scroll_area().classes(
+                                    "w-full h-full max-h-[360px] min-w-0 grow rounded-lg"
+                                ):
+                                    status_display = ui.markdown(
+                                        "Waiting for response..."
+                                    )
+                                    status_display.classes(
+                                        "status-output w-full text-sm font-mono"
+                                    )
 
         use_cloud_services.on_value_change(
             partial(
@@ -522,6 +578,7 @@ class InterfaceStructure:
                 latitude_input=latitude_input,
                 longitude_input=longitude_input,
                 date_input=date_input,
+                agentic_checkbox=agentic_checkbox,
                 status_display=status_display,
                 map_canvas=map_canvas,
             )
