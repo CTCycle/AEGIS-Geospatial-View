@@ -11,7 +11,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from AEGIS.src.app.backend.schemas.geographics import LocationSearchRequest
+from AEGIS.src.app.server.schemas.geographics import LocationSearchRequest
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.utils.services.geospatial.gibs import (
     GIBSRequestError,
@@ -45,10 +45,10 @@ class MapSearchToolkit:
         self.default_layer = default_layer
 
     # -------------------------------------------------------------------------
-    def select_primary_filter(self, filters: list[str]) -> str | None:
-        if not isinstance(filters, list):
+    def select_primary_layer(self, layers: list[str]) -> str | None:
+        if not isinstance(layers, list):
             return None
-        for value in filters:
+        for value in layers:
             normalized = str(value).strip()
             if normalized and normalized.lower() != "none":
                 return normalized
@@ -66,18 +66,8 @@ class MapSearchToolkit:
 
     # -------------------------------------------------------------------------
     def resolve_imagery_layer(self, payload: LocationSearchRequest) -> str:
-        layer_candidates = (
-            self.select_primary_filter(payload.filters),
-            payload.geospatial_filter,
-        )
-        for candidate in layer_candidates:
-            if candidate is None:
-                continue
-            normalized = str(candidate).strip()
-            if not normalized or normalized.lower() == "none":
-                continue
-            return normalized
-        return self.default_layer
+        selected_layer = self.select_primary_layer(payload.filters)
+        return selected_layer or self.default_layer
 
     # -------------------------------------------------------------------------
     def extract_coordinate_pair(
@@ -172,6 +162,7 @@ class MapSearchEndpoint:
         self, payload: LocationSearchRequest
     ) -> dict[str, object]:
         response_payload = payload.model_dump()
+        response_payload["layers"] = response_payload.pop("filters", [])
         if not payload.use_coordinates:
             sanitized_location = await asyncio.to_thread(
                 self.sanitization_service.sanitize_location_inputs,
@@ -236,13 +227,14 @@ class MapSearchEndpoint:
             )
         lon = coordinate_pair[0] if coordinate_pair else None
         lat = coordinate_pair[1] if coordinate_pair else None
+        map_size_value = payload.map_size_m or configurations.maps.default_size_m
         map_arguments = {
             "lon": lon,
             "lat": lat,
             "bbox": bbox,
-            "map_size_m": payload.map_size_m,
-            "width": payload.image_width or configurations.gibs.image_width,
-            "height": payload.image_height or configurations.gibs.image_height,
+            "map_size_m": map_size_value,
+            "width": configurations.gibs.image_width,
+            "height": configurations.gibs.image_height,
             "tiles": None,
         }
         map_response = await asyncio.to_thread(
@@ -296,8 +288,7 @@ class MapSearchEndpoint:
         use_coordinates: bool = Body(default=False),
         latitude: float | None = Body(default=None),
         longitude: float | None = Body(default=None),
-        geospatial_filter: str | None = Body(default=None),
-        filters: list[str] = Body(default_factory=list),
+        geospatial_layers: list[str] = Body(default_factory=list),
         bbox: list[float] | None = Body(default=None),
         radius_m: float | None = Body(default=None),
         map_size_m: float | None = Body(default=None),
@@ -318,8 +309,7 @@ class MapSearchEndpoint:
                 "use_coordinates": use_coordinates,
                 "latitude": latitude,
                 "longitude": longitude,
-                "geospatial_filter": geospatial_filter,
-                "filters": filters,
+                "filters": geospatial_layers,
                 "bbox": bbox,
             }
             payload_data["image_width"] = configurations.gibs.image_width

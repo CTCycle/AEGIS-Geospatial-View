@@ -4,8 +4,8 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from nicegui import ui
 
-from AEGIS.src.app.backend.endpoints.search import router as search_router
-from AEGIS.src.app.frontend.interface import create_interface
+from AEGIS.src.app.server.endpoints.search import router as search_router
+from AEGIS.src.app.client.interface import create_interface
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.database import database
@@ -17,9 +17,9 @@ if database.requires_sqlite_initialization():
     logger.info("AEGIS database has been initialized successfully.")
 
 app = FastAPI(
-    title=configurations.backend.title,
-    version=configurations.backend.version,
-    description=configurations.backend.description,
+    title=configurations.server.title,
+    version=configurations.server.version,
+    description=configurations.server.description,
 )
 
 app.include_router(search_router)
