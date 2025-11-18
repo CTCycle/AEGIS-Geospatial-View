@@ -27,6 +27,11 @@ GEO_AGENTIC_URL = "/maps/agentic"
 DEFAULT_AGENTIC_TEMPERATURE = 0.7
 MIN_AGENTIC_TEMPERATURE = 0.0
 MAX_AGENTIC_TEMPERATURE = 2.0
+NASA_ATTRIBUTION = (
+    "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), "
+    "operated by the NASA/GSFC Earth Science Data and Information System "
+    "(ESDIS) project."
+)
 
 # [CLIENT OPTIONS]
 ###############################################################################
