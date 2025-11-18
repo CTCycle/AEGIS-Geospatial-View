@@ -30,10 +30,6 @@ UI_RUNTIME = configurations.ui_runtime
 
 ###############################################################################
 class InterfaceToolkit:
-    def get_datetime_default_value(self) -> str:
-        current = datetime.now().replace(second=0, microsecond=0)
-        return current.isoformat(timespec="minutes")
-
     def update_status_with_json(
         self, status_display: Any, message: str, payload: Any
     ) -> None:
@@ -290,7 +286,9 @@ class InterfaceController:
         status_display: Any,
         map_canvas: Any,
     ) -> None:
-        reference_datetime = self.toolkit.get_datetime_default_value()
+        search_datetime = (
+            datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        ).isoformat()
         selected_map_tiles = self.settings_controller.resolve_map_tiles(
             map_tile_dropdown.value
         )
@@ -303,7 +301,7 @@ class InterfaceController:
             use_coordinates_switch.value,
             latitude_input.value,
             longitude_input.value,
-            reference_datetime,
+            search_datetime,
             bool(agentic_checkbox.value),
         )
         message = result.get("message") or "Location search payload submitted."
@@ -430,64 +428,80 @@ class InterfaceStructure:
                                 "Provide latitude and longitude"
                             ).props("color=primary")
 
-                            country_input = ui.input(
-                                label="Country or Region",
-                                placeholder="Enter a country or region",
-                            ).classes("w-full")
+                            with ui.row().classes(
+                                "w-full gap-4 flex-wrap xl:flex-nowrap"
+                            ):
+                                with ui.column().classes(
+                                    "flex-1 min-w-[240px] gap-3"
+                                ):
+                                    country_input = ui.input(
+                                        label="Country or Region",
+                                        placeholder="Enter a country or region",
+                                    ).classes("w-full").props("outlined")
 
-                            city_input = ui.input(
-                                label="City Name",
-                                placeholder="Enter a city or locale",
-                            ).classes("w-full")
+                                    city_input = ui.input(
+                                        label="City Name",
+                                        placeholder="Enter a city or locale",
+                                    ).classes("w-full").props("outlined")
 
-                            address_input = (
-                                ui.input(
-                                    label="Street Address",
-                                    placeholder="Enter the specific address",
+                                    address_input = (
+                                        ui.input(
+                                            label="Street Address",
+                                            placeholder="Enter the specific address",
+                                        )
+                                        .classes("w-full")
+                                        .props("outlined required")
+                                    )
+
+                                    with ui.row().classes("w-full gap-3 flex-wrap"):
+                                        latitude_input = ui.number(
+                                            label="Latitude (?)",
+                                            format="%.6f",
+                                            step=0.000001,
+                                        ).classes("flex-1 min-w-[160px]").props(
+                                            "outlined"
+                                        )
+                                        latitude_input.disable()
+                                        longitude_input = ui.number(
+                                            label="Longitude (?)",
+                                            format="%.6f",
+                                            step=0.000001,
+                                        ).classes("flex-1 min-w-[160px]").props(
+                                            "outlined"
+                                        )
+                                        longitude_input.disable()
+
+                                ui.separator().props("vertical").classes(
+                                    "hidden xl:block self-stretch mx-1 opacity-40"
                                 )
-                                .classes("w-full")
-                                .props("required")
-                            )
 
-                            with ui.row().classes("w-full gap-3 flex-wrap"):
-                                latitude_input = ui.number(
-                                    label="Latitude (?)",
-                                    format="%.6f",
-                                    step=0.000001,
-                                ).classes("flex-1 min-w-[160px]")
-                                latitude_input.disable()
-                                longitude_input = ui.number(
-                                    label="Longitude (?)",
-                                    format="%.6f",
-                                    step=0.000001,
-                                ).classes("flex-1 min-w-[160px]")
-                                longitude_input.disable()
-
-                            geospatial_filter_options = [
-                                *GEOSPATIAL_LAYER_CHOICES,
-                            ]
-                            geospatial_selected_filters: list[str] = []
-                            with ui.row().classes("w-full gap-3 flex-wrap"):
-                                map_tile_dropdown = ui.select(
-                                    map_tile_options,
-                                    label="Base Map",
-                                    value=self.settings_controller.resolve_map_tiles(
-                                        current_settings.map_tiles
-                                    ),
-                                ).classes("flex-1 min-w-[200px]")
-                                geospatial_select = ui.select(
-                                    geospatial_filter_options,
-                                    label="Geospatial Layer",
-                                    value=None,
-                                ).classes("flex-1 min-w-[200px]")
-                            geospatial_chip_container = (
-                                ui.row()
-                                .classes(
-                                    "w-full gap-2 flex-wrap border border-primary/30 "
-                                    "rounded-md px-2 py-1 bg-slate-50/60"
-                                )
-                                .style("min-height: 36px;")
-                            )
+                                with ui.column().classes(
+                                    "flex-1 min-w-[240px] gap-3"
+                                ):
+                                    geospatial_filter_options = [
+                                        *GEOSPATIAL_LAYER_CHOICES,
+                                    ]
+                                    geospatial_selected_filters: list[str] = []
+                                    map_tile_dropdown = ui.select(
+                                        map_tile_options,
+                                        label="Base Map",
+                                        value=self.settings_controller.resolve_map_tiles(
+                                            current_settings.map_tiles
+                                        ),
+                                    ).classes("w-full").props("outlined")
+                                    geospatial_select = ui.select(
+                                        geospatial_filter_options,
+                                        label="Geospatial Layer",
+                                        value=None,
+                                    ).classes("w-full").props("outlined")
+                                    geospatial_chip_container = (
+                                        ui.row()
+                                        .classes(
+                                            "w-full gap-2 flex-wrap border border-primary/30 "
+                                            "rounded-md px-2 py-1 bg-slate-50/60"
+                                        )
+                                        .style("min-height: 36px;")
+                                    )
                             self.controller.refresh_geospatial_chips(
                                 chip_container=geospatial_chip_container,
                                 selected_filters=geospatial_selected_filters,
@@ -547,24 +561,24 @@ class InterfaceStructure:
                                 "bg-slate-100 rounded-lg aspect-square overflow-hidden"
                             )
 
-                    with ui.card().classes(
-                        f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full"
-                    ):
-                        with ui.column().classes("gap-3 h-full w-full items-stretch"):
-                            output_accordion = ui.expansion(
-                                "Endpoint Output",
-                                value=False,
-                            ).classes("w-full")
-                            with output_accordion:
-                                with ui.scroll_area().classes(
-                                    "w-full h-full max-h-[360px] min-w-0 grow rounded-lg"
-                                ):
-                                    status_display = ui.markdown(
-                                        "Waiting for response..."
-                                    )
-                                    status_display.classes(
-                                        "status-output w-full text-sm font-mono"
-                                    )
+            with ui.card().classes(
+                f"{CARD_BASE_CLASSES} flex-1 min-w-0 w-full"
+            ):
+                with ui.column().classes("gap-3 h-full w-full items-stretch"):
+                    output_accordion = ui.expansion(
+                        "Endpoint Output",
+                        value=False,
+                    ).classes("w-full")
+                    with output_accordion:
+                        with ui.scroll_area().classes(
+                            "w-full h-full max-h-[360px] min-w-0 grow rounded-lg"
+                        ):
+                            status_display = ui.markdown(
+                                "Waiting for response..."
+                            )
+                            status_display.classes(
+                                "status-output w-full text-sm font-mono"
+                            )
 
         use_cloud_services.on_value_change(
             partial(

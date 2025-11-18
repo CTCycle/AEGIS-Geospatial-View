@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Final
 
 INTERFACE_THEME_CSS: Final = """
+        body {
+            background-color: #f2f8ff;
+        }
+
         .q-table__container {
             border-radius: 14px;
             border: 1px solid #e2e8f0;
