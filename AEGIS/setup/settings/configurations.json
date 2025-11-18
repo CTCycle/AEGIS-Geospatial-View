@@ -66,9 +66,8 @@
         "ows": "http://www.opengis.net/ows/1.1"
       },
       "layer_sync_user_agent": "AEGIS-GIBS-LayerSync/1.0",
-      "layer_sync_timeout": 30.0,
-      "nasa_attribution": "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), operated by the NASA/GSFC Earth Science Data and Information System (ESDIS) project.",
-      "wms_base_endpoints": {
+    "layer_sync_timeout": 30.0,
+    "wms_base_endpoints": {
         "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
         "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
       },

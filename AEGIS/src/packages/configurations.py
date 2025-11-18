@@ -13,6 +13,7 @@ from AEGIS.src.packages.constants import (
     GIBS_MIN_IMAGE_DIMENSION,
     MAX_AGENTIC_TEMPERATURE,
     MIN_AGENTIC_TEMPERATURE,
+    NASA_ATTRIBUTION,
 )
 from AEGIS.src.packages.types import (
     coerce_bool,
@@ -298,14 +299,7 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         max_cache_entries=coerce_int(payload.get("max_cache_entries"), 24, minimum=1),
         bbox_precision=coerce_int(payload.get("bbox_precision"), 6, minimum=0),
         wms_base_endpoints=normalized_endpoints,
-        nasa_attribution=coerce_str(
-            payload.get("nasa_attribution"),
-            (
-                "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), "
-                "operated by the NASA/GSFC Earth Science Data and Information System "
-                "(ESDIS) project."
-            ),
-        ),
+        nasa_attribution=NASA_ATTRIBUTION,
         retry_backoff_s=coerce_float(payload.get("retry_backoff_s"), 2.0, minimum=0.1),
         min_visual_radius_m=coerce_float(
             payload.get("min_visual_radius_m"),
