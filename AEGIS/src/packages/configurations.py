@@ -88,6 +88,14 @@ class GeospatialSettings:
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
+class MapSettings:
+    default_size_m: float
+    render_delay_s: float
+    tiles: str
+
+
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True)
 class GIBSSettings:
     user_agent: str
     timeout: float
@@ -128,6 +136,7 @@ class AppConfigurations:
     database: DatabaseSettings
     nominatim: NominatimSettings
     geospatial: GeospatialSettings
+    maps: MapSettings
     gibs: GIBSSettings
     client_runtime: ClientRuntimeDefaults
     ollama_host_default: str
@@ -229,6 +238,16 @@ def build_geospatial_settings(data: dict[str, Any]) -> GeospatialSettings:
         max_mercator_extent=coerce_float(
             payload.get("max_mercator_extent"), 20037508.3427892
         ),
+    )
+
+
+# -----------------------------------------------------------------------------
+def build_map_settings(data: dict[str, Any]) -> MapSettings:
+    payload = ensure_mapping(data)
+    return MapSettings(
+        default_size_m=coerce_float(payload.get("default_size_m"), 500.0, minimum=1.0),
+        render_delay_s=coerce_float(payload.get("render_delay_s"), 1.0, minimum=0.0),
+        tiles=coerce_str(payload.get("tiles"), "OpenStreetMap"),
     )
 
 
@@ -348,6 +367,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     db_payload = ensure_mapping(data.get("database"))
     nominatim_payload = ensure_mapping(data.get("nominatim"))
     geospatial_payload = ensure_mapping(data.get("geospatial"))
+    map_payload = ensure_mapping(data.get("maps"))
     gibs_payload = ensure_mapping(data.get("gibs"))
     client_payload = ensure_mapping(data.get("client_runtime_defaults"))
     ollama_host_default = coerce_str(
@@ -361,6 +381,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
     database_settings = build_database_settings(db_payload)
     nominatim_settings = build_nominatim_settings(nominatim_payload)
     geospatial_settings = build_geospatial_settings(geospatial_payload)
+    map_settings = build_map_settings(map_payload)
     gibs_settings = build_gibs_settings(gibs_payload)
     client_defaults = build_client_runtime_defaults(client_payload)
 
@@ -372,6 +393,7 @@ def get_configurations(config_path: str | None = None) -> AppConfigurations:
         database=database_settings,
         nominatim=nominatim_settings,
         geospatial=geospatial_settings,
+        maps=map_settings,
         gibs=gibs_settings,
         client_runtime=client_defaults,
         ollama_host_default=ollama_host_default,
@@ -561,6 +583,7 @@ __all__ = [
     "BackendSettings",
     "ClientRuntimeConfig",
     "ClientRuntimeDefaults",
+    "MapSettings",
     "GIBSSettings",
     "DatabaseSettings",
     "HTTPSettings",

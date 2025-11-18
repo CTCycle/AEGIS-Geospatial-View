@@ -43,6 +43,11 @@
     "min_lon": -180.0,
     "max_mercator_extent": 20037508.3427892
   },
+  "maps": {
+    "default_size_m": 500.0,
+    "render_delay_s": 1.0,
+    "tiles": "OpenStreetMap"
+  },
     "gibs": {
       "user_agent": "AEGIS-GIBS/1.0",
       "timeout": 20.0,
