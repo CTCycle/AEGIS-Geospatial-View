@@ -4,7 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
-from AEGIS.src.packages.constants import PROJECT_DIR
+from AEGIS.src.packages.constants import ENV_FILE_PATH
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.singleton import singleton
 
@@ -14,7 +14,7 @@ from AEGIS.src.packages.singleton import singleton
 @singleton
 class EnvironmentVariables:
     def __init__(self) -> None:
-        self.env_path = os.path.join(PROJECT_DIR, "setup", ".env")
+        self.env_path = ENV_FILE_PATH
         if os.path.exists(self.env_path):
             load_dotenv(dotenv_path=self.env_path, override=True)
         else:
