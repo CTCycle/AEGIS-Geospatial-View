@@ -20,6 +20,11 @@ from AEGIS.src.packages.utils.services.geospatial.gibs import (
     GIBSService,
     GIBSValidationError,
 )
+from AEGIS.src.packages.utils.services.geospatial.layers import (
+    LayerProviderError,
+    LayerProviderEntry,
+    LayerProviderService,
+)
 from AEGIS.src.packages.utils.services.geospatial.maps import (
     MapRequestError,
     MapService,
@@ -34,6 +39,9 @@ sanitization_service = LocationSanitizationService()
 normatim_service = NormatimService()
 gibs_service = GIBSService()
 map_service = MapService()
+layer_service = LayerProviderService(
+    metadata_provider=gibs_service.resolve_layer_meters_per_pixel
+)
 
 type CoordinatePair = tuple[float, float]
 __all__ = [
@@ -233,10 +241,12 @@ class MapRenderingService:
         toolkit: MapSearchToolkit,
         map_service: MapService,
         gibs_service: GIBSService,
+        layer_service: LayerProviderService,
     ) -> None:
         self.toolkit = toolkit
         self.map_service = map_service
         self.gibs_service = gibs_service
+        self.layer_service = layer_service
 
     # -------------------------------------------------------------------------
     async def build_satellite_payload(
@@ -272,7 +282,16 @@ class MapRenderingService:
         )
         if layer_payload:
             map_response["overlays"] = layer_payload
-        map_response["layer"] = self.toolkit.resolve_imagery_layer(payload)
+        primary_layer = self.toolkit.resolve_imagery_layer(payload)
+        try:
+            primary_entry = self.layer_service.resolve(primary_layer)
+            map_response["layer"] = primary_entry.name
+            map_response["layer_label"] = primary_entry.label
+            map_response["layer_resolution_m"] = primary_entry.resolution_m
+        except LayerProviderError:
+            map_response["layer"] = primary_layer
+            map_response["layer_label"] = primary_layer
+            map_response["layer_resolution_m"] = None
         map_response["date"] = self.toolkit.resolve_imagery_date(payload)
         return map_response
 
@@ -328,23 +347,51 @@ class MapRenderingService:
         overlays: list[dict[str, Any]] = []
         imagery_date = self.toolkit.resolve_imagery_date(payload)
         for layer_name in normalized_layers:
-            layer_payload = await asyncio.to_thread(
+            layer_entry = self.layer_service.resolve(layer_name)
+            layer_payload = await self._fetch_overlay_for_entry(
+                entry=layer_entry,
+                lon=lon,
+                lat=lat,
+                bbox=bbox,
+                payload=payload,
+                imagery_date=imagery_date,
+            )
+            layer_bytes = layer_payload.pop("image_bytes", b"")
+            layer_payload["image_base64"] = self.toolkit.encode_image(layer_bytes)
+            layer_payload["label"] = layer_entry.label
+            layer_payload["provider"] = layer_entry.provider
+            layer_payload["resolution_m"] = layer_entry.resolution_m
+            overlays.append(layer_payload)
+        return overlays
+
+    # -------------------------------------------------------------------------
+    async def _fetch_overlay_for_entry(
+        self,
+        *,
+        entry: LayerProviderEntry,
+        lon: float | None,
+        lat: float | None,
+        bbox: list[float] | None,
+        payload: LocationSearchRequest,
+        imagery_date: str,
+    ) -> dict[str, Any]:
+        if entry.provider == "gibs":
+            return await asyncio.to_thread(
                 self.gibs_service.fetch_image,
                 lon=lon,
                 lat=lat,
                 bbox=bbox,
                 radius_m=payload.radius_m,
                 date=imagery_date,
-                layer=layer_name,
+                layer=entry.name,
                 width=payload.image_width,
                 height=payload.image_height,
                 crs=payload.image_crs,
                 format=payload.image_format,
             )
-            layer_bytes = layer_payload.pop("image_bytes", b"")
-            layer_payload["image_base64"] = self.toolkit.encode_image(layer_bytes)
-            overlays.append(layer_payload)
-        return overlays
+        raise LayerProviderError(
+            f"No imagery service registered for provider '{entry.provider}'."
+        )
 
 
 ###############################################################################
@@ -423,7 +470,7 @@ class MapSearchEndpoint:
             satellite_payload = await self.renderer.build_satellite_payload(
                 payload, search_payload
             )
-        except (GIBSValidationError, MapValidationError) as exc:
+        except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
@@ -588,7 +635,7 @@ class MapLayerUpdateEndpoint:
             satellite_payload = await self.renderer.build_satellite_payload(
                 location_request, response_payload
             )
-        except (GIBSValidationError, MapValidationError) as exc:
+        except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(exc),
@@ -623,6 +670,7 @@ rendering_service = MapRenderingService(
     toolkit=toolkit,
     map_service=map_service,
     gibs_service=gibs_service,
+    layer_service=layer_service,
 )
 search_endpoint = MapSearchEndpoint(
     router=router,

@@ -21,7 +21,7 @@ from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
-    GEOSPATIAL_LAYER_CHOICES,
+    COMMON_GEOSPATIAL_LAYERS,
 )
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
@@ -114,6 +114,24 @@ class InterfaceToolkit:
         if not normalized or normalized.lower() == "none":
             return None
         return normalized
+
+    def show_map_spinner(self, map_canvas: Any) -> None:
+        if map_canvas is None:
+            return
+        spinner_html = (
+            "<div class=\"w-full h-full min-h-[320px] flex flex-col items-center "
+            "justify-center gap-3 text-primary\">"
+            "<div class=\"animate-spin rounded-full h-12 w-12 border-4 border-primary/20 "
+            "border-t-primary\"></div>"
+            "<p class=\"text-sm font-medium text-primary/80\">Rendering map...</p>"
+            "</div>"
+        )
+        map_canvas.set_content(spinner_html)
+
+    def hide_map_spinner(self, map_canvas: Any) -> None:
+        if map_canvas is None:
+            return
+        map_canvas.set_content("")
 
 
 ###############################################################################
@@ -218,8 +236,11 @@ class InterfaceController:
                 ui.label("No filters selected").classes("text-sm text-gray-500")
                 return
             for filter_value in selected_filters:
+                display_value = COMMON_GEOSPATIAL_LAYERS.get(
+                    filter_value, filter_value
+                )
                 ui.chip(
-                    filter_value,
+                    display_value,
                     on_click=partial(
                         self.on_remove_geospatial_filter,
                         filter_value=filter_value,
@@ -288,24 +309,29 @@ class InterfaceController:
         status_display: Any,
         map_canvas: Any,
     ) -> None:
+        self.toolkit.show_map_spinner(map_canvas)
         search_datetime = (
             datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         ).isoformat()
         selected_map_tiles = self.settings_controller.resolve_map_tiles(
             map_tile_dropdown.value
         )
-        result = await self.geo_search_controller.submit_location_search(
-            geospatial_filters,
-            selected_map_tiles,
-            country_input.value,
-            city_input.value,
-            address_input.value,
-            use_coordinates_switch.value,
-            latitude_input.value,
-            longitude_input.value,
-            search_datetime,
-            bool(agentic_checkbox.value),
-        )
+        try:
+            result = await self.geo_search_controller.submit_location_search(
+                geospatial_filters,
+                selected_map_tiles,
+                country_input.value,
+                city_input.value,
+                address_input.value,
+                use_coordinates_switch.value,
+                latitude_input.value,
+                longitude_input.value,
+                search_datetime,
+                bool(agentic_checkbox.value),
+            )
+        except Exception:
+            self.toolkit.hide_map_spinner(map_canvas)
+            raise
         message = result.get("message") or "Location search payload submitted."
         self.toolkit.update_status_with_json(
             status_display, message, result.get("json")
@@ -478,9 +504,9 @@ class InterfaceStructure:
                                 with ui.column().classes(
                                     "flex-1 min-w-[240px] gap-3"
                                 ):
-                                    geospatial_filter_options = [
-                                        *GEOSPATIAL_LAYER_CHOICES,
-                                    ]
+                                    geospatial_filter_options = dict(
+                                        COMMON_GEOSPATIAL_LAYERS
+                                    )
                                     geospatial_selected_filters: list[str] = []
                                     map_tile_dropdown = ui.select(
                                         map_tile_options,
@@ -542,11 +568,13 @@ class InterfaceStructure:
                         )
 
                         ui.space()
-                        with ui.button(on_click=None) as search_button:
-                            ui.icon("mdi-magnify").classes("text-base")
-                            ui.label("Search").classes("text-sm font-medium")
-                        search_button.props("color=primary size=md flat").classes(
-                            "self-start gap-1 items-center px-4 py-1.5"
+                        search_button = ui.button(
+                            "Search",
+                            icon="search",
+                            on_click=None,
+                        )
+                        search_button.props("color=primary size=md glossy unelevated").classes(
+                            "self-start gap-2 items-center px-5 py-2 text-white rounded-lg shadow-sm"
                         )
 
                 with ui.column().classes(
