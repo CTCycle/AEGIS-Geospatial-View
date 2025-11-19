@@ -348,9 +348,7 @@ class InterfaceStructure:
         cloud_models = selection["models"]
         selected_cloud_model = selection["model"]
         cloud_enabled = current_settings.use_cloud_services
-        map_tile_options, default_map_tiles = (
-            self.settings_controller.get_map_tile_options()
-        )
+        map_tile_options, _ = self.settings_controller.get_map_tile_options()
 
         ui.page_title("AEGIS Geographics")
         ui.add_head_html(f"<style>{INTERFACE_THEME_CSS}</style>")

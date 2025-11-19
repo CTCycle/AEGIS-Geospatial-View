@@ -57,7 +57,7 @@ class SettingsController:
         }
 
     # -------------------------------------------------------------------------
-    def get_map_tile_options(self) -> tuple[list[str], str]:
+    def get_map_tile_options(self) -> tuple[dict[str, str], str]:
         default_tiles = configurations.maps.tiles
         options = get_map_tile_options(default_tiles)
         return options, default_tiles
