@@ -8,12 +8,12 @@ import folium
 
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.constants import (
+    COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
     MAX_GEO_LAT,
     MAX_LONGITUDE,
     MIN_GEO_LAT,
     MIN_LONGITUDE,
-    COMMON_FOLIUM_MAPS
 )
 
 type BBox = list[float]
@@ -28,12 +28,14 @@ __all__ = [
 ]
 
 
-# ----------------------------------------------------------------------------- 
-def get_map_tile_options(default_tiles: str | None = None) -> list[str]:
+# -----------------------------------------------------------------------------
+def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
     default_value = (default_tiles or "").strip()
-    options = [value for value in COMMON_FOLIUM_MAPS if value.strip()]
+    options = {
+        name: label for name, label in COMMON_FOLIUM_MAPS.items() if name.strip()
+    }
     if default_value and default_value not in options:
-        options.insert(0, default_value)
+        options = {default_value: default_value, **options}
     return options
 
 

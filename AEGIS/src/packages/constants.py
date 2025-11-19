@@ -69,15 +69,20 @@ GEOSPATIAL_LAYER_CHOICES = [
     "Weather Radar (NEXRAD)",
 ]
 
-COMMON_FOLIUM_MAPS = [
-    "OpenStreetMap",
-    "OpenTopoMap",   
-    "CartoDB Positron",
-    "CartoDB Dark_Matter",
-    "Esri WorldImagery",
-    "Esri NatGeoWorldMap",
-    "Esri OceanBasemap",
-]
+COMMON_FOLIUM_MAPS = {
+    "OpenStreetMap": "Street Map",
+    "CartoDB Positron": "Cartographic Light",
+    "CartoDB Dark_Matter": "Cartographic Dark",
+    "Stamen Terrain": "Shaded Terrain",
+    "Stamen Toner": "High-Contrast Toner",
+    "Stamen Watercolor": "Watercolor Canvas",
+    "Esri WorldImagery": "Esri World Imagery",
+    "OpenTopoMap": "Topographic Relief",
+    "Thunderforest.Transport": "Transit Network",
+    "Jawg.Dark": "Jawg Dark",
+    "Esri NatGeoWorldMap": "National Geographic",
+    "Esri OceanBasemap": "Ocean Basemap",
+}
 
 # [DATABASE TABLES]
 ###############################################################################
