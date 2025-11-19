@@ -227,7 +227,9 @@ class InterfaceController:
                         chip_container=chip_container,
                         geospatial_select=geospatial_select,
                     ),
-                ).props("color=primary outline clickable")
+                ).props("color=primary outline clickable").classes(
+                    "text-xs px-2 py-0.5 h-7"
+                )
 
     # -------------------------------------------------------------------------
     def on_geospatial_filter_select(
@@ -540,13 +542,11 @@ class InterfaceStructure:
                         )
 
                         ui.space()
-                        search_button = (
-                            ui.button(
-                                "Search",
-                                on_click=None,
-                            )
-                            .props("color=primary size=md icon=mdi-magnify")
-                            .classes("self-start")
+                        with ui.button(on_click=None) as search_button:
+                            ui.icon("mdi-magnify").classes("text-base")
+                            ui.label("Search").classes("text-sm font-medium")
+                        search_button.props("color=primary size=md flat").classes(
+                            "self-start gap-1 items-center px-4 py-1.5"
                         )
 
                 with ui.column().classes(
