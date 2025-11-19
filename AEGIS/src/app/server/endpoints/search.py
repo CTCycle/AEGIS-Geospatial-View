@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import base64
 from datetime import datetime, time
+from io import BytesIO
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from PIL import Image
 from pydantic import ValidationError
 
 from AEGIS.src.app.server.schemas.geographics import (
@@ -44,6 +46,7 @@ layer_service = LayerProviderService(
 )
 
 type CoordinatePair = tuple[float, float]
+DEFAULT_OVERLAY_COLOR = "#2563eb"
 __all__ = [
     "router",
     "MapSearchToolkit",
@@ -260,28 +263,51 @@ class MapRenderingService:
         bbox_candidate, bbox_source_crs = self.toolkit.resolve_bbox_candidate(
             payload, response_payload
         )
-        map_bbox = self.toolkit.harmonize_bbox_crs(
-            bbox_candidate, source_crs=bbox_source_crs, target_crs="EPSG:4326"
-        )
-        imagery_bbox = self.toolkit.resolve_imagery_bbox(
-            bbox_candidate,
-            source_crs=bbox_source_crs,
-            target_crs=payload.image_crs,
+        map_bbox = self._derive_map_bbox(
+            bbox_candidate=bbox_candidate,
+            bbox_source_crs=bbox_source_crs,
             coordinates=coordinate_pair,
-            radius_m=payload.radius_m,
+            payload=payload,
+        )
+        if map_bbox is None:
+            raise MapValidationError(
+                "Unable to resolve map extent for the requested imagery."
+            )
+        (
+            span_x_m,
+            span_y_m,
+            meters_per_pixel,
+            pixels_per_meter,
+        ) = self._compute_map_metrics(map_bbox=map_bbox, payload=payload)
+        imagery_bbox = self.toolkit.harmonize_bbox_crs(
+            map_bbox,
+            source_crs="EPSG:4326",
+            target_crs=payload.image_crs,
+        )
+        if imagery_bbox is None:
+            raise GIBSValidationError(
+                "Unable to project map extent to requested imagery CRS."
+            )
+        overlays = await self._render_layer_overlays(
+            payload=payload,
+            map_bbox=map_bbox,
+            imagery_bbox=imagery_bbox,
+            span_x_m=span_x_m,
+            span_y_m=span_y_m,
+            pixels_per_meter=pixels_per_meter,
         )
         map_response = await self._render_base_map(
             payload=payload,
             coordinate_pair=coordinate_pair,
             bbox=map_bbox,
+            overlays=overlays,
         )
-        layer_payload = await self._render_layer_overlays(
-            payload=payload,
-            coordinate_pair=coordinate_pair,
-            bbox=imagery_bbox,
-        )
-        if layer_payload:
-            map_response["overlays"] = layer_payload
+        if overlays:
+            map_response["overlays"] = [
+                self._prepare_overlay_response(entry) for entry in overlays
+            ]
+        map_response["meters_per_pixel"] = meters_per_pixel
+        map_response["pixels_per_meter"] = pixels_per_meter
         primary_layer = self.toolkit.resolve_imagery_layer(payload)
         try:
             primary_entry = self.layer_service.resolve(primary_layer)
@@ -302,6 +328,7 @@ class MapRenderingService:
         payload: LocationSearchRequest,
         coordinate_pair: CoordinatePair | None,
         bbox: list[float] | None,
+        overlays: list[dict[str, Any]] | None,
     ) -> dict[str, Any]:
         if not bbox and not coordinate_pair:
             raise MapValidationError(
@@ -318,6 +345,7 @@ class MapRenderingService:
             "width": payload.image_width,
             "height": payload.image_height,
             "tiles": payload.map_tiles or configurations.maps.tiles,
+            "overlays": overlays,
         }
         map_response = await asyncio.to_thread(
             self.map_service.fetch_map_image, **map_arguments
@@ -332,36 +360,57 @@ class MapRenderingService:
         self,
         *,
         payload: LocationSearchRequest,
-        coordinate_pair: CoordinatePair | None,
-        bbox: list[float] | None,
+        map_bbox: list[float] | None,
+        imagery_bbox: list[float] | None,
+        span_x_m: float,
+        span_y_m: float,
+        pixels_per_meter: dict[str, float],
     ) -> list[dict[str, Any]]:
         normalized_layers = self.toolkit.normalize_layers(payload.filters)
         if not normalized_layers:
             return []
-        lon = coordinate_pair[0] if coordinate_pair else None
-        lat = coordinate_pair[1] if coordinate_pair else None
-        if bbox is None and (lon is None or lat is None):
+        if map_bbox is None or imagery_bbox is None:
             raise GIBSValidationError(
-                "Provide bbox or coordinates to render geospatial layers."
+                "Provide bbox to render geospatial overlay layers."
             )
         overlays: list[dict[str, Any]] = []
         imagery_date = self.toolkit.resolve_imagery_date(payload)
-        for layer_name in normalized_layers:
+        map_bounds = self._bbox_to_bounds(map_bbox)
+        for index, layer_name in enumerate(normalized_layers):
             layer_entry = self.layer_service.resolve(layer_name)
             layer_payload = await self._fetch_overlay_for_entry(
                 entry=layer_entry,
-                lon=lon,
-                lat=lat,
-                bbox=bbox,
+                lon=None,
+                lat=None,
+                bbox=imagery_bbox,
                 payload=payload,
                 imagery_date=imagery_date,
             )
-            layer_bytes = layer_payload.pop("image_bytes", b"")
-            layer_payload["image_base64"] = self.toolkit.encode_image(layer_bytes)
-            layer_payload["label"] = layer_entry.label
-            layer_payload["provider"] = layer_entry.provider
-            layer_payload["resolution_m"] = layer_entry.resolution_m
-            overlays.append(layer_payload)
+            if self._should_render_as_fill(
+                resolution_m=layer_entry.resolution_m,
+                span_x_m=span_x_m,
+                span_y_m=span_y_m,
+            ):
+                overlays.append(
+                    self._build_fill_overlay(
+                        entry=layer_entry,
+                        bounds=map_bounds,
+                        index=index,
+                        pixels_per_meter=pixels_per_meter,
+                        fill_color=self._derive_heatmap_color(
+                            layer_payload.get("image_bytes")
+                        ),
+                    )
+                )
+                continue
+            overlays.append(
+                self._build_image_overlay(
+                    entry=layer_entry,
+                    payload=layer_payload,
+                    fallback_bounds=map_bounds,
+                    index=index,
+                )
+            )
         return overlays
 
     # -------------------------------------------------------------------------
@@ -392,6 +441,222 @@ class MapRenderingService:
         raise LayerProviderError(
             f"No imagery service registered for provider '{entry.provider}'."
         )
+
+    # -------------------------------------------------------------------------
+    def _derive_map_bbox(
+        self,
+        *,
+        bbox_candidate: list[float] | None,
+        bbox_source_crs: str | None,
+        coordinates: CoordinatePair | None,
+        payload: LocationSearchRequest,
+    ) -> list[float] | None:
+        harmonized = self.toolkit.harmonize_bbox_crs(
+            bbox_candidate,
+            source_crs=bbox_source_crs,
+            target_crs="EPSG:4326",
+        )
+        if harmonized:
+            return harmonized
+        if coordinates is None:
+            return None
+        lon, lat = coordinates
+        map_size_value = payload.map_size_m or configurations.maps.default_size_m
+        return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
+
+    # -------------------------------------------------------------------------
+    def _compute_map_metrics(
+        self,
+        *,
+        map_bbox: list[float],
+        payload: LocationSearchRequest,
+    ) -> tuple[
+        float,
+        float,
+        dict[str, float],
+        dict[str, float],
+    ]:
+        span_x_m, span_y_m = self.gibs_service.bbox_span_in_meters(
+            map_bbox, "EPSG:4326"
+        )
+        meters_per_pixel = self.gibs_service.compute_meters_per_pixel(
+            map_bbox,
+            "EPSG:4326",
+            payload.image_width,
+            payload.image_height,
+        )
+        pixels_per_meter = self._compute_pixels_from_meters(meters_per_pixel)
+        return span_x_m, span_y_m, meters_per_pixel, pixels_per_meter
+
+    # -------------------------------------------------------------------------
+    def _compute_pixels_from_meters(
+        self, meters_per_pixel: dict[str, float] | None
+    ) -> dict[str, float]:
+        if not meters_per_pixel:
+            return {"x": 0.0, "y": 0.0}
+        metrics: dict[str, float] = {}
+        for axis in ("x", "y"):
+            value = float(meters_per_pixel.get(axis, 0.0))
+            metrics[axis] = 0.0 if value <= 0 else 1.0 / value
+        return metrics
+
+    # -------------------------------------------------------------------------
+    def _derive_heatmap_color(self, image_bytes: bytes | None) -> str:
+        if not image_bytes:
+            return DEFAULT_OVERLAY_COLOR
+        try:
+            with Image.open(BytesIO(image_bytes)) as image:
+                sample_size = (
+                    min(image.width, 64) or 1,
+                    min(image.height, 64) or 1,
+                )
+                sample = image.resize(sample_size).convert("RGBA")
+                data = sample.getdata()
+                total_r = total_g = total_b = count = 0
+                for red, green, blue, alpha in data:
+                    if alpha <= 5:
+                        continue
+                    total_r += red
+                    total_g += green
+                    total_b += blue
+                    count += 1
+                if count == 0:
+                    return DEFAULT_OVERLAY_COLOR
+                avg_r = int(total_r / count)
+                avg_g = int(total_g / count)
+                avg_b = int(total_b / count)
+                return f"#{avg_r:02x}{avg_g:02x}{avg_b:02x}"
+        except Exception:  # noqa: BLE001
+            return DEFAULT_OVERLAY_COLOR
+        return DEFAULT_OVERLAY_COLOR
+
+    # -------------------------------------------------------------------------
+    def _prepare_overlay_response(self, overlay: dict[str, Any]) -> dict[str, Any]:
+        response_payload = {
+            "name": overlay.get("name"),
+            "label": overlay.get("label"),
+            "provider": overlay.get("provider"),
+            "resolution_m": overlay.get("resolution_m"),
+            "mode": overlay.get("mode"),
+            "opacity": overlay.get("opacity"),
+            "bounds": overlay.get("bounds"),
+            "meters_per_pixel": overlay.get("meters_per_pixel"),
+            "pixels_per_meter": overlay.get("pixels_per_meter"),
+            "detail": overlay.get("detail"),
+            "wms_url": overlay.get("wms_url"),
+            "attribution": overlay.get("attribution"),
+            "mime": overlay.get("mime"),
+            "image_base64": overlay.get("image_base64"),
+        }
+        if overlay.get("mode") == "fill":
+            response_payload["fill_color"] = overlay.get("fill_color")
+        return response_payload
+
+    # -------------------------------------------------------------------------
+    def _build_image_overlay(
+        self,
+        *,
+        entry: LayerProviderEntry,
+        payload: dict[str, Any],
+        fallback_bounds: list[list[float]],
+        index: int,
+    ) -> dict[str, Any]:
+        image_bytes = payload.pop("image_bytes", b"")
+        encoded_image = self.toolkit.encode_image(image_bytes)
+        bounds = self._resolve_overlay_bounds(
+            payload.get("bbox"),
+            source_crs=payload.get("crs"),
+            fallback_bounds=fallback_bounds,
+        )
+        meters_per_pixel = payload.get("meters_per_pixel")
+        return {
+            "name": entry.name,
+            "label": entry.label,
+            "provider": entry.provider,
+            "resolution_m": entry.resolution_m,
+            "mode": "image",
+            "opacity": 0.68,
+            "bounds": bounds,
+            "image_bytes": image_bytes,
+            "image_base64": encoded_image,
+            "mime": payload.get("mime") or payload.get("format") or "image/png",
+            "meters_per_pixel": meters_per_pixel or {},
+            "pixels_per_meter": self._compute_pixels_from_meters(meters_per_pixel),
+            "wms_url": payload.get("wms_url"),
+            "attribution": payload.get("attribution"),
+            "detail": None,
+            "z_index": 200 + index,
+        }
+
+    # -------------------------------------------------------------------------
+    def _build_fill_overlay(
+        self,
+        *,
+        entry: LayerProviderEntry,
+        bounds: list[list[float]],
+        index: int,
+        pixels_per_meter: dict[str, float],
+        fill_color: str | None,
+    ) -> dict[str, Any]:
+        color_value = fill_color or DEFAULT_OVERLAY_COLOR
+        return {
+            "name": entry.name,
+            "label": entry.label,
+            "provider": entry.provider,
+            "resolution_m": entry.resolution_m,
+            "mode": "fill",
+            "fill_color": color_value,
+            "opacity": 0.4,
+            "bounds": bounds,
+            "image_bytes": b"",
+            "image_base64": "",
+            "mime": "image/png",
+            "meters_per_pixel": {},
+            "pixels_per_meter": pixels_per_meter,
+            "wms_url": None,
+            "attribution": entry.provider,
+            "detail": (
+                "Layer resolution is lower than the current map extent, "
+                "displaying a uniform overlay."
+            ),
+            "z_index": 200 + index,
+        }
+
+    # -------------------------------------------------------------------------
+    def _should_render_as_fill(
+        self, *, resolution_m: float | None, span_x_m: float, span_y_m: float
+    ) -> bool:
+        if resolution_m is None:
+            return False
+        if span_x_m <= 0 or span_y_m <= 0:
+            return True
+        min_pixels = min(span_x_m, span_y_m) / resolution_m
+        return min_pixels < 1.0
+
+    # -------------------------------------------------------------------------
+    def _resolve_overlay_bounds(
+        self,
+        bbox: list[float] | None,
+        *,
+        source_crs: str | None,
+        fallback_bounds: list[list[float]],
+    ) -> list[list[float]]:
+        if bbox is None:
+            return fallback_bounds
+        selected_crs = source_crs or "EPSG:4326"
+        target_bbox = self.toolkit.harmonize_bbox_crs(
+            bbox,
+            source_crs=selected_crs,
+            target_crs="EPSG:4326",
+        )
+        if target_bbox is None:
+            return fallback_bounds
+        return self._bbox_to_bounds(target_bbox)
+
+    # -------------------------------------------------------------------------
+    def _bbox_to_bounds(self, bbox: list[float]) -> list[list[float]]:
+        minx, miny, maxx, maxy = bbox
+        return [[miny, minx], [maxy, maxx]]
 
 
 ###############################################################################

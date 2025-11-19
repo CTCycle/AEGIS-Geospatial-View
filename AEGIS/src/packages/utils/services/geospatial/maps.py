@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import math
 import time
 from typing import Any
@@ -141,6 +142,7 @@ class MapService:
         width: int | None = None,
         height: int | None = None,
         tiles: str | None = None,
+        overlays: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         map_size_value = map_size_m or configurations.maps.default_size_m
         if bbox is not None:
@@ -186,6 +188,9 @@ class MapService:
             attr=self.attribution,
             control=True,
         ).add_to(map_object)
+        overlay_entries = overlays or []
+        for index, overlay in enumerate(overlay_entries):
+            self._add_overlay_layer(map_object, overlay, index)
         folium.LayerControl(position="topright", collapsed=False).add_to(map_object)
         map_object.fit_bounds(
             [[map_bbox[1], map_bbox[0]], [map_bbox[3], map_bbox[2]]]
@@ -211,3 +216,70 @@ class MapService:
             "render_time_s": render_time_s,
             "map_html": map_html,
         }
+
+    # -------------------------------------------------------------------------
+    def _add_overlay_layer(
+        self, map_object: folium.Map, overlay: dict[str, Any], index: int
+    ) -> None:
+        bounds = self._normalize_bounds(overlay.get("bounds"))
+        if bounds is None:
+            return
+        layer_name = (
+            str(overlay.get("label") or overlay.get("name") or f"Layer {index + 1}")
+        )
+        opacity = float(overlay.get("opacity", 0.65))
+        mode = str(overlay.get("mode") or "image").lower()
+        overlay_group = folium.FeatureGroup(name=layer_name, show=True)
+        if mode == "fill":
+            fill_color = str(overlay.get("fill_color") or "#2563eb")
+            folium.Rectangle(
+                bounds=bounds,
+                color=fill_color,
+                fill=True,
+                fill_color=fill_color,
+                fill_opacity=opacity,
+                weight=0,
+            ).add_to(overlay_group)
+        else:
+            source = self._resolve_overlay_source(overlay)
+            if source is None:
+                return
+            folium.raster_layers.ImageOverlay(
+                image=source,
+                bounds=bounds,
+                opacity=opacity,
+                name=layer_name,
+                interactive=False,
+                zindex=int(overlay.get("z_index", 200 + index)),
+            ).add_to(overlay_group)
+        overlay_group.add_to(map_object)
+
+    # -------------------------------------------------------------------------
+    def _resolve_overlay_source(self, overlay: dict[str, Any]) -> str | None:
+        source = overlay.get("image_url")
+        if isinstance(source, str):
+            stripped = source.strip()
+            if stripped:
+                return stripped
+        image_bytes = overlay.get("image_bytes")
+        if not image_bytes:
+            return None
+        mime = str(overlay.get("mime") or "image/png").strip()
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        return f"data:{mime};base64,{encoded}"
+
+    # -------------------------------------------------------------------------
+    def _normalize_bounds(self, bounds: Any) -> list[list[float]] | None:
+        if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
+            return None
+        normalized: list[list[float]] = []
+        for coordinate in bounds:
+            if not isinstance(coordinate, (list, tuple)) or len(coordinate) != 2:
+                return None
+            try:
+                lat = float(coordinate[0])
+                lon = float(coordinate[1])
+            except (TypeError, ValueError):
+                return None
+            normalized.append([lat, lon])
+        return normalized
