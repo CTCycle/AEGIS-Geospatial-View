@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from collections.abc import Callable
 from datetime import datetime, time
 from typing import Any
 
@@ -11,7 +10,10 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from AEGIS.src.app.server.schemas.geographics import LocationSearchRequest
+from AEGIS.src.app.server.schemas.geographics import (
+    LocationSearchRequest,
+    MapLayerUpdateRequest,
+)
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.utils.services.geospatial.gibs import (
     GIBSRequestError,
@@ -34,8 +36,13 @@ gibs_service = GIBSService()
 map_service = MapService()
 
 type CoordinatePair = tuple[float, float]
-type EncodingStrategy = Callable[[bytes], str]
-__all__ = ["router", "MapSearchToolkit", "MapSearchEndpoint"]
+__all__ = [
+    "router",
+    "MapSearchToolkit",
+    "MapRenderingService",
+    "MapSearchEndpoint",
+    "MapLayerUpdateEndpoint",
+]
 
 
 ###############################################################################
@@ -53,6 +60,55 @@ class MapSearchToolkit:
             if normalized and normalized.lower() != "none":
                 return normalized
         return None
+
+    # -------------------------------------------------------------------------
+    def normalize_layer_value(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized or normalized.lower() == "none":
+            return None
+        return normalized
+
+    # -------------------------------------------------------------------------
+    def normalize_layers(
+        self, layers: list[str] | tuple[str, ...] | None
+    ) -> list[str]:
+        if layers is None:
+            return []
+        normalized: list[str] = []
+        for candidate in layers:
+            layer_value = self.normalize_layer_value(candidate)
+            if layer_value is None or layer_value in normalized:
+                continue
+            normalized.append(layer_value)
+        return normalized
+
+    # -------------------------------------------------------------------------
+    def merge_layer_selections(
+        self,
+        base_layers: list[str],
+        *,
+        additions: list[str] | None = None,
+        removals: list[str] | None = None,
+        override_layers: list[str] | None = None,
+    ) -> list[str]:
+        if override_layers is not None:
+            return list(override_layers)
+        merged = list(base_layers)
+        for entry in self.normalize_layers(additions or []):
+            if entry not in merged:
+                merged.append(entry)
+        removal_values = {
+            value.lower() for value in self.normalize_layers(removals or [])
+        }
+        if removal_values:
+            merged = [
+                value
+                for value in merged
+                if value.lower() not in removal_values
+            ]
+        return merged
 
     # -------------------------------------------------------------------------
     def resolve_imagery_date(self, payload: LocationSearchRequest) -> str:
@@ -135,6 +191,161 @@ class MapSearchToolkit:
             )
         return self.gibs_service.reproject_bbox(bbox, target)
 
+    # -------------------------------------------------------------------------
+    def resolve_imagery_bbox(
+        self,
+        bbox: list[float] | None,
+        *,
+        source_crs: str | None,
+        target_crs: str,
+        coordinates: CoordinatePair | None,
+        radius_m: float,
+    ) -> list[float] | None:
+        normalized = self.harmonize_bbox_crs(
+            bbox,
+            source_crs=source_crs,
+            target_crs=target_crs,
+        )
+        if normalized:
+            return normalized
+        if coordinates is None:
+            return None
+        lon, lat = coordinates
+        return self.gibs_service.normalize_bbox(
+            bbox=None,
+            lon=lon,
+            lat=lat,
+            radius_m=radius_m,
+            target_crs=target_crs,
+        )
+
+    # -------------------------------------------------------------------------
+    def encode_image(self, data: bytes) -> str:
+        if not data:
+            return ""
+        return base64.b64encode(data).decode("ascii")
+
+
+###############################################################################
+class MapRenderingService:
+    def __init__(
+        self,
+        toolkit: MapSearchToolkit,
+        map_service: MapService,
+        gibs_service: GIBSService,
+    ) -> None:
+        self.toolkit = toolkit
+        self.map_service = map_service
+        self.gibs_service = gibs_service
+
+    # -------------------------------------------------------------------------
+    async def build_satellite_payload(
+        self,
+        payload: LocationSearchRequest,
+        response_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        coordinate_pair = self.toolkit.extract_coordinate_pair(
+            payload, response_payload
+        )
+        bbox_candidate, bbox_source_crs = self.toolkit.resolve_bbox_candidate(
+            payload, response_payload
+        )
+        map_bbox = self.toolkit.harmonize_bbox_crs(
+            bbox_candidate, source_crs=bbox_source_crs, target_crs="EPSG:4326"
+        )
+        imagery_bbox = self.toolkit.resolve_imagery_bbox(
+            bbox_candidate,
+            source_crs=bbox_source_crs,
+            target_crs=payload.image_crs,
+            coordinates=coordinate_pair,
+            radius_m=payload.radius_m,
+        )
+        map_response = await self._render_base_map(
+            payload=payload,
+            coordinate_pair=coordinate_pair,
+            bbox=map_bbox,
+        )
+        layer_payload = await self._render_layer_overlays(
+            payload=payload,
+            coordinate_pair=coordinate_pair,
+            bbox=imagery_bbox,
+        )
+        if layer_payload:
+            map_response["overlays"] = layer_payload
+        map_response["layer"] = self.toolkit.resolve_imagery_layer(payload)
+        map_response["date"] = self.toolkit.resolve_imagery_date(payload)
+        return map_response
+
+    # -------------------------------------------------------------------------
+    async def _render_base_map(
+        self,
+        *,
+        payload: LocationSearchRequest,
+        coordinate_pair: CoordinatePair | None,
+        bbox: list[float] | None,
+    ) -> dict[str, Any]:
+        if not bbox and not coordinate_pair:
+            raise MapValidationError(
+                "Provide coordinates or bbox for satellite imagery requests."
+            )
+        lon = coordinate_pair[0] if coordinate_pair else None
+        lat = coordinate_pair[1] if coordinate_pair else None
+        map_size_value = payload.map_size_m or configurations.maps.default_size_m
+        map_arguments = {
+            "lon": lon,
+            "lat": lat,
+            "bbox": bbox,
+            "map_size_m": map_size_value,
+            "width": payload.image_width,
+            "height": payload.image_height,
+            "tiles": payload.map_tiles or configurations.maps.tiles,
+        }
+        map_response = await asyncio.to_thread(
+            self.map_service.fetch_map_image, **map_arguments
+        )
+        image_bytes = map_response.pop("image_bytes", b"")
+        map_response["image_base64"] = self.toolkit.encode_image(image_bytes)
+        map_response["mime"] = map_response.get("mime", payload.image_format)
+        return map_response
+
+    # -------------------------------------------------------------------------
+    async def _render_layer_overlays(
+        self,
+        *,
+        payload: LocationSearchRequest,
+        coordinate_pair: CoordinatePair | None,
+        bbox: list[float] | None,
+    ) -> list[dict[str, Any]]:
+        normalized_layers = self.toolkit.normalize_layers(payload.filters)
+        if not normalized_layers:
+            return []
+        lon = coordinate_pair[0] if coordinate_pair else None
+        lat = coordinate_pair[1] if coordinate_pair else None
+        if bbox is None and (lon is None or lat is None):
+            raise GIBSValidationError(
+                "Provide bbox or coordinates to render geospatial layers."
+            )
+        overlays: list[dict[str, Any]] = []
+        imagery_date = self.toolkit.resolve_imagery_date(payload)
+        for layer_name in normalized_layers:
+            layer_payload = await asyncio.to_thread(
+                self.gibs_service.fetch_image,
+                lon=lon,
+                lat=lat,
+                bbox=bbox,
+                radius_m=payload.radius_m,
+                date=imagery_date,
+                layer=layer_name,
+                width=payload.image_width,
+                height=payload.image_height,
+                crs=payload.image_crs,
+                format=payload.image_format,
+            )
+            layer_bytes = layer_payload.pop("image_bytes", b"")
+            layer_payload["image_base64"] = self.toolkit.encode_image(layer_bytes)
+            overlays.append(layer_payload)
+        return overlays
+
 
 ###############################################################################
 class MapSearchEndpoint:
@@ -143,17 +354,14 @@ class MapSearchEndpoint:
         router: APIRouter,
         sanitization_service: LocationSanitizationService,
         normatim_service: NormatimService,
-        gibs_service: GIBSService,
-        map_service: MapService,
+        toolkit: MapSearchToolkit,
+        rendering_service: MapRenderingService,
     ) -> None:
         self.router = router
         self.sanitization_service = sanitization_service
         self.normatim_service = normatim_service
-        self.gibs_service = gibs_service
-        self.map_service = map_service
-        self.toolkit = MapSearchToolkit(
-            gibs_service, default_layer=configurations.gibs.default_layer
-        )
+        self.toolkit = toolkit
+        self.renderer = rendering_service
 
     # -------------------------------------------------------------------------
     async def get_location_coordinates(
@@ -207,53 +415,12 @@ class MapSearchEndpoint:
         return response_payload
 
     # -------------------------------------------------------------------------
-    async def fetch_satellite_imagery(
-        self, payload: LocationSearchRequest, response_payload: dict[str, Any]
-    ) -> dict[str, Any]:
-        coordinate_pair = self.toolkit.extract_coordinate_pair(
-            payload, response_payload
-        )
-        bbox_candidate, bbox_source_crs = self.toolkit.resolve_bbox_candidate(
-            payload, response_payload
-        )
-        bbox = self.toolkit.harmonize_bbox_crs(
-            bbox_candidate, source_crs=bbox_source_crs, target_crs="EPSG:4326"
-        )
-        if not bbox and not coordinate_pair:
-            raise MapValidationError(
-                "Provide coordinates or bbox for satellite imagery requests."
-            )
-        lon = coordinate_pair[0] if coordinate_pair else None
-        lat = coordinate_pair[1] if coordinate_pair else None
-        map_size_value = payload.map_size_m or configurations.maps.default_size_m
-        map_arguments = {
-            "lon": lon,
-            "lat": lat,
-            "bbox": bbox,
-            "map_size_m": map_size_value,
-            "width": configurations.gibs.image_width,
-            "height": configurations.gibs.image_height,
-            "tiles": payload.map_tiles or configurations.maps.tiles,
-        }
-        map_response = await asyncio.to_thread(
-            self.map_service.fetch_map_image, **map_arguments
-        )
-        image_bytes = map_response.pop("image_bytes", b"")
-        encoder: EncodingStrategy = lambda data: base64.b64encode(data).decode("ascii")
-        encoded_image = encoder(image_bytes)
-        map_response["image_base64"] = encoded_image
-        map_response["mime"] = map_response.get("mime", payload.image_format)
-        map_response["layer"] = self.toolkit.resolve_imagery_layer(payload)
-        map_response["date"] = self.toolkit.resolve_imagery_date(payload)
-        return map_response
-
-    # -------------------------------------------------------------------------
     async def process_location_search(
         self, payload: LocationSearchRequest
     ) -> dict[str, Any]:
         search_payload = await self.get_location_coordinates(payload)
         try:
-            satellite_payload = await self.fetch_satellite_imagery(
+            satellite_payload = await self.renderer.build_satellite_payload(
                 payload, search_payload
             )
         except (GIBSValidationError, MapValidationError) as exc:
@@ -332,33 +499,143 @@ class MapSearchEndpoint:
 
         response_payload = await self.process_location_search(payload)
         serialized_payload = await asyncio.to_thread(jsonable_encoder, response_payload)
-        return JSONResponse(content=serialized_payload)
+        return JSONResponse(content=serialized_payload)    
 
     # -------------------------------------------------------------------------
-    async def search_by_agent(self) -> dict[str, str]:
-        return {"message": "Agentic search endpoint is not implemented yet."}
-
-    # -------------------------------------------------------------------------
-    def register_routes(self) -> None:
+    def add_routes(self) -> None:
         self.router.add_api_route(
             "/search",
             self.search_by_location,
             methods=["POST"],
             status_code=status.HTTP_200_OK,
         )
-        self.router.add_api_route(
-            "/agentic",
-            self.search_by_agent,
-            methods=["POST"],
-            status_code=status.HTTP_202_ACCEPTED,
+
+
+###############################################################################
+class MapLayerUpdateEndpoint:
+    def __init__(
+        self,
+        router: APIRouter,
+        toolkit: MapSearchToolkit,
+        rendering_service: MapRenderingService,
+    ) -> None:
+        self.router = router
+        self.toolkit = toolkit
+        self.renderer = rendering_service
+
+    # -------------------------------------------------------------------------
+    def extract_location_fields(self, payload: dict[str, Any]) -> dict[str, Any]:
+        field_names = set(LocationSearchRequest.model_fields.keys())
+        extracted: dict[str, Any] = {}
+        for field in field_names:
+            if field == "filters":
+                continue
+            if field in payload:
+                extracted[field] = payload[field]
+        return extracted
+
+    # -------------------------------------------------------------------------
+    def prepare_update_context(
+        self, request: MapLayerUpdateRequest
+    ) -> tuple[LocationSearchRequest, dict[str, Any]]:
+        base_payload = dict(request.payload or {})
+        base_layers = base_payload.get("layers")
+        if base_layers is None:
+            base_layers = base_payload.get("filters", [])
+        normalized_base = self.toolkit.normalize_layers(base_layers)
+        override_layers = (
+            self.toolkit.normalize_layers(request.layers)
+            if request.layers is not None
+            else None
         )
+        additions = self.toolkit.normalize_layers(request.add_layers)
+        removals = self.toolkit.normalize_layers(request.remove_layers)
+        merged_layers = self.toolkit.merge_layer_selections(
+            normalized_base,
+            additions=additions,
+            removals=removals,
+            override_layers=override_layers,
+        )
+        payload_data = self.extract_location_fields(base_payload)
+        payload_data["filters"] = merged_layers
+        location_request = LocationSearchRequest.model_validate(payload_data)
+        sanitized_layers = list(location_request.filters)
+        response_payload = dict(base_payload)
+        response_payload["layers"] = sanitized_layers
+        response_payload.pop("filters", None)
+        response_payload.pop("satellite_imagery", None)
+        return location_request, response_payload
 
+    # -------------------------------------------------------------------------
+    async def apply_layer_update(
+        self, update_request: MapLayerUpdateRequest = Body(...)
+    ) -> JSONResponse:
+        try:
+            location_request, response_payload = self.prepare_update_context(
+                update_request
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=exc.errors(),
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        try:
+            satellite_payload = await self.renderer.build_satellite_payload(
+                location_request, response_payload
+            )
+        except (GIBSValidationError, MapValidationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        except (GIBSRequestError, MapRequestError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
+        response_payload["satellite_imagery"] = satellite_payload
+        content = {
+            "status_message": "Map layers updated.",
+            "payload": response_payload,
+        }
+        serialized_payload = await asyncio.to_thread(jsonable_encoder, content)
+        return JSONResponse(content=serialized_payload)
 
-endpoint = MapSearchEndpoint(
+    # -------------------------------------------------------------------------
+    def add_routes(self) -> None:
+        self.router.add_api_route(
+            "/update",
+            self.apply_layer_update,
+            methods=["POST"],
+            status_code=status.HTTP_200_OK,
+        )
+        
+toolkit = MapSearchToolkit(
+    gibs_service=gibs_service,
+    default_layer=configurations.gibs.default_layer,
+)
+rendering_service = MapRenderingService(
+    toolkit=toolkit,
+    map_service=map_service,
+    gibs_service=gibs_service,
+)
+search_endpoint = MapSearchEndpoint(
     router=router,
     sanitization_service=sanitization_service,
     normatim_service=normatim_service,
-    gibs_service=gibs_service,
-    map_service=map_service,
+    toolkit=toolkit,
+    rendering_service=rendering_service,
 )
-endpoint.register_routes()
+search_endpoint.add_routes()
+
+update_endpoint = MapLayerUpdateEndpoint(
+    router=router,
+    toolkit=toolkit,
+    rendering_service=rendering_service,
+)
+update_endpoint.add_routes()

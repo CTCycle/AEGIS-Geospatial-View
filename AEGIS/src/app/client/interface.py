@@ -540,10 +540,14 @@ class InterfaceStructure:
                         )
 
                         ui.space()
-                        search_button = ui.button(
-                            "Run search",
-                            on_click=None,
-                        ).props("color=primary size=lg").classes("w-full")
+                        search_button = (
+                            ui.button(
+                                "Search",
+                                on_click=None,
+                            )
+                            .props("color=primary size=md icon=mdi-magnify")
+                            .classes("self-start")
+                        )
 
                 with ui.column().classes(
                     "flex-1 min-w-[360px] gap-4 w-full xl:w-1/2"

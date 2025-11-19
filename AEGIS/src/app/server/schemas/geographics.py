@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Callable
 from datetime import time
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -196,3 +197,19 @@ class LocationSearchRequest(BaseModel):
                 ):
                     raise ValueError("Longitude values must be within [-180, 180].")
         return self
+
+
+###############################################################################
+class MapLayerUpdateRequest(BaseModel):
+    payload: dict[str, Any] = Field(default_factory=dict)
+    layers: list[str] | None = Field(default=None)
+    add_layers: list[str] = Field(default_factory=list)
+    remove_layers: list[str] = Field(default_factory=list)
+
+    # -------------------------------------------------------------------------
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(value, dict) or not value:
+            raise ValueError("payload must be a non-empty object.")
+        return value
