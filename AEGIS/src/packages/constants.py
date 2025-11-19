@@ -60,13 +60,18 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "gemini": GEMINI_CLOUD_MODELS,
 }
 
+COMMON_GEOSPATIAL_LAYERS = {
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color (VIIRS SNPP)",
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover (NLCD)",
+    "SRTM_Color_Index": "Digital Elevation Model (SRTM)",
+    "GPW_Population_Density_2020": "Population Density (GPW)",
+    "MODIS_Terra_L3_Land_Water_Mask": "Hydrology (HydroSHEDS)",
+    "IMERG_Precipitation_Rate": "Weather Radar (NEXRAD)",
+}
+
 GEOSPATIAL_LAYER_CHOICES = [
     "None",
-    "Land Cover (NLCD)",
-    "Digital Elevation Model (SRTM)",
-    "Population Density (GPW)",
-    "Hydrology (HydroSHEDS)",
-    "Weather Radar (NEXRAD)",
+    *COMMON_GEOSPATIAL_LAYERS.values(),
 ]
 
 COMMON_FOLIUM_MAPS = {
