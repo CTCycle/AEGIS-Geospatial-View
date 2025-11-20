@@ -19,7 +19,7 @@ from AEGIS.src.packages.utils.repository.schema import Base
 ###############################################################################
 class SQLiteRepository:
     def __init__(self, settings: DatabaseSettings) -> None:
-        filename = settings.database_name or "database.db"
+        filename = settings.database_name or "sqlite.db"
         if not filename.endswith(".db"):
             filename = f"{filename}.db"
         self.db_path: str | None = os.path.join(DATA_PATH, filename)
