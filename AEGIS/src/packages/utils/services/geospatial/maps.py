@@ -64,13 +64,13 @@ class MapService:
         attribution: str | None = None,
         default_delay_s: float | None = None,
     ) -> None:
-        config_tiles = (configurations.maps.tiles or "").strip()
+        config_tiles = (configurations.server.map.tiles or "").strip()
         self.tiles = (tiles or config_tiles or "OpenStreetMap").strip()
         self.attribution = (
             attribution or "(c) OpenStreetMap contributors, rendered by Folium"
         )
         if default_delay_s is None:
-            default_delay_s = configurations.maps.render_delay_s
+            default_delay_s = configurations.server.map.render_delay_s
         self.default_delay_s = max(float(default_delay_s), 0.0)
 
     # -------------------------------------------------------------------------
@@ -144,7 +144,7 @@ class MapService:
         tiles: str | None = None,
         overlays: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        map_size_value = map_size_m or configurations.maps.default_size_m
+        map_size_value = map_size_m or configurations.server.map.default_size_m
         if bbox is not None:
             map_bbox = self.normalize_bbox(bbox)
             map_size_value = map_size_m or self.estimate_bbox_span_m(map_bbox)
@@ -161,12 +161,12 @@ class MapService:
             width_value = (
                 int(width)
                 if width is not None
-                else int(configurations.gibs.image_width)
+                else int(configurations.server.gibs.image_width)
             )
             height_value = (
                 int(height)
                 if height is not None
-                else int(configurations.gibs.image_height)
+                else int(configurations.server.gibs.image_height)
             )
         except (TypeError, ValueError) as exc:
             raise MapValidationError("Image dimensions must be integers.") from exc

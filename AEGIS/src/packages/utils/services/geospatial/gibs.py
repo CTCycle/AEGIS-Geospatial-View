@@ -145,7 +145,7 @@ class GIBSService:
         bbox_precision: int | None = None,
         min_visual_radius_m: float | None = None,
     ) -> None:
-        settings = configurations.gibs
+        settings = configurations.server.gibs
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
         ttl_value = (
@@ -260,8 +260,8 @@ class GIBSService:
         radius_m: float | None,
         date: str,
         layer: str,
-        width: int = configurations.gibs.image_width,
-        height: int = configurations.gibs.image_height,
+        width: int = configurations.server.gibs.image_width,
+        height: int = configurations.server.gibs.image_height,
         crs: str = "EPSG:3857",
         format: str = "image/png",
         style: str | None = None,

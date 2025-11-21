@@ -8,11 +8,11 @@ from typing import Any
 
 from nicegui import ui
 
-from AEGIS.src.app.client.services import (
+from AEGIS.src.client.services import (
     GeoSearchEndpointService,
     SettingsService,
 )
-from AEGIS.src.app.client.layouts import (
+from AEGIS.src.client.layouts import (
     CARD_BASE_CLASSES,
     INTERFACE_THEME_CSS,
     PAGE_CONTAINER_CLASSES,
