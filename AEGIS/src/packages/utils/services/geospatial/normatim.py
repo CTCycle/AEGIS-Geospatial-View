@@ -14,18 +14,16 @@ from urllib.request import Request, urlopen
 from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 
-NOMINATIM = configurations.nominatim
-
 
 ###############################################################################
 class NormatimService:
-    base_url = NOMINATIM.base_url
+    base_url = configurations.server.nominatim.base_url
 
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
-        self.user_agent = user_agent or NOMINATIM.user_agent
-        default_timeout = NOMINATIM.timeout
+        self.user_agent = user_agent or configurations.server.nominatim.user_agent
+        default_timeout = configurations.server.nominatim.timeout
         self.timeout = timeout if timeout is not None else default_timeout
 
     # -----------------------------------------------------------------------------

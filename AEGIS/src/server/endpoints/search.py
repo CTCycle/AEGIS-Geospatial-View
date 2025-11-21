@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import ValidationError
 
-from AEGIS.src.app.server.schemas.geographics import (
+from AEGIS.src.server.schemas.geographics import (
     LocationSearchRequest,
     MapLayerUpdateRequest,
 )
@@ -336,7 +336,7 @@ class MapRenderingService:
             )
         lon = coordinate_pair[0] if coordinate_pair else None
         lat = coordinate_pair[1] if coordinate_pair else None
-        map_size_value = payload.map_size_m or configurations.maps.default_size_m
+        map_size_value = payload.map_size_m or configurations.server.map.default_size_m
         map_arguments = {
             "lon": lon,
             "lat": lat,
@@ -344,7 +344,7 @@ class MapRenderingService:
             "map_size_m": map_size_value,
             "width": payload.image_width,
             "height": payload.image_height,
-            "tiles": payload.map_tiles or configurations.maps.tiles,
+            "tiles": payload.map_tiles or configurations.server.map.tiles,
             "overlays": overlays,
         }
         map_response = await asyncio.to_thread(
@@ -461,7 +461,7 @@ class MapRenderingService:
         if coordinates is None:
             return None
         lon, lat = coordinates
-        map_size_value = payload.map_size_m or configurations.maps.default_size_m
+        map_size_value = payload.map_size_m or configurations.server.map.default_size_m
         return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
 
     # -------------------------------------------------------------------------
@@ -788,14 +788,14 @@ class MapSearchEndpoint:
                 "filters": geospatial_layers,
                 "bbox": bbox,
             }
-            payload_data["image_width"] = configurations.gibs.image_width
-            payload_data["image_height"] = configurations.gibs.image_height
+            payload_data["image_width"] = configurations.server.gibs.image_width
+            payload_data["image_height"] = configurations.server.gibs.image_height
             if radius_m is not None:
                 payload_data["radius_m"] = radius_m
-            payload_data["map_size_m"] = configurations.maps.default_size_m
+            payload_data["map_size_m"] = configurations.server.map.default_size_m
             if map_size_m is not None:
                 payload_data["map_size_m"] = map_size_m
-            payload_data["map_tiles"] = map_tiles or configurations.maps.tiles
+            payload_data["map_tiles"] = map_tiles or configurations.server.map.tiles
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:
@@ -929,7 +929,7 @@ class MapLayerUpdateEndpoint:
         
 toolkit = MapSearchToolkit(
     gibs_service=gibs_service,
-    default_layer=configurations.gibs.default_layer,
+    default_layer=configurations.server.gibs.default_layer,
 )
 rendering_service = MapRenderingService(
     toolkit=toolkit,

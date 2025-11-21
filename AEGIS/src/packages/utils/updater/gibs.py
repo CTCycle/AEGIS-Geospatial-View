@@ -60,7 +60,7 @@ class GIBSLayersUpdater:
         request_timeout: float | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
-        settings = configurations.gibs
+        settings = configurations.server.gibs
         self.endpoints = copy.deepcopy(endpoints or settings.capabilities_endpoints)
         self.ows_namespaces = copy.deepcopy(ows_namespaces or settings.ows_namespaces)
         self.user_agent = user_agent or settings.layer_sync_user_agent
