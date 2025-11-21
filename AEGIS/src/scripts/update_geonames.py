@@ -6,10 +6,6 @@ from AEGIS.src.packages.utils.updater import GeonamesUpdater
 
 ###############################################################################
 if __name__ == "__main__":
-    if database.requires_sqlite_initialization():
-        logger.info("Database not found, creating instance and making all tables")
-        database.initialize_database()
-
     logger.info("Starting sanitized geonames update process")
     updater = GeonamesUpdater()
     updater.update()

@@ -13,7 +13,6 @@ def sanitize_field(value: str | None) -> str | None:
     stripped = value.strip()
     return stripped or None
 
-
 # -----------------------------------------------------------------------------
 def sanitize_choice(value: Any) -> str | None:
     if value is None:
@@ -22,7 +21,6 @@ def sanitize_choice(value: Any) -> str | None:
     if normalized and normalized.lower() == "none":
         return None
     return normalized
-
 
 # -----------------------------------------------------------------------------
 def sanitize_choice_list(values: list[Any] | None) -> list[str]:
@@ -37,7 +35,6 @@ def sanitize_choice_list(values: list[Any] | None) -> list[str]:
             continue
         normalized_values.append(normalized)
     return normalized_values
-
 
 # -----------------------------------------------------------------------------
 def coerce_float(value: Any) -> float | None:

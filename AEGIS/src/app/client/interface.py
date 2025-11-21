@@ -8,9 +8,9 @@ from typing import Any
 
 from nicegui import ui
 
-from AEGIS.src.app.client.controllers import (
-    GeoSearchController,
-    SettingsController,
+from AEGIS.src.app.client.services import (
+    GeoSearchEndpointService,
+    SettingsService,
 )
 from AEGIS.src.app.client.layouts import (
     CARD_BASE_CLASSES,
@@ -25,11 +25,14 @@ from AEGIS.src.packages.constants import (
 )
 
 CLOUD_PROVIDERS: list[str] = [key for key in CLOUD_MODEL_CHOICES]
-UI_RUNTIME = configurations.ui_runtime
+ui_settings = configurations.client.ui
 
 
+# [TOOLKIT]
 ###############################################################################
 class InterfaceToolkit:
+
+    # -------------------------------------------------------------------------
     def update_status_with_json(
         self, status_display: Any, message: str, payload: Any
     ) -> None:
@@ -68,6 +71,7 @@ class InterfaceToolkit:
             return direct_source
         return None
 
+    # -------------------------------------------------------------------------
     def resolve_map_render_payload(self, response: Any) -> dict[str, str] | None:
         if not isinstance(response, dict):
             return None
@@ -85,6 +89,7 @@ class InterfaceToolkit:
             return {"mode": "img", "value": source}
         return None
 
+    # -------------------------------------------------------------------------
     def update_map_canvas(self, map_canvas: Any, response: Any) -> None:
         if map_canvas is None:
             return
@@ -107,6 +112,7 @@ class InterfaceToolkit:
             f'<img src="{image_source}" class="w-full h-full object-contain rounded-lg" />'
         )
 
+    # -------------------------------------------------------------------------
     def normalize_filter_candidate(self, value: Any) -> str | None:
         if value is None:
             return None
@@ -115,6 +121,7 @@ class InterfaceToolkit:
             return None
         return normalized
 
+    # -------------------------------------------------------------------------
     def show_map_spinner(self, map_canvas: Any) -> None:
         if map_canvas is None:
             return
@@ -128,24 +135,27 @@ class InterfaceToolkit:
         )
         map_canvas.set_content(spinner_html)
 
+    # -------------------------------------------------------------------------
     def hide_map_spinner(self, map_canvas: Any) -> None:
         if map_canvas is None:
             return
         map_canvas.set_content("")
 
 
+# [INTERFACE CONTROLLER]
 ###############################################################################
-class InterfaceController:
+class InterfaceService:
     def __init__(
         self,
-        settings_controller: SettingsController,
-        geo_search_controller: GeoSearchController,
+        settings_controller: SettingsService,
+        geo_search_controller: GeoSearchEndpointService,
         toolkit: InterfaceToolkit,
-    ):
+    ) -> None:
         self.settings_controller = settings_controller
         self.geo_search_controller = geo_search_controller
         self.toolkit = toolkit
 
+    # -------------------------------------------------------------------------
     async def handle_toggle_cloud_services(
         self,
         llm_provider_dropdown: Any,
@@ -178,6 +188,7 @@ class InterfaceController:
             temperature_input.enable()
             reasoning_checkbox.enable()
 
+    # -------------------------------------------------------------------------
     async def handle_cloud_provider_change(
         self,
         llm_provider_dropdown: Any,
@@ -194,6 +205,7 @@ class InterfaceController:
         cloud_model_dropdown.value = selection["model"]
         cloud_model_dropdown.update()
 
+    # -------------------------------------------------------------------------
     async def on_use_coordinates_change(
         self,
         event: Any,
@@ -293,6 +305,7 @@ class InterfaceController:
             geospatial_select=geospatial_select,
         )
 
+    # -------------------------------------------------------------------------
     async def on_search_click(
         self,
         event: Any,
@@ -355,19 +368,21 @@ class InterfaceController:
             agent_prompt_input.disable()
 
 
+# [INTERFACE STRUCTURE]
 ###############################################################################
 class InterfaceStructure:
     def __init__(
         self,
-        controller: InterfaceController,
-        settings_controller: SettingsController,
+        controller: InterfaceService,
+        settings_controller: SettingsService,
         toolkit: InterfaceToolkit,
-    ):
+    ) -> None:
         self.controller = controller
         self.settings_controller = settings_controller
         self.toolkit = toolkit
 
-    def main_page(self) -> None:
+    # -------------------------------------------------------------------------
+    def compose_main_page(self) -> None:
         current_settings = self.settings_controller.get_runtime_settings()
         selection = self.settings_controller.resolve_cloud_selection(
             current_settings.provider, current_settings.cloud_model
@@ -662,13 +677,18 @@ class InterfaceStructure:
             )
         )
 
+    # -------------------------------------------------------------------------
+    def mount_routes(self) -> None:
+        ui.page("/")(self.compose_main_page)
 
+
+# [INTERFACE CREATION AND LAUNCHING]
 ###############################################################################
-def create_interface() -> None:
+def create_interface() -> InterfaceStructure:    
+    settings_controller = SettingsService()
+    geo_search_controller = GeoSearchEndpointService()
     toolkit = InterfaceToolkit()
-    settings_controller = SettingsController()
-    geo_search_controller = GeoSearchController()
-    controller = InterfaceController(
+    controller = InterfaceService(
         settings_controller=settings_controller,
         geo_search_controller=geo_search_controller,
         toolkit=toolkit,
@@ -678,19 +698,20 @@ def create_interface() -> None:
         settings_controller=settings_controller,
         toolkit=toolkit,
     )
-    ui.page("/")(structure.main_page)
+    structure.mount_routes()
 
+    return structure
 
 # -----------------------------------------------------------------------------
 def launch_interface() -> None:
     create_interface()
     ui.run(
-        host=UI_RUNTIME.host,
-        port=UI_RUNTIME.port,
-        title=UI_RUNTIME.title,
-        show_welcome_message=UI_RUNTIME.show_welcome_message,
+        host=ui_settings.host,
+        port=ui_settings.port,
+        title=ui_settings.title,
+        show_welcome_message=ui_settings.show_welcome_message,
+        reconnect_timeout=ui_settings.reconnect_timeout,
     )
-
 
 # -----------------------------------------------------------------------------
 if __name__ in {"__main__", "__mp_main__"}:
