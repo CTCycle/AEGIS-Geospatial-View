@@ -6,8 +6,6 @@ import unicodedata
 from AEGIS.src.packages.constants import COUNTRY_NAME_TO_ISO2, COUNTRY_SYNONYMS
 
 
-
-
 ###############################################################################
 class LocationSanitizationService:
     COUNTRY_NAME_TO_ISO2 = COUNTRY_NAME_TO_ISO2

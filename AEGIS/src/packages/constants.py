@@ -6,32 +6,32 @@ from os.path import abspath, join
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../../.."))
 PROJECT_DIR = join(ROOT_DIR, "AEGIS")
-SETUP_PATH = join(PROJECT_DIR, "setup")
+SETTING_PATH = join(PROJECT_DIR, "setup", "settings")
 RSC_PATH = join(PROJECT_DIR, "resources")
-CONFIGURATION_PATH = join(SETUP_PATH, "configurations.json")
 MODELS_PATH = join(RSC_PATH, "models")
 DATA_PATH = join(RSC_PATH, "database")
 DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 LOGS_PATH = join(RSC_PATH, "logs")
-CONFIGURATION_FILE = join(SETUP_PATH, "configurations.json")
+CONFIGURATION_FILE = join(SETTING_PATH, "configurations.json")
+ENV_FILE_PATH = join(SETTING_PATH, ".env")
+DATABASE_FILENAME = "sqlite.db"
 
 # [ENDPOINS]
 ###############################################################################
 GEO_SEARCH_URL = "/maps/search"
 GEO_AGENTIC_URL = "/maps/agentic"
-DATABASE_FILENAME = "database.db"
-
 
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
-NASA_BASE_URL = "https://atcddd.fhi.no/atc_ddd_index/"
-DEFAULT_TIMELINE_BACKTRACK = 20
-SURROUNDING_RANGE = 10
-MIN_YEAR = 1900
 DEFAULT_AGENTIC_TEMPERATURE = 0.7
 MIN_AGENTIC_TEMPERATURE = 0.0
 MAX_AGENTIC_TEMPERATURE = 2.0
+NASA_ATTRIBUTION = (
+    "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), "
+    "operated by the NASA/GSFC Earth Science Data and Information System "
+    "(ESDIS) project."
+)
 
 # [CLIENT OPTIONS]
 ###############################################################################
@@ -60,14 +60,34 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "gemini": GEMINI_CLOUD_MODELS,
 }
 
+COMMON_GEOSPATIAL_LAYERS = {
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color (VIIRS SNPP)",
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover (NLCD)",
+    "SRTM_Color_Index": "Digital Elevation Model (SRTM)",
+    "GPW_Population_Density_2020": "Population Density (GPW)",
+    "MODIS_Terra_L3_Land_Water_Mask": "Hydrology (HydroSHEDS)",
+    "IMERG_Precipitation_Rate": "Weather Radar (NEXRAD)",
+}
+
 GEOSPATIAL_LAYER_CHOICES = [
     "None",
-    "Land Cover (NLCD)",
-    "Digital Elevation Model (SRTM)",
-    "Population Density (GPW)",
-    "Hydrology (HydroSHEDS)",
-    "Weather Radar (NEXRAD)",
+    *COMMON_GEOSPATIAL_LAYERS.values(),
 ]
+
+COMMON_FOLIUM_MAPS = {
+    "OpenStreetMap": "Street Map",
+    "CartoDB Positron": "Cartographic Light",
+    "CartoDB Dark_Matter": "Cartographic Dark",
+    "Stamen Terrain": "Shaded Terrain",
+    "Stamen Toner": "High-Contrast Toner",
+    "Stamen Watercolor": "Watercolor Canvas",
+    "Esri WorldImagery": "Esri World Imagery",
+    "OpenTopoMap": "Topographic Relief",
+    "Thunderforest.Transport": "Transit Network",
+    "Jawg.Dark": "Jawg Dark",
+    "Esri NatGeoWorldMap": "National Geographic",
+    "Esri OceanBasemap": "Ocean Basemap",
+}
 
 # [DATABASE TABLES]
 ###############################################################################

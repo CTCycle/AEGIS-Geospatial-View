@@ -18,6 +18,7 @@ from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
+    GIBS_LAYERS_TABLE,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
     MAX_GEO_LAT,
@@ -28,7 +29,6 @@ from AEGIS.src.packages.constants import (
     MIN_LONGITUDE,
     MIN_MERCATOR_LAT,
     ORIGIN_SHIFT,
-    GIBS_LAYERS_TABLE,
 )
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.database import database
@@ -145,7 +145,7 @@ class GIBSService:
         bbox_precision: int | None = None,
         min_visual_radius_m: float | None = None,
     ) -> None:
-        settings = configurations.gibs
+        settings = configurations.server.gibs
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
         ttl_value = (
@@ -260,8 +260,8 @@ class GIBSService:
         radius_m: float | None,
         date: str,
         layer: str,
-        width: int = configurations.gibs.image_width,
-        height: int = configurations.gibs.image_height,
+        width: int = configurations.server.gibs.image_width,
+        height: int = configurations.server.gibs.image_height,
         crs: str = "EPSG:3857",
         format: str = "image/png",
         style: str | None = None,
@@ -395,7 +395,9 @@ class GIBSService:
                 raise GIBSValidationError("BBox values must be finite numbers.")
         minx, miny, maxx, maxy = bbox
         if minx >= maxx or miny >= maxy:
-            raise GIBSValidationError("BBox min values must be smaller than max values.")
+            raise GIBSValidationError(
+                "BBox min values must be smaller than max values."
+            )
         if crs == "EPSG:3857":
             for value in bbox:
                 if abs(value) > MAX_WEB_MERCATOR:
@@ -469,7 +471,9 @@ class GIBSService:
         try:
             document = ElementTree.fromstring(payload)
         except ElementTree.ParseError as exc:
-            raise GIBSRequestError(f"Unable to parse GetCapabilities XML: {exc}") from exc
+            raise GIBSRequestError(
+                f"Unable to parse GetCapabilities XML: {exc}"
+            ) from exc
         namespace = self.detect_namespace(document)
         request_formats = self.extract_request_formats(document, namespace)
         layers = self.extract_layers(document, namespace)
@@ -579,7 +583,9 @@ class GIBSService:
         try:
             return capabilities.layers[name]
         except KeyError as exc:
-            raise GIBSValidationError(f"Layer '{name}' not found in capabilities.") from exc
+            raise GIBSValidationError(
+                f"Layer '{name}' not found in capabilities."
+            ) from exc
 
     # -------------------------------------------------------------------------
     def resolve_layer_crs(self, metadata: LayerMetadata, requested_crs: str) -> str:
@@ -622,7 +628,9 @@ class GIBSService:
     ) -> None:
         if not metadata.time_extent:
             return
-        expressions = [expr.strip() for expr in metadata.time_extent.split(",") if expr.strip()]
+        expressions = [
+            expr.strip() for expr in metadata.time_extent.split(",") if expr.strip()
+        ]
         min_supported: date | None = None
         max_supported: date | None = None
         for expression in expressions:
@@ -707,9 +715,7 @@ class GIBSService:
         return ",".join(f"{value:.{self.bbox_precision}f}" for value in values)
 
     # -------------------------------------------------------------------------
-    def execute_request(
-        self, url: str, timeout_s: int
-    ) -> tuple[bytes, str, str]:
+    def execute_request(self, url: str, timeout_s: int) -> tuple[bytes, str, str]:
         max_attempts = 3
         for attempt in range(max_attempts):
             request = Request(
@@ -721,7 +727,9 @@ class GIBSService:
             )
             try:
                 with urlopen(request, timeout=timeout_s) as response:
-                    content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0]
+                    content_type = (response.headers.get("Content-Type") or "").split(
+                        ";", 1
+                    )[0]
                     payload = response.read()
                     if not content_type.startswith("image/"):
                         message = payload.decode("utf-8", errors="ignore")
@@ -733,7 +741,9 @@ class GIBSService:
                             "GIBS GetMap returned a suspiciously small payload."
                         )
                     declared_length = self.extract_content_length(response.headers)
-                    self.ensure_payload_integrity(payload, content_type, declared_length)
+                    self.ensure_payload_integrity(
+                        payload, content_type, declared_length
+                    )
                     logger.info("Fetched GIBS image: url=%s size=%s", url, len(payload))
                     return payload, content_type, url
             except GIBSPayloadIntegrityError:
@@ -781,13 +791,15 @@ class GIBSService:
         if len(payload) < 12:
             return False
         png_signature = b"\x89PNG\r\n\x1a\n"
-        if payload.startswith(png_signature) and payload.endswith(b"\x00\x00\x00\x00IEND\xaeB`\x82"):
+        if payload.startswith(png_signature) and payload.endswith(
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        ):
             return True
         return not payload.startswith(png_signature)
 
     # -------------------------------------------------------------------------
     def compute_backoff_delay(self, attempt: int) -> float:
-        return self.retry_backoff_s * (2 ** attempt)
+        return self.retry_backoff_s * (2**attempt)
 
     # -------------------------------------------------------------------------
     def lonlat_to_mercator(self, lon: float, lat: float) -> tuple[float, float]:
@@ -800,9 +812,7 @@ class GIBSService:
         return x, y
 
     # -------------------------------------------------------------------------
-    def compute_geographic_bbox(
-        self, lon: float, lat: float, radius_m: float
-    ) -> BBox:
+    def compute_geographic_bbox(self, lon: float, lat: float, radius_m: float) -> BBox:
         clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lat_clamped = clamp(lat, MIN_GEO_LAT, MAX_GEO_LAT)
         lat_rad = math.radians(lat_clamped)
@@ -919,8 +929,10 @@ class GIBSService:
     def mercator_to_lonlat(self, x: float, y: float) -> tuple[float, float]:
         lon = (x / ORIGIN_SHIFT) * 180.0
         lat = (y / ORIGIN_SHIFT) * 180.0
-        lat = 180.0 / math.pi * (
-            2.0 * math.atan(math.exp(lat * math.pi / 180.0)) - math.pi / 2.0
+        lat = (
+            180.0
+            / math.pi
+            * (2.0 * math.atan(math.exp(lat * math.pi / 180.0)) - math.pi / 2.0)
         )
         return lon, lat
 

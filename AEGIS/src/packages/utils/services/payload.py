@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+
 # HELPERS
 ###############################################################################
 def sanitize_field(value: str | None) -> str | None:
@@ -11,7 +12,6 @@ def sanitize_field(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
-
 
 # -----------------------------------------------------------------------------
 def sanitize_choice(value: Any) -> str | None:
@@ -21,7 +21,6 @@ def sanitize_choice(value: Any) -> str | None:
     if normalized and normalized.lower() == "none":
         return None
     return normalized
-
 
 # -----------------------------------------------------------------------------
 def sanitize_choice_list(values: list[Any] | None) -> list[str]:
@@ -36,7 +35,6 @@ def sanitize_choice_list(values: list[Any] | None) -> list[str]:
             continue
         normalized_values.append(normalized)
     return normalized_values
-
 
 # -----------------------------------------------------------------------------
 def coerce_float(value: Any) -> float | None:
@@ -54,6 +52,7 @@ def coerce_float(value: Any) -> float | None:
 def sanitize_search_payload(
     *,
     geospatial_filters: list[Any],
+    map_tiles: str | None,
     country: str | None,
     city: str | None,
     address: str | None,
@@ -61,6 +60,7 @@ def sanitize_search_payload(
     latitude: Any,
     longitude: Any,
     date: str | None,
+    agentic_enabled: bool,
 ) -> dict[str, Any]:
     # If coordinates mode is on, lat/lon must be present
     if use_coordinates and (latitude is None or longitude is None):
@@ -78,10 +78,12 @@ def sanitize_search_payload(
 
     sanitized_filters = sanitize_choice_list(geospatial_filters)
     primary_filter = sanitized_filters[0] if sanitized_filters else None
+    selected_tiles = sanitize_choice(map_tiles)
 
     payload: dict[str, Any] = {
         "filters": sanitized_filters,
         "geospatial_filter": primary_filter,
+        "map_tiles": selected_tiles,
         "country": sanitize_field(country),
         "city": sanitize_field(city),
         "address": sanitize_field(address),
@@ -90,6 +92,7 @@ def sanitize_search_payload(
         "longitude": longitude if use_coordinates else None,
         "date": sanitize_field(date),
         "datetime": sanitize_field(date),
+        "agentic_enabled": bool(agentic_enabled),
     }
 
     return payload

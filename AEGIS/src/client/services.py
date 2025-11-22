@@ -1,25 +1,25 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
-from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
-
 from AEGIS.src.packages.configurations import (
+    AppConfigurations,
+    LLMRuntimeConfig,
     configurations,
-    ClientRuntimeConfig,
 )
 from AEGIS.src.packages.constants import (
     CLOUD_MODEL_CHOICES,
     GEO_SEARCH_URL,
 )
+from AEGIS.src.packages.utils.services.geospatial.maps import get_map_tile_options
+from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
 
-configurations = configurations
 
+# [RUNTIME SETTINGS DATACLASS]
 ###############################################################################
 @dataclass
 class RuntimeSettings:
@@ -29,13 +29,19 @@ class RuntimeSettings:
     agent_model: str
     temperature: float | None
     reasoning: bool
+    map_tiles: str
 
 
+# [SETTINGS]
 ###############################################################################
-class SettingsController:
-
-    def __init__(self, runtime_config: type[ClientRuntimeConfig] = ClientRuntimeConfig) -> None:
+class SettingsService:
+    def __init__(
+        self, 
+        runtime_config: type[LLMRuntimeConfig] = LLMRuntimeConfig,
+        app_config: AppConfigurations = configurations
+    ) -> None:
         self.runtime_config = runtime_config
+        self.app_config = app_config
 
     # -------------------------------------------------------------------------
     def resolve_cloud_selection(
@@ -55,18 +61,31 @@ class SettingsController:
         }
 
     # -------------------------------------------------------------------------
-    def get_runtime_settings(self) -> RuntimeSettings:
-        provider = self.runtime_config.get_llm_provider()
-        selection = self.resolve_cloud_selection(
-            provider, self.runtime_config.get_cloud_model()
-        )
+    def get_map_tile_options(self) -> tuple[dict[str, str], str]:
+        default_tiles = configurations.server.map.tiles
+        options = get_map_tile_options(default_tiles)
+        return options, default_tiles
+
+    # -------------------------------------------------------------------------
+    def resolve_map_tiles(self, selection: str | None) -> str:
+        options, default_tiles = self.get_map_tile_options()
+        candidate = (selection or "").strip()
+        if candidate:
+            for choice in options:
+                if candidate.lower() == choice.lower():
+                    return choice
+        return default_tiles
+
+    # -------------------------------------------------------------------------    
+    def get_runtime_settings(self) -> RuntimeSettings:        
         return RuntimeSettings(
             use_cloud_services=self.runtime_config.is_cloud_enabled(),
-            provider=selection["provider"],
-            cloud_model=selection["model"],
-            agent_model=self.runtime_config.get_agent_model(),
+            provider=self.runtime_config.get_llm_provider(),
+            cloud_model=self.runtime_config.get_cloud_model(),
+            agent_model=self.runtime_config.get_agent_model(),            
             temperature=self.runtime_config.get_ollama_temperature(),
             reasoning=self.runtime_config.is_ollama_reasoning_enabled(),
+            map_tiles=configurations.server.map.tiles,
         )
 
     # -------------------------------------------------------------------------
@@ -79,27 +98,26 @@ class SettingsController:
         self.runtime_config.set_use_cloud_services(settings.use_cloud_services)
         provider = self.runtime_config.set_llm_provider(settings.provider)
         self.runtime_config.set_cloud_model(settings.cloud_model)
-        agent_model = self.runtime_config.set_agent_model(settings.agent_model)
-
+        agent_model = self.runtime_config.set_agent_model(settings.agent_model)        
         temperature = self.runtime_config.set_ollama_temperature(settings.temperature)
         reasoning = self.runtime_config.set_ollama_reasoning(settings.reasoning)
-        selection = self.resolve_cloud_selection(
-            provider, self.runtime_config.get_cloud_model()
-        )
+        map_tiles = self.resolve_map_tiles(settings.map_tiles)
+        
         return RuntimeSettings(
             use_cloud_services=self.runtime_config.is_cloud_enabled(),
-            provider=selection["provider"],
-            cloud_model=selection["model"],
+            provider=provider,
+            cloud_model=self.runtime_config.get_cloud_model(),
             agent_model=agent_model,
             temperature=temperature,
             reasoning=reasoning,
+            map_tiles=map_tiles,
         )
 
 
+# [GEOSEARCH CONTROLLER]
 ###############################################################################
-class GeoSearchController:
-    
-    def __init__(self, config: Any = configurations) -> None:
+class GeoSearchEndpointService:
+    def __init__(self, config: AppConfigurations = configurations) -> None:
         self.config = config
 
     # -------------------------------------------------------------------------
@@ -107,14 +125,17 @@ class GeoSearchController:
         self, url: str, payload: dict[str, Any] | None = None
     ) -> tuple[dict[str, Any] | None, str]:
         try:
-            async with httpx.AsyncClient(timeout=self.config.http.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.config.client.ui.http_timeout) as client:
                 response = await client.post(url, json=payload)
             response.raise_for_status()
         except httpx.RequestError as exc:
             return None, f"[ERROR] Unable to reach map service: {exc}"
         except httpx.HTTPStatusError as exc:
             detail = self.extract_error_detail(exc.response)
-            return None, f"[ERROR] Map service error {exc.response.status_code}: {detail}"
+            return (
+                None,
+                f"[ERROR] Map service error {exc.response.status_code}: {detail}",
+            )
 
         try:
             data = response.json()
@@ -125,7 +146,9 @@ class GeoSearchController:
             return None, "[ERROR] Map service returned an unexpected payload."
 
         status_message = self.extract_status_message(data)
-        formatted_status = f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
+        formatted_status = (
+            f"Endpoint: {GEO_SEARCH_URL}\nStatus: {status_message.strip()}"
+        )
         return data, formatted_status
 
     # -------------------------------------------------------------------------
@@ -153,6 +176,7 @@ class GeoSearchController:
     async def submit_location_search(
         self,
         geospatial_filters: list[str],
+        map_tiles: str | None,
         country: str | None,
         city: str | None,
         address: str | None,
@@ -160,9 +184,11 @@ class GeoSearchController:
         latitude: Any,
         longitude: Any,
         date: str | None,
+        agentic_enabled: bool,
     ) -> dict[str, Any | None]:
         cleaned_payload = sanitize_search_payload(
             geospatial_filters=geospatial_filters,
+            map_tiles=map_tiles,
             country=country,
             city=city,
             address=address,
@@ -170,9 +196,10 @@ class GeoSearchController:
             latitude=latitude,
             longitude=longitude,
             date=date,
+            agentic_enabled=agentic_enabled,
         )
 
-        url = f"{self.config.api.base_url}{GEO_SEARCH_URL}"
+        url = f"{self.config.client.ui.api_base_url}{GEO_SEARCH_URL}"
         data, message = await self.trigger_search_maps(url, cleaned_payload)
         normalized_message = (message or "").strip()
         return {"json": data, "message": normalized_message or None}

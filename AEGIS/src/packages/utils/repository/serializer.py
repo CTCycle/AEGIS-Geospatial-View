@@ -6,9 +6,10 @@ import pandas as pd
 
 from AEGIS.src.packages.constants import (
     GEONAMES_COLUMNS,
-    GIBS_LAYER_COLUMNS,    
+    GIBS_LAYER_COLUMNS,
 )
 from AEGIS.src.packages.utils.repository.database import database
+
 
 ###############################################################################
 class DataSerializer:
