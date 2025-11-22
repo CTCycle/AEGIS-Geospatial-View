@@ -9,11 +9,11 @@ from collections.abc import Iterator
 from typing import Any
 
 from AEGIS.src.packages.constants import SOURCES_PATH
-from AEGIS.src.packages.utils.repository.serializer import (
-    DataSerializer,
-    GEONAMES_COLUMNS,
-)
 from AEGIS.src.packages.logger import logger
+from AEGIS.src.packages.utils.repository.serializer import (
+    GEONAMES_COLUMNS,
+    DataSerializer,
+)
 
 GEONAMES_BASE_URL = "https://download.geonames.org/export/dump"
 DEFAULT_DATASET = "allCountries.zip"

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Callable
-from datetime import date, time
+from datetime import time
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -40,10 +41,9 @@ class Location(BaseModel):
 ###############################################################################
 class LocationSearchRequest(BaseModel):
     datetime: dt.datetime | None = Field(default=None)
-    reference_date: date | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(
-        default=None, ge=configurations.geospatial.min_timeline_year
+        default=None, ge=configurations.server.geospatial.min_timeline_year
     )
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
@@ -55,12 +55,10 @@ class LocationSearchRequest(BaseModel):
     geospatial_filter: str | None = Field(default=None, max_length=200)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
-    image_width: int = Field(
-        default=configurations.gibs.image_width, ge=512, le=2048
-    )
-    image_height: int = Field(
-        default=configurations.gibs.image_height, ge=512, le=2048
-    )
+    map_size_m: float = Field(default=configurations.server.map.default_size_m, gt=0)
+    map_tiles: str | None = Field(default=configurations.server.map.tiles, max_length=200)
+    image_width: int = Field(default=configurations.server.gibs.image_width, ge=512, le=2048)
+    image_height: int = Field(default=configurations.server.gibs.image_height, ge=512, le=2048)
     image_crs: str = Field(default="EPSG:3857")
     image_format: str = Field(default="image/png")
 
@@ -69,9 +67,9 @@ class LocationSearchRequest(BaseModel):
         "city",
         "address",
         "geospatial_filter",
+        "map_tiles",
         mode="before",
     )
-
     # -------------------------------------------------------------------------
     @classmethod
     def strip_location_text(cls, value: str | None) -> str | None:
@@ -104,7 +102,9 @@ class LocationSearchRequest(BaseModel):
     # -------------------------------------------------------------------------
     @field_validator("bbox", mode="before")
     @classmethod
-    def normalize_bbox(cls, value: BBox | tuple[float, ...] | str | None) -> BBox | None:
+    def normalize_bbox(
+        cls, value: BBox | tuple[float, ...] | str | None
+    ) -> BBox | None:
         if value is None or value == "":
             return None
         if isinstance(value, str):
@@ -141,6 +141,15 @@ class LocationSearchRequest(BaseModel):
         return str(value).lower()
 
     # -------------------------------------------------------------------------
+    @field_validator("map_tiles", mode="before")
+    @classmethod
+    def normalize_map_tiles(cls, value: str | None) -> str:
+        if value is None:
+            return configurations.server.map.tiles
+        normalized = str(value).strip()
+        return normalized or configurations.server.map.tiles
+
+    # -------------------------------------------------------------------------
     @model_validator(mode="after")
     def validate_location(self) -> "LocationSearchRequest":
         location = Location(
@@ -158,10 +167,8 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError(
                     "Provide a country, city, or address when not using coordinates."
                 )
-        if not (self.reference_date or self.datetime):
-            raise ValueError(
-                "Provide reference_date or datetime to determine imagery date."
-            )
+        if not self.datetime:
+            raise ValueError("Provide datetime to determine imagery date.")
         if self.bbox is None and self.use_coordinates:
             if self.latitude is None or self.longitude is None:
                 raise ValueError(
@@ -174,19 +181,35 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError("BBox min values must be smaller than max values.")
             if self.image_crs == "EPSG:3857":
                 for value in (minx, maxx, miny, maxy):
-                    if abs(value) > configurations.geospatial.max_mercator_extent:
+                    if abs(value) > configurations.server.geospatial.max_mercator_extent:
                         raise ValueError(
                             "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
                         )
             elif self.image_crs == "EPSG:4326":
                 if (
-                    miny < configurations.geospatial.min_lat
-                    or maxy > configurations.geospatial.max_lat
+                    miny < configurations.server.geospatial.min_lat
+                    or maxy > configurations.server.geospatial.max_lat
                 ):
                     raise ValueError("Latitude values must be within [-90, 90].")
                 if (
-                    minx < configurations.geospatial.min_lon
-                    or maxx > configurations.geospatial.max_lon
+                    minx < configurations.server.geospatial.min_lon
+                    or maxx > configurations.server.geospatial.max_lon
                 ):
                     raise ValueError("Longitude values must be within [-180, 180].")
         return self
+
+
+###############################################################################
+class MapLayerUpdateRequest(BaseModel):
+    payload: dict[str, Any] = Field(default_factory=dict)
+    layers: list[str] | None = Field(default=None)
+    add_layers: list[str] = Field(default_factory=list)
+    remove_layers: list[str] = Field(default_factory=list)
+
+    # -------------------------------------------------------------------------
+    @field_validator("payload")
+    @classmethod
+    def validate_payload(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(value, dict) or not value:
+            raise ValueError("payload must be a non-empty object.")
+        return value

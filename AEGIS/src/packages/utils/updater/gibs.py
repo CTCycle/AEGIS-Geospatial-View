@@ -13,7 +13,6 @@ from AEGIS.src.packages.configurations import configurations
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.serializer import DataSerializer
 
-
 TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
     "15.625m": 15.625,
     "31.25m": 31.25,
@@ -61,13 +60,9 @@ class GIBSLayersUpdater:
         request_timeout: float | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
-        settings = configurations.gibs
-        self.endpoints = copy.deepcopy(
-            endpoints or settings.capabilities_endpoints
-        )
-        self.ows_namespaces = copy.deepcopy(
-            ows_namespaces or settings.ows_namespaces
-        )
+        settings = configurations.server.gibs
+        self.endpoints = copy.deepcopy(endpoints or settings.capabilities_endpoints)
+        self.ows_namespaces = copy.deepcopy(ows_namespaces or settings.ows_namespaces)
         self.user_agent = user_agent or settings.layer_sync_user_agent
         self.request_timeout = request_timeout or settings.layer_sync_timeout
 
@@ -139,7 +134,9 @@ class GIBSLayersUpdater:
             with urlopen(request, timeout=self.request_timeout) as response:
                 return response.read()
         except (HTTPError, URLError) as exc:  # pragma: no cover - network failures
-            raise LayerHarvestError(f"Failed to download capabilities at {url}") from exc
+            raise LayerHarvestError(
+                f"Failed to download capabilities at {url}"
+            ) from exc
 
     # -------------------------------------------------------------------------
     def parse_layers(self, payload: bytes) -> list[LayerPayload]:
