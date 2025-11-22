@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
+from AEGIS.src.packages.variables import env_variables
 from AEGIS.src.server.endpoints.search import router as search_router
 from AEGIS.src.packages.configurations import configurations
 
