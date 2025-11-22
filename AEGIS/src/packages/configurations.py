@@ -521,7 +521,8 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     llm_defaults_payload = ensure_mapping(payload.get("llm_defaults"))
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
     default_provider = llm_defaults.llm_provider
-    default_cloud_model = llm_defaults.cloud_model    
+    default_cloud_model = llm_defaults.cloud_model
+    default_ollama_host = coerce_str(payload.get("ollama_base_url"), "http://localhost:11434") 
 
     return ServerSettings(
         fastapi=build_fastapi_settings(fastapi_payload),
