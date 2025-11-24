@@ -7,11 +7,6 @@
     "reconnect_timeout": 3600,      
     "http_timeout": 1800.0,
     "api_base_url": "http://127.0.0.1:8000" 
-  },
-  "llm_defaults": {
-    "agent_model": "llama3.1:8b",
-    "llm_provider": "openai",
-    "cloud_model": "gpt-4o-mini"    
   }
 }
 

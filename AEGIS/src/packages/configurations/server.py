@@ -502,6 +502,8 @@ def get_server_settings(config_path: str | None = None) -> ServerSettings:
     path = config_path or SERVER_CONFIGURATION_FILE
     payload = load_configuration_data(path)
 
+    LLMRuntimeConfig.configure(server_settings.llm_defaults)
+
     return build_server_settings(payload)
 
 
