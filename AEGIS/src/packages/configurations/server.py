@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import Any
 
-from AEGIS.src.packages.configurations import ensure_mapping, load_configuration_data
+from AEGIS.src.packages.configurations.base import ensure_mapping, load_configuration_data
+from AEGIS.src.packages.configurations.models import (
+    LLMRuntimeDefaults,
+    build_llm_runtime_defaults,
+)
 from AEGIS.src.packages.constants import (
-    AGENT_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,   
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,   
     NASA_ATTRIBUTION,
@@ -17,7 +19,6 @@ from AEGIS.src.packages.types import (
     coerce_bool,
     coerce_float,
     coerce_int,
-    coerce_positive_int,
     coerce_str,
     coerce_str_or_none,
 )
@@ -90,16 +91,6 @@ class GIBSSettings:
     ows_namespaces: dict[str, str]
     layer_sync_user_agent: str
     layer_sync_timeout: float
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class LLMRuntimeDefaults:
-    agent_model: str
-    llm_provider: str
-    cloud_model: str
-    use_cloud_services: bool
-    ollama_temperature: float
-    ollama_reasoning: bool
 
 
 # -----------------------------------------------------------------------------
@@ -280,28 +271,13 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
     )
 
 # -----------------------------------------------------------------------------
-def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
-    agent_default = AGENT_MODEL_CHOICES[0] if AGENT_MODEL_CHOICES else ""
-    provider_default = coerce_str(data.get("llm_provider"), "openai").lower()
-    provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
-    cloud_default = provider_models[0] if provider_models else ""
-    return LLMRuntimeDefaults(
-        agent_model=coerce_str(data.get("agent_model"), agent_default),
-        llm_provider=provider_default,
-        cloud_model=coerce_str(data.get("cloud_model"), cloud_default),
-        use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
-        ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
-        ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
-    )
-   
-# -----------------------------------------------------------------------------
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     payload = ensure_mapping(data)
     fastapi_payload = ensure_mapping(payload.get("fastapi"))
     database_payload = ensure_mapping(payload.get("database"))
     nominatim_payload = ensure_mapping(payload.get("nominatim"))
     geospatial_payload = ensure_mapping(payload.get("geospatial"))
-    map_payload = ensure_mapping(payload.get("map"))
+    map_payload = ensure_mapping(payload.get("map") or payload.get("maps"))
     gibs_payload = ensure_mapping(payload.get("gibs"))
     llm_defaults_payload = ensure_mapping(
     payload.get("llm_runtime_defaults") or payload.get("llm_defaults")

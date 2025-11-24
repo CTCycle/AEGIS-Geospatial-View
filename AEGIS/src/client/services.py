@@ -101,6 +101,9 @@ class SettingsService:
 
     # -------------------------------------------------------------------------
     def apply_runtime_settings(self, settings: RuntimeSettings) -> RuntimeSettings:           
+        self.runtime_state.set_cloud_enabled(settings.use_cloud_services)
+        provider = self.runtime_state.set_llm_provider(settings.provider)
+        cloud_model = self.runtime_state.set_cloud_model(settings.cloud_model or "")
         agent_model = self.runtime_state.set_agent_model(settings.agent_model)
         temperature = self.runtime_state.set_ollama_temperature(settings.temperature)
         reasoning = self.runtime_state.set_ollama_reasoning(settings.reasoning)
@@ -108,8 +111,8 @@ class SettingsService:
         
         return RuntimeSettings(
             use_cloud_services=self.runtime_state.is_cloud_enabled(),
-            provider=self.runtime_state.set_llm_provider(settings.provider),
-            cloud_model=self.runtime_state.get_cloud_model(),
+            provider=provider,
+            cloud_model=cloud_model,
             agent_model=agent_model,
             temperature=temperature,
             reasoning=reasoning,
