@@ -20,6 +20,8 @@ from AEGIS.src.packages.configurations.server import (
     MapSettings,
     GIBSSettings, 
     ServerSettings,
+    LLMRuntimeConfig,
+    LLMRuntimeDefaults,
     server_settings,
     get_server_settings,   
 )
@@ -36,8 +38,10 @@ __all__ = [
     "NominatimSettings",
     "GeospatialSettings",
     "MapSettings",
-    "GIBSSettings",    
+    "GIBSSettings",
     "ServerSettings",
+    "LLMRuntimeConfig",
+    "LLMRuntimeDefaults",
     "server_settings",
     "get_server_settings",    
 ]

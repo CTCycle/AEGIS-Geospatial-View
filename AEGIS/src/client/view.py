@@ -12,11 +12,13 @@ from AEGIS.src.client.services import (
     GeoSearchEndpointService,
     SettingsService,
 )
+
 from AEGIS.src.client.layouts import (
     CARD_BASE_CLASSES,
     INTERFACE_THEME_CSS,
     PAGE_CONTAINER_CLASSES,
 )
+
 from AEGIS.src.packages.configurations import client_settings
 from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
