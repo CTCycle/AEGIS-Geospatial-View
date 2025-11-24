@@ -29,13 +29,13 @@ class LLMRuntimeState:
     # -------------------------------------------------------------------------
     def reset_defaults(self) -> None:
         d = self.defaults
-        self.agent_model = d.agent_model
-        self.llm_provider = d.llm_provider
-        self.cloud_model = d.cloud_model
-        self.use_cloud_services = d.use_cloud_services
-        self.ollama_temperature = d.ollama_temperature
-        self.ollama_reasoning = d.ollama_reasoning
-        self.touch_revision()
+        self.revision = 0
+        self.set_llm_provider(d.llm_provider)
+        self.set_cloud_model(d.cloud_model)
+        self.set_agent_model(d.agent_model)
+        self.set_cloud_enabled(d.use_cloud_services)
+        self.set_ollama_temperature(d.ollama_temperature)
+        self.set_ollama_reasoning(d.ollama_reasoning)
 
     # -------------------------------------------------------------------------
     def is_cloud_enabled(self) -> bool:
