@@ -7,9 +7,8 @@ from typing import Any, Protocol
 import pandas as pd
 from sqlalchemy.orm import declarative_base
 
-from AEGIS.src.packages.configurations import DatabaseSettings, configurations
+from AEGIS.src.packages.configurations import DatabaseSettings, server_settings
 from AEGIS.src.packages.logger import logger
-from AEGIS.src.packages.singleton import singleton
 from AEGIS.src.packages.utils.repository.postgres import PostgresRepository
 from AEGIS.src.packages.utils.repository.sqlite import SQLiteRepository
 
@@ -54,10 +53,9 @@ BACKEND_FACTORIES: dict[str, BackendFactory] = {
 
 # [DATABASE]
 ###############################################################################
-@singleton
 class AEGISDatabase:
     def __init__(self) -> None:
-        self.settings = configurations.server.database
+        self.settings = server_settings.database
         self.backend = self._build_backend(self.settings.embedded_database)
 
     # -------------------------------------------------------------------------

@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.configurations import server_settings
 
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
@@ -43,7 +43,7 @@ class LocationSearchRequest(BaseModel):
     datetime: dt.datetime | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(
-        default=None, ge=configurations.server.geospatial.min_timeline_year
+        default=None, ge=server_settings.geospatial.min_timeline_year
     )
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
@@ -55,12 +55,18 @@ class LocationSearchRequest(BaseModel):
     geospatial_filter: str | None = Field(default=None, max_length=200)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
-    map_size_m: float = Field(default=configurations.server.map.default_size_m, gt=0)
-    map_tiles: str | None = Field(default=configurations.server.map.tiles, max_length=200)
-    image_width: int = Field(default=configurations.server.gibs.image_width, ge=512, le=2048)
-    image_height: int = Field(default=configurations.server.gibs.image_height, ge=512, le=2048)
+    map_size_m: float = Field(default=server_settings.map.default_size_m, gt=0)
+    map_tiles: str | None = Field(default=server_settings.map.tiles, max_length=200)
+    image_width: int = Field(default=server_settings.gibs.image_width, ge=512, le=2048)
+    image_height: int = Field(default=server_settings.gibs.image_height, ge=512, le=2048)
     image_crs: str = Field(default="EPSG:3857")
     image_format: str = Field(default="image/png")
+    agentic_enabled: bool = Field(default=False)
+    llm_provider: str | None = Field(default=None, max_length=50)
+    cloud_model: str | None = Field(default=None, max_length=100)
+    agent_model: str | None = Field(default=None, max_length=100)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    reasoning: bool | None = Field(default=None)
 
     @field_validator(
         "country",
@@ -145,9 +151,9 @@ class LocationSearchRequest(BaseModel):
     @classmethod
     def normalize_map_tiles(cls, value: str | None) -> str:
         if value is None:
-            return configurations.server.map.tiles
+            return server_settings.map.tiles
         normalized = str(value).strip()
-        return normalized or configurations.server.map.tiles
+        return normalized or server_settings.map.tiles
 
     # -------------------------------------------------------------------------
     @model_validator(mode="after")
@@ -181,19 +187,19 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError("BBox min values must be smaller than max values.")
             if self.image_crs == "EPSG:3857":
                 for value in (minx, maxx, miny, maxy):
-                    if abs(value) > configurations.server.geospatial.max_mercator_extent:
+                    if abs(value) > server_settings.geospatial.max_mercator_extent:
                         raise ValueError(
                             "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
                         )
             elif self.image_crs == "EPSG:4326":
                 if (
-                    miny < configurations.server.geospatial.min_lat
-                    or maxy > configurations.server.geospatial.max_lat
+                    miny < server_settings.geospatial.min_lat
+                    or maxy > server_settings.geospatial.max_lat
                 ):
                     raise ValueError("Latitude values must be within [-90, 90].")
                 if (
-                    minx < configurations.server.geospatial.min_lon
-                    or maxx > configurations.server.geospatial.max_lon
+                    minx < server_settings.geospatial.min_lon
+                    or maxx > server_settings.geospatial.max_lon
                 ):
                     raise ValueError("Longitude values must be within [-180, 180].")
         return self

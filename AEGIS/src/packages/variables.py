@@ -6,12 +6,10 @@ from dotenv import load_dotenv
 
 from AEGIS.src.packages.constants import ENV_FILE_PATH
 from AEGIS.src.packages.logger import logger
-from AEGIS.src.packages.singleton import singleton
 
 
 # [LOAD ENVIRONMENT VARIABLES]
 ###############################################################################
-@singleton
 class EnvironmentVariables:
     def __init__(self) -> None:
         self.env_path = ENV_FILE_PATH

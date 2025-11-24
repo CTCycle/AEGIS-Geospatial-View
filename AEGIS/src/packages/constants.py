@@ -13,9 +13,12 @@ DATA_PATH = join(RSC_PATH, "database")
 DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 LOGS_PATH = join(RSC_PATH, "logs")
-CONFIGURATION_FILE = join(SETTING_PATH, "configurations.json")
 ENV_FILE_PATH = join(SETTING_PATH, ".env")
 DATABASE_FILENAME = "sqlite.db"
+
+###############################################################################
+SERVER_CONFIGURATION_FILE = join(SETTING_PATH, "server_configurations.json")
+CLIENT_CONFIGURATION_FILE = join(SETTING_PATH, "client_configurations.json")
 
 # [ENDPOINS]
 ###############################################################################

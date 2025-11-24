@@ -11,19 +11,19 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.configurations import server_settings
 from AEGIS.src.packages.logger import logger
 
 
 ###############################################################################
 class NormatimService:
-    base_url = configurations.server.nominatim.base_url
+    base_url = server_settings.nominatim.base_url
 
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
-        self.user_agent = user_agent or configurations.server.nominatim.user_agent
-        default_timeout = configurations.server.nominatim.timeout
+        self.user_agent = user_agent or server_settings.nominatim.user_agent
+        default_timeout = server_settings.nominatim.timeout
         self.timeout = timeout if timeout is not None else default_timeout
 
     # -----------------------------------------------------------------------------

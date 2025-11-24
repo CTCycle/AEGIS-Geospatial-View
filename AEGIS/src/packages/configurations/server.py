@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-import json
-import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from AEGIS.src.packages.configurations import ensure_mapping, load_configuration_data
 from AEGIS.src.packages.constants import (
     AGENT_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,
-    CONFIGURATION_FILE,
+    CLOUD_MODEL_CHOICES,   
     GIBS_MAX_IMAGE_DIMENSION,
-    GIBS_MIN_IMAGE_DIMENSION,
-    MAX_AGENTIC_TEMPERATURE,
-    MIN_AGENTIC_TEMPERATURE,
+    GIBS_MIN_IMAGE_DIMENSION,   
     NASA_ATTRIBUTION,
+    SERVER_CONFIGURATION_FILE,
 )
+
 from AEGIS.src.packages.types import (
     coerce_bool,
     coerce_float,
@@ -24,176 +22,7 @@ from AEGIS.src.packages.types import (
     coerce_str_or_none,
 )
 
-# [LLM RUNTIME CONFIGURATION]
-###############################################################################
-@dataclass
-class LLMRuntimeConfig:
-    defaults: LLMRuntimeDefaults | None = None
-    agent_model: str = ""
-    llm_provider: str = ""
-    cloud_model: str = ""
-    use_cloud_services: bool = False
-    ollama_temperature: float = 0.0
-    ollama_reasoning: bool = False
-    revision: int = 0
 
-    # -------------------------------------------------------------------------
-    @classmethod
-    def configure(cls, defaults: LLMRuntimeDefaults) -> None:
-        cls.defaults = defaults
-        cls.reset_defaults()
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _get_defaults(cls) -> LLMRuntimeDefaults:
-        if cls.defaults is None:
-            raise RuntimeError("Client runtime defaults are not configured.")
-        return cls.defaults
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def touch_revision(cls) -> None:
-        cls.revision += 1
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_agent_model(cls, model: str) -> str:
-        value = model.strip()
-        if value and value != cls.agent_model:
-            cls.agent_model = value
-            cls.touch_revision()
-        return cls.agent_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_llm_provider(cls, provider: str) -> str:
-        value = provider.strip()
-        if value and value != cls.llm_provider:
-            cls.llm_provider = value
-            models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
-            if cls.cloud_model not in models:
-                cls.cloud_model = models[0] if models else ""
-            cls.touch_revision()
-        return cls.llm_provider
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_cloud_model(cls, model: str) -> str:
-        value = model.strip()
-        if not value:
-            if cls.cloud_model:
-                cls.cloud_model = ""
-                cls.touch_revision()
-            return cls.cloud_model
-        models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
-        if value not in models:
-            if models and cls.cloud_model != models[0]:
-                cls.cloud_model = models[0]
-                cls.touch_revision()
-            return cls.cloud_model
-        if cls.cloud_model != value:
-            cls.cloud_model = value
-            cls.touch_revision()
-        return cls.cloud_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_use_cloud_services(cls, enabled: bool) -> bool:
-        normalized = bool(enabled)
-        if cls.use_cloud_services != normalized:
-            cls.use_cloud_services = normalized
-            cls.touch_revision()
-        return cls.use_cloud_services
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_ollama_temperature(cls, value: float | None) -> float:
-        try:
-            parsed = float(value) if value is not None else cls.ollama_temperature
-        except (TypeError, ValueError):
-            parsed = cls.ollama_temperature
-        parsed = max(MIN_AGENTIC_TEMPERATURE, min(MAX_AGENTIC_TEMPERATURE, parsed))
-        rounded = round(parsed, 2)
-        if cls.ollama_temperature != rounded:
-            cls.ollama_temperature = rounded
-            cls.touch_revision()
-        return cls.ollama_temperature
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_ollama_reasoning(cls, enabled: bool) -> bool:
-        normalized = bool(enabled)
-        if cls.ollama_reasoning != normalized:
-            cls.ollama_reasoning = normalized
-            cls.touch_revision()
-        return cls.ollama_reasoning
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_agent_model(cls) -> str:
-        return cls.agent_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_llm_provider(cls) -> str:
-        return cls.llm_provider
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_cloud_model(cls) -> str:
-        return cls.cloud_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def is_cloud_enabled(cls) -> bool:
-        return cls.use_cloud_services
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_ollama_temperature(cls) -> float:
-        return cls.ollama_temperature
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def is_ollama_reasoning_enabled(cls) -> bool:
-        return cls.ollama_reasoning
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def reset_defaults(cls) -> None:
-        defaults = cls._get_defaults()
-        cls.agent_model = defaults.agent_model
-        cls.llm_provider = defaults.llm_provider
-        cls.cloud_model = defaults.cloud_model
-        cls.use_cloud_services = defaults.use_cloud_services
-        cls.ollama_temperature = round(
-            max(
-                MIN_AGENTIC_TEMPERATURE,
-                min(MAX_AGENTIC_TEMPERATURE, defaults.ollama_temperature),
-            ),
-            2,
-        )
-        cls.ollama_reasoning = defaults.ollama_reasoning
-        cls.revision = 0
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_revision(cls) -> int:
-        return cls.revision
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def resolve_provider_and_model(cls, purpose: Literal["agent"]) -> tuple[str, str]:
-        if cls.is_cloud_enabled():
-            provider = cls.get_llm_provider()
-            model = cls.get_cloud_model().strip()
-            if not model:
-                model = cls.get_agent_model()
-        else:
-            provider = "ollama"
-            model = cls.get_agent_model()
-        return provider, model.strip()
-    
 
 # [SERVER SETTINGS]
 ###############################################################################
@@ -201,8 +30,7 @@ class LLMRuntimeConfig:
 class FastAPISettings:
     title: str
     description: str
-    version: str
-    api_base_url: str
+    version: str   
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -273,6 +101,7 @@ class LLMRuntimeDefaults:
     ollama_temperature: float
     ollama_reasoning: bool
 
+
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ServerSettings:
@@ -284,49 +113,6 @@ class ServerSettings:
     gibs: GIBSSettings
     llm_defaults: LLMRuntimeDefaults
 
-# [CLIENT SETTINGS]
-###############################################################################
-@dataclass(frozen=True)
-class UIRuntimeSettings:
-    host: str
-    port: int
-    title: str    
-    show_welcome_message: bool
-    reconnect_timeout: int    
-    http_timeout: float
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class ClientSettings:
-    ui: UIRuntimeSettings
-
-# [APPLICATION SETTINGS]
-###############################################################################
-@dataclass(frozen=True)
-class AppConfigurations:
-    server: ServerSettings
-    client: ClientSettings
-
-# [UTILITY FUNCTIONS]
-###############################################################################
-def ensure_mapping(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict):
-        return value
-    return {}
-
-# -----------------------------------------------------------------------------
-def load_configuration_data(path: str) -> dict[str, Any]:
-    if not os.path.exists(path):
-        raise RuntimeError(f"Configuration file not found: {path}")
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Unable to load configuration from {path}") from exc
-    if not isinstance(data, dict):
-        raise RuntimeError("Configuration root must be a JSON object.")
-    return data
-
 
 # [BUILDER FUNCTIONS]
 ###############################################################################
@@ -335,8 +121,7 @@ def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
     return FastAPISettings(
         title=coerce_str(payload.get("title"), "AEGIS Geospatial Search Backend"),
         version=coerce_str(payload.get("version"), "0.1.0"),
-        description=coerce_str(payload.get("description"), "FastAPI backend"),
-        api_base_url=coerce_str(payload.get("base_url"), "http://127.0.0.1:8000"),
+        description=coerce_str(payload.get("description"), "FastAPI backend"),        
     )
 
 # -----------------------------------------------------------------------------
@@ -508,7 +293,7 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
         ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
         ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
     )
-
+   
 # -----------------------------------------------------------------------------
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     payload = ensure_mapping(data)
@@ -518,11 +303,10 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     geospatial_payload = ensure_mapping(payload.get("geospatial"))
     map_payload = ensure_mapping(payload.get("map"))
     gibs_payload = ensure_mapping(payload.get("gibs"))
-    llm_defaults_payload = ensure_mapping(payload.get("llm_defaults"))
+    llm_defaults_payload = ensure_mapping(
+    payload.get("llm_runtime_defaults") or payload.get("llm_defaults")
+    )
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
-    default_provider = llm_defaults.llm_provider
-    default_cloud_model = llm_defaults.cloud_model
-    default_ollama_host = coerce_str(payload.get("ollama_base_url"), "http://localhost:11434") 
 
     return ServerSettings(
         fastapi=build_fastapi_settings(fastapi_payload),
@@ -531,54 +315,17 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
         geospatial=build_geospatial_settings(geospatial_payload),
         map=build_map_settings(map_payload),
         gibs=build_gibs_settings(gibs_payload),
-        llm_defaults=build_llm_runtime_defaults(llm_defaults_payload),
+        llm_defaults=llm_defaults,
     )
 
-# -----------------------------------------------------------------------------
-def build_ui_settings(payload: dict[str, Any] | Any | Any) -> UIRuntimeSettings:
-    return UIRuntimeSettings(
-        host=coerce_str(payload.get("host"), "0.0.0.0"),
-        port=coerce_int(payload.get("port"), 7861, minimum=1, maximum=65535),
-        title=coerce_str(payload.get("title"), "ADSORFIT Model Fitting"),       
-        show_welcome_message=coerce_bool(payload.get("show_welcome_message"), False),
-        reconnect_timeout=coerce_int(payload.get("reconnect_timeout"), 180, minimum=1),        
-        http_timeout=coerce_float(payload.get("timeout"), 120.0, minimum=1.0)
-    )
 
-# -----------------------------------------------------------------------------
-def build_client_settings(payload: dict[str, Any] | Any) -> ClientSettings:
-    ui_payload = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
-    return ClientSettings(
-        ui=build_ui_settings(ui_payload)        
-    )
-
-# [APPLICATION CONFIGURATION LOADER]
+# [SERVER CONFIGURATION LOADER]
 ###############################################################################
-def get_configurations(config_path: str | None = None) -> AppConfigurations:
-    path = config_path or CONFIGURATION_FILE
-    data = load_configuration_data(path)
-    server_payload = data.get("server") if isinstance(data.get("server"), dict) else {}
-    client_payload = data.get("client") if isinstance(data.get("client"), dict) else {}    
-    app_configs = AppConfigurations(
-        server=build_server_settings(server_payload),
-        client=build_client_settings(client_payload),
-    )
+def get_server_settings(config_path: str | None = None) -> ServerSettings:
+    path = config_path or SERVER_CONFIGURATION_FILE
+    payload = load_configuration_data(path)
 
-    LLMRuntimeConfig.configure(app_configs.server.llm_defaults)
-
-    return app_configs
-
-configurations = get_configurations()
+    return build_server_settings(payload)
 
 
-__all__ = [    
-    "AppConfigurations",
-    "FastAPISettings",
-    "LLMRuntimeConfig",
-    "LLMRuntimeDefaults",
-    "MapSettings",
-    "GIBSSettings",
-    "DatabaseSettings",    
-    "UIRuntimeSettings",
-    "get_configurations",
-]
+server_settings = get_server_settings()
