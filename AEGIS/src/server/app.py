@@ -5,15 +5,13 @@ from fastapi.responses import RedirectResponse
 
 from AEGIS.src.packages.variables import env_variables
 from AEGIS.src.server.endpoints.search import router as search_router
-from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.configurations import server_settings
 
 ###############################################################################
-fastapi_settings = configurations.server.fastapi
-ui_settings = configurations.client.ui
 app = FastAPI(
-    title=fastapi_settings.title,
-    version=fastapi_settings.version,
-    description=fastapi_settings.description,
+    title=server_settings.fastapi.title,
+    version=server_settings.fastapi.version,
+    description=server_settings.fastapi.description,
 )
 
 app.include_router(search_router)
