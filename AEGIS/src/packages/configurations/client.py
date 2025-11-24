@@ -8,11 +8,7 @@ from AEGIS.src.packages.configurations.base import (
     load_configuration_data,
 )
 
-from AEGIS.src.packages.configurations.models import (
-    LLMRuntimeDefaults,
-    build_llm_runtime_defaults,
-)
-
+from AEGIS.src.packages.configurations.server import LLMRuntimeConfig, server_settings
 from AEGIS.src.packages.constants import CLIENT_CONFIGURATION_FILE
   
 from AEGIS.src.packages.types import (
@@ -39,7 +35,6 @@ class UIRuntimeSettings:
 @dataclass(frozen=True)
 class ClientSettings:
     ui: UIRuntimeSettings
-    llm_defaults: LLMRuntimeDefaults
 
 
 # [BUILDER FUNCTIONS]
@@ -56,16 +51,10 @@ def build_ui_settings(payload: dict[str, Any] | Any | Any) -> UIRuntimeSettings:
     )
 
 # -----------------------------------------------------------------------------
-def build_llm_settings(payload: dict[str, Any] | Any) -> LLMRuntimeDefaults:
-    return build_llm_runtime_defaults(ensure_mapping(payload))
-
-# -----------------------------------------------------------------------------
 def build_client_settings(payload: dict[str, Any] | Any) -> ClientSettings:
-    ui_payload = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
-    llm_payload = payload.get("llm_defaults") if isinstance(payload.get("llm_defaults"), dict) else {}
+    ui_payload = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}    
     return ClientSettings(
-        ui=build_ui_settings(ui_payload),  
-        llm_defaults=build_llm_settings(llm_payload)     
+        ui=build_ui_settings(ui_payload),       
     )
 
 
@@ -75,7 +64,8 @@ def get_client_settings(config_path: str | None = None) -> ClientSettings:
     path = config_path or CLIENT_CONFIGURATION_FILE    
     payload = load_configuration_data(path)   
 
+    LLMRuntimeConfig.configure(server_settings.llm_defaults)
+    
     return build_client_settings(payload)
-
 
 client_settings = get_client_settings()

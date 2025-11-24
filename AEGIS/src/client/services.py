@@ -12,7 +12,7 @@ from AEGIS.src.packages.configurations import (
     server_settings    
 )
 
-from AEGIS.src.client.models import LLMRuntimeState
+from AEGIS.src.packages.configurations.server import LLMRuntimeConfig
 from AEGIS.src.packages.constants import CLOUD_MODEL_CHOICES, GEO_SEARCH_URL
 from AEGIS.src.packages.utils.services.geospatial.maps import get_map_tile_options
 from AEGIS.src.packages.utils.services.payload import sanitize_search_payload
@@ -36,10 +36,11 @@ class RuntimeSettings:
 class SettingsService:
     def __init__(
         self,
-        runtime_state: LLMRuntimeState | None = None,
+        runtime_config: type[LLMRuntimeConfig] = LLMRuntimeConfig,        
         config: ClientSettings = client_settings,
     ) -> None:        
-        self.runtime_state = runtime_state or LLMRuntimeState(config.llm_defaults)
+        self.runtime_config = runtime_config
+        self.client_config = config
         self.map_tiles = self.resolve_map_tiles(server_settings.map.tiles)
 
     # -------------------------------------------------------------------------
@@ -78,39 +79,35 @@ class SettingsService:
         return default_tiles
 
     # -------------------------------------------------------------------------    
-    def get_runtime_settings(self) -> RuntimeSettings:
-        selection = self.resolve_cloud_selection(
-            self.runtime_state.llm_provider,
-            self.runtime_state.cloud_model,
-        )
+    def get_runtime_settings(self) -> RuntimeSettings:       
         return RuntimeSettings(
-            use_cloud_services=self.runtime_state.use_cloud_services,
-            provider=selection["provider"],
-            cloud_model=selection["model"] or "",
-            agent_model=self.runtime_state.agent_model,
-            temperature=self.runtime_state.ollama_temperature,
-            reasoning=self.runtime_state.ollama_reasoning,
+            use_cloud_services=self.runtime_config.is_cloud_enabled(),
+            provider=self.runtime_config.get_llm_provider(),
+            cloud_model=self.runtime_config.get_cloud_model(),
+            agent_model=self.runtime_config.agent_model,
+            temperature=self.runtime_config.ollama_temperature,
+            reasoning=self.runtime_config.ollama_reasoning,
             map_tiles=self.map_tiles,
         )
 
     # -------------------------------------------------------------------------
     def reset_runtime_settings(self) -> RuntimeSettings:
-        self.runtime_state.reset_defaults()
+        self.runtime_config.reset_defaults()
         self.map_tiles = self.resolve_map_tiles(server_settings.map.tiles)
         return self.get_runtime_settings()
 
     # -------------------------------------------------------------------------
     def apply_runtime_settings(self, settings: RuntimeSettings) -> RuntimeSettings:           
-        self.runtime_state.set_cloud_enabled(settings.use_cloud_services)
-        provider = self.runtime_state.set_llm_provider(settings.provider)
-        cloud_model = self.runtime_state.set_cloud_model(settings.cloud_model or "")
-        agent_model = self.runtime_state.set_agent_model(settings.agent_model)
-        temperature = self.runtime_state.set_ollama_temperature(settings.temperature)
-        reasoning = self.runtime_state.set_ollama_reasoning(settings.reasoning)
+        self.runtime_config.set_use_cloud_services(settings.use_cloud_services) 
+        provider = self.runtime_config.set_llm_provider(settings.provider)
+        cloud_model = self.runtime_config.set_cloud_model(settings.cloud_model or "")
+        agent_model = self.runtime_config.set_agent_model(settings.agent_model)
+        temperature = self.runtime_config.set_ollama_temperature(settings.temperature)
+        reasoning = self.runtime_config.set_ollama_reasoning(settings.reasoning)
         self.map_tiles = self.resolve_map_tiles(settings.map_tiles)
         
         return RuntimeSettings(
-            use_cloud_services=self.runtime_state.is_cloud_enabled(),
+            use_cloud_services=self.runtime_config.is_cloud_enabled(),
             provider=provider,
             cloud_model=cloud_model,
             agent_model=agent_model,

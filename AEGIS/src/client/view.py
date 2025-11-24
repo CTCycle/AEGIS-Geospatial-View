@@ -424,7 +424,7 @@ class InterfaceStructure:
                         agent_model_dropdown = ui.select(
                             AGENT_MODEL_CHOICES,
                             label="Parsing Model",
-                            value=client_settings.llm_defaults.agent_model
+                            value=current_settings.agent_model,
                         ).classes("w-full")
                         temperature_input = ui.number(
                             label="Temperature",
