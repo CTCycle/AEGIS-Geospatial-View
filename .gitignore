@@ -21,5 +21,6 @@ __pycache__
 *.gz
 !.gitkeep
 
-!AEGIS/setup/settings/configurations.json
+!AEGIS/setup/settings/server_configurations.json
+!AEGIS/setup/settings/client_configurations.json
 AGENTS.md
