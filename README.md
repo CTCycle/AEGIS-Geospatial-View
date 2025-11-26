@@ -5,7 +5,6 @@ AEGIS Geospatial View is a FastAPI + NiceGUI application that geocodes free-text
 
 ## Features
 - `/maps/search` endpoint resolves place names, bounding boxes, and dates into harmonized coordinates and returns a WMS image plus metadata (e.g., meters_per_pixel, normalized bbox).
-- `/maps/agentic` endpoint lets an LLM interpret natural language prompts, pick a geospatial layer, and call the same imagery pipeline.
 - NiceGUI front end with form controls for coordinates, bbox, date/time, and layer selection, plus a live image preview sourced from the backend response.
 - Built-in SQLite database initialization for cached geospatial data and GIBS layer definitions; logging under `AEGIS/resources/logs`.
 - Configurable imagery size, bbox precision, and network timeouts through `AEGIS/setup/configurations.json`.

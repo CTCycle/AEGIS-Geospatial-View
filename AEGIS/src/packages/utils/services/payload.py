@@ -77,12 +77,11 @@ def sanitize_search_payload(
     )
 
     sanitized_filters = sanitize_choice_list(geospatial_filters)
-    primary_filter = sanitized_filters[0] if sanitized_filters else None
     selected_tiles = sanitize_choice(map_tiles)
 
     payload: dict[str, Any] = {
         "filters": sanitized_filters,
-        "geospatial_filter": primary_filter,
+        "geospatial_filter": sanitized_filters,
         "map_tiles": selected_tiles,
         "country": sanitize_field(country),
         "city": sanitize_field(city),

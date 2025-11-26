@@ -16,7 +16,7 @@ from AEGIS.src.server.schemas.geographics import (
     LocationSearchRequest,
     MapLayerUpdateRequest,
 )
-from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.configurations import server_settings
 from AEGIS.src.packages.utils.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
@@ -47,14 +47,6 @@ layer_service = LayerProviderService(
 
 type CoordinatePair = tuple[float, float]
 DEFAULT_OVERLAY_COLOR = "#2563eb"
-__all__ = [
-    "router",
-    "MapSearchToolkit",
-    "MapRenderingService",
-    "MapSearchEndpoint",
-    "MapLayerUpdateEndpoint",
-]
-
 
 ###############################################################################
 class MapSearchToolkit:
@@ -336,7 +328,7 @@ class MapRenderingService:
             )
         lon = coordinate_pair[0] if coordinate_pair else None
         lat = coordinate_pair[1] if coordinate_pair else None
-        map_size_value = payload.map_size_m or configurations.server.map.default_size_m
+        map_size_value = payload.map_size_m or server_settings.map.default_size_m
         map_arguments = {
             "lon": lon,
             "lat": lat,
@@ -344,7 +336,7 @@ class MapRenderingService:
             "map_size_m": map_size_value,
             "width": payload.image_width,
             "height": payload.image_height,
-            "tiles": payload.map_tiles or configurations.server.map.tiles,
+            "tiles": payload.map_tiles,
             "overlays": overlays,
         }
         map_response = await asyncio.to_thread(
@@ -461,7 +453,7 @@ class MapRenderingService:
         if coordinates is None:
             return None
         lon, lat = coordinates
-        map_size_value = payload.map_size_m or configurations.server.map.default_size_m
+        map_size_value = payload.map_size_m or server_settings.map.default_size_m
         return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
 
     # -------------------------------------------------------------------------
@@ -680,7 +672,10 @@ class MapSearchEndpoint:
         self, payload: LocationSearchRequest
     ) -> dict[str, object]:
         response_payload = payload.model_dump()
-        response_payload["layers"] = response_payload.pop("filters", [])
+        normalized_filters = list(payload.filters or [])
+        response_payload["geospatial_filter"] = normalized_filters
+        response_payload["filters"] = normalized_filters
+        response_payload.pop("layers", None)
         if not payload.use_coordinates:
             sanitized_location = await asyncio.to_thread(
                 self.sanitization_service.sanitize_location_inputs,
@@ -788,14 +783,14 @@ class MapSearchEndpoint:
                 "filters": geospatial_layers,
                 "bbox": bbox,
             }
-            payload_data["image_width"] = configurations.server.gibs.image_width
-            payload_data["image_height"] = configurations.server.gibs.image_height
+            payload_data["image_width"] = server_settings.gibs.image_width
+            payload_data["image_height"] = server_settings.gibs.image_height
             if radius_m is not None:
                 payload_data["radius_m"] = radius_m
-            payload_data["map_size_m"] = configurations.server.map.default_size_m
+            payload_data["map_size_m"] = server_settings.map.default_size_m
             if map_size_m is not None:
                 payload_data["map_size_m"] = map_size_m
-            payload_data["map_tiles"] = map_tiles or configurations.server.map.tiles
+            payload_data["map_tiles"] = map_tiles or server_settings.map.tiles
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:
@@ -929,7 +924,7 @@ class MapLayerUpdateEndpoint:
         
 toolkit = MapSearchToolkit(
     gibs_service=gibs_service,
-    default_layer=configurations.server.gibs.default_layer,
+    default_layer=server_settings.gibs.default_layer,
 )
 rendering_service = MapRenderingService(
     toolkit=toolkit,

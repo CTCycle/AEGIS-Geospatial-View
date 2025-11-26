@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 
 from tqdm import tqdm
 
-from AEGIS.src.packages.configurations import configurations
+from AEGIS.src.packages.configurations import server_settings
 from AEGIS.src.packages.logger import logger
 from AEGIS.src.packages.utils.repository.serializer import DataSerializer
 
@@ -60,7 +60,7 @@ class GIBSLayersUpdater:
         request_timeout: float | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
-        settings = configurations.server.gibs
+        settings = server_settings.gibs
         self.endpoints = copy.deepcopy(endpoints or settings.capabilities_endpoints)
         self.ows_namespaces = copy.deepcopy(ows_namespaces or settings.ows_namespaces)
         self.user_agent = user_agent or settings.layer_sync_user_agent
