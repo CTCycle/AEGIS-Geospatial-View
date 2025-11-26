@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from AEGIS.src.packages.configurations.base import ensure_mapping, load_configuration_data
+from AEGIS.src.packages.configurations.base import (
+    ensure_mapping, 
+    load_configuration_data    
+)
 
 from AEGIS.src.packages.constants import (
     GIBS_MAX_IMAGE_DIMENSION,
@@ -501,9 +504,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
     path = config_path or SERVER_CONFIGURATION_FILE
     payload = load_configuration_data(path)
-
-    LLMRuntimeConfig.configure(server_settings.llm_defaults)
-
+    
     return build_server_settings(payload)
 
 

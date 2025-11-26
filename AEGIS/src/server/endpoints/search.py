@@ -47,14 +47,6 @@ layer_service = LayerProviderService(
 
 type CoordinatePair = tuple[float, float]
 DEFAULT_OVERLAY_COLOR = "#2563eb"
-__all__ = [
-    "router",
-    "MapSearchToolkit",
-    "MapRenderingService",
-    "MapSearchEndpoint",
-    "MapLayerUpdateEndpoint",
-]
-
 
 ###############################################################################
 class MapSearchToolkit:
@@ -680,7 +672,10 @@ class MapSearchEndpoint:
         self, payload: LocationSearchRequest
     ) -> dict[str, object]:
         response_payload = payload.model_dump()
-        response_payload["layers"] = response_payload.pop("filters", [])
+        normalized_filters = list(payload.filters or [])
+        response_payload["geospatial_filter"] = normalized_filters
+        response_payload["filters"] = normalized_filters
+        response_payload.pop("layers", None)
         if not payload.use_coordinates:
             sanitized_location = await asyncio.to_thread(
                 self.sanitization_service.sanitize_location_inputs,
