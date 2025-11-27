@@ -1,0 +1,80 @@
+.app-container {
+    min-height: 100vh;
+    position: relative;
+    padding: 1rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.drawer-toggle {
+    position: fixed;
+    left: 0;
+    top: 160px;
+    width: 16px;
+    height: 120px;
+    background-color: #3b82f6;
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+    cursor: pointer;
+    z-index: 30;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drawer-toggle:hover {
+    opacity: 1;
+}
+
+.main-content {
+    margin-left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.app-title {
+    font-size: 1.875rem;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.app-subtitle {
+    font-size: 1rem;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.content-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1280px) {
+    .content-grid {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+}
+
+.left-column {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+}
+
+.right-column {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+}
+
+.bottom-row {
+    width: 100%;
+}
