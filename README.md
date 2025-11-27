@@ -17,7 +17,7 @@ AEGIS Geospatial View is a FastAPI + NiceGUI application that geocodes free-text
 ## Manual run (any OS)
 1. Ensure Python 3.12 is available.
 2. Install dependencies from the repository root: `pip install .` (or `uv pip install .`).
-3. Start the app: `uvicorn AEGIS.src.app:app --host 0.0.0.0 --port 8000`.
+3. Start the app: `uvicorn AEGIS.app:app --host 0.0.0.0 --port 8000`.
 4. Open the UI at `http://localhost:8000/ui`.
 
 ## Configuration
