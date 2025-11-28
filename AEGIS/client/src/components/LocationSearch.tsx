@@ -55,18 +55,6 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
             <div className="card-content">
                 <h3 className="section-title">Location search</h3>
 
-                <div className="form-group switch-group">
-                    <label className="switch">
-                        <input
-                            type="checkbox"
-                            checked={useCoordinates}
-                            onChange={(e) => setUseCoordinates(e.target.checked)}
-                        />
-                        <span className="slider round"></span>
-                    </label>
-                    <span>Provide latitude and longitude</span>
-                </div>
-
                 <div className="search-inputs-row">
                     <div className="input-column">
                         <div className="form-group">
@@ -101,26 +89,47 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                             />
                         </div>
 
-                        <div className="coordinates-row">
-                            <div className="form-group">
-                                <label>Latitude (?)</label>
-                                <input
-                                    type="number"
-                                    step="0.000001"
-                                    value={latitude}
-                                    onChange={(e) => setLatitude(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                    disabled={!useCoordinates}
-                                />
+                        <div className="coordinates-section">
+                            <div className="coordinates-header">
+                                <div className="coordinates-labels">
+                                    <p className="coordinates-title">Coordinate input</p>
+                                    <p className="coordinates-description">Enable to search by latitude and longitude instead of address.</p>
+                                </div>
+                                <div className="coordinates-toggle">
+                                    <span className={`toggle-status ${useCoordinates ? 'active' : ''}`}>
+                                        {useCoordinates ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                    <label className="switch" aria-label="Toggle coordinate input">
+                                        <input
+                                            type="checkbox"
+                                            checked={useCoordinates}
+                                            onChange={(e) => setUseCoordinates(e.target.checked)}
+                                        />
+                                        <span className="slider round"></span>
+                                    </label>
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label>Longitude (?)</label>
-                                <input
-                                    type="number"
-                                    step="0.000001"
-                                    value={longitude}
-                                    onChange={(e) => setLongitude(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                    disabled={!useCoordinates}
-                                />
+                            <div className="coordinates-row">
+                                <div className="form-group">
+                                    <label>Latitude (?)</label>
+                                    <input
+                                        type="number"
+                                        step="0.000001"
+                                        value={latitude}
+                                        onChange={(e) => setLatitude(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                        disabled={!useCoordinates}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Longitude (?)</label>
+                                    <input
+                                        type="number"
+                                        step="0.000001"
+                                        value={longitude}
+                                        onChange={(e) => setLongitude(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                        disabled={!useCoordinates}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

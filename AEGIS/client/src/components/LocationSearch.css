@@ -102,6 +102,64 @@ input:checked+.slider:before {
     gap: 0.75rem;
 }
 
+.coordinates-section {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background-color: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.coordinates-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.coordinates-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.coordinates-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+}
+
+.coordinates-description {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #475569;
+}
+
+.coordinates-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.toggle-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #cbd5e1;
+    background-color: #fff;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.toggle-status.active {
+    color: #166534;
+    border-color: #22c55e;
+    background-color: #ecfdf3;
+}
+
 .coordinates-row {
     display: flex;
     gap: 0.75rem;
