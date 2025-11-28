@@ -1,6 +1,6 @@
 import { LocationSearchRequest, SearchResponse } from '../types';
 
-const API_BASE_URL = '/maps';
+const API_BASE_URL = '/api/maps';
 
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
     try {

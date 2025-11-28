@@ -27,7 +27,7 @@ set "UV_ZIP_AMD=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/u
 set "UV_ZIP_ARM=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/uv-aarch64-pc-windows-msvc.zip"
 
 set "pyproject=%root_folder%pyproject.toml"
-set "UVICORN_MODULE=ADSORFIT.server.app:app"
+set "UVICORN_MODULE=AEGIS.server.app:app"
 set "FRONTEND_DIR=%project_folder%client"
 set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
 
@@ -41,7 +41,7 @@ set "TMPVER=%TEMP%\app_pyver.ps1"
 
 set "UV_LINK_MODE=copy"
 
-title ADSORFIT bootstrap (Python + uv + frontend)
+title AEGIS bootstrap (Python + uv + frontend)
 echo.
 
 REM ============================================================================
@@ -201,8 +201,8 @@ if not exist "%FRONTEND_DIR%\node_modules" (
   call npm install
   set "npm_ec=!ERRORLEVEL!"
   popd >nul
-  if not "%npm_ec%"=="0" (
-    echo [FATAL] npm install failed with code %npm_ec%.
+  if not "!npm_ec!"=="0" (
+    echo [FATAL] npm install failed with code !npm_ec!.
     goto error
   )
 )
@@ -213,8 +213,8 @@ if not exist "%FRONTEND_DIST%" (
   call npm run build
   set "npm_build_ec=!ERRORLEVEL!"
   popd >nul
-  if not "%npm_build_ec%"=="0" (
-    echo [FATAL] Frontend build failed with code %npm_build_ec%.
+  if not "!npm_build_ec!"=="0" (
+    echo [FATAL] Frontend build failed with code !npm_build_ec!.
     goto error
   )
 ) else (
