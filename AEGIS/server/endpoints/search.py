@@ -48,6 +48,21 @@ layer_service = LayerProviderService(
 type CoordinatePair = tuple[float, float]
 DEFAULT_OVERLAY_COLOR = "#2563eb"
 
+
+# -------------------------------------------------------------------------
+def sanitize_validation_errors(
+    errors: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    sanitized: list[dict[str, Any]] = []
+    for error in errors:
+        normalized = dict(error)
+        context = normalized.get("ctx")
+        if isinstance(context, dict):
+            normalized["ctx"] = {key: str(value) for key, value in context.items()}
+        sanitized.append(normalized)
+    return sanitized
+
+
 ###############################################################################
 class MapSearchToolkit:
     def __init__(self, gibs_service: GIBSService, *, default_layer: str) -> None:
@@ -801,7 +816,7 @@ class MapSearchEndpoint:
         except ValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=exc.errors(),
+                detail=sanitize_validation_errors(exc.errors()),
             ) from exc
 
         response_payload = await self.process_location_search(payload)
@@ -884,7 +899,7 @@ class MapLayerUpdateEndpoint:
         except ValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=exc.errors(),
+                detail=sanitize_validation_errors(exc.errors()),
             ) from exc
         except ValueError as exc:
             raise HTTPException(

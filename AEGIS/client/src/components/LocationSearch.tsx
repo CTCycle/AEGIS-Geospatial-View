@@ -33,7 +33,9 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     };
 
     const handleSearch = () => {
+        const nowIso = new Date().toISOString();
         const request: LocationSearchRequest = {
+            datetime: nowIso,
             use_coordinates: useCoordinates,
             country: !useCoordinates ? country : undefined,
             city: !useCoordinates ? city : undefined,
