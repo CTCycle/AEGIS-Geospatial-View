@@ -16,6 +16,7 @@ from AEGIS.server.packages.constants import (
     MIN_GEO_LAT,
     MIN_LONGITUDE,
 )
+from AEGIS.server.packages.logger import logger
 
 type BBox = list[float]
 
@@ -27,7 +28,6 @@ __all__ = [
     "MapRequestError",
     "MapService",
 ]
-
 
 # -----------------------------------------------------------------------------
 def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
@@ -196,15 +196,16 @@ class MapService:
             [[map_bbox[1], map_bbox[0]], [map_bbox[3], map_bbox[2]]]
         )
         start_ts = time.perf_counter()
-        try:
-            image_bytes = map_object._to_png(self.default_delay_s)  # type: ignore[attr-defined]
-        except Exception as exc:  # noqa: BLE001
-            raise MapRequestError("Unable to render map image.") from exc
-        render_time_s = round(time.perf_counter() - start_ts, 3)
         map_html = map_object.get_root().render()
+        render_time_s = round(time.perf_counter() - start_ts, 3)
+        image_bytes: bytes = b""
+        mime_type = "text/html"
+        render_warnings: list[str] = []
+        if not map_html:
+            raise MapRequestError("Unable to render map image.")
         return {
             "image_bytes": image_bytes,
-            "mime": "image/png",
+            "mime": mime_type,
             "bbox": map_bbox,
             "crs": "EPSG:4326",
             "width": width_value,
@@ -215,6 +216,7 @@ class MapService:
             "center": {"longitude": center_lon, "latitude": center_lat},
             "render_time_s": render_time_s,
             "map_html": map_html,
+            "render_warnings": render_warnings,
         }
 
     # -------------------------------------------------------------------------
