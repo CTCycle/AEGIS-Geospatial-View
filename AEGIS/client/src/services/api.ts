@@ -17,7 +17,14 @@ export const searchLocation = async (payload: LocationSearchRequest): Promise<Se
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-            throw new Error(errorData.detail || `Error ${response.status}: ${response.statusText}`);
+            const message = typeof errorData.detail === 'string'
+                ? errorData.detail
+                : `Error ${response.status}: ${response.statusText}`;
+            const error: Error & { detail?: unknown; status?: number; raw?: unknown } = new Error(message);
+            error.detail = errorData.detail ?? errorData;
+            error.raw = errorData;
+            error.status = response.status;
+            throw error;
         }
 
         const data = await response.json();

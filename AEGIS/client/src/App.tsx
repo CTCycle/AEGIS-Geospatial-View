@@ -184,7 +184,8 @@ function App() {
             });
         } catch (error: any) {
             setSearchResult({
-                message: `Error: ${error.message}`,
+                message: `Error${error.status ? ` ${error.status}` : ''}: ${error.message || 'Request failed'}`,
+                json: error.detail || error.raw || error,
             });
         } finally {
             setIsLoading(false);
