@@ -1,10 +1,9 @@
+import { API_BASE_URL } from '../constants';
 import { LocationSearchRequest, SearchResponse } from '../types';
-
-const API_BASE_URL = '/api/maps';
 
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/search`, {
+        const response = await fetch(`${API_BASE_URL}/maps/search`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
