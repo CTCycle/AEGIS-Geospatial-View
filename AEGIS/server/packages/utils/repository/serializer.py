@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -22,7 +22,7 @@ class DataSerializer:
             return
         frame = pd.DataFrame.from_records(records)
         frame = frame.reindex(columns=GEONAMES_COLUMNS)
-        frame = frame.where(pd.notnull(frame), None)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
         database.upsert_into_database(frame, "GEONAMES")
 
     # -----------------------------------------------------------------------------
@@ -31,5 +31,5 @@ class DataSerializer:
             return
         frame = pd.DataFrame.from_records(layers)
         frame = frame.reindex(columns=GIBS_LAYER_COLUMNS)
-        frame = frame.where(pd.notnull(frame), None)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
         database.upsert_into_database(frame, "GIBS_LAYERS")
