@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -9,8 +8,8 @@ from sqlalchemy.orm import declarative_base
 
 from AEGIS.server.packages.configurations import DatabaseSettings, server_settings
 from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.utils.repository.postgres import PostgresRepository
-from AEGIS.server.packages.utils.repository.sqlite import SQLiteRepository
+from AEGIS.server.packages.database.postgres import PostgresRepository
+from AEGIS.server.packages.database.sqlite import SQLiteRepository
 
 Base = declarative_base()
 

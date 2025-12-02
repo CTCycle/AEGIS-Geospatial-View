@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from AEGIS.server.packages.configurations import DatabaseSettings
 from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.utils.repository.schema import Base
+from AEGIS.server.packages.database.schema import Base
 
 
 ###############################################################################

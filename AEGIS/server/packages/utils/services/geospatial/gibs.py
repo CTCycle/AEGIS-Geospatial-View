@@ -31,7 +31,7 @@ from AEGIS.server.packages.constants import (
     ORIGIN_SHIFT,
 )
 from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.utils.repository.database import database
+from AEGIS.server.packages.database.database import database
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
