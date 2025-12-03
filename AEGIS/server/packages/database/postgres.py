@@ -10,10 +10,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from AEGIS.server.packages.database.initializer import normalize_postgres_engine
 from AEGIS.server.packages.configurations import DatabaseSettings
-from AEGIS.server.packages.logger import logger
 from AEGIS.server.packages.database.schema import Base
+from AEGIS.server.packages.database.utils import normalize_postgres_engine
+from AEGIS.server.packages.logger import logger
 
 
 ###############################################################################

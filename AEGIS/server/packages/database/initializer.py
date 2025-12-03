@@ -9,20 +9,11 @@ from AEGIS.server.packages.configurations import DatabaseSettings, server_settin
 from AEGIS.server.packages.database.postgres import PostgresRepository
 from AEGIS.server.packages.database.schema import Base
 from AEGIS.server.packages.database.sqlite import SQLiteRepository
+from AEGIS.server.packages.database.utils import normalize_postgres_engine
 from AEGIS.server.packages.logger import logger
 
 
 ###############################################################################
-def normalize_postgres_engine(engine: str | None) -> str:
-    if not engine:
-        return "postgresql+psycopg"
-    lowered = engine.lower()
-    if lowered in {"postgres", "postgresql"}:
-        return "postgresql+psycopg"
-    return engine
-
-
-# -----------------------------------------------------------------------------
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
     connect_args: dict[str, str | int] = {"connect_timeout": settings.connect_timeout}
     if settings.ssl:
