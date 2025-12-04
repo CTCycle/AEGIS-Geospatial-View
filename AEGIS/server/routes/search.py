@@ -303,6 +303,18 @@ class MapRenderingService:
             span_y_m=span_y_m,
             pixels_per_meter=pixels_per_meter,
         )
+        merged_bbox = self._merge_map_and_overlay_bboxes(
+            map_bbox=map_bbox, overlays=overlays
+        )
+        if merged_bbox is not None:
+            map_bbox = merged_bbox
+            span_x_m, span_y_m, meters_per_pixel, pixels_per_meter = (
+                self._compute_map_metrics(map_bbox=map_bbox, payload=payload)
+            )
+            map_bounds = self._bbox_to_bounds(map_bbox)
+            for overlay in overlays:
+                if overlay.get("mode") == "fill":
+                    overlay["bounds"] = map_bounds
         map_response = await self._render_base_map(
             payload=payload,
             coordinate_pair=coordinate_pair,
@@ -664,6 +676,46 @@ class MapRenderingService:
     def _bbox_to_bounds(self, bbox: list[float]) -> list[list[float]]:
         minx, miny, maxx, maxy = bbox
         return [[miny, minx], [maxy, maxx]]
+
+    # -------------------------------------------------------------------------
+    def _overlay_bounds_to_bbox(
+        self, overlays: list[dict[str, Any]]
+    ) -> list[float] | None:
+        envelopes: list[tuple[float, float, float, float]] = []
+        for overlay in overlays:
+            bounds = overlay.get("bounds")
+            if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
+                continue
+            try:
+                lat1 = float(bounds[0][0])
+                lon1 = float(bounds[0][1])
+                lat2 = float(bounds[1][0])
+                lon2 = float(bounds[1][1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            min_lon, max_lon = (lon1, lon2) if lon1 <= lon2 else (lon2, lon1)
+            min_lat, max_lat = (lat1, lat2) if lat1 <= lat2 else (lat2, lat1)
+            envelopes.append((min_lon, min_lat, max_lon, max_lat))
+        if not envelopes:
+            return None
+        min_lon = min(entry[0] for entry in envelopes)
+        min_lat = min(entry[1] for entry in envelopes)
+        max_lon = max(entry[2] for entry in envelopes)
+        max_lat = max(entry[3] for entry in envelopes)
+        return [min_lon, min_lat, max_lon, max_lat]
+
+    # -------------------------------------------------------------------------
+    def _merge_map_and_overlay_bboxes(
+        self, *, map_bbox: list[float], overlays: list[dict[str, Any]]
+    ) -> list[float] | None:
+        overlay_bbox = self._overlay_bounds_to_bbox(overlays)
+        if overlay_bbox is None:
+            return None
+        min_lon = min(map_bbox[0], overlay_bbox[0])
+        min_lat = min(map_bbox[1], overlay_bbox[1])
+        max_lon = max(map_bbox[2], overlay_bbox[2])
+        max_lat = max(map_bbox[3], overlay_bbox[3])
+        return [min_lon, min_lat, max_lon, max_lat]
 
 
 ###############################################################################
