@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from AEGIS.server.packages.constants import COMMON_GEOSPATIAL_LAYERS
+from AEGIS.server.utils.constants import COMMON_GEOSPATIAL_LAYERS
 
 type LayerDefinition = dict[str, Any]
 type ResolutionProvider = Callable[[str], tuple[float, ...] | list[float]]
@@ -45,14 +45,16 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
             "true color",
             "viirs truecolor",
             "true color (viirs snpp)",
+            "viirs snpp correctedreflectance truecolor",
         ),
     },
     "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": {
         "provider": "gibs",
         "aliases": (
             "land cover",
-            "land cover (nlcd)",
-            "nlcd",
+            "land cover type (modis igbp)",
+            "modis igbp land cover",
+            "igbp land cover",
         ),
     },
     "SRTM_Color_Index": {
@@ -67,24 +69,93 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
         "provider": "gibs",
         "aliases": (
             "population density",
-            "population density (gpw)",
-            "gpw",
+            "population density (gpw 2020)",
+            "gpw 2020",
         ),
     },
     "MODIS_Terra_L3_Land_Water_Mask": {
         "provider": "gibs",
         "aliases": (
-            "hydrology",
-            "hydrology (hydrosheds)",
-            "hydrosheds",
+            "land/water mask (modis terra)",
+            "water mask",
+            "land water mask",
         ),
     },
     "IMERG_Precipitation_Rate": {
         "provider": "gibs",
         "aliases": (
-            "weather radar",
-            "weather radar (nexrad)",
-            "nexrad",
+            "precipitation rate",
+            "imerg precipitation",
+            "imerg",
+        ),
+    },
+    "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": {
+        "provider": "gibs",
+        "aliases": (
+            "air pollution",
+            "no2",
+            "nitrogen dioxide",
+            "ground level no2",
+        ),
+    },
+    "MODIS_Terra_Aerosol": {
+        "provider": "gibs",
+        "aliases": (
+            "aerosol",
+            "aerosol optical depth",
+            "modis aerosol",
+            "aod",
+        ),
+    },
+    "MODIS_Terra_Land_Surface_Temp_Day": {
+        "provider": "gibs",
+        "aliases": (
+            "land surface temperature",
+            "lst day",
+            "modis lst",
+        ),
+    },
+    "MODIS_Terra_NDVI_8Day": {
+        "provider": "gibs",
+        "aliases": (
+            "ndvi",
+            "vegetation index",
+            "modis ndvi",
+        ),
+    },
+    "Landsat_Global_Man-made_Impervious_Surface": {
+        "provider": "gibs",
+        "aliases": (
+            "impervious surface",
+            "gmis",
+            "paved surface",
+            "imperviousness",
+        ),
+    },
+    "Landsat_Human_Built-up_And_Settlement_Extent": {
+        "provider": "gibs",
+        "aliases": (
+            "built-up",
+            "settlement extent",
+            "hbase",
+            "roads and built-up",
+        ),
+    },
+    "VIIRS_CityLights_2012": {
+        "provider": "gibs",
+        "aliases": (
+            "nighttime lights",
+            "city lights",
+            "viirs lights",
+        ),
+    },
+    "LECZ_Urban_Rural_Extents_Below_10m": {
+        "provider": "gibs",
+        "aliases": (
+            "low elevation coastal zone",
+            "lecz",
+            "coastal exposure",
+            "below 10m",
         ),
     },
 }

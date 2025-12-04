@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from AEGIS.server.packages.configurations.base import (
+from AEGIS.server.utils.configurations.base import (
     ensure_mapping, 
     load_configuration_data    
 )
 
-from AEGIS.server.packages.constants import (
+from AEGIS.server.utils.constants import (
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,   
     NASA_ATTRIBUTION,
@@ -17,7 +17,7 @@ from AEGIS.server.packages.constants import (
     AGENT_MODEL_CHOICES
 )
 
-from AEGIS.server.packages.types import (
+from AEGIS.server.utils.types import (
     coerce_bool,
     coerce_float,
     coerce_int,

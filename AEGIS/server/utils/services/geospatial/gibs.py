@@ -14,8 +14,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from AEGIS.server.packages.configurations import server_settings
-from AEGIS.server.packages.constants import (
+from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
     GIBS_LAYERS_TABLE,
@@ -30,8 +30,8 @@ from AEGIS.server.packages.constants import (
     MIN_MERCATOR_LAT,
     ORIGIN_SHIFT,
 )
-from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.database.database import database
+from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.database.database import database
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
@@ -172,6 +172,19 @@ class GIBSService:
         self.layer_catalog = self.load_layer_catalog()
         self.layer_native_resolution_m = {
             "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
+            "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
+            "SRTM_Color_Index": 30.0,
+            "GPW_Population_Density_2020": 1000.0,
+            "MODIS_Terra_L3_Land_Water_Mask": 250.0,
+            "IMERG_Precipitation_Rate": 11000.0,
+            "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": 10000.0,
+            "MODIS_Terra_Aerosol": 10000.0,
+            "MODIS_Terra_Land_Surface_Temp_Day": 1000.0,
+            "MODIS_Terra_NDVI_8Day": 250.0,
+            "Landsat_Global_Man-made_Impervious_Surface": 30.0,
+            "Landsat_Human_Built-up_And_Settlement_Extent": 30.0,
+            "VIIRS_CityLights_2012": 500.0,
+            "LECZ_Urban_Rural_Extents_Below_10m": 1000.0,
         }
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
@@ -283,20 +296,11 @@ class GIBSService:
         )
         self.validate_dimensions(width, height)
         format_lower = format.lower()
-        cache_key = self.build_cache_key(
+        capabilities, _ = self.resolve_capabilities_for_layer(
+            requested_crs=request_crs,
             layer=layer,
-            imagery_date=date,
-            bbox=normalized_bbox,
-            crs=request_crs,
-            width=width,
-            height=height,
-            format_value=format_lower,
-            style_value=style_value,
+            wms_version=wms_version,
         )
-        cached = self.response_cache.get(cache_key)
-        if cached:
-            return dict(cached)
-        capabilities = self.load_capabilities(request_crs, wms_version)
         layer_meta = self.extract_layer(layer, capabilities)
         actual_crs = self.resolve_layer_crs(layer_meta, request_crs)
         bbox_for_request = (
@@ -312,7 +316,23 @@ class GIBSService:
         )
         self.validate_format(format_lower, layer_meta, capabilities)
         imagery_date_value = self.parse_imagery_date(date)
-        self.ensure_layer_temporal_support(imagery_date_value, layer_meta)
+        supported_imagery_date = self.resolve_supported_imagery_date(
+            imagery_date_value, layer_meta
+        )
+        imagery_date_token = supported_imagery_date.isoformat()
+        cache_key = self.build_cache_key(
+            layer=layer,
+            imagery_date=imagery_date_token,
+            bbox=bbox_for_request,
+            crs=actual_crs,
+            width=width,
+            height=height,
+            format_value=format_lower,
+            style_value=style_value,
+        )
+        cached = self.response_cache.get(cache_key)
+        if cached:
+            return dict(cached)
         query = self.build_query(
             base_url=self.resolve_base_url(actual_crs),
             bbox=bbox_for_request,
@@ -320,7 +340,7 @@ class GIBSService:
             width=width,
             height=height,
             layer=layer,
-            imagery_date=date,
+            imagery_date=imagery_date_token,
             format_value=format_lower,
             style_value=style_value,
             wms_version=wms_version,
@@ -332,7 +352,7 @@ class GIBSService:
             "mime": mime,
             "bbox": bbox_for_request,
             "crs": actual_crs,
-            "date": date,
+            "date": imagery_date_token,
             "layer": layer,
             "width": width,
             "height": height,
@@ -457,6 +477,43 @@ class GIBSService:
         capabilities = self.parse_capabilities(xml_payload)
         self.capabilities_cache.set(cache_key, capabilities)
         return capabilities
+
+    # -------------------------------------------------------------------------
+    def build_capability_candidates(self, requested_crs: str, layer: str) -> list[str]:
+        requested = requested_crs.upper()
+        candidates: list[str] = [requested]
+        metadata = self.get_layer_metadata(layer)
+        if metadata and metadata.projections:
+            for projection in metadata.projections:
+                normalized = projection.upper()
+                if normalized in self.wms_base_endpoints and normalized not in candidates:
+                    candidates.append(normalized)
+        for fallback in ("EPSG:3857", "EPSG:4326"):
+            if fallback in self.wms_base_endpoints and fallback not in candidates:
+                candidates.append(fallback)
+        for crs in self.wms_base_endpoints:
+            normalized = crs.upper()
+            if normalized not in candidates:
+                candidates.append(normalized)
+        return candidates
+
+    # -------------------------------------------------------------------------
+    def resolve_capabilities_for_layer(
+        self, *, requested_crs: str, layer: str, wms_version: str
+    ) -> tuple[Capabilities, str]:
+        errors: list[str] = []
+        for candidate in self.build_capability_candidates(requested_crs, layer):
+            try:
+                capabilities = self.load_capabilities(candidate, wms_version)
+            except GIBSRequestError as exc:
+                errors.append(f"{candidate}:{exc}")
+                continue
+            if layer in capabilities.layers:
+                return capabilities, candidate
+        detail = "; ".join(errors) if errors else "layer not advertised"
+        raise GIBSValidationError(
+            f"Layer '{layer}' not available for CRS '{requested_crs}'. ({detail})"
+        )
 
     # -------------------------------------------------------------------------
     def resolve_base_url(self, crs: str) -> str:
@@ -623,13 +680,9 @@ class GIBSService:
             ) from exc
 
     # -------------------------------------------------------------------------
-    def ensure_layer_temporal_support(
-        self, imagery_date: date, metadata: LayerMetadata
-    ) -> None:
-        if not metadata.time_extent:
-            return
+    def parse_time_extent(self, time_extent: str) -> tuple[date | None, date | None]:
         expressions = [
-            expr.strip() for expr in metadata.time_extent.split(",") if expr.strip()
+            expr.strip() for expr in time_extent.split(",") if expr.strip()
         ]
         min_supported: date | None = None
         max_supported: date | None = None
@@ -643,8 +696,6 @@ class GIBSService:
                         min_supported = start
                     if end and (max_supported is None or end > max_supported):
                         max_supported = end
-                    if start and end and start <= imagery_date <= end:
-                        return
             else:
                 literal = self.safe_parse_date(expression)
                 if literal:
@@ -652,24 +703,58 @@ class GIBSService:
                         min_supported = literal
                     if max_supported is None or literal > max_supported:
                         max_supported = literal
-                    if literal == imagery_date:
-                        return
-        if min_supported and max_supported:
+        return min_supported, max_supported
+
+    # -------------------------------------------------------------------------
+    def resolve_supported_imagery_date(
+        self, imagery_date: date, metadata: LayerMetadata
+    ) -> date:
+        if not metadata.time_extent:
+            return imagery_date
+        min_supported, max_supported = self.parse_time_extent(metadata.time_extent)
+        if min_supported and imagery_date < min_supported:
+            return min_supported
+        if max_supported and imagery_date > max_supported:
+            return max_supported
+        return imagery_date
+
+    # -------------------------------------------------------------------------
+    def ensure_layer_temporal_support(
+        self, imagery_date: date, metadata: LayerMetadata
+    ) -> None:
+        if not metadata.time_extent:
+            return
+        min_supported, max_supported = self.parse_time_extent(metadata.time_extent)
+        if min_supported and imagery_date < min_supported:
             raise GIBSValidationError(
                 (
-                    f"Layer '{metadata.name}' supports imagery between "
-                    f"{min_supported.isoformat()} and {max_supported.isoformat()}; "
-                    f"requested {imagery_date.isoformat()}."
+                    f"Layer '{metadata.name}' supports imagery starting "
+                    f"{min_supported.isoformat()}; requested {imagery_date.isoformat()}."
                 )
             )
+        if max_supported and imagery_date > max_supported:
+            raise GIBSValidationError(
+                (
+                    f"Layer '{metadata.name}' supports imagery through "
+                    f"{max_supported.isoformat()}; requested {imagery_date.isoformat()}."
+                )
+            )
+        if min_supported or max_supported:
+            return
         raise GIBSValidationError(
             f"No imagery for '{metadata.name}' on {imagery_date.isoformat()}."
         )
 
     # -------------------------------------------------------------------------
     def safe_parse_date(self, value: str) -> date | None:
+        normalized = (value or "").strip()
+        if not normalized:
+            return None
+        lowered = normalized.lower()
+        if lowered in {"present", "now", "latest"}:
+            return date.today()
         try:
-            return date.fromisoformat(value)
+            return date.fromisoformat(normalized)
         except ValueError:
             return None
 

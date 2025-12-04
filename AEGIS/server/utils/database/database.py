@@ -6,10 +6,10 @@ from typing import Any, Protocol
 import pandas as pd
 from sqlalchemy.orm import declarative_base
 
-from AEGIS.server.packages.configurations import DatabaseSettings, server_settings
-from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.database.postgres import PostgresRepository
-from AEGIS.server.packages.database.sqlite import SQLiteRepository
+from AEGIS.server.utils.configurations import DatabaseSettings, server_settings
+from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.database.postgres import PostgresRepository
+from AEGIS.server.utils.database.sqlite import SQLiteRepository
 
 Base = declarative_base()
 

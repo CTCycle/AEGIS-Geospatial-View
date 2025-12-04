@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.utils.updater import GeonamesUpdater
+from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.updater import GeonamesUpdater
 
 ###############################################################################
 if __name__ == "__main__":

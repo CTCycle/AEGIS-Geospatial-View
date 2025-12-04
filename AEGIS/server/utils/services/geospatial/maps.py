@@ -7,8 +7,8 @@ from typing import Any
 
 import folium
 
-from AEGIS.server.packages.configurations import server_settings
-from AEGIS.server.packages.constants import (
+from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
     MAX_GEO_LAT,
@@ -16,7 +16,7 @@ from AEGIS.server.packages.constants import (
     MIN_GEO_LAT,
     MIN_LONGITUDE,
 )
-from AEGIS.server.packages.logger import logger
+from AEGIS.server.utils.logger import logger
 
 type BBox = list[float]
 

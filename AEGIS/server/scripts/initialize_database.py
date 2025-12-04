@@ -4,8 +4,8 @@ import json
 import os
 import time
 
-from AEGIS.server.packages.database.initializer import initialize_database
-from AEGIS.server.packages.logger import logger
+from AEGIS.server.utils.database.initializer import initialize_database
+from AEGIS.server.utils.logger import logger
 
 
 # -----------------------------------------------------------------------------

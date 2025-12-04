@@ -11,8 +11,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.server.packages.configurations import server_settings
-from AEGIS.server.packages.logger import logger
+from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.logger import logger
 
 
 ###############################################################################

@@ -64,12 +64,25 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
 }
 
 COMMON_GEOSPATIAL_LAYERS = {
-    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color (VIIRS SNPP)",
-    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover (NLCD)",
+GIBS_HOUSING_RELEVANT_LAYERS = {
+    "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": "Air Pollution (NO2, 2010-2012)",
+    "MODIS_Terra_Aerosol": "Aerosol Load (MODIS Terra)",
+    "MODIS_Terra_Land_Surface_Temp_Day": "Land Surface Temperature Day (MODIS Terra)",
+    "MODIS_Terra_NDVI_8Day": "Vegetation Index NDVI (8-day, MODIS Terra)",
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover Type (MODIS IGBP)",
+    "Landsat_Global_Man-made_Impervious_Surface": "Impervious Surface (GMIS, 30 m)",
     "SRTM_Color_Index": "Digital Elevation Model (SRTM)",
-    "GPW_Population_Density_2020": "Population Density (GPW)",
-    "MODIS_Terra_L3_Land_Water_Mask": "Hydrology (HydroSHEDS)",
-    "IMERG_Precipitation_Rate": "Weather Radar (NEXRAD)",
+    "Landsat_Human_Built-up_And_Settlement_Extent": "Built-up & Roads (HBASE, Landsat)",
+    "GPW_Population_Density_2020": "Population Density (GPW 2020)",
+    "VIIRS_CityLights_2012": "Nighttime Lights (VIIRS)",
+    "LECZ_Urban_Rural_Extents_Below_10m": "Low Elevation Coastal Zone (<10 m)",
+}
+
+COMMON_GEOSPATIAL_LAYERS = {
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color (VIIRS SNPP)",
+    "MODIS_Terra_L3_Land_Water_Mask": "Land/Water Mask (MODIS Terra)",
+    "IMERG_Precipitation_Rate": "Precipitation Rate (IMERG)",
+    **GIBS_HOUSING_RELEVANT_LAYERS,
 }
 
 GEOSPATIAL_LAYER_CHOICES = [

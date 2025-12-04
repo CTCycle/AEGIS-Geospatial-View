@@ -16,24 +16,24 @@ from AEGIS.server.schemas.geographics import (
     LocationSearchRequest,
     MapLayerUpdateRequest,
 )
-from AEGIS.server.packages.configurations import server_settings
-from AEGIS.server.packages.utils.services.geospatial.gibs import (
+from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
     GIBSValidationError,
 )
-from AEGIS.server.packages.utils.services.geospatial.layers import (
+from AEGIS.server.utils.services.geospatial.layers import (
     LayerProviderError,
     LayerProviderEntry,
     LayerProviderService,
 )
-from AEGIS.server.packages.utils.services.geospatial.maps import (
+from AEGIS.server.utils.services.geospatial.maps import (
     MapRequestError,
     MapService,
     MapValidationError,
 )
-from AEGIS.server.packages.utils.services.geospatial.normatim import NormatimService
-from AEGIS.server.packages.utils.services.sanitization import LocationSanitizationService
+from AEGIS.server.utils.services.geospatial.normatim import NormatimService
+from AEGIS.server.utils.services.sanitization import LocationSanitizationService
 
 router = APIRouter(prefix="/maps", tags=["search"])
 
