@@ -6,13 +6,13 @@ from os.path import abspath, join
 ###############################################################################
 ROOT_DIR = abspath(join(__file__, "../../../.."))
 PROJECT_DIR = join(ROOT_DIR, "AEGIS")
-SETTING_PATH = join(PROJECT_DIR, "setup", "settings")
-RSC_PATH = join(PROJECT_DIR, "resources")
-MODELS_PATH = join(RSC_PATH, "models")
-DATA_PATH = join(RSC_PATH, "database")
+SETTING_PATH = join(PROJECT_DIR, "settings")
+RESOURCES_PATH = join(PROJECT_DIR, "resources")
+MODELS_PATH = join(RESOURCES_PATH, "models")
+DATA_PATH = join(RESOURCES_PATH, "database")
 DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
-LOGS_PATH = join(RSC_PATH, "logs")
+LOGS_PATH = join(RESOURCES_PATH, "logs")
 ENV_FILE_PATH = join(SETTING_PATH, ".env")
 DATABASE_FILENAME = "sqlite.db"
 
