@@ -1,5 +1,15 @@
-AEGIS/setup/python/*
-AEGIS/setup/settings/.env
+AEGIS/resources/database/*
+AEGIS/resources/runtimes/python/*
+AEGIS/resources/runtimes/nodejs/*
+AEGIS/resources/runtimes/uv/*
+AEGIS/resources/runtimes/uv_cache/*
+AEGIS/settings/.env
+AEGIS/client/node_modules/
+AEGIS/client/dist/
+AEGIS/client/dist-ssr/
+AEGIS/client/.env
+AEGIS/client/*.local
+AEGIS/client/logs/
 AEGIS/resources/models/*
 
 __pycache__
@@ -21,14 +31,8 @@ __pycache__
 *.gz
 !.gitkeep
 
-!AEGIS/setup/settings/server_configurations.json
-!AEGIS/setup/settings/client_configurations.json
+!AEGIS/settings/server_configurations.json
 AGENTS.md
 
-# Frontend
-node_modules
-dist
-dist-ssr
-*.local
-.npm
+
 
