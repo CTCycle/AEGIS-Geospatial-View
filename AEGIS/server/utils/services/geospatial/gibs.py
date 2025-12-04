@@ -943,18 +943,10 @@ class GIBSService:
             return bbox
         target_meter_span = max(meters_per_pixel)
         span_x, span_y = self.bbox_span_in_meters(bbox, crs)
-        if span_x <= 0 or span_y <= 0:
-            return bbox
         min_span_x = target_meter_span * float(width)
         min_span_y = target_meter_span * float(height)
         if span_x >= min_span_x and span_y >= min_span_y:
             return bbox
-        expansion_factor_x = min_span_x / span_x
-        expansion_factor_y = min_span_y / span_y
-        max_expansion_factor = 4.0
-        if expansion_factor_x > max_expansion_factor or expansion_factor_y > max_expansion_factor:
-            min_span_x = span_x * max_expansion_factor
-            min_span_y = span_y * max_expansion_factor
         return self.expand_bbox_to_span(bbox, crs, min_span_x, min_span_y)
 
     # -------------------------------------------------------------------------

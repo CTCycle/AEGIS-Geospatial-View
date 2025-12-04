@@ -63,6 +63,7 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "gemini": GEMINI_CLOUD_MODELS,
 }
 
+COMMON_GEOSPATIAL_LAYERS = {
 GIBS_HOUSING_RELEVANT_LAYERS = {
     "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": "Air Pollution (NO2, 2010-2012)",
     "MODIS_Terra_Aerosol": "Aerosol Load (MODIS Terra)",
