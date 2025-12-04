@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
-from AEGIS.server.packages.variables import env_variables
-from AEGIS.server.endpoints.search import router as search_router
-from AEGIS.server.packages.configurations import server_settings
+from AEGIS.server.utils.variables import env_variables
+from AEGIS.server.routes.search import router as search_router
+from AEGIS.server.utils.configurations import server_settings
 
 ###############################################################################
 app = FastAPI(

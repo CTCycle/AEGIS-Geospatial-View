@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from AEGIS.server.packages.configurations import server_settings
+from AEGIS.server.utils.configurations import server_settings
 
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
