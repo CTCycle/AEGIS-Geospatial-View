@@ -44,7 +44,7 @@ function App() {
             // Let's look at `search.py` again. `search_by_location` endpoint.
             // It doesn't seem to take model params. 
             // BUT, `view.py` has `settings_controller`.
-            // The `SettingsService` in `view.py` updates `runtime_config` which is imported from `AEGIS.server.packages.configurations.server`.
+            // The `SettingsService` in `view.py` updates `runtime_config` which is imported from `AEGIS.server.utils.configurations.server`.
             // So the frontend was directly modifying server-side singleton configuration!
             // Since I cannot modify the backend code to accept these params in the request, and I cannot directly import python modules in React...
             // I might have a problem if the backend expects those settings to be set via a side-channel.
@@ -69,8 +69,8 @@ function App() {
             // `python -m AEGIS.client.main` (Frontend)
             // They are separate processes!
             // So how did `view.py` (Frontend process) affect `server_settings` (Backend process)?
-            // `from AEGIS.server.packages.configurations import client_settings`
-            // `from AEGIS.server.packages.configurations import server_settings`
+            // `from AEGIS.server.utils.configurations import client_settings`
+            // `from AEGIS.server.utils.configurations import server_settings`
             // If they are separate processes, importing `server_settings` in the client creates a COPY of that module in the client process. Modifying it there DOES NOT affect the backend process.
             // UNLESS:
             // 1. They are not separate processes (but the bat file says `start ... uvicorn` and `start ... client.main`).
