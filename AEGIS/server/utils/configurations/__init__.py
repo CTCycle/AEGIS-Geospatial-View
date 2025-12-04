@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from AEGIS.server.packages.configurations.base import (
+from AEGIS.server.utils.configurations.base import (
     ensure_mapping,
     load_configuration_data,
 )
 
-from AEGIS.server.packages.configurations.server import (
+from AEGIS.server.utils.configurations.server import (
     DatabaseSettings,
     FastAPISettings,
     NominatimSettings,

@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from AEGIS.server.packages.constants import LOGS_PATH
+from AEGIS.server.utils.constants import LOGS_PATH
 
 # Generate timestamp for the log filename
 ###############################################################################

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from AEGIS.server.packages.constants import COUNTRY_NAME_TO_ISO2, COUNTRY_SYNONYMS
+from AEGIS.server.utils.constants import COUNTRY_NAME_TO_ISO2, COUNTRY_SYNONYMS
 
 
 ###############################################################################

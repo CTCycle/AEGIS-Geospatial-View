@@ -4,11 +4,11 @@ from typing import Any, cast
 
 import pandas as pd
 
-from AEGIS.server.packages.constants import (
+from AEGIS.server.utils.constants import (
     GEONAMES_COLUMNS,
     GIBS_LAYER_COLUMNS,
 )
-from AEGIS.server.packages.database.database import database
+from AEGIS.server.utils.database.database import database
 
 
 ###############################################################################

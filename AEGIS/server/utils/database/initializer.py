@@ -5,12 +5,12 @@ import urllib.parse
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 
-from AEGIS.server.packages.configurations import DatabaseSettings, server_settings
-from AEGIS.server.packages.database.postgres import PostgresRepository
-from AEGIS.server.packages.database.schema import Base
-from AEGIS.server.packages.database.sqlite import SQLiteRepository
-from AEGIS.server.packages.database.utils import normalize_postgres_engine
-from AEGIS.server.packages.logger import logger
+from AEGIS.server.utils.configurations import DatabaseSettings, server_settings
+from AEGIS.server.utils.database.postgres import PostgresRepository
+from AEGIS.server.utils.database.schema import Base
+from AEGIS.server.utils.database.sqlite import SQLiteRepository
+from AEGIS.server.utils.database.utils import normalize_postgres_engine
+from AEGIS.server.utils.logger import logger
 
 
 ###############################################################################

@@ -8,9 +8,9 @@ import zipfile
 from collections.abc import Iterator
 from typing import Any
 
-from AEGIS.server.packages.constants import SOURCES_PATH
-from AEGIS.server.packages.logger import logger
-from AEGIS.server.packages.utils.repository.serializer import (
+from AEGIS.server.utils.constants import SOURCES_PATH
+from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.repository.serializer import (
     GEONAMES_COLUMNS,
     DataSerializer,
 )
