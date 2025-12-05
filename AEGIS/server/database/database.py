@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any, Protocol
 
 import pandas as pd
@@ -8,8 +8,8 @@ from sqlalchemy.orm import declarative_base
 
 from AEGIS.server.utils.configurations import DatabaseSettings, server_settings
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.utils.database.postgres import PostgresRepository
-from AEGIS.server.utils.database.sqlite import SQLiteRepository
+from AEGIS.server.database.postgres import PostgresRepository
+from AEGIS.server.database.sqlite import SQLiteRepository
 
 Base = declarative_base()
 
@@ -30,10 +30,9 @@ class DatabaseBackend(Protocol):
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int: ...
-
+   
 
 BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
-
 
 # -----------------------------------------------------------------------------
 def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
