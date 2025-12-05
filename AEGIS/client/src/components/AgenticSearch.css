@@ -76,12 +76,6 @@
     gap: 0.75rem;
 }
 
-.field-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 0.75rem;
-}
-
 .form-group {
     display: flex;
     flex-direction: column;
@@ -94,20 +88,50 @@
     color: #0f172a;
 }
 
-.inline-inputs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.5rem;
-}
-
 .helper-text {
     margin: 0;
     font-size: 0.85rem;
     color: #475569;
 }
 
-.helper-text.stacked {
-    grid-column: 1 / -1;
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.config-group {
+    border: 1px solid #dbe5f5;
+    border-radius: 12px;
+    padding: 0.75rem;
+    background: #f8fbff;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.config-title {
+    margin: 0;
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.checkbox-row {
+    border: 1px dashed #cbd5e1;
+    background: #f8fbff;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    gap: 0.25rem;
+}
+
+.inline-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #0f172a;
 }
 
 .agentic-status {

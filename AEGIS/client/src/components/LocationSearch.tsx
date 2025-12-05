@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS } from '../constants';
 import { LocationSearchRequest } from '../types';
 import './LocationSearch.css';
 
@@ -16,6 +17,8 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     const [address, setAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
+    const [mapTile, setMapTile] = useState('OpenStreetMap');
+    const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
 
     const resetErrors = () => setErrors({});
@@ -75,6 +78,8 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                 use_coordinates: true,
                 latitude: parsedLat,
                 longitude: parsedLon,
+                map_tiles: mapTile,
+                filters: selectedFilters,
             };
             onSearch(request);
             return;
@@ -86,8 +91,24 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
             country: country || undefined,
             city: city || undefined,
             address: address || undefined,
+            map_tiles: mapTile,
+            filters: selectedFilters,
         };
         onSearch(request);
+    };
+
+    const handleFilterSelect = (value: string) => {
+        if (!value) {
+            return;
+        }
+        const normalized = value === 'None' ? '' : value;
+        if (normalized && !selectedFilters.includes(normalized)) {
+            setSelectedFilters([...selectedFilters, normalized]);
+        }
+    };
+
+    const removeFilter = (filter: string) => {
+        setSelectedFilters(selectedFilters.filter((f) => f !== filter));
     };
 
     const renderAddressFields = () => (
@@ -192,8 +213,57 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 
             {mode === 'address' ? renderAddressFields() : renderCoordinateFields()}
 
-            <div className="toolbar-summary" role="status">
-                Map layers and models from the left toolbar are applied automatically.
+            <div className="group-label">Map context</div>
+            <p className="helper-text">Select base map and optional geospatial filters to include in results.</p>
+            <div className="field-grid">
+                <div className="form-group">
+                    <label htmlFor="base-map">Base map</label>
+                    <select
+                        id="base-map"
+                        value={mapTile}
+                        onChange={(e) => setMapTile(e.target.value)}
+                    >
+                        {Object.entries(COMMON_FOLIUM_MAPS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label htmlFor="geospatial-layer">Geospatial layer</label>
+                    <select
+                        id="geospatial-layer"
+                        defaultValue=""
+                        onChange={(e) => {
+                            handleFilterSelect(e.target.value);
+                            e.target.value = '';
+                        }}
+                    >
+                        <option value="" disabled>Select a layer...</option>
+                        <option value="None">None</option>
+                        {Object.entries(COMMON_GEOSPATIAL_LAYERS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+                    <p className="helper-text">Choose multiple layers; click a chip to remove.</p>
+                    <div className="chip-container">
+                        {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
+                        {selectedFilters.map((filter) => (
+                            <div
+                                key={filter}
+                                className="chip"
+                                title={COMMON_GEOSPATIAL_LAYERS[filter] || filter}
+                                onClick={() => removeFilter(filter)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => e.key === 'Enter' && removeFilter(filter)}
+                                aria-label={`Remove ${COMMON_GEOSPATIAL_LAYERS[filter] || filter}`}
+                            >
+                                {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
+                                <span className="chip-close">✕</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             <div className="actions">

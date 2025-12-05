@@ -38,6 +38,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
                     className="map-iframe"
                     srcDoc={imagery.map_html}
                     style={{ border: 0 }}
+                    scrolling="no"
                 />
             );
         }
