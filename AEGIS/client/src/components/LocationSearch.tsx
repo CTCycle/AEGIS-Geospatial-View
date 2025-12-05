@@ -244,25 +244,29 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                             <option key={key} value={key}>{label}</option>
                         ))}
                     </select>
-                    <p className="helper-text">Choose multiple layers; click a chip to remove.</p>
-                    <div className="chip-container">
-                        {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
-                        {selectedFilters.map((filter) => (
-                            <div
-                                key={filter}
-                                className="chip"
-                                title={COMMON_GEOSPATIAL_LAYERS[filter] || filter}
-                                onClick={() => removeFilter(filter)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => e.key === 'Enter' && removeFilter(filter)}
-                                aria-label={`Remove ${COMMON_GEOSPATIAL_LAYERS[filter] || filter}`}
-                            >
-                                {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
-                                <span className="chip-close">✕</span>
-                            </div>
-                        ))}
-                    </div>
+
+                </div>
+            </div>
+
+            <div className="form-group">
+                <p className="helper-text">Choose multiple layers; click a chip to remove.</p>
+                <div className="chip-container">
+                    {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
+                    {selectedFilters.map((filter) => (
+                        <div
+                            key={filter}
+                            className="chip"
+                            title={COMMON_GEOSPATIAL_LAYERS[filter] || filter}
+                            onClick={() => removeFilter(filter)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && removeFilter(filter)}
+                            aria-label={`Remove ${COMMON_GEOSPATIAL_LAYERS[filter] || filter}`}
+                        >
+                            {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
+                            <span className="chip-close">✕</span>
+                        </div>
+                    ))}
                 </div>
             </div>
 
