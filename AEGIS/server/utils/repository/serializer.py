@@ -8,7 +8,7 @@ from AEGIS.server.utils.constants import (
     GEONAMES_COLUMNS,
     GIBS_LAYER_COLUMNS,
 )
-from AEGIS.server.utils.database.database import database
+from AEGIS.server.database.database import database
 
 
 ###############################################################################
