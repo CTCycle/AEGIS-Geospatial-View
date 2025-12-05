@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 from datetime import datetime, time
 from io import BytesIO
 from typing import Any
@@ -14,9 +15,10 @@ from pydantic import ValidationError
 
 from AEGIS.server.schemas.geographics import (
     LocationSearchRequest,
-    MapLayerUpdateRequest,
 )
 from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.repository.serializer import DataSerializer
 from AEGIS.server.utils.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
@@ -681,6 +683,91 @@ class MapSearchEndpoint:
         self.normatim_service = normatim_service
         self.toolkit = toolkit
         self.renderer = rendering_service
+        self.serializer = DataSerializer()
+
+    # -------------------------------------------------------------------------
+    def resolve_coordinate_pair(
+        self,
+        payload: LocationSearchRequest | None,
+        response_payload: dict[str, Any] | None,
+        fallback: dict[str, Any],
+    ) -> CoordinatePair | None:
+        payload_snapshot = response_payload.get("payload", {}) if response_payload else {}
+        if payload:
+            coordinates = self.toolkit.extract_coordinate_pair(
+                payload, payload_snapshot
+            )
+            if coordinates:
+                return coordinates
+            coordinates = self.toolkit.extract_coordinate_pair(
+                payload, payload.model_dump()
+            )
+            if coordinates:
+                return coordinates
+        lon_candidate = fallback.get("longitude")
+        lat_candidate = fallback.get("latitude")
+        try:
+            lon_value = float(lon_candidate)
+            lat_value = float(lat_candidate)
+        except (TypeError, ValueError):
+            return None
+        return lon_value, lat_value
+
+    # -------------------------------------------------------------------------
+    def format_coordinate_pair(self, coordinates: CoordinatePair | None) -> str | None:
+        if coordinates is None:
+            return None
+        lon, lat = coordinates
+        return json.dumps({"longitude": lon, "latitude": lat})
+
+    # -------------------------------------------------------------------------
+    def build_search_session_record(
+        self,
+        *,
+        payload: LocationSearchRequest | None,
+        response_payload: dict[str, Any] | None,
+        fallback: dict[str, Any],
+        state: str,
+    ) -> dict[str, Any]:
+        coordinates = self.resolve_coordinate_pair(payload, response_payload, fallback)
+        layers = (
+            list(payload.filters)
+            if payload
+            else self.toolkit.normalize_layers(fallback.get("geospatial_layers") or [])
+        )
+        record = {
+            "id": None,
+            "created_at": datetime.utcnow(),
+            "user": fallback.get("user"),
+            "country": payload.country if payload else fallback.get("country"),
+            "city": payload.city if payload else fallback.get("city"),
+            "address": payload.address if payload else fallback.get("address"),
+            "coordinates": self.format_coordinate_pair(coordinates),
+            "base_map": payload.map_tiles if payload else fallback.get("map_tiles"),
+            "geospatial_layers": json.dumps(layers) if layers else None,
+            "state": state,
+        }
+        return record
+
+    # -------------------------------------------------------------------------
+    async def record_search_session(
+        self,
+        *,
+        payload: LocationSearchRequest | None,
+        response_payload: dict[str, Any] | None,
+        fallback: dict[str, Any],
+        state: str,
+    ) -> None:
+        record = self.build_search_session_record(
+            payload=payload,
+            response_payload=response_payload,
+            fallback=fallback,
+            state=state,
+        )
+        try:
+            await asyncio.to_thread(self.serializer.insert_search_session, record)
+        except Exception as exc:
+            logger.warning("Failed to store search session: %s", exc)
 
     # -------------------------------------------------------------------------
     async def get_location_coordinates(
@@ -784,6 +871,18 @@ class MapSearchEndpoint:
         image_crs: str | None = Body(default=None),
         image_format: str | None = Body(default=None),
     ) -> JSONResponse:
+        payload: LocationSearchRequest | None = None
+        response_payload: dict[str, Any] | None = None
+        request_context = {
+            "user": None,
+            "country": country,
+            "city": city,
+            "address": address,
+            "longitude": longitude,
+            "latitude": latitude,
+            "geospatial_layers": list(geospatial_layers),
+            "map_tiles": map_tiles or server_settings.map.tiles,
+        }
         try:
             payload_data: dict[str, Any] = {
                 "datetime": datetime_value,
@@ -805,7 +904,7 @@ class MapSearchEndpoint:
             payload_data["map_size_m"] = server_settings.map.default_size_m
             if map_size_m is not None:
                 payload_data["map_size_m"] = map_size_m
-            payload_data["map_tiles"] = map_tiles or server_settings.map.tiles
+            payload_data["map_tiles"] = request_context["map_tiles"]
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:
@@ -813,126 +912,42 @@ class MapSearchEndpoint:
             payload = await asyncio.to_thread(
                 LocationSearchRequest.model_validate, payload_data
             )
+            response_payload = await self.process_location_search(payload)
+            serialized_payload = await asyncio.to_thread(
+                jsonable_encoder, response_payload
+            )
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="success",
+            )
+            return JSONResponse(content=serialized_payload)
         except ValidationError as exc:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=sanitize_validation_errors(exc.errors()),
             ) from exc
-
-        response_payload = await self.process_location_search(payload)
-        serialized_payload = await asyncio.to_thread(jsonable_encoder, response_payload)
-        return JSONResponse(content=serialized_payload)    
+        except Exception:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
+            raise
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/search",
             self.search_by_location,
-            methods=["POST"],
-            status_code=status.HTTP_200_OK,
-        )
-
-
-###############################################################################
-class MapLayerUpdateEndpoint:
-    def __init__(
-        self,
-        router: APIRouter,
-        toolkit: MapSearchToolkit,
-        rendering_service: MapRenderingService,
-    ) -> None:
-        self.router = router
-        self.toolkit = toolkit
-        self.renderer = rendering_service
-
-    # -------------------------------------------------------------------------
-    def extract_location_fields(self, payload: dict[str, Any]) -> dict[str, Any]:
-        field_names = set(LocationSearchRequest.model_fields.keys())
-        extracted: dict[str, Any] = {}
-        for field in field_names:
-            if field == "filters":
-                continue
-            if field in payload:
-                extracted[field] = payload[field]
-        return extracted
-
-    # -------------------------------------------------------------------------
-    def prepare_update_context(
-        self, request: MapLayerUpdateRequest
-    ) -> tuple[LocationSearchRequest, dict[str, Any]]:
-        base_payload = dict(request.payload or {})
-        base_layers = base_payload.get("layers")
-        if base_layers is None:
-            base_layers = base_payload.get("filters", [])
-        normalized_base = self.toolkit.normalize_layers(base_layers)
-        override_layers = (
-            self.toolkit.normalize_layers(request.layers)
-            if request.layers is not None
-            else None
-        )
-        additions = self.toolkit.normalize_layers(request.add_layers)
-        removals = self.toolkit.normalize_layers(request.remove_layers)
-        merged_layers = self.toolkit.merge_layer_selections(
-            normalized_base,
-            additions=additions,
-            removals=removals,
-            override_layers=override_layers,
-        )
-        payload_data = self.extract_location_fields(base_payload)
-        payload_data["filters"] = merged_layers
-        location_request = LocationSearchRequest.model_validate(payload_data)
-        sanitized_layers = list(location_request.filters)
-        response_payload = dict(base_payload)
-        response_payload["layers"] = sanitized_layers
-        response_payload.pop("filters", None)
-        response_payload.pop("satellite_imagery", None)
-        return location_request, response_payload
-
-    # -------------------------------------------------------------------------
-    async def apply_layer_update(
-        self, update_request: MapLayerUpdateRequest = Body(...)
-    ) -> JSONResponse:
-        try:
-            location_request, response_payload = self.prepare_update_context(
-                update_request
-            )
-        except ValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=sanitize_validation_errors(exc.errors()),
-            ) from exc
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        try:
-            satellite_payload = await self.renderer.build_satellite_payload(
-                location_request, response_payload
-            )
-        except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        except (GIBSRequestError, MapRequestError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
-            ) from exc
-        response_payload["satellite_imagery"] = satellite_payload
-        content = {
-            "status_message": "Map layers updated.",
-            "payload": response_payload,
-        }
-        serialized_payload = await asyncio.to_thread(jsonable_encoder, content)
-        return JSONResponse(content=serialized_payload)
-
-    # -------------------------------------------------------------------------
-    def add_routes(self) -> None:
-        self.router.add_api_route(
-            "/update",
-            self.apply_layer_update,
             methods=["POST"],
             status_code=status.HTTP_200_OK,
         )
@@ -955,10 +970,3 @@ search_endpoint = MapSearchEndpoint(
     rendering_service=rendering_service,
 )
 search_endpoint.add_routes()
-
-update_endpoint = MapLayerUpdateEndpoint(
-    router=router,
-    toolkit=toolkit,
-    rendering_service=rendering_service,
-)
-update_endpoint.add_routes()

@@ -3,11 +3,13 @@ from __future__ import annotations
 from sqlalchemy import (
     BigInteger,
     Column,
+    DateTime,
     Float,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import declarative_base
 
@@ -50,3 +52,19 @@ class GibsLayerRecord(Base):
     tile_matrix_sets = Column(Text)
     meters_per_pixel = Column(Text)
     __table_args__ = (UniqueConstraint("layer_id"),)
+
+
+###############################################################################
+class SearchSessionRecord(Base):
+    __tablename__ = "SEARCH_SESSIONS"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    user = Column(String(200))
+    country = Column(String(200))
+    city = Column(String(200))
+    address = Column(String(400))
+    coordinates = Column(String(128))
+    base_map = Column(String(200))
+    geospatial_layers = Column(Text)
+    state = Column(String(20))
+    __table_args__ = (UniqueConstraint("id"),)

@@ -108,6 +108,7 @@ COMMON_FOLIUM_MAPS = {
 ###############################################################################
 GEONAMES_TABLE = "GEONAMES"
 GIBS_LAYERS_TABLE = "GIBS_LAYERS"
+SEARCH_SESSIONS_TABLE = "SEARCH_SESSIONS"
 
 
 # [DATABASE COLUMNS]
@@ -142,6 +143,19 @@ GIBS_LAYER_COLUMNS = [
     "source_urls",
     "tile_matrix_sets",
     "meters_per_pixel",
+]
+
+SEARCH_SESSION_COLUMNS = [
+    "id",
+    "created_at",
+    "user",
+    "country",
+    "city",
+    "address",
+    "coordinates",
+    "base_map",
+    "geospatial_layers",
+    "state",
 ]
 
 
