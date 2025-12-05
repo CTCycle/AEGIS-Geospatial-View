@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './AgenticSearch.css';
-import { AgenticConfig } from '../types';
+import { AgenticConfig, RuntimeSettings } from '../types';
+import { CLOUD_MODEL_CHOICES, CLOUD_PROVIDERS, AGENT_MODEL_CHOICES } from '../constants';
 
 interface AgenticSearchProps {
     config: AgenticConfig;
     onChange: (next: AgenticConfig) => void;
     isRunning: boolean;
     lastSummary?: string;
+    settings: RuntimeSettings;
+    onSettingsChange: (next: RuntimeSettings) => void;
 }
 
 const AgenticSearch: React.FC<AgenticSearchProps> = ({
@@ -14,6 +17,8 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
     onChange,
     isRunning,
     lastSummary,
+    settings,
+    onSettingsChange,
 }) => {
     const handleToggle = (enabled: boolean) => {
         onChange({ ...config, enabled });
@@ -23,17 +28,33 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
         onChange({ ...config, objective: value });
     };
 
-    const handleStrategyChange = (value: AgenticConfig['strategy']) => {
-        onChange({ ...config, strategy: value });
+    const handleUseCloudServicesChange = (value: boolean) => {
+        onSettingsChange({ ...settings, useCloudServices: value });
     };
 
-    const handleMaxStepsChange = (value: number) => {
-        onChange({ ...config, maxSteps: Math.max(1, value) });
+    const handleProviderChange = (value: string) => {
+        const availableModels = CLOUD_MODEL_CHOICES[value] || [];
+        onSettingsChange({
+            ...settings,
+            provider: value,
+            cloudModel: availableModels[0] || '',
+        });
     };
 
-    const handleMaxIterationsChange = (value: number) => {
-        onChange({ ...config, maxIterations: Math.max(1, value) });
+    const handleCloudModelChange = (value: string) => {
+        onSettingsChange({ ...settings, cloudModel: value });
     };
+
+    const handleAgentModelChange = (value: string) => {
+        onSettingsChange({ ...settings, agentModel: value });
+    };
+
+    useEffect(() => {
+        const models = CLOUD_MODEL_CHOICES[settings.provider] || [];
+        if (!models.includes(settings.cloudModel) && models.length > 0) {
+            onSettingsChange({ ...settings, cloudModel: models[0] });
+        }
+    }, [settings.provider, settings.cloudModel, settings, onSettingsChange]);
 
     return (
         <div className="agentic-container">
@@ -67,48 +88,67 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
                     />
                 </div>
 
-                <div className="field-grid">
-                    <div className="form-group">
-                        <label htmlFor="agent-strategy">Agent strategy</label>
-                        <select
-                            id="agent-strategy"
-                            value={config.strategy}
-                            onChange={(e) => handleStrategyChange(e.target.value as AgenticConfig['strategy'])}
-                            disabled={!config.enabled}
-                        >
-                            <option value="single_pass">Single pass</option>
-                            <option value="iterative_refinement">Iterative refinement</option>
-                            <option value="exploratory">Exploratory</option>
-                        </select>
-                        <p className="helper-text">Choose how aggressively the agent explores the map.</p>
+                <div className="config-grid">
+                    <div className="config-group">
+                        <p className="config-title">Cloud agent (optional)</p>
+                        <div className="form-group checkbox-row">
+                            <label htmlFor="use-cloud" className="inline-label">
+                                <input
+                                    id="use-cloud"
+                                    type="checkbox"
+                                    checked={settings.useCloudServices}
+                                    onChange={(e) => handleUseCloudServicesChange(e.target.checked)}
+                                />
+                                Use cloud services
+                            </label>
+                            <p className="helper-text">Toggle to route agent calls through a cloud provider.</p>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="cloud-provider">Cloud provider</label>
+                            <select
+                                id="cloud-provider"
+                                value={settings.provider}
+                                onChange={(e) => handleProviderChange(e.target.value)}
+                                disabled={!settings.useCloudServices}
+                            >
+                                {CLOUD_PROVIDERS.map((provider) => (
+                                    <option key={provider} value={provider}>{provider}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="cloud-model">Cloud model</label>
+                            <select
+                                id="cloud-model"
+                                value={settings.cloudModel}
+                                onChange={(e) => handleCloudModelChange(e.target.value)}
+                                disabled={!settings.useCloudServices}
+                            >
+                                {(CLOUD_MODEL_CHOICES[settings.provider] || []).map((model) => (
+                                    <option key={model} value={model}>{model}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="form-group inline-inputs">
-                        <div>
-                            <label htmlFor="max-steps">Maximum steps</label>
-                            <input
-                                id="max-steps"
-                                type="number"
-                                min={1}
-                                max={50}
-                                value={config.maxSteps}
-                                onChange={(e) => handleMaxStepsChange(Number(e.target.value))}
-                                disabled={!config.enabled}
-                            />
+                    <div className="config-group">
+                        <p className="config-title">Local agent model</p>
+                        <div className="form-group">
+                            <label htmlFor="agent-model">Local agent model</label>
+                            <select
+                                id="agent-model"
+                                value={settings.agentModel}
+                                onChange={(e) => handleAgentModelChange(e.target.value)}
+                                disabled={settings.useCloudServices}
+                            >
+                                {AGENT_MODEL_CHOICES.map((model) => (
+                                    <option key={model} value={model}>{model}</option>
+                                ))}
+                            </select>
+                            <p className="helper-text">Used when cloud services are disabled.</p>
                         </div>
-                        <div>
-                            <label htmlFor="max-iterations">Maximum iterations</label>
-                            <input
-                                id="max-iterations"
-                                type="number"
-                                min={1}
-                                max={50}
-                                value={config.maxIterations}
-                                onChange={(e) => handleMaxIterationsChange(Number(e.target.value))}
-                                disabled={!config.enabled}
-                            />
-                        </div>
-                        <p className="helper-text stacked">Higher values may increase latency and cost.</p>
                     </div>
                 </div>
             </div>

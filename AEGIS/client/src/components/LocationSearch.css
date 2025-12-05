@@ -86,13 +86,56 @@
     color: #b91c1c;
 }
 
-.toolbar-summary {
-    font-size: 0.9rem;
-    color: #334155;
-    background: #f8fbff;
-    border: 1px dashed #cbd5e1;
-    padding: 0.5rem 0.75rem;
+.chip-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.5rem;
+    min-height: 52px;
+    max-height: 200px;
+    padding: 0.75rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 10px;
+    background: #f8fafc;
+    width: 100%;
+    grid-column: 1 / -1;
+    margin-top: 0.35rem;
+    margin-left: 0;
+    margin-right: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    align-content: flex-start;
+    align-items: start;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    background: #e0f2fe;
+    border: 1px solid #38bdf8;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: #0f172a;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.chip:hover {
+    background: #bae6fd;
+}
+
+.chip-close {
+    font-size: 0.85rem;
+}
+
+.no-filters {
+    color: #64748b;
+    font-size: 0.9rem;
 }
 
 .actions {

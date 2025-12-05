@@ -19,9 +19,6 @@ export interface LocationSearchRequest {
     image_format?: string;
     agentic_enabled?: boolean;
     agent_prompt?: string;
-    agent_strategy?: string;
-    agent_max_steps?: number;
-    agent_max_iterations?: number;
     llm_provider?: string;
     cloud_model?: string;
     agent_model?: string;
@@ -55,14 +52,9 @@ export interface RuntimeSettings {
     provider: string;
     cloudModel: string;
     agentModel: string;
-    temperature: number;
-    reasoning: boolean;
 }
 
 export interface AgenticConfig {
     enabled: boolean;
     objective: string;
-    strategy: 'single_pass' | 'iterative_refinement' | 'exploratory';
-    maxSteps: number;
-    maxIterations: number;
 }
