@@ -1,67 +1,97 @@
 # AEGIS Geospatial View
 
-# 1. Introduction
-AEGIS Geospatial View delivers a FastAPI backend and a React (Vite) frontend for converting natural-language place descriptions or raw coordinates into normalized bounding boxes and previewable map imagery. It blends OpenStreetMap Nominatim search, NASA GIBS layers, Folium map rendering, and optional LLM-powered “agentic” routing to help users rapidly request geospatial tiles with consistent metadata.
+## 1. Project Overview
+AEGIS Geospatial View turns natural-language location prompts or raw coordinates into normalized bounding boxes and previewable map tiles. The stack pairs a FastAPI backend (geocoding, NASA GIBS layer selection, Folium rendering, and metadata caching) with a Vite + React frontend for interactive searches. It relies on OpenStreetMap Nominatim and optional LLM-powered routing (local Ollama by default) to keep responses consistent and fast.
 
-## Core capabilities
-- Geocode free-text locations into harmonized coordinates and bounding boxes via `/maps/search`, returning imagery plus normalized metadata (e.g., bbox, meters-per-pixel).
-- Render WMS imagery and interactive map previews using Folium with configurable tiles, overlays, and image dimensions.
-- Cache NASA GIBS layer definitions and meters-per-pixel metadata for quicker lookups and deterministic layer selection.
-- Optional LLM-backed prompt routing (Ollama locally by default, OpenAI/Gemini if enabled) to interpret intent and select layers or parameters.
-- React UI for address/coordinate input, layer selection, and live map previews sourced from the backend response.
-- Out-of-the-box logging and local resource folders for data, templates, and cached artifacts.
+## 2. Installation
 
-# 2. Installation
-- **Supported platforms**: Windows scripted setup; manual installation on macOS/Linux/Windows with Python 3.12+ and Node 18+.
-- **Prerequisites**: Python 3.12, `pip` (or `uv`), Node.js 18+, npm, network access to Nominatim and NASA GIBS endpoints. Update `AEGIS/setup/settings/.env` for host/port overrides before startup.
+### 2.1 Windows (One-Click Setup - No Prerequisites Required)
+Launch `AEGIS/start_on_windows.bat` to provision everything automatically:
 
-Standard setup:
-1. Clone the repository and open a terminal at the repo root.
-2. Install Python dependencies: `pip install .` (or `uv pip install .`).
-3. Install frontend deps: `cd AEGIS/client && npm install`.
+1. Download and install **portable Python 3.12** locally (no global install)
+2. Install **uv** locally (portable Python package manager)
+3. Download and install **portable Node.js v22** locally (no global install)
+4. Install all Python and Node.js dependencies
+5. Build the React frontend
+6. Launch the FastAPI backend and Vite frontend preview
+7. Open your browser to the application interface
 
-## Optional: Additional installation modes
-- **Windows one-step bootstrap**: run `AEGIS\\start_on_windows.bat` to download an embeddable Python 3.12, sync dependencies with `uv`, and launch the FastAPI server (defaults to `http://127.0.0.1:8000`).
-- **Editable/development install**: run `AEGIS\\setup_and_maintenance.bat` → “Enable root path imports” to install the backend in editable mode using the bundled `uv`.
-- **Scripted maintenance**: the same menu exposes log cleanup and uninstall helpers; see Maintenance below.
+**First Run**: Expect a 2-5 minute setup while Python, Node.js, and dependencies download to `AEGIS/resources/runtimes/`.  
+**Subsequent Runs**: Launches in seconds using the cached runtimes and installed packages.
 
-# 4. Usage
-Backend (any OS):
-1. Ensure environment variables in `AEGIS/setup/settings/.env` reflect the desired host/port.
-2. From the repo root: `uvicorn AEGIS.server.app:app --host 0.0.0.0 --port 8000`.
+> **Note**: Everything stays inside the project folder. Move the folder and the portable runtimes move with it.
 
-Frontend:
-1. `cd AEGIS/client`
-2. Dev server: `npm run dev -- --host --port 5173` then open the printed URL.  
-   Production preview: `npm run build && npm run preview`.
+### 2.2 macOS / Linux / Manual Setup
+**Prerequisites:**
+- **Python 3.12**
+- **Node.js 18+** and npm
+- A recent version of `pip` (or `uv`)
 
-## Subsections for main workflows
-- **Map search via API**  
-  - Endpoint: `POST /maps/search`  
-  - Typical payload: coordinates or free text plus optional `filters` (layer ids), `bbox`, `datetime`, and map dimensions.  
-  - Response: normalized coordinates, chosen layer, bbox in EPSG:4326, meters-per-pixel estimate, and WMS/Folium imagery encoded for display. Validation errors are normalized with clear context.
+**Setup Steps:**
+1. Create and activate a Python 3.12 environment.
+2. Install backend dependencies from the repository root with `pip install -e . --use-pep517` (or `uv pip install -e .`).
+3. (Optional) Install extras for tooling with `pip install -e .[dev]`.
+4. Navigate to `AEGIS/client` and run `npm install` to install frontend dependencies.
 
-- **Layer and imagery handling**  
-  - Layers are normalized by `MapSearchToolkit` and `LayerProviderService`, defaulting to the configured GIBS layer if none is supplied.  
-  - Bboxes are validated/clamped, and Folium renders maps with configurable base tiles and overlay layers.  
-  - GIBS metadata is cached with configurable TTL and WMS/WMTS endpoints for EPSG:4326/3857/3413/3031.
+## 3. How to use
 
-- **Agentic routing (optional)**  
-  - Defaults to local Ollama (`llama3.1:8b`), with cloud fallbacks configured in `server_configurations.json`.  
-  - Runtime toggles (provider, model, cloud enablement, temperature) are tracked via `LLMRuntimeConfig` and reflected in responses for clients to react to revisions.
+### 3.1 Windows
+Run `AEGIS/start_on_windows.bat` to start both servers together:
 
-### Maintenance or operational tools
-- `AEGIS/start_on_windows.bat`: bootstrap Python, install backend deps with `uv`, and start the API.
-- `AEGIS/setup_and_maintenance.bat`: menu for enabling editable installs, updating the project, clearing `AEGIS/resources/logs`, or uninstalling cached tooling.
-- `AEGIS/server/scripts/update_geonames.py` and `AEGIS/server/scripts/update_gibs_layers.py`: helper scripts for refreshing cached geospatial databases and GIBS layer catalogs.
+- First run: downloads runtimes and dependencies (2-5 minutes)
+- Later runs: reuses cached installations (few seconds)
 
-### Resources
-- `AEGIS/server`: FastAPI app, routers, schemas, services, and configuration loaders.
-- `AEGIS/client`: React/Vite frontend.
-- `AEGIS/setup`: Embeddable Python, `uv` tooling, settings, and automation scripts.
-- `AEGIS/resources/database`: cached geospatial data; `AEGIS/resources/logs`: runtime logs; `AEGIS/resources/templates`: env templates and supporting assets.
-- `LICENSE`, `pyproject.toml`, `uv.lock`: project metadata and dependency lock.
+The launcher opens the interface at `http://127.0.0.1:7861`, proxied to the FastAPI backend at `http://127.0.0.1:8000`.
 
-# 5. License
-This project is licensed under the MIT License. See `LICENSE` for details.
+### 3.2 macOS / Linux / Manual
+Start backend and frontend from separate terminals:
 
+```bash
+# Terminal 1: start backend
+uvicorn AEGIS.server.app:app --host 0.0.0.0 --port 8000
+
+# Terminal 2: start frontend (Vite)
+cd AEGIS/client
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+The React UI runs on the printed Vite URL (default `http://127.0.0.1:5173`), and the API docs are available at `http://127.0.0.1:8000/docs`. To preview a production build locally, run `npm run build && npm run preview`.
+
+### 3.3 Using the Application
+Enter a place name or coordinates, choose imagery options, and request a preview. The backend normalizes the query, selects a NASA GIBS layer when applicable, and returns bbox metadata, meters-per-pixel estimates, and Folium-rendered map imagery for the UI to display.
+
+- **API**: `POST /maps/search` accepts free text or coordinates plus optional filters (layer ids), bbox overrides, datetime, and map dimensions. Responses include normalized coordinates, bbox in EPSG:4326, chosen layer, and imagery payloads suitable for direct rendering.
+- **UI**: The search panel accepts addresses or latitude/longitude pairs, lets you tweak layer and dimension inputs, and shows updated map previews returned by the backend.
+- **LLM routing (optional)**: If enabled via configuration, the backend uses local Ollama by default (cloud providers are configurable in `AEGIS/settings/server_configurations.json`) to interpret intent or choose layers.
+
+## 4. Setup and Maintenance
+Run `AEGIS/setup_and_maintenance.bat` for routine tasks:
+
+- **Remove logs** - clear accumulated files in `AEGIS/resources/logs`
+- **Uninstall app** - delete cached runtimes, locks, and virtual environments created by the launchers
+
+## 5. Resources
+Project assets and outputs live under `AEGIS`:
+
+- **server/** FastAPI app, routers, schemas, services, and configuration loaders for geocoding, layer selection, and map rendering.
+- **client/** React + Vite frontend for submitting searches and viewing map previews.
+- **resources/database/** Cached geospatial datasets used by search and normalization routines.
+- **resources/logs/** Rolling backend and launcher logs; safe to clear through the maintenance script.
+- **resources/templates/** Starter assets such as the `.env` template and ancillary files referenced during setup.
+- **resources/runtimes/** Portable Python, uv, and Node.js installations managed by the Windows launcher.
+
+## 6. Configuration
+Runtime options are defined through environment files and frontend build variables.
+
+| Variable | Description |
+|----------|-------------|
+| FASTAPI_HOST | Host address for the FastAPI server (`AEGIS/settings/.env`, default 127.0.0.1) |
+| FASTAPI_PORT | Port for the FastAPI server (`AEGIS/settings/.env`, default 8002 for manual runs; launcher defaults to 8000) |
+| MPLBACKEND | Matplotlib backend used for server-side rendering (`AEGIS/settings/.env`, default Agg) |
+| VITE_API_BASE_URL | Base URL for API calls from the React app (`AEGIS/client/.env`, default falls back to Vite dev proxy) |
+
+
+Copy `AEGIS/resources/templates/.env` into `AEGIS/settings/.env` (backend) and create `AEGIS/client/.env` for frontend overrides when needed.
+
+## 7. License
+This project is licensed under the terms of the MIT license. See `LICENSE` for details.
