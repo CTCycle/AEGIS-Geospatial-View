@@ -286,9 +286,12 @@ class MapRenderingService:
             raise MapValidationError(
                 "Unable to resolve map extent for the requested imagery."
             )
+        # Preserve the original map bbox for the view (fit_bounds).
+        # Expand a separate bbox for overlay fetching and positioning.
+        view_bbox = list(map_bbox)
         overlay_layers = self.toolkit.normalize_layers(payload.filters)
-        map_bbox = self._expand_map_bbox_for_layers(
-            map_bbox=map_bbox,
+        overlay_bbox = self._expand_map_bbox_for_layers(
+            map_bbox=list(map_bbox),
             overlay_layers=overlay_layers,
             payload=payload,
         )
@@ -297,9 +300,9 @@ class MapRenderingService:
             span_y_m,
             meters_per_pixel,
             pixels_per_meter,
-        ) = self._compute_map_metrics(map_bbox=map_bbox, payload=payload)
+        ) = self._compute_map_metrics(map_bbox=overlay_bbox, payload=payload)
         imagery_bbox = self.toolkit.harmonize_bbox_crs(
-            map_bbox,
+            overlay_bbox,
             source_crs="EPSG:4326",
             target_crs=payload.image_crs,
         )
@@ -310,17 +313,18 @@ class MapRenderingService:
         overlays = await self._render_layer_overlays(
             payload=payload,
             overlay_layers=overlay_layers,
-            map_bbox=map_bbox,
+            map_bbox=overlay_bbox,
             imagery_bbox=imagery_bbox,
             span_x_m=span_x_m,
             span_y_m=span_y_m,
             map_meters_per_pixel=meters_per_pixel,
             pixels_per_meter=pixels_per_meter,
         )
+        # Use view_bbox for fit_bounds (preserves zoom) but overlay_bbox for overlays
         map_response = await self._render_base_map(
             payload=payload,
             coordinate_pair=coordinate_pair,
-            bbox=map_bbox,
+            bbox=view_bbox,
             overlays=overlays,
         )
         if overlays:
@@ -384,6 +388,9 @@ class MapRenderingService:
         overlay_layers: list[str],
         payload: LocationSearchRequest,
     ) -> list[float]:
+        # Expand bbox to ensure overlay layers have enough area to cover given
+        # their native resolution. This expanded bbox is used for overlay
+        # fetching/positioning while the original bbox is used for map view.
         if not overlay_layers:
             return map_bbox
         resolutions: list[float] = []
@@ -531,6 +538,15 @@ class MapRenderingService:
         coordinates: CoordinatePair | None,
         payload: LocationSearchRequest,
     ) -> list[float] | None:
+        # Always compute bbox from coordinates + map_size_m to ensure consistent
+        # sizing between map view and overlays. The geocoding bbox can be very
+        # small (e.g., 30m for a specific street address), which causes overlays
+        # to appear as tiny squares when the map is rendered at a larger scale.
+        if coordinates is not None:
+            lon, lat = coordinates
+            map_size_value = payload.map_size_m or server_settings.map.default_size_m
+            return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
+        # Fall back to provided bbox if no coordinates available
         harmonized = self.toolkit.harmonize_bbox_crs(
             bbox_candidate,
             source_crs=bbox_source_crs,
@@ -538,11 +554,7 @@ class MapRenderingService:
         )
         if harmonized:
             return harmonized
-        if coordinates is None:
-            return None
-        lon, lat = coordinates
-        map_size_value = payload.map_size_m or server_settings.map.default_size_m
-        return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
+        return None
 
     # -------------------------------------------------------------------------
     def _compute_map_metrics(
