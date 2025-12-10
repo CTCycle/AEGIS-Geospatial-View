@@ -286,6 +286,12 @@ class MapRenderingService:
             raise MapValidationError(
                 "Unable to resolve map extent for the requested imagery."
             )
+        overlay_layers = self.toolkit.normalize_layers(payload.filters)
+        map_bbox = self._expand_map_bbox_for_layers(
+            map_bbox=map_bbox,
+            overlay_layers=overlay_layers,
+            payload=payload,
+        )
         (
             span_x_m,
             span_y_m,
@@ -303,10 +309,12 @@ class MapRenderingService:
             )
         overlays = await self._render_layer_overlays(
             payload=payload,
+            overlay_layers=overlay_layers,
             map_bbox=map_bbox,
             imagery_bbox=imagery_bbox,
             span_x_m=span_x_m,
             span_y_m=span_y_m,
+            map_meters_per_pixel=meters_per_pixel,
             pixels_per_meter=pixels_per_meter,
         )
         map_response = await self._render_base_map(
@@ -369,17 +377,51 @@ class MapRenderingService:
         return map_response
 
     # -------------------------------------------------------------------------
+    def _expand_map_bbox_for_layers(
+        self,
+        *,
+        map_bbox: list[float],
+        overlay_layers: list[str],
+        payload: LocationSearchRequest,
+    ) -> list[float]:
+        if not overlay_layers:
+            return map_bbox
+        resolutions: list[float] = []
+        for layer_name in overlay_layers:
+            try:
+                entry = self.layer_service.resolve(layer_name)
+                if entry.resolution_m:
+                    resolutions.append(entry.resolution_m)
+            except LayerProviderError:
+                continue
+        if not resolutions:
+            return map_bbox
+        target_resolution = max(resolutions)
+        target_span_x = target_resolution * float(payload.image_width)
+        target_span_y = target_resolution * float(payload.image_height)
+        span_x, span_y = self.gibs_service.bbox_span_in_meters(
+            map_bbox, "EPSG:4326"
+        )
+        if span_x >= target_span_x and span_y >= target_span_y:
+            return map_bbox
+        return self.gibs_service.expand_bbox_to_span(
+            map_bbox, "EPSG:4326", target_span_x, target_span_y
+        )
+
+    # -------------------------------------------------------------------------
     async def _render_layer_overlays(
         self,
         *,
         payload: LocationSearchRequest,
+        overlay_layers: list[str],
         map_bbox: list[float] | None,
         imagery_bbox: list[float] | None,
         span_x_m: float,
         span_y_m: float,
+        map_meters_per_pixel: dict[str, float] | None,
         pixels_per_meter: dict[str, float],
     ) -> list[dict[str, Any]]:
-        normalized_layers = self.toolkit.normalize_layers(payload.filters)
+        normalized_layers = overlay_layers
         if not normalized_layers:
             return []
         if map_bbox is None or imagery_bbox is None:
@@ -403,6 +445,8 @@ class MapRenderingService:
                 resolution_m=layer_entry.resolution_m,
                 span_x_m=span_x_m,
                 span_y_m=span_y_m,
+                overlay_meters_per_pixel=layer_payload.get("meters_per_pixel"),
+                map_meters_per_pixel=map_meters_per_pixel,
             ):
                 overlays.append(
                     self._build_fill_overlay(
@@ -660,8 +704,27 @@ class MapRenderingService:
 
     # -------------------------------------------------------------------------
     def _should_render_as_fill(
-        self, *, resolution_m: float | None, span_x_m: float, span_y_m: float
+        self,
+        *,
+        resolution_m: float | None,
+        span_x_m: float,
+        span_y_m: float,
+        overlay_meters_per_pixel: dict[str, float] | None = None,
+        map_meters_per_pixel: dict[str, float] | None = None,
     ) -> bool:
+        if overlay_meters_per_pixel and map_meters_per_pixel:
+            overlay_min = min(
+                float(overlay_meters_per_pixel.get("x", 0.0) or 0.0),
+                float(overlay_meters_per_pixel.get("y", 0.0) or 0.0),
+            )
+            map_max = max(
+                float(map_meters_per_pixel.get("x", 0.0) or 0.0),
+                float(map_meters_per_pixel.get("y", 0.0) or 0.0),
+            )
+            if overlay_min > 0 and map_max > 0:
+                ratio = overlay_min / map_max
+                if ratio <= 8.0:
+                    return False
         if resolution_m is None:
             return False
         if span_x_m <= 0 or span_y_m <= 0:
