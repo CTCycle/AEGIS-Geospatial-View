@@ -34,14 +34,6 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
         onSettingsChange({ ...settings, agentModel: e.target.value });
     };
 
-    const handleTemperatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onSettingsChange({ ...settings, temperature: parseFloat(e.target.value) });
-    };
-
-    const handleReasoningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onSettingsChange({ ...settings, reasoning: e.target.checked });
-    };
-
     const handleUseCloudServicesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onSettingsChange({ ...settings, useCloudServices: e.target.checked });
     };
@@ -107,7 +99,7 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                         <div className="column gap-3">
                             <h3 className="aegis-subtitle">Ollama Configuration</h3>
                             <div className="form-group">
-                                <label>Parsing Model</label>
+                                <label>Agent model</label>
                                 <select
                                     value={settings.agentModel}
                                     onChange={handleAgentModelChange}
@@ -118,30 +110,6 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                                         <option key={m} value={m}>{m}</option>
                                     ))}
                                 </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Temperature</label>
-                                <input
-                                    type="number"
-                                    value={settings.temperature}
-                                    onChange={handleTemperatureChange}
-                                    min={0.0}
-                                    max={5.0}
-                                    step={0.1}
-                                    disabled={settings.useCloudServices}
-                                    className="w-full"
-                                />
-                            </div>
-                            <div className="form-group checkbox-group">
-                                <label>
-                                    <input
-                                        type="checkbox"
-                                        checked={settings.reasoning}
-                                        onChange={handleReasoningChange}
-                                        disabled={settings.useCloudServices}
-                                    />
-                                    Enable reasoning (think)
-                                </label>
                             </div>
                         </div>
                     </div>

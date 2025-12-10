@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import time
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -58,6 +59,8 @@ class GIBSLayersUpdater:
         user_agent: str | None = None,
         ows_namespaces: dict[str, str] | None = None,
         request_timeout: float | None = None,
+        retry_backoff_s: float | None = None,
+        max_attempts: int | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
         settings = server_settings.gibs
@@ -65,6 +68,11 @@ class GIBSLayersUpdater:
         self.ows_namespaces = copy.deepcopy(ows_namespaces or settings.ows_namespaces)
         self.user_agent = user_agent or settings.layer_sync_user_agent
         self.request_timeout = request_timeout or settings.layer_sync_timeout
+        self.retry_backoff_s = (
+            retry_backoff_s if retry_backoff_s is not None else settings.retry_backoff_s
+        )
+        attempts = max_attempts if max_attempts is not None else 3
+        self.max_attempts = attempts if attempts > 0 else 1
 
     # -------------------------------------------------------------------------
     def update(self) -> None:
@@ -130,13 +138,31 @@ class GIBSLayersUpdater:
     # -------------------------------------------------------------------------
     def fetch_capabilities(self, url: str) -> bytes:
         request = Request(url, headers={"User-Agent": self.user_agent})
-        try:
-            with urlopen(request, timeout=self.request_timeout) as response:
-                return response.read()
-        except (HTTPError, URLError) as exc:  # pragma: no cover - network failures
-            raise LayerHarvestError(
-                f"Failed to download capabilities at {url}"
-            ) from exc
+        last_error: Exception | None = None
+        for attempt in range(self.max_attempts):
+            try:
+                with urlopen(request, timeout=self.request_timeout) as response:
+                    return response.read()
+            except (HTTPError, URLError, TimeoutError) as exc:  # pragma: no cover
+                last_error = exc
+                if attempt < self.max_attempts - 1:
+                    delay = self.compute_backoff_delay(attempt)
+                    logger.warning(
+                        (
+                            "Capabilities fetch failed (%s/%s) for %s: %s. "
+                            "Retrying in %.1fs."
+                        ),
+                        attempt + 1,
+                        self.max_attempts,
+                        url,
+                        exc,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+        raise LayerHarvestError(
+            f"Failed to download capabilities at {url} after {self.max_attempts} attempts"
+        ) from last_error
 
     # -------------------------------------------------------------------------
     def parse_layers(self, payload: bytes) -> list[LayerPayload]:
@@ -175,3 +201,7 @@ class GIBSLayersUpdater:
             if identifier:
                 matrix_sets.add(identifier)
         return sorted(matrix_sets)
+
+    # -------------------------------------------------------------------------
+    def compute_backoff_delay(self, attempt: int) -> float:
+        return self.retry_backoff_s * (2**attempt)

@@ -1,13 +1,20 @@
 import React from 'react';
-import { SearchResponsePayload } from '../types';
 import './MapPreview.css';
+import { SearchResponsePayload } from '../types';
 
 interface MapPreviewProps {
     payload?: SearchResponsePayload;
     isLoading: boolean;
+    scale?: number;
+    emptyMessage?: string;
 }
 
-const MapPreview: React.FC<MapPreviewProps> = ({ payload, isLoading }) => {
+const MapPreview: React.FC<MapPreviewProps> = ({
+    payload,
+    isLoading,
+    scale = 1,
+    emptyMessage = 'Run a search to display the map.',
+}) => {
     const renderContent = () => {
         if (isLoading) {
             return (
@@ -19,12 +26,11 @@ const MapPreview: React.FC<MapPreviewProps> = ({ payload, isLoading }) => {
         }
 
         if (!payload || !payload.satellite_imagery) {
-            return <div className="empty-state">No map data available</div>;
+            return <div className="empty-state">{emptyMessage}</div>;
         }
 
         const imagery = payload.satellite_imagery;
 
-        // Check for HTML content (iframe)
         if (imagery.map_html) {
             return (
                 <iframe
@@ -32,20 +38,17 @@ const MapPreview: React.FC<MapPreviewProps> = ({ payload, isLoading }) => {
                     className="map-iframe"
                     srcDoc={imagery.map_html}
                     style={{ border: 0 }}
+                    scrolling="no"
                 />
             );
         }
 
-        // Check for Image content (Base64 or URL)
         let imageSource = '';
         if (imagery.image_base64) {
             const mime = imagery.mime || imagery.format || 'image/png';
-            // Ensure mime type is valid
             const normalizedMime = mime.trim().toLowerCase().startsWith('image/')
                 ? mime.trim().toLowerCase()
                 : `image/${mime.trim().split('/').pop()}`;
-
-            // Clean base64 string
             const normalizedPayload = imagery.image_base64.replace(/[\n\r]/g, '');
             imageSource = `data:${normalizedMime};base64,${normalizedPayload}`;
         } else if (imagery.image_url || imagery.wms_url) {
@@ -60,12 +63,9 @@ const MapPreview: React.FC<MapPreviewProps> = ({ payload, isLoading }) => {
     };
 
     return (
-        <div className="card map-preview-card">
-            <div className="card-content">
-                <h4 className="section-title">Map Preview</h4>
-                <div className="map-canvas">
-                    {renderContent()}
-                </div>
+        <div className="map-canvas">
+            <div className="map-content" style={{ transform: `scale(${scale})` }}>
+                {renderContent()}
             </div>
         </div>
     );

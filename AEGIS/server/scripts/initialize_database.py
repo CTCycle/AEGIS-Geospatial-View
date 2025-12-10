@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from AEGIS.server.utils.database.initializer import initialize_database
+from AEGIS.server.database.initializer import initialize_database
 from AEGIS.server.utils.constants import SERVER_CONFIGURATION_FILE
 from AEGIS.server.utils.logger import logger
 

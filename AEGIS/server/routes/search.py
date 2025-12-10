@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 from datetime import datetime, time
 from io import BytesIO
 from typing import Any
@@ -14,14 +15,17 @@ from pydantic import ValidationError
 
 from AEGIS.server.schemas.geographics import (
     LocationSearchRequest,
-    MapLayerUpdateRequest,
 )
 from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.repository.serializer import DataSerializer
 from AEGIS.server.utils.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
     GIBSValidationError,
 )
+from AEGIS.server.utils.services.geospatial.openaq import OpenAQService
+from AEGIS.server.utils.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.utils.services.geospatial.layers import (
     LayerProviderError,
     LayerProviderEntry,
@@ -44,6 +48,8 @@ map_service = MapService()
 layer_service = LayerProviderService(
     metadata_provider=gibs_service.resolve_layer_meters_per_pixel
 )
+openaq_service = OpenAQService()
+elevation_service = OpenElevationService()
 
 type CoordinatePair = tuple[float, float]
 DEFAULT_OVERLAY_COLOR = "#2563eb"
@@ -280,14 +286,23 @@ class MapRenderingService:
             raise MapValidationError(
                 "Unable to resolve map extent for the requested imagery."
             )
+        # Preserve the original map bbox for the view (fit_bounds).
+        # Expand a separate bbox for overlay fetching and positioning.
+        view_bbox = list(map_bbox)
+        overlay_layers = self.toolkit.normalize_layers(payload.filters)
+        overlay_bbox = self._expand_map_bbox_for_layers(
+            map_bbox=list(map_bbox),
+            overlay_layers=overlay_layers,
+            payload=payload,
+        )
         (
             span_x_m,
             span_y_m,
             meters_per_pixel,
             pixels_per_meter,
-        ) = self._compute_map_metrics(map_bbox=map_bbox, payload=payload)
+        ) = self._compute_map_metrics(map_bbox=overlay_bbox, payload=payload)
         imagery_bbox = self.toolkit.harmonize_bbox_crs(
-            map_bbox,
+            overlay_bbox,
             source_crs="EPSG:4326",
             target_crs=payload.image_crs,
         )
@@ -297,16 +312,19 @@ class MapRenderingService:
             )
         overlays = await self._render_layer_overlays(
             payload=payload,
-            map_bbox=map_bbox,
+            overlay_layers=overlay_layers,
+            map_bbox=overlay_bbox,
             imagery_bbox=imagery_bbox,
             span_x_m=span_x_m,
             span_y_m=span_y_m,
+            map_meters_per_pixel=meters_per_pixel,
             pixels_per_meter=pixels_per_meter,
         )
+        # Use view_bbox for fit_bounds (preserves zoom) but overlay_bbox for overlays
         map_response = await self._render_base_map(
             payload=payload,
             coordinate_pair=coordinate_pair,
-            bbox=map_bbox,
+            bbox=view_bbox,
             overlays=overlays,
         )
         if overlays:
@@ -363,17 +381,54 @@ class MapRenderingService:
         return map_response
 
     # -------------------------------------------------------------------------
+    def _expand_map_bbox_for_layers(
+        self,
+        *,
+        map_bbox: list[float],
+        overlay_layers: list[str],
+        payload: LocationSearchRequest,
+    ) -> list[float]:
+        # Expand bbox to ensure overlay layers have enough area to cover given
+        # their native resolution. This expanded bbox is used for overlay
+        # fetching/positioning while the original bbox is used for map view.
+        if not overlay_layers:
+            return map_bbox
+        resolutions: list[float] = []
+        for layer_name in overlay_layers:
+            try:
+                entry = self.layer_service.resolve(layer_name)
+                if entry.resolution_m:
+                    resolutions.append(entry.resolution_m)
+            except LayerProviderError:
+                continue
+        if not resolutions:
+            return map_bbox
+        target_resolution = max(resolutions)
+        target_span_x = target_resolution * float(payload.image_width)
+        target_span_y = target_resolution * float(payload.image_height)
+        span_x, span_y = self.gibs_service.bbox_span_in_meters(
+            map_bbox, "EPSG:4326"
+        )
+        if span_x >= target_span_x and span_y >= target_span_y:
+            return map_bbox
+        return self.gibs_service.expand_bbox_to_span(
+            map_bbox, "EPSG:4326", target_span_x, target_span_y
+        )
+
+    # -------------------------------------------------------------------------
     async def _render_layer_overlays(
         self,
         *,
         payload: LocationSearchRequest,
+        overlay_layers: list[str],
         map_bbox: list[float] | None,
         imagery_bbox: list[float] | None,
         span_x_m: float,
         span_y_m: float,
+        map_meters_per_pixel: dict[str, float] | None,
         pixels_per_meter: dict[str, float],
     ) -> list[dict[str, Any]]:
-        normalized_layers = self.toolkit.normalize_layers(payload.filters)
+        normalized_layers = overlay_layers
         if not normalized_layers:
             return []
         if map_bbox is None or imagery_bbox is None:
@@ -397,6 +452,8 @@ class MapRenderingService:
                 resolution_m=layer_entry.resolution_m,
                 span_x_m=span_x_m,
                 span_y_m=span_y_m,
+                overlay_meters_per_pixel=layer_payload.get("meters_per_pixel"),
+                map_meters_per_pixel=map_meters_per_pixel,
             ):
                 overlays.append(
                     self._build_fill_overlay(
@@ -445,6 +502,29 @@ class MapRenderingService:
                 crs=payload.image_crs,
                 format=payload.image_format,
             )
+        if entry.provider == "openaq":
+            # OpenAQ returns point data, not imagery - extract coordinates from bbox
+            if bbox and len(bbox) == 4:
+                center_lon = (bbox[0] + bbox[2]) / 2
+                center_lat = (bbox[1] + bbox[3]) / 2
+            elif lon is not None and lat is not None:
+                center_lon, center_lat = lon, lat
+            else:
+                raise LayerProviderError("Coordinates required for OpenAQ provider.")
+            air_quality_data = await openaq_service.get_nearby_measurements(
+                lat=center_lat,
+                lon=center_lon,
+                radius_m=payload.radius_m or 25000.0,
+            )
+            # Return in overlay-compatible format
+            return {
+                "data": air_quality_data,
+                "bbox": bbox,
+                "crs": "EPSG:4326",
+                "layer": entry.name,
+                "provider": "openaq",
+                "mode": "data",  # Indicates non-imagery overlay
+            }
         raise LayerProviderError(
             f"No imagery service registered for provider '{entry.provider}'."
         )
@@ -458,6 +538,15 @@ class MapRenderingService:
         coordinates: CoordinatePair | None,
         payload: LocationSearchRequest,
     ) -> list[float] | None:
+        # Always compute bbox from coordinates + map_size_m to ensure consistent
+        # sizing between map view and overlays. The geocoding bbox can be very
+        # small (e.g., 30m for a specific street address), which causes overlays
+        # to appear as tiny squares when the map is rendered at a larger scale.
+        if coordinates is not None:
+            lon, lat = coordinates
+            map_size_value = payload.map_size_m or server_settings.map.default_size_m
+            return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
+        # Fall back to provided bbox if no coordinates available
         harmonized = self.toolkit.harmonize_bbox_crs(
             bbox_candidate,
             source_crs=bbox_source_crs,
@@ -465,11 +554,7 @@ class MapRenderingService:
         )
         if harmonized:
             return harmonized
-        if coordinates is None:
-            return None
-        lon, lat = coordinates
-        map_size_value = payload.map_size_m or server_settings.map.default_size_m
-        return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
+        return None
 
     # -------------------------------------------------------------------------
     def _compute_map_metrics(
@@ -631,8 +716,27 @@ class MapRenderingService:
 
     # -------------------------------------------------------------------------
     def _should_render_as_fill(
-        self, *, resolution_m: float | None, span_x_m: float, span_y_m: float
+        self,
+        *,
+        resolution_m: float | None,
+        span_x_m: float,
+        span_y_m: float,
+        overlay_meters_per_pixel: dict[str, float] | None = None,
+        map_meters_per_pixel: dict[str, float] | None = None,
     ) -> bool:
+        if overlay_meters_per_pixel and map_meters_per_pixel:
+            overlay_min = min(
+                float(overlay_meters_per_pixel.get("x", 0.0) or 0.0),
+                float(overlay_meters_per_pixel.get("y", 0.0) or 0.0),
+            )
+            map_max = max(
+                float(map_meters_per_pixel.get("x", 0.0) or 0.0),
+                float(map_meters_per_pixel.get("y", 0.0) or 0.0),
+            )
+            if overlay_min > 0 and map_max > 0:
+                ratio = overlay_min / map_max
+                if ratio <= 8.0:
+                    return False
         if resolution_m is None:
             return False
         if span_x_m <= 0 or span_y_m <= 0:
@@ -681,6 +785,91 @@ class MapSearchEndpoint:
         self.normatim_service = normatim_service
         self.toolkit = toolkit
         self.renderer = rendering_service
+        self.serializer = DataSerializer()
+
+    # -------------------------------------------------------------------------
+    def resolve_coordinate_pair(
+        self,
+        payload: LocationSearchRequest | None,
+        response_payload: dict[str, Any] | None,
+        fallback: dict[str, Any],
+    ) -> CoordinatePair | None:
+        payload_snapshot = response_payload.get("payload", {}) if response_payload else {}
+        if payload:
+            coordinates = self.toolkit.extract_coordinate_pair(
+                payload, payload_snapshot
+            )
+            if coordinates:
+                return coordinates
+            coordinates = self.toolkit.extract_coordinate_pair(
+                payload, payload.model_dump()
+            )
+            if coordinates:
+                return coordinates
+        lon_candidate = fallback.get("longitude")
+        lat_candidate = fallback.get("latitude")
+        try:
+            lon_value = float(lon_candidate)
+            lat_value = float(lat_candidate)
+        except (TypeError, ValueError):
+            return None
+        return lon_value, lat_value
+
+    # -------------------------------------------------------------------------
+    def format_coordinate_pair(self, coordinates: CoordinatePair | None) -> str | None:
+        if coordinates is None:
+            return None
+        lon, lat = coordinates
+        return json.dumps({"longitude": lon, "latitude": lat})
+
+    # -------------------------------------------------------------------------
+    def build_search_session_record(
+        self,
+        *,
+        payload: LocationSearchRequest | None,
+        response_payload: dict[str, Any] | None,
+        fallback: dict[str, Any],
+        state: str,
+    ) -> dict[str, Any]:
+        coordinates = self.resolve_coordinate_pair(payload, response_payload, fallback)
+        layers = (
+            list(payload.filters)
+            if payload
+            else self.toolkit.normalize_layers(fallback.get("geospatial_layers") or [])
+        )
+        record = {
+            "id": None,
+            "created_at": datetime.utcnow(),
+            "user": fallback.get("user"),
+            "country": payload.country if payload else fallback.get("country"),
+            "city": payload.city if payload else fallback.get("city"),
+            "address": payload.address if payload else fallback.get("address"),
+            "coordinates": self.format_coordinate_pair(coordinates),
+            "base_map": payload.map_tiles if payload else fallback.get("map_tiles"),
+            "geospatial_layers": json.dumps(layers) if layers else None,
+            "state": state,
+        }
+        return record
+
+    # -------------------------------------------------------------------------
+    async def record_search_session(
+        self,
+        *,
+        payload: LocationSearchRequest | None,
+        response_payload: dict[str, Any] | None,
+        fallback: dict[str, Any],
+        state: str,
+    ) -> None:
+        record = self.build_search_session_record(
+            payload=payload,
+            response_payload=response_payload,
+            fallback=fallback,
+            state=state,
+        )
+        try:
+            await asyncio.to_thread(self.serializer.insert_search_session, record)
+        except Exception as exc:
+            logger.warning("Failed to store search session: %s", exc)
 
     # -------------------------------------------------------------------------
     async def get_location_coordinates(
@@ -757,6 +946,17 @@ class MapSearchEndpoint:
             ) from exc
         search_payload["satellite_imagery"] = satellite_payload
 
+        # Fetch elevation data for the search location
+        lat = search_payload.get("latitude")
+        lon = search_payload.get("longitude")
+        if lat is not None and lon is not None:
+            try:
+                elevation_data = await elevation_service.get_elevation(lat, lon)
+                search_payload["elevation"] = elevation_data
+            except Exception as exc:
+                logger.warning("Failed to fetch elevation: %s", exc)
+                search_payload["elevation"] = None
+
         return {
             "status_message": "Map search request submitted.",
             "payload": search_payload,
@@ -784,6 +984,18 @@ class MapSearchEndpoint:
         image_crs: str | None = Body(default=None),
         image_format: str | None = Body(default=None),
     ) -> JSONResponse:
+        payload: LocationSearchRequest | None = None
+        response_payload: dict[str, Any] | None = None
+        request_context = {
+            "user": None,
+            "country": country,
+            "city": city,
+            "address": address,
+            "longitude": longitude,
+            "latitude": latitude,
+            "geospatial_layers": list(geospatial_layers),
+            "map_tiles": map_tiles or server_settings.map.tiles,
+        }
         try:
             payload_data: dict[str, Any] = {
                 "datetime": datetime_value,
@@ -805,7 +1017,7 @@ class MapSearchEndpoint:
             payload_data["map_size_m"] = server_settings.map.default_size_m
             if map_size_m is not None:
                 payload_data["map_size_m"] = map_size_m
-            payload_data["map_tiles"] = map_tiles or server_settings.map.tiles
+            payload_data["map_tiles"] = request_context["map_tiles"]
             if image_crs is not None:
                 payload_data["image_crs"] = image_crs
             if image_format is not None:
@@ -813,126 +1025,42 @@ class MapSearchEndpoint:
             payload = await asyncio.to_thread(
                 LocationSearchRequest.model_validate, payload_data
             )
+            response_payload = await self.process_location_search(payload)
+            serialized_payload = await asyncio.to_thread(
+                jsonable_encoder, response_payload
+            )
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="success",
+            )
+            return JSONResponse(content=serialized_payload)
         except ValidationError as exc:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=sanitize_validation_errors(exc.errors()),
             ) from exc
-
-        response_payload = await self.process_location_search(payload)
-        serialized_payload = await asyncio.to_thread(jsonable_encoder, response_payload)
-        return JSONResponse(content=serialized_payload)    
+        except Exception:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
+            raise
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             "/search",
             self.search_by_location,
-            methods=["POST"],
-            status_code=status.HTTP_200_OK,
-        )
-
-
-###############################################################################
-class MapLayerUpdateEndpoint:
-    def __init__(
-        self,
-        router: APIRouter,
-        toolkit: MapSearchToolkit,
-        rendering_service: MapRenderingService,
-    ) -> None:
-        self.router = router
-        self.toolkit = toolkit
-        self.renderer = rendering_service
-
-    # -------------------------------------------------------------------------
-    def extract_location_fields(self, payload: dict[str, Any]) -> dict[str, Any]:
-        field_names = set(LocationSearchRequest.model_fields.keys())
-        extracted: dict[str, Any] = {}
-        for field in field_names:
-            if field == "filters":
-                continue
-            if field in payload:
-                extracted[field] = payload[field]
-        return extracted
-
-    # -------------------------------------------------------------------------
-    def prepare_update_context(
-        self, request: MapLayerUpdateRequest
-    ) -> tuple[LocationSearchRequest, dict[str, Any]]:
-        base_payload = dict(request.payload or {})
-        base_layers = base_payload.get("layers")
-        if base_layers is None:
-            base_layers = base_payload.get("filters", [])
-        normalized_base = self.toolkit.normalize_layers(base_layers)
-        override_layers = (
-            self.toolkit.normalize_layers(request.layers)
-            if request.layers is not None
-            else None
-        )
-        additions = self.toolkit.normalize_layers(request.add_layers)
-        removals = self.toolkit.normalize_layers(request.remove_layers)
-        merged_layers = self.toolkit.merge_layer_selections(
-            normalized_base,
-            additions=additions,
-            removals=removals,
-            override_layers=override_layers,
-        )
-        payload_data = self.extract_location_fields(base_payload)
-        payload_data["filters"] = merged_layers
-        location_request = LocationSearchRequest.model_validate(payload_data)
-        sanitized_layers = list(location_request.filters)
-        response_payload = dict(base_payload)
-        response_payload["layers"] = sanitized_layers
-        response_payload.pop("filters", None)
-        response_payload.pop("satellite_imagery", None)
-        return location_request, response_payload
-
-    # -------------------------------------------------------------------------
-    async def apply_layer_update(
-        self, update_request: MapLayerUpdateRequest = Body(...)
-    ) -> JSONResponse:
-        try:
-            location_request, response_payload = self.prepare_update_context(
-                update_request
-            )
-        except ValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=sanitize_validation_errors(exc.errors()),
-            ) from exc
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        try:
-            satellite_payload = await self.renderer.build_satellite_payload(
-                location_request, response_payload
-            )
-        except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        except (GIBSRequestError, MapRequestError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
-            ) from exc
-        response_payload["satellite_imagery"] = satellite_payload
-        content = {
-            "status_message": "Map layers updated.",
-            "payload": response_payload,
-        }
-        serialized_payload = await asyncio.to_thread(jsonable_encoder, content)
-        return JSONResponse(content=serialized_payload)
-
-    # -------------------------------------------------------------------------
-    def add_routes(self) -> None:
-        self.router.add_api_route(
-            "/update",
-            self.apply_layer_update,
             methods=["POST"],
             status_code=status.HTTP_200_OK,
         )
@@ -955,10 +1083,3 @@ search_endpoint = MapSearchEndpoint(
     rendering_service=rendering_service,
 )
 search_endpoint.add_routes()
-
-update_endpoint = MapLayerUpdateEndpoint(
-    router=router,
-    toolkit=toolkit,
-    rendering_service=rendering_service,
-)
-update_endpoint.add_routes()
