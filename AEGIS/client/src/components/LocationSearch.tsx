@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS } from '../constants';
+import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, MAX_GEOSPATIAL_LAYERS } from '../constants';
 import { LocationSearchRequest } from '../types';
 import './LocationSearch.css';
 
@@ -20,6 +20,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     const [mapTile, setMapTile] = useState('OpenStreetMap');
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
+    const hasReachedFilterLimit = selectedFilters.length >= MAX_GEOSPATIAL_LAYERS;
 
     const resetErrors = () => setErrors({});
 
@@ -99,6 +100,9 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 
     const handleFilterSelect = (value: string) => {
         if (!value) {
+            return;
+        }
+        if (hasReachedFilterLimit) {
             return;
         }
         const normalized = value === 'None' ? '' : value;
@@ -237,6 +241,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                             handleFilterSelect(e.target.value);
                             e.target.value = '';
                         }}
+                        disabled={hasReachedFilterLimit}
                     >
                         <option value="" disabled>Select a layer...</option>
                         <option value="None">None</option>
@@ -249,7 +254,14 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
             </div>
 
             <div className="form-group">
-                <p className="helper-text">Choose multiple layers; click a chip to remove.</p>
+                <p className="helper-text">
+                    Choose multiple layers; click a chip to remove. Up to {MAX_GEOSPATIAL_LAYERS} overlays.
+                </p>
+                {hasReachedFilterLimit && (
+                    <p className="error-text">
+                        Maximum overlays selected. Remove one to add another.
+                    </p>
+                )}
                 <div className="chip-container">
                     {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
                     {selectedFilters.map((filter) => (

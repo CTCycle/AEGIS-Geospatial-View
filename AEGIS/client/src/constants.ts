@@ -60,3 +60,5 @@ export const COMMON_FOLIUM_MAPS: Record<string, string> = {
     "Esri NatGeoWorldMap": "National Geographic",
     "Esri OceanBasemap": "Ocean Basemap",
 };
+
+export const MAX_GEOSPATIAL_LAYERS = 10;
