@@ -280,6 +280,7 @@ class GIBSService:
         style: str | None = None,
         wms_version: str = "1.3.0",
         timeout_s: int | None = None,
+        skip_bbox_expansion: bool = False,
     ) -> dict[str, Any]:
         request_crs = crs.upper()
         bbox_provided = bbox is not None
@@ -308,9 +309,13 @@ class GIBSService:
             if actual_crs == request_crs
             else self.reproject_bbox(normalized_bbox, actual_crs)
         )
-        bbox_for_request = self.ensure_bbox_resolution(
-            layer, bbox_for_request, actual_crs, width, height
-        )
+        # When skip_bbox_expansion is True, preserve the exact bbox for overlays
+        # to ensure the imagery aligns with the map bounds. Otherwise, expand
+        # the bbox to meet minimum resolution requirements for standalone usage.
+        if not skip_bbox_expansion:
+            bbox_for_request = self.ensure_bbox_resolution(
+                layer, bbox_for_request, actual_crs, width, height
+            )
         meters_per_pixel = self.compute_meters_per_pixel(
             bbox_for_request, actual_crs, width, height
         )
