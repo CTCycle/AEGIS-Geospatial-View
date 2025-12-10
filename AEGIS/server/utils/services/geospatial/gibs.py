@@ -171,20 +171,20 @@ class GIBSService:
         )
         self.layer_catalog = self.load_layer_catalog()
         self.layer_native_resolution_m = {
+            # Daily/NRT layers
             "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
-            "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
-            "SRTM_Color_Index": 30.0,
-            "GPW_Population_Density_2020": 1000.0,
-            "MODIS_Terra_L3_Land_Water_Mask": 250.0,
-            "IMERG_Precipitation_Rate": 11000.0,
-            "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": 10000.0,
             "MODIS_Terra_Aerosol": 10000.0,
             "MODIS_Terra_Land_Surface_Temp_Day": 1000.0,
+            "MODIS_Terra_Land_Surface_Temp_Night": 1000.0,
             "MODIS_Terra_NDVI_8Day": 250.0,
-            "Landsat_Global_Man-made_Impervious_Surface": 30.0,
-            "Landsat_Human_Built-up_And_Settlement_Extent": 30.0,
-            "VIIRS_CityLights_2012": 500.0,
-            "LECZ_Urban_Rural_Extents_Below_10m": 1000.0,
+            "MODIS_Terra_L3_Land_Water_Mask": 250.0,
+            "IMERG_Precipitation_Rate": 11000.0,
+            "VIIRS_SNPP_DayNightBand_ENCC": 500.0,
+            "MODIS_Combined_Thermal_Anomalies_Fire": 1000.0,
+            "OMPS_Ozone_Total_Column": 50000.0,
+            # Annual/static layers
+            "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
+            "SRTM_Color_Index": 30.0,
         }
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution

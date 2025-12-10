@@ -12,8 +12,6 @@ type SearchMode = 'address' | 'coordinates';
 
 const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) => {
     const [mode, setMode] = useState<SearchMode>('address');
-    const [country, setCountry] = useState('');
-    const [city, setCity] = useState('');
     const [address, setAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
@@ -49,8 +47,8 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     };
 
     const validateAddress = () => {
-        if (!country.trim() && !city.trim() && !address.trim()) {
-            return 'Enter at least one address detail.';
+        if (!address.trim()) {
+            return 'Enter an address (e.g., "Via Tesserete 29, Tesserete, Svizzera").';
         }
         return '';
     };
@@ -89,9 +87,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
         const request: LocationSearchRequest = {
             datetime: new Date().toISOString(),
             use_coordinates: false,
-            country: country || undefined,
-            city: city || undefined,
-            address: address || undefined,
+            address: address.trim(),
             map_tiles: mapTile,
             filters: selectedFilters,
         };
@@ -117,36 +113,17 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 
     const renderAddressFields = () => (
         <div className="field-grid">
-            <div className="form-group">
-                <label htmlFor="country">Country or region</label>
-                <input
-                    id="country"
-                    type="text"
-                    placeholder="e.g., Italy"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    aria-describedby="location-helper"
-                />
-            </div>
-            <div className="form-group">
-                <label htmlFor="city">City or locale</label>
-                <input
-                    id="city"
-                    type="text"
-                    placeholder="e.g., Florence"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                />
-            </div>
-            <div className="form-group">
-                <label htmlFor="address">Street address</label>
+            <div className="form-group full-width">
+                <label htmlFor="address">Full Address</label>
                 <input
                     id="address"
                     type="text"
-                    placeholder="e.g., Piazza del Duomo"
+                    placeholder="e.g., Via Tesserete 29, Tesserete, Svizzera"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
+                    aria-describedby="location-helper"
                 />
+                <p className="helper-text">Enter a complete address including street, city, and country</p>
                 {errors.address && <p className="error-text">{errors.address}</p>}
             </div>
         </div>

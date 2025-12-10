@@ -68,6 +68,10 @@
     gap: 0.35rem;
 }
 
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
 .form-group label {
     font-size: 0.95rem;
     font-weight: 600;

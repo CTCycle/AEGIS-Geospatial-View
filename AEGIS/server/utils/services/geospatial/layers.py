@@ -38,64 +38,15 @@ class LayerProviderNotFoundError(LayerProviderError):
 
 
 DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
+    # Daily/NRT GIBS layers
     "VIIRS_SNPP_CorrectedReflectance_TrueColor": {
         "provider": "gibs",
         "aliases": (
             "truecolor",
             "true color",
             "viirs truecolor",
-            "true color (viirs snpp)",
-            "viirs snpp correctedreflectance truecolor",
-        ),
-    },
-    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": {
-        "provider": "gibs",
-        "aliases": (
-            "land cover",
-            "land cover type (modis igbp)",
-            "modis igbp land cover",
-            "igbp land cover",
-        ),
-    },
-    "SRTM_Color_Index": {
-        "provider": "gibs",
-        "aliases": (
-            "digital elevation model",
-            "dem",
-            "digital elevation model (srtm)",
-        ),
-    },
-    "GPW_Population_Density_2020": {
-        "provider": "gibs",
-        "aliases": (
-            "population density",
-            "population density (gpw 2020)",
-            "gpw 2020",
-        ),
-    },
-    "MODIS_Terra_L3_Land_Water_Mask": {
-        "provider": "gibs",
-        "aliases": (
-            "land/water mask (modis terra)",
-            "water mask",
-            "land water mask",
-        ),
-    },
-    "IMERG_Precipitation_Rate": {
-        "provider": "gibs",
-        "aliases": (
-            "precipitation rate",
-            "imerg precipitation",
-            "imerg",
-        ),
-    },
-    "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": {
-        "provider": "gibs",
-        "aliases": (
-            "air pollution",
-            "no2",
-            "nitrogen dioxide",
-            "ground level no2",
+            "true color satellite",
+            "satellite imagery",
         ),
     },
     "MODIS_Terra_Aerosol": {
@@ -105,14 +56,26 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
             "aerosol optical depth",
             "modis aerosol",
             "aod",
+            "air pollution",
         ),
     },
     "MODIS_Terra_Land_Surface_Temp_Day": {
         "provider": "gibs",
         "aliases": (
+            "surface temperature day",
             "land surface temperature",
             "lst day",
             "modis lst",
+            "temperature day",
+        ),
+    },
+    "MODIS_Terra_Land_Surface_Temp_Night": {
+        "provider": "gibs",
+        "aliases": (
+            "surface temperature night",
+            "lst night",
+            "temperature night",
+            "night temperature",
         ),
     },
     "MODIS_Terra_NDVI_8Day": {
@@ -121,41 +84,90 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
             "ndvi",
             "vegetation index",
             "modis ndvi",
+            "vegetation",
+            "greenness",
         ),
     },
-    "Landsat_Global_Man-made_Impervious_Surface": {
+    "MODIS_Terra_L3_Land_Water_Mask": {
         "provider": "gibs",
         "aliases": (
-            "impervious surface",
-            "gmis",
-            "paved surface",
-            "imperviousness",
+            "land/water mask",
+            "water mask",
+            "land water mask",
+            "coastline",
         ),
     },
-    "Landsat_Human_Built-up_And_Settlement_Extent": {
+    "IMERG_Precipitation_Rate": {
         "provider": "gibs",
         "aliases": (
-            "built-up",
-            "settlement extent",
-            "hbase",
-            "roads and built-up",
+            "precipitation rate",
+            "imerg precipitation",
+            "imerg",
+            "rain",
+            "rainfall",
         ),
     },
-    "VIIRS_CityLights_2012": {
+    "VIIRS_SNPP_DayNightBand_ENCC": {
         "provider": "gibs",
         "aliases": (
             "nighttime lights",
             "city lights",
             "viirs lights",
+            "light pollution",
+            "night lights",
         ),
     },
-    "LECZ_Urban_Rural_Extents_Below_10m": {
+    "MODIS_Combined_Thermal_Anomalies_Fire": {
         "provider": "gibs",
         "aliases": (
-            "low elevation coastal zone",
-            "lecz",
-            "coastal exposure",
-            "below 10m",
+            "active fires",
+            "fire",
+            "fires",
+            "thermal anomalies",
+            "wildfire",
+        ),
+    },
+    "OMPS_Ozone_Total_Column": {
+        "provider": "gibs",
+        "aliases": (
+            "ozone",
+            "ozone column",
+            "total ozone",
+            "omps ozone",
+            "atmospheric ozone",
+        ),
+    },
+    # Annual/static GIBS layers
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": {
+        "provider": "gibs",
+        "aliases": (
+            "land cover",
+            "land cover type",
+            "modis igbp land cover",
+            "igbp land cover",
+            "land use",
+        ),
+    },
+    "SRTM_Color_Index": {
+        "provider": "gibs",
+        "aliases": (
+            "elevation",
+            "dem",
+            "digital elevation model",
+            "terrain",
+            "topography",
+        ),
+    },
+    # External API providers (non-GIBS)
+    "OpenAQ_Air_Quality": {
+        "provider": "openaq",
+        "aliases": (
+            "air quality",
+            "air pollution",
+            "pm2.5",
+            "pm25",
+            "pollution",
+            "aqi",
         ),
     },
 }
