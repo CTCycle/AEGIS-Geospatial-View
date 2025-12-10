@@ -24,6 +24,8 @@ from AEGIS.server.utils.services.geospatial.gibs import (
     GIBSService,
     GIBSValidationError,
 )
+from AEGIS.server.utils.services.geospatial.openaq import OpenAQService
+from AEGIS.server.utils.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.utils.services.geospatial.layers import (
     LayerProviderError,
     LayerProviderEntry,
@@ -46,6 +48,8 @@ map_service = MapService()
 layer_service = LayerProviderService(
     metadata_provider=gibs_service.resolve_layer_meters_per_pixel
 )
+openaq_service = OpenAQService()
+elevation_service = OpenElevationService()
 
 type CoordinatePair = tuple[float, float]
 DEFAULT_OVERLAY_COLOR = "#2563eb"
@@ -447,6 +451,29 @@ class MapRenderingService:
                 crs=payload.image_crs,
                 format=payload.image_format,
             )
+        if entry.provider == "openaq":
+            # OpenAQ returns point data, not imagery - extract coordinates from bbox
+            if bbox and len(bbox) == 4:
+                center_lon = (bbox[0] + bbox[2]) / 2
+                center_lat = (bbox[1] + bbox[3]) / 2
+            elif lon is not None and lat is not None:
+                center_lon, center_lat = lon, lat
+            else:
+                raise LayerProviderError("Coordinates required for OpenAQ provider.")
+            air_quality_data = await openaq_service.get_nearby_measurements(
+                lat=center_lat,
+                lon=center_lon,
+                radius_m=payload.radius_m or 25000.0,
+            )
+            # Return in overlay-compatible format
+            return {
+                "data": air_quality_data,
+                "bbox": bbox,
+                "crs": "EPSG:4326",
+                "layer": entry.name,
+                "provider": "openaq",
+                "mode": "data",  # Indicates non-imagery overlay
+            }
         raise LayerProviderError(
             f"No imagery service registered for provider '{entry.provider}'."
         )
@@ -843,6 +870,17 @@ class MapSearchEndpoint:
                 detail=str(exc),
             ) from exc
         search_payload["satellite_imagery"] = satellite_payload
+
+        # Fetch elevation data for the search location
+        lat = search_payload.get("latitude")
+        lon = search_payload.get("longitude")
+        if lat is not None and lon is not None:
+            try:
+                elevation_data = await elevation_service.get_elevation(lat, lon)
+                search_payload["elevation"] = elevation_data
+            except Exception as exc:
+                logger.warning("Failed to fetch elevation: %s", exc)
+                search_payload["elevation"] = None
 
         return {
             "status_message": "Map search request submitted.",
