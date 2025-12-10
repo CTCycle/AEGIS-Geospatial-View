@@ -19,6 +19,11 @@ export interface LocationSearchRequest {
     image_format?: string;
     agentic_enabled?: boolean;
     agent_prompt?: string;
+    llm_provider?: string;
+    cloud_model?: string;
+    agent_model?: string;
+    temperature?: number;
+    reasoning?: boolean;
 }
 
 export interface SatelliteImageryPayload {
@@ -47,6 +52,9 @@ export interface RuntimeSettings {
     provider: string;
     cloudModel: string;
     agentModel: string;
-    temperature: number;
-    reasoning: boolean;
+}
+
+export interface AgenticConfig {
+    enabled: boolean;
+    objective: string;
 }

@@ -10,7 +10,6 @@ SETTING_PATH = join(PROJECT_DIR, "settings")
 RESOURCES_PATH = join(PROJECT_DIR, "resources")
 MODELS_PATH = join(RESOURCES_PATH, "models")
 DATA_PATH = join(RESOURCES_PATH, "database")
-DOCS_PATH = join(DATA_PATH, "documents")
 SOURCES_PATH = join(DATA_PATH, "sources")
 LOGS_PATH = join(RESOURCES_PATH, "logs")
 ENV_FILE_PATH = join(SETTING_PATH, ".env")
@@ -63,25 +62,36 @@ CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
     "gemini": GEMINI_CLOUD_MODELS,
 }
 
-GIBS_HOUSING_RELEVANT_LAYERS = {
-    "Ground_Level_Nitrogen_Dioxide_3_Year_Running_Mean_2010-2012": "Air Pollution (NO2, 2010-2012)",
-    "MODIS_Terra_Aerosol": "Aerosol Load (MODIS Terra)",
-    "MODIS_Terra_Land_Surface_Temp_Day": "Land Surface Temperature Day (MODIS Terra)",
-    "MODIS_Terra_NDVI_8Day": "Vegetation Index NDVI (8-day, MODIS Terra)",
-    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover Type (MODIS IGBP)",
-    "Landsat_Global_Man-made_Impervious_Surface": "Impervious Surface (GMIS, 30 m)",
-    "SRTM_Color_Index": "Digital Elevation Model (SRTM)",
-    "Landsat_Human_Built-up_And_Settlement_Extent": "Built-up & Roads (HBASE, Landsat)",
-    "GPW_Population_Density_2020": "Population Density (GPW 2020)",
-    "VIIRS_CityLights_2012": "Nighttime Lights (VIIRS)",
-    "LECZ_Urban_Rural_Extents_Below_10m": "Low Elevation Coastal Zone (<10 m)",
+# Daily/NRT GIBS layers (updated frequently)
+GIBS_NRT_LAYERS = {
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color Satellite (VIIRS, Daily)",
+    "MODIS_Terra_Aerosol": "Aerosol Optical Depth (MODIS, Daily)",
+    "MODIS_Terra_Land_Surface_Temp_Day": "Surface Temperature Day (MODIS, Daily)",
+    "MODIS_Terra_Land_Surface_Temp_Night": "Surface Temperature Night (MODIS, Daily)",
+    "MODIS_Terra_NDVI_8Day": "Vegetation Index NDVI (MODIS, 8-day)",
+    "MODIS_Terra_L3_Land_Water_Mask": "Land/Water Mask (MODIS, Daily)",
+    "IMERG_Precipitation_Rate": "Precipitation Rate (IMERG, 30min)",
+    "VIIRS_SNPP_DayNightBand_ENCC": "Nighttime Lights (VIIRS, Monthly)",
+    "MODIS_Combined_Thermal_Anomalies_Fire": "Active Fires (MODIS, Daily)",
+    "OMPS_Ozone_Total_Column": "Ozone Column (OMPS, Daily)",
 }
 
+# Annual/static GIBS layers (slow-changing data)
+GIBS_ANNUAL_LAYERS = {
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover Type (MODIS, Annual)",
+    "SRTM_Color_Index": "Elevation DEM (SRTM)",
+}
+
+# External API providers (non-GIBS)
+EXTERNAL_LAYERS = {
+    "OpenAQ_Air_Quality": "Air Quality (OpenAQ, Real-time)",
+}
+
+# Combined layers for UI selection
 COMMON_GEOSPATIAL_LAYERS = {
-    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color (VIIRS SNPP)",
-    "MODIS_Terra_L3_Land_Water_Mask": "Land/Water Mask (MODIS Terra)",
-    "IMERG_Precipitation_Rate": "Precipitation Rate (IMERG)",
-    **GIBS_HOUSING_RELEVANT_LAYERS,
+    **GIBS_NRT_LAYERS,
+    **GIBS_ANNUAL_LAYERS,
+    **EXTERNAL_LAYERS,
 }
 
 GEOSPATIAL_LAYER_CHOICES = [
@@ -108,6 +118,7 @@ COMMON_FOLIUM_MAPS = {
 ###############################################################################
 GEONAMES_TABLE = "GEONAMES"
 GIBS_LAYERS_TABLE = "GIBS_LAYERS"
+SEARCH_SESSIONS_TABLE = "SEARCH_SESSIONS"
 
 
 # [DATABASE COLUMNS]
@@ -142,6 +153,19 @@ GIBS_LAYER_COLUMNS = [
     "source_urls",
     "tile_matrix_sets",
     "meters_per_pixel",
+]
+
+SEARCH_SESSION_COLUMNS = [
+    "id",
+    "created_at",
+    "user",
+    "country",
+    "city",
+    "address",
+    "coordinates",
+    "base_map",
+    "geospatial_layers",
+    "state",
 ]
 
 

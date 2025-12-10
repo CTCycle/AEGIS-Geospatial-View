@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { COMMON_GEOSPATIAL_LAYERS, COMMON_FOLIUM_MAPS } from '../constants';
+import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, MAX_GEOSPATIAL_LAYERS } from '../constants';
 import { LocationSearchRequest } from '../types';
 import './LocationSearch.css';
 
@@ -8,216 +8,263 @@ interface LocationSearchProps {
     isLoading: boolean;
 }
 
-const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) => {
-    const [useCoordinates, setUseCoordinates] = useState(false);
-    const [country, setCountry] = useState('');
-    const [city, setCity] = useState('');
-    const [address, setAddress] = useState('');
-    const [latitude, setLatitude] = useState<number | ''>('');
-    const [longitude, setLongitude] = useState<number | ''>('');
-    const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
-    const [mapTile, setMapTile] = useState('OpenStreetMap');
-    const [agenticEnabled, setAgenticEnabled] = useState(false);
-    const [agentPrompt, setAgentPrompt] = useState('');
+type SearchMode = 'address' | 'coordinates';
 
-    const handleFilterSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const value = e.target.value;
-        if (value && value !== 'None' && !selectedFilters.includes(value)) {
-            setSelectedFilters([...selectedFilters, value]);
+const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) => {
+    const [mode, setMode] = useState<SearchMode>('address');
+    const [address, setAddress] = useState('');
+    const [latitude, setLatitude] = useState('');
+    const [longitude, setLongitude] = useState('');
+    const [mapTile, setMapTile] = useState('OpenStreetMap');
+    const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+    const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
+    const hasReachedFilterLimit = selectedFilters.length >= MAX_GEOSPATIAL_LAYERS;
+
+    const resetErrors = () => setErrors({});
+
+    const validateCoordinates = () => {
+        const newErrors: { latitude?: string; longitude?: string } = {};
+        const parsedLat = parseFloat(latitude);
+        const parsedLon = parseFloat(longitude);
+
+        if (!latitude.trim()) {
+            newErrors.latitude = 'Latitude is required in coordinate mode.';
+        } else if (Number.isNaN(parsedLat)) {
+            newErrors.latitude = 'Latitude must be numeric.';
+        } else if (parsedLat < -90 || parsedLat > 90) {
+            newErrors.latitude = 'Latitude must be between -90 and 90.';
         }
-        e.target.value = ''; // Reset select
+
+        if (!longitude.trim()) {
+            newErrors.longitude = 'Longitude is required in coordinate mode.';
+        } else if (Number.isNaN(parsedLon)) {
+            newErrors.longitude = 'Longitude must be numeric.';
+        } else if (parsedLon < -180 || parsedLon > 180) {
+            newErrors.longitude = 'Longitude must be between -180 and 180.';
+        }
+
+        return { newErrors, parsedLat, parsedLon };
+    };
+
+    const validateAddress = () => {
+        if (!address.trim()) {
+            return 'Enter an address (e.g., "Via Tesserete 29, Tesserete, Svizzera").';
+        }
+        return '';
+    };
+
+    const handleSubmit = (event: React.FormEvent) => {
+        event.preventDefault();
+        resetErrors();
+
+        if (mode === 'address') {
+            const addressError = validateAddress();
+            if (addressError) {
+                setErrors({ address: addressError });
+                return;
+            }
+        }
+
+        if (mode === 'coordinates') {
+            const { newErrors, parsedLat, parsedLon } = validateCoordinates();
+            if (newErrors.latitude || newErrors.longitude) {
+                setErrors(newErrors);
+                return;
+            }
+
+            const request: LocationSearchRequest = {
+                datetime: new Date().toISOString(),
+                use_coordinates: true,
+                latitude: parsedLat,
+                longitude: parsedLon,
+                map_tiles: mapTile,
+                filters: selectedFilters,
+            };
+            onSearch(request);
+            return;
+        }
+
+        const request: LocationSearchRequest = {
+            datetime: new Date().toISOString(),
+            use_coordinates: false,
+            address: address.trim(),
+            map_tiles: mapTile,
+            filters: selectedFilters,
+        };
+        onSearch(request);
+    };
+
+    const handleFilterSelect = (value: string) => {
+        if (!value) {
+            return;
+        }
+        if (hasReachedFilterLimit) {
+            return;
+        }
+        const normalized = value === 'None' ? '' : value;
+        if (normalized && !selectedFilters.includes(normalized)) {
+            setSelectedFilters([...selectedFilters, normalized]);
+        }
     };
 
     const removeFilter = (filter: string) => {
         setSelectedFilters(selectedFilters.filter((f) => f !== filter));
     };
 
-    const handleSearch = () => {
-        const nowIso = new Date().toISOString();
-        const request: LocationSearchRequest = {
-            datetime: nowIso,
-            use_coordinates: useCoordinates,
-            country: !useCoordinates ? country : undefined,
-            city: !useCoordinates ? city : undefined,
-            address: !useCoordinates ? address : undefined,
-            latitude: useCoordinates && latitude !== '' ? Number(latitude) : undefined,
-            longitude: useCoordinates && longitude !== '' ? Number(longitude) : undefined,
-            filters: selectedFilters,
-            map_tiles: mapTile,
-            agentic_enabled: agenticEnabled,
-            agent_prompt: agenticEnabled ? agentPrompt : undefined,
-        };
-        onSearch(request);
-    };
+    const renderAddressFields = () => (
+        <div className="field-grid">
+            <div className="form-group full-width">
+                <label htmlFor="address">Full Address</label>
+                <input
+                    id="address"
+                    type="text"
+                    placeholder="e.g., Via Tesserete 29, Tesserete, Svizzera"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    aria-describedby="location-helper"
+                />
+                <p className="helper-text">Enter a complete address including street, city, and country</p>
+                {errors.address && <p className="error-text">{errors.address}</p>}
+            </div>
+        </div>
+    );
+
+    const renderCoordinateFields = () => (
+        <div className="field-grid">
+            <div className="form-group">
+                <label htmlFor="latitude">Latitude</label>
+                <input
+                    id="latitude"
+                    type="number"
+                    step="0.000001"
+                    placeholder="Decimal degrees from -90 to 90"
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                />
+                <p className="helper-text">Numeric value, -90 to 90</p>
+                {errors.latitude && <p className="error-text">{errors.latitude}</p>}
+            </div>
+            <div className="form-group">
+                <label htmlFor="longitude">Longitude</label>
+                <input
+                    id="longitude"
+                    type="number"
+                    step="0.000001"
+                    placeholder="Decimal degrees from -180 to 180"
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                />
+                <p className="helper-text">Numeric value, -180 to 180</p>
+                {errors.longitude && <p className="error-text">{errors.longitude}</p>}
+            </div>
+        </div>
+    );
 
     return (
-        <div className="card location-search-card">
-            <div className="card-content">
-                <h3 className="section-title">Location search</h3>
-
-                <div className="search-inputs-row">
-                    <div className="input-column">
-                        <div className="form-group">
-                            <label>Country or Region</label>
-                            <input
-                                type="text"
-                                placeholder="Enter a country or region"
-                                value={country}
-                                onChange={(e) => setCountry(e.target.value)}
-                                disabled={useCoordinates}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>City Name</label>
-                            <input
-                                type="text"
-                                placeholder="Enter a city or locale"
-                                value={city}
-                                onChange={(e) => setCity(e.target.value)}
-                                disabled={useCoordinates}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Street Address</label>
-                            <input
-                                type="text"
-                                placeholder="Enter the specific address"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                disabled={useCoordinates}
-                                required={!useCoordinates}
-                            />
-                        </div>
-
-                        <div className="coordinates-section">
-                            <div className="coordinates-header">
-                                <div className="coordinates-labels">
-                                    <p className="coordinates-title">Coordinate input</p>
-                                    <p className="coordinates-description">Enable to search by latitude and longitude instead of address.</p>
-                                </div>
-                                <div className="coordinates-toggle">
-                                    <span className={`toggle-status ${useCoordinates ? 'active' : ''}`}>
-                                        {useCoordinates ? 'Enabled' : 'Disabled'}
-                                    </span>
-                                    <label className="switch" aria-label="Toggle coordinate input">
-                                        <input
-                                            type="checkbox"
-                                            checked={useCoordinates}
-                                            onChange={(e) => setUseCoordinates(e.target.checked)}
-                                        />
-                                        <span className="slider round"></span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div className="coordinates-row">
-                                <div className="form-group">
-                                    <label>Latitude (?)</label>
-                                    <input
-                                        type="number"
-                                        step="0.000001"
-                                        value={latitude}
-                                        onChange={(e) => setLatitude(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                        disabled={!useCoordinates}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Longitude (?)</label>
-                                    <input
-                                        type="number"
-                                        step="0.000001"
-                                        value={longitude}
-                                        onChange={(e) => setLongitude(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                        disabled={!useCoordinates}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="separator hidden-xl"></div>
-
-                    <div className="input-column">
-                        <div className="form-group">
-                            <label>Base Map</label>
-                            <select value={mapTile} onChange={(e) => setMapTile(e.target.value)}>
-                                {Object.entries(COMMON_FOLIUM_MAPS).map(([key, label]) => (
-                                    <option key={key} value={key}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Geospatial Layer</label>
-                            <select onChange={handleFilterSelect} defaultValue="">
-                                <option value="" disabled>Select a layer...</option>
-                                <option value="None">None</option>
-                                {Object.entries(COMMON_GEOSPATIAL_LAYERS).map(([key, label]) => (
-                                    <option key={key} value={key}>
-                                        {label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="chip-container">
-                            {selectedFilters.length === 0 && (
-                                <span className="no-filters">No filters selected</span>
-                            )}
-                            {selectedFilters.map((filter) => (
-                                <div key={filter} className="chip" onClick={() => removeFilter(filter)}>
-                                    {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
-                                    <span className="material-icons chip-close">close</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+        <form className="location-container" onSubmit={handleSubmit}>
+            <div className="header-row">
+                <div>
+                    <h3 className="panel-title">Location search</h3>
+                    <p className="panel-description">Specify where to focus the map.</p>
                 </div>
-
-                <hr className="divider" />
-
-                <div className="agentic-section">
-                    <div className="agentic-header">
-                        <label className="checkbox-label">
-                            <input
-                                type="checkbox"
-                                checked={agenticEnabled}
-                                onChange={(e) => setAgenticEnabled(e.target.checked)}
-                            />
-                            Activate agentic assistant
-                        </label>
-                    </div>
-                    {agenticEnabled && (
-                        <div className="agentic-content fade-in">
-                            <div className="form-group">
-                                <label>Agent Prompt</label>
-                                <textarea
-                                    placeholder="Describe the geographic insights you need"
-                                    value={agentPrompt}
-                                    onChange={(e) => setAgentPrompt(e.target.value)}
-                                    rows={3}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="actions">
-                    <button className="search-button" onClick={handleSearch} disabled={isLoading}>
-                        {isLoading ? (
-                            <>
-                                <span className="animate-spin material-icons" style={{ fontSize: '1.2em' }}>refresh</span>
-                                Searching...
-                            </>
-                        ) : (
-                            <>
-                                <span className="material-icons">search</span>
-                                Search
-                            </>
-                        )}
+                <div className="mode-switch" role="tablist" aria-label="Search mode">
+                    <button
+                        type="button"
+                        className={`mode-tab ${mode === 'address' ? 'active' : ''}`}
+                        onClick={() => setMode('address')}
+                        aria-selected={mode === 'address'}
+                    >
+                        Address
+                    </button>
+                    <button
+                        type="button"
+                        className={`mode-tab ${mode === 'coordinates' ? 'active' : ''}`}
+                        onClick={() => setMode('coordinates')}
+                        aria-selected={mode === 'coordinates'}
+                    >
+                        Coordinates
                     </button>
                 </div>
             </div>
-        </div>
+
+            <div className="group-label">Location</div>
+            <p id="location-helper" className="helper-text">
+                Choose address mode or coordinate mode. Validation applies only to the active mode.
+            </p>
+
+            {mode === 'address' ? renderAddressFields() : renderCoordinateFields()}
+
+            <div className="group-label">Map context</div>
+            <p className="helper-text">Select base map and optional geospatial filters to include in results.</p>
+            <div className="field-grid">
+                <div className="form-group">
+                    <label htmlFor="base-map">Base map</label>
+                    <select
+                        id="base-map"
+                        value={mapTile}
+                        onChange={(e) => setMapTile(e.target.value)}
+                    >
+                        {Object.entries(COMMON_FOLIUM_MAPS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="form-group">
+                    <label htmlFor="geospatial-layer">Geospatial layer</label>
+                    <select
+                        id="geospatial-layer"
+                        defaultValue=""
+                        onChange={(e) => {
+                            handleFilterSelect(e.target.value);
+                            e.target.value = '';
+                        }}
+                        disabled={hasReachedFilterLimit}
+                    >
+                        <option value="" disabled>Select a layer...</option>
+                        <option value="None">None</option>
+                        {Object.entries(COMMON_GEOSPATIAL_LAYERS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+
+                </div>
+            </div>
+
+            <div className="form-group">
+                <p className="helper-text">
+                    Choose multiple layers; click a chip to remove. Up to {MAX_GEOSPATIAL_LAYERS} overlays.
+                </p>
+                {hasReachedFilterLimit && (
+                    <p className="error-text">
+                        Maximum overlays selected. Remove one to add another.
+                    </p>
+                )}
+                <div className="chip-container">
+                    {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
+                    {selectedFilters.map((filter) => (
+                        <div
+                            key={filter}
+                            className="chip"
+                            title={COMMON_GEOSPATIAL_LAYERS[filter] || filter}
+                            onClick={() => removeFilter(filter)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && removeFilter(filter)}
+                            aria-label={`Remove ${COMMON_GEOSPATIAL_LAYERS[filter] || filter}`}
+                        >
+                            {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
+                            <span className="chip-close">✕</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="actions">
+                <button className="primary-button" type="submit" disabled={isLoading}>
+                    {isLoading ? 'Searching...' : 'Search'}
+                </button>
+            </div>
+        </form>
     );
 };
 

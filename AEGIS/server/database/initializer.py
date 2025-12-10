@@ -6,10 +6,10 @@ import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 
 from AEGIS.server.utils.configurations import DatabaseSettings, server_settings
-from AEGIS.server.utils.database.postgres import PostgresRepository
-from AEGIS.server.utils.database.schema import Base
-from AEGIS.server.utils.database.sqlite import SQLiteRepository
-from AEGIS.server.utils.database.utils import normalize_postgres_engine
+from AEGIS.server.database.postgres import PostgresRepository
+from AEGIS.server.database.schema import Base
+from AEGIS.server.database.sqlite import SQLiteRepository
+from AEGIS.server.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
 
 
