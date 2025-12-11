@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 import json
 
-from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.constants import OPENAQ_API_BASE_URL
 from AEGIS.server.utils.logger import logger
 
 
@@ -40,7 +40,7 @@ class OpenAQService:
     API Reference: https://docs.openaq.org/
     """
     
-    BASE_URL = "https://api.openaq.org/v3"
+    BASE_URL = OPENAQ_API_BASE_URL
     
     # Pollutants supported by OpenAQ
     SUPPORTED_POLLUTANTS = ("pm25", "pm10", "no2", "o3", "so2", "co", "bc")
