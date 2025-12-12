@@ -8,6 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import json
 
+from AEGIS.server.utils.constants import OPEN_ELEVATION_API_BASE_URL
 from AEGIS.server.utils.logger import logger
 
 
@@ -32,7 +33,7 @@ class OpenElevationService:
     API Reference: https://open-elevation.com/
     """
     
-    BASE_URL = "https://api.open-elevation.com/api/v1"
+    BASE_URL = OPEN_ELEVATION_API_BASE_URL
     
     def __init__(
         self,

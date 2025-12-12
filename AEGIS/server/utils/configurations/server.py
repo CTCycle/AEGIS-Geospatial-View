@@ -9,12 +9,17 @@ from AEGIS.server.utils.configurations.base import (
 )
 
 from AEGIS.server.utils.constants import (
-    GIBS_MAX_IMAGE_DIMENSION,
-    GIBS_MIN_IMAGE_DIMENSION,   
-    NASA_ATTRIBUTION,
-    SERVER_CONFIGURATION_FILE,
+    AGENT_MODEL_CHOICES,
     CLOUD_MODEL_CHOICES,
-    AGENT_MODEL_CHOICES
+    GIBS_CAPABILITIES_ENDPOINTS,
+    GIBS_MAX_IMAGE_DIMENSION,
+    GIBS_MIN_IMAGE_DIMENSION,
+    GIBS_OWS_NAMESPACES,
+    GIBS_WMS_BASE_ENDPOINTS,
+    NASA_ATTRIBUTION,
+    NOMINATIM_SEARCH_URL,
+    OLLAMA_DEFAULT_HOST,
+    SERVER_CONFIGURATION_FILE,
 )
 
 from AEGIS.server.utils.types import (
@@ -344,7 +349,7 @@ def build_nominatim_settings(data: dict[str, Any]) -> NominatimSettings:
     return NominatimSettings(
         base_url=coerce_str(
             payload.get("base_url"),
-            "https://nominatim.openstreetmap.org/search",
+            NOMINATIM_SEARCH_URL,
         ),
         user_agent=coerce_str(
             payload.get("user_agent"),
@@ -387,10 +392,7 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         if crs_key and endpoint:
             normalized_endpoints[crs_key] = endpoint
     if not normalized_endpoints:
-        normalized_endpoints = {
-            "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
-            "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
-        }
+        normalized_endpoints = dict(GIBS_WMS_BASE_ENDPOINTS)
     capabilities_payload = ensure_mapping(payload.get("capabilities_endpoints"))
     capabilities_endpoints: dict[str, str] = {}
     for crs, url in capabilities_payload.items():
@@ -399,12 +401,7 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         if crs_key and endpoint:
             capabilities_endpoints[crs_key] = endpoint
     if not capabilities_endpoints:
-        capabilities_endpoints = {
-            "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
-            "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
-            "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
-            "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml",
-        }
+        capabilities_endpoints = dict(GIBS_CAPABILITIES_ENDPOINTS)
     namespaces_payload = ensure_mapping(payload.get("ows_namespaces"))
     ows_namespaces: dict[str, str] = {}
     for key, value in namespaces_payload.items():
@@ -413,7 +410,7 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         if prefix and namespace:
             ows_namespaces[prefix] = namespace
     if not ows_namespaces:
-        ows_namespaces = {"ows": "http://www.opengis.net/ows/1.1"}
+        ows_namespaces = dict(GIBS_OWS_NAMESPACES)
     return GIBSSettings(
         user_agent=coerce_str(payload.get("user_agent"), "AEGIS-GIBS/1.0"),
         timeout=coerce_float(payload.get("timeout"), 20.0, minimum=1.0),
@@ -470,7 +467,10 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
         use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
         ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
         ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
-        ollama_host_default=coerce_str(data.get("ollama_host_default"), "http://localhost:11434"),
+        ollama_host_default=coerce_str(
+            data.get("ollama_host_default"),
+            OLLAMA_DEFAULT_HOST,
+        ),
     )
 
 # -----------------------------------------------------------------------------
@@ -486,7 +486,10 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
     default_provider = llm_defaults.llm_provider
     default_cloud_model = llm_defaults.cloud_model
-    default_ollama_host = coerce_str(payload.get("ollama_base_url"), "http://localhost:11434")    
+    default_ollama_host = coerce_str(
+        payload.get("ollama_base_url"),
+        OLLAMA_DEFAULT_HOST,
+    )
 
     return ServerSettings(
         fastapi=build_fastapi_settings(fastapi_payload),
