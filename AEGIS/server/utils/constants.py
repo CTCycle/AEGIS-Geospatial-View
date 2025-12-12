@@ -24,6 +24,27 @@ SERVER_CONFIGURATION_FILE = join(SETTING_PATH, "server_configurations.json")
 GEO_SEARCH_URL = "/maps/search"
 GEO_AGENTIC_URL = "/maps/agentic"
 
+# [SERVER URLS]
+###############################################################################
+NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+OPENAQ_API_BASE_URL = "https://api.openaq.org/v3"
+OPEN_ELEVATION_API_BASE_URL = "https://api.open-elevation.com/api/v1"
+OLLAMA_DEFAULT_HOST = "http://localhost:11434"
+
+# [GIBS SERVICE URLS]
+###############################################################################
+GIBS_WMS_BASE_ENDPOINTS = {
+    "EPSG:3857": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+    "EPSG:4326": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
+}
+GIBS_CAPABILITIES_ENDPOINTS = {
+    "EPSG:4326": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
+    "EPSG:3857": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
+    "EPSG:3413": "https://gibs.earthdata.nasa.gov/wmts/epsg3413/best/1.0.0/WMTSCapabilities.xml",
+    "EPSG:3031": "https://gibs.earthdata.nasa.gov/wmts/epsg3031/best/1.0.0/WMTSCapabilities.xml",
+}
+GIBS_OWS_NAMESPACES = {"ows": "http://www.opengis.net/ows/1.1"}
+
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
 DEFAULT_AGENTIC_TEMPERATURE = 0.7
