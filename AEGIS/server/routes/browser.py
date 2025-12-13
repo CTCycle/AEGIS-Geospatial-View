@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from AEGIS.server.database.database import database
@@ -23,7 +24,7 @@ def list_tables() -> JSONResponse:
         {"name": name, "displayName": display_name}
         for name, display_name in TABLE_MAPPING.items()
     ]
-    return JSONResponse(content={"tables": tables})
+    return JSONResponse(content=jsonable_encoder({"tables": tables}))
 
 
 # -----------------------------------------------------------------------------
@@ -40,14 +41,16 @@ def get_table_data(table_name: str) -> JSONResponse:
         columns = df.columns.tolist()
         rows = df.to_dict(orient="records")
         return JSONResponse(
-            content={
-                "tableName": table_name,
-                "displayName": TABLE_MAPPING[table_name],
-                "columns": columns,
-                "rows": rows,
-                "rowCount": len(rows),
-                "columnCount": len(columns),
-            }
+            content=jsonable_encoder(
+                {
+                    "tableName": table_name,
+                    "displayName": TABLE_MAPPING[table_name],
+                    "columns": columns,
+                    "rows": rows,
+                    "rowCount": len(rows),
+                    "columnCount": len(columns),
+                }
+            )
         )
     except Exception as e:
         logger.error("Error loading table %s: %s", table_name, e)
@@ -69,12 +72,14 @@ def get_table_stats(table_name: str) -> JSONResponse:
     try:
         df = database.load_from_database(table_name)
         return JSONResponse(
-            content={
-                "tableName": table_name,
-                "displayName": TABLE_MAPPING[table_name],
-                "rowCount": len(df),
-                "columnCount": len(df.columns),
-            }
+            content=jsonable_encoder(
+                {
+                    "tableName": table_name,
+                    "displayName": TABLE_MAPPING[table_name],
+                    "rowCount": len(df),
+                    "columnCount": len(df.columns),
+                }
+            )
         )
     except Exception as e:
         logger.error("Error getting stats for table %s: %s", table_name, e)
