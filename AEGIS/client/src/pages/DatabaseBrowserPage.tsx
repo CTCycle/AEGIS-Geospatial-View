@@ -40,7 +40,7 @@ function DatabaseBrowserPage() {
         loadTables();
     }, []);
 
-    // Fetch table data when selection changes
+    // Fetch table data - only called when refresh button is clicked
     const loadTableData = useCallback(async (tableName: string) => {
         if (!tableName) return;
         setIsLoading(true);
@@ -56,12 +56,6 @@ function DatabaseBrowserPage() {
         }
     }, []);
 
-    useEffect(() => {
-        if (selectedTable) {
-            loadTableData(selectedTable);
-        }
-    }, [selectedTable, loadTableData]);
-
     const handleRefresh = () => {
         if (selectedTable) {
             loadTableData(selectedTable);
@@ -70,6 +64,7 @@ function DatabaseBrowserPage() {
 
     const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedTable(e.target.value);
+        setTableData(null); // Clear data when table changes, user must click refresh
     };
 
     const getDisplayName = (tableName: string): string => {
@@ -178,6 +173,12 @@ function DatabaseBrowserPage() {
                 {!isLoading && !error && tableData && tableData.rows.length === 0 && (
                     <div className="empty-state">
                         <span>No data available in this table.</span>
+                    </div>
+                )}
+
+                {!isLoading && !error && !tableData && (
+                    <div className="empty-state">
+                        <span>Select a table and click the refresh button to load data.</span>
                     </div>
                 )}
             </div>
