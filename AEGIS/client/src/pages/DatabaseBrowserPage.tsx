@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { fetchTables, fetchTableData, TableInfo, TableData } from '../services/api';
+import { useEffect } from 'react';
+import { useDatabaseBrowser } from '../context/DatabaseBrowserContext';
 import './DatabaseBrowserPage.css';
 
 // Refresh icon
@@ -17,54 +17,29 @@ const Spinner = () => (
 );
 
 function DatabaseBrowserPage() {
-    const [tables, setTables] = useState<TableInfo[]>([]);
-    const [selectedTable, setSelectedTable] = useState<string>('');
-    const [tableData, setTableData] = useState<TableData | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const {
+        tables,
+        selectedTable,
+        tableData,
+        isLoading,
+        error,
+        setSelectedTable,
+        refreshData,
+        loadTables,
+    } = useDatabaseBrowser();
 
-    // Fetch list of tables on mount
+    // Load list of tables on mount (only fetches once due to context logic)
     useEffect(() => {
-        const loadTables = async () => {
-            try {
-                const data = await fetchTables();
-                setTables(data);
-                if (data.length > 0) {
-                    setSelectedTable(data[0].name);
-                }
-            } catch (err) {
-                setError('Failed to load tables');
-                console.error(err);
-            }
-        };
         loadTables();
-    }, []);
-
-    // Fetch table data - only called when refresh button is clicked
-    const loadTableData = useCallback(async (tableName: string) => {
-        if (!tableName) return;
-        setIsLoading(true);
-        setError(null);
-        try {
-            const data = await fetchTableData(tableName);
-            setTableData(data);
-        } catch (err) {
-            setError('Failed to load table data');
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    }, [loadTables]);
 
     const handleRefresh = () => {
-        if (selectedTable) {
-            loadTableData(selectedTable);
-        }
+        refreshData();
     };
 
     const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        // This will also trigger data fetch for the new table
         setSelectedTable(e.target.value);
-        setTableData(null); // Clear data when table changes, user must click refresh
     };
 
     const getDisplayName = (tableName: string): string => {
