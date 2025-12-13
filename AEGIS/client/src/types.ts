@@ -58,3 +58,19 @@ export interface AgenticConfig {
     enabled: boolean;
     objective: string;
 }
+
+// Database Browser types
+export interface TableInfo {
+    name: string;
+    displayName: string;
+}
+
+export interface TableData {
+    tableName: string;
+    displayName: string;
+    columns: string[];
+    rows: Record<string, any>[];
+    rowCount: number;
+    columnCount: number;
+}
+
