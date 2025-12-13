@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../constants';
-import { LocationSearchRequest, SearchResponse } from '../types';
+import { LocationSearchRequest, SearchResponse, TableInfo, TableData } from '../types';
 
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
     try {
@@ -33,3 +33,23 @@ export const searchLocation = async (payload: LocationSearchRequest): Promise<Se
         throw error;
     }
 };
+
+export const fetchTables = async (): Promise<TableInfo[]> => {
+    const response = await fetch(`${API_BASE_URL}/browser/tables`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch tables');
+    }
+    const data = await response.json();
+    return data.tables;
+};
+
+export const fetchTableData = async (tableName: string): Promise<TableData> => {
+    const response = await fetch(`${API_BASE_URL}/browser/tables/${tableName}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch table data');
+    }
+    return response.json();
+};
+
+// Re-export types for convenience
+export type { TableInfo, TableData } from '../types';

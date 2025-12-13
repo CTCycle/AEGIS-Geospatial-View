@@ -1,12 +1,16 @@
-.app-container {
+.app-layout {
+    display: flex;
     min-height: 100vh;
-    background: linear-gradient(135deg, #f1f5ff 0%, #e6efff 60%, #f6fbff 100%);
-    padding: 20px 18px 40px 26px;
 }
 
 .main-content {
-    max-width: 1440px;
-    margin: 0 auto;
+    flex: 1;
+    margin-left: 72px;
+    /* Sidebar width */
+    max-width: calc(100% - 72px);
+    padding: 20px 26px 40px 26px;
+    background: linear-gradient(135deg, #f1f5ff 0%, #e6efff 60%, #f6fbff 100%);
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
@@ -58,6 +62,19 @@
     flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
+}
+
+.panel-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.panel-description {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin: 0;
 }
 
 .map-toolbar {
