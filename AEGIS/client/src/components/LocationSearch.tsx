@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, MAX_GEOSPATIAL_LAYERS } from '../constants';
+import React, { useState, useMemo } from 'react';
+import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, MAX_GEOSPATIAL_LAYERS, DATA_PROVIDERS, LAYER_PROVIDERS } from '../constants';
 import { LocationSearchRequest } from '../types';
 import './LocationSearch.css';
 
@@ -17,8 +17,27 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     const [longitude, setLongitude] = useState('');
     const [mapTile, setMapTile] = useState('OpenStreetMap');
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+    const [selectedProvider, setSelectedProvider] = useState('all');
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
     const hasReachedFilterLimit = selectedFilters.length >= MAX_GEOSPATIAL_LAYERS;
+
+    // Get the description of the currently selected provider
+    const currentProviderDescription = useMemo(() => {
+        const provider = DATA_PROVIDERS.find(p => p.id === selectedProvider);
+        return provider?.description || '';
+    }, [selectedProvider]);
+
+    // Filter layers based on selected provider
+    const filteredLayers = useMemo(() => {
+        if (selectedProvider === 'all') {
+            return COMMON_GEOSPATIAL_LAYERS;
+        }
+        return Object.fromEntries(
+            Object.entries(COMMON_GEOSPATIAL_LAYERS).filter(
+                ([key]) => LAYER_PROVIDERS[key] === selectedProvider
+            )
+        );
+    }, [selectedProvider]);
 
     const resetErrors = () => setErrors({});
 
@@ -210,6 +229,21 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                     </select>
                 </div>
                 <div className="form-group">
+                    <label htmlFor="data-provider">Data provider</label>
+                    <select
+                        id="data-provider"
+                        value={selectedProvider}
+                        onChange={(e) => setSelectedProvider(e.target.value)}
+                    >
+                        {DATA_PROVIDERS.map((provider) => (
+                            <option key={provider.id} value={provider.id}>{provider.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+            <p className="provider-description">{currentProviderDescription}</p>
+            <div className="field-grid">
+                <div className="form-group full-width">
                     <label htmlFor="geospatial-layer">Geospatial layer</label>
                     <select
                         id="geospatial-layer"
@@ -218,15 +252,18 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                             handleFilterSelect(e.target.value);
                             e.target.value = '';
                         }}
-                        disabled={hasReachedFilterLimit}
+                        disabled={hasReachedFilterLimit || Object.keys(filteredLayers).length === 0}
                     >
-                        <option value="" disabled>Select a layer...</option>
+                        <option value="" disabled>
+                            {Object.keys(filteredLayers).length === 0
+                                ? 'No layers available for this provider'
+                                : 'Select a layer...'}
+                        </option>
                         <option value="None">None</option>
-                        {Object.entries(COMMON_GEOSPATIAL_LAYERS).map(([key, label]) => (
+                        {Object.entries(filteredLayers).map(([key, label]) => (
                             <option key={key} value={key}>{label}</option>
                         ))}
                     </select>
-
                 </div>
             </div>
 
