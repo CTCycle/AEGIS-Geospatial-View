@@ -90,6 +90,15 @@
     color: #b91c1c;
 }
 
+.provider-description {
+    margin: 0.5rem 0 0.75rem 0;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #64748b;
+    line-height: 1.4;
+    transition: opacity 0.2s ease;
+}
+
 .chip-container {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
