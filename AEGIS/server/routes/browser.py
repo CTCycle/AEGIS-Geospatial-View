@@ -5,9 +5,15 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from AEGIS.server.database.database import database
+from AEGIS.server.utils.constants import (
+    BROWSER_ROUTER_PREFIX,
+    BROWSER_TABLE_ROUTE,
+    BROWSER_TABLE_STATS_ROUTE,
+    BROWSER_TABLES_ROUTE,
+)
 from AEGIS.server.utils.logger import logger
 
-router = APIRouter(prefix="/browser", tags=["browser"])
+router = APIRouter(prefix=BROWSER_ROUTER_PREFIX, tags=["browser"])
 
 # Table name mapping: internal name -> display name
 TABLE_MAPPING: dict[str, str] = {
@@ -17,7 +23,7 @@ TABLE_MAPPING: dict[str, str] = {
 
 
 # -----------------------------------------------------------------------------
-@router.get("/tables")
+@router.get(BROWSER_TABLES_ROUTE)
 def list_tables() -> JSONResponse:
     """List all available tables with verbose display names."""
     tables = [
@@ -28,7 +34,7 @@ def list_tables() -> JSONResponse:
 
 
 # -----------------------------------------------------------------------------
-@router.get("/tables/{table_name}")
+@router.get(BROWSER_TABLE_ROUTE)
 def get_table_data(table_name: str) -> JSONResponse:
     """Fetch all data from a specific table."""
     if table_name not in TABLE_MAPPING:
@@ -61,7 +67,7 @@ def get_table_data(table_name: str) -> JSONResponse:
 
 
 # -----------------------------------------------------------------------------
-@router.get("/tables/{table_name}/stats")
+@router.get(BROWSER_TABLE_STATS_ROUTE)
 def get_table_stats(table_name: str) -> JSONResponse:
     """Get statistics for a specific table."""
     if table_name not in TABLE_MAPPING:

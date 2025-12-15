@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import ValidationError
 
+from AEGIS.server.utils.constants import MAPS_ROUTER_PREFIX, MAPS_SEARCH_ROUTE
 from AEGIS.server.schemas.geographics import (
     LocationSearchRequest,
 )
@@ -39,7 +40,7 @@ from AEGIS.server.utils.services.geospatial.maps import (
 from AEGIS.server.utils.services.geospatial.normatim import NormatimService
 from AEGIS.server.utils.services.sanitization import LocationSanitizationService
 
-router = APIRouter(prefix="/maps", tags=["search"])
+router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 
 sanitization_service = LocationSanitizationService()
 normatim_service = NormatimService()
@@ -1059,7 +1060,7 @@ class MapSearchEndpoint:
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
-            "/search",
+            MAPS_SEARCH_ROUTE,
             self.search_by_location,
             methods=["POST"],
             status_code=status.HTTP_200_OK,

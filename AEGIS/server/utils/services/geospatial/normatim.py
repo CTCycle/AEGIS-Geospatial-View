@@ -11,6 +11,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from AEGIS.server.utils.constants import (
+    NOMINATIM_REVERSE_PATH,
+    NOMINATIM_SEARCH_PATH,
+)
 from AEGIS.server.utils.configurations import server_settings
 from AEGIS.server.utils.logger import logger
 
@@ -623,6 +627,7 @@ class NormatimService:
     # -----------------------------------------------------------------------------
     def resolve_reverse_url(self) -> str:
         normalized = self.base_url.rstrip("/")
-        if normalized.endswith("/search"):
-            return f"{normalized[:-6]}reverse"
-        return f"{normalized}/reverse"
+        if normalized.endswith(NOMINATIM_SEARCH_PATH):
+            base = normalized[: -len(NOMINATIM_SEARCH_PATH)]
+            return f"{base}{NOMINATIM_REVERSE_PATH}"
+        return f"{normalized}{NOMINATIM_REVERSE_PATH}"
