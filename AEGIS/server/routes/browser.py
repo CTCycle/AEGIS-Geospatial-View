@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from AEGIS.server.database.database import database
 from AEGIS.server.utils.constants import (
     BROWSER_ROUTER_PREFIX,
     BROWSER_TABLE_ROUTE,
@@ -12,8 +11,10 @@ from AEGIS.server.utils.constants import (
     BROWSER_TABLES_ROUTE,
 )
 from AEGIS.server.utils.logger import logger
+from AEGIS.server.utils.repository.serializer import DataSerializer
 
 router = APIRouter(prefix=BROWSER_ROUTER_PREFIX, tags=["browser"])
+serializer = DataSerializer()
 
 # Table name mapping: internal name -> display name
 TABLE_MAPPING: dict[str, str] = {
@@ -43,18 +44,16 @@ def get_table_data(table_name: str) -> JSONResponse:
             detail=f"Table '{table_name}' not found.",
         )
     try:
-        df = database.load_from_database(table_name)
-        columns = df.columns.tolist()
-        rows = df.to_dict(orient="records")
+        payload = serializer.load_table_records(table_name)
         return JSONResponse(
             content=jsonable_encoder(
                 {
                     "tableName": table_name,
                     "displayName": TABLE_MAPPING[table_name],
-                    "columns": columns,
-                    "rows": rows,
-                    "rowCount": len(rows),
-                    "columnCount": len(columns),
+                    "columns": payload["columns"],
+                    "rows": payload["rows"],
+                    "rowCount": payload["row_count"],
+                    "columnCount": payload["column_count"],
                 }
             )
         )
@@ -76,14 +75,14 @@ def get_table_stats(table_name: str) -> JSONResponse:
             detail=f"Table '{table_name}' not found.",
         )
     try:
-        df = database.load_from_database(table_name)
+        stats = serializer.get_table_stats(table_name)
         return JSONResponse(
             content=jsonable_encoder(
                 {
                     "tableName": table_name,
                     "displayName": TABLE_MAPPING[table_name],
-                    "rowCount": len(df),
-                    "columnCount": len(df.columns),
+                    "rowCount": stats["row_count"],
+                    "columnCount": stats["column_count"],
                 }
             )
         )
