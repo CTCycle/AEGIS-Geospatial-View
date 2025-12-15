@@ -19,14 +19,27 @@ DATABASE_FILENAME = "sqlite.db"
 SERVER_CONFIGURATION_FILE = join(SETTING_PATH, "server_configurations.json")
 
 
-# [ENDPOINS]
+# [BACKEND ROUTES]
 ###############################################################################
-GEO_SEARCH_URL = "/maps/search"
-GEO_AGENTIC_URL = "/maps/agentic"
+ROOT_ROUTE = "/"
+DOCS_ROUTE = "/docs"
+MAPS_ROUTER_PREFIX = "/maps"
+BROWSER_ROUTER_PREFIX = "/browser"
+MAPS_SEARCH_ROUTE = "/search"
+MAPS_AGENTIC_ROUTE = "/agentic"
+BROWSER_TABLES_ROUTE = "/tables"
+BROWSER_TABLE_ROUTE = "/tables/{table_name}"
+BROWSER_TABLE_STATS_ROUTE = "/tables/{table_name}/stats"
+GEO_SEARCH_URL = f"{MAPS_ROUTER_PREFIX}{MAPS_SEARCH_ROUTE}"
+GEO_AGENTIC_URL = f"{MAPS_ROUTER_PREFIX}{MAPS_AGENTIC_ROUTE}"
 
 # [SERVER URLS]
 ###############################################################################
-NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org"
+NOMINATIM_SEARCH_PATH = "/search"
+NOMINATIM_REVERSE_PATH = "/reverse"
+NOMINATIM_SEARCH_URL = f"{NOMINATIM_BASE_URL}{NOMINATIM_SEARCH_PATH}"
+NOMINATIM_REVERSE_URL = f"{NOMINATIM_BASE_URL}{NOMINATIM_REVERSE_PATH}"
 OPENAQ_API_BASE_URL = "https://api.openaq.org/v3"
 OPEN_ELEVATION_API_BASE_URL = "https://api.open-elevation.com/api/v1"
 OLLAMA_DEFAULT_HOST = "http://localhost:11434"
