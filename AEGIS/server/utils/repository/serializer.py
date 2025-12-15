@@ -46,3 +46,28 @@ class DataSerializer:
         frame = frame.reindex(columns=SEARCH_SESSION_COLUMNS)
         frame = frame.where(pd.notnull(frame), cast(Any, None))
         database.upsert_into_database(frame, SEARCH_SESSIONS_TABLE)
+
+    # -----------------------------------------------------------------------------
+    def load_table(self, table_name: str) -> pd.DataFrame:
+        return database.load_from_database(table_name)
+
+    # -----------------------------------------------------------------------------
+    def load_table_records(self, table_name: str) -> dict[str, Any]:
+        frame = self.load_table(table_name)
+        columns = frame.columns.tolist()
+        rows = frame.to_dict(orient="records")
+        return {
+            "columns": columns,
+            "rows": rows,
+            "row_count": len(rows),
+            "column_count": len(columns),
+        }
+
+    # -----------------------------------------------------------------------------
+    def get_table_stats(self, table_name: str) -> dict[str, int]:
+        column_count = len(self.load_table(table_name).columns)
+        row_count = database.count_rows(table_name)
+        return {
+            "row_count": row_count,
+            "column_count": column_count,
+        }
