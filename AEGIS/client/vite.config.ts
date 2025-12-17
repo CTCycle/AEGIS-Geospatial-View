@@ -6,6 +6,7 @@ const apiHost = process.env.FASTAPI_HOST || '127.0.0.1'
 const apiPort = process.env.FASTAPI_PORT || '8000'
 const apiTarget = `http://${apiHost}:${apiPort}`
 
+
 export default defineConfig({
     plugins: [react()],
     server: {
