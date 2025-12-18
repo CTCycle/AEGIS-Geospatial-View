@@ -9,6 +9,9 @@ AEGIS/client/dist-ssr/
 AEGIS/client/package-lock.json
 AEGIS/client/logs/
 
+# Local agent documentation (not committed)
+rules/
+
 # Environment files (keep templates)
 AEGIS/settings/.env
 AEGIS/client/.env
