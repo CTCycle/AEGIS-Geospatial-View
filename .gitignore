@@ -1,4 +1,5 @@
 # Project-specific generated/runtime artifacts
+docs/**
 AEGIS/resources/database/**
 AEGIS/resources/runtimes/**
 AEGIS/resources/runtimes/uv_cache/**
@@ -57,7 +58,6 @@ Thumbs.db
 *.db
 *.sqlite*
 *.exe
-AGENTS.MD
 
 !.gitkeep
 !AEGIS/settings/server_configurations.json
