@@ -54,8 +54,13 @@ function DatabaseBrowserPage() {
         return table?.displayName || tableName;
     };
 
+    const formatColumnName = (name: string): string => name.split('_').join(' ');
+
     const getRowKey = (row: Record<string, unknown>): string =>
         tableData?.columns.map(col => String(row[col] ?? '')).join('|') || '';
+
+    const hasTableData = Boolean(tableData);
+    const rowCount = tableData?.rows.length ?? 0;
 
     return (
         <div className="database-browser">
@@ -128,13 +133,13 @@ function DatabaseBrowserPage() {
                     </div>
                 )}
 
-                {!isLoading && !error && tableData && tableData.rows.length > 0 && (
+                {!isLoading && !error && hasTableData && rowCount > 0 && (
                     <div className="table-scroll">
                         <table className="data-table">
                             <thead>
                                 <tr>
                                     {tableData.columns.map(col => (
-                                        <th key={col}>{col.replaceAll('_', ' ')}</th>
+                                        <th key={col}>{formatColumnName(col)}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -159,7 +164,7 @@ function DatabaseBrowserPage() {
                     </div>
                 )}
 
-                {!isLoading && !error && tableData && tableData.rows.length === 0 && (
+                {!isLoading && !error && hasTableData && rowCount === 0 && (
                     <div className="empty-state">
                         <span>No data available in this table.</span>
                     </div>
