@@ -99,7 +99,7 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
                                     checked={settings.useCloudServices}
                                     onChange={(e) => handleUseCloudServicesChange(e.target.checked)}
                                 />
-                                Use cloud services
+                                <span>Use cloud services</span>
                             </label>
                             <p className="helper-text">Toggle to route agent calls through a cloud provider.</p>
                         </div>

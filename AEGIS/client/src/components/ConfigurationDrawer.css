@@ -22,11 +22,14 @@
     left: 0;
     width: 100vw;
     height: 100vh;
+    border: none;
+    padding: 0;
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 40;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease-in-out;
+    cursor: pointer;
 }
 
 .drawer-overlay.open {
