@@ -17,7 +17,7 @@ interface DatabaseBrowserContextType extends DatabaseBrowserState {
 
 const DatabaseBrowserContext = createContext<DatabaseBrowserContextType | null>(null);
 
-export function DatabaseBrowserProvider({ children }: { children: ReactNode }) {
+export function DatabaseBrowserProvider({ children }: Readonly<{ children: ReactNode }>) {
     const [tables, setTables] = useState<TableInfo[]>([]);
     const [selectedTable, setSelectedTableState] = useState<string>('');
     const [tableData, setTableData] = useState<TableData | null>(null);
