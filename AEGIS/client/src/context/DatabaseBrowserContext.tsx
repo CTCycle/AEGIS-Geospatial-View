@@ -19,7 +19,7 @@ const DatabaseBrowserContext = createContext<DatabaseBrowserContextType | null>(
 
 export function DatabaseBrowserProvider({ children }: Readonly<{ children: ReactNode }>) {
     const [tables, setTables] = useState<TableInfo[]>([]);
-    const [selectedTable, setSelectedTableState] = useState<string>('');
+    const [selectedTable, setSelectedTable] = useState<string>('');
     const [tableData, setTableData] = useState<TableData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function DatabaseBrowserProvider({ children }: Readonly<{ children: React
             const data = await fetchTables();
             setTables(data);
             if (data.length > 0 && !selectedTable) {
-                setSelectedTableState(data[0].name);
+                setSelectedTable(data[0].name);
             }
             setTablesLoaded(true);
         } catch (err) {
@@ -58,8 +58,8 @@ export function DatabaseBrowserProvider({ children }: Readonly<{ children: React
     }, []);
 
     // Handle table selection change - fetch data for new table
-    const setSelectedTable = useCallback((tableName: string) => {
-        setSelectedTableState(tableName);
+    const handleSelectedTableChange = useCallback((tableName: string) => {
+        setSelectedTable(tableName);
         // Fetch data when selecting a different table
         loadTableData(tableName);
     }, [loadTableData]);
@@ -79,7 +79,7 @@ export function DatabaseBrowserProvider({ children }: Readonly<{ children: React
                 tableData,
                 isLoading,
                 error,
-                setSelectedTable,
+                setSelectedTable: handleSelectedTableChange,
                 refreshData,
                 loadTables,
             }}
