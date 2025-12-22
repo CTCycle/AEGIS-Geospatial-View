@@ -3,18 +3,25 @@ import { useDatabaseBrowser } from '../context/DatabaseBrowserContext';
 import './DatabaseBrowserPage.css';
 
 // Refresh icon
-const RefreshIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+const RefreshIcon = ({ className }: { className?: string }) => (
+    <svg
+        className={className}
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+    >
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+        />
     </svg>
 );
 
 // Loading spinner
-const Spinner = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-);
+const Spinner = () => <RefreshIcon />;
 
 function DatabaseBrowserPage() {
     const {
@@ -46,6 +53,9 @@ function DatabaseBrowserPage() {
         const table = tables.find(t => t.name === tableName);
         return table?.displayName || tableName;
     };
+
+    const getRowKey = (row: Record<string, unknown>): string =>
+        tableData?.columns.map(col => String(row[col] ?? '')).join('|') || '';
 
     return (
         <div className="database-browser">
@@ -124,22 +134,26 @@ function DatabaseBrowserPage() {
                             <thead>
                                 <tr>
                                     {tableData.columns.map(col => (
-                                        <th key={col}>{col.replace(/_/g, ' ')}</th>
+                                        <th key={col}>{col.replaceAll('_', ' ')}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
-                                {tableData.rows.map((row, idx) => (
-                                    <tr key={idx}>
-                                        {tableData.columns.map(col => (
-                                            <td key={col} title={String(row[col] ?? '')}>
-                                                {row[col] !== null && row[col] !== undefined
-                                                    ? String(row[col])
-                                                    : ''}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
+                                {tableData.rows.map(row => {
+                                    const rowKey = getRowKey(row);
+                                    return (
+                                        <tr key={rowKey}>
+                                            {tableData.columns.map(col => {
+                                                const cellValue = row[col];
+                                                return (
+                                                    <td key={col} title={String(cellValue ?? '')}>
+                                                        {cellValue?.toString() ?? ''}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
