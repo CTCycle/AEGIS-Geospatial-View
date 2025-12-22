@@ -48,7 +48,12 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
 
     return (
         <>
-            <div className={`drawer-overlay ${isOpen ? 'open' : ''}`} onClick={onClose} />
+            <button
+                type="button"
+                className={`drawer-overlay ${isOpen ? 'open' : ''}`}
+                onClick={onClose}
+                aria-label="Close configuration drawer"
+            />
             <div className={`drawer ${isOpen ? 'open' : ''}`}>
                 <div className="drawer-content">
                     <h2 className="aegis-card-title">Models Configuration</h2>
@@ -61,6 +66,7 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                                 checked={settings.useCloudServices}
                                 onChange={handleUseCloudServicesChange}
                             />
+                            {' '}
                             Use Cloud Services
                         </label>
                     </div>
@@ -69,8 +75,9 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                         <div className="column gap-3">
                             <h3 className="aegis-subtitle">Cloud Configuration</h3>
                             <div className="form-group">
-                                <label>Cloud Service</label>
+                                <label htmlFor="cloud-provider-select">Cloud Service</label>
                                 <select
+                                    id="cloud-provider-select"
                                     value={settings.provider}
                                     onChange={handleProviderChange}
                                     disabled={!settings.useCloudServices}
@@ -82,8 +89,9 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Cloud Model</label>
+                                <label htmlFor="cloud-model-select">Cloud Model</label>
                                 <select
+                                    id="cloud-model-select"
                                     value={settings.cloudModel}
                                     onChange={handleCloudModelChange}
                                     disabled={!settings.useCloudServices}
@@ -99,8 +107,9 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                         <div className="column gap-3">
                             <h3 className="aegis-subtitle">Ollama Configuration</h3>
                             <div className="form-group">
-                                <label>Agent model</label>
+                                <label htmlFor="agent-model-select">Agent model</label>
                                 <select
+                                    id="agent-model-select"
                                     value={settings.agentModel}
                                     onChange={handleAgentModelChange}
                                     disabled={settings.useCloudServices}
