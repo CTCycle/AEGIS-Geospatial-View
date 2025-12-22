@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { fetchTables, fetchTableData, TableInfo, TableData } from '../services/api';
 
 interface DatabaseBrowserState {
@@ -12,7 +12,7 @@ interface DatabaseBrowserState {
 interface DatabaseBrowserContextType extends DatabaseBrowserState {
     setSelectedTable: (tableName: string) => void;
     refreshData: () => void;
-    loadTables: () => void;
+    loadTables: () => Promise<void>;
 }
 
 const DatabaseBrowserContext = createContext<DatabaseBrowserContextType | null>(null);
@@ -71,19 +71,31 @@ export function DatabaseBrowserProvider({ children }: Readonly<{ children: React
         }
     }, [selectedTable, loadTableData]);
 
+    const contextValue = useMemo(
+        () => ({
+            tables,
+            selectedTable,
+            tableData,
+            isLoading,
+            error,
+            setSelectedTable: handleSelectedTableChange,
+            refreshData,
+            loadTables,
+        }),
+        [
+            tables,
+            selectedTable,
+            tableData,
+            isLoading,
+            error,
+            handleSelectedTableChange,
+            refreshData,
+            loadTables,
+        ],
+    );
+
     return (
-        <DatabaseBrowserContext.Provider
-            value={{
-                tables,
-                selectedTable,
-                tableData,
-                isLoading,
-                error,
-                setSelectedTable: handleSelectedTableChange,
-                refreshData,
-                loadTables,
-            }}
-        >
+        <DatabaseBrowserContext.Provider value={contextValue}>
             {children}
         </DatabaseBrowserContext.Provider>
     );
