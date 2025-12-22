@@ -57,8 +57,9 @@ function GeospatialPage() {
                 response.status_message,
             );
         } catch (error: any) {
+            const statusPrefix = error.status ? ` ${error.status}` : '';
             setSearchResult({
-                message: `Error${error.status ? ` ${error.status}` : ''}: ${error.message || 'Request failed'}`,
+                message: `Error${statusPrefix}: ${error.message || 'Request failed'}`,
                 json: error.detail || error.raw || error,
             });
         } finally {
@@ -84,13 +85,7 @@ function GeospatialPage() {
         return lastRequest.use_coordinates ? 'Coordinate search' : 'Address search';
     }, [lastRequest]);
 
-    const handleResetView = () => {
-        if (lastRequest) {
-            handleSearch(lastRequest);
-        }
-    };
-
-    const handleReload = () => {
+    const rerunLastSearch = () => {
         if (lastRequest) {
             handleSearch(lastRequest);
         }
@@ -136,13 +131,13 @@ function GeospatialPage() {
                                 <span className="toolbar-value">{mapToolbarSummary}</span>
                             </div>
                             <div className="toolbar-actions" aria-label="Map controls">
-                                <button type="button" className="ghost-button" onClick={handleResetView}>
+                                <button type="button" className="ghost-button" onClick={rerunLastSearch}>
                                     Reset view
                                 </button>
                                 <button
                                     type="button"
                                     className="ghost-button"
-                                    onClick={handleReload}
+                                    onClick={rerunLastSearch}
                                     disabled={!lastRequest || isLoading}
                                 >
                                     Reload overlays
