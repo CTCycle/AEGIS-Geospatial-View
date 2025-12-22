@@ -33,14 +33,23 @@ const StatusOutput: React.FC<StatusOutputProps> = ({ message, json }) => {
     return (
         <div className="card status-card">
             <div className="card-content">
-                <div className="accordion-header" onClick={toggleExpansion}>
+                <button
+                    type="button"
+                    className="accordion-header"
+                    onClick={toggleExpansion}
+                    aria-expanded={isExpanded}
+                    aria-controls="status-output-content"
+                >
                     <span className="accordion-title">Endpoint Output</span>
                     <span className="material-icons accordion-icon">
                         {isExpanded ? 'expand_less' : 'expand_more'}
                     </span>
-                </div>
+                </button>
 
-                <div className={`accordion-content ${isExpanded ? 'expanded' : ''}`}>
+                <div
+                    id="status-output-content"
+                    className={`accordion-content ${isExpanded ? 'expanded' : ''}`}
+                >
                     <div className="scroll-area">
                         {renderContent()}
                     </div>
