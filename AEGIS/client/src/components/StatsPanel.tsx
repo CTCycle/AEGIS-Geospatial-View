@@ -108,12 +108,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
                 </div>
             </div>
 
-            <div className="verbose-box" role="region" aria-label="Verbose map information">
+            <section className="verbose-box" aria-label="Verbose map information">
                 <p className="verbose-title">Verbose info</p>
                 <div className="verbose-content">
                     <pre>{verboseText()}</pre>
                 </div>
-            </div>
+            </section>
         </div>
     );
 };
