@@ -55,13 +55,13 @@
 }
 
 .sidebar-link:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #f1f5f9;
+    background: #0b1220;
+    color: #f8fafc;
 }
 
 .sidebar-link.active {
-    background: rgba(34, 211, 238, 0.15);
-    color: #22d3ee;
+    background: #0b2230;
+    color: #67e8f9;
 }
 
 .sidebar-link svg {

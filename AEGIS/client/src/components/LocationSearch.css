@@ -31,6 +31,19 @@
     border-radius: 10px;
     padding: 4px;
     gap: 4px;
+    margin: 0;
+}
+
+.mode-switch-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+    white-space: nowrap;
 }
 
 .mode-tab {
@@ -136,6 +149,7 @@
     text-overflow: ellipsis;
     overflow: hidden;
     max-width: 100%;
+    font: inherit;
 }
 
 .chip:hover {

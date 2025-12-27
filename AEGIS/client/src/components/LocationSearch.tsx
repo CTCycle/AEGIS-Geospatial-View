@@ -186,7 +186,8 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                     <h3 className="panel-title">Location search</h3>
                     <p className="panel-description">Specify where to focus the map.</p>
                 </div>
-                <div className="mode-switch" role="group" aria-label="Search mode">
+                <fieldset className="mode-switch">
+                    <legend className="mode-switch-label">Search mode</legend>
                     <button
                         type="button"
                         className={`mode-tab ${mode === 'address' ? 'active' : ''}`}
@@ -203,7 +204,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                     >
                         Coordinates
                     </button>
-                </div>
+                </fieldset>
             </div>
 
             <div className="group-label">Location</div>
@@ -279,19 +280,17 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                 <div className="chip-container">
                     {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
                     {selectedFilters.map((filter) => (
-                        <div
+                        <button
                             key={filter}
                             className="chip"
+                            type="button"
                             title={COMMON_GEOSPATIAL_LAYERS[filter] || filter}
                             onClick={() => removeFilter(filter)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && removeFilter(filter)}
                             aria-label={`Remove ${COMMON_GEOSPATIAL_LAYERS[filter] || filter}`}
                         >
                             {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
                             <span className="chip-close">✕</span>
-                        </div>
+                        </button>
                     ))}
                 </div>
             </div>
