@@ -1,7 +1,11 @@
 export const CLOUD_PROVIDERS = ['openai', 'gemini'];
 
 const apiBaseEnv = (import.meta.env.VITE_API_BASE_URL || '').trim();
-export const API_BASE_URL = (apiBaseEnv || '/api').replace(/\/+$/, '');
+let apiBase = apiBaseEnv || '/api';
+while (apiBase.endsWith('/')) {
+    apiBase = apiBase.slice(0, -1);
+}
+export const API_BASE_URL = apiBase;
 
 export const CLOUD_MODEL_CHOICES: Record<string, string[]> = {
     openai: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
