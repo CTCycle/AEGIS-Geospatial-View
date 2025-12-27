@@ -43,8 +43,8 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 
     const validateCoordinates = () => {
         const newErrors: { latitude?: string; longitude?: string } = {};
-        const parsedLat = parseFloat(latitude);
-        const parsedLon = parseFloat(longitude);
+        const parsedLat = Number.parseFloat(latitude);
+        const parsedLon = Number.parseFloat(longitude);
 
         if (!latitude.trim()) {
             newErrors.latitude = 'Latitude is required in coordinate mode.';
@@ -186,12 +186,12 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                     <h3 className="panel-title">Location search</h3>
                     <p className="panel-description">Specify where to focus the map.</p>
                 </div>
-                <div className="mode-switch" role="tablist" aria-label="Search mode">
+                <div className="mode-switch" role="group" aria-label="Search mode">
                     <button
                         type="button"
                         className={`mode-tab ${mode === 'address' ? 'active' : ''}`}
                         onClick={() => setMode('address')}
-                        aria-selected={mode === 'address'}
+                        aria-pressed={mode === 'address'}
                     >
                         Address
                     </button>
@@ -199,7 +199,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                         type="button"
                         className={`mode-tab ${mode === 'coordinates' ? 'active' : ''}`}
                         onClick={() => setMode('coordinates')}
-                        aria-selected={mode === 'coordinates'}
+                        aria-pressed={mode === 'coordinates'}
                     >
                         Coordinates
                     </button>
