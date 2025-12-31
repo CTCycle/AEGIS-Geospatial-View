@@ -20,7 +20,7 @@ def build_coordinate_payload(**overrides: object) -> dict[str, object]:
 
 
 def post_search(api_context: APIRequestContext, payload: dict[str, object]):
-    return api_context.post("/maps/search", json=payload)
+    return api_context.post("/maps/search", data=payload)
 
 
 def assert_error_contains(response, expected: str) -> None:
@@ -125,4 +125,5 @@ class TestMapSearchValidation:
         payload = build_coordinate_payload(image_crs="EPSG:9999")
         response = post_search(api_context, payload)
         assert response.status == 400
-        assert_error_contains(response, "Unsupported target CRS")
+        assert_error_contains(response, "Unsupported")
+        assert_error_contains(response, "EPSG:9999")

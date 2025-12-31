@@ -59,8 +59,6 @@ function DatabaseBrowserPage() {
     const getRowKey = (row: Record<string, unknown>): string =>
         tableData?.columns.map(col => String(row[col] ?? '')).join('|') || '';
 
-    const hasTableData = Boolean(tableData);
-    const rowCount = tableData?.rows.length ?? 0;
 
     return (
         <div className="database-browser">
@@ -133,7 +131,7 @@ function DatabaseBrowserPage() {
                     </div>
                 )}
 
-                {!isLoading && !error && hasTableData && rowCount > 0 && (
+                {!isLoading && !error && tableData && tableData.rows.length > 0 && (
                     <div className="table-scroll">
                         <table className="data-table">
                             <thead>
@@ -164,7 +162,7 @@ function DatabaseBrowserPage() {
                     </div>
                 )}
 
-                {!isLoading && !error && hasTableData && rowCount === 0 && (
+                {!isLoading && !error && tableData && tableData.rows.length === 0 && (
                     <div className="empty-state">
                         <span>No data available in this table.</span>
                     </div>

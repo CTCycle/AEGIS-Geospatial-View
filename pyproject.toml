@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "AEGIS"
-version = "1.6"
+version = "1.7.0"
 requires-python = ">=3.14"
 
 dependencies = [
     "fastapi==0.128.0",
-    "uvicorn[standard]>=0.30.0",
-    "numpy==2.2.6",
+    "uvicorn[standard]>=0.40.0",
+    "numpy==2.3.3",
     "pandas==2.3.3",
     "tqdm==4.67.1",
     "SQLAlchemy==2.0.43",
@@ -18,7 +18,6 @@ dependencies = [
     "python-dotenv==1.2.1",
     "folium==0.17.0",
     "pillow==12.0.0",
-
 ]
 
 [project.optional-dependencies]
