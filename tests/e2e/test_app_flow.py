@@ -10,7 +10,7 @@ class TestAppShell:
 
     def test_homepage_loads_with_core_panels(self, page: Page, base_url: str):
         page.goto(base_url)
-        expect(page.get_by_text("AEGIS")).to_be_visible()
+        expect(page.get_by_text("AEGIS", exact=True)).to_be_visible()
         expect(page.get_by_role("heading", name="AEGIS Geographics")).to_be_visible()
         expect(page.get_by_text("Location search")).to_be_visible()
         expect(page.get_by_text("Map statistics")).to_be_visible()
