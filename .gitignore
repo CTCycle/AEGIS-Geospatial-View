@@ -60,6 +60,6 @@ Thumbs.db
 *.exe
 
 !.gitkeep
-!AEGIS/settings/server_configurations.json
+!AEGIS/settings/configurations.json
 
 

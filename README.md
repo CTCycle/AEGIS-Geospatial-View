@@ -89,7 +89,7 @@ Project resources are stored under `AEGIS/resources`. Each subdirectory contains
 - **templates:** starter configuration files such as the `.env` template
 
 ## 6. Configuration
-Backend configuration is loaded from `AEGIS/settings/.env` (copy from `AEGIS/resources/templates/.env`). Optional provider settings are stored in `AEGIS/settings/server_configurations.json`. Frontend configuration can be overridden through `AEGIS/client/.env` when needed.
+Backend configuration is loaded from `AEGIS/settings/.env` (copy from `AEGIS/resources/templates/.env`). Optional provider settings are stored in `AEGIS/settings/configurations.json`. Frontend configuration can be overridden through `AEGIS/client/.env` when needed.
 
 | Variable | Description |
 |----------|-------------|
