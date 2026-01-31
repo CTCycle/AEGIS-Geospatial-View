@@ -10,9 +10,9 @@ from xml.etree import ElementTree
 
 from tqdm import tqdm
 
-from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.configurations import server_settings
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.utils.repository.serializer import DataSerializer
+from AEGIS.server.repositories.serializer import DataSerializer
 
 TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
     "15.625m": 15.625,

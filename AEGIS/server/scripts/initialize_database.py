@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from AEGIS.server.database.initializer import initialize_database
+from AEGIS.server.repositories.initializer import initialize_database
 from AEGIS.server.utils.constants import CONFIGURATIONS_FILE
 from AEGIS.server.utils.logger import logger
 
@@ -31,7 +31,9 @@ def load_database_config() -> dict[str, object]:
 if __name__ == "__main__":
     start = time.perf_counter()
     logger.info("Starting database initialization")
-    logger.info("Current database configuration: %s", json.dumps(load_database_config()))
+    logger.info(
+        "Current database configuration: %s", json.dumps(load_database_config())
+    )
     initialize_database()
     elapsed = time.perf_counter() - start
     logger.info("Database initialization completed in %.2f seconds", elapsed)

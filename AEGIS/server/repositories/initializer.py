@@ -5,11 +5,11 @@ import urllib.parse
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
 
-from AEGIS.server.utils.configurations import DatabaseSettings, server_settings
-from AEGIS.server.database.postgres import PostgresRepository
-from AEGIS.server.database.schema import Base
-from AEGIS.server.database.sqlite import SQLiteRepository
-from AEGIS.server.database.utils import normalize_postgres_engine
+from AEGIS.server.configurations import DatabaseSettings, server_settings
+from AEGIS.server.repositories.postgres import PostgresRepository
+from AEGIS.server.repositories.schema import Base
+from AEGIS.server.repositories.sqlite import SQLiteRepository
+from AEGIS.server.repositories.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
 
 
@@ -56,7 +56,7 @@ def clone_settings_with_database(
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
-    repository = SQLiteRepository(settings)    
+    repository = SQLiteRepository(settings)
     logger.info("Initialized SQLite database at %s", repository.db_path)
 
 
@@ -110,7 +110,12 @@ def run_database_initialization() -> None:
         return
 
     engine_name = normalize_postgres_engine(settings.engine).lower()
-    if engine_name not in {"postgres", "postgresql", "postgresql+psycopg", "postgresql+psycopg2"}:
+    if engine_name not in {
+        "postgres",
+        "postgresql",
+        "postgresql+psycopg",
+        "postgresql+psycopg2",
+    }:
         raise ValueError(f"Unsupported database engine: {settings.engine}")
 
     ensure_postgres_database(settings)

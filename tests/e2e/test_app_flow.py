@@ -2,6 +2,7 @@
 E2E tests for AEGIS UI navigation and key user flows.
 Exercises sidebar navigation, form validation, and map rendering.
 """
+
 from playwright.sync_api import Page, expect
 
 

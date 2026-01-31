@@ -12,7 +12,7 @@ from AEGIS.server.utils.constants import (
     SEARCH_SESSION_COLUMNS,
     SEARCH_SESSIONS_TABLE,
 )
-from AEGIS.server.database.database import database
+from AEGIS.server.repositories.database import database
 
 
 ###############################################################################

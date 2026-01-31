@@ -10,10 +10,10 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from AEGIS.server.utils.configurations import DatabaseSettings
+from AEGIS.server.configurations import DatabaseSettings
 from AEGIS.server.utils.constants import DATA_PATH, DATABASE_FILENAME
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.database.schema import Base
+from AEGIS.server.repositories.schema import Base
 
 
 # [SQLITE DATABASE]
@@ -28,7 +28,7 @@ class SQLiteRepository:
         self.Session = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         if self.db_path is not None and not os.path.exists(self.db_path):
-            Base.metadata.create_all(self.engine)   
+            Base.metadata.create_all(self.engine)
 
     # -------------------------------------------------------------------------
     def get_table_class(self, table_name: str) -> Any:

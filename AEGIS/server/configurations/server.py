@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from AEGIS.server.utils.configurations.base import (
-    ensure_mapping, 
-    load_configuration_data    
-)
+from AEGIS.server.configurations.base import ensure_mapping, load_configuration_data
 
 from AEGIS.server.utils.constants import (
     AGENT_MODEL_CHOICES,
@@ -30,11 +27,12 @@ from AEGIS.server.utils.types import (
     coerce_str_or_none,
 )
 
+
 ###############################################################################
 @dataclass
 class LLMRuntimeConfig:
     defaults: LLMRuntimeDefaults | None = None
-    agent_model: str = ""    
+    agent_model: str = ""
     llm_provider: str = ""
     cloud_model: str = ""
     use_cloud_services: bool = False
@@ -143,7 +141,7 @@ class LLMRuntimeConfig:
     # -------------------------------------------------------------------------
     @classmethod
     def get_agent_model(cls) -> str:
-        return cls.agent_model   
+        return cls.agent_model
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -174,12 +172,13 @@ class LLMRuntimeConfig:
     @classmethod
     def reset_defaults(cls) -> None:
         defaults = cls._get_defaults()
-        cls.agent_model = defaults.agent_model        
+        cls.agent_model = defaults.agent_model
         cls.llm_provider = defaults.llm_provider
         cls.cloud_model = defaults.cloud_model
         cls.use_cloud_services = defaults.use_cloud_services
         cls.ollama_temperature = round(
-            max(0.0, min(2.0, defaults.ollama_temperature)), 2,
+            max(0.0, min(2.0, defaults.ollama_temperature)),
+            2,
         )
         cls.ollama_reasoning = defaults.ollama_reasoning
         cls.revision = 0
@@ -199,12 +198,11 @@ class LLMRuntimeConfig:
             provider = cls.get_llm_provider()
             model = cls.get_cloud_model().strip()
             if not model:
-                model = cls.get_agent_model() 
+                model = cls.get_agent_model()
         else:
             provider = "ollama"
-            model = cls.get_agent_model() 
+            model = cls.get_agent_model()
         return provider, model.strip()
-
 
 
 # [SERVER SETTINGS]
@@ -213,22 +211,24 @@ class LLMRuntimeConfig:
 class FastAPISettings:
     title: str
     description: str
-    version: str   
+    version: str
+
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class DatabaseSettings:
     embedded_database: bool
-    engine: str | None          
-    host: str | None            
-    port: int | None            
+    engine: str | None
+    host: str | None
+    port: int | None
     database_name: str | None
     username: str | None
     password: str | None
-    ssl: bool                   
-    ssl_ca: str | None         
+    ssl: bool
+    ssl_ca: str | None
     connect_timeout: int
     insert_batch_size: int
+
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -236,6 +236,7 @@ class NominatimSettings:
     base_url: str
     user_agent: str
     timeout: float
+
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -247,6 +248,7 @@ class GeospatialSettings:
     min_lon: float
     max_mercator_extent: float
 
+
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class MapSettings:
@@ -254,10 +256,12 @@ class MapSettings:
     render_delay_s: float
     tiles: str
 
+
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
+
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
@@ -279,9 +283,10 @@ class GIBSSettings:
     layer_sync_user_agent: str
     layer_sync_timeout: float
 
+
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
-class LLMRuntimeDefaults:    
+class LLMRuntimeDefaults:
     agent_model: str
     llm_provider: str
     cloud_model: str
@@ -290,11 +295,12 @@ class LLMRuntimeDefaults:
     ollama_reasoning: bool
     ollama_host_default: str
 
+
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ServerSettings:
     fastapi: FastAPISettings
-    database: DatabaseSettings     
+    database: DatabaseSettings
     nominatim: NominatimSettings
     geospatial: GeospatialSettings
     map: MapSettings
@@ -310,8 +316,9 @@ def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
     return FastAPISettings(
         title=coerce_str(payload.get("title"), "AEGIS Geospatial Search Backend"),
         version=coerce_str(payload.get("version"), "0.1.0"),
-        description=coerce_str(payload.get("description"), "FastAPI backend"),        
+        description=coerce_str(payload.get("description"), "FastAPI backend"),
     )
+
 
 # -----------------------------------------------------------------------------
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
@@ -329,7 +336,9 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
             ssl=False,
             ssl_ca=None,
             connect_timeout=10,
-            insert_batch_size=coerce_int(payload.get("insert_batch_size"), 1000, minimum=1),
+            insert_batch_size=coerce_int(
+                payload.get("insert_batch_size"), 1000, minimum=1
+            ),
         )
 
     # External DB mode
@@ -349,6 +358,7 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
         insert_batch_size=coerce_int(payload.get("insert_batch_size"), 1000, minimum=1),
     )
 
+
 # -----------------------------------------------------------------------------
 def build_nominatim_settings(data: dict[str, Any]) -> NominatimSettings:
     payload = ensure_mapping(data)
@@ -364,6 +374,7 @@ def build_nominatim_settings(data: dict[str, Any]) -> NominatimSettings:
         timeout=coerce_float(payload.get("timeout"), 10.0, minimum=1.0),
     )
 
+
 # -----------------------------------------------------------------------------
 def build_geospatial_settings(data: dict[str, Any]) -> GeospatialSettings:
     payload = ensure_mapping(data)
@@ -378,6 +389,7 @@ def build_geospatial_settings(data: dict[str, Any]) -> GeospatialSettings:
         ),
     )
 
+
 # -----------------------------------------------------------------------------
 def build_map_settings(data: dict[str, Any]) -> MapSettings:
     payload = ensure_mapping(data)
@@ -387,12 +399,14 @@ def build_map_settings(data: dict[str, Any]) -> MapSettings:
         tiles=coerce_str(payload.get("tiles"), "OpenStreetMap"),
     )
 
+
 # -----------------------------------------------------------------------------
 def build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     payload = ensure_mapping(data)
     return JobsSettings(
         polling_interval=coerce_float(payload.get("polling_interval"), 1.0),
     )
+
 
 # -----------------------------------------------------------------------------
 def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
@@ -467,14 +481,15 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         ),
     )
 
+
 # -----------------------------------------------------------------------------
 def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
-    agent_default = AGENT_MODEL_CHOICES[0]     
+    agent_default = AGENT_MODEL_CHOICES[0]
     provider_default = coerce_str(data.get("llm_provider"), "openai").lower()
     provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
     cloud_default = provider_models[0] if provider_models else ""
     return LLMRuntimeDefaults(
-        agent_model=coerce_str(data.get("agent_model"), agent_default),        
+        agent_model=coerce_str(data.get("agent_model"), agent_default),
         llm_provider=provider_default,
         cloud_model=coerce_str(data.get("cloud_model"), cloud_default),
         use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
@@ -485,6 +500,7 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
             OLLAMA_DEFAULT_HOST,
         ),
     )
+
 
 # -----------------------------------------------------------------------------
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
@@ -522,7 +538,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
 def get_server_settings(config_path: str | None = None) -> ServerSettings:
     path = config_path or CONFIGURATIONS_FILE
     payload = load_configuration_data(path)
-    
+
     return build_server_settings(payload)
 
 

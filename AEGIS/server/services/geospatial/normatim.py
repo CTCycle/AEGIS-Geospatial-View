@@ -15,7 +15,7 @@ from AEGIS.server.utils.constants import (
     NOMINATIM_REVERSE_PATH,
     NOMINATIM_SEARCH_PATH,
 )
-from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.configurations import server_settings
 from AEGIS.server.utils.logger import logger
 
 

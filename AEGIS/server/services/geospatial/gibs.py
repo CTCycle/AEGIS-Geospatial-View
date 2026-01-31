@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.configurations import server_settings
 from AEGIS.server.utils.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
@@ -31,7 +31,7 @@ from AEGIS.server.utils.constants import (
     ORIGIN_SHIFT,
 )
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.database.database import database
+from AEGIS.server.repositories.database import database
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
@@ -491,7 +491,10 @@ class GIBSService:
         if metadata and metadata.projections:
             for projection in metadata.projections:
                 normalized = projection.upper()
-                if normalized in self.wms_base_endpoints and normalized not in candidates:
+                if (
+                    normalized in self.wms_base_endpoints
+                    and normalized not in candidates
+                ):
                     candidates.append(normalized)
         for fallback in ("EPSG:3857", "EPSG:4326"):
             if fallback in self.wms_base_endpoints and fallback not in candidates:
@@ -686,9 +689,7 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def parse_time_extent(self, time_extent: str) -> tuple[date | None, date | None]:
-        expressions = [
-            expr.strip() for expr in time_extent.split(",") if expr.strip()
-        ]
+        expressions = [expr.strip() for expr in time_extent.split(",") if expr.strip()]
         min_supported: date | None = None
         max_supported: date | None = None
         for expression in expressions:
