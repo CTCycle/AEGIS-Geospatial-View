@@ -256,6 +256,11 @@ class MapSettings:
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
+class JobsSettings:
+    polling_interval: float
+
+# -----------------------------------------------------------------------------
+@dataclass(frozen=True)
 class GIBSSettings:
     user_agent: str
     timeout: float
@@ -293,6 +298,7 @@ class ServerSettings:
     nominatim: NominatimSettings
     geospatial: GeospatialSettings
     map: MapSettings
+    jobs: JobsSettings
     gibs: GIBSSettings
     llm_defaults: LLMRuntimeDefaults
 
@@ -379,6 +385,13 @@ def build_map_settings(data: dict[str, Any]) -> MapSettings:
         default_size_m=coerce_float(payload.get("default_size_m"), 500.0, minimum=1.0),
         render_delay_s=coerce_float(payload.get("render_delay_s"), 1.0, minimum=0.0),
         tiles=coerce_str(payload.get("tiles"), "OpenStreetMap"),
+    )
+
+# -----------------------------------------------------------------------------
+def build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
+    payload = ensure_mapping(data)
+    return JobsSettings(
+        polling_interval=coerce_float(payload.get("polling_interval"), 1.0),
     )
 
 # -----------------------------------------------------------------------------
@@ -481,6 +494,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     nominatim_payload = ensure_mapping(payload.get("nominatim"))
     geospatial_payload = ensure_mapping(payload.get("geospatial"))
     map_payload = ensure_mapping(payload.get("map") or payload.get("maps"))
+    jobs_payload = ensure_mapping(payload.get("jobs"))
     gibs_payload = ensure_mapping(payload.get("gibs"))
     llm_defaults_payload = ensure_mapping(payload.get("llm_defaults"))
     llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
@@ -497,6 +511,7 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
         nominatim=build_nominatim_settings(nominatim_payload),
         geospatial=build_geospatial_settings(geospatial_payload),
         map=build_map_settings(map_payload),
+        jobs=build_jobs_settings(jobs_payload),
         gibs=build_gibs_settings(gibs_payload),
         llm_defaults=llm_defaults,
     )

@@ -13,11 +13,22 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import ValidationError
 
-from AEGIS.server.utils.constants import MAPS_ROUTER_PREFIX, MAPS_SEARCH_ROUTE
+from AEGIS.server.utils.constants import (
+    MAPS_JOB_ROUTE,
+    MAPS_JOBS_ROUTE,
+    MAPS_ROUTER_PREFIX,
+    MAPS_SEARCH_ROUTE,
+)
 from AEGIS.server.schemas.geographics import (
     LocationSearchRequest,
 )
+from AEGIS.server.schemas.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.utils.jobs import JobManager, job_manager
 from AEGIS.server.utils.logger import logger
 from AEGIS.server.utils.repository.serializer import DataSerializer
 from AEGIS.server.utils.services.geospatial.gibs import (
@@ -68,6 +79,22 @@ def sanitize_validation_errors(
             normalized["ctx"] = {key: str(value) for key, value in context.items()}
         sanitized.append(normalized)
     return sanitized
+
+
+###############################################################################
+def run_map_search_job(
+    endpoint: "MapSearchEndpoint",
+    payload: LocationSearchRequest,
+    request_context: dict[str, Any],
+    job_id: str,
+) -> dict[str, Any]:
+    return asyncio.run(
+        endpoint.process_location_search_job(
+            payload=payload,
+            request_context=request_context,
+            job_id=job_id,
+        )
+    )
 
 
 ###############################################################################
@@ -780,12 +807,14 @@ class MapSearchEndpoint:
         normatim_service: NormatimService,
         toolkit: MapSearchToolkit,
         rendering_service: MapRenderingService,
+        job_manager: JobManager,
     ) -> None:
         self.router = router
         self.sanitization_service = sanitization_service
         self.normatim_service = normatim_service
         self.toolkit = toolkit
         self.renderer = rendering_service
+        self.job_manager = job_manager
         self.serializer = DataSerializer()
 
     # -------------------------------------------------------------------------
@@ -964,6 +993,96 @@ class MapSearchEndpoint:
         }
 
     # -------------------------------------------------------------------------
+    async def process_location_search_job(
+        self,
+        *,
+        payload: LocationSearchRequest,
+        request_context: dict[str, Any],
+        job_id: str,
+    ) -> dict[str, Any]:
+        response_payload: dict[str, Any] | None = None
+        try:
+            self.job_manager.update_progress(job_id, 8.0)
+            search_payload = await self.get_location_coordinates(payload)
+            if self.job_manager.should_stop(job_id):
+                await self.record_search_session(
+                    payload=payload,
+                    response_payload=response_payload,
+                    fallback=request_context,
+                    state="cancelled",
+                )
+                return {}
+            self.job_manager.update_progress(job_id, 35.0)
+
+            try:
+                satellite_payload = await self.renderer.build_satellite_payload(
+                    payload, search_payload
+                )
+            except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
+            except (GIBSRequestError, MapRequestError) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=str(exc),
+                ) from exc
+
+            search_payload["satellite_imagery"] = satellite_payload
+            self.job_manager.update_progress(job_id, 70.0)
+
+            lat = search_payload.get("latitude")
+            lon = search_payload.get("longitude")
+            if lat is not None and lon is not None:
+                try:
+                    elevation_data = await elevation_service.get_elevation(lat, lon)
+                    search_payload["elevation"] = elevation_data
+                except Exception as exc:
+                    logger.warning("Failed to fetch elevation: %s", exc)
+                    search_payload["elevation"] = None
+
+            response_payload = {
+                "status_message": "Map search request submitted.",
+                "payload": search_payload,
+            }
+            self.job_manager.update_result(job_id, response_payload)
+            if self.job_manager.should_stop(job_id):
+                await self.record_search_session(
+                    payload=payload,
+                    response_payload=response_payload,
+                    fallback=request_context,
+                    state="cancelled",
+                )
+                return response_payload
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="success",
+            )
+            self.job_manager.update_progress(job_id, 92.0)
+            return response_payload
+        except HTTPException as exc:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
+            error_detail = exc.detail
+            message = str(error_detail) if error_detail is not None else str(exc)
+            raise RuntimeError(message) from exc
+        except Exception:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
+            raise
+
+    # -------------------------------------------------------------------------
     async def search_by_location(
         self,
         datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
@@ -1058,11 +1177,156 @@ class MapSearchEndpoint:
             raise
 
     # -------------------------------------------------------------------------
+    async def start_search_job(
+        self,
+        datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
+        time_of_day: time | str | None = Body(default=None),
+        timeline_year: int | None = Body(default=None),
+        country: str | None = Body(default=None),
+        city: str | None = Body(default=None),
+        address: str | None = Body(default=None),
+        use_coordinates: bool = Body(default=False),
+        latitude: float | None = Body(default=None),
+        longitude: float | None = Body(default=None),
+        geospatial_layers: list[str] = Body(default_factory=list),
+        bbox: list[float] | None = Body(default=None),
+        radius_m: float | None = Body(default=None),
+        map_size_m: float | None = Body(default=None),
+        map_tiles: str | None = Body(default=None),
+        image_width: int | None = Body(default=None),
+        image_height: int | None = Body(default=None),
+        image_crs: str | None = Body(default=None),
+        image_format: str | None = Body(default=None),
+    ) -> JobStartResponse:
+        payload: LocationSearchRequest | None = None
+        response_payload: dict[str, Any] | None = None
+        request_context = {
+            "user": None,
+            "country": country,
+            "city": city,
+            "address": address,
+            "longitude": longitude,
+            "latitude": latitude,
+            "geospatial_layers": list(geospatial_layers),
+            "map_tiles": map_tiles or server_settings.map.tiles,
+        }
+        try:
+            payload_data: dict[str, Any] = {
+                "datetime": datetime_value,
+                "time_of_day": time_of_day,
+                "timeline_year": timeline_year,
+                "country": country,
+                "city": city,
+                "address": address,
+                "use_coordinates": use_coordinates,
+                "latitude": latitude,
+                "longitude": longitude,
+                "filters": geospatial_layers,
+                "bbox": bbox,
+            }
+            payload_data["image_width"] = server_settings.gibs.image_width
+            payload_data["image_height"] = server_settings.gibs.image_height
+            if radius_m is not None:
+                payload_data["radius_m"] = radius_m
+            payload_data["map_size_m"] = server_settings.map.default_size_m
+            if map_size_m is not None:
+                payload_data["map_size_m"] = map_size_m
+            payload_data["map_tiles"] = request_context["map_tiles"]
+            if image_crs is not None:
+                payload_data["image_crs"] = image_crs
+            if image_format is not None:
+                payload_data["image_format"] = image_format
+
+            payload = await asyncio.to_thread(
+                LocationSearchRequest.model_validate, payload_data
+            )
+        except ValidationError as exc:
+            await self.record_search_session(
+                payload=payload,
+                response_payload=response_payload,
+                fallback=request_context,
+                state="failed",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=sanitize_validation_errors(exc.errors()),
+            ) from exc
+
+        job_id = self.job_manager.start_job(
+            job_type="map_search",
+            runner=run_map_search_job,
+            kwargs={
+                "endpoint": self,
+                "payload": payload,
+                "request_context": request_context,
+            },
+        )
+        job_status = self.job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initialize map search job",
+            )
+        return JobStartResponse(
+            job_id=job_id,
+            job_type=job_status["job_type"],
+            status=job_status["status"],
+            message="Map search job started",
+            poll_interval=server_settings.jobs.polling_interval,
+        )
+
+    # -------------------------------------------------------------------------
+    async def get_search_job_status(self, job_id: str) -> JobStatusResponse:
+        job_status = self.job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}",
+            )
+        return JobStatusResponse(**job_status)
+
+    # -------------------------------------------------------------------------
+    async def cancel_search_job(self, job_id: str) -> JobCancelResponse:
+        job_status = self.job_manager.get_job_status(job_id)
+        if job_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}",
+            )
+        success = self.job_manager.cancel_job(job_id)
+        return JobCancelResponse(
+            job_id=job_id,
+            success=success,
+            message="Cancellation requested" if success else "Job cannot be cancelled",
+        )
+
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
         self.router.add_api_route(
             MAPS_SEARCH_ROUTE,
             self.search_by_location,
             methods=["POST"],
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            MAPS_JOBS_ROUTE,
+            self.start_search_job,
+            methods=["POST"],
+            response_model=JobStartResponse,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+        self.router.add_api_route(
+            MAPS_JOB_ROUTE,
+            self.get_search_job_status,
+            methods=["GET"],
+            response_model=JobStatusResponse,
+            status_code=status.HTTP_200_OK,
+        )
+        self.router.add_api_route(
+            MAPS_JOB_ROUTE,
+            self.cancel_search_job,
+            methods=["DELETE"],
+            response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )
         
@@ -1082,5 +1346,6 @@ search_endpoint = MapSearchEndpoint(
     normatim_service=normatim_service,
     toolkit=toolkit,
     rendering_service=rendering_service,
+    job_manager=job_manager,
 )
 search_endpoint.add_routes()

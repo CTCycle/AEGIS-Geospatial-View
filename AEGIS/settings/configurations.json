@@ -38,6 +38,9 @@
     "render_delay_s": 1.0,
     "tiles": "OpenStreetMap"
   },
+  "jobs": {
+    "polling_interval": 1.0
+  },
   "gibs": {
     "user_agent": "AEGIS-GIBS/1.0",
     "timeout": 20.0,
