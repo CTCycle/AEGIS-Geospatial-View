@@ -2,6 +2,7 @@
 E2E tests for Database Browser API endpoints.
 Tests: /browser/tables, /browser/tables/{name}, /browser/tables/{name}/stats
 """
+
 from playwright.sync_api import APIRequestContext
 
 
@@ -49,12 +50,16 @@ class TestBrowserEndpoints:
         assert isinstance(data.get("columnCount"), int)
         assert data["columnCount"] > 0
 
-    def test_get_table_data_invalid_table_returns_404(self, api_context: APIRequestContext):
+    def test_get_table_data_invalid_table_returns_404(
+        self, api_context: APIRequestContext
+    ):
         """GET /browser/tables/{invalid} should return 404."""
         response = api_context.get("/browser/tables/NOT_A_TABLE")
         assert response.status == 404
 
-    def test_get_table_stats_invalid_table_returns_404(self, api_context: APIRequestContext):
+    def test_get_table_stats_invalid_table_returns_404(
+        self, api_context: APIRequestContext
+    ):
         """GET /browser/tables/{invalid}/stats should return 404."""
         response = api_context.get("/browser/tables/NOT_A_TABLE/stats")
         assert response.status == 404

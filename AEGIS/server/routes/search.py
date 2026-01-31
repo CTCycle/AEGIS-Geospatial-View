@@ -27,29 +27,29 @@ from AEGIS.server.schemas.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from AEGIS.server.utils.configurations import server_settings
-from AEGIS.server.utils.jobs import JobManager, job_manager
+from AEGIS.server.configurations import server_settings
+from AEGIS.server.services.jobs import JobManager, job_manager
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.utils.repository.serializer import DataSerializer
-from AEGIS.server.utils.services.geospatial.gibs import (
+from AEGIS.server.repositories.serializer import DataSerializer
+from AEGIS.server.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
     GIBSValidationError,
 )
-from AEGIS.server.utils.services.geospatial.openaq import OpenAQService
-from AEGIS.server.utils.services.geospatial.elevation import OpenElevationService
-from AEGIS.server.utils.services.geospatial.layers import (
+from AEGIS.server.services.geospatial.openaq import OpenAQService
+from AEGIS.server.services.geospatial.elevation import OpenElevationService
+from AEGIS.server.services.geospatial.layers import (
     LayerProviderError,
     LayerProviderEntry,
     LayerProviderService,
 )
-from AEGIS.server.utils.services.geospatial.maps import (
+from AEGIS.server.services.geospatial.maps import (
     MapRequestError,
     MapService,
     MapValidationError,
 )
-from AEGIS.server.utils.services.geospatial.normatim import NormatimService
-from AEGIS.server.utils.services.sanitization import LocationSanitizationService
+from AEGIS.server.services.geospatial.normatim import NormatimService
+from AEGIS.server.services.sanitization import LocationSanitizationService
 
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 
@@ -68,9 +68,7 @@ DEFAULT_OVERLAY_COLOR = "#2563eb"
 
 
 # -------------------------------------------------------------------------
-def sanitize_validation_errors(
-    errors: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def sanitize_validation_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sanitized: list[dict[str, Any]] = []
     for error in errors:
         normalized = dict(error)
@@ -123,9 +121,7 @@ class MapSearchToolkit:
         return normalized
 
     # -------------------------------------------------------------------------
-    def normalize_layers(
-        self, layers: list[str] | tuple[str, ...] | None
-    ) -> list[str]:
+    def normalize_layers(self, layers: list[str] | tuple[str, ...] | None) -> list[str]:
         if layers is None:
             return []
         normalized: list[str] = []
@@ -155,20 +151,14 @@ class MapSearchToolkit:
             value.lower() for value in self.normalize_layers(removals or [])
         }
         if removal_values:
-            merged = [
-                value
-                for value in merged
-                if value.lower() not in removal_values
-            ]
+            merged = [value for value in merged if value.lower() not in removal_values]
         return merged
 
     # -------------------------------------------------------------------------
     def resolve_imagery_date(self, payload: LocationSearchRequest) -> str:
         if payload.datetime:
             return payload.datetime.date().isoformat()
-        raise GIBSValidationError(
-            "Provide datetime to determine imagery date."
-        )
+        raise GIBSValidationError("Provide datetime to determine imagery date.")
 
     # -------------------------------------------------------------------------
     def resolve_imagery_layer(self, payload: LocationSearchRequest) -> str:
@@ -434,9 +424,7 @@ class MapRenderingService:
         target_resolution = max(resolutions)
         target_span_x = target_resolution * float(payload.image_width)
         target_span_y = target_resolution * float(payload.image_height)
-        span_x, span_y = self.gibs_service.bbox_span_in_meters(
-            map_bbox, "EPSG:4326"
-        )
+        span_x, span_y = self.gibs_service.bbox_span_in_meters(map_bbox, "EPSG:4326")
         if span_x >= target_span_x and span_y >= target_span_y:
             return map_bbox
         return self.gibs_service.expand_bbox_to_span(
@@ -824,7 +812,9 @@ class MapSearchEndpoint:
         response_payload: dict[str, Any] | None,
         fallback: dict[str, Any],
     ) -> CoordinatePair | None:
-        payload_snapshot = response_payload.get("payload", {}) if response_payload else {}
+        payload_snapshot = (
+            response_payload.get("payload", {}) if response_payload else {}
+        )
         if payload:
             coordinates = self.toolkit.extract_coordinate_pair(
                 payload, payload_snapshot
@@ -1329,7 +1319,8 @@ class MapSearchEndpoint:
             response_model=JobCancelResponse,
             status_code=status.HTTP_200_OK,
         )
-        
+
+
 toolkit = MapSearchToolkit(
     gibs_service=gibs_service,
     default_layer=server_settings.gibs.default_layer,

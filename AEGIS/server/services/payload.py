@@ -13,6 +13,7 @@ def sanitize_field(value: str | None) -> str | None:
     stripped = value.strip()
     return stripped or None
 
+
 # -----------------------------------------------------------------------------
 def sanitize_choice(value: Any) -> str | None:
     if value is None:
@@ -21,6 +22,7 @@ def sanitize_choice(value: Any) -> str | None:
     if normalized and normalized.lower() == "none":
         return None
     return normalized
+
 
 # -----------------------------------------------------------------------------
 def sanitize_choice_list(values: list[Any] | None) -> list[str]:
@@ -35,6 +37,7 @@ def sanitize_choice_list(values: list[Any] | None) -> list[str]:
             continue
         normalized_values.append(normalized)
     return normalized_values
+
 
 # -----------------------------------------------------------------------------
 def coerce_float(value: Any) -> float | None:
@@ -73,8 +76,8 @@ def sanitize_search_payload(
     if not use_coordinates and not any([address, city, country]):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail="Provide an address/city/country or enable coordinates.",
-    )
+            detail="Provide an address/city/country or enable coordinates.",
+        )
 
     sanitized_filters = sanitize_choice_list(geospatial_filters)
     selected_tiles = sanitize_choice(map_tiles)

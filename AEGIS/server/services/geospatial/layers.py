@@ -196,9 +196,7 @@ class LayerProviderService:
             if not provider:
                 continue
             metadata_label = COMMON_GEOSPATIAL_LAYERS.get(name)
-            label = str(
-                specification.get("label") or metadata_label or name
-            ).strip()
+            label = str(specification.get("label") or metadata_label or name).strip()
             aliases = tuple(
                 str(value).strip()
                 for value in specification.get("aliases", ())
@@ -260,9 +258,7 @@ class LayerProviderService:
         key = normalized.lower()
         canonical = self.alias_lookup.get(key)
         if canonical is None:
-            raise LayerProviderNotFoundError(
-                f"Layer '{normalized}' is not available."
-            )
+            raise LayerProviderNotFoundError(f"Layer '{normalized}' is not available.")
         return self.layer_definitions[canonical]
 
     # -------------------------------------------------------------------------

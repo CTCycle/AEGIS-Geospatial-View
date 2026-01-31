@@ -7,7 +7,7 @@ from typing import Any
 
 import folium
 
-from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.configurations import server_settings
 from AEGIS.server.utils.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
@@ -28,6 +28,7 @@ __all__ = [
     "MapRequestError",
     "MapService",
 ]
+
 
 # -----------------------------------------------------------------------------
 def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
@@ -76,7 +77,9 @@ class MapService:
     # -------------------------------------------------------------------------
     def normalize_bbox(self, bbox: BBox) -> BBox:
         if len(bbox) != 4:
-            raise MapValidationError("BBox must include four values [minx,miny,maxx,maxy].")
+            raise MapValidationError(
+                "BBox must include four values [minx,miny,maxx,maxy]."
+            )
         try:
             minx, miny, maxx, maxy = [float(value) for value in bbox]
         except (TypeError, ValueError) as exc:
@@ -90,9 +93,7 @@ class MapService:
         return [minx, miny, maxx, maxy]
 
     # -------------------------------------------------------------------------
-    def compute_bbox_from_center(
-        self, lon: float, lat: float, size_m: float
-    ) -> BBox:
+    def compute_bbox_from_center(self, lon: float, lat: float, size_m: float) -> BBox:
         if size_m <= 0:
             raise MapValidationError("map_size_m must be greater than zero.")
         lat_radians = math.radians(lat)
@@ -117,8 +118,10 @@ class MapService:
         lat_span_rad = math.radians(maxy - miny)
         lon_span_rad = math.radians(maxx - minx)
         lat_span_m = abs(lat_span_rad) * EARTH_RADIUS_M
-        lon_span_m = abs(lon_span_rad) * EARTH_RADIUS_M * max(
-            math.cos(math.radians(mean_lat)), 1e-6
+        lon_span_m = (
+            abs(lon_span_rad)
+            * EARTH_RADIUS_M
+            * max(math.cos(math.radians(mean_lat)), 1e-6)
         )
         return max(lat_span_m, lon_span_m)
 
@@ -192,9 +195,7 @@ class MapService:
         for index, overlay in enumerate(overlay_entries):
             self._add_overlay_layer(map_object, overlay, index)
         folium.LayerControl(position="topright", collapsed=False).add_to(map_object)
-        map_object.fit_bounds(
-            [[map_bbox[1], map_bbox[0]], [map_bbox[3], map_bbox[2]]]
-        )
+        map_object.fit_bounds([[map_bbox[1], map_bbox[0]], [map_bbox[3], map_bbox[2]]])
         start_ts = time.perf_counter()
         map_html = map_object.get_root().render()
         render_time_s = round(time.perf_counter() - start_ts, 3)
@@ -226,8 +227,8 @@ class MapService:
         bounds = self._normalize_bounds(overlay.get("bounds"))
         if bounds is None:
             return
-        layer_name = (
-            str(overlay.get("label") or overlay.get("name") or f"Layer {index + 1}")
+        layer_name = str(
+            overlay.get("label") or overlay.get("name") or f"Layer {index + 1}"
         )
         opacity = float(overlay.get("opacity", 0.65))
         mode = str(overlay.get("mode") or "image").lower()

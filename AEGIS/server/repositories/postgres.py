@@ -10,9 +10,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from AEGIS.server.utils.configurations import DatabaseSettings
-from AEGIS.server.database.schema import Base
-from AEGIS.server.database.utils import normalize_postgres_engine
+from AEGIS.server.configurations import DatabaseSettings
+from AEGIS.server.repositories.schema import Base
+from AEGIS.server.repositories.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
 
 
@@ -22,9 +22,7 @@ class PostgresRepository:
         if not settings.host:
             raise ValueError("Database host must be provided for external database.")
         if not settings.database_name:
-            raise ValueError(
-                "Database name must be provided for external database."
-            )
+            raise ValueError("Database name must be provided for external database.")
         if not settings.username:
             raise ValueError(
                 "Database username must be provided for external database."

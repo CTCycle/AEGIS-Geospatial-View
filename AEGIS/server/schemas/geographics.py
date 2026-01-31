@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from AEGIS.server.utils.configurations import server_settings
+from AEGIS.server.configurations import server_settings
 
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
@@ -58,7 +58,9 @@ class LocationSearchRequest(BaseModel):
     map_size_m: float = Field(default=server_settings.map.default_size_m, gt=0)
     map_tiles: str | None = Field(default=server_settings.map.tiles, max_length=200)
     image_width: int = Field(default=server_settings.gibs.image_width, ge=512, le=2048)
-    image_height: int = Field(default=server_settings.gibs.image_height, ge=512, le=2048)
+    image_height: int = Field(
+        default=server_settings.gibs.image_height, ge=512, le=2048
+    )
     image_crs: str = Field(default="EPSG:3857")
     image_format: str = Field(default="image/png")
     agentic_enabled: bool = Field(default=False)
