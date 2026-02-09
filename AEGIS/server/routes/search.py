@@ -19,10 +19,10 @@ from AEGIS.server.utils.constants import (
     MAPS_ROUTER_PREFIX,
     MAPS_SEARCH_ROUTE,
 )
-from AEGIS.server.schemas.geographics import (
+from AEGIS.server.entities.geographics import (
     LocationSearchRequest,
 )
-from AEGIS.server.schemas.jobs import (
+from AEGIS.server.entities.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
