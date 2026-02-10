@@ -25,7 +25,7 @@ class SQLiteRepository:
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
-        self.Session = sessionmaker(bind=self.engine, future=True)
+        self.session = sessionmaker(bind=self.engine, future=True)
         self.insert_batch_size = settings.insert_batch_size
         if self.db_path is not None and not os.path.exists(self.db_path):
             Base.metadata.create_all(self.engine)
@@ -40,7 +40,7 @@ class SQLiteRepository:
     # -------------------------------------------------------------------------
     def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
         table = table_cls.__table__
-        session = self.Session()
+        session = self.session()
         try:
             unique_cols = []
             for uc in table.constraints:
