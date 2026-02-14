@@ -22,6 +22,9 @@ CONFIGURATIONS_FILE = join(SETTING_PATH, "configurations.json")
 ###############################################################################
 ROOT_ROUTE = "/"
 DOCS_ROUTE = "/docs"
+FASTAPI_TITLE = "AEGIS Geospatial Search Backend"
+FASTAPI_DESCRIPTION = "FastAPI backend"
+FASTAPI_VERSION = "1.0.0"
 MAPS_ROUTER_PREFIX = "/maps"
 BROWSER_ROUTER_PREFIX = "/browser"
 MAPS_SEARCH_ROUTE = "/search"

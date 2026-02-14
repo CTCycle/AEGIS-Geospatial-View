@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from typing import Any, cast
+
+import pandas as pd
+
+from AEGIS.server.utils.constants import (
+    GEONAMES_TABLE,
+    GEONAMES_COLUMNS,
+    GIBS_LAYERS_TABLE,
+    GIBS_LAYER_COLUMNS,
+    SEARCH_SESSION_COLUMNS,
+    SEARCH_SESSIONS_TABLE,
+)
+from AEGIS.server.repositories.queries import (
+    count_table_rows,
+    load_table_frame,
+    upsert_table_frame,
+)
+
+
+###############################################################################
+class DataSerializer:
+    def __init__(self) -> None:
+        pass
+
+    # -----------------------------------------------------------------------------
+    def upsert_geonames_records(self, records: list[dict[str, Any]]) -> None:
+        if not records:
+            return
+        frame = pd.DataFrame.from_records(records)
+        frame = frame.reindex(columns=GEONAMES_COLUMNS)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
+        upsert_table_frame(frame, GEONAMES_TABLE)
+
+    # -----------------------------------------------------------------------------
+    def upsert_gibs_layers(self, layers: list[dict[str, Any]]) -> None:
+        if not layers:
+            return
+        frame = pd.DataFrame.from_records(layers)
+        frame = frame.reindex(columns=GIBS_LAYER_COLUMNS)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
+        upsert_table_frame(frame, GIBS_LAYERS_TABLE)
+
+    # -----------------------------------------------------------------------------
+    def insert_search_session(self, session: dict[str, Any]) -> None:
+        if not session:
+            return
+        frame = pd.DataFrame.from_records([session])
+        frame = frame.reindex(columns=SEARCH_SESSION_COLUMNS)
+        frame = frame.where(pd.notnull(frame), cast(Any, None))
+        upsert_table_frame(frame, SEARCH_SESSIONS_TABLE)
+
+    # -----------------------------------------------------------------------------
+    def load_table(self, table_name: str) -> pd.DataFrame:
+        return load_table_frame(table_name)
+
+    # -----------------------------------------------------------------------------
+    def load_table_records(self, table_name: str) -> dict[str, Any]:
+        frame = self.load_table(table_name)
+        columns = frame.columns.tolist()
+        rows = frame.to_dict(orient="records")
+        return {
+            "columns": columns,
+            "rows": rows,
+            "row_count": len(rows),
+            "column_count": len(columns),
+        }
+
+    # -----------------------------------------------------------------------------
+    def get_table_stats(self, table_name: str) -> dict[str, int]:
+        column_count = len(self.load_table(table_name).columns)
+        row_count = count_table_rows(table_name)
+        return {
+            "row_count": row_count,
+            "column_count": column_count,
+        }

@@ -205,16 +205,6 @@ class LLMRuntimeConfig:
         return provider, model.strip()
 
 
-# [SERVER SETTINGS]
-###############################################################################
-@dataclass(frozen=True)
-class FastAPISettings:
-    title: str
-    description: str
-    version: str
-
-
-# -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class DatabaseSettings:
     embedded_database: bool
@@ -299,7 +289,6 @@ class LLMRuntimeDefaults:
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ServerSettings:
-    fastapi: FastAPISettings
     database: DatabaseSettings
     nominatim: NominatimSettings
     geospatial: GeospatialSettings
@@ -309,18 +298,6 @@ class ServerSettings:
     llm_defaults: LLMRuntimeDefaults
 
 
-# [BUILDER FUNCTIONS]
-###############################################################################
-def build_fastapi_settings(data: dict[str, Any]) -> FastAPISettings:
-    payload = ensure_mapping(data)
-    return FastAPISettings(
-        title=coerce_str(payload.get("title"), "AEGIS Geospatial Search Backend"),
-        version=coerce_str(payload.get("version"), "0.1.0"),
-        description=coerce_str(payload.get("description"), "FastAPI backend"),
-    )
-
-
-# -----------------------------------------------------------------------------
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
     embedded = bool(payload.get("embedded_database", True))
     if embedded:
@@ -505,7 +482,6 @@ def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
 # -----------------------------------------------------------------------------
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     payload = ensure_mapping(data)
-    fastapi_payload = ensure_mapping(payload.get("fastapi"))
     database_payload = ensure_mapping(payload.get("database"))
     nominatim_payload = ensure_mapping(payload.get("nominatim"))
     geospatial_payload = ensure_mapping(payload.get("geospatial"))
@@ -522,7 +498,6 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     )
 
     return ServerSettings(
-        fastapi=build_fastapi_settings(fastapi_payload),
         database=build_database_settings(database_payload),
         nominatim=build_nominatim_settings(nominatim_payload),
         geospatial=build_geospatial_settings(geospatial_payload),
