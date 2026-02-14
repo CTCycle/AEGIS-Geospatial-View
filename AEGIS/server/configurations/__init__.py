@@ -7,7 +7,6 @@ from AEGIS.server.configurations.base import (
 
 from AEGIS.server.configurations.server import (
     DatabaseSettings,
-    FastAPISettings,
     NominatimSettings,
     GeospatialSettings,
     MapSettings,
@@ -24,7 +23,6 @@ __all__ = [
     "ensure_mapping",
     "load_configuration_data",
     "DatabaseSettings",
-    "FastAPISettings",
     "NominatimSettings",
     "GeospatialSettings",
     "MapSettings",
