@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from AEGIS.server.repositories.database.manager import database
+from AEGIS.server.repositories.database.backend import database
 
 
 # -----------------------------------------------------------------------------

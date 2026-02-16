@@ -4,10 +4,11 @@ import urllib.parse
 
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.sql.elements import TextClause
 
 from AEGIS.server.configurations import DatabaseSettings, server_settings
-from AEGIS.server.repositories.database.backends.postgres import PostgresRepository
-from AEGIS.server.repositories.database.backends.sqlite import SQLiteRepository
+from AEGIS.server.repositories.database.postgres import PostgresRepository
+from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.repositories.schemas import Base
 from AEGIS.server.repositories.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
@@ -15,7 +16,10 @@ from AEGIS.server.utils.logger import logger
 
 ###############################################################################
 def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
-    connect_args: dict[str, str | int] = {"connect_timeout": settings.connect_timeout}
+    connect_args: dict[str, str | int] = {
+        "connect_timeout": settings.connect_timeout,
+        "client_encoding": "utf8",
+    }
     if settings.ssl:
         connect_args["sslmode"] = "require"
         if settings.ssl_ca:
@@ -53,6 +57,15 @@ def clone_settings_with_database(
         insert_batch_size=settings.insert_batch_size,
     )
 
+# -----------------------------------------------------------------------------
+def build_postgres_create_database_sql(
+    database_name: str,
+) -> TextClause:
+    safe_database = database_name.replace('"', '""')
+    return sqlalchemy.text(
+        f'CREATE DATABASE "{safe_database}" WITH ENCODING \'UTF8\' TEMPLATE template0'
+    )
+
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
@@ -70,7 +83,6 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
         raise ValueError("Database name is required for PostgreSQL initialization.")
 
     target_database = settings.database_name
-    safe_database = target_database.replace('"', '""')
     connect_args = build_postgres_connect_args(settings)
 
     admin_url = build_postgres_url(settings, "postgres")
@@ -91,7 +103,7 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
         if exists:
             logger.info("PostgreSQL database %s already exists", target_database)
         else:
-            conn.execute(sqlalchemy.text(f'CREATE DATABASE "{safe_database}"'))
+            conn.execute(build_postgres_create_database_sql(target_database))
             logger.info("Created PostgreSQL database %s", target_database)
 
     normalized_settings = clone_settings_with_database(settings, target_database)
@@ -100,7 +112,6 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
     logger.info("Ensured PostgreSQL tables exist in %s", target_database)
 
     return target_database
-
 
 # -----------------------------------------------------------------------------
 def run_database_initialization() -> None:
