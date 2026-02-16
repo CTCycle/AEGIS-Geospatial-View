@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from AEGIS.server.repositories.database.manager import (
+from AEGIS.server.repositories.database.backend import (
     AEGISDatabase,
     BACKEND_FACTORIES,
     BackendFactory,

@@ -16,7 +16,7 @@ __all__ = [
 # -----------------------------------------------------------------------------
 def __getattr__(name: str) -> Any:
     if name in __all__:
-        from AEGIS.server.repositories.database import manager as manager_module
+        from AEGIS.server.repositories.database import backend as manager_module
 
         return getattr(manager_module, name)
     raise AttributeError(

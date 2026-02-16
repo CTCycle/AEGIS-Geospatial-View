@@ -6,8 +6,8 @@ from typing import Any, Protocol
 import pandas as pd
 
 from AEGIS.server.configurations import DatabaseSettings, server_settings
-from AEGIS.server.repositories.database.backends.postgres import PostgresRepository
-from AEGIS.server.repositories.database.backends.sqlite import SQLiteRepository
+from AEGIS.server.repositories.database.postgres import PostgresRepository
+from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.utils.logger import logger
 
 
