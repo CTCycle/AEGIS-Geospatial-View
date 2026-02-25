@@ -244,11 +244,22 @@ start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MO
 if not exist "%FRONTEND_DIR%\node_modules" (
   echo [STEP] Installing frontend dependencies...
   pushd "%FRONTEND_DIR%" >nul
-  call "%NPM_CMD%" install
-  set "npm_ec=!ERRORLEVEL!"
+  if exist "%FRONTEND_DIR%\package-lock.json" (
+    echo [INFO] Detected package-lock.json. Using npm ci...
+    call "%NPM_CMD%" ci
+    set "npm_ec=!ERRORLEVEL!"
+    if not "!npm_ec!"=="0" (
+      echo [WARN] npm ci failed with code !npm_ec!. Falling back to npm install.
+      call "%NPM_CMD%" install
+      set "npm_ec=!ERRORLEVEL!"
+    )
+  ) else (
+    call "%NPM_CMD%" install
+    set "npm_ec=!ERRORLEVEL!"
+  )
   popd >nul
   if not "!npm_ec!"=="0" (
-    echo [FATAL] npm install failed with code !npm_ec!.
+    echo [FATAL] Frontend dependency installation failed with code !npm_ec!.
     goto error
   )
 )
