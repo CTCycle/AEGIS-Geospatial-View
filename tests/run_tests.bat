@@ -75,6 +75,19 @@ if exist "%DOTENV%" (
     )
 )
 
+set "FASTAPI_TEST_HOST=%FASTAPI_HOST%"
+if /i "%FASTAPI_TEST_HOST%"=="0.0.0.0" set "FASTAPI_TEST_HOST=127.0.0.1"
+set "UI_TEST_HOST=%UI_HOST%"
+if /i "%UI_TEST_HOST%"=="0.0.0.0" set "UI_TEST_HOST=127.0.0.1"
+
+if not defined APP_TEST_BACKEND_URL set "APP_TEST_BACKEND_URL=http://%FASTAPI_TEST_HOST%:%FASTAPI_PORT%"
+if not defined APP_TEST_FRONTEND_URL set "APP_TEST_FRONTEND_URL=http://%UI_TEST_HOST%:%UI_PORT%"
+set "API_BASE_URL=%APP_TEST_BACKEND_URL%"
+set "UI_BASE_URL=%APP_TEST_FRONTEND_URL%"
+
+echo [INFO] APP_TEST_BACKEND_URL=%APP_TEST_BACKEND_URL%
+echo [INFO] APP_TEST_FRONTEND_URL=%APP_TEST_FRONTEND_URL%
+
 REM ============================================================================
 REM == Force portable runtimes (avoid global Python/npm)
 REM ============================================================================
@@ -124,7 +137,7 @@ start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MO
 REM Wait for backend to be ready
 echo [INFO] Waiting for backend to start...
 for /L %%i in (1,1,120) do (
-  netstat -ano | findstr ":%FASTAPI_PORT%" | findstr "LISTENING" >nul
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $response = Invoke-WebRequest -Uri '%APP_TEST_BACKEND_URL%/docs' -UseBasicParsing -TimeoutSec 2; if ($response.StatusCode -ge 200) { exit 0 } ; exit 1 } catch { exit 1 }" >nul 2>&1
   if !errorlevel! equ 0 goto :backend_ready_check
   timeout /t 1 /nobreak >nul
 )
@@ -139,8 +152,24 @@ echo [STEP 3/4] Starting frontend server...
 if not exist "%FRONTEND_DIR%\node_modules" (
     echo [INFO] Installing frontend dependencies...
     pushd "%FRONTEND_DIR%" >nul
-    call "%npm_cmd%" install
+    if exist "%FRONTEND_DIR%\package-lock.json" (
+        echo [INFO] Detected package-lock.json. Using npm ci...
+        call "%npm_cmd%" ci
+        set "npm_ec=!ERRORLEVEL!"
+        if not "!npm_ec!"=="0" (
+            echo [WARN] npm ci failed with code !npm_ec!. Falling back to npm install.
+            call "%npm_cmd%" install
+            set "npm_ec=!ERRORLEVEL!"
+        )
+    ) else (
+        call "%npm_cmd%" install
+        set "npm_ec=!ERRORLEVEL!"
+    )
     popd >nul
+    if not "!npm_ec!"=="0" (
+        echo [FATAL] Frontend dependency installation failed with code !npm_ec!.
+        goto error
+    )
 )
 
 if not exist "%FRONTEND_DIST%" (
@@ -157,7 +186,13 @@ popd >nul
 
 REM Wait for frontend to be ready
 echo [INFO] Waiting for frontend to start...
-timeout /t 3 /nobreak >nul
+for /L %%i in (1,1,120) do (
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $response = Invoke-WebRequest -Uri '%APP_TEST_FRONTEND_URL%' -UseBasicParsing -TimeoutSec 2; if ($response.StatusCode -ge 200) { exit 0 } ; exit 1 } catch { exit 1 }" >nul 2>&1
+  if !errorlevel! equ 0 goto :frontend_ready_check
+  timeout /t 1 /nobreak >nul
+)
+echo [WARN] Timed out waiting for frontend.
+:frontend_ready_check
 
 REM ============================================================================
 REM == Run tests

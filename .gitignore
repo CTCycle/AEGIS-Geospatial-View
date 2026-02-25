@@ -1,5 +1,6 @@
 # Project-specific generated/runtime artifacts
 docs/**
+!docs/PACKAGING_AND_RUNTIME_MODES.md
 AEGIS/resources/database/**
 AEGIS/resources/runtimes/**
 AEGIS/resources/runtimes/uv_cache/**
@@ -7,7 +8,6 @@ AEGIS/resources/logs/**
 AEGIS/client/node_modules/
 AEGIS/client/dist/
 AEGIS/client/dist-ssr/
-AEGIS/client/package-lock.json
 AEGIS/client/logs/
 
 # Local agent documentation (not committed)
@@ -61,6 +61,7 @@ Thumbs.db
 *.db
 *.sqlite*
 *.exe
+!uv.lock
 
 !.gitkeep
 !AEGIS/settings/configurations.json

@@ -6,25 +6,52 @@ Provides fixtures for Playwright page objects and API client.
 import os
 
 import pytest
-from playwright.sync_api import Page
+
+
+def _pick_first_non_empty(*values: str | None) -> str | None:
+    for value in values:
+        if value is None:
+            continue
+        stripped = value.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _normalize_host(raw_host: str | None, default_host: str) -> str:
+    host = (raw_host or default_host).strip() or default_host
+    if host in {"0.0.0.0", "::", "[::]"}:
+        return "127.0.0.1"
+    return host
 
 
 def _build_base_url(
-    host_env: str, port_env: str, default_host: str, default_port: str
+    host_env: str,
+    port_env: str,
+    default_host: str,
+    default_port: str,
 ) -> str:
-    host = os.getenv(host_env, default_host)
+    host = _normalize_host(os.getenv(host_env), default_host)
     port = os.getenv(port_env, default_port)
     return f"http://{host}:{port}"
 
 
-# Base URLs - prefer explicit env vars, then fall back to host/port pairs.
-UI_BASE_URL = (
-    os.getenv("UI_BASE_URL")
-    or os.getenv("UI_URL")
-    or _build_base_url("UI_HOST", "UI_PORT", "127.0.0.1", "7861")
-)
-API_BASE_URL = os.getenv("API_BASE_URL") or _build_base_url(
+FRONTEND_URL_FALLBACK = _build_base_url("UI_HOST", "UI_PORT", "127.0.0.1", "7861")
+BACKEND_URL_FALLBACK = _build_base_url(
     "FASTAPI_HOST", "FASTAPI_PORT", "127.0.0.1", "8000"
+)
+
+# Base URLs - APP_TEST_* vars are first-class; fall back deterministically.
+UI_BASE_URL = _pick_first_non_empty(
+    os.getenv("APP_TEST_FRONTEND_URL"),
+    os.getenv("UI_BASE_URL"),
+    os.getenv("UI_URL"),
+    FRONTEND_URL_FALLBACK,
+)
+API_BASE_URL = _pick_first_non_empty(
+    os.getenv("APP_TEST_BACKEND_URL"),
+    os.getenv("API_BASE_URL"),
+    BACKEND_URL_FALLBACK,
 )
 
 
