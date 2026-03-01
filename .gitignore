@@ -9,12 +9,7 @@ AEGIS/client/logs/
 
 
 # Environment files (keep templates)
-AEGIS/settings/.env
-AEGIS/client/.env
 AEGIS/client/*.local
-!.env.example
-!.env.sample
-
 
 # Python
 __pycache__/
@@ -59,6 +54,6 @@ Thumbs.db
 uv.lock
 
 !.gitkeep
-!AEGIS/settings/configurations.json
+
 
 
