@@ -1,7 +1,4 @@
 # Project-specific generated/runtime artifacts
-docs/**
-!docs/PACKAGING_AND_RUNTIME_MODES.md
-AEGIS/resources/database/**
 AEGIS/resources/runtimes/**
 AEGIS/resources/runtimes/uv_cache/**
 AEGIS/resources/logs/**
@@ -10,8 +7,6 @@ AEGIS/client/dist/
 AEGIS/client/dist-ssr/
 AEGIS/client/logs/
 
-# Local agent documentation (not committed)
-rules/
 
 # Environment files (keep templates)
 AEGIS/settings/.env
@@ -19,7 +14,7 @@ AEGIS/client/.env
 AEGIS/client/*.local
 !.env.example
 !.env.sample
-!AEGIS/resources/templates/.env
+
 
 # Python
 __pycache__/
@@ -53,7 +48,7 @@ lerna-debug.log*
 Thumbs.db
 
 # Agents
-.agent/**
+.agent/skills/**
 
 # Misc
 *.lock
@@ -61,7 +56,7 @@ Thumbs.db
 *.db
 *.sqlite*
 *.exe
-!uv.lock
+uv.lock
 
 !.gitkeep
 !AEGIS/settings/configurations.json
