@@ -34,6 +34,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+package-lock.json
+yarn.lock
 
 # IDE / OS
 .vscode/
@@ -51,7 +53,7 @@ Thumbs.db
 *.db
 *.sqlite*
 *.exe
-uv.lock
+
 
 !.gitkeep
 
