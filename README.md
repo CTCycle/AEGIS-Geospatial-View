@@ -108,10 +108,10 @@ and uses those URLs for readiness checks and pytest runtime config.
 
 ## 7. Screenshots
 
-![Geospatial search panel](AEGIS/assets/figures/search_page.png)
+![Geospatial search panel](figures/search_page.png)
 Search panel for entering a place or coordinates and selecting imagery options.
 
-![Map preview output](AEGIS/assets/figures/database_browser.png)
+![Map preview output](figures/database_browser.png)
 Preview area showing the generated map and summary metadata.
 
 ## 8. Setup and Maintenance
