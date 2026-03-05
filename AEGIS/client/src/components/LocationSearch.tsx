@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
+
 import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, MAX_GEOSPATIAL_LAYERS, DATA_PROVIDERS, LAYER_PROVIDERS } from '../constants';
 import { LocationSearchRequest } from '../types';
+import PanelHeader from './PanelHeader';
 import './LocationSearch.css';
 
 interface LocationSearchProps {
@@ -21,13 +23,11 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
     const hasReachedFilterLimit = selectedFilters.length >= MAX_GEOSPATIAL_LAYERS;
 
-    // Get the description of the currently selected provider
     const currentProviderDescription = useMemo(() => {
         const provider = DATA_PROVIDERS.find(p => p.id === selectedProvider);
         return provider?.description || '';
     }, [selectedProvider]);
 
-    // Filter layers based on selected provider
     const filteredLayers = useMemo(() => {
         if (selectedProvider === 'all') {
             return COMMON_GEOSPATIAL_LAYERS;
@@ -35,7 +35,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
         return Object.fromEntries(
             Object.entries(COMMON_GEOSPATIAL_LAYERS).filter(
                 ([key]) => LAYER_PROVIDERS[key] === selectedProvider
-            )
+            ),
         );
     }, [selectedProvider]);
 
@@ -182,10 +182,10 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     return (
         <form className="location-container" onSubmit={handleSubmit}>
             <div className="header-row">
-                <div>
-                    <h3 className="panel-title">Location search</h3>
-                    <p className="panel-description">Specify where to focus the map.</p>
-                </div>
+                <PanelHeader
+                    title="Location search"
+                    description="Specify where to focus the map."
+                />
                 <fieldset className="mode-switch">
                     <legend className="mode-switch-label">Search mode</legend>
                     <button
@@ -305,3 +305,4 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 };
 
 export default LocationSearch;
+

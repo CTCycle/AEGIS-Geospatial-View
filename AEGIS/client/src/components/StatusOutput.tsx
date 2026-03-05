@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+
 import './StatusOutput.css';
 
 interface StatusOutputProps {
     message?: string;
-    json?: any;
+    json?: unknown;
 }
 
 const StatusOutput: React.FC<StatusOutputProps> = ({ message, json }) => {
@@ -21,7 +22,7 @@ const StatusOutput: React.FC<StatusOutputProps> = ({ message, json }) => {
         return (
             <div className="status-content">
                 {message && <div className="status-message">{message}</div>}
-                {json && (
+                {json !== undefined && json !== null && (
                     <pre className="json-output">
                         <code>{JSON.stringify(json, null, 2)}</code>
                     </pre>
@@ -60,3 +61,4 @@ const StatusOutput: React.FC<StatusOutputProps> = ({ message, json }) => {
 };
 
 export default StatusOutput;
+

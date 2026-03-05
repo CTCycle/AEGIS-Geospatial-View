@@ -1,11 +1,26 @@
 import { useMemo, useState } from 'react';
+
+import AgenticSearch from '../components/AgenticSearch';
 import LocationSearch from '../components/LocationSearch';
 import MapPreview from '../components/MapPreview';
+import PanelHeader from '../components/PanelHeader';
 import StatsPanel from '../components/StatsPanel';
-import AgenticSearch from '../components/AgenticSearch';
-import { AgenticConfig, LocationSearchRequest, RuntimeSettings, SearchResponsePayload } from '../types';
 import { searchLocation } from '../services/api';
+import { AgenticConfig, LocationSearchRequest, RuntimeSettings, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
+
+interface SearchResultState {
+    message?: string;
+    json?: unknown;
+    payload?: SearchResponsePayload;
+}
+
+const readErrorField = (error: unknown, field: string): unknown => {
+    if (typeof error !== 'object' || error === null) {
+        return undefined;
+    }
+    return Reflect.get(error, field);
+};
 
 function GeospatialPage() {
     const [settings, setSettings] = useState<RuntimeSettings>({
@@ -16,11 +31,7 @@ function GeospatialPage() {
     });
 
     const [isLoading, setIsLoading] = useState(false);
-    const [searchResult, setSearchResult] = useState<{
-        message?: string;
-        json?: any;
-        payload?: SearchResponsePayload;
-    }>({});
+    const [searchResult, setSearchResult] = useState<SearchResultState>({});
     const [lastRequest, setLastRequest] = useState<LocationSearchRequest | undefined>();
     const [agenticConfig, setAgenticConfig] = useState<AgenticConfig>({
         enabled: false,
@@ -48,19 +59,26 @@ function GeospatialPage() {
             const response = await searchLocation(enrichedRequest);
             setSearchResult({
                 message: response.status_message,
-                json: response.json || response.payload,
+                json: response.json ?? response.payload,
                 payload: response.payload,
             });
             setAgentSummary(
-                response.payload?.agent_summary ||
-                response.payload?.status_message ||
-                response.status_message,
+                typeof response.payload?.agent_summary === 'string'
+                    ? response.payload.agent_summary
+                    : typeof response.payload?.status_message === 'string'
+                        ? response.payload.status_message
+                        : response.status_message,
             );
-        } catch (error: any) {
-            const statusPrefix = error.status ? ` ${error.status}` : '';
+        } catch (error: unknown) {
+            const statusCandidate = readErrorField(error, 'status');
+            const statusPrefix = typeof statusCandidate === 'number' ? ` ${statusCandidate}` : '';
+            const messageCandidate = readErrorField(error, 'message');
+            const detailCandidate = readErrorField(error, 'detail');
+            const rawCandidate = readErrorField(error, 'raw');
+
             setSearchResult({
-                message: `Error${statusPrefix}: ${error.message || 'Request failed'}`,
-                json: error.detail || error.raw || error,
+                message: `Error${statusPrefix}: ${typeof messageCandidate === 'string' ? messageCandidate : 'Request failed'}`,
+                json: detailCandidate ?? rawCandidate ?? error,
             });
         } finally {
             setIsLoading(false);
@@ -117,10 +135,10 @@ function GeospatialPage() {
             <section className="visual-row" aria-label="Map and statistics">
                 <section className="panel map-panel" aria-label="Map section">
                     <div className="panel-head">
-                        <div>
-                            <h3 className="panel-title">Map</h3>
-                            <p className="panel-description">Rendered view with toolbar controls.</p>
-                        </div>
+                        <PanelHeader
+                            title="Map"
+                            description="Rendered view with toolbar controls."
+                        />
                         <div className="map-toolbar">
                             <div className="toolbar-group">
                                 <span className="toolbar-label">Location</span>

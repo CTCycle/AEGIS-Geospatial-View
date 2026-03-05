@@ -1,6 +1,20 @@
 import { API_BASE_URL } from '../constants';
 import { LocationSearchRequest, SearchResponse, TableInfo, TableData } from '../types';
 
+class ApiRequestError extends Error {
+    detail?: unknown;
+    status?: number;
+    raw?: unknown;
+
+    constructor(message: string, options?: { detail?: unknown; status?: number; raw?: unknown }) {
+        super(message);
+        this.name = 'ApiRequestError';
+        this.detail = options?.detail;
+        this.status = options?.status;
+        this.raw = options?.raw;
+    }
+}
+
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
     try {
         const response = await fetch(`${API_BASE_URL}/maps/search`, {
@@ -16,18 +30,20 @@ export const searchLocation = async (payload: LocationSearchRequest): Promise<Se
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-            const message = typeof errorData.detail === 'string'
+            const detail = typeof errorData === 'object' && errorData !== null && 'detail' in errorData
                 ? errorData.detail
+                : errorData;
+            const message = typeof detail === 'string'
+                ? detail
                 : `Error ${response.status}: ${response.statusText}`;
-            const error: Error & { detail?: unknown; status?: number; raw?: unknown } = new Error(message);
-            error.detail = errorData.detail ?? errorData;
-            error.raw = errorData;
-            error.status = response.status;
-            throw error;
+            throw new ApiRequestError(message, {
+                detail,
+                raw: errorData,
+                status: response.status,
+            });
         }
 
-        const data = await response.json();
-        return data;
+        return response.json();
     } catch (error) {
         console.error('Search API Error:', error);
         throw error;
@@ -52,5 +68,4 @@ export const fetchTableData = async (tableName: string): Promise<TableData> => {
     return response.json();
 };
 
-// Re-export types for convenience
 export type { TableInfo, TableData } from '../types';

@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+
 import { CLOUD_PROVIDERS, CLOUD_MODEL_CHOICES, AGENT_MODEL_CHOICES } from '../constants';
+import useCloudModelSync from '../hooks/useCloudModelSync';
 import { RuntimeSettings } from '../types';
 import './ConfigurationDrawer.css';
 
@@ -16,6 +18,8 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
     settings,
     onSettingsChange,
 }) => {
+    useCloudModelSync({ settings, onSettingsChange });
+
     const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newProvider = e.target.value;
         const availableModels = CLOUD_MODEL_CHOICES[newProvider] || [];
@@ -37,14 +41,6 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
     const handleUseCloudServicesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onSettingsChange({ ...settings, useCloudServices: e.target.checked });
     };
-
-    // Ensure valid model selection when provider changes or on init
-    useEffect(() => {
-        const models = CLOUD_MODEL_CHOICES[settings.provider] || [];
-        if (!models.includes(settings.cloudModel) && models.length > 0) {
-            onSettingsChange({ ...settings, cloudModel: models[0] });
-        }
-    }, [settings.provider, settings.cloudModel, settings, onSettingsChange]);
 
     return (
         <>

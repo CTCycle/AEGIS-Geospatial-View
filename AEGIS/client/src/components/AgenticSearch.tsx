@@ -1,7 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+
 import './AgenticSearch.css';
-import { AgenticConfig, RuntimeSettings } from '../types';
+
+import PanelHeader from './PanelHeader';
 import { CLOUD_MODEL_CHOICES, CLOUD_PROVIDERS, AGENT_MODEL_CHOICES } from '../constants';
+import useCloudModelSync from '../hooks/useCloudModelSync';
+import { AgenticConfig, RuntimeSettings } from '../types';
 
 interface AgenticSearchProps {
     config: AgenticConfig;
@@ -20,6 +24,8 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
     settings,
     onSettingsChange,
 }) => {
+    useCloudModelSync({ settings, onSettingsChange });
+
     const handleToggle = (enabled: boolean) => {
         onChange({ ...config, enabled });
     };
@@ -49,20 +55,13 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
         onSettingsChange({ ...settings, agentModel: value });
     };
 
-    useEffect(() => {
-        const models = CLOUD_MODEL_CHOICES[settings.provider] || [];
-        if (!models.includes(settings.cloudModel) && models.length > 0) {
-            onSettingsChange({ ...settings, cloudModel: models[0] });
-        }
-    }, [settings.provider, settings.cloudModel, settings, onSettingsChange]);
-
     return (
         <div className="agentic-container">
             <div className="agentic-header">
-                <div>
-                    <h3 className="panel-title">Agentic search</h3>
-                    <p className="panel-description">Optional automation that explores and refines results.</p>
-                </div>
+                <PanelHeader
+                    title="Agentic search"
+                    description="Optional automation that explores and refines results."
+                />
                 <label className="toggle-control">
                     <input
                         type="checkbox"
