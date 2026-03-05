@@ -57,6 +57,12 @@ Cloud topology:
 - `backend`: FastAPI/Uvicorn container on internal port `8000`.
 - `frontend`: Nginx container serving SPA static assets.
 - `/api` on frontend origin is reverse-proxied to backend (`http://backend:8000/`).
+- Backend host publishing is loopback-bound (`127.0.0.1:${FASTAPI_PORT}:8000`) to reduce direct external exposure.
+- Nginx denies direct access to `/api/docs`, `/api/redoc`, `/api/openapi.json`, and `/api/maps/jobs*` in cloud mode.
+
+Cloud security notes:
+- Keep `VITE_API_BASE_URL=/api`; production frontend builds fall back to `/api` when given non-relative API bases.
+- Do not commit real credentials in `AEGIS/settings/.env`; use environment-specific secrets at deploy time.
 
 ## 6. Deterministic Build Notes
 

@@ -6,7 +6,7 @@ services:
     env_file:
       - AEGIS/settings/.env
     ports:
-      - "${FASTAPI_PORT:-8000}:8000"
+      - "127.0.0.1:${FASTAPI_PORT:-8000}:8000"
     volumes:
       - aegis_resources:/app/AEGIS/resources
     healthcheck:
@@ -40,3 +40,4 @@ services:
 
 volumes:
   aegis_resources:
+

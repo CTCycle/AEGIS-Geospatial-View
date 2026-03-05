@@ -10,7 +10,7 @@ export const searchLocation = async (payload: LocationSearchRequest): Promise<Se
             },
             body: JSON.stringify({
                 ...payload,
-                geospatial_layers: payload.filters, // Map filters to geospatial_layers expected by backend
+                geospatial_layers: payload.filters,
             }),
         });
 
@@ -44,7 +44,8 @@ export const fetchTables = async (): Promise<TableInfo[]> => {
 };
 
 export const fetchTableData = async (tableName: string): Promise<TableData> => {
-    const response = await fetch(`${API_BASE_URL}/browser/tables/${tableName}`);
+    const normalizedName = tableName.trim();
+    const response = await fetch(`${API_BASE_URL}/browser/tables/${encodeURIComponent(normalizedName)}`);
     if (!response.ok) {
         throw new Error('Failed to fetch table data');
     }

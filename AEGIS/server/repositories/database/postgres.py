@@ -5,7 +5,7 @@ from typing import Any
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, inspect
+from sqlalchemy import UniqueConstraint, delete, func, inspect, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -90,21 +90,25 @@ class PostgresRepository:
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> pd.DataFrame:
+        table_cls = self.get_table_class(table_name)
+        canonical_name = str(table_cls.__tablename__)
         with self.engine.connect() as conn:
             inspector = inspect(conn)
-            if not inspector.has_table(table_name):
-                logger.warning("Table %s does not exist", table_name)
+            if not inspector.has_table(canonical_name):
+                logger.warning("Table %s does not exist", canonical_name)
                 return pd.DataFrame()
-            data = pd.read_sql_table(table_name, conn)
+            data = pd.read_sql_table(canonical_name, conn)
         return data
 
     # -------------------------------------------------------------------------
     def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+        table_cls = self.get_table_class(table_name)
+        table = table_cls.__table__
         with self.engine.begin() as conn:
             inspector = inspect(conn)
-            if inspector.has_table(table_name):
-                conn.execute(sqlalchemy.text(f'DELETE FROM "{table_name}"'))
-            df.to_sql(table_name, conn, if_exists="append", index=False)
+            if inspector.has_table(table.name):
+                conn.execute(delete(table))
+            df.to_sql(table.name, conn, if_exists="append", index=False)
 
     # -------------------------------------------------------------------------
     def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
@@ -113,9 +117,9 @@ class PostgresRepository:
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
+        table_cls = self.get_table_class(table_name)
+        table = table_cls.__table__
         with self.engine.connect() as conn:
-            result = conn.execute(
-                sqlalchemy.text(f'SELECT COUNT(*) FROM "{table_name}"')
-            )
+            result = conn.execute(select(func.count()).select_from(table))
             value = result.scalar() or 0
         return int(value)

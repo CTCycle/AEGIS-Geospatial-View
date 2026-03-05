@@ -61,7 +61,7 @@ def get_table_data(table_name: str) -> JSONResponse:
         logger.error("Error loading table %s: %s", table_name, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load table: {e}",
+            detail="Failed to load table.",
         )
 
 
@@ -90,5 +90,5 @@ def get_table_stats(table_name: str) -> JSONResponse:
         logger.error("Error getting stats for table %s: %s", table_name, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get table stats: {e}",
+            detail="Failed to get table stats.",
         )
