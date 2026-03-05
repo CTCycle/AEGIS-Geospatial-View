@@ -5,7 +5,7 @@ from collections.abc import Callable
 from datetime import time
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from AEGIS.server.configurations import server_settings
 
@@ -15,12 +15,16 @@ type RangeComparator = Callable[[float, float], bool]
 
 ###############################################################################
 class Coordinates(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
 
 
 ###############################################################################
 class Location(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
     address: str | None = Field(default=None, max_length=400)
@@ -32,6 +36,8 @@ class Location(BaseModel):
         if value is None:
             return None
         stripped = str(value).strip()
+        if any(ord(char) < 32 for char in stripped):
+            raise ValueError("Text fields cannot contain control characters.")
         return stripped or None
 
     def has_any_value(self) -> bool:
@@ -40,6 +46,8 @@ class Location(BaseModel):
 
 ###############################################################################
 class LocationSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     datetime: dt.datetime | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(
@@ -83,6 +91,8 @@ class LocationSearchRequest(BaseModel):
         if value is None:
             return None
         stripped = str(value).strip()
+        if any(ord(char) < 32 for char in stripped):
+            raise ValueError("Text fields cannot contain control characters.")
         return stripped or None
 
     # -------------------------------------------------------------------------
@@ -101,9 +111,13 @@ class LocationSearchRequest(BaseModel):
                 continue
             if normalized.lower() == "none":
                 continue
+            if len(normalized) > 120:
+                raise ValueError("Filter values must be at most 120 characters long.")
             if normalized in candidates:
                 continue
             candidates.append(normalized)
+        if len(candidates) > 10:
+            raise ValueError("At most 10 geospatial filters are allowed.")
         return candidates
 
     # -------------------------------------------------------------------------
@@ -216,6 +230,8 @@ class LocationSearchRequest(BaseModel):
 
 ###############################################################################
 class MapLayerUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     payload: dict[str, Any] = Field(default_factory=dict)
     layers: list[str] | None = Field(default=None)
     add_layers: list[str] = Field(default_factory=list)

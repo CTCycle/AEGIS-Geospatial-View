@@ -6,7 +6,7 @@
     "port": 5432,
     "database_name": "AEGIS",
     "username": "postgres",
-    "password": "admin",
+    "password": null,
     "ssl": false,
     "ssl_ca": null,
     "connect_timeout": 30,
@@ -72,3 +72,4 @@
   }
  
 }
+
