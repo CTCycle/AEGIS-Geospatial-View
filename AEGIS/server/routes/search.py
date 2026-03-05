@@ -30,7 +30,7 @@ from AEGIS.server.entities.jobs import (
 from AEGIS.server.configurations import server_settings
 from AEGIS.server.services.jobs import JobManager, job_manager
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.repositories.serializer import DataSerializer
+from AEGIS.server.repositories.serialization import DataSerializer
 from AEGIS.server.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,

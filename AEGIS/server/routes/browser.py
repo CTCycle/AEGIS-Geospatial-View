@@ -11,7 +11,7 @@ from AEGIS.server.utils.constants import (
     BROWSER_TABLES_ROUTE,
 )
 from AEGIS.server.utils.logger import logger
-from AEGIS.server.repositories.serializer import DataSerializer
+from AEGIS.server.repositories.serialization import DataSerializer
 
 router = APIRouter(prefix=BROWSER_ROUTER_PREFIX, tags=["browser"])
 serializer = DataSerializer()

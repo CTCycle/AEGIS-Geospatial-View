@@ -10,7 +10,7 @@ from AEGIS.server.configurations import DatabaseSettings, server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.repositories.schemas import Base
-from AEGIS.server.repositories.utils import normalize_postgres_engine
+from AEGIS.server.repositories.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
 
 
