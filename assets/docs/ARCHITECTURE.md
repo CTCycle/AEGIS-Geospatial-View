@@ -30,7 +30,7 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 | `/AEGIS/client` | React + Vite frontend |
 | `/AEGIS/server` | FastAPI backend (routes, schemas, services) |
 | `/AEGIS/server/utils` | Configuration, constants, logger, and service helpers |
-| `/AEGIS/server/database` | Database backends and ORM schema |
+| `/AEGIS/server/repositories` | Data persistence layer (database backends, queries, schemas, serialization) |
 | `/AEGIS/server/scripts` | Maintenance scripts (DB init, layer sync) |
 | `/AEGIS/settings` | Server configuration and environment overrides |
 | `/AEGIS/resources` | Runtime assets (database, logs, templates, runtimes) |
@@ -41,7 +41,7 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 - Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/routes/search.py`, `AEGIS/server/routes/browser.py`.
 - Schemas and validation: `AEGIS/server/schemas/geographics.py`.
 - Geospatial services: `AEGIS/server/utils/services/geospatial/*` (GIBS, Nominatim, OpenAQ, Open-Elevation, MapService).
-- Data persistence: `AEGIS/server/database/*`, `AEGIS/server/utils/repository/serializer.py`.
+- Data persistence: `AEGIS/server/repositories/database/*`, `AEGIS/server/repositories/queries/*`, `AEGIS/server/repositories/schemas/*`, `AEGIS/server/repositories/serialization/*`.
 - Configuration and constants: `AEGIS/server/utils/configurations/server.py`, `AEGIS/server/utils/constants.py`.
 - Frontend pages and components: `AEGIS/client/src/pages/*`, `AEGIS/client/src/components/*`.
 - Frontend API client and state: `AEGIS/client/src/services/api.ts`, `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
@@ -55,8 +55,8 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 - `MapService` (Folium rendering) in `AEGIS/server/utils/services/geospatial/maps.py`.
 - `NormatimService` geocoding in `AEGIS/server/utils/services/geospatial/normatim.py`.
 - `OpenAQService` and `OpenElevationService` data fetchers in `AEGIS/server/utils/services/geospatial/openaq.py` and `AEGIS/server/utils/services/geospatial/elevation.py`.
-- `AEGISDatabase`, `SQLiteRepository`, and `PostgresRepository` in `AEGIS/server/database/database.py`, `AEGIS/server/database/sqlite.py`, `AEGIS/server/database/postgres.py`.
-- `DataSerializer` for database IO in `AEGIS/server/utils/repository/serializer.py`.
+- `AEGISDatabase`, `SQLiteRepository`, and `PostgresRepository` in `AEGIS/server/repositories/database/backend.py`, `AEGIS/server/repositories/database/sqlite.py`, `AEGIS/server/repositories/database/postgres.py`.
+- `DataSerializer` for database IO in `AEGIS/server/repositories/serialization/serializer.py`.
 - `searchLocation` HTTP client in `AEGIS/client/src/services/api.ts`.
 - `DatabaseBrowserContext` data provider in `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
 
@@ -141,7 +141,7 @@ No authentication or authorization is implemented in the backend. All routes are
 - Search session: request metadata and state (success/failed).
 
 ### 6.2 Database Schema
-Defined in `AEGIS/server/database/schema.py`:
+Defined in `AEGIS/server/repositories/schemas/models.py`:
 - `GEONAMES`: geonameid, name, asciiname, alternatenames, latitude, longitude, feature_class, feature_code, country_code, admin codes, population, elevation, timezone, modification_date.
 - `GIBS_LAYERS`: layer_id, title, abstract, projections, source_urls, tile_matrix_sets, meters_per_pixel.
 - `SEARCH_SESSIONS`: id, created_at, user, country, city, address, coordinates, base_map, geospatial_layers, state.

@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from AEGIS.server.configurations import DatabaseSettings
 from AEGIS.server.repositories.schemas import Base
-from AEGIS.server.repositories.utils import normalize_postgres_engine
+from AEGIS.server.repositories.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
 
 
