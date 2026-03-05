@@ -1,3 +1,18 @@
+export type JsonPrimitive = string | number | boolean | null;
+
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+
+export interface JsonObject {
+    [key: string]: JsonValue;
+}
+
+export interface ApiErrorShape {
+    message: string;
+    detail?: unknown;
+    status?: number;
+    raw?: unknown;
+}
+
 export interface LocationSearchRequest {
     datetime?: string;
     time_of_day?: string;
@@ -8,7 +23,7 @@ export interface LocationSearchRequest {
     use_coordinates: boolean;
     latitude?: number;
     longitude?: number;
-    filters?: string[]; // geospatial_layers
+    filters?: string[];
     bbox?: number[];
     radius_m?: number;
     map_size_m?: number;
@@ -33,18 +48,18 @@ export interface SatelliteImageryPayload {
     image_url?: string;
     wms_url?: string;
     format?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface SearchResponsePayload {
     satellite_imagery?: SatelliteImageryPayload;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface SearchResponse {
     status_message: string;
     payload: SearchResponsePayload;
-    json?: any; // For backward compatibility with the way the UI displays it
+    json?: unknown;
 }
 
 export interface RuntimeSettings {
@@ -59,7 +74,6 @@ export interface AgenticConfig {
     objective: string;
 }
 
-// Database Browser types
 export interface TableInfo {
     name: string;
     displayName: string;
@@ -69,8 +83,7 @@ export interface TableData {
     tableName: string;
     displayName: string;
     columns: string[];
-    rows: Record<string, any>[];
+    rows: Record<string, unknown>[];
     rowCount: number;
     columnCount: number;
 }
-

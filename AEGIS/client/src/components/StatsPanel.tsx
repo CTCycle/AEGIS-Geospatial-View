@@ -1,4 +1,6 @@
 import React from 'react';
+
+import PanelHeader from './PanelHeader';
 import './StatsPanel.css';
 import { SearchResponsePayload } from '../types';
 
@@ -20,9 +22,13 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
     agentNote,
 }) => {
     const featureCount =
-        payload?.feature_count ??
-        payload?.features?.length ??
-        payload?.satellite_imagery?.features?.length;
+        typeof payload?.feature_count === 'number'
+            ? payload.feature_count
+            : Array.isArray(payload?.features)
+                ? payload.features.length
+                : Array.isArray(payload?.satellite_imagery?.features)
+                    ? payload.satellite_imagery.features.length
+                    : undefined;
     const datasetName =
         payload?.dataset_name ??
         payload?.data_source ??
@@ -77,8 +83,10 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
     return (
         <div className="stats-container">
             <div className="stats-header">
-                <h3 className="panel-title">Map statistics</h3>
-                <p className="panel-description">Metrics and narrative tied to the current map view.</p>
+                <PanelHeader
+                    title="Map statistics"
+                    description="Metrics and narrative tied to the current map view."
+                />
             </div>
 
             <div className="metrics-grid" aria-live="polite">
