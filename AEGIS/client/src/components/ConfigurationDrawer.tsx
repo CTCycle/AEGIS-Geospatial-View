@@ -2,6 +2,8 @@ import React from 'react';
 
 import { CLOUD_PROVIDERS, CLOUD_MODEL_CHOICES, AGENT_MODEL_CHOICES } from '../constants';
 import useCloudModelSync from '../hooks/useCloudModelSync';
+import useRuntimeSettingsHandlers from '../hooks/useRuntimeSettingsHandlers';
+import LabeledSelect from './LabeledSelect';
 import { RuntimeSettings } from '../types';
 import './ConfigurationDrawer.css';
 
@@ -20,27 +22,16 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
 }) => {
     useCloudModelSync({ settings, onSettingsChange });
 
-    const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newProvider = e.target.value;
-        const availableModels = CLOUD_MODEL_CHOICES[newProvider] || [];
-        onSettingsChange({
-            ...settings,
-            provider: newProvider,
-            cloudModel: availableModels[0] || '',
-        });
-    };
+    const {
+        handleUseCloudServicesChange,
+        handleProviderChange,
+        handleCloudModelChange,
+        handleAgentModelChange,
+    } = useRuntimeSettingsHandlers({ settings, onSettingsChange });
 
-    const handleCloudModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        onSettingsChange({ ...settings, cloudModel: e.target.value });
-    };
-
-    const handleAgentModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        onSettingsChange({ ...settings, agentModel: e.target.value });
-    };
-
-    const handleUseCloudServicesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onSettingsChange({ ...settings, useCloudServices: e.target.checked });
-    };
+    const cloudProviderOptions = CLOUD_PROVIDERS.map((provider) => ({ value: provider, label: provider }));
+    const cloudModelOptions = (CLOUD_MODEL_CHOICES[settings.provider] || []).map((model) => ({ value: model, label: model }));
+    const agentModelOptions = AGENT_MODEL_CHOICES.map((model) => ({ value: model, label: model }));
 
     return (
         <>
@@ -60,7 +51,7 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                             <input
                                 type="checkbox"
                                 checked={settings.useCloudServices}
-                                onChange={handleUseCloudServicesChange}
+                                onChange={(e) => handleUseCloudServicesChange(e.target.checked)}
                             />
                             {' '}
                             Use Cloud Services
@@ -70,52 +61,37 @@ const ConfigurationDrawer: React.FC<ConfigurationDrawerProps> = ({
                     <div className="grid-cols-1 lg:grid-cols-2 gap-5">
                         <div className="column gap-3">
                             <h3 className="aegis-subtitle">Cloud Configuration</h3>
-                            <div className="form-group">
-                                <label htmlFor="cloud-provider-select">Cloud Service</label>
-                                <select
-                                    id="cloud-provider-select"
-                                    value={settings.provider}
-                                    onChange={handleProviderChange}
-                                    disabled={!settings.useCloudServices}
-                                    className="w-full"
-                                >
-                                    {CLOUD_PROVIDERS.map((p) => (
-                                        <option key={p} value={p}>{p}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="cloud-model-select">Cloud Model</label>
-                                <select
-                                    id="cloud-model-select"
-                                    value={settings.cloudModel}
-                                    onChange={handleCloudModelChange}
-                                    disabled={!settings.useCloudServices}
-                                    className="w-full"
-                                >
-                                    {(CLOUD_MODEL_CHOICES[settings.provider] || []).map((m) => (
-                                        <option key={m} value={m}>{m}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <LabeledSelect
+                                id="cloud-provider-select"
+                                label="Cloud Service"
+                                value={settings.provider}
+                                options={cloudProviderOptions}
+                                onChange={handleProviderChange}
+                                disabled={!settings.useCloudServices}
+                                selectClassName="w-full"
+                            />
+                            <LabeledSelect
+                                id="cloud-model-select"
+                                label="Cloud Model"
+                                value={settings.cloudModel}
+                                options={cloudModelOptions}
+                                onChange={handleCloudModelChange}
+                                disabled={!settings.useCloudServices}
+                                selectClassName="w-full"
+                            />
                         </div>
 
                         <div className="column gap-3">
                             <h3 className="aegis-subtitle">Ollama Configuration</h3>
-                            <div className="form-group">
-                                <label htmlFor="agent-model-select">Agent model</label>
-                                <select
-                                    id="agent-model-select"
-                                    value={settings.agentModel}
-                                    onChange={handleAgentModelChange}
-                                    disabled={settings.useCloudServices}
-                                    className="w-full"
-                                >
-                                    {AGENT_MODEL_CHOICES.map((m) => (
-                                        <option key={m} value={m}>{m}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <LabeledSelect
+                                id="agent-model-select"
+                                label="Agent model"
+                                value={settings.agentModel}
+                                options={agentModelOptions}
+                                onChange={handleAgentModelChange}
+                                disabled={settings.useCloudServices}
+                                selectClassName="w-full"
+                            />
                         </div>
                     </div>
 
