@@ -3,8 +3,10 @@ import React from 'react';
 import './AgenticSearch.css';
 
 import PanelHeader from './PanelHeader';
+import LabeledSelect from './LabeledSelect';
 import { CLOUD_MODEL_CHOICES, CLOUD_PROVIDERS, AGENT_MODEL_CHOICES } from '../constants';
 import useCloudModelSync from '../hooks/useCloudModelSync';
+import useRuntimeSettingsHandlers from '../hooks/useRuntimeSettingsHandlers';
 import { AgenticConfig, RuntimeSettings } from '../types';
 
 interface AgenticSearchProps {
@@ -26,6 +28,13 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
 }) => {
     useCloudModelSync({ settings, onSettingsChange });
 
+    const {
+        handleUseCloudServicesChange,
+        handleProviderChange,
+        handleCloudModelChange,
+        handleAgentModelChange,
+    } = useRuntimeSettingsHandlers({ settings, onSettingsChange });
+
     const handleToggle = (enabled: boolean) => {
         onChange({ ...config, enabled });
     };
@@ -34,26 +43,9 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
         onChange({ ...config, objective: value });
     };
 
-    const handleUseCloudServicesChange = (value: boolean) => {
-        onSettingsChange({ ...settings, useCloudServices: value });
-    };
-
-    const handleProviderChange = (value: string) => {
-        const availableModels = CLOUD_MODEL_CHOICES[value] || [];
-        onSettingsChange({
-            ...settings,
-            provider: value,
-            cloudModel: availableModels[0] || '',
-        });
-    };
-
-    const handleCloudModelChange = (value: string) => {
-        onSettingsChange({ ...settings, cloudModel: value });
-    };
-
-    const handleAgentModelChange = (value: string) => {
-        onSettingsChange({ ...settings, agentModel: value });
-    };
+    const cloudProviderOptions = CLOUD_PROVIDERS.map((provider) => ({ value: provider, label: provider }));
+    const cloudModelOptions = (CLOUD_MODEL_CHOICES[settings.provider] || []).map((model) => ({ value: model, label: model }));
+    const agentModelOptions = AGENT_MODEL_CHOICES.map((model) => ({ value: model, label: model }));
 
     return (
         <div className="agentic-container">
@@ -103,51 +95,36 @@ const AgenticSearch: React.FC<AgenticSearchProps> = ({
                             <p className="helper-text">Toggle to route agent calls through a cloud provider.</p>
                         </div>
 
-                        <div className="form-group">
-                            <label htmlFor="cloud-provider">Cloud provider</label>
-                            <select
-                                id="cloud-provider"
-                                value={settings.provider}
-                                onChange={(e) => handleProviderChange(e.target.value)}
-                                disabled={!settings.useCloudServices}
-                            >
-                                {CLOUD_PROVIDERS.map((provider) => (
-                                    <option key={provider} value={provider}>{provider}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <LabeledSelect
+                            id="cloud-provider"
+                            label="Cloud provider"
+                            value={settings.provider}
+                            options={cloudProviderOptions}
+                            onChange={handleProviderChange}
+                            disabled={!settings.useCloudServices}
+                        />
 
-                        <div className="form-group">
-                            <label htmlFor="cloud-model">Cloud model</label>
-                            <select
-                                id="cloud-model"
-                                value={settings.cloudModel}
-                                onChange={(e) => handleCloudModelChange(e.target.value)}
-                                disabled={!settings.useCloudServices}
-                            >
-                                {(CLOUD_MODEL_CHOICES[settings.provider] || []).map((model) => (
-                                    <option key={model} value={model}>{model}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <LabeledSelect
+                            id="cloud-model"
+                            label="Cloud model"
+                            value={settings.cloudModel}
+                            options={cloudModelOptions}
+                            onChange={handleCloudModelChange}
+                            disabled={!settings.useCloudServices}
+                        />
                     </div>
 
                     <div className="config-group">
                         <p className="config-title">Local agent model</p>
-                        <div className="form-group">
-                            <label htmlFor="agent-model">Local agent model</label>
-                            <select
-                                id="agent-model"
-                                value={settings.agentModel}
-                                onChange={(e) => handleAgentModelChange(e.target.value)}
-                                disabled={settings.useCloudServices}
-                            >
-                                {AGENT_MODEL_CHOICES.map((model) => (
-                                    <option key={model} value={model}>{model}</option>
-                                ))}
-                            </select>
-                            <p className="helper-text">Used when cloud services are disabled.</p>
-                        </div>
+                        <LabeledSelect
+                            id="agent-model"
+                            label="Local agent model"
+                            value={settings.agentModel}
+                            options={agentModelOptions}
+                            onChange={handleAgentModelChange}
+                            disabled={settings.useCloudServices}
+                            helperText="Used when cloud services are disabled."
+                        />
                     </div>
                 </div>
             </div>
