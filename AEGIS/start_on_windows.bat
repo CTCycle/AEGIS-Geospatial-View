@@ -27,7 +27,7 @@ set "UV_CHANNEL=latest"
 set "UV_ZIP_AMD=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/uv-x86_64-pc-windows-msvc.zip"
 set "UV_ZIP_ARM=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/uv-aarch64-pc-windows-msvc.zip"
 
-set "nodejs_version=22.12.0"
+set "nodejs_version=22.13.0"
 set "nodejs_dir=%runtimes_dir%\nodejs"
 set "nodejs_zip_filename=node-v%nodejs_version%-win-x64.zip"
 set "nodejs_zip_url=https://nodejs.org/dist/v%nodejs_version%/%nodejs_zip_filename%"
@@ -40,6 +40,7 @@ set "pyproject=%root_folder%pyproject.toml"
 set "UVICORN_MODULE=AEGIS.server.app:app"
 set "FRONTEND_DIR=%project_folder%client"
 set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
+set "FRONTEND_LOCKFILE=%FRONTEND_DIR%\package-lock.json"
 
 set "DOTENV=%settings_dir%\.env"
 set "TMPDL=%TEMP%\app_dl.ps1"
@@ -128,17 +129,25 @@ if not exist "%node_exe%" (
   powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPDL%" "%nodejs_zip_url%" "%nodejs_zip_path%" || goto error
   powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPEXP%" "%nodejs_zip_path%" "%nodejs_dir%" || goto error
   del /q "%nodejs_zip_path%" >nul 2>&1
+)
 
-  for /f "delims=" %%F in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPFINDNODE%" "%nodejs_dir%"') do set "found_node=%%F"
-  if not defined found_node (
-    echo [FATAL] node.exe not found after extraction.
-    goto error
-  )
+set "node_archive_dir=%nodejs_dir%\node-v%nodejs_version%-win-x64"
+if exist "%node_archive_dir%\node.exe" (
+  call :promote_node_runtime "%node_archive_dir%"
+  if errorlevel 1 goto error
+)
 
-  if /i not "%found_node%"=="%node_exe%" (
-    for %%D in ("!found_node!") do set "node_parent=%%~dpD"
-    xcopy /s /e /i /q "!node_parent!*" "%nodejs_dir%" >nul
-  )
+for /f "delims=" %%F in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPFINDNODE%" "%nodejs_dir%"') do set "found_node=%%F"
+if not defined found_node (
+  echo [FATAL] node.exe not found after extraction.
+  goto error
+)
+
+if /i not "!found_node!"=="%node_exe%" (
+  for %%D in ("!found_node!") do set "node_parent=%%~dpD"
+  if "!node_parent:~-1!"=="\" set "node_parent=!node_parent:~0,-1!"
+  call :promote_node_runtime "!node_parent!"
+  if errorlevel 1 goto error
 )
 
 if exist "%node_exe%" (
@@ -244,7 +253,7 @@ start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MO
 if not exist "%FRONTEND_DIR%\node_modules" (
   echo [STEP] Installing frontend dependencies...
   pushd "%FRONTEND_DIR%" >nul
-  if exist "%FRONTEND_DIR%\package-lock.json" (
+  if exist "%FRONTEND_LOCKFILE%" (
     echo [INFO] Detected package-lock.json. Using npm ci...
     call "%NPM_CMD%" ci
     set "npm_ec=!ERRORLEVEL!"
@@ -299,6 +308,22 @@ popd >nul
 start "" "%UI_URL%"
 echo [SUCCESS] Backend and frontend correctly launched
 goto cleanup
+
+:promote_node_runtime
+set "node_source_dir=%~1"
+if not defined node_source_dir exit /b 1
+for %%D in ("%~1") do set "node_source_dir=%%~fD"
+if /i "!node_source_dir!"=="%nodejs_dir%" exit /b 0
+
+robocopy "!node_source_dir!" "%nodejs_dir%" /MOVE /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS >nul
+set "node_move_ec=!ERRORLEVEL!"
+if !node_move_ec! geq 8 (
+  echo [FATAL] Failed to flatten portable Node.js runtime from "!node_source_dir!".
+  exit /b !node_move_ec!
+)
+
+if exist "!node_source_dir!" rd /s /q "!node_source_dir!" >nul 2>&1
+exit /b 0
 
 REM ============================================================================
 REM Cleanup temp helpers

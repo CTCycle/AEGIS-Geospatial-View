@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AEGIS Desktop",
+  "version": "1.7.0",
+  "identifier": "com.aegis.desktop",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist",
+    "devUrl": "about:blank"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "AEGIS Desktop",
+        "url": "about:blank",
+        "width": 1440,
+        "height": 920,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "r/pyproject.toml": "pyproject.toml",
+      "r/uv.lock": "uv.lock",
+      "r/server": "AEGIS/server",
+      "r/scripts": "AEGIS/scripts",
+      "r/settings": "AEGIS/settings",
+      "r/client/dist": "AEGIS/client/dist",
+      "r/resources/database.db": "AEGIS/resources/database.db",
+      "r/resources/runtimes/python": "AEGIS/resources/runtimes/python",
+      "r/resources/runtimes/uv": "AEGIS/resources/runtimes/uv"
+    }
+  }
+}
