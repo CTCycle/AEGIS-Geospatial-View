@@ -8,10 +8,12 @@ AEGIS uses one active runtime file: `AEGIS/settings/.env`.
 
 - Local mode is the default workflow and runs without Docker.
 - Cloud mode runs with Docker (`backend` + `frontend`).
+- Desktop packaging runs with Tauri and a local packaged backend.
 - Mode switching is configuration-only: copy one profile into `AEGIS/settings/.env`.
 
 Runtime profiles:
 - `AEGIS/settings/.env.local.example`
+- `AEGIS/settings/.env.local.tauri.example`
 - `AEGIS/settings/.env.cloud.example`
 - Active file: `AEGIS/settings/.env`
 
@@ -50,6 +52,44 @@ uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002
 cd AEGIS/client
 npm install
 npm run dev -- --host 127.0.0.1 --port 5000
+```
+
+### 3.3 Windows Desktop Packaging (Tauri)
+Prepare the desktop runtime profile:
+
+```cmd
+copy /Y AEGIS\settings\.env.local.tauri.example AEGIS\settings\.env
+```
+
+Ensure the portable runtimes exist:
+
+```cmd
+AEGIS\start_on_windows.bat
+```
+
+Build the packaged desktop artifacts:
+
+```cmd
+release\tauri\build_with_tauri.bat
+```
+
+The user-facing outputs are exported to:
+
+- `release/windows/installers`
+- `release/windows/portable`
+
+Regenerate desktop icon assets from the shared favicon source:
+
+```cmd
+cd AEGIS\client
+npm run tauri:icon
+```
+
+Clean desktop build outputs:
+
+```cmd
+cd AEGIS\client
+npm run tauri:clean
 ```
 
 ## 4. Cloud Mode (Docker)
@@ -121,6 +161,7 @@ Run `AEGIS/setup_and_maintenance.bat` for routine tasks:
 - Uninstall app runtime artifacts
 - Initialize database
 - Update NASA GIBS layers
+- Clean desktop build artifacts
 
 ## 9. License
 This project is licensed under the MIT license. See `LICENSE`.
