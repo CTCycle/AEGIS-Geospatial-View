@@ -171,10 +171,15 @@ fn is_workspace_root(candidate: &Path) -> bool {
 
 fn has_workspace_venv(candidate: &Path) -> bool {
     candidate
+        .join("runtimes")
         .join(".venv")
         .join("Scripts")
         .join("python.exe")
         .is_file()
+}
+
+fn first_existing_file(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find(|path| path.is_file()).cloned()
 }
 
 fn push_with_ancestors(base: &Path, candidates: &mut Vec<PathBuf>) {
@@ -318,30 +323,49 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
         let project_dir = workspace_root.join("AEGIS");
         let env_path = project_dir.join("settings").join(".env");
         let backend_config = resolve_backend_launch_config(&env_path);
-        let uv_exe = project_dir
-            .join("resources")
-            .join("runtimes")
-            .join("uv")
-            .join("uv.exe");
-        let python_exe = project_dir
-            .join("resources")
-            .join("runtimes")
-            .join("python")
-            .join("python.exe");
-        let venv_dir = runtime_root.join(".venv");
+        let bundled_runtimes_dir = workspace_root.join("runtimes");
+        let uv_candidates = vec![
+            bundled_runtimes_dir.join("uv").join("uv.exe"),
+            project_dir
+                .join("resources")
+                .join("runtimes")
+                .join("uv")
+                .join("uv.exe"),
+        ];
+        let python_candidates = vec![
+            bundled_runtimes_dir.join("python").join("python.exe"),
+            project_dir
+                .join("resources")
+                .join("runtimes")
+                .join("python")
+                .join("python.exe"),
+        ];
+        let uv_exe = first_existing_file(&uv_candidates).unwrap_or_else(|| uv_candidates[0].clone());
+        let python_exe =
+            first_existing_file(&python_candidates).unwrap_or_else(|| python_candidates[0].clone());
+        let runtime_state_dir = runtime_root.join("runtimes");
+        let venv_dir = runtime_state_dir.join(".venv");
         let venv_python_exe = venv_dir.join("Scripts").join("python.exe");
-        let uv_cache_dir = runtime_root.join(".uv-cache");
+        let uv_cache_dir = runtime_state_dir.join(".uv-cache");
 
         if !uv_exe.is_file() {
+            let checked = uv_candidates
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
             return Err(format!(
-                "Bundled uv runtime not found at {}",
-                uv_exe.display()
+                "Bundled uv runtime not found. Checked: {checked}"
             ));
         }
         if !python_exe.is_file() {
+            let checked = python_candidates
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
             return Err(format!(
-                "Bundled python runtime not found at {}",
-                python_exe.display()
+                "Bundled python runtime not found. Checked: {checked}"
             ));
         }
 

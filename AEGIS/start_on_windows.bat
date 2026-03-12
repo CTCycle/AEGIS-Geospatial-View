@@ -17,6 +17,9 @@ set "uv_dir=%runtimes_dir%\uv"
 set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
 set "UV_CACHE_DIR=%runtimes_dir%\uv_cache"
+set "venv_dir=%runtimes_dir%\.venv"
+set "runtime_uv_lock=%runtimes_dir%\uv.lock"
+set "uv_lock_file=%root_folder%uv.lock"
 
 set "py_version=3.14.2"
 set "python_zip_filename=python-%py_version%-embed-amd64.zip"
@@ -27,7 +30,7 @@ set "UV_CHANNEL=latest"
 set "UV_ZIP_AMD=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/uv-x86_64-pc-windows-msvc.zip"
 set "UV_ZIP_ARM=https://github.com/astral-sh/uv/releases/%UV_CHANNEL%/download/uv-aarch64-pc-windows-msvc.zip"
 
-set "nodejs_version=22.13.0"
+set "nodejs_version=22.12.0"
 set "nodejs_dir=%runtimes_dir%\nodejs"
 set "nodejs_zip_filename=node-v%nodejs_version%-win-x64.zip"
 set "nodejs_zip_url=https://nodejs.org/dist/v%nodejs_version%/%nodejs_zip_filename%"
@@ -48,9 +51,9 @@ set "TMPEXP=%TEMP%\app_expand.ps1"
 set "TMPTXT=%TEMP%\app_txt.ps1"
 set "TMPFIND=%TEMP%\app_find_uv.ps1"
 set "TMPVER=%TEMP%\app_pyver.ps1"
-set "TMPFINDNODE=%TEMP%\app_find_node.ps1"
 
 set "UV_LINK_MODE=copy"
+set "UV_PROJECT_ENVIRONMENT=%venv_dir%"
 
 title AEGIS Launcher
 echo.
@@ -73,7 +76,6 @@ echo $ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $args[0] -Destin
 echo $ErrorActionPreference='Stop'; (Get-Content -LiteralPath $args[0]) -replace '#import site','import site' ^| Set-Content -LiteralPath $args[0] > "%TMPTXT%"
 echo $ErrorActionPreference='Stop'; (Get-ChildItem -LiteralPath $args[0] -Recurse -Filter 'uv.exe' ^| Select-Object -First 1).FullName > "%TMPFIND%"
 echo $ErrorActionPreference='Stop'; ^& $args[0] -c "import platform;print(platform.python_version())" > "%TMPVER%"
-echo $ErrorActionPreference='Stop'; (Get-ChildItem -LiteralPath $args[0] -Recurse -Filter 'node.exe' ^| Select-Object -First 1).FullName > "%TMPFINDNODE%"
 
 REM ============================================================================
 REM == Step 1: Ensure Python (embeddable)
@@ -137,19 +139,6 @@ if exist "%node_archive_dir%\node.exe" (
   if errorlevel 1 goto error
 )
 
-for /f "delims=" %%F in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPFINDNODE%" "%nodejs_dir%"') do set "found_node=%%F"
-if not defined found_node (
-  echo [FATAL] node.exe not found after extraction.
-  goto error
-)
-
-if /i not "!found_node!"=="%node_exe%" (
-  for %%D in ("!found_node!") do set "node_parent=%%~dpD"
-  if "!node_parent:~-1!"=="\" set "node_parent=!node_parent:~0,-1!"
-  call :promote_node_runtime "!node_parent!"
-  if errorlevel 1 goto error
-)
-
 if exist "%node_exe%" (
   for /f "delims=" %%V in ('"%node_exe%" --version') do echo [OK] Node.js ready: %%V
   set "NPM_CMD=%npm_cmd%"
@@ -157,7 +146,8 @@ if exist "%node_exe%" (
   set "PATH=%nodejs_dir%;%PATH%"
 
 ) else (
-  echo [FATAL] node.exe not found at expected location.
+  echo [FATAL] node.exe not found in "%nodejs_dir%".
+  echo [INFO] Expected file: "%node_exe%"
   goto error
 )
 
@@ -168,20 +158,21 @@ REM ============================================================================
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
-set "UI_PORT=7861"
-set "RELOAD=false"
+set "UI_PORT=8001"
+set "RELOAD=true"
 set "OPTIONAL_DEPENDENCIES=false"
 
 if exist "%DOTENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
     set "line=%%L"
     if not "!line!"=="" if "!line:~0,1!" NEQ "#" if "!line:~0,1!" NEQ ";" (
-      for /f "tokens=1* delims==" %%K in ("!line!") do (
-        set "k=%%K"
-        set "v=%%L"
+      for /f "tokens=1,* delims==" %%A in ("!line!") do (
+        set "k=%%A"
+        set "v=%%B"
         if defined v (
-          if "!v:~0,1!"=="\"" set "v=!v:~1,-1!"
-          if "!v:~0,1!"=="'" set "v=!v:~1,-1!"
+          for /f "tokens=* delims= " %%Q in ("!v!") do set "v=%%Q"
+          set "v=!v:"=!"
+          if "!v:~0,1!"=="'" if "!v:~-1!"=="'" set "v=!v:~1,-1!"
         )
         set "!k!=!v!"
       )
@@ -213,6 +204,15 @@ if not exist "%pyproject%" (
   goto error
 )
 
+if exist "%runtime_uv_lock%" (
+  copy /y "%runtime_uv_lock%" "%uv_lock_file%" >nul
+  if errorlevel 1 (
+    echo [WARN] Could not refresh workspace uv.lock from "%runtime_uv_lock%".
+  ) else (
+    echo [INFO] Using runtime lockfile from "%runtime_uv_lock%".
+  )
+)
+
 pushd "%root_folder%" >nul
 set "uv_extras_flag="
 if /i "%INSTALL_EXTRAS%"=="true" set "uv_extras_flag=--all-extras"
@@ -227,6 +227,17 @@ popd >nul
 if not "%sync_ec%"=="0" (
   echo [FATAL] uv sync failed with code %sync_ec%.
   goto error
+)
+
+if exist "%uv_lock_file%" (
+  copy /y "%uv_lock_file%" "%runtime_uv_lock%" >nul
+  if errorlevel 1 (
+    echo [WARN] Could not copy uv.lock to "%runtime_uv_lock%".
+  ) else (
+    echo [OK] Runtime lockfile updated: "%runtime_uv_lock%"
+  )
+) else (
+  echo [WARN] uv.lock was not found at "%uv_lock_file%" after sync.
 )
 
 > "%env_marker%" echo setup_completed
@@ -254,21 +265,14 @@ if not exist "%FRONTEND_DIR%\node_modules" (
   echo [STEP] Installing frontend dependencies...
   pushd "%FRONTEND_DIR%" >nul
   if exist "%FRONTEND_LOCKFILE%" (
-    echo [INFO] Detected package-lock.json. Using npm ci...
     call "%NPM_CMD%" ci
-    set "npm_ec=!ERRORLEVEL!"
-    if not "!npm_ec!"=="0" (
-      echo [WARN] npm ci failed with code !npm_ec!. Falling back to npm install.
-      call "%NPM_CMD%" install
-      set "npm_ec=!ERRORLEVEL!"
-    )
   ) else (
     call "%NPM_CMD%" install
-    set "npm_ec=!ERRORLEVEL!"
   )
+  set "npm_ec=!ERRORLEVEL!"
   popd >nul
   if not "!npm_ec!"=="0" (
-    echo [FATAL] Frontend dependency installation failed with code !npm_ec!.
+    echo [FATAL] Frontend dependency install failed with code !npm_ec!.
     goto error
   )
 )
@@ -329,7 +333,7 @@ REM ============================================================================
 REM Cleanup temp helpers
 REM ============================================================================
 :cleanup
-del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" "%TMPFINDNODE%" >nul 2>&1
+del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" >nul 2>&1
 endlocal & exit /b 0
 
 REM ============================================================================
@@ -339,7 +343,7 @@ REM ============================================================================
 echo.
 echo !!! An error occurred during execution. !!!
 pause
-del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" "%TMPFINDNODE%" >nul 2>&1
+del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" >nul 2>&1
 endlocal & exit /b 1
 
 :kill_port

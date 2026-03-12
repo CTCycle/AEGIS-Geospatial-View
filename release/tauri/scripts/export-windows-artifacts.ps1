@@ -59,6 +59,8 @@ foreach ($file in $portableExeCandidates) {
 
 $portableResourceEntries = @(
   "AEGIS",
+  "runtimes",
+  "resources",
   "pyproject.toml",
   "uv.lock",
   "_up_"
