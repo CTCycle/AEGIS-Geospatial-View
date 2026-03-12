@@ -7,6 +7,6 @@ __pycache__/
 AEGIS/client/node_modules/
 AEGIS/client/dist/
 AEGIS/client/dist-ssr/
-AEGIS/resources/runtimes/
+runtimes/
 AEGIS/resources/logs/
 AEGIS/resources/database/

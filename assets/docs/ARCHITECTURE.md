@@ -11,7 +11,7 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 - External dependencies and integrations: OpenStreetMap Nominatim, NASA GIBS WMS/WMTS endpoints, OpenAQ API, Open-Elevation API, Folium tile providers, SQLite/Postgres via SQLAlchemy, Pillow for imagery handling.
 
 ### 1.3 Deployment and Runtime Assumptions
-- Backend targets Python 3.12; frontend targets Node 18+ (Windows launcher installs Node 22 and Python 3.12 in `AEGIS/resources/runtimes`).
+- Backend targets Python 3.12; frontend targets Node 18+ (Windows launcher installs Node 22 and Python 3.12 in repository-root `runtimes/`).
 - Default ports: FastAPI `127.0.0.1:8000`, Vite preview `127.0.0.1:7861` (manual dev server uses 5173).
 - Vite proxies `/api/*` to the FastAPI host/port; frontend can override with `VITE_API_BASE_URL`.
 - Backend configuration is driven by `AEGIS/settings/configurations.json` and optional `AEGIS/settings/.env` (template in `AEGIS/resources/templates/.env`).
@@ -33,7 +33,8 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 | `/AEGIS/server/repositories` | Data persistence layer (database backends, queries, schemas, serialization) |
 | `/AEGIS/server/scripts` | Maintenance scripts (DB init, layer sync) |
 | `/AEGIS/settings` | Server configuration and environment overrides |
-| `/AEGIS/resources` | Runtime assets (database, logs, templates, runtimes) |
+| `/AEGIS/resources` | Data assets (database, logs, templates) |
+| `/runtimes` | Portable runtime binaries for Windows launcher (Python, uv, Node.js) |
 | `/AEGIS/assets` | Static assets |
 | `/docs` | Documentation |
 
