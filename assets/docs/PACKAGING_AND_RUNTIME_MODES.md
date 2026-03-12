@@ -66,6 +66,6 @@ Cloud security notes:
 
 ## 6. Deterministic Build Notes
 
-- Backend dependency graph is lockfile-backed via `uv.lock` and installed with `uv sync --frozen`.
+- Backend dependency graph is lockfile-backed via `runtimes/uv.lock` and installed with `uv sync --frozen`.
 - Frontend dependency graph is lockfile-backed via `AEGIS/client/package-lock.json` and installed with `npm ci`.
 - Docker base images are pinned with explicit tags in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.

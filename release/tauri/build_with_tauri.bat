@@ -11,6 +11,7 @@ set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "release_export_dir=%repo_root%\release\windows"
 set "runtime_python_exe=%repo_root%\runtimes\python\python.exe"
 set "runtime_uv_exe=%repo_root%\runtimes\uv\uv.exe"
+set "runtime_uv_lock=%repo_root%\runtimes\uv.lock"
 set "runtime_node_dir=%repo_root%\runtimes\nodejs"
 set "runtime_database=%project_folder%resources\database.db"
 set "node_cmd=%runtime_node_dir%\node.exe"
@@ -21,6 +22,7 @@ echo [TAURI] Release build helper
 echo [CHECK] Validating bundled runtimes...
 call :require_file "%runtime_python_exe%" "embedded Python runtime" || goto build_error
 call :require_file "%runtime_uv_exe%" "embedded uv runtime" || goto build_error
+call :require_file "%runtime_uv_lock%" "runtime uv lockfile" || goto build_error
 call :require_file "%node_cmd%" "embedded Node.js runtime" || goto build_error
 call :require_file "%npm_cmd%" "embedded npm runtime" || goto build_error
 
@@ -38,13 +40,14 @@ if not defined cargo_cmd (
   echo [FATAL] Rust/Cargo not found. Install Rust first: https://rustup.rs/
   goto build_error
 )
-for /f "delims=" %%V in ('"%cargo_cmd%" --version 2^>nul') do set "cargo_version=%%V"
 echo [INFO] Cargo command: %cargo_cmd%
-if defined cargo_version echo [INFO] !cargo_version!
 if /I not "%cargo_cmd%"=="cargo" (
   for %%I in ("%cargo_cmd%") do set "PATH=%%~dpI;%PATH%"
 )
 set "CARGO=%cargo_cmd%"
+call :ensure_cargo_toolchain "%cargo_cmd%" || goto build_error
+for /f "delims=" %%V in ('"%cargo_cmd%" --version 2^>nul') do set "cargo_version=%%V"
+if defined cargo_version echo [INFO] !cargo_version!
 
 if /I not "%node_cmd%"=="node" (
   for %%I in ("%node_cmd%") do set "PATH=%%~dpI;%PATH%"
@@ -120,6 +123,60 @@ echo [FATAL] Missing %~2 at "%~1"
 echo         Run AEGIS\start_on_windows.bat first to install the portable runtimes.
 exit /b 1
 
+:ensure_cargo_toolchain
+set "cargo_version_probe="
+"%~1" --version >nul 2>&1
+if not errorlevel 1 exit /b 0
+
+for /f "usebackq delims=" %%V in (`"%~1" --version 2^>^&1`) do (
+  if not defined cargo_version_probe set "cargo_version_probe=%%V"
+)
+if not defined cargo_version_probe set "cargo_version_probe=unknown error while probing cargo"
+echo [WARN] Cargo version probe failed: !cargo_version_probe!
+
+echo(!cargo_version_probe!| findstr /I /C:"rustup could not choose a version of cargo to run" >nul
+if errorlevel 1 (
+  echo [FATAL] Cargo is installed but not runnable.
+  echo         Details: !cargo_version_probe!
+  exit /b 1
+)
+
+set "rustup_cmd="
+if exist "%USERPROFILE%\.cargo\bin\rustup.exe" set "rustup_cmd=%USERPROFILE%\.cargo\bin\rustup.exe"
+if not defined rustup_cmd (
+  rustup --version >nul 2>&1
+  if not errorlevel 1 set "rustup_cmd=rustup"
+)
+if not defined rustup_cmd (
+  echo [FATAL] rustup is required to configure Cargo toolchains. Install Rust first: https://rustup.rs/
+  exit /b 1
+)
+
+set "resolved_toolchain="
+for /f "usebackq delims=" %%L in (`"%rustup_cmd%" toolchain list 2^>nul`) do (
+  set "toolchain_line=%%L"
+  echo(!toolchain_line!| findstr /I /C:"-pc-windows-" >nul
+  if not errorlevel 1 if not defined resolved_toolchain (
+    for /f "tokens=1" %%T in ("!toolchain_line!") do set "resolved_toolchain=%%T"
+  )
+)
+if not defined resolved_toolchain (
+  echo [FATAL] No Rust toolchain is installed for rustup.
+  echo         Run these commands once, then retry this build:
+  echo         rustup toolchain install stable-x86_64-pc-windows-msvc
+  echo         rustup default stable-x86_64-pc-windows-msvc
+  exit /b 1
+)
+
+set "RUSTUP_TOOLCHAIN=!resolved_toolchain!"
+echo [INFO] Using Rust toolchain from rustup list: !RUSTUP_TOOLCHAIN!
+"%~1" --version >nul 2>&1
+if errorlevel 1 (
+  echo [FATAL] Cargo still failed after selecting toolchain "!RUSTUP_TOOLCHAIN!".
+  exit /b 1
+)
+exit /b 0
+
 :prepare_bundle_sources
 call :cleanup_bundle_sources
 
@@ -137,9 +194,10 @@ if errorlevel 1 (
   echo [FATAL] Failed to stage pyproject.toml for Tauri bundling.
   exit /b 1
 )
-copy /y "%repo_root%\uv.lock" "%bundle_source_dir%\uv.lock" >nul
+copy /y "%runtime_uv_lock%" "%bundle_source_dir%\uv.lock" >nul
 if errorlevel 1 (
-  echo [FATAL] Failed to stage uv.lock for Tauri bundling.
+  echo [FATAL] Failed to stage uv.lock for Tauri bundling from "%runtime_uv_lock%".
+  echo         Run AEGIS\start_on_windows.bat to install and stage runtime lockfiles.
   exit /b 1
 )
 

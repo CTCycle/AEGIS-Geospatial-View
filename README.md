@@ -28,10 +28,11 @@ AEGIS\start_on_windows.bat
 
 The launcher:
 1. Downloads portable Python/uv/Node runtimes into `runtimes/` (repository root)
-2. Installs backend dependencies
-3. Installs frontend dependencies (uses `npm ci` when lockfile exists, fallback to `npm install`)
-4. Builds frontend
-5. Starts backend + frontend
+2. Installs backend dependencies into `runtimes/.venv`
+3. Writes the runtime lockfile to `runtimes/uv.lock`
+4. Installs frontend dependencies (uses `npm ci` when lockfile exists, fallback to `npm install`)
+5. Builds frontend
+6. Starts backend + frontend
 
 Before running, set the active profile as local defaults:
 
@@ -65,6 +66,13 @@ Ensure the portable runtimes exist:
 
 ```cmd
 AEGIS\start_on_windows.bat
+```
+
+Ensure Rust (MSVC toolchain) is installed for Tauri:
+
+```cmd
+rustup toolchain install stable-x86_64-pc-windows-msvc
+rustup default stable-x86_64-pc-windows-msvc
 ```
 
 Build the packaged desktop artifacts:
