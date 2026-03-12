@@ -40,8 +40,8 @@
       "r/settings": "AEGIS/settings",
       "r/client/dist": "AEGIS/client/dist",
       "r/resources/database.db": "AEGIS/resources/database.db",
-      "r/resources/runtimes/python": "AEGIS/resources/runtimes/python",
-      "r/resources/runtimes/uv": "AEGIS/resources/runtimes/uv"
+      "r/runtimes/python": "runtimes/python",
+      "r/runtimes/uv": "runtimes/uv"
     }
   }
 }

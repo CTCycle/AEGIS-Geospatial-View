@@ -27,7 +27,7 @@ AEGIS\start_on_windows.bat
 ```
 
 The launcher:
-1. Downloads portable Python/uv/Node runtimes into `AEGIS/resources/runtimes/`
+1. Downloads portable Python/uv/Node runtimes into `runtimes/` (repository root)
 2. Installs backend dependencies
 3. Installs frontend dependencies (uses `npm ci` when lockfile exists, fallback to `npm install`)
 4. Builds frontend
