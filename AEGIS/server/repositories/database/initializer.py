@@ -4,11 +4,14 @@ import urllib.parse
 
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.sql.elements import TextClause
 
 from AEGIS.server.configurations import DatabaseSettings, server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
+from AEGIS.server.repositories.queries import (
+    build_postgres_create_database_statement,
+    build_postgres_database_exists_statement,
+)
 from AEGIS.server.repositories.schemas import Base
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
@@ -57,15 +60,6 @@ def clone_settings_with_database(
         insert_batch_size=settings.insert_batch_size,
     )
 
-# -----------------------------------------------------------------------------
-def build_postgres_create_database_sql(
-    database_name: str,
-) -> TextClause:
-    safe_database = database_name.replace('"', '""')
-    return sqlalchemy.text(
-        f'CREATE DATABASE "{safe_database}" WITH ENCODING \'UTF8\' TEMPLATE template0'
-    )
-
 
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
@@ -97,13 +91,13 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
 
     with admin_engine.connect() as conn:
         exists = conn.execute(
-            sqlalchemy.text("SELECT 1 FROM pg_database WHERE datname=:name"),
+            build_postgres_database_exists_statement(),
             {"name": target_database},
         ).scalar()
         if exists:
             logger.info("PostgreSQL database %s already exists", target_database)
         else:
-            conn.execute(build_postgres_create_database_sql(target_database))
+            conn.execute(build_postgres_create_database_statement(target_database))
             logger.info("Created PostgreSQL database %s", target_database)
 
     normalized_settings = clone_settings_with_database(settings, target_database)

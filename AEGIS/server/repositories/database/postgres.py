@@ -5,12 +5,16 @@ from typing import Any
 
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, delete, func, inspect, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import UniqueConstraint, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from AEGIS.server.configurations import DatabaseSettings
+from AEGIS.server.repositories.queries import (
+    build_count_rows_statement,
+    build_delete_all_rows_statement,
+    build_postgres_upsert_statement,
+)
 from AEGIS.server.repositories.schemas import Base
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
@@ -62,10 +66,10 @@ class PostgresRepository:
         table = table_cls.__table__
         session = self.session()
         try:
-            unique_cols = []
+            unique_cols: list[str] = []
             for uc in table.constraints:
                 if isinstance(uc, UniqueConstraint):
-                    unique_cols = uc.columns.keys()
+                    unique_cols = list(uc.columns.keys())
                     break
             if not unique_cols:
                 raise ValueError(f"No unique constraint found for {table_cls.__name__}")
@@ -74,16 +78,12 @@ class PostgresRepository:
                 batch = records[i : i + self.insert_batch_size]
                 if not batch:
                     continue
-                stmt = insert(table).values(batch)
-                update_cols = {
-                    col: getattr(stmt.excluded, col)  # type: ignore[attr-defined]
-                    for col in batch[0]
-                    if col not in unique_cols
-                }
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=unique_cols, set_=update_cols
+                statement = build_postgres_upsert_statement(
+                    table=table,
+                    batch=batch,
+                    unique_columns=unique_cols,
                 )
-                session.execute(stmt)
+                session.execute(statement)
                 session.commit()
         finally:
             session.close()
@@ -107,7 +107,7 @@ class PostgresRepository:
         with self.engine.begin() as conn:
             inspector = inspect(conn)
             if inspector.has_table(table.name):
-                conn.execute(delete(table))
+                conn.execute(build_delete_all_rows_statement(table))
             df.to_sql(table.name, conn, if_exists="append", index=False)
 
     # -------------------------------------------------------------------------
@@ -120,6 +120,7 @@ class PostgresRepository:
         table_cls = self.get_table_class(table_name)
         table = table_cls.__table__
         with self.engine.connect() as conn:
-            result = conn.execute(select(func.count()).select_from(table))
+            statement = build_count_rows_statement(table)
+            result = conn.execute(statement)
             value = result.scalar() or 0
         return int(value)
