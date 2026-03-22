@@ -4,7 +4,7 @@ import urllib.parse
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, delete, func, inspect, select
+from sqlalchemy import UniqueConstraint, func, inspect, select
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -142,22 +142,6 @@ class PostgresRepository:
         with self.session() as session:
             rows = session.execute(select(table_cls)).scalars().all()
         return [self.serialize_model(row) for row in rows]
-
-    # -------------------------------------------------------------------------
-    def save_into_database(
-        self, records: list[dict[str, Any]], table_name: str
-    ) -> None:
-        table_cls = self.get_table_class(table_name)
-        normalized_records: list[dict[str, Any]] = []
-        for record in records:
-            normalized = self.normalize_record(table_cls, record)
-            if normalized:
-                normalized_records.append(normalized)
-        with self.session() as session:
-            session.execute(delete(table_cls))
-            if normalized_records:
-                session.add_all(table_cls(**record) for record in normalized_records)
-            session.commit()
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:

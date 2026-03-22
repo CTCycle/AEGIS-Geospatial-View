@@ -18,11 +18,6 @@ class DatabaseBackend(Protocol):
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...
 
     # -------------------------------------------------------------------------
-    def save_into_database(
-        self, records: list[dict[str, Any]], table_name: str
-    ) -> None: ...
-
-    # -------------------------------------------------------------------------
     def upsert_into_database(
         self, records: list[dict[str, Any]], table_name: str
     ) -> None: ...
@@ -78,12 +73,6 @@ class AEGISDatabase:
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]:
         return self.backend.load_from_database(table_name)
-
-    # -------------------------------------------------------------------------
-    def save_into_database(
-        self, records: list[dict[str, Any]], table_name: str
-    ) -> None:
-        self.backend.save_into_database(records, table_name)
 
     # -------------------------------------------------------------------------
     def upsert_into_database(
