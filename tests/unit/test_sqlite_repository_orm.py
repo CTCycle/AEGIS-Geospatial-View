@@ -65,13 +65,13 @@ def test_upsert_uses_orm_and_updates_existing_rows(monkeypatch, tmp_path) -> Non
     assert rows[0]["title"] == "Updated"
 
 
-def test_save_replaces_table_with_new_records(monkeypatch, tmp_path) -> None:
+def test_upsert_adds_new_rows_and_updates_existing_rows(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         "AEGIS.server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
     )
     repository = SQLiteRepository(build_test_settings())
 
-    repository.save_into_database(
+    repository.upsert_into_database(
         [
             {
                 "layer_id": "layer-1",
@@ -80,7 +80,16 @@ def test_save_replaces_table_with_new_records(monkeypatch, tmp_path) -> None:
         ],
         GIBS_LAYERS_TABLE,
     )
-    repository.save_into_database(
+    repository.upsert_into_database(
+        [
+            {
+                "layer_id": "layer-1",
+                "title": "One Updated",
+            }
+        ],
+        GIBS_LAYERS_TABLE,
+    )
+    repository.upsert_into_database(
         [
             {
                 "layer_id": "layer-2",
@@ -91,9 +100,11 @@ def test_save_replaces_table_with_new_records(monkeypatch, tmp_path) -> None:
     )
 
     rows = repository.load_from_database(GIBS_LAYERS_TABLE)
-    assert repository.count_rows(GIBS_LAYERS_TABLE) == 1
-    assert len(rows) == 1
-    assert rows[0]["layer_id"] == "layer-2"
+    by_id = {row["layer_id"]: row for row in rows}
+    assert repository.count_rows(GIBS_LAYERS_TABLE) == 2
+    assert len(rows) == 2
+    assert by_id["layer-1"]["title"] == "One Updated"
+    assert by_id["layer-2"]["title"] == "Two"
 
 
 def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> None:
