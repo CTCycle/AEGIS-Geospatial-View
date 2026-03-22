@@ -42,7 +42,7 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 - Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/routes/search.py`, `AEGIS/server/routes/browser.py`.
 - Schemas and validation: `AEGIS/server/schemas/geographics.py`.
 - Geospatial services: `AEGIS/server/utils/services/geospatial/*` (GIBS, Nominatim, OpenAQ, Open-Elevation, MapService).
-- Data persistence: `AEGIS/server/repositories/database/*`, `AEGIS/server/repositories/queries/*`, `AEGIS/server/repositories/schemas/*`, `AEGIS/server/repositories/serialization/*`.
+- Data persistence: `AEGIS/server/repositories/database/*`, `AEGIS/server/repositories/schemas/*`, `AEGIS/server/repositories/serialization/*` (ORM-first SQLAlchemy Session + mapped models).
 - Configuration and constants: `AEGIS/server/utils/configurations/server.py`, `AEGIS/server/utils/constants.py`.
 - Frontend pages and components: `AEGIS/client/src/pages/*`, `AEGIS/client/src/components/*`.
 - Frontend API client and state: `AEGIS/client/src/services/api.ts`, `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
@@ -164,7 +164,7 @@ Defined in `AEGIS/server/repositories/schemas/models.py`:
 ### 7.2 Communication Patterns
 - Synchronous HTTP JSON between frontend and backend.
 - Backend uses blocking HTTP calls (urllib) executed in `asyncio.to_thread` for external APIs.
-- Database access via SQLAlchemy (synchronous).
+- Database access via SQLAlchemy ORM (synchronous Session + mapped models).
 - No async messaging, queues, or event bus.
 
 ---

@@ -3,21 +3,15 @@ from __future__ import annotations
 import urllib.parse
 from typing import Any
 
-import pandas as pd
 import sqlalchemy
-from sqlalchemy import UniqueConstraint, inspect
+from sqlalchemy import UniqueConstraint, delete, func, inspect, select
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from AEGIS.server.configurations import DatabaseSettings
-from AEGIS.server.repositories.queries import (
-    build_count_rows_statement,
-    build_delete_all_rows_statement,
-    build_postgres_upsert_statement,
-)
-from AEGIS.server.repositories.schemas import Base
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.repositories.schemas import Base
 
 
 ###############################################################################
@@ -62,65 +56,112 @@ class PostgresRepository:
         raise ValueError(f"No table class found for name {table_name}")
 
     # -------------------------------------------------------------------------
-    def upsert_dataframe(self, df: pd.DataFrame, table_cls) -> None:
-        table = table_cls.__table__
-        session = self.session()
-        try:
-            unique_cols: list[str] = []
-            for uc in table.constraints:
-                if isinstance(uc, UniqueConstraint):
-                    unique_cols = list(uc.columns.keys())
-                    break
-            if not unique_cols:
-                raise ValueError(f"No unique constraint found for {table_cls.__name__}")
-            records = df.to_dict(orient="records")
-            for i in range(0, len(records), self.insert_batch_size):
-                batch = records[i : i + self.insert_batch_size]
+    def get_upsert_constraint_columns(self, table_cls: Any) -> list[str]:
+        mapper = inspect(table_cls)
+        primary_key_columns = [column.key for column in mapper.primary_key]
+        if primary_key_columns:
+            return primary_key_columns
+
+        for constraint in table_cls.__table__.constraints:
+            if isinstance(constraint, UniqueConstraint):
+                return list(constraint.columns.keys())
+        raise ValueError(f"No unique constraint found for {table_cls.__name__}")
+
+    # -------------------------------------------------------------------------
+    def normalize_record(self, table_cls: Any, record: dict[str, Any]) -> dict[str, Any]:
+        column_payload: dict[str, Any] = {}
+        for column in table_cls.__table__.columns:
+            if column.name not in record:
+                continue
+            value = record[column.name]
+            if value is None and bool(column.autoincrement):
+                continue
+            column_payload[column.name] = value
+        return column_payload
+
+    # -------------------------------------------------------------------------
+    def serialize_model(self, instance: Any) -> dict[str, Any]:
+        return {
+            column.name: getattr(instance, column.name)
+            for column in instance.__table__.columns
+        }
+
+    # -------------------------------------------------------------------------
+    def list_columns(self, table_name: str) -> list[str]:
+        table_cls = self.get_table_class(table_name)
+        return [column.name for column in table_cls.__table__.columns]
+
+    # -------------------------------------------------------------------------
+    def upsert_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None:
+        if not records:
+            return
+
+        table_cls = self.get_table_class(table_name)
+        conflict_columns = self.get_upsert_constraint_columns(table_cls)
+        normalized_records: list[dict[str, Any]] = []
+        for record in records:
+            normalized = self.normalize_record(table_cls, record)
+            if normalized:
+                normalized_records.append(normalized)
+        if not normalized_records:
+            return
+
+        table_columns = [column.name for column in table_cls.__table__.columns]
+        with self.session() as session:
+            for offset in range(0, len(normalized_records), self.insert_batch_size):
+                batch = normalized_records[offset : offset + self.insert_batch_size]
                 if not batch:
                     continue
-                statement = build_postgres_upsert_statement(
-                    table=table,
-                    batch=batch,
-                    unique_columns=unique_cols,
-                )
+                statement = postgres_insert(table_cls).values(batch)
+                batch_columns = {key for row in batch for key in row}
+                update_columns = {
+                    column: getattr(statement.excluded, column)  # type: ignore[attr-defined]
+                    for column in table_columns
+                    if column not in conflict_columns and column in batch_columns
+                }
+                if update_columns:
+                    statement = statement.on_conflict_do_update(
+                        index_elements=conflict_columns,
+                        set_=update_columns,
+                    )
+                else:
+                    statement = statement.on_conflict_do_nothing(
+                        index_elements=conflict_columns
+                    )
                 session.execute(statement)
-                session.commit()
-        finally:
-            session.close()
+            session.commit()
 
     # -------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> pd.DataFrame:
+    def load_from_database(self, table_name: str) -> list[dict[str, Any]]:
         table_cls = self.get_table_class(table_name)
-        canonical_name = str(table_cls.__tablename__)
-        with self.engine.connect() as conn:
-            inspector = inspect(conn)
-            if not inspector.has_table(canonical_name):
-                logger.warning("Table %s does not exist", canonical_name)
-                return pd.DataFrame()
-            data = pd.read_sql_table(canonical_name, conn)
-        return data
+        if not inspect(self.engine).has_table(str(table_cls.__tablename__)):
+            return []
+
+        with self.session() as session:
+            rows = session.execute(select(table_cls)).scalars().all()
+        return [self.serialize_model(row) for row in rows]
 
     # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
+    def save_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None:
         table_cls = self.get_table_class(table_name)
-        table = table_cls.__table__
-        with self.engine.begin() as conn:
-            inspector = inspect(conn)
-            if inspector.has_table(table.name):
-                conn.execute(build_delete_all_rows_statement(table))
-            df.to_sql(table.name, conn, if_exists="append", index=False)
-
-    # -------------------------------------------------------------------------
-    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        table_cls = self.get_table_class(table_name)
-        self.upsert_dataframe(df, table_cls)
+        normalized_records: list[dict[str, Any]] = []
+        for record in records:
+            normalized = self.normalize_record(table_cls, record)
+            if normalized:
+                normalized_records.append(normalized)
+        with self.session() as session:
+            session.execute(delete(table_cls))
+            if normalized_records:
+                session.add_all(table_cls(**record) for record in normalized_records)
+            session.commit()
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
         table_cls = self.get_table_class(table_name)
-        table = table_cls.__table__
-        with self.engine.connect() as conn:
-            statement = build_count_rows_statement(table)
-            result = conn.execute(statement)
-            value = result.scalar() or 0
+        with self.session() as session:
+            value = session.scalar(select(func.count()).select_from(table_cls)) or 0
         return int(value)

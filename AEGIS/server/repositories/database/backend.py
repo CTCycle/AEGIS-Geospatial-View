@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol
 
-import pandas as pd
-
 from AEGIS.server.configurations import DatabaseSettings, server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
@@ -17,16 +15,23 @@ class DatabaseBackend(Protocol):
     engine: Any
 
     # -------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> pd.DataFrame: ...
+    def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...
 
     # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None: ...
+    def save_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None: ...
 
     # -------------------------------------------------------------------------
-    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None: ...
+    def upsert_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None: ...
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int: ...
+
+    # -------------------------------------------------------------------------
+    def list_columns(self, table_name: str) -> list[str]: ...
 
 
 BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
@@ -71,20 +76,28 @@ class AEGISDatabase:
         return getattr(self.backend, "db_path", None)
 
     # -------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> pd.DataFrame:
+    def load_from_database(self, table_name: str) -> list[dict[str, Any]]:
         return self.backend.load_from_database(table_name)
 
     # -------------------------------------------------------------------------
-    def save_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        self.backend.save_into_database(df, table_name)
+    def save_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None:
+        self.backend.save_into_database(records, table_name)
 
     # -------------------------------------------------------------------------
-    def upsert_into_database(self, df: pd.DataFrame, table_name: str) -> None:
-        self.backend.upsert_into_database(df, table_name)
+    def upsert_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None:
+        self.backend.upsert_into_database(records, table_name)
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
         return self.backend.count_rows(table_name)
+
+    # -------------------------------------------------------------------------
+    def list_columns(self, table_name: str) -> list[str]:
+        return self.backend.list_columns(table_name)
 
 
 database = AEGISDatabase()
