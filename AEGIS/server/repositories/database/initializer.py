@@ -4,14 +4,11 @@ import urllib.parse
 
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.sql.elements import TextClause
 
 from AEGIS.server.configurations import DatabaseSettings, server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
-from AEGIS.server.repositories.queries import (
-    build_postgres_create_database_statement,
-    build_postgres_database_exists_statement,
-)
 from AEGIS.server.repositories.schemas import Base
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
@@ -65,6 +62,19 @@ def clone_settings_with_database(
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
     repository = SQLiteRepository(settings)
     logger.info("Initialized SQLite database at %s", repository.db_path)
+
+
+# -----------------------------------------------------------------------------
+def build_postgres_database_exists_statement() -> TextClause:
+    return sqlalchemy.text("SELECT 1 FROM pg_database WHERE datname=:name")
+
+
+# -----------------------------------------------------------------------------
+def build_postgres_create_database_statement(database_name: str) -> TextClause:
+    safe_database = database_name.replace('"', '""')
+    return sqlalchemy.text(
+        f'CREATE DATABASE "{safe_database}" WITH ENCODING \'UTF8\' TEMPLATE template0'
+    )
 
 
 # -----------------------------------------------------------------------------

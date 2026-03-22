@@ -192,14 +192,14 @@ class GIBSService:
     # -------------------------------------------------------------------------
     def load_layer_catalog(self) -> dict[str, LayerCatalogEntry]:
         try:
-            frame = database.load_from_database(GIBS_LAYERS_TABLE)
+            rows = database.load_from_database(GIBS_LAYERS_TABLE)
         except Exception as exc:  # pragma: no cover - database access failures
             logger.warning("Unable to load GIBS layer metadata: %s", exc)
             return {}
-        if frame.empty:
+        if not rows:
             return {}
         catalog: dict[str, LayerCatalogEntry] = {}
-        for _, row in frame.iterrows():
+        for row in rows:
             layer_id = str(row.get("layer_id") or "").strip()
             if not layer_id:
                 continue
