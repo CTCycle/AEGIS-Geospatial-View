@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from AEGIS.server.routes.browser import router as browser_router
-from AEGIS.server.routes.search import router as search_router
+from AEGIS.server.api.browser import router as browser_router
+from AEGIS.server.api.search import router as search_router
 from AEGIS.server.utils.constants import (
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
