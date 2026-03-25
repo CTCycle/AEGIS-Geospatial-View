@@ -39,7 +39,7 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 | `/docs` | Documentation |
 
 ### 2.2 Key Modules
-- Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/routes/search.py`, `AEGIS/server/routes/browser.py`.
+- Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/api/search.py`, `AEGIS/server/api/browser.py`.
 - Schemas and validation: `AEGIS/server/schemas/geographics.py`.
 - Geospatial services: `AEGIS/server/utils/services/geospatial/*` (GIBS, Nominatim, OpenAQ, Open-Elevation, MapService).
 - Data persistence: `AEGIS/server/repositories/database/*`, `AEGIS/server/repositories/schemas/*`, `AEGIS/server/repositories/serialization/*` (ORM-first SQLAlchemy Session + mapped models).
@@ -49,7 +49,7 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 
 ### 2.3 Core Classes and Functions
 - FastAPI application and router wiring in `AEGIS/server/app.py`.
-- `MapSearchEndpoint`, `MapSearchToolkit`, and `MapRenderingService` orchestrate search processing in `AEGIS/server/routes/search.py`.
+- `MapSearchEndpoint`, `MapSearchToolkit`, and `MapRenderingService` orchestrate search processing in `AEGIS/server/api/search.py`.
 - `LocationSearchRequest` request model and validation in `AEGIS/server/schemas/geographics.py`.
 - `GIBSService` (NASA WMS client, caching, reprojection) in `AEGIS/server/utils/services/geospatial/gibs.py`.
 - `LayerProviderService` for layer alias resolution in `AEGIS/server/utils/services/geospatial/layers.py`.
@@ -91,7 +91,7 @@ The API is REST-style JSON over HTTP using FastAPI. Routes are grouped under `/m
 No authentication or authorization is implemented in the backend. All routes are publicly accessible to any caller who can reach the server.
 
 ### 3.5 Error Handling
-- Validation errors from Pydantic are returned as HTTP 422 with sanitized `detail` in `AEGIS/server/routes/search.py`.
+- Validation errors from Pydantic are returned as HTTP 422 with sanitized `detail` in `AEGIS/server/api/search.py`.
 - Geospatial validation errors return HTTP 400.
 - External service failures (NASA GIBS or map rendering) return HTTP 502.
 - Browser endpoints return HTTP 404 for unknown tables and HTTP 500 for server errors.
@@ -104,8 +104,8 @@ No authentication or authorization is implemented in the backend. All routes are
 ### 4.1 Component List
 - Geospatial UI: `LocationSearch`, `AgenticSearch`, `MapPreview`, `StatsPanel` in `AEGIS/client/src/components/*`.
 - Database Browser UI: `DatabaseBrowserPage` and `DatabaseBrowserContext` in `AEGIS/client/src/pages/DatabaseBrowserPage.tsx` and `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
-- Backend search pipeline: `MapSearchEndpoint` plus geospatial services in `AEGIS/server/routes/search.py` and `AEGIS/server/utils/services/geospatial/*`.
-- Database browsing API: `AEGIS/server/routes/browser.py` with `DataSerializer`.
+- Backend search pipeline: `MapSearchEndpoint` plus geospatial services in `AEGIS/server/api/search.py` and `AEGIS/server/utils/services/geospatial/*`.
+- Database browsing API: `AEGIS/server/api/browser.py` with `DataSerializer`.
 
 ### 4.2 Responsibilities and Boundaries
 - Frontend owns user input, UI validation, and rendering of results; it does not perform geocoding or data fetching from external providers directly.
