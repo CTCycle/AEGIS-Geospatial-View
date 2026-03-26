@@ -47,10 +47,8 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-# Agents
-.agent/skills/**
-
 # Misc
+Cargo.toml
 *.lock
 *.log
 *.db
