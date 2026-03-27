@@ -60,16 +60,6 @@
     },
     "retry_backoff_s": 2.0,
     "default_layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor"
-  },
-  "llm_runtime_defaults": {
-    "agent_model": "llama3.1:8b",
-    "llm_provider": "openai",
-    "cloud_model": "gpt-4o-mini",
-    "use_cloud_services": false,
-    "ollama_temperature": 0.7,
-    "ollama_reasoning": false,
-    "ollama_host_default": "http://localhost:11434"   
   }
- 
 }
 

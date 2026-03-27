@@ -97,18 +97,6 @@ class TestMapSearchSuccess:
         assert overlays, "Expected at least one overlay entry."
         assert any(entry.get("provider") == "gibs" for entry in overlays)
 
-    def test_search_records_session(self, api_context: APIRequestContext):
-        before = api_context.get("/browser/tables/SEARCH_SESSIONS/stats").json()
-        before_count = int(before.get("rowCount", 0))
-
-        response = post_search(api_context, build_coordinate_payload())
-        assert response.ok, f"Expected 200, got {response.status}"
-
-        after = api_context.get("/browser/tables/SEARCH_SESSIONS/stats").json()
-        after_count = int(after.get("rowCount", 0))
-        assert after_count >= before_count + 1
-
-
 class TestMapSearchValidation:
     """Validation error handling for map search."""
 

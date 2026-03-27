@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 
-import AgenticSearch from '../components/AgenticSearch';
 import LocationSearch from '../components/LocationSearch';
 import MapPreview from '../components/MapPreview';
 import PanelHeader from '../components/PanelHeader';
 import StatsPanel from '../components/StatsPanel';
 import { searchLocation } from '../services/api';
-import { AgenticConfig, LocationSearchRequest, RuntimeSettings, SearchResponsePayload } from '../types';
+import { LocationSearchRequest, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
 
 interface SearchResultState {
@@ -23,52 +22,22 @@ const readErrorField = (error: unknown, field: string): unknown => {
 };
 
 function GeospatialPage() {
-    const [settings, setSettings] = useState<RuntimeSettings>({
-        useCloudServices: false,
-        provider: 'openai',
-        cloudModel: 'gpt-4o',
-        agentModel: 'llama3.1:8b',
-    });
-
     const [isLoading, setIsLoading] = useState(false);
     const [searchResult, setSearchResult] = useState<SearchResultState>({});
     const [lastRequest, setLastRequest] = useState<LocationSearchRequest | undefined>();
-    const [agenticConfig, setAgenticConfig] = useState<AgenticConfig>({
-        enabled: false,
-        objective: '',
-    });
-    const [agentSummary, setAgentSummary] = useState<string | undefined>();
 
     const handleSearch = async (request: LocationSearchRequest) => {
         setIsLoading(true);
         setSearchResult({});
-        setAgentSummary(undefined);
+        setLastRequest(request);
 
         try {
-            const enrichedRequest: LocationSearchRequest = {
-                ...request,
-                agentic_enabled: agenticConfig.enabled,
-                agent_prompt: agenticConfig.enabled ? agenticConfig.objective : undefined,
-                llm_provider: settings.useCloudServices ? settings.provider : undefined,
-                cloud_model: settings.useCloudServices ? settings.cloudModel : undefined,
-                agent_model: settings.useCloudServices ? undefined : settings.agentModel,
-            };
-
-            setLastRequest(enrichedRequest);
-
-            const response = await searchLocation(enrichedRequest);
+            const response = await searchLocation(request);
             setSearchResult({
                 message: response.status_message,
                 json: response.json ?? response.payload,
                 payload: response.payload,
             });
-            setAgentSummary(
-                typeof response.payload?.agent_summary === 'string'
-                    ? response.payload.agent_summary
-                    : typeof response.payload?.status_message === 'string'
-                        ? response.payload.status_message
-                        : response.status_message,
-            );
         } catch (error: unknown) {
             const statusCandidate = readErrorField(error, 'status');
             const statusPrefix = typeof statusCandidate === 'number' ? ` ${statusCandidate}` : '';
@@ -96,7 +65,7 @@ function GeospatialPage() {
         return parts.join(', ') || 'Location submitted';
     }, [lastRequest]);
 
-    const mapToolbarSummary = useMemo(() => {
+    const searchModeSummary = useMemo(() => {
         if (!lastRequest) {
             return 'Awaiting first search.';
         }
@@ -111,75 +80,56 @@ function GeospatialPage() {
 
     return (
         <div className="geospatial-page">
-            <header className="app-header">
-                <h1 className="app-title">AEGIS Geographics</h1>
-                <p className="app-subtitle">Visualize geographic data overlays in real time</p>
+            <header className="geospatial-page__header">
+                <h1 className="geospatial-page__title">AEGIS Geospatial View</h1>
+                <p className="geospatial-page__subtitle">Search locations and render map overlays in real time.</p>
             </header>
 
-            <section className="controls-row" aria-label="Search controls">
-                <section className="panel" aria-label="Location search">
-                    <LocationSearch onSearch={handleSearch} isLoading={isLoading} />
-                </section>
-                <section className="panel" aria-label="Agentic search">
-                    <AgenticSearch
-                        config={agenticConfig}
-                        onChange={setAgenticConfig}
-                        isRunning={isLoading && agenticConfig.enabled}
-                        lastSummary={agentSummary}
-                        settings={settings}
-                        onSettingsChange={setSettings}
+            <div className="geospatial-workspace">
+                <aside className="panel toolbar-panel" aria-label="Search toolbar">
+                    <PanelHeader
+                        title="Search Commands"
+                        description="Use address or coordinates, then select map layers."
+                        headingLevel={2}
                     />
-                </section>
-            </section>
-
-            <section className="visual-row" aria-label="Map and statistics">
-                <section className="panel map-panel" aria-label="Map section">
-                    <div className="panel-head">
-                        <PanelHeader
-                            title="Map"
-                            description="Rendered view with toolbar controls."
-                        />
-                        <div className="map-toolbar">
-                            <div className="toolbar-group">
-                                <span className="toolbar-label">Location</span>
-                                <span className="toolbar-value">{locationSummary}</span>
-                            </div>
-                            <div className="toolbar-group">
-                                <span className="toolbar-label">Mode</span>
-                                <span className="toolbar-value">{mapToolbarSummary}</span>
-                            </div>
-                            <div className="toolbar-actions" aria-label="Map controls">
-                                <button type="button" className="ghost-button" onClick={rerunLastSearch}>
-                                    Reset view
-                                </button>
-                                <button
-                                    type="button"
-                                    className="ghost-button"
-                                    onClick={rerunLastSearch}
-                                    disabled={!lastRequest || isLoading}
-                                >
-                                    Reload overlays
-                                </button>
-                            </div>
+                    <div className="toolbar-summary" aria-live="polite">
+                        <div className="toolbar-summary__item">
+                            <span className="toolbar-summary__label">Location</span>
+                            <span className="toolbar-summary__value">{locationSummary}</span>
+                        </div>
+                        <div className="toolbar-summary__item">
+                            <span className="toolbar-summary__label">Mode</span>
+                            <span className="toolbar-summary__value">{searchModeSummary}</span>
                         </div>
                     </div>
-                    <MapPreview
-                        payload={searchResult.payload}
-                        isLoading={isLoading}
-                    />
-                </section>
+                    <div className="toolbar-actions" aria-label="Search actions">
+                        <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={rerunLastSearch}
+                            disabled={!lastRequest || isLoading}
+                        >
+                            Re-run last search
+                        </button>
+                    </div>
+                    <LocationSearch onSearch={handleSearch} isLoading={isLoading} />
+                </aside>
 
-                <section className="panel stats-panel" aria-label="Statistics and verbose information">
+                <section className="panel canvas-panel" aria-label="Map canvas and statistics">
+                    <PanelHeader
+                        title="Map Canvas"
+                        description="Rendered map output and metadata for the current search."
+                        headingLevel={2}
+                    />
+                    <MapPreview payload={searchResult.payload} isLoading={isLoading} />
                     <StatsPanel
                         payload={searchResult.payload}
                         message={searchResult.message}
                         isLoading={isLoading}
-                        agenticEnabled={agenticConfig.enabled}
                         locationSummary={locationSummary}
-                        agentNote={agentSummary}
                     />
                 </section>
-            </section>
+            </div>
         </div>
     );
 }

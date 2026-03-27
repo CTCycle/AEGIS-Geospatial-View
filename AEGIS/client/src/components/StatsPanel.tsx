@@ -8,18 +8,14 @@ interface StatsPanelProps {
     payload?: SearchResponsePayload;
     message?: string;
     isLoading: boolean;
-    agenticEnabled: boolean;
     locationSummary: string;
-    agentNote?: string;
 }
 
 const StatsPanel: React.FC<StatsPanelProps> = ({
     payload,
     message,
     isLoading,
-    agenticEnabled,
     locationSummary,
-    agentNote,
 }) => {
     const featureCount =
         typeof payload?.feature_count === 'number'
@@ -69,11 +65,8 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
         }
         const lines = [
             locationSummary,
-            agenticEnabled ? 'Agentic search applied to the last run.' : 'Standard search executed.',
+            'Standard search executed.',
         ];
-        if (agentNote) {
-            lines.push(agentNote);
-        }
         if (message) {
             lines.push(message);
         }
@@ -86,6 +79,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
                 <PanelHeader
                     title="Map statistics"
                     description="Metrics and narrative tied to the current map view."
+                    headingLevel={3}
                 />
             </div>
 

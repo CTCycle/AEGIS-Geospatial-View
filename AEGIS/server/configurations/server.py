@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from AEGIS.server.configurations.base import ensure_mapping, load_configuration_data
 
 from AEGIS.server.utils.constants import (
-    AGENT_MODEL_CHOICES,
-    CLOUD_MODEL_CHOICES,
     GIBS_CAPABILITIES_ENDPOINTS,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
@@ -16,7 +14,6 @@ from AEGIS.server.utils.constants import (
     GIBS_WMS_BASE_ENDPOINTS,
     NASA_ATTRIBUTION,
     NOMINATIM_SEARCH_URL,
-    OLLAMA_DEFAULT_HOST,
     CONFIGURATIONS_FILE,
 )
 
@@ -27,183 +24,6 @@ from AEGIS.server.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
-
-
-###############################################################################
-@dataclass
-class LLMRuntimeConfig:
-    defaults: LLMRuntimeDefaults | None = None
-    agent_model: str = ""
-    llm_provider: str = ""
-    cloud_model: str = ""
-    use_cloud_services: bool = False
-    ollama_temperature: float = 0.0
-    ollama_reasoning: bool = False
-    revision: int = 0
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def configure(cls, defaults: LLMRuntimeDefaults) -> None:
-        cls.defaults = defaults
-        cls.reset_defaults()
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def _get_defaults(cls) -> LLMRuntimeDefaults:
-        if cls.defaults is None:
-            raise RuntimeError("Client runtime defaults are not configured.")
-        return cls.defaults
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def touch_revision(cls) -> None:
-        cls.revision += 1
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_agent_model(cls, model: str) -> str:
-        value = model.strip()
-        if value and value != cls.agent_model:
-            cls.agent_model = value
-            cls.touch_revision()
-        return cls.agent_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_llm_provider(cls, provider: str) -> str:
-        defaults = cls._get_defaults()
-        value = provider.strip().lower()
-        if not value:
-            return cls.llm_provider
-        if value not in CLOUD_MODEL_CHOICES:
-            value = defaults.llm_provider
-        if cls.llm_provider != value:
-            cls.llm_provider = value
-            models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
-            if cls.cloud_model not in models:
-                cls.cloud_model = models[0] if models else ""
-            cls.touch_revision()
-        return cls.llm_provider
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_cloud_model(cls, model: str) -> str:
-        value = model.strip()
-        if not value:
-            if cls.cloud_model:
-                cls.cloud_model = ""
-                cls.touch_revision()
-            return cls.cloud_model
-        models = CLOUD_MODEL_CHOICES.get(cls.llm_provider, [])
-        if value not in models:
-            fallback = models[0] if models else ""
-            if fallback and fallback != cls.cloud_model:
-                cls.cloud_model = fallback
-                cls.touch_revision()
-            return cls.cloud_model
-        if cls.cloud_model != value:
-            cls.cloud_model = value
-            cls.touch_revision()
-        return cls.cloud_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_use_cloud_services(cls, enabled: bool) -> bool:
-        normalized = bool(enabled)
-        if cls.use_cloud_services != normalized:
-            cls.use_cloud_services = normalized
-            cls.touch_revision()
-        return cls.use_cloud_services
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_ollama_temperature(cls, value: float | None) -> float:
-        defaults = cls._get_defaults()
-        try:
-            parsed = float(value) if value is not None else cls.ollama_temperature
-        except (TypeError, ValueError):
-            parsed = defaults.ollama_temperature
-        parsed = max(0.0, min(2.0, parsed))
-        rounded = round(parsed, 2)
-        if cls.ollama_temperature != rounded:
-            cls.ollama_temperature = rounded
-            cls.touch_revision()
-        return cls.ollama_temperature
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_ollama_reasoning(cls, enabled: bool) -> bool:
-        normalized = bool(enabled)
-        if cls.ollama_reasoning != normalized:
-            cls.ollama_reasoning = normalized
-            cls.touch_revision()
-        return cls.ollama_reasoning
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_agent_model(cls) -> str:
-        return cls.agent_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_llm_provider(cls) -> str:
-        return cls.llm_provider
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_cloud_model(cls) -> str:
-        return cls.cloud_model
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def is_cloud_enabled(cls) -> bool:
-        return cls.use_cloud_services
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_ollama_temperature(cls) -> float:
-        return cls.ollama_temperature
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def is_ollama_reasoning_enabled(cls) -> bool:
-        return cls.ollama_reasoning
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def reset_defaults(cls) -> None:
-        defaults = cls._get_defaults()
-        cls.agent_model = defaults.agent_model
-        cls.llm_provider = defaults.llm_provider
-        cls.cloud_model = defaults.cloud_model
-        cls.use_cloud_services = defaults.use_cloud_services
-        cls.ollama_temperature = round(
-            max(0.0, min(2.0, defaults.ollama_temperature)),
-            2,
-        )
-        cls.ollama_reasoning = defaults.ollama_reasoning
-        cls.revision = 0
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def get_revision(cls) -> int:
-        return cls.revision
-
-    # -------------------------------------------------------------------------
-    @classmethod
-    def resolve_provider_and_model(
-        cls,
-        purpose: Literal["agent"],
-    ) -> tuple[str, str]:
-        if cls.is_cloud_enabled():
-            provider = cls.get_llm_provider()
-            model = cls.get_cloud_model().strip()
-            if not model:
-                model = cls.get_agent_model()
-        else:
-            provider = "ollama"
-            model = cls.get_agent_model()
-        return provider, model.strip()
 
 
 @dataclass(frozen=True)
@@ -277,18 +97,6 @@ class GIBSSettings:
 
 # -----------------------------------------------------------------------------
 @dataclass(frozen=True)
-class LLMRuntimeDefaults:
-    agent_model: str
-    llm_provider: str
-    cloud_model: str
-    use_cloud_services: bool
-    ollama_temperature: float
-    ollama_reasoning: bool
-    ollama_host_default: str
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
 class ServerSettings:
     database: DatabaseSettings
     nominatim: NominatimSettings
@@ -296,7 +104,6 @@ class ServerSettings:
     map: MapSettings
     jobs: JobsSettings
     gibs: GIBSSettings
-    llm_defaults: LLMRuntimeDefaults
 
 
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
@@ -505,26 +312,6 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
 
 
 # -----------------------------------------------------------------------------
-def build_llm_runtime_defaults(data: dict[str, Any]) -> LLMRuntimeDefaults:
-    agent_default = AGENT_MODEL_CHOICES[0]
-    provider_default = coerce_str(data.get("llm_provider"), "openai").lower()
-    provider_models = CLOUD_MODEL_CHOICES.get(provider_default, [])
-    cloud_default = provider_models[0] if provider_models else ""
-    return LLMRuntimeDefaults(
-        agent_model=coerce_str(data.get("agent_model"), agent_default),
-        llm_provider=provider_default,
-        cloud_model=coerce_str(data.get("cloud_model"), cloud_default),
-        use_cloud_services=coerce_bool(data.get("use_cloud_services"), False),
-        ollama_temperature=coerce_float(data.get("ollama_temperature"), 0.7),
-        ollama_reasoning=coerce_bool(data.get("ollama_reasoning"), False),
-        ollama_host_default=coerce_str(
-            data.get("ollama_host_default"),
-            OLLAMA_DEFAULT_HOST,
-        ),
-    )
-
-
-# -----------------------------------------------------------------------------
 def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     payload = ensure_mapping(data)
     database_payload = ensure_mapping(payload.get("database"))
@@ -533,14 +320,6 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     map_payload = ensure_mapping(payload.get("map") or payload.get("maps"))
     jobs_payload = ensure_mapping(payload.get("jobs"))
     gibs_payload = ensure_mapping(payload.get("gibs"))
-    llm_defaults_payload = ensure_mapping(payload.get("llm_defaults"))
-    llm_defaults = build_llm_runtime_defaults(llm_defaults_payload)
-    default_provider = llm_defaults.llm_provider
-    default_cloud_model = llm_defaults.cloud_model
-    default_ollama_host = coerce_str(
-        payload.get("ollama_base_url"),
-        OLLAMA_DEFAULT_HOST,
-    )
 
     return ServerSettings(
         database=build_database_settings(database_payload),
@@ -549,7 +328,6 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
         map=build_map_settings(map_payload),
         jobs=build_jobs_settings(jobs_payload),
         gibs=build_gibs_settings(gibs_payload),
-        llm_defaults=llm_defaults,
     )
 
 
