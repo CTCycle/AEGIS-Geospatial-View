@@ -1,86 +1,70 @@
 # Background Job Management
 
-ADSMOD uses a centralized, thread-based job management system to handle long-running operations like isotherm fitting, dataset processing, and chemical property scraping. This ensures the main FastAPI event loop remains unblocked and responsive.
+Last updated: 2026-03-28  
+Scope: `AEGIS/server/services/jobs.py`, `AEGIS/server/api/search.py`
 
-## Core Concepts
+AEGIS uses an in-process, thread-based job manager for asynchronous map-search execution.
 
-The system is built around a singleton `JobManager` instance located in `server/utils/jobs.py`.
+## 1. Components
 
-### Threading Model
-- **Daemon Threads**: Each job runs in its own dedicated `threading.Thread`. The threads are set to `daemon=True`, meaning they will not prevent the application from shutting down.
-- **Concurrency**: The Global Interpreter Lock (GIL) is respected, but since many of ADSMOD's heavy tasks (NumPy/SciPy fitting, PyTorch training) release the GIL or are I/O bound (network requests), threaded concurrency is effective.
+- `JobState` dataclass: per-job status container.
+- `JobManager`: singleton coordinator for job lifecycle.
+- Shared instance: `job_manager`.
 
-### Job State
-Every job is tracked via a thread-safe `JobState` object containing:
-- **`job_id`**: A unique 8-character UUID string.
-- **`status`**: Current state (`pending`, `running`, `completed`, `failed`, `cancelled`).
-- **`progress`**: Float value from 0.0 to 100.0.
-- **`result`**: The final output payload (dict) upon successful completion.
-- **`error`**: Error message if the job failed.
-- **`stop_requested`**: Boolean flag indicating if a user cancellation has been requested.
+Location:
+- `AEGIS/server/services/jobs.py`
 
-## Usage Guide
+## 2. Job Lifecycle
 
-### 1. The Job Manager Singleton
-Import the shared instance to interact with the system:
-```python
-from ADSMOD.server.utils.jobs import job_manager
-```
+States:
+- `pending`
+- `running`
+- `completed`
+- `failed`
+- `cancelled`
 
-### 2. Implementation Pattern
-To create a new background service, define a synchronous runner function that performs the heavy lifting.
+State fields include:
+- `job_id`, `job_type`
+- `status`, `progress`
+- `result`, `error`
+- `created_at`, `completed_at`
+- `stop_requested`
 
-```python
-def my_blocking_runner(payload: dict) -> dict:
-    """
-    This function runs inside the worker thread.
-    """
-    # 1. Periodically check for cancellation
-    # Note: 'job_id' checks must be managed by passing the ID or handling it within the context
-    
-    # 2. Update progress (optional, if you have reference to the manager/id)
-    # job_manager.update_progress(job_id, 50.0)
-    
-    # 3. Perform work
-    result = perform_expensive_calculation(payload)
-    
-    return {"data": result}
-```
+## 3. API Endpoints
 
-### 3. Starting a Job in an API Endpoint
-In your FastAPI route, use `start_job` to spawn the thread.
+Exposed by `MapSearchEndpoint`:
+- `POST /maps/jobs`: start async map search
+- `GET /maps/jobs/{job_id}`: fetch state snapshot
+- `DELETE /maps/jobs/{job_id}`: request cancellation
 
-```python
-@router.post("/start")
-def start_processing(payload: Dict):
-    # Optional: Prevent multiple jobs of the same type
-    if job_manager.is_job_running("MY_JOB_TYPE"):
-        raise HTTPException(400, "Job already in progress")
+The same routes are mirrored under `/api`.
 
-    job_id = job_manager.start_job(
-        job_type="MY_JOB_TYPE",
-        runner=my_blocking_runner,
-        args=(payload,)
-    )
-    return {"job_id": job_id}
-```
+## 4. Execution Model
 
-### 4. Cooperative Cancellation
-Cancellation is **cooperative**, meaning the running thread must actively check if it should stop. It is not forcibly killed.
+- Each job runs in a dedicated daemon `threading.Thread`.
+- Worker function for map jobs: `run_map_search_job(...)`.
+- The job runner updates progress and merges final result payloads.
+- Failures are captured and truncated into `error` for status polling.
 
-Inside your runner loop:
-```python
-if job_manager.should_stop(current_job_id):
-    # Clean up resources if necessary
-    return
-```
+## 5. Cancellation Semantics
 
-## API Interaction
+Cancellation is cooperative:
+- `cancel_job` sets `stop_requested=True` and marks status `cancelled`.
+- Running logic must check `job_manager.should_stop(job_id)` and exit cleanly.
+- There is no force-kill mechanism for active threads.
 
-The frontend interacts with jobs via a polling mechanism:
+## 6. Usage Pattern
 
-1. **Start**: `POST /api/...` returns `{"job_id": "..."}`.
-2. **Poll**: `GET /api/jobs/{job_id}` returns the full `JobState`.
-   - The frontend updates progress bars based on the `progress` field.
-   - If `status` is `completed`, the frontend displays the `result`.
-   - If `status` is `failed`, the frontend displays the `error`.
+Typical backend usage:
+1. Validate request payload.
+2. Start job with `job_manager.start_job(...)`.
+3. Return `job_id` to caller.
+4. Client polls job status endpoint.
+5. Client reads `status` and `result` when `completed`.
+
+## 7. Operational Notes
+
+- Jobs are process-local and memory-backed.
+- Job state is not persisted across server restarts.
+- This model is appropriate for low/medium local concurrency and development workflows.
+- For distributed/high-volume workloads, move to external queue + worker infrastructure.

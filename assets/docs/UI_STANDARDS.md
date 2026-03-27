@@ -1,114 +1,58 @@
 # UI Standards
 
-Date: 2026-03-27  
+Last updated: 2026-03-28  
 Scope: `AEGIS/client/src`
 
-## 1) Spacing Scale
+## 1. Design Tokens
 
-Use the shared spacing tokens from `index.css`:
-
-- `--space-1`: 4px
-- `--space-2`: 8px
-- `--space-3`: 12px
-- `--space-4`: 16px
-- `--space-5`: 24px
-- `--space-6`: 32px
+Use shared tokens from `src/index.css` for:
+- spacing (`--space-*`)
+- typography (`--font-size-*`, weights, line heights)
+- colors (`--color-*`)
+- radii and shadows (`--radius-*`, `--shadow-*`)
 
 Rules:
-- Prefer tokenized spacing over one-off pixel literals.
-- Use `--space-1` to `--space-3` for intra-component spacing.
-- Use `--space-4`+ for section/panel spacing.
+- Prefer tokens over one-off literals.
+- Keep spacing and sizing on the existing scale where possible.
 
-## 2) Typography Scale
+## 2. Layout Rules
 
-Use these shared tokens:
+Current primary layout is a two-pane workspace:
+- left: command toolbar (`.toolbar-panel`)
+- right: map canvas (`.canvas-panel`)
 
-- `--font-size-caption`: 0.8rem
-- `--font-size-label`: 0.9rem
-- `--font-size-body`: 1rem
-- `--font-size-title-sm`: 1.05rem
-- `--font-size-title-md`: 1.2rem
-- `--font-size-title-lg`: responsive `clamp(1.65rem, 2.8vw, 2.2rem)`
+Implementation expectations:
+- desktop: persistent split layout (`GeospatialPage.css`)
+- narrow screens: stack toolbar above canvas via breakpoints
+- avoid introducing additional global navigation shells unless product requirements change
 
-Weight conventions:
-- Labels/meta: `--font-weight-semibold`
-- Titles/key metrics/actions: `--font-weight-bold`
+## 3. Typography and Hierarchy
 
-## 3) Color System
+- Keep heading hierarchy semantic (`h1` page title, `h2` section headers, etc.).
+- Use shared title/body token sizes.
+- Keep metadata/helper text visually secondary with muted text tokens.
 
-Primary text/surface:
+## 4. Interaction and States
 
-- `--color-text-primary`
-- `--color-text-secondary`
-- `--color-text-muted`
-- `--color-surface-app`
-- `--color-surface-panel`
-- `--color-surface-subtle`
+- All custom interactive controls require visible `:focus-visible` styles.
+- Provide clear disabled, hover, and loading states.
+- Keep primary actions distinct from secondary actions.
 
-Brand/accent:
+## 5. Accessibility
 
-- `--color-brand`
-- `--color-accent`
-- `--color-accent-soft`
-- `--color-accent-muted`
-- `--color-accent-border`
+- Use semantic structure (`main`, `section`, `aside`, labeled regions).
+- Keep labels associated with controls.
+- Do not rely only on color to communicate state.
+- Respect `prefers-reduced-motion` (already implemented globally in `index.css`).
 
-Semantic:
-
-- Danger text: `--color-text-danger`
-- Focus: `--color-focus-ring`
-
-Rules:
-- Prefer variables over hex literals in component CSS.
-- Do not rely on color alone to communicate state.
-
-## 4) Component Usage Rules
-
-Buttons:
-- `primary-button`: primary submit action only.
-- `secondary-button`: supporting actions.
-- Always include `:hover`, `:disabled`, `:focus-visible`.
-
-Inputs/selects/textarea:
-- Use global input styles from `index.css`.
-- Keep labels visible and placed above controls.
-
-Panels/cards:
-- Use shared panel surface and border tokens.
-- Keep radius/shadow consistent (`--radius-*`, `--shadow-*`).
-
-Headings:
-- Use `PanelHeader` with explicit `headingLevel` where needed to preserve hierarchy.
-
-## 5) Layout Rules
-
-- Main geospatial shell is full-height and split into:
-  - Left continuous command toolbar (includes brand/logo area at top).
-  - Right full working canvas.
-- Avoid redundant top headers when the toolbar already carries app identity.
-- Primary workspace layout:
-  - Left command toolbar.
-  - Right output canvas.
-- Desktop target split: roughly 30/70.
-- At narrow widths, stack toolbar above canvas.
-
-## 6) Accessibility Rules
-
-- Every interactive custom element must have a visible `:focus-visible` style.
-- Respect reduced-motion preferences (global `prefers-reduced-motion` guard).
-- Keep helper and error text near related inputs.
-- Preserve semantic structure (`main`, `header`, `aside`, `section`, heading levels).
-
-## 7) Do and Don’t
+## 6. Styling Hygiene
 
 Do:
-- Use design tokens.
-- Keep spacing and radii on scale.
-- Keep action labels explicit.
-- Keep responsive behavior deterministic.
+- keep component styles scoped and predictable
+- reuse shared utility patterns where practical
+- prefer small, targeted CSS changes
 
-Don’t:
-- Add duplicate class names with conflicting definitions across files.
-- Add one-off color literals when a token exists.
-- Use rigid heights that break small viewports.
-- Introduce new visual variants without a documented need.
+Do not:
+- duplicate conflicting class definitions across files
+- introduce hardcoded colors when token equivalents exist
+- use rigid heights that break mobile/small laptop viewports
