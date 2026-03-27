@@ -13,8 +13,6 @@ from AEGIS.server.configurations.server import (
     JobsSettings,
     GIBSSettings,
     ServerSettings,
-    LLMRuntimeConfig,
-    LLMRuntimeDefaults,
     server_settings,
     get_server_settings,
 )
@@ -29,8 +27,6 @@ __all__ = [
     "JobsSettings",
     "GIBSSettings",
     "ServerSettings",
-    "LLMRuntimeConfig",
-    "LLMRuntimeDefaults",
     "server_settings",
     "get_server_settings",
 ]

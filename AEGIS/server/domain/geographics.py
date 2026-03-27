@@ -71,12 +71,6 @@ class LocationSearchRequest(BaseModel):
     )
     image_crs: str = Field(default="EPSG:3857")
     image_format: str = Field(default="image/png")
-    agentic_enabled: bool = Field(default=False)
-    llm_provider: str | None = Field(default=None, max_length=50)
-    cloud_model: str | None = Field(default=None, max_length=100)
-    agent_model: str | None = Field(default=None, max_length=100)
-    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
-    reasoning: bool | None = Field(default=None)
 
     @field_validator(
         "country",

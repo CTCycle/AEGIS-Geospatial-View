@@ -3,11 +3,11 @@
 ## 1. High-Level Architecture Overview
 
 ### 1.1 Purpose and Scope
-AEGIS Geospatial View converts free-text locations or explicit coordinates into normalized bounding boxes and map previews. The system focuses on geocoding, selecting NASA GIBS satellite layers, rendering overlays, and presenting results in a web UI. It also provides a lightweight database browser for stored metadata and search history.
+AEGIS Geospatial View converts free-text locations or explicit coordinates into normalized bounding boxes and map previews. The system focuses on geocoding, selecting NASA GIBS satellite layers, rendering overlays, and presenting results in a web UI.
 
 ### 1.2 System Overview
-- Frontend components: React + Vite UI with a geospatial search page, agentic settings panel, map preview, metrics panel, and a database browser.
-- Backend services: FastAPI app with map search and database browser routes, geospatial services (Nominatim, GIBS, OpenAQ, Open-Elevation), Folium map rendering, and persistence for layer metadata and search sessions.
+- Frontend components: React + Vite UI with a fixed top tab navbar, left command toolbar, right map canvas, and metrics panel.
+- Backend services: FastAPI app with map search routes, geospatial services (Nominatim, GIBS, OpenAQ, Open-Elevation), Folium map rendering, and persistence for layer metadata and search sessions.
 - External dependencies and integrations: OpenStreetMap Nominatim, NASA GIBS WMS/WMTS endpoints, OpenAQ API, Open-Elevation API, Folium tile providers, SQLite/Postgres via SQLAlchemy, Pillow for imagery handling.
 
 ### 1.3 Deployment and Runtime Assumptions
@@ -39,13 +39,13 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 | `/docs` | Documentation |
 
 ### 2.2 Key Modules
-- Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/api/search.py`, `AEGIS/server/api/browser.py`.
+- Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/api/search.py`.
 - Schemas and validation: `AEGIS/server/schemas/geographics.py`.
 - Geospatial services: `AEGIS/server/utils/services/geospatial/*` (GIBS, Nominatim, OpenAQ, Open-Elevation, MapService).
 - Data persistence: `AEGIS/server/repositories/database/*`, `AEGIS/server/repositories/schemas/*`, `AEGIS/server/repositories/serialization/*` (ORM-first SQLAlchemy Session + mapped models).
 - Configuration and constants: `AEGIS/server/utils/configurations/server.py`, `AEGIS/server/utils/constants.py`.
 - Frontend pages and components: `AEGIS/client/src/pages/*`, `AEGIS/client/src/components/*`.
-- Frontend API client and state: `AEGIS/client/src/services/api.ts`, `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
+- Frontend API client and state: `AEGIS/client/src/services/api.ts`, `AEGIS/client/src/pages/GeospatialPage.tsx`.
 
 ### 2.3 Core Classes and Functions
 - FastAPI application and router wiring in `AEGIS/server/app.py`.
@@ -59,14 +59,14 @@ AEGIS Geospatial View converts free-text locations or explicit coordinates into 
 - `AEGISDatabase`, `SQLiteRepository`, and `PostgresRepository` in `AEGIS/server/repositories/database/backend.py`, `AEGIS/server/repositories/database/sqlite.py`, `AEGIS/server/repositories/database/postgres.py`.
 - `DataSerializer` for database IO in `AEGIS/server/repositories/serialization/serializer.py`.
 - `searchLocation` HTTP client in `AEGIS/client/src/services/api.ts`.
-- `DatabaseBrowserContext` data provider in `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
+- Top-level tabbed shell in `AEGIS/client/src/App.tsx` and workspace layout in `AEGIS/client/src/pages/GeospatialPage.tsx`.
 
 ---
 
 ## 3. Backend API
 
 ### 3.1 API Overview
-The API is REST-style JSON over HTTP using FastAPI. Routes are grouped under `/maps` and `/browser`. The root path redirects to FastAPI docs. There is no versioning prefix or auth middleware configured in code.
+The API is REST-style JSON over HTTP using FastAPI. Routes are grouped under `/maps`. The root path redirects to FastAPI docs. There is no versioning prefix or auth middleware configured in code.
 
 ### 3.2 Endpoints
 
@@ -74,9 +74,6 @@ The API is REST-style JSON over HTTP using FastAPI. Routes are grouped under `/m
 |-------|-------|-------------|
 | GET | `/` | Redirect to `/docs` |
 | POST | `/maps/search` | Perform a geospatial search and render map overlays |
-| GET | `/browser/tables` | List available database tables |
-| GET | `/browser/tables/{table_name}` | Fetch full table contents |
-| GET | `/browser/tables/{table_name}/stats` | Fetch table row/column counts |
 
 ### 3.3 Request and Response Models
 - `LocationSearchRequest` in `AEGIS/server/schemas/geographics.py` validates inputs such as `datetime`, `address/city/country` or `latitude/longitude`, `filters` (geospatial layers), bbox, map size, and imagery settings.
@@ -84,8 +81,6 @@ The API is REST-style JSON over HTTP using FastAPI. Routes are grouped under `/m
 - Responses from `/maps/search` include:
   - `status_message` (string)
   - `payload` (object) containing normalized location fields, optional bbox, and `satellite_imagery` with map HTML, overlay metadata, and image payloads.
-- `/browser/tables` responds with `{ tables: [{ name, displayName }] }`.
-- `/browser/tables/{table_name}` responds with columns, rows, and counts in a JSON object.
 
 ### 3.4 Authentication and Authorization
 No authentication or authorization is implemented in the backend. All routes are publicly accessible to any caller who can reach the server.
@@ -94,7 +89,6 @@ No authentication or authorization is implemented in the backend. All routes are
 - Validation errors from Pydantic are returned as HTTP 422 with sanitized `detail` in `AEGIS/server/api/search.py`.
 - Geospatial validation errors return HTTP 400.
 - External service failures (NASA GIBS or map rendering) return HTTP 502.
-- Browser endpoints return HTTP 404 for unknown tables and HTTP 500 for server errors.
 - Unhandled exceptions propagate as FastAPI 500 responses.
 
 ---
@@ -102,15 +96,13 @@ No authentication or authorization is implemented in the backend. All routes are
 ## 4. Main Components
 
 ### 4.1 Component List
-- Geospatial UI: `LocationSearch`, `AgenticSearch`, `MapPreview`, `StatsPanel` in `AEGIS/client/src/components/*`.
-- Database Browser UI: `DatabaseBrowserPage` and `DatabaseBrowserContext` in `AEGIS/client/src/pages/DatabaseBrowserPage.tsx` and `AEGIS/client/src/context/DatabaseBrowserContext.tsx`.
+- Geospatial UI: `LocationSearch`, `MapPreview`, `StatsPanel` in `AEGIS/client/src/components/*`.
 - Backend search pipeline: `MapSearchEndpoint` plus geospatial services in `AEGIS/server/api/search.py` and `AEGIS/server/utils/services/geospatial/*`.
-- Database browsing API: `AEGIS/server/api/browser.py` with `DataSerializer`.
 
 ### 4.2 Responsibilities and Boundaries
 - Frontend owns user input, UI validation, and rendering of results; it does not perform geocoding or data fetching from external providers directly.
 - Backend owns geocoding, imagery selection, map rendering, external API calls, and persistence.
-- Data persistence is handled by database modules; UI only reads via `/browser/*` endpoints.
+- Data persistence is handled by database modules and is not directly exposed via dedicated browser endpoints.
 
 ---
 
@@ -129,7 +121,7 @@ No authentication or authorization is implemented in the backend. All routes are
 ### 5.2 Critical Workflows
 - User interaction flow: UI inputs -> `/maps/search` -> map preview and stats update in `GeospatialPage`.
 - Data ingestion flow: `AEGIS/server/scripts/update_gibs_layers.py` pulls NASA capabilities and stores layer metadata in the database.
-- Database browsing flow: UI calls `/browser/tables` and `/browser/tables/{table_name}` to populate the data table.
+- Shell layout flow: `App.tsx` renders a fixed top tab navbar and `GeospatialPage` splits command controls (left toolbar) from output rendering (right canvas).
 
 ---
 
@@ -182,10 +174,10 @@ Not applicable.
 ## 9. Database Browsing and Inspection
 
 ### 9.1 Admin or Browser Interfaces
-The Database Browser UI in `AEGIS/client/src/pages/DatabaseBrowserPage.tsx` surfaces `/browser/*` endpoints for viewing table data and statistics.
+No dedicated database browser UI/API is exposed in the current application.
 
 ### 9.2 Access Control and Security
-No access control is implemented; all database browser endpoints are available without authentication.
+No public database browsing endpoints are exposed.
 
 ---
 
@@ -203,9 +195,7 @@ There is a UI stats panel for map results, but no training or model monitoring d
 ---
 
 ## 11. Known Limitations and Open Questions
-- Agentic search fields and `MAPS_AGENTIC_ROUTE` are present, but no backend route or LLM pipeline is implemented.
-- `configurations.json` uses `llm_runtime_defaults`, while code expects `llm_defaults`, so LLM defaults may not load from the config file.
-- Database paging fields in `configurations.json` (`select_page_size`, `browser_page_size`) are not used in backend code.
+- Database paging fields in `configurations.json` (`select_page_size`, `browse_page_size`) are not used in backend code.
 - `MapLayerUpdateRequest` exists in schemas but has no corresponding route.
 - No authentication, rate limiting, or request quotas for external services.
 - GEONAMES table exists but no ingestion workflow is defined in the repo.

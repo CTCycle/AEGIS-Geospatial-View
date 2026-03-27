@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../constants';
-import { LocationSearchRequest, SearchResponse, SearchResponsePayload, TableInfo, TableData } from '../types';
+import { LocationSearchRequest, SearchResponse, SearchResponsePayload } from '../types';
 
 class ApiRequestError extends Error {
     detail?: unknown;
@@ -38,69 +38,6 @@ const parseSearchResponse = (value: unknown): SearchResponse => {
     };
 };
 
-const parseTableInfo = (value: unknown): TableInfo | null => {
-    if (!isRecord(value)) {
-        return null;
-    }
-    const name = value.name;
-    const displayName = value.displayName;
-    if (typeof name !== 'string' || typeof displayName !== 'string') {
-        return null;
-    }
-    return { name, displayName };
-};
-
-const parseTablesResponse = (value: unknown): TableInfo[] => {
-    if (!isRecord(value) || !Array.isArray(value.tables)) {
-        throw new Error('Failed to fetch tables');
-    }
-
-    const tables = value.tables.map(parseTableInfo);
-    const invalidEntry = tables.find((table) => table === null);
-    if (invalidEntry !== undefined) {
-        throw new Error('Failed to parse tables payload');
-    }
-
-    return tables.filter((table): table is TableInfo => table !== null);
-};
-
-const isRowRecord = (value: unknown): value is Record<string, unknown> => isRecord(value);
-
-const parseTableData = (value: unknown): TableData => {
-    if (!isRecord(value)) {
-        throw new Error('Failed to parse table data payload');
-    }
-
-    const tableName = value.tableName;
-    const displayName = value.displayName;
-    const columns = value.columns;
-    const rows = value.rows;
-    const rowCount = value.rowCount;
-    const columnCount = value.columnCount;
-
-    if (typeof tableName !== 'string' || typeof displayName !== 'string') {
-        throw new Error('Failed to parse table metadata');
-    }
-    if (!Array.isArray(columns) || columns.some((column) => typeof column !== 'string')) {
-        throw new Error('Failed to parse table columns');
-    }
-    if (!Array.isArray(rows) || rows.some((row) => !isRowRecord(row))) {
-        throw new Error('Failed to parse table rows');
-    }
-    if (typeof rowCount !== 'number' || typeof columnCount !== 'number') {
-        throw new Error('Failed to parse table stats');
-    }
-
-    return {
-        tableName,
-        displayName,
-        columns,
-        rows,
-        rowCount,
-        columnCount,
-    };
-};
-
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
     try {
         const response = await fetch(`${API_BASE_URL}/maps/search`, {
@@ -136,24 +73,3 @@ export const searchLocation = async (payload: LocationSearchRequest): Promise<Se
         throw error;
     }
 };
-
-export const fetchTables = async (): Promise<TableInfo[]> => {
-    const response = await fetch(`${API_BASE_URL}/browser/tables`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch tables');
-    }
-    const data: unknown = await response.json();
-    return parseTablesResponse(data);
-};
-
-export const fetchTableData = async (tableName: string): Promise<TableData> => {
-    const normalizedName = tableName.trim();
-    const response = await fetch(`${API_BASE_URL}/browser/tables/${encodeURIComponent(normalizedName)}`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch table data');
-    }
-    const data: unknown = await response.json();
-    return parseTableData(data);
-};
-
-export type { TableInfo, TableData } from '../types';

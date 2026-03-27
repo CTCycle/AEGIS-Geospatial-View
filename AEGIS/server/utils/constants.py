@@ -26,16 +26,10 @@ FASTAPI_TITLE = "AEGIS Geospatial Search Backend"
 FASTAPI_DESCRIPTION = "FastAPI backend"
 FASTAPI_VERSION = "1.0.0"
 MAPS_ROUTER_PREFIX = "/maps"
-BROWSER_ROUTER_PREFIX = "/browser"
 MAPS_SEARCH_ROUTE = "/search"
-MAPS_AGENTIC_ROUTE = "/agentic"
 MAPS_JOBS_ROUTE = "/jobs"
 MAPS_JOB_ROUTE = "/jobs/{job_id}"
-BROWSER_TABLES_ROUTE = "/tables"
-BROWSER_TABLE_ROUTE = "/tables/{table_name}"
-BROWSER_TABLE_STATS_ROUTE = "/tables/{table_name}/stats"
 GEO_SEARCH_URL = f"{MAPS_ROUTER_PREFIX}{MAPS_SEARCH_ROUTE}"
-GEO_AGENTIC_URL = f"{MAPS_ROUTER_PREFIX}{MAPS_AGENTIC_ROUTE}"
 
 # [SERVER URLS]
 ###############################################################################
@@ -64,41 +58,11 @@ GIBS_OWS_NAMESPACES = {"ows": "http://www.opengis.net/ows/1.1"}
 
 # [EXTERNAL DATA SOURCES]
 ###############################################################################
-DEFAULT_AGENTIC_TEMPERATURE = 0.7
-MIN_AGENTIC_TEMPERATURE = 0.0
-MAX_AGENTIC_TEMPERATURE = 2.0
 NASA_ATTRIBUTION = (
     "Imagery courtesy of NASA's Global Imagery Browse Services (GIBS), "
     "operated by the NASA/GSFC Earth Science Data and Information System "
     "(ESDIS) project."
 )
-
-# [CLIENT OPTIONS]
-###############################################################################
-OPENAI_CLOUD_MODELS = ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]
-GEMINI_CLOUD_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro",
-    "gemini-1.5-pro-latest",
-    "gemini-1.0-pro",
-    "gemini-1.0-pro-vision",
-]
-
-AGENT_MODEL_CHOICES = [
-    "gpt-oss:20b",
-    "llama3.1:8b",
-    "llama3.1:70b",
-    "phi3.5:mini",
-    "phi3.5:moe",
-    "deepseek-r1:14b",
-    "gemma3:27b",
-]
-
-CLOUD_MODEL_CHOICES: dict[str, list[str]] = {
-    "openai": OPENAI_CLOUD_MODELS,
-    "gemini": GEMINI_CLOUD_MODELS,
-}
 
 # Daily/NRT GIBS layers (updated frequently)
 GIBS_NRT_LAYERS = {

@@ -19,7 +19,6 @@ tests/
 |-- conftest.py               # Pytest configuration and fixtures
 `-- e2e/
     |-- test_app_flow.py       # UI navigation + search flows
-    |-- test_database_api.py   # /browser API tests
     `-- test_maps_api.py       # /maps/search validation + overlays
 ```
 
@@ -121,8 +120,8 @@ from playwright.sync_api import expect
 
 def test_navigation(page, base_url):
     page.goto(base_url)
-    page.get_by_role("button", name="Database Browser").click()
-    expect(page.get_by_role("heading", name="Database Browser")).to_be_visible()
+    expect(page.get_by_role("tab", name="Geospatial View")).to_be_visible()
+    expect(page.get_by_role("heading", name="AEGIS Geospatial View")).to_be_visible()
 ```
 If a text locator matches multiple nodes, prefer `get_by_role` or
 `get_by_text(..., exact=True)` to avoid strict-mode collisions.

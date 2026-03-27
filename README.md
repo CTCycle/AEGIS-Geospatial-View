@@ -157,10 +157,10 @@ and uses those URLs for readiness checks and pytest runtime config.
 ## 7. Screenshots
 
 ![Geospatial search panel](figures/search_page.png)
-Search panel for entering a place or coordinates and selecting imagery options.
+Search toolbar for entering a place or coordinates and selecting imagery options.
 
 ![Map preview output](figures/database_browser.png)
-Preview area showing the generated map and summary metadata.
+Map canvas area showing the generated output and summary metadata.
 
 ## 8. Setup and Maintenance
 Run `AEGIS/setup_and_maintenance.bat` for routine tasks:

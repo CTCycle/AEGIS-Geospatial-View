@@ -1,5 +1,3 @@
-export const CLOUD_PROVIDERS = ['openai', 'gemini'];
-
 const DEFAULT_API_BASE_URL = '/api';
 
 const trimTrailingSlashes = (value: string): string => {
@@ -31,28 +29,6 @@ export const API_BASE_URL = normalizeApiBaseUrl(
     String(import.meta.env.VITE_API_BASE_URL || ''),
     Boolean(import.meta.env.PROD),
 );
-
-export const CLOUD_MODEL_CHOICES: Record<string, string[]> = {
-    openai: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
-    gemini: [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
-        "gemini-1.5-pro-latest",
-        "gemini-1.0-pro",
-        "gemini-1.0-pro-vision",
-    ],
-};
-
-export const AGENT_MODEL_CHOICES = [
-    "gpt-oss:20b",
-    "llama3.1:8b",
-    "llama3.1:70b",
-    "phi3.5:mini",
-    "phi3.5:moe",
-    "deepseek-r1:14b",
-    "gemma3:27b",
-];
 
 // Daily/NRT GIBS layers (updated frequently)
 export const GIBS_NRT_LAYERS: Record<string, string> = {

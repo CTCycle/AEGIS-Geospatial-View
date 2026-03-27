@@ -5,14 +5,12 @@ import { SearchResponsePayload } from '../types';
 interface MapPreviewProps {
     payload?: SearchResponsePayload;
     isLoading: boolean;
-    scale?: number;
     emptyMessage?: string;
 }
 
 const MapPreview: React.FC<MapPreviewProps> = ({
     payload,
     isLoading,
-    scale = 1,
     emptyMessage = 'Run a search to display the map.',
 }) => {
     const renderContent = () => {
@@ -37,7 +35,6 @@ const MapPreview: React.FC<MapPreviewProps> = ({
                     title="Map Preview"
                     className="map-iframe"
                     srcDoc={imagery.map_html}
-                    style={{ border: 0 }}
                     scrolling="no"
                 />
             );
@@ -64,7 +61,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
 
     return (
         <div className="map-canvas">
-            <div className="map-content" style={{ transform: `scale(${scale})` }}>
+            <div className="map-content">
                 {renderContent()}
             </div>
         </div>

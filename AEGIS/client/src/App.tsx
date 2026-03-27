@@ -1,27 +1,47 @@
 import { useState } from 'react';
 import './App.css';
-import Sidebar, { PageType } from './components/Sidebar';
 import GeospatialPage from './pages/GeospatialPage';
-import DatabaseBrowserPage from './pages/DatabaseBrowserPage';
-import { DatabaseBrowserProvider } from './context/DatabaseBrowserContext';
 
 function App() {
-    const [activePage, setActivePage] = useState<PageType>('geospatial');
+    const [activeTab, setActiveTab] = useState<'geospatial'>('geospatial');
 
-    const handleNavigate = (page: PageType) => {
-        setActivePage(page);
+    const handleSelectTab = (tab: 'geospatial') => {
+        setActiveTab(tab);
     };
 
     return (
-        <DatabaseBrowserProvider>
-            <div className="app-layout">
-                <Sidebar activePage={activePage} onNavigate={handleNavigate} />
-                <main className="main-content" role="main">
-                    {activePage === 'geospatial' && <GeospatialPage />}
-                    {activePage === 'database' && <DatabaseBrowserPage />}
-                </main>
-            </div>
-        </DatabaseBrowserProvider>
+        <div className="app-shell">
+            <header className="top-navbar">
+                <div className="top-navbar__inner">
+                    <span className="top-navbar__brand">AEGIS</span>
+                    <nav aria-label="Primary tabs">
+                        <div className="top-navbar__tabs" role="tablist">
+                            <button
+                                type="button"
+                                role="tab"
+                                id="tab-geospatial"
+                                className={`top-navbar__tab ${activeTab === 'geospatial' ? 'top-navbar__tab--active' : ''}`}
+                                aria-selected={activeTab === 'geospatial'}
+                                aria-controls="panel-geospatial"
+                                onClick={() => handleSelectTab('geospatial')}
+                            >
+                                Geospatial View
+                            </button>
+                        </div>
+                    </nav>
+                </div>
+            </header>
+
+            <main className="app-content" role="main">
+                <section
+                    id="panel-geospatial"
+                    role="tabpanel"
+                    aria-labelledby="tab-geospatial"
+                >
+                    <GeospatialPage />
+                </section>
+            </main>
+        </div>
     );
 }
 
