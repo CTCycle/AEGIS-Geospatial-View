@@ -82,7 +82,10 @@ Headings:
 
 ## 5) Layout Rules
 
-- Top navigation is fixed (`--layout-navbar-height`), content must offset by navbar height.
+- Main geospatial shell is full-height and split into:
+  - Left continuous command toolbar (includes brand/logo area at top).
+  - Right full working canvas.
+- Avoid redundant top headers when the toolbar already carries app identity.
 - Primary workspace layout:
   - Left command toolbar.
   - Right output canvas.
