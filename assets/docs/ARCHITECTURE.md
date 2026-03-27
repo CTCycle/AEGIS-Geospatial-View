@@ -1,201 +1,111 @@
 # AEGIS Geospatial View Architecture
 
-## 1. High-Level Architecture Overview
+Last updated: 2026-03-28  
+Scope: `AEGIS/` and `tests/`
 
-### 1.1 Purpose and Scope
-AEGIS Geospatial View converts free-text locations or explicit coordinates into normalized bounding boxes and map previews. The system focuses on geocoding, selecting NASA GIBS satellite layers, rendering overlays, and presenting results in a web UI.
+## 1. System Overview
 
-### 1.2 System Overview
-- Frontend components: React + Vite UI with a fixed top tab navbar, left command toolbar, right map canvas, and metrics panel.
-- Backend services: FastAPI app with map search routes, geospatial services (Nominatim, GIBS, OpenAQ, Open-Elevation), Folium map rendering, and persistence for layer metadata and search sessions.
-- External dependencies and integrations: OpenStreetMap Nominatim, NASA GIBS WMS/WMTS endpoints, OpenAQ API, Open-Elevation API, Folium tile providers, SQLite/Postgres via SQLAlchemy, Pillow for imagery handling.
+AEGIS Geospatial View accepts address or coordinate-based location searches, resolves location data, composes map overlays (NASA GIBS and OpenAQ), enriches results with elevation data, and returns a rendered map payload for the React UI.
 
-### 1.3 Deployment and Runtime Assumptions
-- Backend targets Python 3.12; frontend targets Node 18+ (Windows launcher installs Node 22 and Python 3.12 in repository-root `runtimes/`).
-- Default ports: FastAPI `127.0.0.1:8000`, Vite preview `127.0.0.1:7861` (manual dev server uses 5173).
-- Vite proxies `/api/*` to the FastAPI host/port; frontend can override with `VITE_API_BASE_URL`.
-- Backend configuration is driven by `AEGIS/settings/configurations.json` and optional `AEGIS/settings/.env` (template in `AEGIS/resources/templates/.env`).
-- Embedded database uses SQLite at `AEGIS/resources/database/sqlite.db` unless external Postgres is enabled.
-- Logs are written to `AEGIS/resources/logs`.
+Main stack:
+- Frontend: React 18 + TypeScript 5 + Vite 6 (`AEGIS/client`)
+- Backend: FastAPI (`AEGIS/server`)
+- Persistence: SQLAlchemy with SQLite (embedded) or PostgreSQL (external)
+- Mapping/rendering: Folium + Pillow
 
----
+## 2. Runtime and Deployment Assumptions
 
-## 2. Codebase Structure
+- Python requirement: `>=3.14` (`pyproject.toml`)
+- Frontend runtime: Node.js 22 (portable runtime installed by launcher)
+- Local launcher: `AEGIS/start_on_windows.bat`
+- Test runner: `tests/run_tests.bat`
+- Default runtime configuration source: `AEGIS/settings/.env`
 
-### 2.1 Directory Layout
+Important ports:
+- `.env` examples default to backend `5002`, frontend `5000`
+- launcher fallback defaults are also `5002`/`5000`
+- test runner fallback defaults are `8000`/`7861`, but `.env` overrides are applied when present
 
-| Path | Description |
-|-----|-------------|
-| `/AEGIS` | Application root (frontend, backend, resources, scripts) |
-| `/AEGIS/client` | React + Vite frontend |
-| `/AEGIS/server` | FastAPI backend (routes, schemas, services) |
-| `/AEGIS/server/utils` | Configuration, constants, logger, and service helpers |
-| `/AEGIS/server/repositories` | Data persistence layer (database backends, queries, schemas, serialization) |
-| `/AEGIS/server/scripts` | Maintenance scripts (DB init, layer sync) |
-| `/AEGIS/settings` | Server configuration and environment overrides |
-| `/AEGIS/resources` | Data assets (database, logs, templates) |
-| `/runtimes` | Portable runtime binaries for Windows launcher (Python, uv, Node.js) |
-| `/AEGIS/assets` | Static assets |
-| `/docs` | Documentation |
+## 3. Repository Layout
 
-### 2.2 Key Modules
-- Backend entrypoint and routing: `AEGIS/server/app.py`, `AEGIS/server/api/search.py`.
-- Schemas and validation: `AEGIS/server/schemas/geographics.py`.
-- Geospatial services: `AEGIS/server/utils/services/geospatial/*` (GIBS, Nominatim, OpenAQ, Open-Elevation, MapService).
-- Data persistence: `AEGIS/server/repositories/database/*`, `AEGIS/server/repositories/schemas/*`, `AEGIS/server/repositories/serialization/*` (ORM-first SQLAlchemy Session + mapped models).
-- Configuration and constants: `AEGIS/server/utils/configurations/server.py`, `AEGIS/server/utils/constants.py`.
-- Frontend pages and components: `AEGIS/client/src/pages/*`, `AEGIS/client/src/components/*`.
-- Frontend API client and state: `AEGIS/client/src/services/api.ts`, `AEGIS/client/src/pages/GeospatialPage.tsx`.
+- `AEGIS/client`: React application
+- `AEGIS/server`: FastAPI application
+- `AEGIS/server/api`: route handlers
+- `AEGIS/server/domain`: request/response models
+- `AEGIS/server/services`: geospatial and job services
+- `AEGIS/server/repositories`: DB backends, schemas, serializers
+- `AEGIS/server/configurations`: server settings loader
+- `AEGIS/server/utils`: constants, logger, helpers
+- `AEGIS/settings`: `.env` and JSON configuration
+- `AEGIS/resources`: DB file, logs, templates, other local resources
+- `tests/e2e`: Playwright+pytest end-to-end tests
+- `runtimes`: portable Python/uv/Node and runtime lockfile
 
-### 2.3 Core Classes and Functions
-- FastAPI application and router wiring in `AEGIS/server/app.py`.
-- `MapSearchEndpoint`, `MapSearchToolkit`, and `MapRenderingService` orchestrate search processing in `AEGIS/server/api/search.py`.
-- `LocationSearchRequest` request model and validation in `AEGIS/server/schemas/geographics.py`.
-- `GIBSService` (NASA WMS client, caching, reprojection) in `AEGIS/server/utils/services/geospatial/gibs.py`.
-- `LayerProviderService` for layer alias resolution in `AEGIS/server/utils/services/geospatial/layers.py`.
-- `MapService` (Folium rendering) in `AEGIS/server/utils/services/geospatial/maps.py`.
-- `NormatimService` geocoding in `AEGIS/server/utils/services/geospatial/normatim.py`.
-- `OpenAQService` and `OpenElevationService` data fetchers in `AEGIS/server/utils/services/geospatial/openaq.py` and `AEGIS/server/utils/services/geospatial/elevation.py`.
-- `AEGISDatabase`, `SQLiteRepository`, and `PostgresRepository` in `AEGIS/server/repositories/database/backend.py`, `AEGIS/server/repositories/database/sqlite.py`, `AEGIS/server/repositories/database/postgres.py`.
-- `DataSerializer` for database IO in `AEGIS/server/repositories/serialization/serializer.py`.
-- `searchLocation` HTTP client in `AEGIS/client/src/services/api.ts`.
-- Top-level tabbed shell in `AEGIS/client/src/App.tsx` and workspace layout in `AEGIS/client/src/pages/GeospatialPage.tsx`.
+## 4. Backend API Surface
 
----
+Primary router prefix: `/maps`.
 
-## 3. Backend API
+Routes:
+- `POST /maps/search`: synchronous location search and map payload generation
+- `POST /maps/jobs`: start async map search job
+- `GET /maps/jobs/{job_id}`: poll job status
+- `DELETE /maps/jobs/{job_id}`: request cooperative cancellation
 
-### 3.1 API Overview
-The API is REST-style JSON over HTTP using FastAPI. Routes are grouped under `/maps`. The root path redirects to FastAPI docs. There is no versioning prefix or auth middleware configured in code.
+Compatibility mount:
+- The same routes are also exposed under `/api` (for frontend proxy paths), for example `/api/maps/search`.
 
-### 3.2 Endpoints
+Root behavior:
+- If packaged SPA is available in Tauri mode, `/` serves frontend assets.
+- Otherwise `/` redirects to `/docs`.
 
-| Method | Route | Description |
-|-------|-------|-------------|
-| GET | `/` | Redirect to `/docs` |
-| POST | `/maps/search` | Perform a geospatial search and render map overlays |
+## 5. Core Backend Flow
 
-### 3.3 Request and Response Models
-- `LocationSearchRequest` in `AEGIS/server/schemas/geographics.py` validates inputs such as `datetime`, `address/city/country` or `latitude/longitude`, `filters` (geospatial layers), bbox, map size, and imagery settings.
-- The frontend sends `filters` and also maps them to `geospatial_layers` in `AEGIS/client/src/services/api.ts`.
-- Responses from `/maps/search` include:
-  - `status_message` (string)
-  - `payload` (object) containing normalized location fields, optional bbox, and `satellite_imagery` with map HTML, overlay metadata, and image payloads.
+1. Request enters `MapSearchEndpoint` in `AEGIS/server/api/search.py`.
+2. Payload is validated via `LocationSearchRequest`.
+3. Location normalization/geocoding is performed by sanitization + Nominatim services.
+4. Overlay selection and map composition are performed by `MapRenderingService`.
+5. Optional enrichment is fetched from Open-Elevation and OpenAQ service integrations.
+6. Search session metadata is persisted through `DataSerializer`.
+7. JSON response returns `status_message` and `payload` with `satellite_imagery` content.
 
-### 3.4 Authentication and Authorization
-No authentication or authorization is implemented in the backend. All routes are publicly accessible to any caller who can reach the server.
+## 6. Background Job Model
 
-### 3.5 Error Handling
-- Validation errors from Pydantic are returned as HTTP 422 with sanitized `detail` in `AEGIS/server/api/search.py`.
-- Geospatial validation errors return HTTP 400.
-- External service failures (NASA GIBS or map rendering) return HTTP 502.
-- Unhandled exceptions propagate as FastAPI 500 responses.
+- Job execution is thread-based via `AEGIS/server/services/jobs.py`.
+- `JobManager` tracks status, progress, result, and error per job.
+- Cancellation is cooperative (`stop_requested`) and must be checked by worker logic.
+- Job routes live in the same `MapSearchEndpoint` as synchronous search.
 
----
+See `assets/docs/BACKGROUND_JOBS.md` for full details.
 
-## 4. Main Components
+## 7. Data Model Snapshot
 
-### 4.1 Component List
-- Geospatial UI: `LocationSearch`, `MapPreview`, `StatsPanel` in `AEGIS/client/src/components/*`.
-- Backend search pipeline: `MapSearchEndpoint` plus geospatial services in `AEGIS/server/api/search.py` and `AEGIS/server/utils/services/geospatial/*`.
+Main SQLAlchemy entities in `AEGIS/server/repositories/schemas/models.py`:
+- `GEONAMES`
+- `GIBS_LAYERS`
+- `SEARCH_SESSIONS`
 
-### 4.2 Responsibilities and Boundaries
-- Frontend owns user input, UI validation, and rendering of results; it does not perform geocoding or data fetching from external providers directly.
-- Backend owns geocoding, imagery selection, map rendering, external API calls, and persistence.
-- Data persistence is handled by database modules and is not directly exposed via dedicated browser endpoints.
+Database backend choice:
+- Embedded SQLite when `DB_EMBEDDED=true`
+- PostgreSQL when `DB_EMBEDDED=false`
 
----
+## 8. Frontend Architecture
 
-## 5. Main Application Flows
+- Single-page shell in `AEGIS/client/src/App.tsx`.
+- Primary workspace page: `AEGIS/client/src/pages/GeospatialPage.tsx`.
+- Layout: left search toolbar + right map canvas.
+- Service layer for API calls: `AEGIS/client/src/services/api.ts`.
 
-### 5.1 Typical Request Flow
-1. User selects address or coordinates and optional layers in the UI.
-2. Frontend builds a `LocationSearchRequest` and POSTs to `/maps/search`.
-3. Backend validates the request with `LocationSearchRequest` and normalizes filters.
-4. `LocationSanitizationService` and `NormatimService` resolve coordinates and bbox when needed.
-5. `MapRenderingService` uses `GIBSService` and `MapService` to build overlays and a Folium map HTML payload.
-6. Optional enrichment is fetched from OpenAQ and Open-Elevation.
-7. Search session metadata is stored in the database.
-8. Frontend renders the map (HTML iframe) and metrics in the stats panel.
+## 9. External Integrations
 
-### 5.2 Critical Workflows
-- User interaction flow: UI inputs -> `/maps/search` -> map preview and stats update in `GeospatialPage`.
-- Data ingestion flow: `AEGIS/server/scripts/update_gibs_layers.py` pulls NASA capabilities and stores layer metadata in the database.
-- Shell layout flow: `App.tsx` renders a fixed top tab navbar and `GeospatialPage` splits command controls (left toolbar) from output rendering (right canvas).
+- OpenStreetMap Nominatim
+- NASA GIBS
+- OpenAQ
+- Open-Elevation
 
----
+These integrations are network-dependent; failures are surfaced as request errors (typically 400/502 depending on failure type).
 
-## 6. Data Model and Data Structures
+## 10. Known Constraints
 
-### 6.1 Core Domain Entities
-- Location search request: address/city/country or coordinates, optional bbox, map tiles, imagery settings, filters.
-- Satellite imagery payload: map HTML, overlay metadata, base64 imagery or WMS URLs.
-- Layer metadata: GIBS layer id, projections, tile matrix sets, and meters-per-pixel estimates.
-- Search session: request metadata and state (success/failed).
-
-### 6.2 Database Schema
-Defined in `AEGIS/server/repositories/schemas/models.py`:
-- `GEONAMES`: geonameid, name, asciiname, alternatenames, latitude, longitude, feature_class, feature_code, country_code, admin codes, population, elevation, timezone, modification_date.
-- `GIBS_LAYERS`: layer_id, title, abstract, projections, source_urls, tile_matrix_sets, meters_per_pixel.
-- `SEARCH_SESSIONS`: id, created_at, user, country, city, address, coordinates, base_map, geospatial_layers, state.
-
-### 6.3 In-Memory Data Structures
-- `CapabilitiesCache` and `ResponseCache` in `AEGIS/server/utils/services/geospatial/gibs.py` for GIBS metadata and imagery caching.
-- Layer alias lookup in `LayerProviderService` (`AEGIS/server/utils/services/geospatial/layers.py`).
-- Country normalization lookup in `LocationSanitizationService` (`AEGIS/server/utils/services/sanitization.py`).
-
----
-
-## 7. Component Relationships
-
-### 7.1 Dependency Graph
-- Frontend (React) depends on the backend API for search and data browsing.
-- Backend depends on geospatial services (Nominatim, GIBS, OpenAQ, Open-Elevation) and database repositories.
-- Database layer depends on SQLAlchemy and an embedded SQLite file or external Postgres.
-
-### 7.2 Communication Patterns
-- Synchronous HTTP JSON between frontend and backend.
-- Backend uses blocking HTTP calls (urllib) executed in `asyncio.to_thread` for external APIs.
-- Database access via SQLAlchemy ORM (synchronous Session + mapped models).
-- No async messaging, queues, or event bus.
-
----
-
-## 8. WebSocket Implementation
-
-### 8.1 Presence and Purpose
-No WebSocket usage was found in the codebase.
-
-### 8.2 Protocol and Message Format
-Not applicable.
-
----
-
-## 9. Database Browsing and Inspection
-
-### 9.1 Admin or Browser Interfaces
-No dedicated database browser UI/API is exposed in the current application.
-
-### 9.2 Access Control and Security
-No public database browsing endpoints are exposed.
-
----
-
-## 10. Training Pipeline and Dashboard
-
-### 10.1 Training Workflow
-No training pipeline is implemented in this repository.
-
-### 10.2 Model Artifacts
-No model artifact storage or versioning is defined.
-
-### 10.3 Dashboard and Monitoring
-There is a UI stats panel for map results, but no training or model monitoring dashboards.
-
----
-
-## 11. Known Limitations and Open Questions
-- Database paging fields in `configurations.json` (`select_page_size`, `browse_page_size`) are not used in backend code.
-- `MapLayerUpdateRequest` exists in schemas but has no corresponding route.
-- No authentication, rate limiting, or request quotas for external services.
-- GEONAMES table exists but no ingestion workflow is defined in the repo.
+- No built-in authentication/authorization middleware for map endpoints.
+- External API availability can affect E2E and manual runs.
+- Job execution is in-process and thread-based, not queue-worker distributed.

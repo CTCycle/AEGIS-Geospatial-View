@@ -1,71 +1,83 @@
 # AEGIS Packaging and Runtime Modes
 
-## 1. Strategy
+Last updated: 2026-03-28
 
-AEGIS uses one active runtime file: `AEGIS/settings/.env`.
+## 1. Runtime Strategy
 
-- Local mode: run directly on host with `AEGIS/start_on_windows.bat` (default workflow).
-- Cloud mode: run with Docker (`backend` + `frontend`).
-- Mode switching: replace values in `AEGIS/settings/.env` only.
-- Runtime mode switches are configuration-only; business logic does not branch by mode.
+AEGIS uses a single active environment file:
+- `AEGIS/settings/.env`
 
-## 2. Runtime Profiles
+Profiles provided:
+- `AEGIS/settings/.env.local.example`
+- `AEGIS/settings/.env.cloud.example`
 
-- `AEGIS/settings/.env.local.example`: local defaults (loopback host values, embedded DB enabled).
-- `AEGIS/settings/.env.cloud.example`: cloud defaults (bind host values, external DB enabled).
-- `AEGIS/settings/.env`: active profile consumed by launcher, tests, and Docker runtime env loading.
-- `AEGIS/settings/configurations.json`: non-runtime defaults and service configuration fallback.
+Runtime mode switching is configuration-driven (no separate code branches for business logic).
 
-## 3. Required Environment Keys
+## 2. Supported Modes
+
+### Local mode (default for development)
+- Start with `AEGIS/start_on_windows.bat`.
+- Uses portable runtimes under `runtimes/`.
+- Typical host binding values are loopback (`127.0.0.1`).
+
+### Cloud mode (Docker)
+- Uses `docker compose` with env file values.
+- Backend and frontend run in separate containers.
+- Frontend serves SPA and proxies `/api` to backend.
+
+## 3. Environment Keys
 
 | Key | Purpose |
 |---|---|
-| `FASTAPI_HOST`, `FASTAPI_PORT` | Backend host/port in local mode and host-published backend port in Docker compose mapping. |
-| `UI_HOST`, `UI_PORT` | Frontend host/port in local mode and host-published frontend port in Docker compose mapping. |
-| `VITE_API_BASE_URL` | Frontend API base path; keep `/api` for same-origin proxying in cloud mode. |
-| `RELOAD` | Enables backend reload when running locally. |
-| `DB_EMBEDDED` | `true` uses SQLite; `false` enables external DB settings. |
-| `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection settings when `DB_EMBEDDED=false`. |
-| `DB_SSL`, `DB_SSL_CA` | External DB TLS settings. |
-| `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB connection and write-batching runtime settings. |
-| `OPTIONAL_DEPENDENCIES` | Enables optional dependency install path in local launcher. |
-| `MPLBACKEND`, `KERAS_BACKEND` | Runtime backend selection for plotting and ML stack. |
+| `FASTAPI_HOST`, `FASTAPI_PORT` | Backend host/port binding |
+| `UI_HOST`, `UI_PORT` | Frontend host/port binding |
+| `VITE_API_BASE_URL` | Frontend API base path (keep `/api` for proxied deployments) |
+| `RELOAD` | Backend hot-reload toggle for local use |
+| `DB_EMBEDDED` | `true`: SQLite embedded mode, `false`: external DB mode |
+| `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection config |
+| `DB_SSL`, `DB_SSL_CA` | External DB TLS options |
+| `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB runtime tuning |
+| `OPTIONAL_DEPENDENCIES` | Controls extra dependency install behavior in launcher |
+| `MPLBACKEND`, `KERAS_BACKEND` | Runtime backend configuration for plotting/ML dependencies |
 
-## 4. Local Mode (Default)
+## 4. Local Workflow
 
-1. Copy local profile values into active env:
-   - `copy /Y AEGIS\settings\.env.local.example AEGIS\settings\.env`
-2. Start application:
-   - `AEGIS\start_on_windows.bat`
-3. Run tests (optional):
-   - `tests\run_tests.bat`
+1. Populate active env file (copy local example if needed).
+2. Run:
 
-Local mode does not require Docker.
+```cmd
+AEGIS\start_on_windows.bat
+```
 
-## 5. Cloud Mode (Docker)
+3. (Optional) Run E2E suite:
 
-1. Copy cloud profile values into active env:
-   - `copy /Y AEGIS\settings\.env.cloud.example AEGIS\settings\.env`
-2. Build images (reproducibility check):
-   - `docker compose --env-file AEGIS/settings/.env build --no-cache`
-3. Start containers:
-   - `docker compose --env-file AEGIS/settings/.env up -d`
-4. Stop containers:
-   - `docker compose --env-file AEGIS/settings/.env down`
+```cmd
+tests\run_tests.bat
+```
 
-Cloud topology:
-- `backend`: FastAPI/Uvicorn container on internal port `8000`.
-- `frontend`: Nginx container serving SPA static assets.
-- `/api` on frontend origin is reverse-proxied to backend (`http://backend:8000/`).
-- Backend host publishing is loopback-bound (`127.0.0.1:${FASTAPI_PORT}:8000`) to reduce direct external exposure.
-- Nginx denies direct access to `/api/docs`, `/api/redoc`, `/api/openapi.json`, and `/api/maps/jobs*` in cloud mode.
+## 5. Cloud Workflow (Docker)
 
-Cloud security notes:
-- Keep `VITE_API_BASE_URL=/api`; production frontend builds fall back to `/api` when given non-relative API bases.
-- Do not commit real credentials in `AEGIS/settings/.env`; use environment-specific secrets at deploy time.
+1. Populate active env with cloud values.
+2. Build images:
+
+```cmd
+docker compose --env-file AEGIS/settings/.env build --no-cache
+```
+
+3. Start:
+
+```cmd
+docker compose --env-file AEGIS/settings/.env up -d
+```
+
+4. Stop:
+
+```cmd
+docker compose --env-file AEGIS/settings/.env down
+```
 
 ## 6. Deterministic Build Notes
 
-- Backend dependency graph is lockfile-backed via `runtimes/uv.lock` and installed with `uv sync --frozen`.
-- Frontend dependency graph is lockfile-backed via `AEGIS/client/package-lock.json` and installed with `npm ci`.
-- Docker base images are pinned with explicit tags in `docker/backend.Dockerfile` and `docker/frontend.Dockerfile`.
+- Python dependencies are lockfile-backed with `runtimes/uv.lock` and installed via `uv sync`.
+- Frontend dependencies are lockfile-backed with `AEGIS/client/package-lock.json` and installed via `npm ci`.
+- Do not commit environment secrets in `.env` files.
