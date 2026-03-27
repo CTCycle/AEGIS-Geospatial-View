@@ -1,106 +1,111 @@
 .geospatial-page {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-}
-
-.geospatial-page__header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-}
-
-.geospatial-page__title {
-    margin: 0;
-    font-size: var(--font-size-title-lg);
-    line-height: var(--line-height-tight);
-    color: var(--color-text-primary);
-}
-
-.geospatial-page__subtitle {
-    margin: 0;
-    color: var(--color-text-muted);
-    font-size: var(--font-size-body);
+    width: 100%;
+    height: 100%;
 }
 
 .geospatial-workspace {
     display: grid;
-    grid-template-columns: minmax(22rem, 1fr) minmax(0, 2.35fr);
-    gap: var(--space-4);
-    align-items: start;
+    grid-template-columns: minmax(19rem, 22.5rem) minmax(0, 1fr);
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
 }
 
-.panel {
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
-    background: var(--color-surface-panel);
-    box-shadow: var(--shadow-1);
-    padding: var(--space-4);
-}
-
-.toolbar-panel {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-}
-
+.toolbar-panel,
 .canvas-panel {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
 }
 
-.toolbar-summary {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-3);
-    border: 1px dashed var(--color-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-subtle);
-    padding: var(--space-3);
+.toolbar-panel {
+    height: 100%;
+    gap: 0.875rem;
+    padding: 0;
+    background:
+        linear-gradient(180deg, rgb(245 248 255 / 96%), rgb(239 245 255 / 92%));
+    border-right: 1px solid var(--color-border-subtle);
+    overflow-y: auto;
 }
 
-.toolbar-summary__item {
+.toolbar-brand {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+    padding: var(--space-4) var(--space-4) var(--space-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: rgb(255 255 255 / 84%);
+    backdrop-filter: blur(10px);
 }
 
-.toolbar-summary__label {
-    color: var(--color-text-muted);
+.toolbar-brand__logo {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-brand);
 }
 
-.toolbar-summary__value {
-    color: var(--color-text-primary);
-    font-size: var(--font-size-label);
-    font-weight: var(--font-weight-semibold);
+.toolbar-brand__meta {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.toolbar-panel__content {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.toolbar-panel .panel-title,
+.canvas-panel .panel-title {
+    font-size: 1.05rem;
+}
+
+.toolbar-panel .panel-description,
+.canvas-panel .panel-description {
+    margin-top: 0.2rem;
+    font-size: 0.82rem;
+}
+
+.canvas-panel {
+    min-height: 0;
+    padding: 0;
+    background:
+        linear-gradient(180deg, rgb(250 252 255 / 86%), rgb(236 243 255 / 98%)),
+        radial-gradient(circle at 14% 16%, rgb(14 165 233 / 8%), transparent 32%),
+        radial-gradient(circle at 82% 6%, rgb(37 99 235 / 8%), transparent 28%),
+        var(--color-surface-canvas);
 }
 
 .toolbar-actions {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-2);
 }
 
 .secondary-button {
     border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-panel);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 82%);
     color: var(--color-text-primary);
-    font-size: var(--font-size-label);
+    font-size: 0.82rem;
     font-weight: var(--font-weight-semibold);
-    padding: var(--space-2) var(--space-3);
-    transition: background-color 160ms ease;
+    padding: 0.45rem 0.8rem;
+    transition: background-color 160ms ease, border-color 160ms ease;
 }
 
 .secondary-button:hover:not(:disabled) {
-    background: var(--color-surface-subtle);
+    background: rgb(255 255 255 / 96%);
+    border-color: #b7c5db;
 }
 
 .secondary-button:disabled {
@@ -115,12 +120,29 @@
 
 @media (max-width: 1280px) {
     .geospatial-workspace {
-        grid-template-columns: minmax(20rem, 1fr) minmax(0, 2fr);
+        grid-template-columns: minmax(17.5rem, 19.5rem) minmax(0, 1fr);
     }
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 960px) {
     .geospatial-workspace {
         grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100%;
+    }
+
+    .toolbar-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--color-border-subtle);
+        max-height: 55vh;
+    }
+
+    .toolbar-brand {
+        position: static;
+        backdrop-filter: none;
+    }
+
+    .canvas-panel {
+        min-height: 45vh;
     }
 }
