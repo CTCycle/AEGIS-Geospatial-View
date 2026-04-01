@@ -7,7 +7,7 @@ import time
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -186,6 +186,12 @@ class GIBSService:
             "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
             "SRTM_Color_Index": 30.0,
         }
+        self.layer_date_fallback_days = {
+            "MODIS_Combined_Thermal_Anomalies_All": 3,
+            "MODIS_Combined_Thermal_Anomalies_Day": 3,
+            "MODIS_Combined_Thermal_Anomalies_Night": 3,
+            "OMPS_Ozone_Total_Column": 2,
+        }
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
@@ -324,49 +330,63 @@ class GIBSService:
         supported_imagery_date = self.resolve_supported_imagery_date(
             imagery_date_value, layer_meta
         )
-        imagery_date_token = supported_imagery_date.isoformat()
-        cache_key = self.build_cache_key(
-            layer=layer,
-            imagery_date=imagery_date_token,
-            bbox=bbox_for_request,
-            crs=actual_crs,
-            width=width,
-            height=height,
-            format_value=format_lower,
-            style_value=style_value,
-        )
-        cached = self.response_cache.get(cache_key)
-        if cached:
-            return dict(cached)
-        query = self.build_query(
-            base_url=self.resolve_base_url(actual_crs),
-            bbox=bbox_for_request,
-            crs=actual_crs,
-            width=width,
-            height=height,
-            layer=layer,
-            imagery_date=imagery_date_token,
-            format_value=format_lower,
-            style_value=style_value,
-            wms_version=wms_version,
-        )
         timeout = timeout_s or self.timeout_s
-        image_bytes, mime, final_url = self.execute_request(query, timeout)
-        response = {
-            "image_bytes": image_bytes,
-            "mime": mime,
-            "bbox": bbox_for_request,
-            "crs": actual_crs,
-            "date": imagery_date_token,
-            "layer": layer,
-            "width": width,
-            "height": height,
-            "wms_url": final_url,
-            "attribution": self.nasa_attribution,
-            "meters_per_pixel": meters_per_pixel,
-        }
-        self.response_cache.set(cache_key, dict(response))
-        return response
+        last_error: GIBSRequestError | None = None
+        for imagery_date_value in self.resolve_request_dates(
+            layer=layer,
+            imagery_date=supported_imagery_date,
+        ):
+            imagery_date_token = imagery_date_value.isoformat()
+            cache_key = self.build_cache_key(
+                layer=layer,
+                imagery_date=imagery_date_token,
+                bbox=bbox_for_request,
+                crs=actual_crs,
+                width=width,
+                height=height,
+                format_value=format_lower,
+                style_value=style_value,
+            )
+            cached = self.response_cache.get(cache_key)
+            if cached:
+                return dict(cached)
+            query = self.build_query(
+                base_url=self.resolve_base_url(actual_crs),
+                bbox=bbox_for_request,
+                crs=actual_crs,
+                width=width,
+                height=height,
+                layer=layer,
+                imagery_date=imagery_date_token,
+                format_value=format_lower,
+                style_value=style_value,
+                wms_version=wms_version,
+            )
+            try:
+                image_bytes, mime, final_url = self.execute_request(query, timeout)
+            except GIBSRequestError as exc:
+                last_error = exc
+                if self.should_retry_previous_date(layer=layer, error=exc):
+                    continue
+                raise
+            response = {
+                "image_bytes": image_bytes,
+                "mime": mime,
+                "bbox": bbox_for_request,
+                "crs": actual_crs,
+                "date": imagery_date_token,
+                "layer": layer,
+                "width": width,
+                "height": height,
+                "wms_url": final_url,
+                "attribution": self.nasa_attribution,
+                "meters_per_pixel": meters_per_pixel,
+            }
+            self.response_cache.set(cache_key, dict(response))
+            return response
+        if last_error is not None:
+            raise last_error
+        raise GIBSRequestError("GIBS GetMap failed without a usable fallback date.")
 
     # -------------------------------------------------------------------------
     def normalize_bbox(
@@ -723,6 +743,22 @@ class GIBSService:
         if max_supported and imagery_date > max_supported:
             return max_supported
         return imagery_date
+
+    # -------------------------------------------------------------------------
+    def resolve_request_dates(self, *, layer: str, imagery_date: date) -> list[date]:
+        fallback_days = self.layer_date_fallback_days.get(layer, 0)
+        return [imagery_date - timedelta(days=offset) for offset in range(fallback_days + 1)]
+
+    # -------------------------------------------------------------------------
+    def should_retry_previous_date(self, *, layer: str, error: GIBSRequestError) -> bool:
+        if self.layer_date_fallback_days.get(layer, 0) <= 0:
+            return False
+        message = str(error).lower()
+        return (
+            "gibs getmap returned non image payload" in message
+            or "shapefile cannot be found" in message
+            or "failed to draw layer named" in message
+        )
 
     # -------------------------------------------------------------------------
     def ensure_layer_temporal_support(

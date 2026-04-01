@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 
-import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, MAX_GEOSPATIAL_LAYERS, DATA_PROVIDERS, LAYER_PROVIDERS } from '../constants';
+import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, DATA_PROVIDERS, LAYER_PROVIDERS } from '../constants';
 import { LocationSearchRequest } from '../types';
 import PanelHeader from './PanelHeader';
 import './LocationSearch.css';
@@ -21,7 +21,6 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
     const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
     const [selectedProvider, setSelectedProvider] = useState('all');
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
-    const hasReachedFilterLimit = selectedFilters.length >= MAX_GEOSPATIAL_LAYERS;
 
     const currentProviderDescription = useMemo(() => {
         const provider = DATA_PROVIDERS.find(p => p.id === selectedProvider);
@@ -117,13 +116,8 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
         if (!value) {
             return;
         }
-        if (hasReachedFilterLimit) {
-            return;
-        }
         const normalized = value === 'None' ? '' : value;
-        if (normalized && !selectedFilters.includes(normalized)) {
-            setSelectedFilters([...selectedFilters, normalized]);
-        }
+        setSelectedFilters(normalized ? [normalized] : []);
     };
 
     const removeFilter = (filter: string) => {
@@ -253,7 +247,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                             handleFilterSelect(e.target.value);
                             e.target.value = '';
                         }}
-                        disabled={hasReachedFilterLimit || Object.keys(filteredLayers).length === 0}
+                        disabled={Object.keys(filteredLayers).length === 0}
                     >
                         <option value="" disabled>
                             {Object.keys(filteredLayers).length === 0
@@ -270,15 +264,10 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 
             <div className="form-group">
                 <p className="helper-text">
-                    Choose multiple layers; click a chip to remove. Up to {MAX_GEOSPATIAL_LAYERS} overlays.
+                    Select one layer at a time. Choosing a new layer replaces the previous selection.
                 </p>
-                {hasReachedFilterLimit && (
-                    <p className="error-text">
-                        Maximum overlays selected. Remove one to add another.
-                    </p>
-                )}
                 <div className="chip-container">
-                    {selectedFilters.length === 0 && <span className="no-filters">No filters selected</span>}
+                    {selectedFilters.length === 0 && <span className="no-filters">No layer selected</span>}
                     {selectedFilters.map((filter) => (
                         <button
                             key={filter}

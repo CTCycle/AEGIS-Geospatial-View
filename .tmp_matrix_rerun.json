@@ -1,0 +1,2354 @@
+[
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Street Map",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Light",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Cartographic Dark",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Shaded Terrain",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "High-Contrast Toner",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Watercolor Canvas",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Esri World Imagery",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Topographic Relief",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Transit Network",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Jawg Dark",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "National Geographic",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "address",
+    "base_map": "Ocean Basemap",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Street Map",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Light",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Cartographic Dark",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Shaded Terrain",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "High-Contrast Toner",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Watercolor Canvas",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Esri World Imagery",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Topographic Relief",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Transit Network",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Jawg Dark",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "National Geographic",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "None",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "True Color Satellite (VIIRS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Aerosol Optical Depth (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Surface Temperature Day (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Surface Temperature Night (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Vegetation Index NDVI (MODIS, 8-day)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Land/Water Mask (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Precipitation Rate (IMERG, 30min)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Nighttime Lights (VIIRS, Monthly)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Active Fires (MODIS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Ozone Column (OMPS, Daily)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Land Cover Type (MODIS, Annual)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Elevation DEM (SRTM)",
+    "status": 200,
+    "detail": null
+  },
+  {
+    "mode": "coordinates",
+    "base_map": "Ocean Basemap",
+    "layer": "Air Quality (OpenAQ, Real-time)",
+    "status": 200,
+    "detail": null
+  }
+]
