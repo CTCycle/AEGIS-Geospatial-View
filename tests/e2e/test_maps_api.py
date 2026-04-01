@@ -61,21 +61,6 @@ class TestMapSearchSuccess:
         assert isinstance(imagery.get("map_html"), str)
         assert imagery.get("map_html"), "Expected map HTML to be populated."
 
-    def test_search_with_openaq_overlay_includes_overlays(
-        self, api_context: APIRequestContext
-    ):
-        payload = build_coordinate_payload(geospatial_layers=["OpenAQ_Air_Quality"])
-        response = post_search(api_context, payload)
-        assert response.ok, f"Expected 200, got {response.status}"
-
-        data = response.json()
-        overlays = (
-            data.get("payload", {}).get("satellite_imagery", {}).get("overlays", [])
-        )
-        assert isinstance(overlays, list)
-        assert overlays, "Expected at least one overlay entry."
-        assert any(entry.get("provider") == "openaq" for entry in overlays)
-
     def test_search_with_gibs_overlay_includes_overlays(
         self, api_context: APIRequestContext
     ):
@@ -130,3 +115,9 @@ class TestMapSearchValidation:
         assert response.status == 400
         assert_error_contains(response, "Unsupported")
         assert_error_contains(response, "EPSG:9999")
+
+    def test_search_rejects_removed_layer(self, api_context: APIRequestContext):
+        payload = build_coordinate_payload(geospatial_layers=["OpenAQ_Air_Quality"])
+        response = post_search(api_context, payload)
+        assert response.status == 400
+        assert_error_contains(response, "not available")

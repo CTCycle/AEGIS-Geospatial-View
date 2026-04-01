@@ -32,13 +32,8 @@ __all__ = [
 
 # -----------------------------------------------------------------------------
 def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
-    default_value = (default_tiles or "").strip()
-    options = {
-        name: label for name, label in COMMON_FOLIUM_MAPS.items() if name.strip()
-    }
-    if default_value and default_value not in options:
-        options = {default_value: default_value, **options}
-    return options
+    del default_tiles
+    return {name: label for name, label in COMMON_FOLIUM_MAPS.items() if name.strip()}
 
 
 ###############################################################################
@@ -73,6 +68,15 @@ class MapService:
         if default_delay_s is None:
             default_delay_s = server_settings.map.render_delay_s
         self.default_delay_s = max(float(default_delay_s), 0.0)
+
+    # -------------------------------------------------------------------------
+    def resolve_base_tiles(self, tiles: str | None) -> tuple[str, list[str]]:
+        selected_tiles = (tiles or self.tiles).strip() or self.tiles
+        warnings: list[str] = []
+        available_tiles = get_map_tile_options(self.tiles)
+        if selected_tiles not in available_tiles:
+            raise MapValidationError(f"Map tile '{selected_tiles}' is not available.")
+        return selected_tiles, warnings
 
     # -------------------------------------------------------------------------
     def normalize_bbox(self, bbox: BBox) -> BBox:
@@ -179,12 +183,12 @@ class MapService:
             location=[center_lat, center_lon],
             zoom_start=17,
             tiles=None,
-            width=width_value,
-            height=height_value,
+            width="100%",
+            height="100%",
             control_scale=True,
             zoom_control=True,
         )
-        base_tiles = tiles or self.tiles
+        base_tiles, render_warnings = self.resolve_base_tiles(tiles)
         folium.TileLayer(
             base_tiles,
             name="Base Map",
@@ -201,7 +205,6 @@ class MapService:
         render_time_s = round(time.perf_counter() - start_ts, 3)
         image_bytes: bytes = b""
         mime_type = "text/html"
-        render_warnings: list[str] = []
         if not map_html:
             raise MapRequestError("Unable to render map image.")
         return {

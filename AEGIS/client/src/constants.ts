@@ -50,11 +50,6 @@ export const GIBS_ANNUAL_LAYERS: Record<string, string> = {
     "SRTM_Color_Index": "Elevation DEM (SRTM)",
 };
 
-// External API providers (non-GIBS)
-export const EXTERNAL_LAYERS: Record<string, string> = {
-    "OpenAQ_Air_Quality": "Air Quality (OpenAQ, Real-time)",
-};
-
 // Provider definitions with metadata
 export type Provider = {
     id: string;
@@ -66,17 +61,12 @@ export const DATA_PROVIDERS: Provider[] = [
     {
         id: 'all',
         name: 'All Providers',
-        description: 'Browse all available geospatial layers from NASA, air quality networks, and other sources.'
+        description: 'Browse all available geospatial layers from NASA satellite and environmental datasets.'
     },
     {
         id: 'gibs',
         name: 'NASA GIBS',
         description: 'NASA Global Imagery Browse Services provides satellite imagery and environmental data including temperature, vegetation, and atmospheric conditions.'
-    },
-    {
-        id: 'openaq',
-        name: 'OpenAQ',
-        description: 'Real-time air quality measurements from monitoring stations worldwide, including PM2.5, ozone, and other pollutants.'
     },
 ];
 
@@ -85,28 +75,20 @@ export const LAYER_PROVIDERS: Record<string, string> = {
     // All GIBS layers map to 'gibs'
     ...Object.fromEntries(Object.keys(GIBS_NRT_LAYERS).map(k => [k, 'gibs'])),
     ...Object.fromEntries(Object.keys(GIBS_ANNUAL_LAYERS).map(k => [k, 'gibs'])),
-    // External layers
-    "OpenAQ_Air_Quality": "openaq",
 };
 
 // Combined layers for UI selection
 export const COMMON_GEOSPATIAL_LAYERS: Record<string, string> = {
     ...GIBS_NRT_LAYERS,
     ...GIBS_ANNUAL_LAYERS,
-    ...EXTERNAL_LAYERS,
 };
 
 export const COMMON_FOLIUM_MAPS: Record<string, string> = {
     "OpenStreetMap": "Street Map",
     "CartoDB Positron": "Cartographic Light",
     "CartoDB Dark_Matter": "Cartographic Dark",
-    "Stamen Terrain": "Shaded Terrain",
-    "Stamen Toner": "High-Contrast Toner",
-    "Stamen Watercolor": "Watercolor Canvas",
     "Esri WorldImagery": "Esri World Imagery",
     "OpenTopoMap": "Topographic Relief",
-    "Thunderforest.Transport": "Transit Network",
-    "Jawg.Dark": "Jawg Dark",
     "Esri NatGeoWorldMap": "National Geographic",
     "Esri OceanBasemap": "Ocean Basemap",
 };

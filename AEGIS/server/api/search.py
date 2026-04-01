@@ -36,7 +36,6 @@ from AEGIS.server.services.geospatial.gibs import (
     GIBSService,
     GIBSValidationError,
 )
-from AEGIS.server.services.geospatial.openaq import OpenAQService
 from AEGIS.server.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.services.geospatial.layers import (
     LayerProviderError,
@@ -60,7 +59,6 @@ map_service = MapService()
 layer_service = LayerProviderService(
     metadata_provider=gibs_service.resolve_layer_meters_per_pixel
 )
-openaq_service = OpenAQService()
 elevation_service = OpenElevationService()
 
 type CoordinatePair = tuple[float, float]
@@ -427,9 +425,12 @@ class MapRenderingService:
         span_x, span_y = self.gibs_service.bbox_span_in_meters(map_bbox, "EPSG:4326")
         if span_x >= target_span_x and span_y >= target_span_y:
             return map_bbox
-        return self.gibs_service.expand_bbox_to_span(
-            map_bbox, "EPSG:4326", target_span_x, target_span_y
-        )
+        try:
+            return self.gibs_service.expand_bbox_to_span(
+                map_bbox, "EPSG:4326", target_span_x, target_span_y
+            )
+        except GIBSValidationError:
+            return map_bbox
 
     # -------------------------------------------------------------------------
     async def _render_layer_overlays(
@@ -512,35 +513,13 @@ class MapRenderingService:
                 bbox=bbox,
                 radius_m=payload.radius_m,
                 date=imagery_date,
-                layer=entry.name,
+                layer=entry.provider_name or entry.name,
                 width=payload.image_width,
                 height=payload.image_height,
                 crs=payload.image_crs,
                 format=payload.image_format,
+                skip_bbox_expansion=True,
             )
-        if entry.provider == "openaq":
-            # OpenAQ returns point data, not imagery - extract coordinates from bbox
-            if bbox and len(bbox) == 4:
-                center_lon = (bbox[0] + bbox[2]) / 2
-                center_lat = (bbox[1] + bbox[3]) / 2
-            elif lon is not None and lat is not None:
-                center_lon, center_lat = lon, lat
-            else:
-                raise LayerProviderError("Coordinates required for OpenAQ provider.")
-            air_quality_data = await openaq_service.get_nearby_measurements(
-                lat=center_lat,
-                lon=center_lon,
-                radius_m=payload.radius_m or 25000.0,
-            )
-            # Return in overlay-compatible format
-            return {
-                "data": air_quality_data,
-                "bbox": bbox,
-                "crs": "EPSG:4326",
-                "layer": entry.name,
-                "provider": "openaq",
-                "mode": "data",  # Indicates non-imagery overlay
-            }
         raise LayerProviderError(
             f"No imagery service registered for provider '{entry.provider}'."
         )

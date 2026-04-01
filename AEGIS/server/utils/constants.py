@@ -84,16 +84,10 @@ GIBS_ANNUAL_LAYERS = {
     "SRTM_Color_Index": "Elevation DEM (SRTM)",
 }
 
-# External API providers (non-GIBS)
-EXTERNAL_LAYERS = {
-    "OpenAQ_Air_Quality": "Air Quality (OpenAQ, Real-time)",
-}
-
 # Combined layers for UI selection
 COMMON_GEOSPATIAL_LAYERS = {
     **GIBS_NRT_LAYERS,
     **GIBS_ANNUAL_LAYERS,
-    **EXTERNAL_LAYERS,
 }
 
 GEOSPATIAL_LAYER_CHOICES = [
@@ -105,13 +99,8 @@ COMMON_FOLIUM_MAPS = {
     "OpenStreetMap": "Street Map",
     "CartoDB Positron": "Cartographic Light",
     "CartoDB Dark_Matter": "Cartographic Dark",
-    "Stamen Terrain": "Shaded Terrain",
-    "Stamen Toner": "High-Contrast Toner",
-    "Stamen Watercolor": "Watercolor Canvas",
     "Esri WorldImagery": "Esri World Imagery",
     "OpenTopoMap": "Topographic Relief",
-    "Thunderforest.Transport": "Transit Network",
-    "Jawg.Dark": "Jawg Dark",
     "Esri NatGeoWorldMap": "National Geographic",
     "Esri OceanBasemap": "Ocean Basemap",
 }
