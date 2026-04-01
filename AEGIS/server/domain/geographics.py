@@ -65,6 +65,10 @@ class LocationSearchRequest(BaseModel):
     radius_m: float = Field(default=2500.0, gt=0)
     map_size_m: float = Field(default=server_settings.map.default_size_m, gt=0)
     map_tiles: str | None = Field(default=server_settings.map.tiles, max_length=200)
+    basemap_id: str | None = Field(default=None, max_length=120)
+    overlay_ids: list[str] = Field(default_factory=list)
+    aoi: dict[str, Any] | None = Field(default=None)
+    commute: dict[str, Any] | None = Field(default=None)
     image_width: int = Field(default=server_settings.gibs.image_width, ge=512, le=2048)
     image_height: int = Field(
         default=server_settings.gibs.image_height, ge=512, le=2048
@@ -113,6 +117,14 @@ class LocationSearchRequest(BaseModel):
         if len(candidates) > 10:
             raise ValueError("At most 10 geospatial filters are allowed.")
         return candidates
+
+    # -------------------------------------------------------------------------
+    @field_validator("overlay_ids", mode="before")
+    @classmethod
+    def normalize_overlay_ids(
+        cls, value: list[str] | tuple[str, ...] | str | None
+    ) -> list[str]:
+        return cls.normalize_filters(value)
 
     # -------------------------------------------------------------------------
     @field_validator("geospatial_filter", mode="before")
@@ -171,6 +183,15 @@ class LocationSearchRequest(BaseModel):
             return server_settings.map.tiles
         normalized = str(value).strip()
         return normalized or server_settings.map.tiles
+
+    # -------------------------------------------------------------------------
+    @field_validator("basemap_id", mode="before")
+    @classmethod
+    def normalize_basemap_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
 
     # -------------------------------------------------------------------------
     @model_validator(mode="after")

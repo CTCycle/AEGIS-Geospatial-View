@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import LocationSearch from '../components/LocationSearch';
 import MapPreview from '../components/MapPreview';
 import PanelHeader from '../components/PanelHeader';
-import { searchLocation } from '../services/api';
-import { LocationSearchRequest, SearchResponsePayload } from '../types';
+import { fetchCatalog, searchLocation } from '../services/api';
+import { CatalogResponse, LocationSearchRequest, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
 
 interface SearchResultState {
@@ -21,8 +21,34 @@ const readErrorField = (error: unknown, field: string): unknown => {
 
 function GeospatialPage() {
     const [isLoading, setIsLoading] = useState(false);
+    const [isCatalogLoading, setIsCatalogLoading] = useState(false);
     const [searchResult, setSearchResult] = useState<SearchResultState>({});
     const [lastRequest, setLastRequest] = useState<LocationSearchRequest | undefined>();
+    const [catalog, setCatalog] = useState<CatalogResponse>({
+        providers: [],
+        basemaps: [],
+        overlays: [],
+    });
+    const [catalogError, setCatalogError] = useState<string | undefined>();
+
+    useEffect(() => {
+        const loadCatalog = async () => {
+            setIsCatalogLoading(true);
+            setCatalogError(undefined);
+            try {
+                const response = await fetchCatalog();
+                setCatalog(response);
+            } catch (error) {
+                const messageCandidate = readErrorField(error, 'message');
+                setCatalogError(
+                    typeof messageCandidate === 'string' ? messageCandidate : 'Failed to load provider catalog',
+                );
+            } finally {
+                setIsCatalogLoading(false);
+            }
+        };
+        loadCatalog();
+    }, []);
 
     const handleSearch = async (request: LocationSearchRequest) => {
         setIsLoading(true);
@@ -80,7 +106,13 @@ function GeospatialPage() {
                                 Re-run last search
                             </button>
                         </div>
-                        <LocationSearch onSearch={handleSearch} isLoading={isLoading} />
+                        {catalogError && <p className="error-text">{catalogError}</p>}
+                        <LocationSearch
+                            onSearch={handleSearch}
+                            isLoading={isLoading}
+                            catalog={catalog}
+                            isCatalogLoading={isCatalogLoading}
+                        />
                     </div>
                 </aside>
 

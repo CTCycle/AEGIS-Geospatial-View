@@ -14,6 +14,7 @@ from PIL import Image
 from pydantic import ValidationError
 
 from AEGIS.server.utils.constants import (
+    MAPS_CATALOG_ROUTE,
     MAPS_JOB_ROUTE,
     MAPS_JOBS_ROUTE,
     MAPS_ROUTER_PREFIX,
@@ -37,6 +38,9 @@ from AEGIS.server.services.geospatial.gibs import (
     GIBSValidationError,
 )
 from AEGIS.server.services.geospatial.elevation import OpenElevationService
+from AEGIS.server.services.geospatial.openaq import OpenAQService
+from AEGIS.server.services.geospatial.pvgis import PVGISService
+from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
 from AEGIS.server.services.geospatial.layers import (
     LayerProviderError,
     LayerProviderEntry,
@@ -60,6 +64,12 @@ layer_service = LayerProviderService(
     metadata_provider=gibs_service.resolve_layer_meters_per_pixel
 )
 elevation_service = OpenElevationService()
+openaq_service = OpenAQService()
+pvgis_service = PVGISService()
+catalog_service = GeospatialCatalogService(
+    openaq_service=openaq_service,
+    pvgis_service=pvgis_service,
+)
 
 type CoordinatePair = tuple[float, float]
 DEFAULT_OVERLAY_COLOR = "#2563eb"
@@ -775,6 +785,7 @@ class MapSearchEndpoint:
         toolkit: MapSearchToolkit,
         rendering_service: MapRenderingService,
         job_manager: JobManager,
+        catalog_service: GeospatialCatalogService,
     ) -> None:
         self.router = router
         self.sanitization_service = sanitization_service
@@ -782,6 +793,7 @@ class MapSearchEndpoint:
         self.toolkit = toolkit
         self.renderer = rendering_service
         self.job_manager = job_manager
+        self.catalog_service = catalog_service
         self.serializer = DataSerializer()
 
     # -------------------------------------------------------------------------
@@ -836,6 +848,19 @@ class MapSearchEndpoint:
             if payload
             else self.toolkit.normalize_layers(fallback.get("geospatial_layers") or [])
         )
+        overlay_ids = (
+            list(payload.overlay_ids)
+            if payload
+            else self.toolkit.normalize_layers(fallback.get("overlay_ids") or [])
+        )
+        if overlay_ids:
+            layers = list(dict.fromkeys([*layers, *overlay_ids]))
+        basemap_id = payload.basemap_id if payload else fallback.get("basemap_id")
+        persisted_selection = {
+            "legacy_layers": layers,
+            "overlay_ids": overlay_ids,
+            "basemap_id": basemap_id,
+        }
         record = {
             "id": None,
             "created_at": datetime.utcnow(),
@@ -845,10 +870,83 @@ class MapSearchEndpoint:
             "address": payload.address if payload else fallback.get("address"),
             "coordinates": self.format_coordinate_pair(coordinates),
             "base_map": payload.map_tiles if payload else fallback.get("map_tiles"),
-            "geospatial_layers": json.dumps(layers) if layers else None,
+            "geospatial_layers": json.dumps(persisted_selection),
             "state": state,
         }
         return record
+
+    # -------------------------------------------------------------------------
+    def _resolve_overlay_ids(self, payload: LocationSearchRequest) -> list[str]:
+        legacy_layers = self.toolkit.normalize_layers(payload.filters)
+        explicit_overlays = self.toolkit.normalize_layers(payload.overlay_ids)
+        resolved = list(explicit_overlays)
+        for layer in legacy_layers:
+            if layer not in resolved:
+                resolved.append(layer)
+        return resolved
+
+    # -------------------------------------------------------------------------
+    async def build_map_session(
+        self,
+        *,
+        payload: LocationSearchRequest,
+        search_payload: dict[str, Any],
+        satellite_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        overlays = self.catalog_service.resolve_overlays(
+            self._resolve_overlay_ids(payload)
+        )
+        if not overlays:
+            legacy_overlays = satellite_payload.get("overlays", [])
+            if isinstance(legacy_overlays, list):
+                for entry in legacy_overlays:
+                    if not isinstance(entry, dict):
+                        continue
+                    overlays.append(
+                        {
+                            "id": str(entry.get("name") or "legacy_overlay"),
+                            "label": str(entry.get("label") or "Legacy Overlay"),
+                            "provider": str(entry.get("provider") or "gibs"),
+                            "type": "legacy-image",
+                            "default_opacity": float(entry.get("opacity", 0.68)),
+                            "coverage": "dynamic",
+                            "requires_key": False,
+                            "attribution": entry.get("attribution"),
+                        }
+                    )
+        basemap = self.catalog_service.resolve_basemap(payload.basemap_id)
+        latitude = search_payload.get("latitude")
+        longitude = search_payload.get("longitude")
+        try:
+            lat_value = float(latitude) if latitude is not None else None
+            lon_value = float(longitude) if longitude is not None else None
+        except (TypeError, ValueError):
+            lat_value = None
+            lon_value = None
+        radius_m = float(payload.radius_m or 2500.0)
+        insights = await self.catalog_service.fetch_insights(
+            latitude=lat_value,
+            longitude=lon_value,
+            overlay_ids=[item["id"] for item in overlays],
+            radius_m=radius_m,
+        )
+        compliance_warnings = self.catalog_service.resolve_compliance_warnings(
+            basemap=basemap,
+            overlays=overlays,
+        )
+        center = {
+            "latitude": lat_value,
+            "longitude": lon_value,
+        }
+        bounds = satellite_payload.get("bbox")
+        return {
+            "center": center,
+            "bounds": bounds,
+            "basemap": basemap,
+            "overlays": overlays,
+            "insights": insights,
+            "compliance_warnings": compliance_warnings,
+        }
 
     # -------------------------------------------------------------------------
     async def record_search_session(
@@ -944,6 +1042,15 @@ class MapSearchEndpoint:
                 detail=str(exc),
             ) from exc
         search_payload["satellite_imagery"] = satellite_payload
+        map_session = await self.build_map_session(
+            payload=payload,
+            search_payload=search_payload,
+            satellite_payload=satellite_payload,
+        )
+        search_payload["map_session"] = map_session
+        search_payload["compliance_warnings"] = map_session.get(
+            "compliance_warnings", []
+        )
 
         # Fetch elevation data for the search location
         lat = search_payload.get("latitude")
@@ -959,6 +1066,8 @@ class MapSearchEndpoint:
         return {
             "status_message": "Map search request submitted.",
             "payload": search_payload,
+            "map_session": map_session,
+            "compliance_warnings": map_session.get("compliance_warnings", []),
         }
 
     # -------------------------------------------------------------------------
@@ -999,6 +1108,15 @@ class MapSearchEndpoint:
                 ) from exc
 
             search_payload["satellite_imagery"] = satellite_payload
+            map_session = await self.build_map_session(
+                payload=payload,
+                search_payload=search_payload,
+                satellite_payload=satellite_payload,
+            )
+            search_payload["map_session"] = map_session
+            search_payload["compliance_warnings"] = map_session.get(
+                "compliance_warnings", []
+            )
             self.job_manager.update_progress(job_id, 70.0)
 
             lat = search_payload.get("latitude")
@@ -1014,6 +1132,8 @@ class MapSearchEndpoint:
             response_payload = {
                 "status_message": "Map search request submitted.",
                 "payload": search_payload,
+                "map_session": map_session,
+                "compliance_warnings": map_session.get("compliance_warnings", []),
             }
             self.job_manager.update_result(job_id, response_payload)
             if self.job_manager.should_stop(job_id):
@@ -1064,6 +1184,10 @@ class MapSearchEndpoint:
         latitude: float | None = Body(default=None),
         longitude: float | None = Body(default=None),
         geospatial_layers: list[str] = Body(default_factory=list),
+        basemap_id: str | None = Body(default=None),
+        overlay_ids: list[str] = Body(default_factory=list),
+        aoi: dict[str, Any] | None = Body(default=None),
+        commute: dict[str, Any] | None = Body(default=None),
         bbox: list[float] | None = Body(default=None),
         radius_m: float | None = Body(default=None),
         map_size_m: float | None = Body(default=None),
@@ -1083,6 +1207,8 @@ class MapSearchEndpoint:
             "longitude": longitude,
             "latitude": latitude,
             "geospatial_layers": list(geospatial_layers),
+            "overlay_ids": list(overlay_ids),
+            "basemap_id": basemap_id,
             "map_tiles": map_tiles or server_settings.map.tiles,
         }
         try:
@@ -1097,6 +1223,10 @@ class MapSearchEndpoint:
                 "latitude": latitude,
                 "longitude": longitude,
                 "filters": geospatial_layers,
+                "overlay_ids": overlay_ids,
+                "basemap_id": basemap_id,
+                "aoi": aoi,
+                "commute": commute,
                 "bbox": bbox,
             }
             payload_data["image_width"] = server_settings.gibs.image_width
@@ -1158,6 +1288,10 @@ class MapSearchEndpoint:
         latitude: float | None = Body(default=None),
         longitude: float | None = Body(default=None),
         geospatial_layers: list[str] = Body(default_factory=list),
+        basemap_id: str | None = Body(default=None),
+        overlay_ids: list[str] = Body(default_factory=list),
+        aoi: dict[str, Any] | None = Body(default=None),
+        commute: dict[str, Any] | None = Body(default=None),
         bbox: list[float] | None = Body(default=None),
         radius_m: float | None = Body(default=None),
         map_size_m: float | None = Body(default=None),
@@ -1177,6 +1311,8 @@ class MapSearchEndpoint:
             "longitude": longitude,
             "latitude": latitude,
             "geospatial_layers": list(geospatial_layers),
+            "overlay_ids": list(overlay_ids),
+            "basemap_id": basemap_id,
             "map_tiles": map_tiles or server_settings.map.tiles,
         }
         try:
@@ -1191,6 +1327,10 @@ class MapSearchEndpoint:
                 "latitude": latitude,
                 "longitude": longitude,
                 "filters": geospatial_layers,
+                "overlay_ids": overlay_ids,
+                "basemap_id": basemap_id,
+                "aoi": aoi,
+                "commute": commute,
                 "bbox": bbox,
             }
             payload_data["image_width"] = server_settings.gibs.image_width
@@ -1270,7 +1410,18 @@ class MapSearchEndpoint:
         )
 
     # -------------------------------------------------------------------------
+    async def get_catalog(self) -> JSONResponse:
+        catalog = await asyncio.to_thread(self.catalog_service.list_catalog)
+        return JSONResponse(content=catalog)
+
+    # -------------------------------------------------------------------------
     def add_routes(self) -> None:
+        self.router.add_api_route(
+            MAPS_CATALOG_ROUTE,
+            self.get_catalog,
+            methods=["GET"],
+            status_code=status.HTTP_200_OK,
+        )
         self.router.add_api_route(
             MAPS_SEARCH_ROUTE,
             self.search_by_location,
@@ -1317,5 +1468,6 @@ search_endpoint = MapSearchEndpoint(
     toolkit=toolkit,
     rendering_service=rendering_service,
     job_manager=job_manager,
+    catalog_service=catalog_service,
 )
 search_endpoint.add_routes()

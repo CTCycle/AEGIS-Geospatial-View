@@ -151,13 +151,15 @@
     background: var(--color-accent-soft);
 }
 
+.chip--selected {
+    background: var(--color-brand);
+    color: var(--color-text-on-brand);
+    border-color: var(--color-brand);
+}
+
 .chip:focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
-}
-
-.chip-close {
-    font-size: 0.64rem;
 }
 
 .no-filters {
