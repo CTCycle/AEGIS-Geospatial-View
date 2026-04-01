@@ -70,6 +70,13 @@ export interface CatalogOverlay {
     requires_key: boolean;
     url?: string | null;
     layers?: string;
+    layer_id?: string;
+    tile_matrix_set?: string;
+    wmts_format?: string;
+    wmts_style?: string;
+    wms_version?: string;
+    wms_exceptions?: string;
+    bounds?: [number, number, number, number];
     attribution?: string;
 }
 

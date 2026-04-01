@@ -181,6 +181,11 @@ class GeospatialCatalogService:
                 "requires_key": False,
                 "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer",
                 "layers": "0",
+                "wms_version": "1.1.1",
+                "wms_exceptions": "application/vnd.ogc.se_inimage",
+                # Approximate Europe/EEA extent in EPSG:4326 to reduce out-of-coverage
+                # tile requests that trigger ArcGIS WMS errors.
+                "bounds": [-35.0, 24.0, 45.0, 72.0],
                 "attribution": "© European Environment Agency (CC BY 4.0 where applicable)",
             },
             {
@@ -193,6 +198,9 @@ class GeospatialCatalogService:
                 "requires_key": False,
                 "url": "https://services.terrascope.be/wmts/v2",
                 "layer_id": "WORLDCOVER_2021_MAP",
+                "tile_matrix_set": "EPSG:3857",
+                "wmts_format": "image/png",
+                "wmts_style": "",
                 "attribution": "© ESA WorldCover / Terrascope",
             },
             {

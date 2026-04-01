@@ -10,6 +10,70 @@ interface MapPreviewProps {
     emptyMessage?: string;
 }
 
+type OverlayEntry = NonNullable<MapSession['overlays']>[number];
+
+const appendQuery = (baseUrl: string, query: string): string => {
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${separator}${query}`;
+};
+
+const normalizeOverlayBounds = (
+    bounds?: [number, number, number, number],
+): [number, number, number, number] | undefined => {
+    if (!Array.isArray(bounds) || bounds.length !== 4) {
+        return undefined;
+    }
+    const [minLon, minLat, maxLon, maxLat] = bounds;
+    return [minLon, minLat, maxLon, maxLat];
+};
+
+const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
+    if (!overlay.url) {
+        return null;
+    }
+    const layers = overlay.layers || '0';
+    const version = overlay.wms_version || '1.1.1';
+    const exceptions = overlay.wms_exceptions || 'application/vnd.ogc.se_inimage';
+    const query = [
+        'service=WMS',
+        'request=GetMap',
+        `layers=${encodeURIComponent(layers)}`,
+        'styles=',
+        'format=image/png',
+        'transparent=true',
+        `version=${encodeURIComponent(version)}`,
+        'srs=EPSG:3857',
+        `exceptions=${encodeURIComponent(exceptions)}`,
+        'bbox={bbox-epsg-3857}',
+        'width=256',
+        'height=256',
+    ].join('&');
+    return appendQuery(overlay.url, query);
+};
+
+const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
+    if (!overlay.url) {
+        return null;
+    }
+    const layerId = overlay.layer_id || overlay.layers || '0';
+    const matrixSet = overlay.tile_matrix_set || 'EPSG:3857';
+    const format = overlay.wmts_format || 'image/png';
+    const style = overlay.wmts_style ?? '';
+    const query = [
+        'service=WMTS',
+        'request=GetTile',
+        'version=1.0.0',
+        `layer=${encodeURIComponent(layerId)}`,
+        `style=${encodeURIComponent(style)}`,
+        `tilematrixset=${encodeURIComponent(matrixSet)}`,
+        `tilematrix=${matrixSet}:{z}`,
+        'tilerow={y}',
+        'tilecol={x}',
+        `format=${encodeURIComponent(format)}`,
+    ].join('&');
+    return appendQuery(overlay.url, query);
+};
+
 const buildStyle = (mapSession?: MapSession): StyleSpecification => {
     const basemap = mapSession?.basemap;
     const baseTileUrl = basemap?.tile_url || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -41,13 +105,23 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
         const sourceId = `overlay-source-${overlay.id}`;
         const layerId = `overlay-layer-${overlay.id}`;
         const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : 0.65;
+        const sourceBounds = normalizeOverlayBounds(overlay.bounds);
 
         if (overlay.type === 'tile' && overlay.url) {
-            map.addSource(sourceId, {
+            const rasterSource: {
+                type: 'raster';
+                tiles: string[];
+                tileSize: number;
+                bounds?: [number, number, number, number];
+            } = {
                 type: 'raster',
                 tiles: [overlay.url],
                 tileSize: 256,
-            });
+            };
+            if (sourceBounds) {
+                rasterSource.bounds = sourceBounds;
+            }
+            map.addSource(sourceId, rasterSource);
             map.addLayer({
                 id: layerId,
                 source: sourceId,
@@ -57,13 +131,53 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
             return;
         }
 
-        if ((overlay.type === 'wms' || overlay.type === 'wmts') && overlay.url) {
-            const wmsTiles = `${overlay.url}?service=WMS&request=GetMap&layers=${overlay.layers || '0'}&styles=&format=image/png&transparent=true&version=1.1.1&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=256&height=256`;
-            map.addSource(sourceId, {
+        if (overlay.type === 'wms' && overlay.url) {
+            const wmsTiles = buildWmsTileUrl(overlay);
+            if (!wmsTiles) {
+                return;
+            }
+            const rasterSource: {
+                type: 'raster';
+                tiles: string[];
+                tileSize: number;
+                bounds?: [number, number, number, number];
+            } = {
                 type: 'raster',
                 tiles: [wmsTiles],
                 tileSize: 256,
+            };
+            if (sourceBounds) {
+                rasterSource.bounds = sourceBounds;
+            }
+            map.addSource(sourceId, rasterSource);
+            map.addLayer({
+                id: layerId,
+                source: sourceId,
+                type: 'raster',
+                paint: { 'raster-opacity': opacity },
             });
+            return;
+        }
+
+        if (overlay.type === 'wmts' && overlay.url) {
+            const wmtsTiles = buildWmtsTileUrl(overlay);
+            if (!wmtsTiles) {
+                return;
+            }
+            const rasterSource: {
+                type: 'raster';
+                tiles: string[];
+                tileSize: number;
+                bounds?: [number, number, number, number];
+            } = {
+                type: 'raster',
+                tiles: [wmtsTiles],
+                tileSize: 256,
+            };
+            if (sourceBounds) {
+                rasterSource.bounds = sourceBounds;
+            }
+            map.addSource(sourceId, rasterSource);
             map.addLayer({
                 id: layerId,
                 source: sourceId,

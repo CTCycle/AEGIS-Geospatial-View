@@ -55,6 +55,31 @@ def test_resolve_overlays_ignores_unknown_entries() -> None:
     assert resolved[0]["id"] == "openaq_air_quality"
 
 
+def test_catalog_exposes_eea_esa_overlay_transport_metadata() -> None:
+    service = GeospatialCatalogService(
+        openaq_service=_OpenAQStub(),  # type: ignore[arg-type]
+        pvgis_service=_PVGISStub(),  # type: ignore[arg-type]
+    )
+
+    overlays = service.list_catalog()["overlays"]
+    lookup = {item["id"]: item for item in overlays}
+
+    eea = lookup["eea_noise_2019"]
+    assert eea["type"] == "wms"
+    assert eea["layers"] == "0"
+    assert eea["wms_version"] == "1.1.1"
+    assert eea["wms_exceptions"] == "application/vnd.ogc.se_inimage"
+    assert isinstance(eea["bounds"], list)
+    assert len(eea["bounds"]) == 4
+
+    esa = lookup["esa_worldcover"]
+    assert esa["type"] == "wmts"
+    assert esa["layer_id"] == "WORLDCOVER_2021_MAP"
+    assert esa["tile_matrix_set"] == "EPSG:3857"
+    assert esa["wmts_format"] == "image/png"
+    assert esa["wmts_style"] == ""
+
+
 def test_insights_are_cached_for_same_aoi() -> None:
     service = GeospatialCatalogService(
         openaq_service=_OpenAQStub(),  # type: ignore[arg-type]

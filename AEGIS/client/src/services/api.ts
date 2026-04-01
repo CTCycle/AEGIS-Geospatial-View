@@ -87,6 +87,16 @@ const parseCatalogResponse = (value: unknown): CatalogResponse => {
                 requires_key: Boolean(item.requires_key),
                 url: typeof item.url === 'string' ? item.url : null,
                 layers: typeof item.layers === 'string' ? item.layers : undefined,
+                layer_id: typeof item.layer_id === 'string' ? item.layer_id : undefined,
+                tile_matrix_set: typeof item.tile_matrix_set === 'string' ? item.tile_matrix_set : undefined,
+                wmts_format: typeof item.wmts_format === 'string' ? item.wmts_format : undefined,
+                wmts_style: typeof item.wmts_style === 'string' ? item.wmts_style : undefined,
+                wms_version: typeof item.wms_version === 'string' ? item.wms_version : undefined,
+                wms_exceptions: typeof item.wms_exceptions === 'string' ? item.wms_exceptions : undefined,
+                bounds: Array.isArray(item.bounds) && item.bounds.length === 4
+                    && item.bounds.every((value) => typeof value === 'number')
+                    ? item.bounds as [number, number, number, number]
+                    : undefined,
                 attribution: typeof item.attribution === 'string' ? item.attribution : undefined,
             })),
     };
