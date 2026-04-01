@@ -4,7 +4,10 @@ import asyncio
 import json
 import math
 import socket
+import threading
+import time
 import unicodedata
+from collections import OrderedDict
 from difflib import SequenceMatcher
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -29,6 +32,12 @@ class NormatimService:
         self.user_agent = user_agent or server_settings.nominatim.user_agent
         default_timeout = server_settings.nominatim.timeout
         self.timeout = timeout if timeout is not None else default_timeout
+        self._request_lock = threading.Lock()
+        self._last_request_started_at = 0.0
+        self._min_request_interval_s = 1.0
+        self._search_cache: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+        self._reverse_cache: OrderedDict[str, dict[str, Any] | None] = OrderedDict()
+        self._max_cache_entries = 128
 
     # -----------------------------------------------------------------------------
     async def extract_coordinates(
@@ -106,19 +115,16 @@ class NormatimService:
 
     # -----------------------------------------------------------------------------
     def perform_request(self, params: dict[str, str]) -> list[dict[str, Any]]:
-        url = f"{self.base_url}?{urlencode(params)}"
-        request = Request(url, headers={"User-Agent": self.user_agent})
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                payload = response.read()
-        except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
-            logger.warning("Normatim request failed: %s", exc)
-            return []
-        try:
-            data = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            logger.warning("Normatim response parsing failed: %s", exc)
-            return []
+        cache_key = urlencode(sorted(params.items()))
+        cached = self._cache_get(self._search_cache, cache_key)
+        if cached is not None:
+            return [dict(item) for item in cached]
+        data = self._perform_json_request(
+            url=f"{self.base_url}?{urlencode(params)}",
+            cache_key=cache_key,
+            cache=self._search_cache,
+            request_kind="search",
+        )
         if not isinstance(data, list):
             return []
         return [item for item in data if isinstance(item, dict)]
@@ -126,22 +132,69 @@ class NormatimService:
     # -----------------------------------------------------------------------------
     def perform_reverse_request(self, params: dict[str, str]) -> dict[str, Any] | None:
         reverse_url = self.resolve_reverse_url()
-        url = f"{reverse_url}?{urlencode(params)}"
+        cache_key = urlencode(sorted(params.items()))
+        cached = self._cache_get(self._reverse_cache, cache_key)
+        if cached is not None:
+            return dict(cached) if isinstance(cached, dict) else None
+        data = self._perform_json_request(
+            url=f"{reverse_url}?{urlencode(params)}",
+            cache_key=cache_key,
+            cache=self._reverse_cache,
+            request_kind="reverse",
+        )
+        if isinstance(data, dict):
+            return data
+        return None
+
+    # -----------------------------------------------------------------------------
+    def _perform_json_request(
+        self,
+        *,
+        url: str,
+        cache_key: str,
+        cache: OrderedDict[str, Any],
+        request_kind: str,
+    ) -> Any:
+        self._wait_for_rate_limit_slot()
         request = Request(url, headers={"User-Agent": self.user_agent})
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 payload = response.read()
         except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
-            logger.warning("Normatim reverse request failed: %s", exc)
+            logger.warning("Normatim %s request failed: %s", request_kind, exc)
             return None
         try:
             data = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            logger.warning("Normatim reverse response parsing failed: %s", exc)
+            logger.warning("Normatim %s response parsing failed: %s", request_kind, exc)
             return None
-        if isinstance(data, dict):
-            return data
-        return None
+        self._cache_set(cache, cache_key, data)
+        return data
+
+    # -----------------------------------------------------------------------------
+    def _wait_for_rate_limit_slot(self) -> None:
+        with self._request_lock:
+            now = time.monotonic()
+            remaining = self._min_request_interval_s - (now - self._last_request_started_at)
+            if remaining > 0:
+                time.sleep(remaining)
+            self._last_request_started_at = time.monotonic()
+
+    # -----------------------------------------------------------------------------
+    def _cache_get(self, cache: OrderedDict[str, Any], key: str) -> Any:
+        with self._request_lock:
+            if key not in cache:
+                return None
+            cache.move_to_end(key)
+            return cache[key]
+
+    # -----------------------------------------------------------------------------
+    def _cache_set(self, cache: OrderedDict[str, Any], key: str, value: Any) -> None:
+        with self._request_lock:
+            cache[key] = value
+            cache.move_to_end(key)
+            while len(cache) > self._max_cache_entries:
+                cache.popitem(last=False)
 
     # -----------------------------------------------------------------------------
     def format_result(

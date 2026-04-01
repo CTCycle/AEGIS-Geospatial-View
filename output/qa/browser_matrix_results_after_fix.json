@@ -1,0 +1,4562 @@
+[
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "b.tile.opentopomap.org",
+        "a.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "address",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenStreetMap",
+    "map_label": "Street Map",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "tile.openstreetmap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Positron",
+    "map_label": "Cartographic Light",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "CartoDB Dark_Matter",
+    "map_label": "Cartographic Dark",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "b.basemaps.cartocdn.com",
+        "c.basemaps.cartocdn.com",
+        "a.basemaps.cartocdn.com",
+        "d.basemaps.cartocdn.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 0,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri WorldImagery",
+    "map_label": "Esri World Imagery",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "OpenTopoMap",
+    "map_label": "Topographic Relief",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "c.tile.opentopomap.org",
+        "a.tile.opentopomap.org",
+        "b.tile.opentopomap.org"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri NatGeoWorldMap",
+    "map_label": "National Geographic",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 30,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 30,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+    "layer_label": "True Color Satellite (VIIRS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "True Color Satellite (VIIRS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_Aerosol",
+    "layer_label": "Aerosol Optical Depth (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Aerosol Optical Depth (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Day",
+    "layer_label": "Surface Temperature Day (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Day (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_Land_Surface_Temp_Night",
+    "layer_label": "Surface Temperature Night (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Surface Temperature Night (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_NDVI_8Day",
+    "layer_label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Vegetation Index NDVI (MODIS, 8-day)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Terra_L3_Land_Water_Mask",
+    "layer_label": "Land/Water Mask (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land/Water Mask (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "IMERG_Precipitation_Rate",
+    "layer_label": "Precipitation Rate (IMERG, 30min)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Precipitation Rate (IMERG, 30min)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "VIIRS_SNPP_DayNightBand_ENCC",
+    "layer_label": "Nighttime Lights (VIIRS, Monthly)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Nighttime Lights (VIIRS, Monthly)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layer_label": "Active Fires (MODIS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Active Fires (MODIS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "OMPS_Ozone_Total_Column",
+    "layer_label": "Ozone Column (OMPS, Daily)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Ozone Column (OMPS, Daily)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "layer_label": "Land Cover Type (MODIS, Annual)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Land Cover Type (MODIS, Annual)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  },
+  {
+    "mode": "coordinates",
+    "map": "Esri OceanBasemap",
+    "map_label": "Ocean Basemap",
+    "layer": "SRTM_Color_Index",
+    "layer_label": "Elevation DEM (SRTM)",
+    "api_status": 200,
+    "ui_state": "iframe",
+    "frame_stats": {
+      "loadedLeafletTiles": 25,
+      "brokenLeafletTiles": 0,
+      "leafletTileCount": 25,
+      "overlayImageCount": 1,
+      "overlayImagesLoaded": 1,
+      "markerIcons": 0,
+      "svgPaths": 3,
+      "layerLabels": [
+        "Base Map",
+        "Elevation DEM (SRTM)"
+      ],
+      "tileHosts": [
+        "server.arcgisonline.com"
+      ]
+    },
+    "network_errors": []
+  }
+]
