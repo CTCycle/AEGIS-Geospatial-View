@@ -24,6 +24,7 @@ class LayerProviderEntry:
     provider: str
     label: str
     aliases: tuple[str, ...]
+    provider_name: str | None = None
     resolution_m: float | None = None
 
 
@@ -119,6 +120,7 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
     },
     "MODIS_Combined_Thermal_Anomalies_Fire": {
         "provider": "gibs",
+        "provider_name": "MODIS_Combined_Thermal_Anomalies_All",
         "aliases": (
             "active fires",
             "fire",
@@ -156,18 +158,6 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, LayerDefinition] = {
             "digital elevation model",
             "terrain",
             "topography",
-        ),
-    },
-    # External API providers (non-GIBS)
-    "OpenAQ_Air_Quality": {
-        "provider": "openaq",
-        "aliases": (
-            "air quality",
-            "air pollution",
-            "pm2.5",
-            "pm25",
-            "pollution",
-            "aqi",
         ),
     },
 }
@@ -208,6 +198,10 @@ class LayerProviderService:
                 provider=provider,
                 label=label,
                 aliases=aliases,
+                provider_name=str(
+                    specification.get("provider_name") or name
+                ).strip()
+                or name,
                 resolution_m=resolution_value,
             )
         return entries
