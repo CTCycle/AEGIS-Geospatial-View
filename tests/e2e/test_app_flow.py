@@ -32,4 +32,4 @@ class TestSearchUI:
         page.get_by_label("Latitude").fill("41.9028")
         page.get_by_label("Longitude").fill("12.4964")
         page.get_by_role("button", name="Search", exact=True).click()
-        expect(page.locator("iframe.map-iframe")).to_be_visible(timeout=45000)
+        expect(page.locator(".maplibre-container")).to_be_visible(timeout=45000)

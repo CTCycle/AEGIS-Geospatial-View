@@ -23,6 +23,9 @@ def build_coordinate_payload(**overrides: object) -> dict[str, object]:
 def post_search(api_context: APIRequestContext, payload: dict[str, object]):
     return api_context.post("/maps/search", data=payload)
 
+def get_catalog(api_context: APIRequestContext):
+    return api_context.get("/maps/catalog")
+
 
 def assert_error_contains(response, expected: str) -> None:
     body = response.json()
@@ -81,6 +84,29 @@ class TestMapSearchSuccess:
         assert isinstance(overlays, list)
         assert overlays, "Expected at least one overlay entry."
         assert any(entry.get("provider") == "gibs" for entry in overlays)
+
+    def test_catalog_returns_core_collections(self, api_context: APIRequestContext):
+        response = get_catalog(api_context)
+        assert response.ok, f"Expected 200, got {response.status}"
+        data = response.json()
+        assert isinstance(data.get("providers"), list)
+        assert isinstance(data.get("basemaps"), list)
+        assert isinstance(data.get("overlays"), list)
+
+    def test_search_accepts_overlay_ids(self, api_context: APIRequestContext):
+        payload = build_coordinate_payload(
+            overlay_ids=["openaq_air_quality", "pvgis_solar"],
+            basemap_id="osm_default",
+        )
+        response = post_search(api_context, payload)
+        assert response.ok, f"Expected 200, got {response.status}"
+        data = response.json()
+        map_session = data.get("payload", {}).get("map_session", {})
+        overlays = map_session.get("overlays", [])
+        assert isinstance(overlays, list)
+        overlay_ids = {entry.get("id") for entry in overlays if isinstance(entry, dict)}
+        assert "openaq_air_quality" in overlay_ids
+        assert "pvgis_solar" in overlay_ids
 
 class TestMapSearchValidation:
     """Validation error handling for map search."""

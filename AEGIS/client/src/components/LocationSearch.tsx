@@ -1,42 +1,49 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 
-import { COMMON_FOLIUM_MAPS, COMMON_GEOSPATIAL_LAYERS, DATA_PROVIDERS, LAYER_PROVIDERS } from '../constants';
-import { LocationSearchRequest } from '../types';
+import { CatalogResponse, LocationSearchRequest } from '../types';
 import PanelHeader from './PanelHeader';
 import './LocationSearch.css';
 
 interface LocationSearchProps {
     onSearch: (request: LocationSearchRequest) => void;
     isLoading: boolean;
+    catalog: CatalogResponse;
+    isCatalogLoading: boolean;
 }
 
 type SearchMode = 'address' | 'coordinates';
 
-const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) => {
+const LocationSearch: React.FC<LocationSearchProps> = ({
+    onSearch,
+    isLoading,
+    catalog,
+    isCatalogLoading,
+}) => {
     const [mode, setMode] = useState<SearchMode>('address');
     const [address, setAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
-    const [mapTile, setMapTile] = useState('OpenStreetMap');
-    const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+    const [radiusM, setRadiusM] = useState('2500');
     const [selectedProvider, setSelectedProvider] = useState('all');
+    const [selectedBasemapId, setSelectedBasemapId] = useState<string>('osm_default');
+    const [selectedOverlayIds, setSelectedOverlayIds] = useState<string[]>([]);
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
 
-    const currentProviderDescription = useMemo(() => {
-        const provider = DATA_PROVIDERS.find(p => p.id === selectedProvider);
-        return provider?.description || '';
-    }, [selectedProvider]);
+    const providers = useMemo(() => {
+        return [{ id: 'all', name: 'All providers', docs_url: '', commercial_notes: 'Show all providers', warning_level: 'low' }, ...catalog.providers];
+    }, [catalog.providers]);
 
-    const filteredLayers = useMemo(() => {
+    const filteredOverlays = useMemo(() => {
         if (selectedProvider === 'all') {
-            return COMMON_GEOSPATIAL_LAYERS;
+            return catalog.overlays;
         }
-        return Object.fromEntries(
-            Object.entries(COMMON_GEOSPATIAL_LAYERS).filter(
-                ([key]) => LAYER_PROVIDERS[key] === selectedProvider
-            ),
-        );
-    }, [selectedProvider]);
+        return catalog.overlays.filter((item) => item.provider === selectedProvider);
+    }, [catalog.overlays, selectedProvider]);
+
+    const currentProviderDescription = useMemo(() => {
+        const provider = catalog.providers.find((p) => p.id === selectedProvider);
+        return provider?.commercial_notes || '';
+    }, [catalog.providers, selectedProvider]);
 
     const resetErrors = () => setErrors({});
 
@@ -71,9 +78,17 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
         return '';
     };
 
+    const getSelectedLegacyFilters = (): string[] => {
+        return selectedOverlayIds
+            .filter((id) => id.startsWith('GIBS_'))
+            .map((id) => id.replace(/^GIBS_/, ''));
+    };
+
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
         resetErrors();
+        const radiusValue = Number.parseFloat(radiusM);
+        const normalizedRadius = Number.isFinite(radiusValue) && radiusValue > 0 ? radiusValue : 2500;
 
         if (mode === 'address') {
             const addressError = validateAddress();
@@ -89,14 +104,16 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                 setErrors(newErrors);
                 return;
             }
-
             const request: LocationSearchRequest = {
                 datetime: new Date().toISOString(),
                 use_coordinates: true,
                 latitude: parsedLat,
                 longitude: parsedLon,
-                map_tiles: mapTile,
-                filters: selectedFilters,
+                radius_m: normalizedRadius,
+                filters: getSelectedLegacyFilters(),
+                overlay_ids: selectedOverlayIds,
+                basemap_id: selectedBasemapId,
+                aoi: { mode: 'radius', radius_m: normalizedRadius },
             };
             onSearch(request);
             return;
@@ -106,72 +123,22 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
             datetime: new Date().toISOString(),
             use_coordinates: false,
             address: address.trim(),
-            map_tiles: mapTile,
-            filters: selectedFilters,
+            radius_m: normalizedRadius,
+            filters: getSelectedLegacyFilters(),
+            overlay_ids: selectedOverlayIds,
+            basemap_id: selectedBasemapId,
+            aoi: { mode: 'radius', radius_m: normalizedRadius },
         };
         onSearch(request);
     };
 
-    const handleFilterSelect = (value: string) => {
-        if (!value) {
-            return;
-        }
-        const normalized = value === 'None' ? '' : value;
-        setSelectedFilters(normalized ? [normalized] : []);
+    const toggleOverlay = (overlayId: string) => {
+        setSelectedOverlayIds((current) => (
+            current.includes(overlayId)
+                ? current.filter((item) => item !== overlayId)
+                : [...current, overlayId]
+        ));
     };
-
-    const removeFilter = (filter: string) => {
-        setSelectedFilters(selectedFilters.filter((f) => f !== filter));
-    };
-
-    const renderAddressFields = () => (
-        <div className="field-grid">
-            <div className="form-group full-width">
-                <label htmlFor="address">Full Address</label>
-                <input
-                    id="address"
-                    type="text"
-                    placeholder="e.g., Via Tesserete 29, Tesserete, Svizzera"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    aria-describedby="location-helper"
-                />
-                <p className="helper-text">Enter a complete address including street, city, and country</p>
-                {errors.address && <p className="error-text">{errors.address}</p>}
-            </div>
-        </div>
-    );
-
-    const renderCoordinateFields = () => (
-        <div className="field-grid">
-            <div className="form-group">
-                <label htmlFor="latitude">Latitude</label>
-                <input
-                    id="latitude"
-                    type="number"
-                    step="0.000001"
-                    placeholder="Decimal degrees from -90 to 90"
-                    value={latitude}
-                    onChange={(e) => setLatitude(e.target.value)}
-                />
-                <p className="helper-text">Numeric value, -90 to 90</p>
-                {errors.latitude && <p className="error-text">{errors.latitude}</p>}
-            </div>
-            <div className="form-group">
-                <label htmlFor="longitude">Longitude</label>
-                <input
-                    id="longitude"
-                    type="number"
-                    step="0.000001"
-                    placeholder="Decimal degrees from -180 to 180"
-                    value={longitude}
-                    onChange={(e) => setLongitude(e.target.value)}
-                />
-                <p className="helper-text">Numeric value, -180 to 180</p>
-                {errors.longitude && <p className="error-text">{errors.longitude}</p>}
-            </div>
-        </div>
-    );
 
     return (
         <form className="location-container" onSubmit={handleSubmit}>
@@ -201,28 +168,76 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                 </fieldset>
             </div>
 
-            <div className="group-label">Location</div>
-            <p id="location-helper" className="helper-text">
-                Choose address mode or coordinate mode. Validation applies only to the active mode.
-            </p>
+            {mode === 'address' && (
+                <div className="form-group full-width">
+                    <label htmlFor="address">Full Address</label>
+                    <input
+                        id="address"
+                        type="text"
+                        placeholder="e.g., Via Tesserete 29, Tesserete, Svizzera"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                    />
+                    {errors.address && <p className="error-text">{errors.address}</p>}
+                </div>
+            )}
+            {mode === 'coordinates' && (
+                <div className="field-grid">
+                    <div className="form-group">
+                        <label htmlFor="latitude">Latitude</label>
+                        <input
+                            id="latitude"
+                            type="number"
+                            step="0.000001"
+                            value={latitude}
+                            onChange={(e) => setLatitude(e.target.value)}
+                        />
+                        {errors.latitude && <p className="error-text">{errors.latitude}</p>}
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="longitude">Longitude</label>
+                        <input
+                            id="longitude"
+                            type="number"
+                            step="0.000001"
+                            value={longitude}
+                            onChange={(e) => setLongitude(e.target.value)}
+                        />
+                        {errors.longitude && <p className="error-text">{errors.longitude}</p>}
+                    </div>
+                </div>
+            )}
 
-            {mode === 'address' ? renderAddressFields() : renderCoordinateFields()}
-
-            <div className="group-label">Map context</div>
-            <p className="helper-text">Select base map and optional geospatial filters to include in results.</p>
             <div className="field-grid">
                 <div className="form-group">
-                    <label htmlFor="base-map">Base map</label>
+                    <label htmlFor="radius-m">AOI Radius (m)</label>
+                    <input
+                        id="radius-m"
+                        type="number"
+                        min={100}
+                        step={100}
+                        value={radiusM}
+                        onChange={(e) => setRadiusM(e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label htmlFor="basemap">Basemap</label>
                     <select
-                        id="base-map"
-                        value={mapTile}
-                        onChange={(e) => setMapTile(e.target.value)}
+                        id="basemap"
+                        value={selectedBasemapId}
+                        onChange={(e) => setSelectedBasemapId(e.target.value)}
+                        disabled={isCatalogLoading}
                     >
-                        {Object.entries(COMMON_FOLIUM_MAPS).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
+                        {catalog.basemaps.map((basemap) => (
+                            <option key={basemap.id} value={basemap.id}>
+                                {basemap.label}
+                            </option>
                         ))}
                     </select>
                 </div>
+            </div>
+
+            <div className="field-grid">
                 <div className="form-group">
                     <label htmlFor="data-provider">Data provider</label>
                     <select
@@ -230,62 +245,40 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
                         value={selectedProvider}
                         onChange={(e) => setSelectedProvider(e.target.value)}
                     >
-                        {DATA_PROVIDERS.map((provider) => (
-                            <option key={provider.id} value={provider.id}>{provider.name}</option>
+                        {providers.map((provider) => (
+                            <option key={provider.id} value={provider.id}>
+                                {provider.name || provider.id}
+                            </option>
                         ))}
                     </select>
-                </div>
-            </div>
-            <p className="provider-description">{currentProviderDescription}</p>
-            <div className="field-grid">
-                <div className="form-group full-width">
-                    <label htmlFor="geospatial-layer">Geospatial layer</label>
-                    <select
-                        id="geospatial-layer"
-                        defaultValue=""
-                        onChange={(e) => {
-                            handleFilterSelect(e.target.value);
-                            e.target.value = '';
-                        }}
-                        disabled={Object.keys(filteredLayers).length === 0}
-                    >
-                        <option value="" disabled>
-                            {Object.keys(filteredLayers).length === 0
-                                ? 'No layers available for this provider'
-                                : 'Select a layer...'}
-                        </option>
-                        <option value="None">None</option>
-                        {Object.entries(filteredLayers).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                        ))}
-                    </select>
+                    {currentProviderDescription && (
+                        <p className="provider-description">{currentProviderDescription}</p>
+                    )}
                 </div>
             </div>
 
-            <div className="form-group">
-                <p className="helper-text">
-                    Select one layer at a time. Choosing a new layer replaces the previous selection.
-                </p>
+            <div className="form-group full-width">
+                <label>Overlay layers</label>
                 <div className="chip-container">
-                    {selectedFilters.length === 0 && <span className="no-filters">No layer selected</span>}
-                    {selectedFilters.map((filter) => (
+                    {filteredOverlays.map((overlay) => (
                         <button
-                            key={filter}
-                            className="chip"
+                            key={overlay.id}
                             type="button"
-                            title={COMMON_GEOSPATIAL_LAYERS[filter] || filter}
-                            onClick={() => removeFilter(filter)}
-                            aria-label={`Remove ${COMMON_GEOSPATIAL_LAYERS[filter] || filter}`}
+                            className={`chip ${selectedOverlayIds.includes(overlay.id) ? 'chip--selected' : ''}`}
+                            onClick={() => toggleOverlay(overlay.id)}
+                            aria-pressed={selectedOverlayIds.includes(overlay.id)}
                         >
-                            {COMMON_GEOSPATIAL_LAYERS[filter] || filter}
-                            <span className="chip-close">✕</span>
+                            {overlay.label}
                         </button>
                     ))}
+                    {filteredOverlays.length === 0 && (
+                        <span className="no-filters">No overlays available for provider.</span>
+                    )}
                 </div>
             </div>
 
             <div className="actions">
-                <button className="primary-button" type="submit" disabled={isLoading}>
+                <button className="primary-button" type="submit" disabled={isLoading || isCatalogLoading}>
                     {isLoading ? 'Searching...' : 'Search'}
                 </button>
             </div>
@@ -294,4 +287,3 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSearch, isLoading }) 
 };
 
 export default LocationSearch;
-
