@@ -42,20 +42,20 @@ cls
 echo ==========================================================================
 echo                         Setup and Maintenance
 echo ==========================================================================
-echo 1. Remove logs
-echo 2. Uninstall app
-echo 3. Initialize database
-echo 4. Update NASA GIBS layers
-echo 5. Clean desktop build artifacts
+echo 1. Initialize database
+echo 2. Update NASA GIBS layers
+echo 3. Clean desktop build artifacts
+echo 4. Remove logs
+echo 5. Uninstall app
 echo 6. Exit
 echo.
 set /p sub_choice="Select an option (1-6): "
 
-if "%sub_choice%"=="1" goto :logs
-if "%sub_choice%"=="2" goto :uninstall
-if "%sub_choice%"=="3" goto :run_init_db
-if "%sub_choice%"=="4" goto :run_gibs
-if "%sub_choice%"=="5" goto :clean_desktop
+if "%sub_choice%"=="1" goto :run_init_db
+if "%sub_choice%"=="2" goto :run_gibs
+if "%sub_choice%"=="3" goto :clean_desktop
+if "%sub_choice%"=="4" goto :logs
+if "%sub_choice%"=="5" goto :uninstall
 if "%sub_choice%"=="6" goto :exit
 echo Invalid option, try again.
 pause
