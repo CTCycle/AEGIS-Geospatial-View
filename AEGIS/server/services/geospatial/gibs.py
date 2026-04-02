@@ -6,7 +6,6 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -15,9 +14,12 @@ from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
 from AEGIS.server.configurations import server_settings
+from AEGIS.server.domain.gibs import Capabilities, LayerCatalogEntry, LayerMetadata
 from AEGIS.server.utils.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
+    GIBS_LAYER_DATE_FALLBACK_DAYS,
+    GIBS_LAYER_NATIVE_RESOLUTION_M,
     GIBS_LAYERS_TABLE,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
@@ -58,32 +60,6 @@ class GIBSPayloadIntegrityError(GIBSRequestError):
     """Raised when NASA returns incomplete imagery payloads."""
 
 
-###############################################################################
-@dataclass(frozen=True)
-class LayerMetadata:
-    name: str
-    supported_crs: frozenset[str]
-    formats: frozenset[str]
-    time_extent: str | None
-
-
-###############################################################################
-@dataclass(frozen=True)
-class LayerCatalogEntry:
-    name: str
-    projections: frozenset[str]
-    meters_per_pixel: tuple[float, ...]
-
-
-###############################################################################
-@dataclass(frozen=True)
-class Capabilities:
-    layers: LayerStore
-    supported_formats: frozenset[str]
-    retrieved_at: float
-
-
-###############################################################################
 class CapabilitiesCache:
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
@@ -170,28 +146,8 @@ class GIBSService:
             else settings.min_visual_radius_m
         )
         self.layer_catalog = self.load_layer_catalog()
-        self.layer_native_resolution_m = {
-            # Daily/NRT layers
-            "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
-            "MODIS_Terra_Aerosol": 10000.0,
-            "MODIS_Terra_Land_Surface_Temp_Day": 1000.0,
-            "MODIS_Terra_Land_Surface_Temp_Night": 1000.0,
-            "MODIS_Terra_NDVI_8Day": 250.0,
-            "MODIS_Terra_L3_Land_Water_Mask": 250.0,
-            "IMERG_Precipitation_Rate": 11000.0,
-            "VIIRS_SNPP_DayNightBand_ENCC": 500.0,
-            "MODIS_Combined_Thermal_Anomalies_Fire": 1000.0,
-            "OMPS_Ozone_Total_Column": 50000.0,
-            # Annual/static layers
-            "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
-            "SRTM_Color_Index": 30.0,
-        }
-        self.layer_date_fallback_days = {
-            "MODIS_Combined_Thermal_Anomalies_All": 3,
-            "MODIS_Combined_Thermal_Anomalies_Day": 3,
-            "MODIS_Combined_Thermal_Anomalies_Night": 3,
-            "OMPS_Ozone_Total_Column": 2,
-        }
+        self.layer_native_resolution_m = dict(GIBS_LAYER_NATIVE_RESOLUTION_M)
+        self.layer_date_fallback_days = dict(GIBS_LAYER_DATE_FALLBACK_DAYS)
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 

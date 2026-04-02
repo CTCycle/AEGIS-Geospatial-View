@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
+import { DEFAULT_AOI_RADIUS_M, DEFAULT_BASEMAP_ID } from '../constants';
 import { CatalogResponse, LocationSearchRequest } from '../types';
 import PanelHeader from './PanelHeader';
 import './LocationSearch.css';
@@ -23,9 +24,9 @@ const LocationSearch: React.FC<LocationSearchProps> = ({
     const [address, setAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
-    const [radiusM, setRadiusM] = useState('2500');
+    const [radiusM, setRadiusM] = useState(String(DEFAULT_AOI_RADIUS_M));
     const [selectedProvider, setSelectedProvider] = useState('all');
-    const [selectedBasemapId, setSelectedBasemapId] = useState<string>('osm_default');
+    const [selectedBasemapId, setSelectedBasemapId] = useState<string>(DEFAULT_BASEMAP_ID);
     const [selectedOverlayIds, setSelectedOverlayIds] = useState<string[]>([]);
     const [errors, setErrors] = useState<{ address?: string; latitude?: string; longitude?: string }>({});
 
@@ -88,7 +89,7 @@ const LocationSearch: React.FC<LocationSearchProps> = ({
         event.preventDefault();
         resetErrors();
         const radiusValue = Number.parseFloat(radiusM);
-        const normalizedRadius = Number.isFinite(radiusValue) && radiusValue > 0 ? radiusValue : 2500;
+        const normalizedRadius = Number.isFinite(radiusValue) && radiusValue > 0 ? radiusValue : DEFAULT_AOI_RADIUS_M;
 
         if (mode === 'address') {
             const addressError = validateAddress();

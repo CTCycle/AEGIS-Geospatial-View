@@ -1,4 +1,8 @@
-import { API_BASE_URL } from '../constants';
+import {
+    API_BASE_URL,
+    API_MAPS_CATALOG_PATH,
+    API_MAPS_SEARCH_PATH,
+} from '../constants';
 import {
     CatalogResponse,
     LocationSearchRequest,
@@ -103,59 +107,45 @@ const parseCatalogResponse = (value: unknown): CatalogResponse => {
 };
 
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/maps/search`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                ...payload,
-                geospatial_layers: payload.filters,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-            const detail = typeof errorData === 'object' && errorData !== null && 'detail' in errorData
-                ? errorData.detail
-                : errorData;
-            const message = typeof detail === 'string'
-                ? detail
-                : `Error ${response.status}: ${response.statusText}`;
-            throw new ApiRequestError(message, {
-                detail,
-                raw: errorData,
-                status: response.status,
-            });
-        }
-
-        const data: unknown = await response.json();
-        return parseSearchResponse(data);
-    } catch (error) {
-        console.error('Search API Error:', error);
-        throw error;
-    }
+    const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_SEARCH_PATH}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            ...payload,
+            geospatial_layers: payload.filters,
+        }),
+    });
+    return parseSearchResponse(data);
 };
 
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
-    const response = await fetch(`${API_BASE_URL}/maps/catalog`, {
+    const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_CATALOG_PATH}`, {
         method: 'GET',
     });
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-        const detail = typeof errorData === 'object' && errorData !== null && 'detail' in errorData
-            ? errorData.detail
-            : errorData;
-        const message = typeof detail === 'string'
-            ? detail
-            : `Error ${response.status}: ${response.statusText}`;
-        throw new ApiRequestError(message, {
-            detail,
-            raw: errorData,
-            status: response.status,
-        });
-    }
-    const data: unknown = await response.json();
     return parseCatalogResponse(data);
+};
+
+const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
+    const response = await fetch(url, init);
+    if (!response.ok) {
+        throw await buildApiError(response);
+    }
+    return response.json();
+};
+
+const buildApiError = async (response: Response): Promise<ApiRequestError> => {
+    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+    const detail = typeof errorData === 'object' && errorData !== null && 'detail' in errorData
+        ? errorData.detail
+        : errorData;
+    const message = typeof detail === 'string'
+        ? detail
+        : `Error ${response.status}: ${response.statusText}`;
+    return new ApiRequestError(message, {
+        detail,
+        raw: errorData,
+        status: response.status,
+    });
 };

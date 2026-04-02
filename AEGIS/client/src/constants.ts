@@ -29,6 +29,19 @@ export const API_BASE_URL = normalizeApiBaseUrl(
     String(import.meta.env.VITE_API_BASE_URL || ''),
     Boolean(import.meta.env.PROD),
 );
+export const API_MAPS_SEARCH_PATH = '/maps/search';
+export const API_MAPS_CATALOG_PATH = '/maps/catalog';
+
+export const DEFAULT_AOI_RADIUS_M = 2500;
+export const DEFAULT_BASEMAP_ID = 'osm_default';
+export const DEFAULT_OVERLAY_OPACITY = 0.65;
+export const DEFAULT_WMS_LAYER_ID = '0';
+export const DEFAULT_WMS_VERSION = '1.1.1';
+export const DEFAULT_WMS_EXCEPTIONS = 'application/vnd.ogc.se_inimage';
+export const DEFAULT_WMTS_MATRIX_SET = 'EPSG:3857';
+export const DEFAULT_WMTS_FORMAT = 'image/png';
+export const DEFAULT_BASE_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const DEFAULT_BASE_ATTRIBUTION = '© OpenStreetMap contributors';
 
 // Daily/NRT GIBS layers (updated frequently)
 export const GIBS_NRT_LAYERS: Record<string, string> = {

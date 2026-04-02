@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import json
 import time
-from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
@@ -11,24 +10,10 @@ from xml.etree import ElementTree
 from tqdm import tqdm
 
 from AEGIS.server.configurations import server_settings
+from AEGIS.server.domain.updater import LayerAggregate
+from AEGIS.server.utils.constants import GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M
 from AEGIS.server.utils.logger import logger
 from AEGIS.server.repositories.serialization import DataSerializer
-
-TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
-    "15.625m": 15.625,
-    "31.25m": 31.25,
-    "250m": 250.0,
-    "500m": 500.0,
-    "1km": 1000.0,
-    "1.5km": 1500.0,
-    "2km": 2000.0,
-    "GoogleMapsCompatible_Level6": 2445.98490512564,
-    "GoogleMapsCompatible_Level7": 1222.99245256282,
-    "GoogleMapsCompatible_Level8": 611.49622628141,
-    "GoogleMapsCompatible_Level9": 305.748113140705,
-    "GoogleMapsCompatible_Level12": 38.21851414258813,
-    "GoogleMapsCompatible_Level13": 19.109257071294063,
-}
 
 
 type LayerPayload = dict[str, str | None | list[str] | list[float]]
@@ -39,18 +24,6 @@ class LayerHarvestError(RuntimeError):
     pass
 
 
-###############################################################################
-@dataclass
-class LayerAggregate:
-    layer_id: str
-    title: str
-    abstract: str | None
-    projections: set[str]
-    source_urls: set[str]
-    tile_matrix_sets: set[str]
-
-
-###############################################################################
 class GIBSLayersUpdater:
     def __init__(
         self,
@@ -130,7 +103,7 @@ class GIBSLayersUpdater:
     def resolve_meters_per_pixel(self, tile_matrix_sets: set[str]) -> list[float]:
         resolutions: list[float] = []
         for tile_matrix in sorted(tile_matrix_sets):
-            resolved = TILE_MATRIX_SET_TO_RESOLUTION_M.get(tile_matrix)
+            resolved = GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M.get(tile_matrix)
             if resolved is not None:
                 resolutions.append(resolved)
         return resolutions
