@@ -5,7 +5,14 @@ from collections.abc import Callable
 from datetime import time
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    field_validator,
+    model_validator,
+)
 
 from AEGIS.server.configurations import server_settings
 
@@ -259,3 +266,18 @@ class MapLayerUpdateRequest(BaseModel):
         if not isinstance(value, dict) or not value:
             raise ValueError("payload must be a non-empty object.")
         return value
+
+
+###############################################################################
+class SearchByLocationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status_message: str
+    payload: dict[str, Any]
+    map_session: dict[str, Any]
+    compliance_warnings: list[Any] = Field(default_factory=list)
+
+
+###############################################################################
+class GeospatialCatalogResponse(RootModel[dict[str, Any]]):
+    pass

@@ -5,15 +5,23 @@ import base64
 import json
 from datetime import datetime, time
 from io import BytesIO
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from fastapi import APIRouter, Body, HTTPException, status
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import ValidationError
 
 from AEGIS.server.utils.constants import (
+    JOB_STATUS_CANCELLED,
+    MAP_SEARCH_CANCELLATION_NOT_ALLOWED,
+    MAP_SEARCH_CANCELLATION_REQUESTED,
+    MAP_SEARCH_JOB_INIT_ERROR,
+    MAP_SEARCH_JOB_PROGRESS_COORDINATES,
+    MAP_SEARCH_JOB_PROGRESS_IMAGERY,
+    MAP_SEARCH_JOB_PROGRESS_PERSISTED,
+    MAP_SEARCH_JOB_PROGRESS_POSTPROCESS,
+    MAP_SEARCH_JOB_START_MESSAGE,
+    MAP_SEARCH_STATUS_MESSAGE,
     MAPS_CATALOG_ROUTE,
     MAPS_JOB_ROUTE,
     MAPS_JOBS_ROUTE,
@@ -21,7 +29,9 @@ from AEGIS.server.utils.constants import (
     MAPS_SEARCH_ROUTE,
 )
 from AEGIS.server.domain.geographics import (
+    GeospatialCatalogResponse,
     LocationSearchRequest,
+    SearchByLocationResponse,
 )
 from AEGIS.server.domain.jobs import (
     JobCancelResponse,
@@ -30,6 +40,11 @@ from AEGIS.server.domain.jobs import (
 )
 from AEGIS.server.configurations import server_settings
 from AEGIS.server.services.jobs import JobManager, job_manager
+from AEGIS.server.services.search.factory import (
+    build_location_search_payload_data,
+    build_request_context,
+    build_search_response,
+)
 from AEGIS.server.utils.logger import logger
 from AEGIS.server.repositories.serialization import DataSerializer
 from AEGIS.server.services.geospatial.gibs import (
@@ -76,7 +91,9 @@ DEFAULT_OVERLAY_COLOR = "#2563eb"
 
 
 # -------------------------------------------------------------------------
-def sanitize_validation_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def sanitize_validation_errors(
+    errors: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
     sanitized: list[dict[str, Any]] = []
     for error in errors:
         normalized = dict(error)
@@ -610,7 +627,10 @@ class MapRenderingService:
                 sample = image.resize(sample_size).convert("RGBA")
                 data = sample.getdata()
                 total_r = total_g = total_b = count = 0
-                for red, green, blue, alpha in data:
+                for pixel in data:
+                    if not isinstance(pixel, tuple) or len(pixel) < 4:
+                        continue
+                    red, green, blue, alpha = pixel[:4]
                     if alpha <= 5:
                         continue
                     total_r += red
@@ -819,12 +839,20 @@ class MapSearchEndpoint:
                 return coordinates
         lon_candidate = fallback.get("longitude")
         lat_candidate = fallback.get("latitude")
+        if lon_candidate is None or lat_candidate is None:
+            return None
         try:
             lon_value = float(lon_candidate)
             lat_value = float(lat_candidate)
         except (TypeError, ValueError):
             return None
         return lon_value, lat_value
+
+    # -------------------------------------------------------------------------
+    def _coerce_coordinate_scalar(self, value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
 
     # -------------------------------------------------------------------------
     def format_coordinate_pair(self, coordinates: CoordinatePair | None) -> str | None:
@@ -1055,16 +1083,20 @@ class MapSearchEndpoint:
         # Fetch elevation data for the search location
         lat = search_payload.get("latitude")
         lon = search_payload.get("longitude")
-        if lat is not None and lon is not None:
+        lat_value = self._coerce_coordinate_scalar(lat)
+        lon_value = self._coerce_coordinate_scalar(lon)
+        if lat_value is not None and lon_value is not None:
             try:
-                elevation_data = await elevation_service.get_elevation(lat, lon)
+                elevation_data = await elevation_service.get_elevation(
+                    lat_value, lon_value
+                )
                 search_payload["elevation"] = elevation_data
             except Exception as exc:
                 logger.warning("Failed to fetch elevation: %s", exc)
                 search_payload["elevation"] = None
 
         return {
-            "status_message": "Map search request submitted.",
+            "status_message": MAP_SEARCH_STATUS_MESSAGE,
             "payload": search_payload,
             "map_session": map_session,
             "compliance_warnings": map_session.get("compliance_warnings", []),
@@ -1080,17 +1112,17 @@ class MapSearchEndpoint:
     ) -> dict[str, Any]:
         response_payload: dict[str, Any] | None = None
         try:
-            self.job_manager.update_progress(job_id, 8.0)
+            self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_COORDINATES)
             search_payload = await self.get_location_coordinates(payload)
             if self.job_manager.should_stop(job_id):
                 await self.record_search_session(
                     payload=payload,
                     response_payload=response_payload,
                     fallback=request_context,
-                    state="cancelled",
+                    state=JOB_STATUS_CANCELLED,
                 )
                 return {}
-            self.job_manager.update_progress(job_id, 35.0)
+            self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_IMAGERY)
 
             try:
                 satellite_payload = await self.renderer.build_satellite_payload(
@@ -1117,31 +1149,33 @@ class MapSearchEndpoint:
             search_payload["compliance_warnings"] = map_session.get(
                 "compliance_warnings", []
             )
-            self.job_manager.update_progress(job_id, 70.0)
+            self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_POSTPROCESS)
 
             lat = search_payload.get("latitude")
             lon = search_payload.get("longitude")
-            if lat is not None and lon is not None:
+            lat_value = self._coerce_coordinate_scalar(lat)
+            lon_value = self._coerce_coordinate_scalar(lon)
+            if lat_value is not None and lon_value is not None:
                 try:
-                    elevation_data = await elevation_service.get_elevation(lat, lon)
+                    elevation_data = await elevation_service.get_elevation(
+                        lat_value, lon_value
+                    )
                     search_payload["elevation"] = elevation_data
                 except Exception as exc:
                     logger.warning("Failed to fetch elevation: %s", exc)
                     search_payload["elevation"] = None
 
-            response_payload = {
-                "status_message": "Map search request submitted.",
-                "payload": search_payload,
-                "map_session": map_session,
-                "compliance_warnings": map_session.get("compliance_warnings", []),
-            }
+            response_payload = build_search_response(
+                search_payload=search_payload,
+                map_session=map_session,
+            )
             self.job_manager.update_result(job_id, response_payload)
             if self.job_manager.should_stop(job_id):
                 await self.record_search_session(
                     payload=payload,
                     response_payload=response_payload,
                     fallback=request_context,
-                    state="cancelled",
+                    state=JOB_STATUS_CANCELLED,
                 )
                 return response_payload
             await self.record_search_session(
@@ -1150,7 +1184,7 @@ class MapSearchEndpoint:
                 fallback=request_context,
                 state="success",
             )
-            self.job_manager.update_progress(job_id, 92.0)
+            self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_PERSISTED)
             return response_payload
         except HTTPException as exc:
             await self.record_search_session(
@@ -1196,57 +1230,49 @@ class MapSearchEndpoint:
         image_height: int | None = Body(default=None),
         image_crs: str | None = Body(default=None),
         image_format: str | None = Body(default=None),
-    ) -> JSONResponse:
+    ) -> SearchByLocationResponse:
         payload: LocationSearchRequest | None = None
         response_payload: dict[str, Any] | None = None
-        request_context = {
-            "user": None,
-            "country": country,
-            "city": city,
-            "address": address,
-            "longitude": longitude,
-            "latitude": latitude,
-            "geospatial_layers": list(geospatial_layers),
-            "overlay_ids": list(overlay_ids),
-            "basemap_id": basemap_id,
-            "map_tiles": map_tiles or server_settings.map.tiles,
-        }
+        request_context = build_request_context(
+            country=country,
+            city=city,
+            address=address,
+            longitude=longitude,
+            latitude=latitude,
+            geospatial_layers=geospatial_layers,
+            overlay_ids=overlay_ids,
+            basemap_id=basemap_id,
+            map_tiles=map_tiles,
+        )
         try:
-            payload_data: dict[str, Any] = {
-                "datetime": datetime_value,
-                "time_of_day": time_of_day,
-                "timeline_year": timeline_year,
-                "country": country,
-                "city": city,
-                "address": address,
-                "use_coordinates": use_coordinates,
-                "latitude": latitude,
-                "longitude": longitude,
-                "filters": geospatial_layers,
-                "overlay_ids": overlay_ids,
-                "basemap_id": basemap_id,
-                "aoi": aoi,
-                "commute": commute,
-                "bbox": bbox,
-            }
-            payload_data["image_width"] = server_settings.gibs.image_width
-            payload_data["image_height"] = server_settings.gibs.image_height
-            if radius_m is not None:
-                payload_data["radius_m"] = radius_m
-            payload_data["map_size_m"] = server_settings.map.default_size_m
-            if map_size_m is not None:
-                payload_data["map_size_m"] = map_size_m
-            payload_data["map_tiles"] = request_context["map_tiles"]
-            if image_crs is not None:
-                payload_data["image_crs"] = image_crs
-            if image_format is not None:
-                payload_data["image_format"] = image_format
+            payload_data = build_location_search_payload_data(
+                datetime_value=datetime_value,
+                time_of_day=time_of_day,
+                timeline_year=timeline_year,
+                country=country,
+                city=city,
+                address=address,
+                use_coordinates=use_coordinates,
+                latitude=latitude,
+                longitude=longitude,
+                geospatial_layers=geospatial_layers,
+                basemap_id=basemap_id,
+                overlay_ids=overlay_ids,
+                aoi=aoi,
+                commute=commute,
+                bbox=bbox,
+                radius_m=radius_m,
+                map_size_m=map_size_m,
+                map_tiles=request_context["map_tiles"],
+                image_crs=image_crs,
+                image_format=image_format,
+            )
             payload = await asyncio.to_thread(
                 LocationSearchRequest.model_validate, payload_data
             )
             response_payload = await self.process_location_search(payload)
-            serialized_payload = await asyncio.to_thread(
-                jsonable_encoder, response_payload
+            typed_response = await asyncio.to_thread(
+                SearchByLocationResponse.model_validate, response_payload
             )
             await self.record_search_session(
                 payload=payload,
@@ -1254,7 +1280,7 @@ class MapSearchEndpoint:
                 fallback=request_context,
                 state="success",
             )
-            return JSONResponse(content=serialized_payload)
+            return typed_response
         except ValidationError as exc:
             await self.record_search_session(
                 payload=payload,
@@ -1303,48 +1329,40 @@ class MapSearchEndpoint:
     ) -> JobStartResponse:
         payload: LocationSearchRequest | None = None
         response_payload: dict[str, Any] | None = None
-        request_context = {
-            "user": None,
-            "country": country,
-            "city": city,
-            "address": address,
-            "longitude": longitude,
-            "latitude": latitude,
-            "geospatial_layers": list(geospatial_layers),
-            "overlay_ids": list(overlay_ids),
-            "basemap_id": basemap_id,
-            "map_tiles": map_tiles or server_settings.map.tiles,
-        }
+        request_context = build_request_context(
+            country=country,
+            city=city,
+            address=address,
+            longitude=longitude,
+            latitude=latitude,
+            geospatial_layers=geospatial_layers,
+            overlay_ids=overlay_ids,
+            basemap_id=basemap_id,
+            map_tiles=map_tiles,
+        )
         try:
-            payload_data: dict[str, Any] = {
-                "datetime": datetime_value,
-                "time_of_day": time_of_day,
-                "timeline_year": timeline_year,
-                "country": country,
-                "city": city,
-                "address": address,
-                "use_coordinates": use_coordinates,
-                "latitude": latitude,
-                "longitude": longitude,
-                "filters": geospatial_layers,
-                "overlay_ids": overlay_ids,
-                "basemap_id": basemap_id,
-                "aoi": aoi,
-                "commute": commute,
-                "bbox": bbox,
-            }
-            payload_data["image_width"] = server_settings.gibs.image_width
-            payload_data["image_height"] = server_settings.gibs.image_height
-            if radius_m is not None:
-                payload_data["radius_m"] = radius_m
-            payload_data["map_size_m"] = server_settings.map.default_size_m
-            if map_size_m is not None:
-                payload_data["map_size_m"] = map_size_m
-            payload_data["map_tiles"] = request_context["map_tiles"]
-            if image_crs is not None:
-                payload_data["image_crs"] = image_crs
-            if image_format is not None:
-                payload_data["image_format"] = image_format
+            payload_data = build_location_search_payload_data(
+                datetime_value=datetime_value,
+                time_of_day=time_of_day,
+                timeline_year=timeline_year,
+                country=country,
+                city=city,
+                address=address,
+                use_coordinates=use_coordinates,
+                latitude=latitude,
+                longitude=longitude,
+                geospatial_layers=geospatial_layers,
+                basemap_id=basemap_id,
+                overlay_ids=overlay_ids,
+                aoi=aoi,
+                commute=commute,
+                bbox=bbox,
+                radius_m=radius_m,
+                map_size_m=map_size_m,
+                map_tiles=request_context["map_tiles"],
+                image_crs=image_crs,
+                image_format=image_format,
+            )
 
             payload = await asyncio.to_thread(
                 LocationSearchRequest.model_validate, payload_data
@@ -1374,13 +1392,13 @@ class MapSearchEndpoint:
         if job_status is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initialize map search job",
+                detail=MAP_SEARCH_JOB_INIT_ERROR,
             )
         return JobStartResponse(
             job_id=job_id,
             job_type=job_status["job_type"],
             status=job_status["status"],
-            message="Map search job started",
+            message=MAP_SEARCH_JOB_START_MESSAGE,
             poll_interval=server_settings.jobs.polling_interval,
         )
 
@@ -1406,13 +1424,17 @@ class MapSearchEndpoint:
         return JobCancelResponse(
             job_id=job_id,
             success=success,
-            message="Cancellation requested" if success else "Job cannot be cancelled",
+            message=(
+                MAP_SEARCH_CANCELLATION_REQUESTED
+                if success
+                else MAP_SEARCH_CANCELLATION_NOT_ALLOWED
+            ),
         )
 
     # -------------------------------------------------------------------------
-    async def get_catalog(self) -> JSONResponse:
+    async def get_catalog(self) -> GeospatialCatalogResponse:
         catalog = await asyncio.to_thread(self.catalog_service.list_catalog)
-        return JSONResponse(content=catalog)
+        return GeospatialCatalogResponse.model_validate(catalog)
 
     # -------------------------------------------------------------------------
     def add_routes(self) -> None:
@@ -1420,12 +1442,14 @@ class MapSearchEndpoint:
             MAPS_CATALOG_ROUTE,
             self.get_catalog,
             methods=["GET"],
+            response_model=GeospatialCatalogResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(
             MAPS_SEARCH_ROUTE,
             self.search_by_location,
             methods=["POST"],
+            response_model=SearchByLocationResponse,
             status_code=status.HTTP_200_OK,
         )
         self.router.add_api_route(

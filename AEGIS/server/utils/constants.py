@@ -496,3 +496,128 @@ EARTH_RADIUS_M = 6_378_137.0
 CAPABILITIES_QUERY = {"SERVICE": "WMS", "REQUEST": "GetCapabilities"}
 GIBS_MIN_IMAGE_DIMENSION = 512
 GIBS_MAX_IMAGE_DIMENSION = 2048
+
+# [JOBS AND SEARCH WORKFLOW]
+###############################################################################
+JOB_STATUS_PENDING = "pending"
+JOB_STATUS_RUNNING = "running"
+JOB_STATUS_COMPLETED = "completed"
+JOB_STATUS_FAILED = "failed"
+JOB_STATUS_CANCELLED = "cancelled"
+
+MAP_SEARCH_STATUS_MESSAGE = "Map search request submitted."
+MAP_SEARCH_JOB_START_MESSAGE = "Map search job started"
+MAP_SEARCH_JOB_INIT_ERROR = "Failed to initialize map search job"
+MAP_SEARCH_CANCELLATION_REQUESTED = "Cancellation requested"
+MAP_SEARCH_CANCELLATION_NOT_ALLOWED = "Job cannot be cancelled"
+
+MAP_SEARCH_JOB_PROGRESS_COORDINATES = 8.0
+MAP_SEARCH_JOB_PROGRESS_IMAGERY = 35.0
+MAP_SEARCH_JOB_PROGRESS_POSTPROCESS = 70.0
+MAP_SEARCH_JOB_PROGRESS_PERSISTED = 92.0
+
+# [SETTINGS DEFAULTS]
+###############################################################################
+DEFAULT_DB_CONNECT_TIMEOUT = 10
+DEFAULT_DB_INSERT_BATCH_SIZE = 1000
+DEFAULT_NOMINATIM_USER_AGENT = "AEGIS-Geographics/1.0 (contact: support@aegis.local)"
+DEFAULT_GIBS_USER_AGENT = "AEGIS-GIBS/1.0"
+DEFAULT_GIBS_LAYER_SYNC_USER_AGENT = "AEGIS-GIBS-LayerSync/1.0"
+DEFAULT_GIBS_DEFAULT_LAYER = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+
+# [GIBS FALLBACKS]
+###############################################################################
+GIBS_LAYER_NATIVE_RESOLUTION_M: dict[str, float] = {
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
+    "MODIS_Terra_Aerosol": 10000.0,
+    "MODIS_Terra_Land_Surface_Temp_Day": 1000.0,
+    "MODIS_Terra_Land_Surface_Temp_Night": 1000.0,
+    "MODIS_Terra_NDVI_8Day": 250.0,
+    "MODIS_Terra_L3_Land_Water_Mask": 250.0,
+    "IMERG_Precipitation_Rate": 11000.0,
+    "VIIRS_SNPP_DayNightBand_ENCC": 500.0,
+    "MODIS_Combined_Thermal_Anomalies_Fire": 1000.0,
+    "OMPS_Ozone_Total_Column": 50000.0,
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
+    "SRTM_Color_Index": 30.0,
+}
+GIBS_LAYER_DATE_FALLBACK_DAYS: dict[str, int] = {
+    "MODIS_Combined_Thermal_Anomalies_All": 3,
+    "MODIS_Combined_Thermal_Anomalies_Day": 3,
+    "MODIS_Combined_Thermal_Anomalies_Night": 3,
+    "OMPS_Ozone_Total_Column": 2,
+}
+
+GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
+    "15.625m": 15.625,
+    "31.25m": 31.25,
+    "250m": 250.0,
+    "500m": 500.0,
+    "1km": 1000.0,
+    "1.5km": 1500.0,
+    "2km": 2000.0,
+    "GoogleMapsCompatible_Level6": 2445.98490512564,
+    "GoogleMapsCompatible_Level7": 1222.99245256282,
+    "GoogleMapsCompatible_Level8": 611.49622628141,
+    "GoogleMapsCompatible_Level9": 305.748113140705,
+    "GoogleMapsCompatible_Level12": 38.21851414258813,
+    "GoogleMapsCompatible_Level13": 19.109257071294063,
+}
+
+DEFAULT_LAYER_DEFINITIONS: dict[str, dict[str, object]] = {
+    "VIIRS_SNPP_CorrectedReflectance_TrueColor": {
+        "provider": "gibs",
+        "aliases": (
+            "truecolor",
+            "true color",
+            "viirs truecolor",
+            "true color satellite",
+            "satellite imagery",
+        ),
+    },
+    "MODIS_Terra_Aerosol": {
+        "provider": "gibs",
+        "aliases": ("aerosol", "aerosol optical depth", "modis aerosol", "aod", "air pollution"),
+    },
+    "MODIS_Terra_Land_Surface_Temp_Day": {
+        "provider": "gibs",
+        "aliases": ("surface temperature day", "land surface temperature", "lst day", "modis lst", "temperature day"),
+    },
+    "MODIS_Terra_Land_Surface_Temp_Night": {
+        "provider": "gibs",
+        "aliases": ("surface temperature night", "lst night", "temperature night", "night temperature"),
+    },
+    "MODIS_Terra_NDVI_8Day": {
+        "provider": "gibs",
+        "aliases": ("ndvi", "vegetation index", "modis ndvi", "vegetation", "greenness"),
+    },
+    "MODIS_Terra_L3_Land_Water_Mask": {
+        "provider": "gibs",
+        "aliases": ("land/water mask", "water mask", "land water mask", "coastline"),
+    },
+    "IMERG_Precipitation_Rate": {
+        "provider": "gibs",
+        "aliases": ("precipitation rate", "imerg precipitation", "imerg", "rain", "rainfall"),
+    },
+    "VIIRS_SNPP_DayNightBand_ENCC": {
+        "provider": "gibs",
+        "aliases": ("nighttime lights", "city lights", "viirs lights", "light pollution", "night lights"),
+    },
+    "MODIS_Combined_Thermal_Anomalies_Fire": {
+        "provider": "gibs",
+        "provider_name": "MODIS_Combined_Thermal_Anomalies_All",
+        "aliases": ("active fires", "fire", "fires", "thermal anomalies", "wildfire"),
+    },
+    "OMPS_Ozone_Total_Column": {
+        "provider": "gibs",
+        "aliases": ("ozone", "ozone column", "total ozone", "omps ozone", "atmospheric ozone"),
+    },
+    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": {
+        "provider": "gibs",
+        "aliases": ("land cover", "land cover type", "modis igbp land cover", "igbp land cover", "land use"),
+    },
+    "SRTM_Color_Index": {
+        "provider": "gibs",
+        "aliases": ("elevation", "dem", "digital elevation model", "terrain", "topography"),
+    },
+}

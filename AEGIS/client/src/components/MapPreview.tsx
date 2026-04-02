@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
 
+import {
+    DEFAULT_BASE_ATTRIBUTION,
+    DEFAULT_BASE_TILE_URL,
+    DEFAULT_OVERLAY_OPACITY,
+    DEFAULT_WMS_EXCEPTIONS,
+    DEFAULT_WMS_LAYER_ID,
+    DEFAULT_WMS_VERSION,
+    DEFAULT_WMTS_FORMAT,
+    DEFAULT_WMTS_MATRIX_SET,
+} from '../constants';
 import { MapSession, SearchResponsePayload } from '../types';
 import './MapPreview.css';
 
@@ -31,9 +41,9 @@ const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
     if (!overlay.url) {
         return null;
     }
-    const layers = overlay.layers || '0';
-    const version = overlay.wms_version || '1.1.1';
-    const exceptions = overlay.wms_exceptions || 'application/vnd.ogc.se_inimage';
+    const layers = overlay.layers || DEFAULT_WMS_LAYER_ID;
+    const version = overlay.wms_version || DEFAULT_WMS_VERSION;
+    const exceptions = overlay.wms_exceptions || DEFAULT_WMS_EXCEPTIONS;
     const query = [
         'service=WMS',
         'request=GetMap',
@@ -55,9 +65,9 @@ const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
     if (!overlay.url) {
         return null;
     }
-    const layerId = overlay.layer_id || overlay.layers || '0';
-    const matrixSet = overlay.tile_matrix_set || 'EPSG:3857';
-    const format = overlay.wmts_format || 'image/png';
+    const layerId = overlay.layer_id || overlay.layers || DEFAULT_WMS_LAYER_ID;
+    const matrixSet = overlay.tile_matrix_set || DEFAULT_WMTS_MATRIX_SET;
+    const format = overlay.wmts_format || DEFAULT_WMTS_FORMAT;
     const style = overlay.wmts_style ?? '';
     const query = [
         'service=WMTS',
@@ -76,7 +86,7 @@ const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
 
 const buildStyle = (mapSession?: MapSession): StyleSpecification => {
     const basemap = mapSession?.basemap;
-    const baseTileUrl = basemap?.tile_url || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const baseTileUrl = basemap?.tile_url || DEFAULT_BASE_TILE_URL;
     return {
         version: 8,
         sources: {
@@ -84,7 +94,7 @@ const buildStyle = (mapSession?: MapSession): StyleSpecification => {
                 type: 'raster',
                 tiles: [baseTileUrl],
                 tileSize: 256,
-                attribution: basemap?.attribution || '© OpenStreetMap contributors',
+                attribution: basemap?.attribution || DEFAULT_BASE_ATTRIBUTION,
             },
         },
         layers: [
@@ -104,7 +114,7 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
     overlays.forEach((overlay, index) => {
         const sourceId = `overlay-source-${overlay.id}`;
         const layerId = `overlay-layer-${overlay.id}`;
-        const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : 0.65;
+        const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
         const sourceBounds = normalizeOverlayBounds(overlay.bounds);
 
         if (overlay.type === 'tile' && overlay.url) {
@@ -252,7 +262,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
         const opacity: Record<string, number> = {};
         overlays.forEach((overlay) => {
             visibility[overlay.id] = true;
-            opacity[overlay.id] = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : 0.65;
+            opacity[overlay.id] = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
         });
         setOverlayVisibility(visibility);
         setOverlayOpacity(opacity);
@@ -299,7 +309,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
             }
             const visible = overlayVisibility[overlay.id] ?? true;
             map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
-            const opacityValue = overlayOpacity[overlay.id] ?? overlay.default_opacity ?? 0.65;
+            const opacityValue = overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY;
             if (overlay.type === 'point-insight') {
                 map.setPaintProperty(layerId, 'circle-opacity', opacityValue);
             } else {
@@ -347,7 +357,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
                                     type="range"
                                     min={0}
                                     max={100}
-                                    value={Math.round((overlayOpacity[overlay.id] ?? overlay.default_opacity ?? 0.65) * 100)}
+                                    value={Math.round((overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY) * 100)}
                                     onChange={(event) => {
                                         const value = Number(event.target.value) / 100;
                                         setOverlayOpacity((current) => ({

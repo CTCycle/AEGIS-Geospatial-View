@@ -3,48 +3,20 @@ from __future__ import annotations
 import inspect
 import threading
 import uuid
-from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
 
 from collections.abc import Callable
 
+from AEGIS.server.domain.job_state import JobState
+from AEGIS.server.utils.constants import (
+    JOB_STATUS_CANCELLED,
+    JOB_STATUS_COMPLETED,
+    JOB_STATUS_FAILED,
+    JOB_STATUS_PENDING,
+    JOB_STATUS_RUNNING,
+)
 from AEGIS.server.utils.logger import logger
-
-
-@dataclass
-class JobState:
-    job_id: str
-    job_type: str
-    status: str
-    progress: float = 0.0
-    result: dict[str, Any] | None = None
-    error: str | None = None
-    created_at: float = field(default_factory=monotonic)
-    completed_at: float | None = None
-    stop_requested: bool = False
-    lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
-
-    # -------------------------------------------------------------------------
-    def update(self, **kwargs: Any) -> None:
-        with self.lock:
-            for key, value in kwargs.items():
-                if hasattr(self, key):
-                    setattr(self, key, value)
-
-    # -------------------------------------------------------------------------
-    def snapshot(self) -> dict[str, Any]:
-        with self.lock:
-            return {
-                "job_id": self.job_id,
-                "job_type": self.job_type,
-                "status": self.status,
-                "progress": self.progress,
-                "result": self.result,
-                "error": self.error,
-                "created_at": self.created_at,
-                "completed_at": self.completed_at,
-            }
 
 
 ###############################################################################
@@ -63,7 +35,7 @@ class JobManager:
         kwargs: dict[str, Any] | None = None,
     ) -> str:
         job_id = str(uuid.uuid4())[:8]
-        state = JobState(job_id=job_id, job_type=job_type, status="pending")
+        state = JobState(job_id=job_id, job_type=job_type, status=JOB_STATUS_PENDING)
         runner_kwargs = kwargs.copy() if kwargs else {}
 
         if self.runner_accepts_job_id(runner):
@@ -81,7 +53,7 @@ class JobManager:
         with self.lock:
             self.threads[job_id] = thread
 
-        state.update(status="running")
+        state.update(status=JOB_STATUS_RUNNING)
         thread.start()
 
         logger.info("Started job %s (type=%s)", job_id, job_type)
@@ -101,9 +73,13 @@ class JobManager:
             state = self.jobs.get(job_id)
         if state is None:
             return False
-        if state.status not in ("pending", "running"):
+        if state.status not in (JOB_STATUS_PENDING, JOB_STATUS_RUNNING):
             return False
-        state.update(stop_requested=True, status="cancelled", completed_at=monotonic())
+        state.update(
+            stop_requested=True,
+            status=JOB_STATUS_CANCELLED,
+            completed_at=monotonic(),
+        )
         logger.info("Cancelled job %s", job_id)
         return True
 
@@ -111,7 +87,7 @@ class JobManager:
     def is_job_running(self, job_type: str | None = None) -> bool:
         with self.lock:
             for state in self.jobs.values():
-                if state.status in ("pending", "running"):
+                if state.status in (JOB_STATUS_PENDING, JOB_STATUS_RUNNING):
                     if job_type is None or state.job_type == job_type:
                         return True
         return False
@@ -168,13 +144,13 @@ class JobManager:
         try:
             result = runner(*args, **kwargs)
             if state.stop_requested:
-                state.update(status="cancelled", completed_at=monotonic())
+                state.update(status=JOB_STATUS_CANCELLED, completed_at=monotonic())
             else:
                 result_payload = result or {}
                 with state.lock:
                     merged = {**(state.result or {}), **result_payload}
                 state.update(
-                    status="completed",
+                    status=JOB_STATUS_COMPLETED,
                     result=merged if merged else None,
                     progress=100.0,
                     completed_at=monotonic(),
@@ -182,11 +158,15 @@ class JobManager:
                 logger.info("Job %s completed successfully", job_id)
         except Exception as exc:  # noqa: BLE001
             if state.stop_requested:
-                state.update(status="cancelled", completed_at=monotonic())
+                state.update(status=JOB_STATUS_CANCELLED, completed_at=monotonic())
                 logger.info("Job %s cancelled during execution", job_id)
                 return
             error_msg = str(exc).split("\n")[0][:200]
-            state.update(status="failed", error=error_msg, completed_at=monotonic())
+            state.update(
+                status=JOB_STATUS_FAILED,
+                error=error_msg,
+                completed_at=monotonic(),
+            )
             logger.error("Job %s failed: %s", job_id, error_msg)
             logger.debug("Job %s error details", job_id, exc_info=True)
 

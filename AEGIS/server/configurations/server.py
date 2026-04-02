@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Any
 
 from AEGIS.server.configurations.base import ensure_mapping, load_configuration_data
+from AEGIS.server.domain.settings import (
+    DatabaseSettings,
+    GIBSSettings,
+    GeospatialSettings,
+    JobsSettings,
+    MapSettings,
+    NominatimSettings,
+    ServerSettings,
+)
 
 from AEGIS.server.utils.constants import (
     GIBS_CAPABILITIES_ENDPOINTS,
+    DEFAULT_DB_CONNECT_TIMEOUT,
+    DEFAULT_DB_INSERT_BATCH_SIZE,
+    DEFAULT_GIBS_DEFAULT_LAYER,
+    DEFAULT_GIBS_LAYER_SYNC_USER_AGENT,
+    DEFAULT_GIBS_USER_AGENT,
+    DEFAULT_NOMINATIM_USER_AGENT,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
     GIBS_OWS_NAMESPACES,
@@ -24,86 +38,6 @@ from AEGIS.server.utils.types import (
     coerce_str,
     coerce_str_or_none,
 )
-
-
-@dataclass(frozen=True)
-class DatabaseSettings:
-    embedded_database: bool
-    engine: str | None
-    host: str | None
-    port: int | None
-    database_name: str | None
-    username: str | None
-    password: str | None
-    ssl: bool
-    ssl_ca: str | None
-    connect_timeout: int
-    insert_batch_size: int
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class NominatimSettings:
-    base_url: str
-    user_agent: str
-    timeout: float
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class GeospatialSettings:
-    min_timeline_year: int
-    max_lat: float
-    min_lat: float
-    max_lon: float
-    min_lon: float
-    max_mercator_extent: float
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class MapSettings:
-    default_size_m: float
-    render_delay_s: float
-    tiles: str
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class JobsSettings:
-    polling_interval: float
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class GIBSSettings:
-    user_agent: str
-    timeout: float
-    capabilities_ttl_s: float
-    max_cache_entries: int
-    bbox_precision: int
-    wms_base_endpoints: dict[str, str]
-    nasa_attribution: str
-    retry_backoff_s: float
-    min_visual_radius_m: float
-    image_width: int
-    image_height: int
-    default_layer: str
-    capabilities_endpoints: dict[str, str]
-    ows_namespaces: dict[str, str]
-    layer_sync_user_agent: str
-    layer_sync_timeout: float
-
-
-# -----------------------------------------------------------------------------
-@dataclass(frozen=True)
-class ServerSettings:
-    database: DatabaseSettings
-    nominatim: NominatimSettings
-    geospatial: GeospatialSettings
-    map: MapSettings
-    jobs: JobsSettings
-    gibs: GIBSSettings
 
 
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
@@ -126,8 +60,10 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
             password=None,
             ssl=False,
             ssl_ca=None,
-            connect_timeout=10,
-            insert_batch_size=coerce_int(raw_insert_batch_size, 1000, minimum=1),
+            connect_timeout=DEFAULT_DB_CONNECT_TIMEOUT,
+            insert_batch_size=coerce_int(
+                raw_insert_batch_size, DEFAULT_DB_INSERT_BATCH_SIZE, minimum=1
+            ),
         )
 
     # External DB mode
@@ -183,8 +119,12 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
         password=password_value,
         ssl=ssl_value,
         ssl_ca=ssl_ca_value,
-        connect_timeout=coerce_int(raw_connect_timeout, 10, minimum=1),
-        insert_batch_size=coerce_int(raw_insert_batch_size, 1000, minimum=1),
+        connect_timeout=coerce_int(
+            raw_connect_timeout, DEFAULT_DB_CONNECT_TIMEOUT, minimum=1
+        ),
+        insert_batch_size=coerce_int(
+            raw_insert_batch_size, DEFAULT_DB_INSERT_BATCH_SIZE, minimum=1
+        ),
     )
 
 
@@ -198,7 +138,7 @@ def build_nominatim_settings(data: dict[str, Any]) -> NominatimSettings:
         ),
         user_agent=coerce_str(
             payload.get("user_agent"),
-            "AEGIS-Geographics/1.0 (contact: support@aegis.local)",
+            DEFAULT_NOMINATIM_USER_AGENT,
         ),
         timeout=coerce_float(payload.get("timeout"), 10.0, minimum=1.0),
     )
@@ -268,7 +208,7 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
     if not ows_namespaces:
         ows_namespaces = dict(GIBS_OWS_NAMESPACES)
     return GIBSSettings(
-        user_agent=coerce_str(payload.get("user_agent"), "AEGIS-GIBS/1.0"),
+        user_agent=coerce_str(payload.get("user_agent"), DEFAULT_GIBS_USER_AGENT),
         timeout=coerce_float(payload.get("timeout"), 20.0, minimum=1.0),
         capabilities_ttl_s=coerce_float(
             payload.get("capabilities_ttl_s"), 6 * 60 * 60, minimum=60.0
@@ -297,13 +237,13 @@ def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
         ),
         default_layer=coerce_str(
             payload.get("default_layer"),
-            "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+            DEFAULT_GIBS_DEFAULT_LAYER,
         ),
         capabilities_endpoints=capabilities_endpoints,
         ows_namespaces=ows_namespaces,
         layer_sync_user_agent=coerce_str(
             payload.get("layer_sync_user_agent"),
-            "AEGIS-GIBS-LayerSync/1.0",
+            DEFAULT_GIBS_LAYER_SYNC_USER_AGENT,
         ),
         layer_sync_timeout=coerce_float(
             payload.get("layer_sync_timeout"), 30.0, minimum=1.0
