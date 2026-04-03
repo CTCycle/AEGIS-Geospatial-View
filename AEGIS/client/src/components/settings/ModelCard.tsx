@@ -24,7 +24,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
     <article className="model-card">
         <header>
             <h3>{model.name}</h3>
-            <span>{model.provider}</span>
+            <span className="model-card__provider">{model.provider}</span>
         </header>
         <p>{model.description}</p>
         <div className="model-card__actions">

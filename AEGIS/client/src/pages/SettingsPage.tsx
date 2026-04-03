@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 import ConfigurationPanel from '../components/settings/ConfigurationPanel';
 import ManifestToolsPanel from '../components/settings/ManifestToolsPanel';
-import ModelFilterBar from '../components/settings/ModelFilterBar';
 import ModelGrid from '../components/settings/ModelGrid';
 import ModelProviderToggle from '../components/settings/ModelProviderToggle';
 import ModelSearchBar from '../components/settings/ModelSearchBar';
@@ -39,7 +38,6 @@ function SettingsPage({ onBack }: SettingsPageProps) {
     const [cloudModels, setCloudModels] = useState<ModelCardDescriptor[]>([]);
     const [localModels, setLocalModels] = useState<ModelCardDescriptor[]>([]);
     const [searchText, setSearchText] = useState('');
-    const [providerFilter, setProviderFilter] = useState('all');
     const [providerMode, setProviderMode] = useState<ModelProviderMode>('local');
     const [statusText, setStatusText] = useState('Ready');
 
@@ -60,34 +58,10 @@ function SettingsPage({ onBack }: SettingsPageProps) {
         });
     }, []);
 
-    const providerOptions = useMemo(() => {
-        if (providerMode === 'local') {
-            return [
-                { value: 'all', label: 'All local models' },
-                { value: 'ollama', label: 'Ollama' },
-            ];
-        }
-        return [
-            { value: 'all', label: 'All cloud providers' },
-            { value: 'openai', label: 'OpenAI' },
-            { value: 'google', label: 'Google' },
-        ];
-    }, [providerMode]);
-
-    useEffect(() => {
-        const validValues = new Set(providerOptions.map((option) => option.value));
-        if (!validValues.has(providerFilter)) {
-            setProviderFilter('all');
-        }
-    }, [providerFilter, providerOptions]);
-
     const displayedModels = useMemo(() => {
         const source = providerMode === 'local' ? localModels : cloudModels;
         const query = searchText.trim().toLowerCase();
         return source.filter((model) => {
-            if (providerFilter !== 'all' && model.provider !== providerFilter) {
-                return false;
-            }
             if (!query) {
                 return true;
             }
@@ -97,13 +71,12 @@ function SettingsPage({ onBack }: SettingsPageProps) {
                 || model.provider.toLowerCase().includes(query)
             );
         });
-    }, [providerMode, localModels, cloudModels, providerFilter, searchText]);
+    }, [providerMode, localModels, cloudModels, searchText]);
 
     const localModelIds = useMemo(() => new Set(localModels.map((item) => item.id)), [localModels]);
 
     const handleProviderModeChange = async (mode: ModelProviderMode) => {
         setProviderMode(mode);
-        setProviderFilter('all');
         try {
             const updated = await updateChatSettings({
                 ...settings,
@@ -128,26 +101,23 @@ function SettingsPage({ onBack }: SettingsPageProps) {
         const updated = await updateChatSettings(payload);
         setSettings(updated);
         setProviderMode(updated.active_provider_mode);
-        setProviderFilter('all');
         setStatusText(`Selected ${model.name} for ${kind}`);
     };
 
     return (
         <div className="settings-page">
             <header className="settings-page__header">
-                <h1>Model Settings</h1>
-                <button type="button" onClick={onBack}>Back to Chat</button>
+                <div className="settings-page__heading">
+                    <h1>Model Settings</h1>
+                    <p>Configure active providers and assign dedicated chat and agent models.</p>
+                </div>
+                <button type="button" className="settings-page__back" onClick={onBack}>Back to Chat</button>
             </header>
 
-            <div className="settings-page__controls">
+            <section className="settings-page__controls" aria-label="Settings controls">
                 <ModelProviderToggle value={providerMode} onChange={handleProviderModeChange} />
                 <ModelSearchBar value={searchText} onChange={setSearchText} />
-                <ModelFilterBar
-                    providerFilter={providerFilter}
-                    providerOptions={providerOptions}
-                    onProviderFilter={setProviderFilter}
-                />
-            </div>
+            </section>
 
             <ModelGrid
                 models={displayedModels}

@@ -684,3 +684,4 @@ class NormatimService:
             base = normalized[: -len(NOMINATIM_SEARCH_PATH)]
             return f"{base}{NOMINATIM_REVERSE_PATH}"
         return f"{normalized}{NOMINATIM_REVERSE_PATH}"
+

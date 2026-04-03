@@ -6,7 +6,7 @@
     height: 100%;
     overflow: auto;
     background:
-        linear-gradient(180deg, rgb(247 250 255 / 95%), rgb(238 245 255 / 92%));
+        linear-gradient(180deg, rgb(229 236 248 / 96%), rgb(218 227 241 / 93%));
 }
 
 .settings-page__header,
@@ -18,15 +18,27 @@
     flex-wrap: wrap;
 }
 
-.settings-page__header h1 {
-    font-size: var(--font-size-title-md);
+.settings-page__heading h1 {
+    font-size: 1.85rem;
+    line-height: 1.15;
 }
 
-.settings-page__header button {
+.settings-page__heading p {
+    margin-top: 0.35rem;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-label);
+}
+
+.settings-page__back {
     border: 1px solid var(--color-border-strong);
     border-radius: 999px;
-    background: var(--color-surface-panel);
-    padding: 0.4rem 0.8rem;
+    background: rgb(255 255 255 / 88%);
+    padding: 0.46rem 0.95rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+.settings-page__controls {
+    padding: 0.6rem 0;
 }
 
 .settings-page__controls > * {
@@ -45,13 +57,14 @@
     border: 1px solid var(--color-border-subtle);
     border-radius: 999px;
     overflow: hidden;
-    background: var(--color-surface-panel);
+    background: rgb(255 255 255 / 86%);
+    box-shadow: var(--shadow-1);
 }
 
 .provider-toggle button {
     border: none;
     background: transparent;
-    padding: 0.4rem 0.8rem;
+    padding: 0.38rem 0.82rem;
     font-size: var(--font-size-caption);
     font-weight: var(--font-weight-semibold);
 }
@@ -62,20 +75,16 @@
 }
 
 .model-search-bar,
-.model-filter-bar,
 .configuration-panel input {
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-sm);
-    padding: 0.45rem 0.65rem;
+    padding: 0.5rem 0.7rem;
     font-size: var(--font-size-label);
+    background: rgb(255 255 255 / 92%);
 }
 
 .model-search-bar {
-    width: min(22rem, 100%);
-}
-
-.model-filter-bar {
-    width: min(13rem, 100%);
+    width: min(24rem, 100%);
 }
 
 .model-grid-scroll {
@@ -85,7 +94,7 @@
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
     padding: var(--space-3);
-    background: rgb(255 255 255 / 92%);
+    background: rgb(255 255 255 / 86%);
 }
 
 .model-grid {
@@ -98,7 +107,7 @@
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-md);
     padding: var(--space-3);
-    background: var(--color-surface-panel);
+    background: rgb(255 255 255 / 94%);
     box-shadow: var(--shadow-1);
 }
 
@@ -119,9 +128,15 @@
     font-size: var(--font-size-caption);
 }
 
+.model-card__provider {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-transform: lowercase;
+}
+
 .model-card__actions {
     display: flex;
-    gap: var(--space-2);
+    gap: 0.42rem;
     flex-wrap: wrap;
     margin-top: var(--space-3);
 }
@@ -129,9 +144,9 @@
 .model-card__actions button {
     border: 1px solid var(--color-border-strong);
     border-radius: 999px;
-    padding: 0.25rem 0.6rem;
-    background: var(--color-surface-panel);
-    font-size: var(--font-size-caption);
+    padding: 0.24rem 0.55rem;
+    background: rgb(248 250 252 / 94%);
+    font-size: 0.76rem;
 }
 
 .model-card__actions button.active {
@@ -143,38 +158,49 @@
 .configuration-panel {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
+    gap: 0.85rem;
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
-    padding: 0.75rem;
-    background: rgb(255 255 255 / 92%);
+    padding: 0.8rem;
+    background: rgb(255 255 255 / 86%);
+}
+
+.configuration-panel h3,
+.manifest-tools-panel h3 {
+    font-size: var(--font-size-title-sm);
+    margin-bottom: var(--space-2);
 }
 
 .configuration-panel label {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.42rem;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-muted);
 }
 
 .row-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.45rem;
+    flex-wrap: wrap;
 }
 
 .row-actions button,
-.configuration-panel .primary-button {
+.configuration-panel .primary-button,
+.manifest-tools-panel button {
     border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-panel);
-    padding: 0.35rem 0.7rem;
+    border-radius: 0.55rem;
+    background: rgb(248 250 252 / 94%);
+    padding: 0.36rem 0.66rem;
+    font-size: 0.8rem;
+    font-weight: var(--font-weight-semibold);
 }
 
 .configuration-panel .primary-button {
     justify-self: start;
     border-color: var(--color-brand);
     color: #1d4ed8;
-    font-weight: var(--font-weight-semibold);
 }
 
 .configuration-panel__cloud {
@@ -184,8 +210,14 @@
 .manifest-tools-panel {
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
-    padding: 0.75rem;
-    background: rgb(255 255 255 / 92%);
+    padding: 0.8rem;
+    background: rgb(255 255 255 / 86%);
+}
+
+.manifest-tools-panel p {
+    margin-top: 0.55rem;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-muted);
 }
 
 @media (max-width: 1200px) {
