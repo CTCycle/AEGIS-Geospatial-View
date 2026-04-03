@@ -31,3 +31,6 @@ test = [
 [tool.hatch.build.targets.wheel]
 packages = ["AEGIS"] 
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+

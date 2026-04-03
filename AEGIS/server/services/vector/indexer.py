@@ -40,11 +40,39 @@ class VectorIndexer:
                 "name": entry.get("name"),
                 "provider": entry.get("provider"),
                 "type": entry.get("type"),
+                "document_kind": self._resolve_document_kind(entry),
+                "overlay_type": str(entry.get("type") or "") if self._resolve_document_kind(entry) == "overlay" else "",
+                "view_tags": ",".join(self._infer_view_tags(entry)),
+                "coverage_tags": ",".join(self._infer_coverage_tags(entry)),
+                "provider_requires_key": bool(metadata.get("requires_key", False)),
                 "capabilities": ",".join(str(item) for item in entry.get("capabilities", [])),
                 "coverage": entry.get("coverage"),
                 "keywords": ",".join(str(item) for item in keywords),
             },
         )
+
+    def _resolve_document_kind(self, entry: dict[str, Any]) -> str:
+        entry_type = str(entry.get("type") or "").lower()
+        if entry_type == "provider":
+            return "provider"
+        if entry.get("id") in {"osm_default", "tomtom_basic", "geoapify_osm"}:
+            return "basemap"
+        if entry.get("provider") in {"fallback", "geoapify", "tomtom"} and entry_type == "tile":
+            return "basemap" if str(entry.get("id") or "").endswith(("default", "basic", "osm")) else "overlay"
+        return "overlay"
+
+    def _infer_view_tags(self, entry: dict[str, Any]) -> list[str]:
+        capabilities = [str(item).lower() for item in entry.get("capabilities", [])]
+        tags: list[str] = ["interactive_map"]
+        if "imagery" in capabilities or str(entry.get("type") or "").lower() == "legacy-image":
+            tags.append("static_imagery")
+        return tags
+
+    def _infer_coverage_tags(self, entry: dict[str, Any]) -> list[str]:
+        coverage = str(entry.get("coverage") or "").lower()
+        if not coverage:
+            return []
+        return [coverage]
 
     def rebuild(self) -> dict[str, Any]:
         catalog = self.manifest_loader.load_all()

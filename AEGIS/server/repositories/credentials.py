@@ -4,13 +4,13 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from AEGIS.server.repositories.database.backend import database
+from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import ModelCredentialRecord
 
 
 class CredentialRepository:
     def __init__(self) -> None:
-        self._session_factory = database.backend.session
+        self._session_factory = get_database().backend.session
 
     def upsert(
         self,

@@ -166,6 +166,21 @@ and uses those URLs for readiness checks and pytest runtime config.
 Chat API coverage is in:
 - `tests/e2e/test_chat_api.py`
 
+Backend unit tests from a plain checkout:
+
+```cmd
+uv sync --extra test
+uv run pytest -q tests/unit
+```
+
+Frontend production validation:
+
+```cmd
+cd AEGIS/client
+npm install
+npm run build
+```
+
 ## 7. Screenshots
 
 ![Geospatial search panel](figures/search_page.png)

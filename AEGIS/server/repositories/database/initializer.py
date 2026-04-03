@@ -61,6 +61,8 @@ def clone_settings_with_database(
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
     repository = SQLiteRepository(settings)
+    if repository.db_path and not sqlalchemy.inspect(repository.engine).get_table_names():
+        Base.metadata.create_all(repository.engine)
     logger.info("Initialized SQLite database at %s", repository.db_path)
 
 
@@ -86,36 +88,22 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
     if not settings.database_name:
         raise ValueError("Database name is required for PostgreSQL initialization.")
 
-    target_database = settings.database_name
-    connect_args = build_postgres_connect_args(settings)
-
-    admin_url = build_postgres_url(settings, "postgres")
-    admin_engine = sqlalchemy.create_engine(
-        admin_url,
-        echo=False,
-        future=True,
-        connect_args=connect_args,
-        isolation_level="AUTOCOMMIT",
-        pool_pre_ping=True,
-    )
-
-    with admin_engine.connect() as conn:
-        exists = conn.execute(
-            build_postgres_database_exists_statement(),
-            {"name": target_database},
-        ).scalar()
-        if exists:
-            logger.info("PostgreSQL database %s already exists", target_database)
-        else:
-            conn.execute(build_postgres_create_database_statement(target_database))
-            logger.info("Created PostgreSQL database %s", target_database)
-
-    normalized_settings = clone_settings_with_database(settings, target_database)
-    repository = PostgresRepository(normalized_settings)
+    repository = PostgresRepository(settings)
     Base.metadata.create_all(repository.engine)
-    logger.info("Ensured PostgreSQL tables exist in %s", target_database)
+    logger.info("Ensured PostgreSQL tables exist in %s", settings.database_name)
+    return str(settings.database_name)
 
-    return target_database
+
+def validate_postgres_schema(settings: DatabaseSettings) -> None:
+    repository = PostgresRepository(settings)
+    existing = set(sqlalchemy.inspect(repository.engine).get_table_names())
+    required = set(Base.metadata.tables.keys())
+    missing = sorted(required - existing)
+    if missing:
+        raise ValueError(
+            "PostgreSQL schema is missing required tables. "
+            f"Run the external initialization script first. Missing: {', '.join(missing)}"
+        )
 
 # -----------------------------------------------------------------------------
 def run_database_initialization() -> None:

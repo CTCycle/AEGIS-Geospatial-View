@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from AEGIS.server.repositories.database.backend import database
+from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import ChatMessageRecord, ChatSessionRecord
 
 
@@ -27,7 +27,7 @@ def _from_json_payload(value: str | None) -> Any:
 
 class ChatHistoryRepository:
     def __init__(self) -> None:
-        self._session_factory = database.backend.session
+        self._session_factory = get_database().backend.session
 
     def create_session(self, *, title: str | None = None) -> ChatSessionRecord:
         with self._session_factory() as session:

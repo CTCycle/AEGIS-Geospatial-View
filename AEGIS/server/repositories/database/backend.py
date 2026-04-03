@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from AEGIS.server.configurations import DatabaseSettings, server_settings
+from AEGIS.server.repositories.database.initializer import validate_postgres_schema
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.utils.logger import logger
@@ -63,7 +64,10 @@ class AEGISDatabase:
         if normalized_name not in BACKEND_FACTORIES:
             raise ValueError(f"Unsupported database engine: {backend_name}")
         factory = BACKEND_FACTORIES[normalized_name]
-        return factory(self.settings)
+        backend = factory(self.settings)
+        if normalized_name != "sqlite":
+            validate_postgres_schema(self.settings)
+        return backend
 
     # -------------------------------------------------------------------------
     @property
@@ -89,4 +93,19 @@ class AEGISDatabase:
         return self.backend.list_columns(table_name)
 
 
-database = AEGISDatabase()
+_database_instance: AEGISDatabase | None = None
+
+
+def get_database() -> AEGISDatabase:
+    global _database_instance
+    if _database_instance is None:
+        _database_instance = AEGISDatabase()
+    return _database_instance
+
+
+class _DatabaseProxy:
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_database(), name)
+
+
+database = _DatabaseProxy()

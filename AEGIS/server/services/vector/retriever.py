@@ -14,19 +14,35 @@ class VectorRetriever:
         self.store = store or ChromaVectorStore()
         self.indexer = indexer or VectorIndexer(store=self.store)
 
-    def retrieve_layers(self, query: str, *, top_k: int = 8) -> dict[str, list[str]]:
+    def retrieve_candidates(self, query: str, *, top_k: int = 8) -> dict[str, list[dict[str, object]]]:
         self.indexer.ensure_index()
         matches = self.store.similarity_search(query, top_k=top_k)
-        basemap_ids: list[str] = []
-        overlay_ids: list[str] = []
+        basemaps: list[dict[str, object]] = []
+        overlays: list[dict[str, object]] = []
+        providers: list[dict[str, object]] = []
+        seen: set[str] = set()
         for item in matches:
             metadata = item.get("metadata", {})
             entry_id = metadata.get("id")
-            entry_type = metadata.get("type")
             if not isinstance(entry_id, str):
                 continue
-            if entry_type == "tile" and entry_id not in basemap_ids:
-                basemap_ids.append(entry_id)
-            if entry_type != "provider" and entry_id not in overlay_ids:
-                overlay_ids.append(entry_id)
-        return {"basemap_ids": basemap_ids, "overlay_ids": overlay_ids}
+            if entry_id in seen:
+                continue
+            seen.add(entry_id)
+            score = float(item.get("distance", 0.0) or 0.0)
+            candidate = {"id": entry_id, "score": score, "metadata": metadata}
+            document_kind = str(metadata.get("document_kind") or "")
+            if document_kind == "provider":
+                providers.append(candidate)
+            elif document_kind == "basemap":
+                basemaps.append(candidate)
+            else:
+                overlays.append(candidate)
+        return {"basemaps": basemaps, "overlays": overlays, "providers": providers}
+
+    def retrieve_layers(self, query: str, *, top_k: int = 8) -> dict[str, list[str]]:
+        candidates = self.retrieve_candidates(query, top_k=top_k)
+        return {
+            "basemap_ids": [str(item["id"]) for item in candidates["basemaps"]],
+            "overlay_ids": [str(item["id"]) for item in candidates["overlays"]],
+        }
