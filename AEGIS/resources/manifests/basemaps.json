@@ -1,0 +1,47 @@
+[
+  {
+    "id": "osm_default",
+    "name": "OpenStreetMap",
+    "provider": "fallback",
+    "type": "tile",
+    "description": "Default OpenStreetMap streets basemap.",
+    "capabilities": ["tile"],
+    "coverage": "global",
+    "metadata": {
+      "label": "OpenStreetMap",
+      "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "attribution": "© OpenStreetMap contributors",
+      "requires_key": false
+    }
+  },
+  {
+    "id": "tomtom_basic",
+    "name": "TomTom Basic",
+    "provider": "tomtom",
+    "type": "tile",
+    "description": "TomTom vector-style raster tiles for global streets context.",
+    "capabilities": ["tile"],
+    "coverage": "global",
+    "metadata": {
+      "label": "TomTom Basic",
+      "tile_url_template": "https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key={api_key}",
+      "attribution": "© TomTom",
+      "requires_key": true
+    }
+  },
+  {
+    "id": "geoapify_osm",
+    "name": "Geoapify OSM Bright",
+    "provider": "geoapify",
+    "type": "tile",
+    "description": "Geoapify bright OSM basemap style.",
+    "capabilities": ["tile"],
+    "coverage": "global",
+    "metadata": {
+      "label": "Geoapify OSM Bright",
+      "tile_url_template": "https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey={api_key}",
+      "attribution": "© OpenMapTiles © OpenStreetMap contributors © Geoapify",
+      "requires_key": true
+    }
+  }
+]

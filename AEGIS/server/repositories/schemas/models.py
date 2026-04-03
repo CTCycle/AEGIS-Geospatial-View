@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -71,3 +82,80 @@ class SearchSessionRecord(Base):
     state: Mapped[str | None] = mapped_column(String(20))
 
     __table_args__ = (UniqueConstraint("id"),)
+
+
+###############################################################################
+class ModelProviderSettingsRecord(Base):
+    __tablename__ = "MODEL_PROVIDER_SETTINGS"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    active_provider_mode: Mapped[str] = mapped_column(String(20), default="local")
+    chat_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
+    chat_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
+    agent_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
+    agent_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
+    ollama_url: Mapped[str] = mapped_column(String(400), default="http://localhost:11434")
+    openai_base_url: Mapped[str | None] = mapped_column(String(400))
+    google_base_url: Mapped[str | None] = mapped_column(String(400))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+###############################################################################
+class ModelCredentialRecord(Base):
+    __tablename__ = "MODEL_CREDENTIALS"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
+    key_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+###############################################################################
+class ChatSessionRecord(Base):
+    __tablename__ = "CHAT_SESSIONS"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    last_map_session_json: Mapped[str | None] = mapped_column(Text)
+
+
+###############################################################################
+class ChatMessageRecord(Base):
+    __tablename__ = "CHAT_MESSAGES"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("CHAT_SESSIONS.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    structured_payload_json: Mapped[str | None] = mapped_column(Text)
+    tool_payload_json: Mapped[str | None] = mapped_column(Text)
+    map_session_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )

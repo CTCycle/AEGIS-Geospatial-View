@@ -268,6 +268,14 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
         map=build_map_settings(map_payload),
         jobs=build_jobs_settings(jobs_payload),
         gibs=build_gibs_settings(gibs_payload),
+        credential_master_key=coerce_str(
+            os.getenv("AEGIS_CREDENTIAL_MASTER_KEY"),
+            "dev-insecure-master-key-change-me",
+        ),
+        credential_key_version=coerce_str(
+            os.getenv("AEGIS_CREDENTIAL_KEY_VERSION"),
+            "v1",
+        ),
     )
 
 

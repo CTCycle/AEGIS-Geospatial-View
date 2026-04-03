@@ -327,7 +327,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
                 </div>
             );
         }
-        if (!payload || !payload.satellite_imagery) {
+        if (!payload || (!payload.satellite_imagery && !payload.map_session)) {
             return <div className="empty-state">{emptyMessage}</div>;
         }
         if (!hasCenter) {

@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+from AEGIS.server.services.llm.base import LLMProvider
+from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult, ModelDescriptor
+
+
+class OllamaProvider(LLMProvider):
+    provider_name = "ollama"
+
+    def __init__(self, *, base_url: str) -> None:
+        self.base_url = base_url.rstrip("/")
+
+    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        request = Request(
+            f"{self.base_url}{path}",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def _get_json(self, path: str) -> dict[str, Any]:
+        request = Request(f"{self.base_url}{path}", method="GET")
+        with urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def list_models(self) -> list[ModelDescriptor]:
+        try:
+            payload = self._get_json("/api/tags")
+        except Exception:
+            return []
+        models: list[ModelDescriptor] = []
+        for item in payload.get("models", []):
+            if not isinstance(item, dict):
+                continue
+            model_name = str(item.get("name") or "")
+            if not model_name:
+                continue
+            models.append(
+                ModelDescriptor(
+                    name=model_name,
+                    description=f"Local Ollama model {model_name}",
+                    provider="ollama",
+                    capabilities=["chat", "stream", "embeddings"],
+                    metadata={"size": item.get("size")},
+                )
+            )
+        return models
+
+    def pull_model(self, *, model: str) -> dict[str, Any]:
+        return self._post_json("/api/pull", {"name": model, "stream": False})
+
+    def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
+        payload = self._post_json(
+            "/api/chat",
+            {"model": request.model, "messages": request.messages, "stream": False},
+        )
+        message = payload.get("message", {}) if isinstance(payload, dict) else {}
+        content = str(message.get("content") or "")
+        return ChatCompletionResult(content=content, raw=payload)
+
+    def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
+        payload = self.chat(request)
+        if payload.content:
+            yield payload.content
+
+    def structured_output(self, request: ChatCompletionRequest, schema: dict[str, Any]) -> dict[str, Any]:
+        result = self.chat(request)
+        try:
+            parsed = json.loads(result.content)
+        except json.JSONDecodeError:
+            parsed = {}
+        if not isinstance(parsed, dict):
+            return {}
+        return parsed
+
+    def embeddings(self, *, model: str, input_text: str) -> list[float]:
+        payload = self._post_json("/api/embeddings", {"model": model, "prompt": input_text})
+        vector = payload.get("embedding", [])
+        if not isinstance(vector, list):
+            return []
+        return [float(value) for value in vector if isinstance(value, (int, float))]
+
+    def health_check(self) -> dict[str, Any]:
+        try:
+            payload = self._get_json("/api/tags")
+            return {"ok": True, "detail": "reachable", "models": len(payload.get("models", []))}
+        except (HTTPError, URLError, TimeoutError) as exc:
+            return {"ok": False, "detail": str(exc)}

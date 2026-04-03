@@ -31,6 +31,14 @@ export const API_BASE_URL = normalizeApiBaseUrl(
 );
 export const API_MAPS_SEARCH_PATH = '/maps/search';
 export const API_MAPS_CATALOG_PATH = '/maps/catalog';
+export const API_CHAT_TURN_PATH = '/chat/turn';
+export const API_CHAT_STREAM_PATH = '/chat/stream';
+export const API_CHAT_MODELS_PATH = '/chat/models';
+export const API_CHAT_SETTINGS_PATH = '/chat/settings';
+export const API_OLLAMA_REFRESH_PATH = '/chat/models/ollama/refresh';
+export const API_OLLAMA_PULL_PATH = '/chat/models/ollama/pull';
+export const API_OLLAMA_HEALTH_PATH = '/chat/models/ollama/health';
+export const API_VECTOR_REBUILD_PATH = '/chat/vectors/rebuild';
 
 export const DEFAULT_AOI_RADIUS_M = 2500;
 export const DEFAULT_BASEMAP_ID = 'osm_default';

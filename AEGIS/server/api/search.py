@@ -45,6 +45,7 @@ from AEGIS.server.services.search.factory import (
     build_request_context,
     build_search_response,
 )
+from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.utils.logger import logger
 from AEGIS.server.repositories.serialization import DataSerializer
 from AEGIS.server.services.geospatial.gibs import (
@@ -815,6 +816,14 @@ class MapSearchEndpoint:
         self.job_manager = job_manager
         self.catalog_service = catalog_service
         self.serializer = DataSerializer()
+        self.orchestrator = LocationSearchOrchestrator(
+            sanitization_service=sanitization_service,
+            normatim_service=normatim_service,
+            catalog_service=catalog_service,
+            elevation_service=elevation_service,
+            renderer=rendering_service,
+            toolkit=toolkit,
+        )
 
     # -------------------------------------------------------------------------
     def resolve_coordinate_pair(
@@ -870,38 +879,12 @@ class MapSearchEndpoint:
         fallback: dict[str, Any],
         state: str,
     ) -> dict[str, Any]:
-        coordinates = self.resolve_coordinate_pair(payload, response_payload, fallback)
-        layers = (
-            list(payload.filters)
-            if payload
-            else self.toolkit.normalize_layers(fallback.get("geospatial_layers") or [])
+        return self.orchestrator.build_search_session_record(
+            payload=payload,
+            response_payload=response_payload,
+            fallback=fallback,
+            state=state,
         )
-        overlay_ids = (
-            list(payload.overlay_ids)
-            if payload
-            else self.toolkit.normalize_layers(fallback.get("overlay_ids") or [])
-        )
-        if overlay_ids:
-            layers = list(dict.fromkeys([*layers, *overlay_ids]))
-        basemap_id = payload.basemap_id if payload else fallback.get("basemap_id")
-        persisted_selection = {
-            "legacy_layers": layers,
-            "overlay_ids": overlay_ids,
-            "basemap_id": basemap_id,
-        }
-        record = {
-            "id": None,
-            "created_at": datetime.utcnow(),
-            "user": fallback.get("user"),
-            "country": payload.country if payload else fallback.get("country"),
-            "city": payload.city if payload else fallback.get("city"),
-            "address": payload.address if payload else fallback.get("address"),
-            "coordinates": self.format_coordinate_pair(coordinates),
-            "base_map": payload.map_tiles if payload else fallback.get("map_tiles"),
-            "geospatial_layers": json.dumps(persisted_selection),
-            "state": state,
-        }
-        return record
 
     # -------------------------------------------------------------------------
     def _resolve_overlay_ids(self, payload: LocationSearchRequest) -> list[str]:
@@ -921,60 +904,11 @@ class MapSearchEndpoint:
         search_payload: dict[str, Any],
         satellite_payload: dict[str, Any],
     ) -> dict[str, Any]:
-        overlays = self.catalog_service.resolve_overlays(
-            self._resolve_overlay_ids(payload)
+        return await self.orchestrator.assemble_map_session(
+            payload=payload,
+            search_payload=search_payload,
+            satellite_payload=satellite_payload,
         )
-        if not overlays:
-            legacy_overlays = satellite_payload.get("overlays", [])
-            if isinstance(legacy_overlays, list):
-                for entry in legacy_overlays:
-                    if not isinstance(entry, dict):
-                        continue
-                    overlays.append(
-                        {
-                            "id": str(entry.get("name") or "legacy_overlay"),
-                            "label": str(entry.get("label") or "Legacy Overlay"),
-                            "provider": str(entry.get("provider") or "gibs"),
-                            "type": "legacy-image",
-                            "default_opacity": float(entry.get("opacity", 0.68)),
-                            "coverage": "dynamic",
-                            "requires_key": False,
-                            "attribution": entry.get("attribution"),
-                        }
-                    )
-        basemap = self.catalog_service.resolve_basemap(payload.basemap_id)
-        latitude = search_payload.get("latitude")
-        longitude = search_payload.get("longitude")
-        try:
-            lat_value = float(latitude) if latitude is not None else None
-            lon_value = float(longitude) if longitude is not None else None
-        except (TypeError, ValueError):
-            lat_value = None
-            lon_value = None
-        radius_m = float(payload.radius_m or 2500.0)
-        insights = await self.catalog_service.fetch_insights(
-            latitude=lat_value,
-            longitude=lon_value,
-            overlay_ids=[item["id"] for item in overlays],
-            radius_m=radius_m,
-        )
-        compliance_warnings = self.catalog_service.resolve_compliance_warnings(
-            basemap=basemap,
-            overlays=overlays,
-        )
-        center = {
-            "latitude": lat_value,
-            "longitude": lon_value,
-        }
-        bounds = satellite_payload.get("bbox")
-        return {
-            "center": center,
-            "bounds": bounds,
-            "basemap": basemap,
-            "overlays": overlays,
-            "insights": insights,
-            "compliance_warnings": compliance_warnings,
-        }
 
     # -------------------------------------------------------------------------
     async def record_search_session(
@@ -1000,107 +934,13 @@ class MapSearchEndpoint:
     async def get_location_coordinates(
         self, payload: LocationSearchRequest
     ) -> dict[str, object]:
-        response_payload = payload.model_dump()
-        normalized_filters = list(payload.filters or [])
-        response_payload["geospatial_filter"] = normalized_filters
-        response_payload["filters"] = normalized_filters
-        response_payload.pop("layers", None)
-        if not payload.use_coordinates:
-            sanitized_location = await asyncio.to_thread(
-                self.sanitization_service.sanitize_location_inputs,
-                payload.address or "",
-                payload.city,
-                payload.country,
-            )
-            response_payload["sanitized_location"] = sanitized_location
-            normatim_candidate = await self.normatim_service.extract_coordinates(
-                address=sanitized_location["address"] or "",
-                city=sanitized_location["city"],
-                country_name=sanitized_location["country"],
-                country_code=sanitized_location["country_code"],
-            )
-            if normatim_candidate:
-                latitude = normatim_candidate.get("lat")
-                longitude = normatim_candidate.get("lon")
-                if latitude is not None and longitude is not None:
-                    try:
-                        lat_value = float(latitude)
-                        lon_value = float(longitude)
-                    except (TypeError, ValueError):
-                        lat_value = None
-                        lon_value = None
-                    if lat_value is not None and lon_value is not None:
-                        response_payload["latitude"] = lat_value
-                        response_payload["longitude"] = lon_value
-
-                if normatim_candidate.get("bbox"):
-                    response_payload["bbox"] = normatim_candidate["bbox"]
-                if normatim_candidate.get("confidence") is not None:
-                    response_payload["confidence"] = normatim_candidate["confidence"]
-        else:
-            if payload.latitude is not None and payload.longitude is not None:
-                response_payload["latitude"] = payload.latitude
-                response_payload["longitude"] = payload.longitude
-                bbox = await self.normatim_service.extract_bbox_from_coordinates(
-                    latitude=payload.latitude,
-                    longitude=payload.longitude,
-                )
-                if bbox:
-                    response_payload["bbox"] = bbox
-
-        return response_payload
+        return await self.orchestrator.resolve_coordinates(payload)
 
     # -------------------------------------------------------------------------
     async def process_location_search(
         self, payload: LocationSearchRequest
     ) -> dict[str, Any]:
-        search_payload = await self.get_location_coordinates(payload)
-        try:
-            satellite_payload = await self.renderer.build_satellite_payload(
-                payload, search_payload
-            )
-        except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
-        except (GIBSRequestError, MapRequestError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
-            ) from exc
-        search_payload["satellite_imagery"] = satellite_payload
-        map_session = await self.build_map_session(
-            payload=payload,
-            search_payload=search_payload,
-            satellite_payload=satellite_payload,
-        )
-        search_payload["map_session"] = map_session
-        search_payload["compliance_warnings"] = map_session.get(
-            "compliance_warnings", []
-        )
-
-        # Fetch elevation data for the search location
-        lat = search_payload.get("latitude")
-        lon = search_payload.get("longitude")
-        lat_value = self._coerce_coordinate_scalar(lat)
-        lon_value = self._coerce_coordinate_scalar(lon)
-        if lat_value is not None and lon_value is not None:
-            try:
-                elevation_data = await elevation_service.get_elevation(
-                    lat_value, lon_value
-                )
-                search_payload["elevation"] = elevation_data
-            except Exception as exc:
-                logger.warning("Failed to fetch elevation: %s", exc)
-                search_payload["elevation"] = None
-
-        return {
-            "status_message": MAP_SEARCH_STATUS_MESSAGE,
-            "payload": search_payload,
-            "map_session": map_session,
-            "compliance_warnings": map_session.get("compliance_warnings", []),
-        }
+        return await self.orchestrator.execute(payload)
 
     # -------------------------------------------------------------------------
     async def process_location_search_job(
