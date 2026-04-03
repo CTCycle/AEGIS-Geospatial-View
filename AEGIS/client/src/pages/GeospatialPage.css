@@ -5,10 +5,14 @@
 
 .geospatial-workspace {
     display: grid;
-    grid-template-columns: minmax(19rem, 22.5rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--toolbar-width, 22.5rem)) 0.45rem minmax(0, 1fr);
     align-items: stretch;
     width: 100%;
     height: 100%;
+}
+
+.geospatial-workspace--toolbar-collapsed {
+    grid-template-columns: 0 0 minmax(0, 1fr);
 }
 
 .toolbar-panel,
@@ -28,6 +32,11 @@
         linear-gradient(180deg, rgb(245 248 255 / 98%), rgb(236 242 255 / 95%));
     border-right: 1px solid var(--color-border-subtle);
     overflow-y: auto;
+}
+
+.geospatial-workspace--toolbar-collapsed .toolbar-panel {
+    border-right: none;
+    overflow: hidden;
 }
 
 .toolbar-brand {
@@ -95,15 +104,38 @@
     gap: var(--space-2);
 }
 
+.toolbar-collapse,
 .toolbar-gear {
     border: 1px solid var(--color-border-subtle);
     border-radius: 999px;
-    padding: 0.42rem 0.78rem;
     background: rgb(255 255 255 / 88%);
+    box-shadow: var(--shadow-1);
+}
+
+.toolbar-collapse {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    font-weight: var(--font-weight-bold);
+}
+
+.toolbar-gear {
+    padding: 0.42rem 0.78rem;
     font-size: var(--font-size-caption);
     font-weight: var(--font-weight-semibold);
-    cursor: pointer;
-    box-shadow: var(--shadow-1);
+}
+
+.toolbar-resize-handle {
+    width: 0.45rem;
+    cursor: col-resize;
+    background: linear-gradient(180deg, rgb(203 213 225 / 0%), rgb(203 213 225 / 65%), rgb(203 213 225 / 0%));
+    transition: background-color 120ms ease;
+}
+
+.toolbar-resize-handle:hover,
+.toolbar-resize-handle.is-active {
+    background: linear-gradient(180deg, rgb(59 130 246 / 18%), rgb(59 130 246 / 45%), rgb(59 130 246 / 18%));
 }
 
 .agent-chat-panel {
@@ -187,22 +219,24 @@
 }
 
 .chat-composer textarea {
-    min-height: 3.2rem;
-    max-height: 11rem;
+    min-height: 5rem;
+    max-height: 14rem;
     resize: vertical;
     border: 1px solid var(--color-border-subtle);
-    border-radius: 1.1rem;
-    padding: 0.7rem 0.9rem;
+    border-radius: 1rem;
+    padding: 0.85rem 1rem;
     background: rgb(255 255 255 / 95%);
 }
 
 .chat-composer .primary-button {
     border-radius: 999px;
-    min-width: 4.8rem;
-    padding: 0.55rem 0.9rem;
-    border: 1px solid var(--color-brand);
-    background: var(--color-brand);
-    color: var(--color-text-on-brand);
+    min-width: 3.75rem;
+    padding: 0.48rem 0.72rem;
+    border: 1px solid var(--color-border-strong);
+    background: rgb(248 250 252 / 88%);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-semibold);
 }
 
 .chat-composer .primary-button:disabled {
@@ -237,7 +271,7 @@
 
 @media (max-width: 1280px) {
     .geospatial-workspace {
-        grid-template-columns: minmax(17.5rem, 19.5rem) minmax(0, 1fr);
+        grid-template-columns: minmax(17.5rem, var(--toolbar-width, 19.5rem)) 0.45rem minmax(0, 1fr);
     }
 }
 
@@ -257,6 +291,10 @@
     .toolbar-brand {
         position: static;
         backdrop-filter: none;
+    }
+
+    .toolbar-resize-handle {
+        display: none;
     }
 
     .canvas-panel {
