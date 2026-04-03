@@ -31,6 +31,15 @@ MAPS_CATALOG_ROUTE = "/catalog"
 MAPS_JOBS_ROUTE = "/jobs"
 MAPS_JOB_ROUTE = "/jobs/{job_id}"
 GEO_SEARCH_URL = f"{MAPS_ROUTER_PREFIX}{MAPS_SEARCH_ROUTE}"
+CHAT_ROUTER_PREFIX = "/chat"
+CHAT_TURN_ROUTE = "/turn"
+CHAT_STREAM_ROUTE = "/stream"
+CHAT_MODELS_ROUTE = "/models"
+CHAT_SETTINGS_ROUTE = "/settings"
+CHAT_OLLAMA_REFRESH_ROUTE = "/models/ollama/refresh"
+CHAT_OLLAMA_PULL_ROUTE = "/models/ollama/pull"
+CHAT_VECTORS_REBUILD_ROUTE = "/vectors/rebuild"
+CHAT_OLLAMA_HEALTH_ROUTE = "/models/ollama/health"
 
 # [SERVER URLS]
 ###############################################################################
@@ -111,6 +120,10 @@ COMMON_FOLIUM_MAPS = {
 GEONAMES_TABLE = "GEONAMES"
 GIBS_LAYERS_TABLE = "GIBS_LAYERS"
 SEARCH_SESSIONS_TABLE = "SEARCH_SESSIONS"
+MODEL_PROVIDER_SETTINGS_TABLE = "MODEL_PROVIDER_SETTINGS"
+MODEL_CREDENTIALS_TABLE = "MODEL_CREDENTIALS"
+CHAT_SESSIONS_TABLE = "CHAT_SESSIONS"
+CHAT_MESSAGES_TABLE = "CHAT_MESSAGES"
 
 
 # [DATABASE COLUMNS]
@@ -158,6 +171,53 @@ SEARCH_SESSION_COLUMNS = [
     "base_map",
     "geospatial_layers",
     "state",
+]
+
+MODEL_PROVIDER_SETTINGS_COLUMNS = [
+    "id",
+    "active_provider_mode",
+    "chat_model_provider",
+    "chat_model_name",
+    "agent_model_provider",
+    "agent_model_name",
+    "ollama_url",
+    "openai_base_url",
+    "google_base_url",
+    "created_at",
+    "updated_at",
+]
+
+MODEL_CREDENTIALS_COLUMNS = [
+    "id",
+    "provider",
+    "label",
+    "encrypted_value",
+    "key_version",
+    "is_active",
+    "created_at",
+    "updated_at",
+    "last_used_at",
+]
+
+CHAT_SESSION_COLUMNS = [
+    "id",
+    "title",
+    "status",
+    "created_at",
+    "updated_at",
+    "last_map_session_json",
+]
+
+CHAT_MESSAGE_COLUMNS = [
+    "id",
+    "session_id",
+    "turn_index",
+    "role",
+    "content",
+    "structured_payload_json",
+    "tool_payload_json",
+    "map_session_json",
+    "created_at",
 ]
 
 

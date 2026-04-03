@@ -218,8 +218,8 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError(
                     "Provide a country, city, or address when not using coordinates."
                 )
-        if not self.datetime:
-            raise ValueError("Provide datetime to determine imagery date.")
+        if self.datetime is None:
+            self.datetime = dt.datetime.now(dt.UTC)
         if self.bbox is None and self.use_coordinates:
             if self.latitude is None or self.longitude is None:
                 raise ValueError(

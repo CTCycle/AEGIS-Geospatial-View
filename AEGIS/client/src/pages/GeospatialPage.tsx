@@ -1,126 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import LocationSearch from '../components/LocationSearch';
+import AgentChatPanel from '../components/chat/AgentChatPanel';
 import MapPreview from '../components/MapPreview';
-import PanelHeader from '../components/PanelHeader';
-import { fetchCatalog, searchLocation } from '../services/api';
-import { CatalogResponse, LocationSearchRequest, SearchResponsePayload } from '../types';
+import { MapSession, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
 
-interface SearchResultState {
-    message?: string;
-    payload?: SearchResponsePayload;
+interface GeospatialPageProps {
+    onOpenSettings: () => void;
 }
 
-const readErrorField = (error: unknown, field: string): unknown => {
-    if (typeof error !== 'object' || error === null) {
-        return undefined;
-    }
-    return Reflect.get(error, field);
-};
+function GeospatialPage({ onOpenSettings }: GeospatialPageProps) {
+    const [payload, setPayload] = useState<SearchResponsePayload | undefined>();
 
-function GeospatialPage() {
-    const [isLoading, setIsLoading] = useState(false);
-    const [isCatalogLoading, setIsCatalogLoading] = useState(false);
-    const [searchResult, setSearchResult] = useState<SearchResultState>({});
-    const [lastRequest, setLastRequest] = useState<LocationSearchRequest | undefined>();
-    const [catalog, setCatalog] = useState<CatalogResponse>({
-        providers: [],
-        basemaps: [],
-        overlays: [],
-    });
-    const [catalogError, setCatalogError] = useState<string | undefined>();
-
-    useEffect(() => {
-        const loadCatalog = async () => {
-            setIsCatalogLoading(true);
-            setCatalogError(undefined);
-            try {
-                const response = await fetchCatalog();
-                setCatalog(response);
-            } catch (error) {
-                const messageCandidate = readErrorField(error, 'message');
-                setCatalogError(
-                    typeof messageCandidate === 'string' ? messageCandidate : 'Failed to load provider catalog',
-                );
-            } finally {
-                setIsCatalogLoading(false);
-            }
-        };
-        loadCatalog();
-    }, []);
-
-    const handleSearch = async (request: LocationSearchRequest) => {
-        setIsLoading(true);
-        setSearchResult({});
-        setLastRequest(request);
-
-        try {
-            const response = await searchLocation(request);
-            setSearchResult({
-                message: response.status_message,
-                payload: response.payload,
-            });
-        } catch (error: unknown) {
-            const statusCandidate = readErrorField(error, 'status');
-            const statusPrefix = typeof statusCandidate === 'number' ? ` ${statusCandidate}` : '';
-            const messageCandidate = readErrorField(error, 'message');
-
-            setSearchResult({
-                message: `Error${statusPrefix}: ${typeof messageCandidate === 'string' ? messageCandidate : 'Request failed'}`,
-                payload: undefined,
-            });
-        } finally {
-            setIsLoading(false);
+    const handleMapSession = (mapSession: MapSession | undefined) => {
+        if (!mapSession) {
+            return;
         }
-    };
-
-    const rerunLastSearch = () => {
-        if (lastRequest) {
-            handleSearch(lastRequest);
-        }
+        setPayload({
+            satellite_imagery: payload?.satellite_imagery,
+            map_session: mapSession,
+            compliance_warnings: mapSession.compliance_warnings,
+        });
     };
 
     return (
         <div className="geospatial-page">
             <div className="geospatial-workspace">
-                <aside className="toolbar-panel" aria-label="Search toolbar">
+                <aside className="toolbar-panel" aria-label="Chat toolbar">
                     <header className="toolbar-brand" aria-label="Application identity">
-                        <span className="toolbar-brand__logo">AEGIS</span>
-                        <p className="toolbar-brand__meta">Operations Console</p>
+                        <div>
+                            <span className="toolbar-brand__logo">AEGIS</span>
+                            <p className="toolbar-brand__meta">Operations Console</p>
+                        </div>
+                        <button
+                            type="button"
+                            className="toolbar-gear"
+                            aria-label="Open settings"
+                            onClick={onOpenSettings}
+                        >
+                            Settings
+                        </button>
                     </header>
 
                     <div className="toolbar-panel__content">
-                        <PanelHeader
-                            title="Search Commands"
-                            description="Use address or coordinates, then select map layers."
-                            headingLevel={2}
-                        />
-                        <div className="toolbar-actions" aria-label="Search actions">
-                            <button
-                                type="button"
-                                className="secondary-button"
-                                onClick={rerunLastSearch}
-                                disabled={!lastRequest || isLoading}
-                            >
-                                Re-run last search
-                            </button>
-                        </div>
-                        {catalogError && <p className="error-text">{catalogError}</p>}
-                        <LocationSearch
-                            onSearch={handleSearch}
-                            isLoading={isLoading}
-                            catalog={catalog}
-                            isCatalogLoading={isCatalogLoading}
-                        />
+                        <AgentChatPanel onMapSession={handleMapSession} />
                     </div>
                 </aside>
 
                 <section className="canvas-panel" aria-label="Map canvas">
                     <MapPreview
-                        payload={searchResult.payload}
-                        isLoading={isLoading}
-                        emptyMessage={searchResult.message ?? 'Run a search to display the map.'}
+                        payload={payload}
+                        isLoading={false}
+                        emptyMessage="Ask the assistant to run a geospatial search."
                     />
                 </section>
             </div>

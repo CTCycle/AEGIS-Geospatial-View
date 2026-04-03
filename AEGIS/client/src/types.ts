@@ -119,3 +119,83 @@ export interface SearchResponse {
     compliance_warnings?: string[];
     json?: unknown;
 }
+
+export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
+
+export interface ChatMessage {
+    role: ChatRole;
+    content: string;
+    created_at?: string;
+}
+
+export interface ChatSession {
+    id: number;
+    title?: string;
+    status?: string;
+    messages?: ChatMessage[];
+}
+
+export interface StructuredSearchIntent {
+    location_text?: string | null;
+    coordinates?: { latitude?: number; longitude?: number } | null;
+    search_radius_m?: number | null;
+    representation_type?: string | null;
+    requested_overlays?: string[];
+    user_intent?: string | null;
+    datetime_inference?: string | null;
+    missing_information?: string[];
+    should_execute_search?: boolean;
+    follow_up_question?: string | null;
+}
+
+export interface ChatTurnRequest {
+    session_id?: number;
+    title?: string;
+    message: string;
+    datetime?: string;
+}
+
+export interface ChatTurnResponse {
+    session_id: number;
+    assistant_message: string;
+    structured_intent?: StructuredSearchIntent | null;
+    map_session?: MapSession | null;
+    tool_payload?: Record<string, JsonValue> | null;
+    follow_up_required?: boolean;
+}
+
+export type ChatStreamEventType = 'status' | 'assistant_delta' | 'tool_status' | 'final' | 'error';
+
+export interface ChatStreamEvent {
+    event: ChatStreamEventType;
+    data: Record<string, JsonValue>;
+}
+
+export type ModelProviderMode = 'local' | 'cloud';
+
+export interface ModelCardDescriptor {
+    id: string;
+    name: string;
+    description: string;
+    provider: string;
+    capabilities: string[];
+    metadata: Record<string, JsonValue>;
+}
+
+export interface ModelSettingsResponse {
+    active_provider_mode: ModelProviderMode;
+    chat_model_provider: string;
+    chat_model_name: string;
+    agent_model_provider: string;
+    agent_model_name: string;
+    ollama_url: string;
+    openai_base_url?: string | null;
+    google_base_url?: string | null;
+    credentials: Record<string, Record<string, boolean>>;
+}
+
+export interface VectorizationResponse {
+    status: string;
+    indexed_documents: number;
+    vector_path: string;
+}

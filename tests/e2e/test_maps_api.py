@@ -111,12 +111,16 @@ class TestMapSearchSuccess:
 class TestMapSearchValidation:
     """Validation error handling for map search."""
 
-    def test_search_missing_datetime_returns_422(self, api_context: APIRequestContext):
+    def test_search_missing_datetime_defaults_to_present(self, api_context: APIRequestContext):
         payload = build_coordinate_payload()
         payload.pop("datetime", None)
         response = post_search(api_context, payload)
-        assert response.status == 422
-        assert_error_contains(response, "Provide datetime")
+        if response.status == 502:
+            pytest.skip("GIBS service unavailable for datetime default check.")
+        assert response.ok, f"Expected 200, got {response.status}"
+        body = response.json()
+        date_value = body.get("payload", {}).get("satellite_imagery", {}).get("date")
+        assert isinstance(date_value, str)
 
     def test_search_requires_coordinates_when_enabled(
         self, api_context: APIRequestContext

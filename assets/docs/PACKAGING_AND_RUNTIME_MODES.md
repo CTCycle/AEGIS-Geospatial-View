@@ -1,6 +1,6 @@
 # AEGIS Packaging and Runtime Modes
 
-Last updated: 2026-03-28
+Last updated: 2026-04-03
 
 ## 1. Runtime Strategy
 
@@ -39,6 +39,8 @@ Runtime mode switching is configuration-driven (no separate code branches for bu
 | `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB runtime tuning |
 | `OPTIONAL_DEPENDENCIES` | Controls extra dependency install behavior in launcher |
 | `MPLBACKEND`, `KERAS_BACKEND` | Runtime backend configuration for plotting/ML dependencies |
+| `AEGIS_CREDENTIAL_MASTER_KEY` | Master key for encrypting cloud provider credentials at rest |
+| `AEGIS_CREDENTIAL_KEY_VERSION` | Encryption key version tag stored alongside encrypted secrets |
 
 ## 4. Local Workflow
 
@@ -81,3 +83,9 @@ docker compose --env-file AEGIS/settings/.env down
 - Python dependencies are lockfile-backed with `runtimes/uv.lock` and installed via `uv sync`.
 - Frontend dependencies are lockfile-backed with `AEGIS/client/package-lock.json` and installed via `npm ci`.
 - Do not commit environment secrets in `.env` files.
+
+## 7. Ollama Runtime Contract
+
+- AEGIS does not start Ollama automatically in browser or Tauri mode.
+- Ollama integration is connection-only: configure URL, validate health, refresh/pull models via API.
+- Desktop and browser behavior are intentionally aligned (no desktop-only process spawn path).

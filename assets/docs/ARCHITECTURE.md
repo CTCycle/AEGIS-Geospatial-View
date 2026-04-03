@@ -1,6 +1,6 @@
 # AEGIS Geospatial View Architecture
 
-Last updated: 2026-03-28  
+Last updated: 2026-04-03  
 Scope: `AEGIS/` and `tests/`
 
 ## 1. System Overview
@@ -54,6 +54,19 @@ Routes:
 Compatibility mount:
 - The same routes are also exposed under `/api` (for frontend proxy paths), for example `/api/maps/search`.
 
+Chat router prefix: `/chat`.
+
+Routes:
+- `POST /chat/turn`: process one chat turn and optionally execute map search.
+- `POST /chat/stream`: stream turn events as NDJSON (`status`, `assistant_delta`, `tool_status`, `final`, `error`).
+- `GET /chat/models`: return cloud and local model catalogs.
+- `GET /chat/settings`: return persisted provider/model settings and masked credential presence.
+- `PUT /chat/settings`: update persisted provider/model settings and encrypted credentials.
+- `POST /chat/models/ollama/refresh`: refresh local Ollama model availability.
+- `POST /chat/models/ollama/pull`: request model pull from the configured Ollama server.
+- `GET /chat/models/ollama/health`: validate Ollama connectivity.
+- `POST /chat/vectors/rebuild`: rebuild vector index from manifests.
+
 Root behavior:
 - If packaged SPA is available in Tauri mode, `/` serves frontend assets.
 - Otherwise `/` redirects to `/docs`.
@@ -83,6 +96,10 @@ Main SQLAlchemy entities in `AEGIS/server/repositories/schemas/models.py`:
 - `GEONAMES`
 - `GIBS_LAYERS`
 - `SEARCH_SESSIONS`
+- `MODEL_PROVIDER_SETTINGS`
+- `MODEL_CREDENTIALS` (encrypted values only)
+- `CHAT_SESSIONS`
+- `CHAT_MESSAGES`
 
 Database backend choice:
 - Embedded SQLite when `DB_EMBEDDED=true`
@@ -92,7 +109,8 @@ Database backend choice:
 
 - Single-page shell in `AEGIS/client/src/App.tsx`.
 - Primary workspace page: `AEGIS/client/src/pages/GeospatialPage.tsx`.
-- Layout: left search toolbar + right map canvas.
+- Settings page: `AEGIS/client/src/pages/SettingsPage.tsx`.
+- Layout: left chat toolbar + right map canvas.
 - Service layer for API calls: `AEGIS/client/src/services/api.ts`.
 
 ## 9. External Integrations

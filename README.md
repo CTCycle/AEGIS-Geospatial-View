@@ -1,7 +1,16 @@
 # AEGIS Geospatial View
 
 ## 1. Project Overview
-AEGIS Geospatial View turns place names or coordinates into consistent bounding boxes and previewable map imagery. The system includes a FastAPI backend for geocoding, imagery selection, and metadata preparation, plus a React frontend for interactive search and preview.
+AEGIS Geospatial View is a chat-first geospatial assistant. User turns can execute map search (place name or coordinates), retrieve relevant layers, and update an interactive map session. The stack includes a FastAPI backend and React frontend with aligned browser/Tauri behavior.
+
+Finalized behavior highlights:
+- Chat-first interaction replaces the old form-driven toolbar flow.
+- Ollama is treated as an external running service (connection-only, no auto-start).
+- Provider/model settings are persisted in the database.
+- Cloud credentials are encrypted at rest in the database.
+- Layer metadata source of truth is JSON manifests in `AEGIS/resources/manifests`.
+- Chroma vector index is auto-created on first chat use and manually rebuildable from settings.
+- Datetime defaults to present (UTC) when omitted, unless a follow-up is required for ambiguity.
 
 ## 2. Runtime Model (Local Default + Docker Cloud)
 AEGIS uses one active runtime file: `AEGIS/settings/.env`.
@@ -153,6 +162,9 @@ The runner resolves host/port from `AEGIS/settings/.env`, exports:
 - `APP_TEST_BACKEND_URL`
 
 and uses those URLs for readiness checks and pytest runtime config.
+
+Chat API coverage is in:
+- `tests/e2e/test_chat_api.py`
 
 ## 7. Screenshots
 

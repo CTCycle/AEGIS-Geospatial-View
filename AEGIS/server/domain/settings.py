@@ -75,3 +75,5 @@ class ServerSettings:
     map: MapSettings
     jobs: JobsSettings
     gibs: GIBSSettings
+    credential_master_key: str
+    credential_key_version: str

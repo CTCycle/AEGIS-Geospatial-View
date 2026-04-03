@@ -1,15 +1,15 @@
 # UI/UX Audit Report
 
-Date: 2026-03-28  
+Date: 2026-04-03  
 Scope: `AEGIS/client/src`
 
 This report reflects the current implemented state (not a pre-implementation plan).
 
 ## 1. Current UI Baseline
 
-- App shell is minimal and hosts `GeospatialPage` directly.
+- App shell is minimal and switches between chat workspace and settings page.
 - Primary interface is a two-pane geospatial workspace:
-  - left command toolbar
+  - left agent chat toolbar
   - right map canvas
 - Styling relies on centralized CSS variables in `src/index.css`.
 - Responsive behavior is implemented through breakpoints in page/component CSS.
@@ -28,7 +28,7 @@ This report reflects the current implemented state (not a pre-implementation pla
 - A small set of spacing/font-size literals could be normalized further for stricter consistency.
 
 ### Medium
-- Validate keyboard traversal order and screen-reader verbosity across full search flow after future UI changes.
+- Validate keyboard traversal order and screen-reader verbosity across transcript streaming and settings model-card actions.
 
 ### Low
 - Continue reducing ad-hoc visual variants unless tied to a documented UX requirement.
