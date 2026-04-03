@@ -561,15 +561,29 @@ class MapRenderingService:
         coordinates: CoordinatePair | None,
         payload: LocationSearchRequest,
     ) -> list[float] | None:
-        # Always compute bbox from coordinates + map_size_m to ensure consistent
-        # sizing between map view and overlays. The geocoding bbox can be very
-        # small (e.g., 30m for a specific street address), which causes overlays
-        # to appear as tiny squares when the map is rendered at a larger scale.
-        if coordinates is not None:
-            lon, lat = coordinates
-            map_size_value = payload.map_size_m or server_settings.map.default_size_m
-            return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
-        # Fall back to provided bbox if no coordinates available
+        # Precedence:
+        # 1. explicit request bbox
+        # 2. AOI bbox
+        # 3. inherited geocoder bbox
+        # 4. center+map_size_m from coordinates (point/radius style searches)
+        if payload.bbox:
+            explicit = self.toolkit.harmonize_bbox_crs(
+                payload.bbox,
+                source_crs=payload.image_crs,
+                target_crs="EPSG:4326",
+            )
+            if explicit:
+                return explicit
+        if isinstance(payload.aoi, dict):
+            aoi_bbox = payload.aoi.get("bbox")
+            if isinstance(aoi_bbox, list) and len(aoi_bbox) == 4:
+                harmonized_aoi = self.toolkit.harmonize_bbox_crs(
+                    aoi_bbox,
+                    source_crs=payload.image_crs,
+                    target_crs="EPSG:4326",
+                )
+                if harmonized_aoi:
+                    return harmonized_aoi
         harmonized = self.toolkit.harmonize_bbox_crs(
             bbox_candidate,
             source_crs=bbox_source_crs,
@@ -577,6 +591,10 @@ class MapRenderingService:
         )
         if harmonized:
             return harmonized
+        if coordinates is not None:
+            lon, lat = coordinates
+            map_size_value = payload.map_size_m or server_settings.map.default_size_m
+            return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
         return None
 
     # -------------------------------------------------------------------------

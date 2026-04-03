@@ -4,14 +4,14 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from AEGIS.server.repositories.database.backend import database
+from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import ModelProviderSettingsRecord
 from AEGIS.server.utils.constants import OLLAMA_DEFAULT_HOST
 
 
 class ModelSettingsRepository:
     def __init__(self) -> None:
-        self._session_factory = database.backend.session
+        self._session_factory = get_database().backend.session
 
     def get_or_create(self) -> ModelProviderSettingsRecord:
         with self._session_factory() as session:

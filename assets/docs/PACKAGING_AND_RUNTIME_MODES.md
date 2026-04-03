@@ -89,3 +89,9 @@ docker compose --env-file AEGIS/settings/.env down
 - AEGIS does not start Ollama automatically in browser or Tauri mode.
 - Ollama integration is connection-only: configure URL, validate health, refresh/pull models via API.
 - Desktop and browser behavior are intentionally aligned (no desktop-only process spawn path).
+
+## 8. Validation Prerequisites
+
+- Backend unit tests require project and test extras installed (`uv sync --extra test`).
+- Plain `pytest` collection expects repository root on import path (configured in `pyproject.toml`).
+- Frontend production validation requires installed npm dependencies in `AEGIS/client` before `npm run build`.

@@ -30,8 +30,8 @@ set "scripts_dir=%project_folder%\scripts"
 set "desktop_clean_script=%root_folder%release\tauri\scripts\clean-tauri-build.ps1"
 set "init_db_script=%scripts_dir%\initialize_database.py"
 set "gibs_script=%scripts_dir%\update_gibs_layers.py"
-set "init_db_module=AEGIS.server.scripts.initialize_database"
-set "gibs_module=AEGIS.server.scripts.update_gibs_layers"
+set "init_db_module=AEGIS.scripts.initialize_database"
+set "gibs_module=AEGIS.scripts.update_gibs_layers"
 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

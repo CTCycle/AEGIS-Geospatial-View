@@ -16,16 +16,12 @@ class ChatMessage(BaseModel):
 
 
 class StructuredSearchIntent(BaseModel):
-    location_text: str | None = None
-    coordinates: dict[str, float] | None = None
-    search_radius_m: float | None = None
-    representation_type: str | None = None
-    requested_overlays: list[str] = Field(default_factory=list)
-    user_intent: str | None = None
-    datetime_inference: str | None = None
-    missing_information: list[str] = Field(default_factory=list)
-    should_execute_search: bool = True
-    follow_up_question: str | None = None
+    request_text: str = ""
+    location: dict[str, Any] = Field(default_factory=dict)
+    display_area: dict[str, Any] = Field(default_factory=dict)
+    view: dict[str, Any] = Field(default_factory=dict)
+    overlays: dict[str, Any] = Field(default_factory=dict)
+    planning: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExecutionPlan(BaseModel):
