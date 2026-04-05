@@ -21,6 +21,15 @@ class VectorIndexer:
         keywords = metadata.get("keywords", [])
         if not isinstance(keywords, list):
             keywords = []
+        intent_tags = metadata.get("intent_tags", [])
+        if not isinstance(intent_tags, list):
+            intent_tags = []
+        task_tags = metadata.get("task_tags", [])
+        if not isinstance(task_tags, list):
+            task_tags = []
+        map_type_tags = metadata.get("map_type_tags", [])
+        if not isinstance(map_type_tags, list):
+            map_type_tags = []
         text = " ".join(
             [
                 str(entry.get("id") or ""),
@@ -30,6 +39,12 @@ class VectorIndexer:
                 " ".join(str(item) for item in entry.get("capabilities", [])),
                 str(entry.get("coverage") or ""),
                 " ".join(str(item) for item in keywords),
+                " ".join(str(item) for item in intent_tags),
+                " ".join(str(item) for item in task_tags),
+                " ".join(str(item) for item in map_type_tags),
+                str(metadata.get("coverage_scope") or ""),
+                str(metadata.get("temporal_behavior") or ""),
+                str(metadata.get("constraints") or ""),
             ]
         ).strip()
         return VectorDocument(
@@ -48,6 +63,7 @@ class VectorIndexer:
                 "capabilities": ",".join(str(item) for item in entry.get("capabilities", [])),
                 "coverage": entry.get("coverage"),
                 "keywords": ",".join(str(item) for item in keywords),
+                "style_tags": ",".join(str(item) for item in map_type_tags),
             },
         )
 

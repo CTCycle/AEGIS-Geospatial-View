@@ -28,6 +28,10 @@ class SQLiteRepository:
         self.insert_batch_size = settings.insert_batch_size
 
     # -------------------------------------------------------------------------
+    def ensure_schema(self) -> None:
+        Base.metadata.create_all(self.engine)
+
+    # -------------------------------------------------------------------------
     def get_table_class(self, table_name: str) -> Any:
         for cls in Base.__subclasses__():
             if getattr(cls, "__tablename__", None) == table_name:
@@ -76,6 +80,7 @@ class SQLiteRepository:
     ) -> None:
         if not records:
             return
+        self.ensure_schema()
 
         table_cls = self.get_table_class(table_name)
         conflict_columns = self.get_upsert_constraint_columns(table_cls)
@@ -114,6 +119,7 @@ class SQLiteRepository:
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]:
+        self.ensure_schema()
         table_cls = self.get_table_class(table_name)
         canonical_name = str(table_cls.__tablename__)
         if not inspect(self.engine).has_table(canonical_name):
@@ -126,6 +132,7 @@ class SQLiteRepository:
 
     # -----------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
+        self.ensure_schema()
         table_cls = self.get_table_class(table_name)
         with self.session() as session:
             value = session.scalar(select(func.count()).select_from(table_cls)) or 0

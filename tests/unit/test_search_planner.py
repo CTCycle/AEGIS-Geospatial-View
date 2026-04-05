@@ -9,8 +9,8 @@ def test_search_planner_keeps_traffic_as_overlay() -> None:
     manifests = GeospatialManifestLoader().load_all()
     plan = planner.plan(
         intent={
-            "overlays": {"requested": ["tomtom_traffic_flow"]},
-            "display_area": {"mode": "radius"},
+            "location": {"name": "Rome", "is_partial": False},
+            "map_preferences": {"overlay_candidates": ["tomtom_traffic_flow"], "map_type": "street"},
             "planning": {"confidence": 0.8},
         },
         retrieval={

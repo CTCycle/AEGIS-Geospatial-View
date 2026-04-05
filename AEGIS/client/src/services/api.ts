@@ -153,6 +153,7 @@ const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
         map_session: isRecord(value.map_session) ? value.map_session : undefined,
         tool_payload: isRecord(value.tool_payload) ? value.tool_payload as Record<string, JsonValue> : undefined,
         follow_up_required: Boolean(value.follow_up_required),
+        fallback_mode: typeof value.fallback_mode === 'string' ? value.fallback_mode : undefined,
     };
 };
 

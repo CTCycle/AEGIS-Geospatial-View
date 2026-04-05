@@ -5,12 +5,39 @@
     "provider": "gibs",
     "type": "provider",
     "description": "NASA Global Imagery Browse Services for satellite imagery layers.",
-    "capabilities": ["imagery", "wms", "wmts"],
+    "capabilities": [
+      "imagery",
+      "wms",
+      "wmts"
+    ],
     "coverage": "global",
     "metadata": {
       "docs_url": "https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs",
       "commercial_notes": "NASA imagery requires attribution and service-aware usage.",
-      "warning_level": "low"
+      "warning_level": "low",
+      "keywords": [
+        "imagery",
+        "wms",
+        "wmts",
+        "gibs",
+        "nasa gibs"
+      ],
+      "intent_tags": [
+        "imagery",
+        "wms",
+        "wmts"
+      ],
+      "task_tags": [
+        "imagery",
+        "wms",
+        "wmts"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "global",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   },
   {
@@ -19,12 +46,35 @@
     "provider": "openaq",
     "type": "provider",
     "description": "OpenAQ air quality station observations and measurements.",
-    "capabilities": ["air-quality", "point-insight"],
+    "capabilities": [
+      "air-quality",
+      "point-insight"
+    ],
     "coverage": "global-partial",
     "metadata": {
       "docs_url": "https://docs.openaq.org/",
       "commercial_notes": "Coverage is uneven and source licenses vary by station.",
-      "warning_level": "medium"
+      "warning_level": "medium",
+      "keywords": [
+        "air-quality",
+        "point-insight",
+        "openaq",
+        "openaq"
+      ],
+      "intent_tags": [
+        "air-quality",
+        "point-insight"
+      ],
+      "task_tags": [
+        "air-quality",
+        "point-insight"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "global-partial",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   },
   {
@@ -33,12 +83,35 @@
     "provider": "pvgis",
     "type": "provider",
     "description": "PVGIS solar irradiation and photovoltaic potential estimates.",
-    "capabilities": ["solar", "point-insight"],
+    "capabilities": [
+      "solar",
+      "point-insight"
+    ],
     "coverage": "global-except-poles",
     "metadata": {
       "docs_url": "https://re.jrc.ec.europa.eu/pvg_tools/en/",
       "commercial_notes": "PVGIS results are generally reusable; attribution recommended.",
-      "warning_level": "low"
+      "warning_level": "low",
+      "keywords": [
+        "solar",
+        "point-insight",
+        "pvgis",
+        "pvgis"
+      ],
+      "intent_tags": [
+        "solar",
+        "point-insight"
+      ],
+      "task_tags": [
+        "solar",
+        "point-insight"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "global-except-poles",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   },
   {
@@ -47,12 +120,35 @@
     "provider": "eea",
     "type": "provider",
     "description": "European Environment Agency thematic map overlays.",
-    "capabilities": ["wms", "noise"],
+    "capabilities": [
+      "wms",
+      "noise"
+    ],
     "coverage": "eu-eea",
     "metadata": {
       "docs_url": "https://www.eea.europa.eu/",
       "commercial_notes": "EU-focused institutional datasets; service shape may change.",
-      "warning_level": "medium"
+      "warning_level": "medium",
+      "keywords": [
+        "wms",
+        "noise",
+        "eea",
+        "eea"
+      ],
+      "intent_tags": [
+        "wms",
+        "noise"
+      ],
+      "task_tags": [
+        "wms",
+        "noise"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "eu-eea",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   },
   {
@@ -61,12 +157,35 @@
     "provider": "esa",
     "type": "provider",
     "description": "European Space Agency WorldCover land use maps.",
-    "capabilities": ["wmts", "land-cover"],
+    "capabilities": [
+      "wmts",
+      "land-cover"
+    ],
     "coverage": "global",
     "metadata": {
       "docs_url": "https://services.terrascope.be/",
       "commercial_notes": "Attribution required for WorldCover services.",
-      "warning_level": "low"
+      "warning_level": "low",
+      "keywords": [
+        "wmts",
+        "land-cover",
+        "esa",
+        "esa"
+      ],
+      "intent_tags": [
+        "wmts",
+        "land-cover"
+      ],
+      "task_tags": [
+        "wmts",
+        "land-cover"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "global",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   },
   {
@@ -75,12 +194,35 @@
     "provider": "tomtom",
     "type": "provider",
     "description": "TomTom map and traffic tiles (API key required).",
-    "capabilities": ["tile", "traffic"],
+    "capabilities": [
+      "tile",
+      "traffic"
+    ],
     "coverage": "global",
     "metadata": {
       "docs_url": "https://developer.tomtom.com/",
       "commercial_notes": "Commercial use allowed under TomTom terms.",
-      "warning_level": "medium"
+      "warning_level": "medium",
+      "keywords": [
+        "tile",
+        "traffic",
+        "tomtom",
+        "tomtom"
+      ],
+      "intent_tags": [
+        "tile",
+        "traffic"
+      ],
+      "task_tags": [
+        "tile",
+        "traffic"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "global",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   },
   {
@@ -89,12 +231,39 @@
     "provider": "geoapify",
     "type": "provider",
     "description": "Geoapify basemap and amenities overlays (API key required).",
-    "capabilities": ["tile", "geojson", "places"],
+    "capabilities": [
+      "tile",
+      "geojson",
+      "places"
+    ],
     "coverage": "global",
     "metadata": {
       "docs_url": "https://www.geoapify.com/",
       "commercial_notes": "Free tier supports limited commercial use with attribution.",
-      "warning_level": "medium"
+      "warning_level": "medium",
+      "keywords": [
+        "tile",
+        "geojson",
+        "places",
+        "geoapify",
+        "geoapify"
+      ],
+      "intent_tags": [
+        "tile",
+        "geojson",
+        "places"
+      ],
+      "task_tags": [
+        "tile",
+        "geojson",
+        "places"
+      ],
+      "map_type_tags": [
+        "auto"
+      ],
+      "coverage_scope": "global",
+      "temporal_behavior": "static",
+      "constraints": "verify provider availability and attribution requirements"
     }
   }
 ]

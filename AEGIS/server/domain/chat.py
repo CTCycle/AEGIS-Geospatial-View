@@ -18,9 +18,9 @@ class ChatMessage(BaseModel):
 class StructuredSearchIntent(BaseModel):
     request_text: str = ""
     location: dict[str, Any] = Field(default_factory=dict)
-    display_area: dict[str, Any] = Field(default_factory=dict)
-    view: dict[str, Any] = Field(default_factory=dict)
-    overlays: dict[str, Any] = Field(default_factory=dict)
+    map_preferences: dict[str, Any] = Field(default_factory=dict)
+    task: dict[str, Any] = Field(default_factory=dict)
+    temporal_context: dict[str, Any] = Field(default_factory=dict)
     planning: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -44,6 +44,7 @@ class ChatTurnResponse(BaseModel):
     map_session: dict[str, Any] | None = None
     tool_payload: dict[str, Any] | None = None
     follow_up_required: bool = False
+    fallback_mode: str | None = None
 
 
 class ChatStreamEvent(BaseModel):

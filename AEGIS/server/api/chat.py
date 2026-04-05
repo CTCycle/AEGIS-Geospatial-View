@@ -63,6 +63,7 @@ async def chat_stream(payload: ChatTurnRequest):
                         "structured_intent": result.structured_intent,
                         "map_session": result.map_session,
                         "follow_up_required": result.follow_up_required,
+                        "fallback_mode": result.fallback_mode,
                     },
                 )
             )

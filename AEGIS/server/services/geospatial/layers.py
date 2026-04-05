@@ -16,7 +16,7 @@ __all__ = [
     "LayerProviderService",
 ]
 
-
+###############################################################################
 class LayerProviderError(Exception):
     """Base exception raised when a layer provider cannot fulfill a request."""
 
@@ -25,7 +25,7 @@ class LayerProviderError(Exception):
 class LayerProviderNotFoundError(LayerProviderError):
     """Raised when a requested layer does not have a registered provider."""
 
-
+###############################################################################
 class LayerProviderService:
     def __init__(
         self,

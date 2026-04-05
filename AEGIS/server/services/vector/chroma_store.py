@@ -69,9 +69,10 @@ class ChromaVectorStore:
             result = self._collection.query(query_texts=[query_text], n_results=max(1, top_k))
             docs = result.get("documents", [[]])[0]
             metadatas = result.get("metadatas", [[]])[0]
+            distances = result.get("distances", [[]])[0]
             return [
-                {"text": doc, "metadata": metadata or {}}
-                for doc, metadata in zip(docs, metadatas, strict=False)
+                {"text": doc, "metadata": metadata or {}, "distance": distance, "score": _distance_to_score(distance)}
+                for doc, metadata, distance in zip(docs, metadatas, distances, strict=False)
             ]
         tokens = {token.lower() for token in query_text.split() if token.strip()}
         scored: list[tuple[int, VectorDocument]] = []
@@ -81,7 +82,15 @@ class ChromaVectorStore:
             scored.append((score, document))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [
-            {"text": item.text, "metadata": item.metadata}
+            {"text": item.text, "metadata": item.metadata, "distance": float(max(0, 100 - score)), "score": float(score)}
             for score, item in scored[:top_k]
             if score > 0
         ]
+
+
+def _distance_to_score(distance: Any) -> float:
+    try:
+        value = float(distance)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, 1.0 - value)

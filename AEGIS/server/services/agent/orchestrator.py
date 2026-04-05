@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -8,15 +7,17 @@ from AEGIS.server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.repositories.chat_history import ChatHistoryRepository
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
-from AEGIS.server.services.agent.executor import infer_datetime, requires_follow_up
-from AEGIS.server.services.agent.prompts import AGENT_INTENT_SYSTEM_PROMPT
+from AEGIS.server.services.agent.intent_extractor import IntentExtractor
+from AEGIS.server.services.agent.response_generator import AgentResponseGenerator
 from AEGIS.server.services.chat.settings_service import ChatSettingsService
+from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from AEGIS.server.services.geospatial.openaq import OpenAQService
+from AEGIS.server.services.geospatial.pvgis import PVGISService
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.structured import INTENT_SCHEMA, normalize_structured_payload
-from AEGIS.server.services.llm.types import ChatCompletionRequest
 from AEGIS.server.services.search.intent_mapper import map_structured_intent_to_location_request
 from AEGIS.server.services.search.planner import SearchPlanner
+from AEGIS.server.services.search.query_service import QueryService
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.services.vector.retriever import VectorRetriever
 
@@ -42,178 +43,114 @@ class AgentOrchestrator:
         self.vector_retriever = vector_retriever or VectorRetriever()
         self.planner = planner or SearchPlanner()
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
+        self.catalog_service = GeospatialCatalogService(openaq_service=OpenAQService(), pvgis_service=PVGISService())
 
-    def _heuristic_intent(self, text: str, *, explicit_datetime: str | None) -> dict[str, Any]:
-        coordinates_match = re.search(
-            r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)",
-            text,
-        )
-        coordinates = None
-        if coordinates_match:
-            coordinates = {
-                "latitude": float(coordinates_match.group(1)),
-                "longitude": float(coordinates_match.group(2)),
-            }
-        bbox_match = re.search(
-            r"\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]",
-            text,
-        )
-        bbox = None
-        if bbox_match:
-            bbox = [
-                float(bbox_match.group(1)),
-                float(bbox_match.group(2)),
-                float(bbox_match.group(3)),
-                float(bbox_match.group(4)),
-            ]
-        map_type = "auto"
-        text_lower = text.lower()
-        if "satellite" in text_lower:
-            map_type = "satellite"
-        elif "terrain" in text_lower:
-            map_type = "terrain"
-        elif "street" in text_lower:
-            map_type = "streets"
-        requested_overlays: list[str] = []
-        overlay_map = {
-            "traffic": "tomtom_traffic_flow",
-            "air quality": "openaq_air_quality",
-            "solar": "pvgis_solar",
-            "noise": "eea_noise_2019",
-            "wildfire": "GIBS_MODIS_Combined_Thermal_Anomalies_Fire",
-        }
-        for phrase, overlay_id in overlay_map.items():
-            if phrase in text_lower:
-                requested_overlays.append(overlay_id)
-        return normalize_structured_payload(
-            {
-                "request_text": text,
-                "location": {
-                    "text": None if coordinates or bbox else text,
-                    "coordinates": coordinates,
-                    "bbox": bbox,
-                },
-                "display_area": {
-                    "mode": "bbox" if bbox else ("point" if coordinates else "inferred"),
-                    "radius_m": 2500.0,
-                    "bbox": bbox,
-                },
-                "view": {
-                    "view_mode": "interactive_map",
-                    "map_type": map_type,
-                },
-                "overlays": {"requested": requested_overlays},
-                "planning": {
-                    "user_intent": "map_search",
-                    "datetime_inference": explicit_datetime or datetime.now(UTC).isoformat(),
-                    "confidence": 0.5,
-                    "missing_information": [],
-                    "should_execute_search": True,
-                    "follow_up_question": None,
-                },
-            }
-        )
-
-    def _extract_intent(self, text: str, *, explicit_datetime: str | None) -> dict[str, Any]:
+    def extract_intent(self, text: str, *, explicit_datetime: str | None) -> dict[str, Any]:
         settings = self.settings_repo.get_or_create()
-        provider = self.llm_factory.get_provider(settings.agent_model_provider)
-        request = ChatCompletionRequest(
+        extractor = IntentExtractor(
+            llm_factory=self.llm_factory,
+            provider=settings.agent_model_provider,
             model=settings.agent_model_name,
-            messages=[
-                {"role": "system", "content": AGENT_INTENT_SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
         )
         try:
-            payload = provider.structured_output(request, schema=INTENT_SCHEMA)
-            if payload:
-                if isinstance(payload, str):
-                    normalized = normalize_structured_payload({"request_text": payload})
-                elif isinstance(payload, dict):
-                    normalized = normalize_structured_payload(payload)
-                else:
-                    normalized = normalize_structured_payload({})
-                if explicit_datetime:
-                    normalized["planning"]["datetime_inference"] = explicit_datetime
-                else:
-                    normalized["planning"]["datetime_inference"] = infer_datetime(normalized["planning"])
-                return normalized
+            return extractor.extract(text, explicit_datetime=explicit_datetime)
         except Exception:
-            pass
-        return self._heuristic_intent(text, explicit_datetime=explicit_datetime)
+            return {
+                "request_text": text,
+                "location": {"name": text, "coordinates": None, "bbox": None, "granularity": None, "is_partial": False, "ambiguity_reason": None},
+                "map_preferences": {
+                    "map_type": "auto",
+                    "map_type_confidence": 0.0,
+                    "basemap_preference": None,
+                    "overlay_candidates": [],
+                },
+                "task": {
+                    "user_intent": "map_search",
+                    "scope": "missing_area",
+                    "requires_external_fact_finding": False,
+                    "is_geographically_actionable": False,
+                },
+                "temporal_context": {
+                    "raw_text": None,
+                    "normalized_datetime": explicit_datetime or datetime.now(UTC).isoformat(),
+                    "date_range": None,
+                },
+                "planning": {
+                    "confidence": 0.0,
+                    "missing_information": ["location"],
+                    "should_execute_search": False,
+                    "follow_up_question": "Which location should I inspect on the map?",
+                    "fallback_mode": "missing_location",
+                },
+            }
 
     async def run_turn(self, request: ChatTurnRequest) -> ChatTurnResponse:
         session = self.history_repo.upsert_session(request.session_id, title=request.title)
-        self.history_repo.append_message(
-            session_id=session.id,
-            role="user",
-            content=request.message,
-        )
-        intent = self._extract_intent(request.message, explicit_datetime=request.datetime)
-        retrieval = self.vector_retriever.retrieve_candidates(request.message)
-        plan = self.planner.plan(
-            intent=intent,
-            retrieval=retrieval,
-            manifests=self.manifest_loader.load_all(),
-        )
-        intent.setdefault("overlays", {})
-        intent["overlays"]["requested"] = plan.selected_overlay_ids
-        intent.setdefault("planning", {})
-        if plan.follow_up_reason and not intent["planning"].get("follow_up_question"):
-            intent["planning"]["follow_up_question"] = (
-                "Please clarify the location or map extent so I can execute this search."
-            )
-            intent["planning"]["missing_information"] = [plan.follow_up_reason]
-            intent["planning"]["should_execute_search"] = False
-        if requires_follow_up(intent):
-            follow_up = str(
-                intent.get("planning", {}).get("follow_up_question")
-                or "Could you clarify the requested location or display area?"
-            )
-            self.history_repo.append_message(
-                session_id=session.id,
-                role="assistant",
-                content=follow_up,
-                structured_payload=intent,
-            )
-            return ChatTurnResponse(
-                session_id=session.id,
-                assistant_message=follow_up,
-                structured_intent=intent,
-                map_session=None,
-                tool_payload={"execution": "follow_up"},
-                follow_up_required=True,
-            )
+        self.history_repo.append_message(session_id=session.id, role="user", content=request.message)
 
-        mapped_payload = map_structured_intent_to_location_request(
-            {
-                **intent,
-                "datetime": intent.get("planning", {}).get("datetime_inference") or datetime.now(UTC).isoformat(),
-                "overlay_ids": plan.selected_overlay_ids,
-                "base_map": plan.selected_basemap_id,
-            }
+        intent = self.extract_intent(request.message, explicit_datetime=request.datetime)
+        query_service = QueryService(
+            planner=self.planner,
+            retriever=self.vector_retriever,
+            catalog_service=self.catalog_service,
         )
-        location_request = LocationSearchRequest.model_validate(mapped_payload)
-        result = await self.search_orchestrator.execute(location_request)
-        assistant_message = (
-            f"Resolved location: {intent.get('location', {}).get('text') or 'coordinates'}, "
-            f"display area: {plan.selected_display_area.get('mode', 'inferred')}, "
-            f"basemap: {plan.selected_basemap_id}, "
-            f"overlays: {', '.join(plan.selected_overlay_ids) if plan.selected_overlay_ids else 'none'}."
+        query = query_service.process(intent=intent, user_text=request.message, manifests=self.manifest_loader.load_all())
+        intent = query.intent
+        plan = query.plan
+
+        execution = "follow_up"
+        map_session: dict[str, Any] | None = None
+        tool_payload: dict[str, Any] | None = None
+
+        if plan.should_execute:
+            mapped_payload = map_structured_intent_to_location_request(
+                {
+                    **intent,
+                    "datetime": intent.get("temporal_context", {}).get("normalized_datetime") or datetime.now(UTC).isoformat(),
+                    "overlay_ids": plan.selected_overlay_ids,
+                    "base_map": plan.selected_basemap_id,
+                }
+            )
+            location_request = LocationSearchRequest.model_validate(mapped_payload)
+            result = await self.search_orchestrator.execute(location_request)
+            map_session = result.get("map_session")
+            tool_payload = result.get("payload")
+            execution = "search"
+        else:
+            map_session = plan.preview_map_session
+            tool_payload = {"execution": "follow_up", "fallback_mode": plan.fallback_mode}
+
+        settings = self.settings_repo.get_or_create()
+        responder = AgentResponseGenerator(
+            llm_factory=self.llm_factory,
+            provider=settings.agent_model_provider,
+            model=settings.agent_model_name,
         )
+        follow_up_question = intent.get("planning", {}).get("follow_up_question") if isinstance(intent.get("planning"), dict) else None
+        assistant_message = responder.generate(
+            user_message=request.message,
+            intent=intent,
+            retrieval=query.retrieval,
+            execution=execution,
+            map_session=map_session,
+            follow_up_question=str(follow_up_question) if follow_up_question else None,
+        )
+
+        follow_up_required = not plan.should_execute
         self.history_repo.append_message(
             session_id=session.id,
             role="assistant",
             content=assistant_message,
             structured_payload=intent,
-            tool_payload={"execution": "search"},
-            map_session=result.get("map_session"),
+            tool_payload=tool_payload,
+            map_session=map_session,
         )
         return ChatTurnResponse(
             session_id=session.id,
             assistant_message=assistant_message,
             structured_intent=intent,
-            map_session=result.get("map_session"),
-            tool_payload=result.get("payload"),
-            follow_up_required=False,
+            map_session=map_session,
+            tool_payload=tool_payload,
+            follow_up_required=follow_up_required,
+            fallback_mode=plan.fallback_mode,
         )

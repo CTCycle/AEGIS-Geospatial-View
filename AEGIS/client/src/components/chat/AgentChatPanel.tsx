@@ -46,6 +46,7 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession }) => {
         if (event.event === 'final') {
             const finalMessage = String(event.data.assistant_message ?? assistantDraft ?? '');
             const nextSessionId = Number(event.data.session_id ?? sessionId ?? 0);
+            const followUpRequired = Boolean(event.data.follow_up_required);
             if (nextSessionId > 0) {
                 setSessionId(nextSessionId);
             }
@@ -55,7 +56,7 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession }) => {
                 onMapSession(mapSession as MapSession);
             }
             setAssistantDraft('');
-            setStatus('Complete');
+            setStatus(followUpRequired ? 'Need more detail' : 'Complete');
         }
     };
 
