@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import ConfigurationPanel from '../components/settings/ConfigurationPanel';
 import ManifestToolsPanel from '../components/settings/ManifestToolsPanel';
@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { ModelCardDescriptor, ModelProviderMode, ModelSettingsResponse } from '../types';
 import './SettingsPage.css';
+import { PersistedSettingsPageState } from '../state/appState';
 
 const defaultSettings: ModelSettingsResponse = {
     active_provider_mode: 'local',
@@ -31,15 +32,47 @@ const defaultSettings: ModelSettingsResponse = {
 
 interface SettingsPageProps {
     onBack: () => void;
+    state: PersistedSettingsPageState;
+    onStateChange: (state: PersistedSettingsPageState) => void;
+    isActive: boolean;
 }
 
-function SettingsPage({ onBack }: SettingsPageProps) {
+const isProviderMode = (value: string | null): value is ModelProviderMode =>
+    value === 'local' || value === 'cloud';
+
+const readSettingsQueryState = (): Pick<PersistedSettingsPageState, 'searchText' | 'providerMode'> => {
+    const params = new URLSearchParams(window.location.search);
+    const searchText = params.get('q') ?? '';
+    const providerMode = isProviderMode(params.get('mode')) ? (params.get('mode') as ModelProviderMode) : 'local';
+    return { searchText, providerMode };
+};
+
+const writeSettingsQueryState = (searchText: string, providerMode: ModelProviderMode) => {
+    const params = new URLSearchParams(window.location.search);
+    if (searchText.trim()) {
+        params.set('q', searchText);
+    } else {
+        params.delete('q');
+    }
+    if (providerMode !== 'local') {
+        params.set('mode', providerMode);
+    } else {
+        params.delete('mode');
+    }
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+    window.history.replaceState(window.history.state, '', nextUrl);
+};
+
+function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPageProps) {
+    const queryState = readSettingsQueryState();
     const [settings, setSettings] = useState<ModelSettingsResponse>(defaultSettings);
     const [cloudModels, setCloudModels] = useState<ModelCardDescriptor[]>([]);
     const [localModels, setLocalModels] = useState<ModelCardDescriptor[]>([]);
-    const [searchText, setSearchText] = useState('');
-    const [providerMode, setProviderMode] = useState<ModelProviderMode>('local');
-    const [statusText, setStatusText] = useState('Ready');
+    const [searchText, setSearchText] = useState(queryState.searchText || state.searchText);
+    const [providerMode, setProviderMode] = useState<ModelProviderMode>(queryState.providerMode || state.providerMode);
+    const [statusText, setStatusText] = useState(state.statusText);
+    const modelGridRef = useRef<HTMLDivElement | null>(null);
 
     const loadData = async () => {
         const [nextSettings, modelLibrary] = await Promise.all([
@@ -57,6 +90,33 @@ function SettingsPage({ onBack }: SettingsPageProps) {
             setStatusText(`Load failed: ${String((error as { message?: string })?.message ?? error)}`);
         });
     }, []);
+
+    useEffect(() => {
+        if (!isActive) {
+            return;
+        }
+        writeSettingsQueryState(searchText, providerMode);
+    }, [searchText, providerMode, isActive]);
+
+    useEffect(() => {
+        onStateChange({
+            searchText,
+            providerMode,
+            statusText,
+            scrollY: isActive ? window.scrollY : state.scrollY,
+            modelGridScrollTop: modelGridRef.current?.scrollTop ?? state.modelGridScrollTop,
+        });
+    }, [searchText, providerMode, statusText, isActive, state.scrollY, state.modelGridScrollTop, onStateChange]);
+
+    useEffect(() => {
+        if (!isActive) {
+            return;
+        }
+        window.scrollTo({ top: state.scrollY, behavior: 'auto' });
+        if (modelGridRef.current) {
+            modelGridRef.current.scrollTop = state.modelGridScrollTop;
+        }
+    }, [isActive, state.scrollY, state.modelGridScrollTop]);
 
     const displayedModels = useMemo(() => {
         const source = providerMode === 'local' ? localModels : cloudModels;
@@ -105,7 +165,7 @@ function SettingsPage({ onBack }: SettingsPageProps) {
     };
 
     return (
-        <div className="settings-page">
+        <div className="settings-page" hidden={!isActive} aria-hidden={!isActive}>
             <header className="settings-page__header">
                 <div className="settings-page__heading">
                     <h1>Model Settings</h1>
@@ -120,6 +180,7 @@ function SettingsPage({ onBack }: SettingsPageProps) {
             </section>
 
             <ModelGrid
+                containerRef={modelGridRef}
                 models={displayedModels}
                 localModelIds={localModelIds}
                 selectedChatModel={{

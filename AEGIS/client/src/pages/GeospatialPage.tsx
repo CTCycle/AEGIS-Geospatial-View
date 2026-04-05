@@ -4,15 +4,21 @@ import AgentChatPanel from '../components/chat/AgentChatPanel';
 import MapPreview from '../components/MapPreview';
 import { MapSession, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
+import { PersistedChatPageState } from '../state/appState';
 
 interface GeospatialPageProps {
     onOpenSettings: () => void;
+    state: PersistedChatPageState;
+    onStateChange: (state: PersistedChatPageState) => void;
+    isActive: boolean;
 }
 
-function GeospatialPage({ onOpenSettings }: GeospatialPageProps) {
-    const [payload, setPayload] = useState<SearchResponsePayload | undefined>();
-    const [toolbarWidth, setToolbarWidth] = useState(360);
-    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: GeospatialPageProps) {
+    const [payload, setPayload] = useState<SearchResponsePayload | undefined>(state.payload);
+    const [toolbarWidth, setToolbarWidth] = useState(state.toolbarWidth);
+    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(state.isToolbarCollapsed);
+    const [chatPanelState, setChatPanelState] = useState(state.chatPanel);
+    const [mapState, setMapState] = useState(state.mapState);
     const [isResizing, setIsResizing] = useState(false);
 
     useEffect(() => {
@@ -53,8 +59,26 @@ function GeospatialPage({ onOpenSettings }: GeospatialPageProps) {
         });
     };
 
+    useEffect(() => {
+        onStateChange({
+            toolbarWidth,
+            isToolbarCollapsed,
+            payload,
+            chatPanel: chatPanelState,
+            mapState,
+            scrollY: isActive ? window.scrollY : state.scrollY,
+        });
+    }, [toolbarWidth, isToolbarCollapsed, payload, chatPanelState, mapState, isActive, state.scrollY, onStateChange]);
+
+    useEffect(() => {
+        if (!isActive) {
+            return;
+        }
+        window.scrollTo({ top: state.scrollY, behavior: 'auto' });
+    }, [isActive, state.scrollY]);
+
     return (
-        <div className="geospatial-page">
+        <div className="geospatial-page" hidden={!isActive} aria-hidden={!isActive}>
             <div
                 className={`geospatial-workspace${isToolbarCollapsed ? ' geospatial-workspace--toolbar-collapsed' : ''}`}
                 style={{ ['--toolbar-width' as string]: `${toolbarWidth}px` }}
@@ -86,7 +110,11 @@ function GeospatialPage({ onOpenSettings }: GeospatialPageProps) {
                     </header>
 
                     <div className="toolbar-panel__content">
-                        <AgentChatPanel onMapSession={handleMapSession} />
+                        <AgentChatPanel
+                            onMapSession={handleMapSession}
+                            initialState={chatPanelState}
+                            onStateChange={setChatPanelState}
+                        />
                     </div>
                 </aside>
 
@@ -103,6 +131,9 @@ function GeospatialPage({ onOpenSettings }: GeospatialPageProps) {
                         payload={payload}
                         isLoading={false}
                         emptyMessage="Ask the assistant to run a geospatial search."
+                        initialOverlayVisibility={mapState.overlayVisibility}
+                        initialOverlayOpacity={mapState.overlayOpacity}
+                        onOverlayStateChange={setMapState}
                     />
                 </section>
             </div>

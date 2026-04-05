@@ -4,6 +4,7 @@ import { ModelCardDescriptor } from '../../types';
 import ModelCard from './ModelCard';
 
 interface ModelGridProps {
+    containerRef?: React.Ref<HTMLDivElement>;
     models: ModelCardDescriptor[];
     localModelIds: Set<string>;
     selectedChatModel: { provider: string; name: string };
@@ -14,6 +15,7 @@ interface ModelGridProps {
 }
 
 const ModelGrid: React.FC<ModelGridProps> = ({
+    containerRef,
     models,
     localModelIds,
     selectedChatModel,
@@ -22,7 +24,7 @@ const ModelGrid: React.FC<ModelGridProps> = ({
     onSelectAgent,
     onPull,
 }) => (
-    <div className="model-grid-scroll">
+    <div className="model-grid-scroll" ref={containerRef}>
         <div className="model-grid">
             {models.map((model) => (
                 <ModelCard
