@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import ConfigurationPanel from '../components/settings/ConfigurationPanel';
-import ManifestToolsPanel from '../components/settings/ManifestToolsPanel';
 import ModelGrid from '../components/settings/ModelGrid';
 import ModelProviderToggle from '../components/settings/ModelProviderToggle';
 import ModelSearchBar from '../components/settings/ModelSearchBar';
@@ -10,9 +8,8 @@ import {
     fetchChatModels,
     fetchChatSettings,
     pullOllamaModel,
-    rebuildVectors,
     refreshOllamaModels,
-    updateChatSettings,
+    updateChatSettings
 } from '../services/api';
 import { ModelCardDescriptor, ModelProviderMode, ModelSettingsResponse } from '../types';
 import './SettingsPage.css';
@@ -73,6 +70,11 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
     const [providerMode, setProviderMode] = useState<ModelProviderMode>(queryState.providerMode || state.providerMode);
     const [statusText, setStatusText] = useState(state.statusText);
     const modelGridRef = useRef<HTMLDivElement | null>(null);
+    const [isKeysModalOpen, setIsKeysModalOpen] = useState(false);
+    const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
+    const [openaiKey, setOpenaiKey] = useState('');
+    const [googleKey, setGoogleKey] = useState('');
+    const [ollamaUrlDraft, setOllamaUrlDraft] = useState(defaultSettings.ollama_url);
 
     const loadData = async () => {
         const [nextSettings, modelLibrary] = await Promise.all([
@@ -81,6 +83,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         ]);
         setSettings(nextSettings);
         setProviderMode(nextSettings.active_provider_mode);
+        setOllamaUrlDraft(nextSettings.ollama_url);
         setCloudModels(modelLibrary.cloud);
         setLocalModels(modelLibrary.local);
     };
@@ -176,7 +179,29 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
 
             <section className="settings-page__controls" aria-label="Settings controls">
                 <ModelProviderToggle value={providerMode} onChange={handleProviderModeChange} />
-                <ModelSearchBar value={searchText} onChange={setSearchText} />
+                <div className="settings-page__search-with-actions">
+                    <div className="settings-page__control-icons">
+                        <button
+                            type="button"
+                            className="settings-icon-button"
+                            onClick={() => setIsKeysModalOpen(true)}
+                            aria-label="Manage API keys"
+                            title="API key settings"
+                        >
+                            <span className="settings-icon-button__glyph" aria-hidden="true">⌁</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="settings-icon-button"
+                            onClick={() => setIsOllamaModalOpen(true)}
+                            aria-label="Open Ollama settings"
+                            title="Ollama settings"
+                        >
+                            <span className="settings-icon-button__glyph" aria-hidden="true">◉</span>
+                        </button>
+                    </div>
+                    <ModelSearchBar value={searchText} onChange={setSearchText} />
+                </div>
             </section>
 
             <ModelGrid
@@ -201,31 +226,114 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 }}
             />
 
-            <ConfigurationPanel
-                providerMode={providerMode}
-                settings={settings}
-                onSave={async (payload) => {
-                    const updated = await updateChatSettings(payload);
-                    setSettings(updated);
-                    setStatusText('Settings saved');
-                }}
-                onRefreshOllama={async () => {
-                    await refreshOllamaModels();
-                    await loadData();
-                    setStatusText('Ollama library refreshed');
-                }}
-                onCheckOllama={async () => {
-                    const health = await checkOllamaHealth();
-                    setStatusText(`Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`);
-                }}
-            />
+            {isKeysModalOpen && (
+                <div className="settings-modal-backdrop" role="presentation" onClick={() => setIsKeysModalOpen(false)}>
+                    <section className="settings-modal" role="dialog" aria-modal="true" aria-label="API key management" onClick={(event) => event.stopPropagation()}>
+                        <header className="settings-modal__header">
+                            <h2>API keys</h2>
+                            <button type="button" className="settings-modal__close" onClick={() => setIsKeysModalOpen(false)}>Close</button>
+                        </header>
+                        <div className="settings-modal__body">
+                            <label>
+                                OpenAI API key {settings.credentials.openai?.api_key ? '(Configured)' : '(Not configured)'}
+                                <input
+                                    type="password"
+                                    value={openaiKey}
+                                    onChange={(event) => setOpenaiKey(event.target.value)}
+                                    placeholder="sk-..."
+                                />
+                            </label>
+                            <label>
+                                Google API key {settings.credentials.google?.api_key ? '(Configured)' : '(Not configured)'}
+                                <input
+                                    type="password"
+                                    value={googleKey}
+                                    onChange={(event) => setGoogleKey(event.target.value)}
+                                    placeholder="AIza..."
+                                />
+                            </label>
+                        </div>
+                        <footer className="settings-modal__footer">
+                            <button
+                                type="button"
+                                className="primary-button"
+                                onClick={async () => {
+                                    const updated = await updateChatSettings({
+                                        ...settings,
+                                        credentials: {
+                                            openai: openaiKey.trim() ? { api_key: openaiKey.trim() } : {},
+                                            google: googleKey.trim() ? { api_key: googleKey.trim() } : {},
+                                        },
+                                    });
+                                    setSettings(updated);
+                                    setOpenaiKey('');
+                                    setGoogleKey('');
+                                    setStatusText('API keys saved');
+                                    setIsKeysModalOpen(false);
+                                }}
+                            >
+                                Save keys
+                            </button>
+                        </footer>
+                    </section>
+                </div>
+            )}
 
-            <ManifestToolsPanel
-                onRebuild={async () => {
-                    const response = await rebuildVectors();
-                    setStatusText(`Indexed ${response.indexed_documents} manifest entries`);
-                }}
-            />
+            {isOllamaModalOpen && (
+                <div className="settings-modal-backdrop" role="presentation" onClick={() => setIsOllamaModalOpen(false)}>
+                    <section className="settings-modal" role="dialog" aria-modal="true" aria-label="Ollama settings" onClick={(event) => event.stopPropagation()}>
+                        <header className="settings-modal__header">
+                            <h2>Ollama settings</h2>
+                            <button type="button" className="settings-modal__close" onClick={() => setIsOllamaModalOpen(false)}>Close</button>
+                        </header>
+                        <div className="settings-modal__body">
+                            <label>
+                                Ollama server URL
+                                <input value={ollamaUrlDraft} onChange={(event) => setOllamaUrlDraft(event.target.value)} />
+                            </label>
+                        </div>
+                        <footer className="settings-modal__footer settings-modal__footer--spread">
+                            <div className="row-actions">
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const health = await checkOllamaHealth();
+                                        setStatusText(`Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`);
+                                    }}
+                                >
+                                    Check connection
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        await refreshOllamaModels();
+                                        await loadData();
+                                        setStatusText('Ollama library refreshed');
+                                    }}
+                                >
+                                    Refresh models
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                className="primary-button"
+                                onClick={async () => {
+                                    const updated = await updateChatSettings({
+                                        ...settings,
+                                        ollama_url: ollamaUrlDraft.trim() || defaultSettings.ollama_url,
+                                    });
+                                    setSettings(updated);
+                                    setOllamaUrlDraft(updated.ollama_url);
+                                    setStatusText('Ollama settings saved');
+                                    setIsOllamaModalOpen(false);
+                                }}
+                            >
+                                Save settings
+                            </button>
+                        </footer>
+                    </section>
+                </div>
+            )}
 
             <footer className="settings-page__status">{statusText}</footer>
         </div>

@@ -10,7 +10,8 @@ The web app now preserves user working context across:
 - browser back/forward navigation
 - page refreshes in the same tab
 
-State is stored in `sessionStorage` under `aegis:webapp-state:v1` with a 6-hour TTL.
+State is stored in `sessionStorage` under `aegis:webapp-state:v2` with a 6-hour TTL.
+Legacy key `aegis:webapp-state:v1` is removed on load; no backward restore compatibility is retained.
 
 ## Preserved State Categories
 

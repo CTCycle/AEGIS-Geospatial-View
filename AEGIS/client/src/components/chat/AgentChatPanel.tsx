@@ -24,13 +24,20 @@ interface AgentChatPanelProps {
         composerDraft: string;
         transcriptScrollTop: number;
     }) => void;
+    onProgressChange?: (state: { isLoading: boolean; progressPercent: number }) => void;
 }
 
-const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession, initialState, onStateChange }) => {
+const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
+    onMapSession,
+    initialState,
+    onStateChange,
+    onProgressChange,
+}) => {
     const [sessionId, setSessionId] = useState<number | undefined>(initialState.sessionId);
     const [messages, setMessages] = useState<ChatMessage[]>(initialState.messages);
     const [status, setStatus] = useState(initialState.status);
     const [isLoading, setIsLoading] = useState(false);
+    const [progressPercent, setProgressPercent] = useState(0);
     const [assistantDraft, setAssistantDraft] = useState(initialState.assistantDraft);
     const [composerDraft, setComposerDraft] = useState(initialState.composerDraft);
     const [transcriptScrollTop, setTranscriptScrollTop] = useState(initialState.transcriptScrollTop);
@@ -45,20 +52,24 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession, initialSt
     const pushEvent = (event: ChatStreamEvent) => {
         if (event.event === 'status') {
             setStatus(String(event.data.message ?? 'Running'));
+            setProgressPercent((current) => Math.max(current, 14));
             return;
         }
         if (event.event === 'assistant_delta') {
             const delta = String(event.data.delta ?? '');
             setAssistantDraft((current) => current + delta);
+            setProgressPercent((current) => Math.min(92, Math.max(current, 20 + Math.round((assistantDraft.length + delta.length) / 7))));
             return;
         }
         if (event.event === 'tool_status') {
             setStatus('Executing tools');
+            setProgressPercent((current) => Math.max(current, 68));
             return;
         }
         if (event.event === 'error') {
             setStatus('Failed');
             setAssistantDraft('');
+            setProgressPercent(0);
             return;
         }
         if (event.event === 'final') {
@@ -75,12 +86,14 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession, initialSt
             }
             setAssistantDraft('');
             setStatus(followUpRequired ? 'Need more detail' : 'Complete');
+            setProgressPercent(100);
         }
     };
 
     const sendMessage = async (message: string) => {
         setIsLoading(true);
         setStatus('Submitting');
+        setProgressPercent(8);
         setMessages((current) => [...current, { role: 'user' as ChatRole, content: message }]);
         setAssistantDraft('');
         try {
@@ -102,6 +115,13 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession, initialSt
     };
 
     React.useEffect(() => {
+        onProgressChange?.({
+            isLoading,
+            progressPercent: isLoading ? Math.max(4, Math.min(100, progressPercent)) : progressPercent,
+        });
+    }, [isLoading, progressPercent, onProgressChange]);
+
+    React.useEffect(() => {
         onStateChange({
             sessionId,
             messages,
@@ -115,7 +135,6 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession, initialSt
     return (
         <div className="agent-chat-panel">
             <div className="agent-chat-panel__header">
-                <h2 className="panel-title">Agent Chat</h2>
                 <ChatStatusPill status={status} />
             </div>
             <ChatTranscript

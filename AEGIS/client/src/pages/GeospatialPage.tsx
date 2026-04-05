@@ -20,6 +20,7 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
     const [chatPanelState, setChatPanelState] = useState(state.chatPanel);
     const [mapState, setMapState] = useState(state.mapState);
     const [isResizing, setIsResizing] = useState(false);
+    const [chatProgress, setChatProgress] = useState({ isLoading: false, progressPercent: 0 });
 
     useEffect(() => {
         if (!isResizing) {
@@ -114,17 +115,25 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
                             onMapSession={handleMapSession}
                             initialState={chatPanelState}
                             onStateChange={setChatPanelState}
+                            onProgressChange={setChatProgress}
                         />
                     </div>
                 </aside>
 
-                {!isToolbarCollapsed && (
-                    <div
-                        className={`toolbar-resize-handle${isResizing ? ' is-active' : ''}`}
-                        aria-hidden="true"
-                        onMouseDown={() => setIsResizing(true)}
-                    />
-                )}
+                <div
+                    className={[
+                        'toolbar-resize-handle',
+                        isResizing ? 'is-active' : '',
+                        isToolbarCollapsed ? 'is-collapsed' : ''
+                    ].filter(Boolean).join(' ')}
+                    aria-hidden="true"
+                    onMouseDown={() => {
+                        if (isToolbarCollapsed) {
+                            setIsToolbarCollapsed(false);
+                        }
+                        setIsResizing(true);
+                    }}
+                />
 
                 <section className="canvas-panel" aria-label="Map canvas">
                     <MapPreview
@@ -136,6 +145,10 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
                         onOverlayStateChange={setMapState}
                     />
                 </section>
+                <div className="chat-progress-indicator" aria-live="polite">
+                    {chatProgress.isLoading && <span className="chat-progress-spinner" aria-hidden="true" />}
+                    <span>{chatProgress.progressPercent}%</span>
+                </div>
             </div>
         </div>
     );
