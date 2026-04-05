@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import hashlib
 from dataclasses import dataclass
 
@@ -8,10 +9,44 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from AEGIS.server.configurations import server_settings
 
-
+# -------------------------------------------------------------------------
 def _derive_fernet_key(master_key: str) -> bytes:
     digest = hashlib.sha256(master_key.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest)
+
+# -------------------------------------------------------------------------
+def _load_access_key_fernet() -> Fernet:
+    raw_key = (os.getenv("ACCESS_KEY_ENCRYPTION_KEY") or "").strip()
+    if not raw_key:
+        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is not configured")
+    try:
+        return Fernet(raw_key.encode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is invalid") from exc
+
+
+def encrypt_access_key(plaintext: str) -> str:
+    normalized = plaintext.strip()
+    if not normalized:
+        raise ValueError("Access key must not be empty")
+    return _load_access_key_fernet().encrypt(normalized.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_access_key(ciphertext: str) -> str:
+    normalized = ciphertext.strip()
+    if not normalized:
+        raise ValueError("Access key must not be empty")
+    fernet = _load_access_key_fernet()
+    try:
+        return fernet.decrypt(normalized.encode("utf-8")).decode("utf-8")
+    except InvalidToken as exc:
+        raise RuntimeError("Encrypted access key is invalid") from exc
+    except Exception as exc:
+        raise RuntimeError("Failed to decrypt access key") from exc
+
+
+def build_access_key_fingerprint(ciphertext: str) -> str:
+    return hashlib.sha256(ciphertext.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
