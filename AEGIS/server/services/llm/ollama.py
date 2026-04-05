@@ -43,13 +43,28 @@ class OllamaProvider(LLMProvider):
             model_name = str(item.get("name") or "")
             if not model_name:
                 continue
+            details = item.get("details") if isinstance(item.get("details"), dict) else {}
+            family = str(details.get("family") or "").strip()
+            parameter_size = str(details.get("parameter_size") or "").strip()
+            quantization_level = str(details.get("quantization_level") or "").strip()
+            details_chunks = [chunk for chunk in [family, parameter_size, quantization_level] if chunk]
+            description = (
+                " | ".join(details_chunks)
+                if details_chunks
+                else f"Local Ollama model {model_name}"
+            )
             models.append(
                 ModelDescriptor(
                     name=model_name,
-                    description=f"Local Ollama model {model_name}",
+                    description=description,
                     provider="ollama",
                     capabilities=["chat", "stream", "embeddings"],
-                    metadata={"size": item.get("size")},
+                    metadata={
+                        "size": item.get("size"),
+                        "family": family,
+                        "parameter_size": parameter_size,
+                        "quantization_level": quantization_level,
+                    },
                 )
             )
         return models

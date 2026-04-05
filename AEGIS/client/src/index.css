@@ -27,27 +27,27 @@
     --radius-lg: 0.875rem;
 
     --color-text-primary: #0f172a;
-    --color-text-secondary: #334155;
-    --color-text-muted: #475569;
+    --color-text-secondary: #3c4c63;
+    --color-text-muted: #54667f;
     --color-text-danger: #b91c1c;
     --color-text-brand: #1d4ed8;
     --color-text-on-brand: #f8fafc;
 
-    --color-brand: #2563eb;
-    --color-accent: #0ea5e9;
-    --color-accent-soft: #bae6fd;
-    --color-accent-muted: #e0f2fe;
-    --color-accent-border: #38bdf8;
+    --color-brand: #3368b5;
+    --color-accent: #5ca4da;
+    --color-accent-soft: #d2e9fb;
+    --color-accent-muted: #e7f2fb;
+    --color-accent-border: #7fb4dd;
 
     --color-focus-ring: rgb(37 99 235 / 50%);
 
-    --color-surface-app: #eaf1ff;
-    --color-surface-panel: #ffffff;
-    --color-surface-subtle: #f8fafc;
-    --color-surface-canvas: #eef4ff;
+    --color-surface-app: #e3eaf4;
+    --color-surface-panel: #f8fbff;
+    --color-surface-subtle: #f1f5fb;
+    --color-surface-canvas: #e7edf6;
 
-    --color-border-subtle: #dbe5f5;
-    --color-border-strong: #cbd5e1;
+    --color-border-subtle: #cfdae9;
+    --color-border-strong: #bcc8d8;
 
     --shadow-1: 0 8px 24px rgb(15 23 42 / 5%);
     --shadow-2: 0 10px 20px rgb(37 99 235 / 15%);

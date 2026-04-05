@@ -3,7 +3,12 @@
     height: 100%;
 }
 
+.geospatial-page[hidden] {
+    display: none;
+}
+
 .geospatial-workspace {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, var(--toolbar-width, 22.5rem)) 0.45rem minmax(0, 1fr);
     align-items: stretch;
@@ -12,7 +17,7 @@
 }
 
 .geospatial-workspace--toolbar-collapsed {
-    grid-template-columns: 0 0 minmax(0, 1fr);
+    grid-template-columns: 0 0.45rem minmax(0, 1fr);
 }
 
 .toolbar-panel,
@@ -24,14 +29,14 @@
 
 .toolbar-panel {
     height: 100%;
-    gap: 0.875rem;
+    gap: 0;
     padding: 0;
     background:
         radial-gradient(circle at 0% 0%, rgb(56 189 248 / 16%), transparent 32%),
         radial-gradient(circle at 100% 0%, rgb(37 99 235 / 16%), transparent 38%),
         linear-gradient(180deg, rgb(245 248 255 / 98%), rgb(236 242 255 / 95%));
     border-right: 1px solid var(--color-border-subtle);
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .geospatial-workspace--toolbar-collapsed .toolbar-panel {
@@ -71,10 +76,12 @@
 }
 
 .toolbar-panel__content {
-    padding: var(--space-4);
+    padding: var(--space-2) var(--space-3) var(--space-3);
     display: flex;
     flex-direction: column;
-    gap: 0.875rem;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
 }
 
 .toolbar-panel .panel-title,
@@ -138,25 +145,31 @@
     background: linear-gradient(180deg, rgb(59 130 246 / 18%), rgb(59 130 246 / 45%), rgb(59 130 246 / 18%));
 }
 
+.toolbar-resize-handle.is-collapsed {
+    background: linear-gradient(180deg, rgb(59 130 246 / 24%), rgb(59 130 246 / 55%), rgb(59 130 246 / 24%));
+    cursor: e-resize;
+}
+
 .agent-chat-panel {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
     min-height: 0;
-    border: 1px solid var(--color-border-subtle);
-    border-radius: var(--radius-lg);
-    background: rgb(255 255 255 / 82%);
-    box-shadow: var(--shadow-1);
-    padding: var(--space-3);
+    height: 100%;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .agent-chat-panel__header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 0.5rem;
-    padding-bottom: var(--space-2);
-    border-bottom: 1px solid var(--color-border-subtle);
+    padding: 0.15rem 0 0;
+    border: none;
 }
 
 .chat-status-pill {
@@ -169,14 +182,13 @@
 
 .chat-transcript {
     flex: 1;
-    min-height: 22rem;
-    max-height: 52vh;
+    min-height: 0;
     overflow: auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    padding: var(--space-2);
-    background: rgb(255 255 255 / 72%);
+    padding: var(--space-2) var(--space-2) 0;
+    background: rgb(255 255 255 / 64%);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-md);
 }
@@ -212,31 +224,34 @@
 
 .chat-composer {
     display: flex;
-    align-items: end;
+    align-items: flex-end;
     gap: 0.5rem;
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--color-border-subtle);
+    margin-top: auto;
+    padding: var(--space-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 82%);
 }
 
 .chat-composer textarea {
-    min-height: 5rem;
+    min-height: 4.2rem;
     max-height: 14rem;
     resize: vertical;
     border: 1px solid var(--color-border-subtle);
     border-radius: 1rem;
-    padding: 0.85rem 1rem;
-    background: rgb(255 255 255 / 95%);
+    padding: 0.72rem 0.9rem;
+    background: rgb(255 255 255 / 92%);
 }
 
 .chat-composer .primary-button {
     border-radius: 999px;
     min-width: 3.75rem;
-    padding: 0.48rem 0.72rem;
-    border: 1px solid var(--color-border-strong);
-    background: rgb(248 250 252 / 88%);
+    padding: 0.38rem 0.64rem;
+    border: 1px solid #d0d9e7;
+    background: rgb(248 250 252 / 72%);
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-semibold);
+    font-weight: 500;
 }
 
 .chat-composer .primary-button:disabled {
@@ -269,6 +284,32 @@
     outline-offset: 2px;
 }
 
+.chat-progress-indicator {
+    position: absolute;
+    right: 1rem;
+    bottom: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.26rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #c9d5e8;
+    background: rgb(241 246 253 / 82%);
+    color: #415269;
+    font-size: 0.72rem;
+    font-weight: 600;
+    z-index: 3;
+}
+
+.chat-progress-spinner {
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 999px;
+    border: 2px solid #c4d4ea;
+    border-top-color: #7094c5;
+    animation: spin 0.85s linear infinite;
+}
+
 @media (max-width: 1280px) {
     .geospatial-workspace {
         grid-template-columns: minmax(17.5rem, var(--toolbar-width, 19.5rem)) 0.45rem minmax(0, 1fr);
@@ -285,7 +326,8 @@
     .toolbar-panel {
         border-right: none;
         border-bottom: 1px solid var(--color-border-subtle);
-        max-height: 55vh;
+        min-height: 50vh;
+        max-height: 70vh;
     }
 
     .toolbar-brand {
@@ -299,5 +341,10 @@
 
     .canvas-panel {
         min-height: 45vh;
+    }
+
+    .chat-progress-indicator {
+        right: 0.7rem;
+        bottom: 0.6rem;
     }
 }

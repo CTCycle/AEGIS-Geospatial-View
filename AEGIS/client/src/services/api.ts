@@ -237,6 +237,19 @@ export const streamChatTurn = async (
 export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
     const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}`, { method: 'GET' });
     const value = isRecord(data) ? data : {};
+    const buildDescription = (item: Record<string, unknown>): string => {
+        const rawDescription = String(item.description ?? '').trim();
+        if (rawDescription && !rawDescription.toLowerCase().startsWith('local ollama model ')) {
+            return rawDescription;
+        }
+        const metadata = isRecord(item.metadata) ? item.metadata : {};
+        const family = typeof metadata.family === 'string' ? metadata.family : '';
+        const parameterSize = typeof metadata.parameter_size === 'string' ? metadata.parameter_size : '';
+        const quantization = typeof metadata.quantization_level === 'string' ? metadata.quantization_level : '';
+        const details = [family, parameterSize, quantization].filter(Boolean).join(' ');
+        return details ? `Optimized for ${details}.` : rawDescription || 'General purpose local model.';
+    };
+
     const normalize = (input: unknown): ModelCardDescriptor[] => {
         if (!Array.isArray(input)) {
             return [];
@@ -246,7 +259,7 @@ export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[];
             .map((item) => ({
                 id: String(item.id ?? item.name ?? ''),
                 name: String(item.name ?? item.id ?? ''),
-                description: String(item.description ?? ''),
+                description: buildDescription(item),
                 provider: String(item.provider ?? ''),
                 capabilities: Array.isArray(item.capabilities)
                     ? item.capabilities.filter((entry): entry is string => typeof entry === 'string')

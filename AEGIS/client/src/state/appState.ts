@@ -1,6 +1,7 @@
 import { ModelProviderMode, SearchResponsePayload } from '../types';
 
-const STORAGE_KEY = 'aegis:webapp-state:v1';
+const STORAGE_KEY = 'aegis:webapp-state:v2';
+const LEGACY_STORAGE_KEYS = ['aegis:webapp-state:v1'];
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
@@ -38,7 +39,7 @@ export interface PersistedSettingsPageState {
 }
 
 export interface PersistedAppState {
-    version: 1;
+    version: 2;
     savedAt: number;
     tabId: string;
     chatPage: PersistedChatPageState;
@@ -52,7 +53,7 @@ const isProviderMode = (value: unknown): value is ModelProviderMode =>
     value === 'local' || value === 'cloud';
 
 export const defaultAppState = (): PersistedAppState => ({
-    version: 1,
+    version: 2,
     savedAt: Date.now(),
     tabId: '',
     chatPage: {
@@ -136,6 +137,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
     }
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     let currentTabId = ensureTabId();
+    LEGACY_STORAGE_KEYS.forEach((key) => window.sessionStorage.removeItem(key));
     if (hasActiveOwner(currentTabId)) {
         currentTabId = rotateTabId();
         window.sessionStorage.removeItem(STORAGE_KEY);
@@ -149,7 +151,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
     }
     try {
         const parsed = JSON.parse(raw);
-        if (!isRecord(parsed) || parsed.version !== 1) {
+        if (!isRecord(parsed) || parsed.version !== 2) {
             return {
                 ...defaultAppState(),
                 tabId: currentTabId,
