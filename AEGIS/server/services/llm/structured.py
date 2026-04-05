@@ -4,6 +4,10 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
+MAP_TYPE_ENUM = {"street", "satellite", "terrain", "light", "dark", "thematic", "auto"}
+FALLBACK_MODES = {"none", "missing_location", "partial_location", "invalid_scope", "needs_clarification"}
+SCOPE_CLASSIFICATIONS = {"concrete_area", "broad_but_usable_area", "missing_area", "requires_area_discovery"}
+
 
 INTENT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -12,7 +16,7 @@ INTENT_SCHEMA: dict[str, Any] = {
         "location": {
             "type": "object",
             "properties": {
-                "text": {"type": ["string", "null"]},
+                "name": {"type": ["string", "null"]},
                 "coordinates": {"type": ["object", "null"]},
                 "bbox": {
                     "type": ["array", "null"],
@@ -20,67 +24,60 @@ INTENT_SCHEMA: dict[str, Any] = {
                     "minItems": 4,
                     "maxItems": 4,
                 },
-                "place_kind": {"type": ["string", "null"]},
+                "granularity": {"type": ["string", "null"]},
+                "is_partial": {"type": "boolean"},
                 "ambiguity_reason": {"type": ["string", "null"]},
             },
-            "required": ["text", "coordinates", "bbox", "place_kind", "ambiguity_reason"],
+            "required": ["name", "coordinates", "bbox", "granularity", "is_partial", "ambiguity_reason"],
         },
-        "display_area": {
+        "map_preferences": {
             "type": "object",
             "properties": {
-                "mode": {"type": "string"},
-                "radius_m": {"type": ["number", "null"]},
-                "map_size_m": {"type": ["number", "null"]},
-                "bbox": {
-                    "type": ["array", "null"],
-                    "items": {"type": "number"},
-                    "minItems": 4,
-                    "maxItems": 4,
-                },
-                "admin_level": {"type": ["string", "null"]},
-            },
-            "required": ["mode", "radius_m", "map_size_m", "bbox", "admin_level"],
-        },
-        "view": {
-            "type": "object",
-            "properties": {
-                "view_mode": {"type": "string"},
                 "map_type": {"type": "string"},
+                "map_type_confidence": {"type": "number"},
                 "basemap_preference": {"type": ["string", "null"]},
+                "overlay_candidates": {"type": "array", "items": {"type": "string"}},
             },
-            "required": ["view_mode", "map_type", "basemap_preference"],
+            "required": ["map_type", "map_type_confidence", "basemap_preference", "overlay_candidates"],
         },
-        "overlays": {
+        "task": {
             "type": "object",
             "properties": {
-                "requested": {"type": "array", "items": {"type": "string"}},
-                "ranked_candidates": {"type": "array", "items": {"type": "object"}},
+                "user_intent": {"type": "string"},
+                "scope": {"type": "string"},
+                "requires_external_fact_finding": {"type": "boolean"},
+                "is_geographically_actionable": {"type": "boolean"},
             },
-            "required": ["requested", "ranked_candidates"],
+            "required": ["user_intent", "scope", "requires_external_fact_finding", "is_geographically_actionable"],
+        },
+        "temporal_context": {
+            "type": "object",
+            "properties": {
+                "raw_text": {"type": ["string", "null"]},
+                "normalized_datetime": {"type": ["string", "null"]},
+                "date_range": {"type": ["array", "null"], "items": {"type": "string"}, "minItems": 2, "maxItems": 2},
+            },
+            "required": ["raw_text", "normalized_datetime", "date_range"],
         },
         "planning": {
             "type": "object",
             "properties": {
-                "user_intent": {"type": ["string", "null"]},
                 "confidence": {"type": "number"},
                 "missing_information": {"type": "array", "items": {"type": "string"}},
                 "should_execute_search": {"type": "boolean"},
                 "follow_up_question": {"type": ["string", "null"]},
-                "reasoning_summary": {"type": ["string", "null"]},
-                "datetime_inference": {"type": ["string", "null"]},
+                "fallback_mode": {"type": "string"},
             },
             "required": [
-                "user_intent",
                 "confidence",
                 "missing_information",
                 "should_execute_search",
                 "follow_up_question",
-                "reasoning_summary",
-                "datetime_inference",
+                "fallback_mode",
             ],
         },
     },
-    "required": ["request_text", "location", "display_area", "view", "overlays", "planning"],
+    "required": ["request_text", "location", "map_preferences", "task", "temporal_context", "planning"],
 }
 
 
@@ -95,12 +92,10 @@ def parse_structured_json(raw: str) -> dict[str, Any]:
 
 
 def normalize_structured_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    # Backward-compatible normalization from legacy flat schema.
     legacy_coordinates = payload.get("coordinates")
     legacy_location_text = payload.get("location_text")
-    legacy_radius = payload.get("search_radius_m")
     legacy_overlays = payload.get("requested_overlays")
-    legacy_representation = payload.get("representation_type")
+    legacy_map_type = payload.get("representation_type")
     legacy_user_intent = payload.get("user_intent")
     legacy_dt = payload.get("datetime_inference")
     legacy_missing = payload.get("missing_information")
@@ -110,73 +105,111 @@ def normalize_structured_payload(payload: dict[str, Any]) -> dict[str, Any]:
     location = payload.get("location")
     if not isinstance(location, dict):
         location = {}
-    display_area = payload.get("display_area")
-    if not isinstance(display_area, dict):
-        display_area = {}
-    view = payload.get("view")
-    if not isinstance(view, dict):
-        view = {}
-    overlays = payload.get("overlays")
-    if not isinstance(overlays, dict):
-        overlays = {}
+    map_preferences = payload.get("map_preferences")
+    if not isinstance(map_preferences, dict):
+        map_preferences = {}
+    task = payload.get("task")
+    if not isinstance(task, dict):
+        task = {}
+    temporal_context = payload.get("temporal_context")
+    if not isinstance(temporal_context, dict):
+        temporal_context = {}
     planning = payload.get("planning")
     if not isinstance(planning, dict):
         planning = {}
 
-    requested = overlays.get("requested", legacy_overlays if isinstance(legacy_overlays, list) else [])
-    if not isinstance(requested, list):
-        requested = []
-    ranked_candidates = overlays.get("ranked_candidates", [])
-    if not isinstance(ranked_candidates, list):
-        ranked_candidates = []
+    overlay_candidates = map_preferences.get("overlay_candidates", legacy_overlays if isinstance(legacy_overlays, list) else [])
+    if not isinstance(overlay_candidates, list):
+        overlay_candidates = []
     missing_information = planning.get("missing_information", legacy_missing if isinstance(legacy_missing, list) else [])
     if not isinstance(missing_information, list):
         missing_information = []
-
-    mode = str(display_area.get("mode") or "inferred")
-    if mode not in {"point", "radius", "bbox", "viewport", "administrative_area", "inferred"}:
-        mode = "inferred"
-    view_mode = str(view.get("view_mode") or "interactive_map")
-    if view_mode not in {"interactive_map", "static_imagery"}:
-        view_mode = "interactive_map"
-    map_type = str(view.get("map_type") or "auto")
-    if map_type not in {"streets", "satellite", "terrain", "light", "dark", "thematic", "auto"}:
-        map_type = "auto"
+    map_type = _normalize_map_type(map_preferences.get("map_type", legacy_map_type))
+    map_type_confidence = _normalize_confidence(map_preferences.get("map_type_confidence", 0.0))
+    planning_confidence = _normalize_confidence(planning.get("confidence", 0.0))
+    fallback_mode = str(planning.get("fallback_mode") or "none").strip().lower()
+    if fallback_mode not in FALLBACK_MODES:
+        fallback_mode = "none"
+    should_execute = bool(planning.get("should_execute_search", True if legacy_should_execute is None else legacy_should_execute))
+    location_name = location.get("name", location.get("text", legacy_location_text))
+    location_bbox = location.get("bbox", payload.get("bbox"))
+    is_partial = bool(location.get("is_partial", False))
+    granularity = str(location.get("granularity") or "").strip().lower() or None
+    if not is_partial and granularity in {"country", "region", "state"}:
+        is_partial = True
+    if not is_partial and _is_partial_location_name(location_name):
+        is_partial = True
+    if _requires_area_discovery(str(payload.get("request_text") or legacy_location_text or "")):
+        should_execute = False
+        fallback_mode = "invalid_scope"
+        missing_information.append("concrete_target_area")
 
     return {
         "request_text": str(payload.get("request_text") or legacy_location_text or ""),
         "location": {
-            "text": location.get("text", legacy_location_text),
+            "name": location_name,
             "coordinates": location.get("coordinates", legacy_coordinates),
-            "bbox": location.get("bbox", payload.get("bbox")),
-            "place_kind": location.get("place_kind"),
+            "bbox": location_bbox,
+            "granularity": granularity,
+            "is_partial": is_partial,
             "ambiguity_reason": location.get("ambiguity_reason"),
         },
-        "display_area": {
-            "mode": mode,
-            "radius_m": display_area.get("radius_m", legacy_radius),
-            "map_size_m": display_area.get("map_size_m"),
-            "bbox": display_area.get("bbox", payload.get("bbox")),
-            "admin_level": display_area.get("admin_level"),
-        },
-        "view": {
-            "view_mode": view_mode,
+        "map_preferences": {
             "map_type": map_type,
-            "basemap_preference": view.get("basemap_preference", legacy_representation),
+            "map_type_confidence": map_type_confidence,
+            "basemap_preference": map_preferences.get("basemap_preference"),
+            "overlay_candidates": [str(item) for item in overlay_candidates if str(item).strip()],
         },
-        "overlays": {
-            "requested": [str(item) for item in requested if str(item).strip()],
-            "ranked_candidates": [item for item in ranked_candidates if isinstance(item, dict)],
+        "task": {
+            "user_intent": str(task.get("user_intent") or legacy_user_intent or "map_search"),
+            "scope": _normalize_scope(str(task.get("scope") or "")),
+            "requires_external_fact_finding": bool(task.get("requires_external_fact_finding", False)),
+            "is_geographically_actionable": bool(task.get("is_geographically_actionable", True)),
+        },
+        "temporal_context": {
+            "raw_text": temporal_context.get("raw_text"),
+            "normalized_datetime": temporal_context.get("normalized_datetime", legacy_dt or datetime.now(UTC).isoformat()),
+            "date_range": temporal_context.get("date_range"),
         },
         "planning": {
-            "user_intent": planning.get("user_intent", legacy_user_intent or "map_search"),
-            "confidence": float(planning.get("confidence", 0.0) or 0.0),
+            "confidence": planning_confidence,
             "missing_information": [str(item) for item in missing_information if str(item).strip()],
-            "should_execute_search": bool(
-                planning.get("should_execute_search", True if legacy_should_execute is None else legacy_should_execute)
-            ),
+            "should_execute_search": should_execute,
             "follow_up_question": planning.get("follow_up_question", legacy_follow_up),
-            "reasoning_summary": planning.get("reasoning_summary"),
-            "datetime_inference": planning.get("datetime_inference", legacy_dt or datetime.now(UTC).isoformat()),
+            "fallback_mode": fallback_mode,
         },
     }
+
+
+def _normalize_map_type(value: Any) -> str:
+    normalized = str(value or "auto").strip().lower()
+    aliases = {"streets": "street", "standard": "street", "photo": "satellite"}
+    normalized = aliases.get(normalized, normalized)
+    return normalized if normalized in MAP_TYPE_ENUM else "auto"
+
+
+def _normalize_confidence(value: Any) -> float:
+    try:
+        parsed = float(value or 0.0)
+    except (TypeError, ValueError):
+        parsed = 0.0
+    return max(0.0, min(1.0, parsed))
+
+
+def _is_partial_location_name(location_name: Any) -> bool:
+    if not isinstance(location_name, str):
+        return False
+    name = location_name.strip().lower()
+    tokens = {"italy", "france", "germany", "europe", "usa", "united states"}
+    return name in tokens
+
+
+def _requires_area_discovery(text: str) -> bool:
+    lowered = text.lower()
+    patterns = ("best place in", "least rainy place", "where it rains the least", "find me the best place")
+    return any(pattern in lowered for pattern in patterns)
+
+
+def _normalize_scope(value: str) -> str:
+    normalized = value.strip().lower()
+    return normalized if normalized in SCOPE_CLASSIFICATIONS else "concrete_area"

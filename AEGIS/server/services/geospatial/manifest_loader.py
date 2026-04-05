@@ -8,11 +8,11 @@ from AEGIS.server.utils.constants import PROJECT_DIR
 
 type JsonDict = dict[str, Any]
 
-
+###############################################################################
 class ManifestValidationError(ValueError):
     pass
 
-
+###############################################################################
 class GeospatialManifestLoader:
     REQUIRED_FIELDS = {
         "id",

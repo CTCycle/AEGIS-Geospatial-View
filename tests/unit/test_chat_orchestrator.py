@@ -23,21 +23,20 @@ def test_chat_orchestrator_executes_when_intent_complete(monkeypatch) -> None:
     def fake_intent(text: str, explicit_datetime: str | None = None):  # noqa: ANN001
         return {
             "request_text": text,
-            "location": {"text": "Rome, Italy", "coordinates": {"latitude": 41.9, "longitude": 12.5}},
-            "display_area": {"mode": "point", "radius_m": 2500.0},
-            "view": {"view_mode": "interactive_map", "map_type": "auto"},
-            "overlays": {"requested": []},
+            "location": {"name": "Rome, Italy", "coordinates": {"latitude": 41.9, "longitude": 12.5}, "bbox": None, "granularity": "city", "is_partial": False, "ambiguity_reason": None},
+            "map_preferences": {"map_type": "auto", "map_type_confidence": 0.8, "basemap_preference": None, "overlay_candidates": []},
+            "task": {"user_intent": "map_search", "scope": "concrete_area", "requires_external_fact_finding": False, "is_geographically_actionable": True},
+            "temporal_context": {"normalized_datetime": explicit_datetime or "2026-01-01T00:00:00Z"},
             "planning": {
-                "user_intent": "map_search",
-                "datetime_inference": explicit_datetime or "2026-01-01T00:00:00Z",
                 "missing_information": [],
                 "confidence": 0.8,
                 "should_execute_search": True,
                 "follow_up_question": None,
+                "fallback_mode": "none",
             },
         }
 
-    monkeypatch.setattr(orchestrator, "_extract_intent", fake_intent)
+    monkeypatch.setattr(orchestrator, "extract_intent", fake_intent)
     result = asyncio.run(
         orchestrator.run_turn(ChatTurnRequest(message="Find me Rome weather layers"))
     )
@@ -51,19 +50,20 @@ def test_chat_orchestrator_follow_up_for_ambiguous_location(monkeypatch) -> None
     def ambiguous_intent(text: str, explicit_datetime: str | None = None):  # noqa: ANN001
         return {
             "request_text": text,
-            "location": {"text": "Springfield", "ambiguity_reason": "multiple_matches"},
-            "display_area": {"mode": "inferred"},
-            "view": {"view_mode": "interactive_map", "map_type": "auto"},
-            "overlays": {"requested": []},
+            "location": {"name": "Springfield", "coordinates": None, "bbox": None, "granularity": "city", "is_partial": True, "ambiguity_reason": "multiple_matches"},
+            "map_preferences": {"map_type": "auto", "map_type_confidence": 0.2, "basemap_preference": None, "overlay_candidates": []},
+            "task": {"user_intent": "map_search", "scope": "broad_but_usable_area", "requires_external_fact_finding": False, "is_geographically_actionable": True},
+            "temporal_context": {"normalized_datetime": explicit_datetime or "2026-01-01T00:00:00Z"},
             "planning": {
-                "datetime_inference": explicit_datetime or "2026-01-01T00:00:00Z",
                 "missing_information": ["location"],
                 "confidence": 0.2,
                 "should_execute_search": False,
                 "follow_up_question": "Which Springfield did you mean?",
+                "fallback_mode": "partial_location",
             },
         }
 
-    monkeypatch.setattr(orchestrator, "_extract_intent", ambiguous_intent)
+    monkeypatch.setattr(orchestrator, "extract_intent", ambiguous_intent)
     result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Show traffic in Springfield")))
     assert result.follow_up_required is True
+    assert result.fallback_mode == "partial_location"

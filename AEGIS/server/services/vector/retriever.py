@@ -14,7 +14,15 @@ class VectorRetriever:
         self.store = store or ChromaVectorStore()
         self.indexer = indexer or VectorIndexer(store=self.store)
 
-    def retrieve_candidates(self, query: str, *, top_k: int = 8) -> dict[str, list[dict[str, object]]]:
+    def retrieve_candidates(
+        self,
+        query: str,
+        *,
+        top_k: int = 8,
+        basemap_k: int | None = None,
+        overlay_k: int | None = None,
+        provider_k: int | None = None,
+    ) -> dict[str, list[dict[str, object]]]:
         self.indexer.ensure_index()
         matches = self.store.similarity_search(query, top_k=top_k)
         basemaps: list[dict[str, object]] = []
@@ -29,8 +37,9 @@ class VectorRetriever:
             if entry_id in seen:
                 continue
             seen.add(entry_id)
-            score = float(item.get("distance", 0.0) or 0.0)
-            candidate = {"id": entry_id, "score": score, "metadata": metadata}
+            distance = float(item.get("distance", 0.0) or 0.0)
+            score = float(item.get("score", 0.0) or 0.0)
+            candidate = {"id": entry_id, "score": score, "distance": distance, "metadata": metadata}
             document_kind = str(metadata.get("document_kind") or "")
             if document_kind == "provider":
                 providers.append(candidate)
@@ -38,7 +47,11 @@ class VectorRetriever:
                 basemaps.append(candidate)
             else:
                 overlays.append(candidate)
-        return {"basemaps": basemaps, "overlays": overlays, "providers": providers}
+        return {
+            "basemaps": self._limit_ranked(basemaps, basemap_k or top_k),
+            "overlays": self._limit_ranked(overlays, overlay_k or top_k),
+            "providers": self._limit_ranked(providers, provider_k or top_k),
+        }
 
     def retrieve_layers(self, query: str, *, top_k: int = 8) -> dict[str, list[str]]:
         candidates = self.retrieve_candidates(query, top_k=top_k)
@@ -46,3 +59,6 @@ class VectorRetriever:
             "basemap_ids": [str(item["id"]) for item in candidates["basemaps"]],
             "overlay_ids": [str(item["id"]) for item in candidates["overlays"]],
         }
+
+    def _limit_ranked(self, items: list[dict[str, object]], budget: int) -> list[dict[str, object]]:
+        return sorted(items, key=lambda item: float(item.get("score", 0.0) or 0.0), reverse=True)[: max(1, budget)]

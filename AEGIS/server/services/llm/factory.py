@@ -39,3 +39,21 @@ class LLMFactory:
             api_key = self.crypto_service.decrypt(credential.encrypted_value)
             return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
         raise ValueError(f"Unsupported model provider '{provider}'.")
+
+    def get_agent_provider(self, provider: str) -> LLMProvider:
+        return self.get_provider(provider)
+
+    def get_chat_provider(self, provider: str) -> LLMProvider:
+        return _ChatOnlyProvider(self.get_provider(provider))
+
+
+class _ChatOnlyProvider:
+    def __init__(self, delegate: LLMProvider) -> None:
+        self._delegate = delegate
+        self.provider_name = getattr(delegate, "provider_name", "chat")
+
+    def __getattr__(self, item: str):  # noqa: ANN001
+        return getattr(self._delegate, item)
+
+    def structured_output(self, request, schema):  # noqa: ANN001
+        raise RuntimeError("Structured extraction is forbidden on chat-model path.")

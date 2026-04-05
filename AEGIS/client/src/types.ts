@@ -136,16 +136,39 @@ export interface ChatSession {
 }
 
 export interface StructuredSearchIntent {
-    location_text?: string | null;
-    coordinates?: { latitude?: number; longitude?: number } | null;
-    search_radius_m?: number | null;
-    representation_type?: string | null;
-    requested_overlays?: string[];
-    user_intent?: string | null;
-    datetime_inference?: string | null;
-    missing_information?: string[];
-    should_execute_search?: boolean;
-    follow_up_question?: string | null;
+    request_text?: string;
+    location?: {
+        name?: string | null;
+        coordinates?: { latitude?: number; longitude?: number } | null;
+        bbox?: [number, number, number, number] | null;
+        granularity?: string | null;
+        is_partial?: boolean;
+        ambiguity_reason?: string | null;
+    };
+    map_preferences?: {
+        map_type?: 'street' | 'satellite' | 'terrain' | 'light' | 'dark' | 'thematic' | 'auto' | string;
+        map_type_confidence?: number;
+        basemap_preference?: string | null;
+        overlay_candidates?: string[];
+    };
+    task?: {
+        user_intent?: string;
+        scope?: 'concrete_area' | 'broad_but_usable_area' | 'missing_area' | 'requires_area_discovery' | string;
+        requires_external_fact_finding?: boolean;
+        is_geographically_actionable?: boolean;
+    };
+    temporal_context?: {
+        raw_text?: string | null;
+        normalized_datetime?: string | null;
+        date_range?: [string, string] | null;
+    };
+    planning?: {
+        confidence?: number;
+        missing_information?: string[];
+        should_execute_search?: boolean;
+        follow_up_question?: string | null;
+        fallback_mode?: string;
+    };
 }
 
 export interface ChatTurnRequest {
@@ -162,6 +185,7 @@ export interface ChatTurnResponse {
     map_session?: MapSession | null;
     tool_payload?: Record<string, JsonValue> | null;
     follow_up_required?: boolean;
+    fallback_mode?: string | null;
 }
 
 export type ChatStreamEventType = 'status' | 'assistant_delta' | 'tool_status' | 'final' | 'error';

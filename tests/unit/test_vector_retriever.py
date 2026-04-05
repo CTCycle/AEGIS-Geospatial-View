@@ -14,6 +14,7 @@ def test_vector_retriever_returns_overlay_matches(tmp_path) -> None:
     assert isinstance(matches["overlays"], list)
     overlay_ids = [str(item["id"]) for item in matches["overlays"]]
     assert "openaq_air_quality" in overlay_ids
+    assert all("score" in item for item in matches["overlays"])
     assert "tomtom_traffic_flow" not in [str(item["id"]) for item in matches["basemaps"]]
 
 

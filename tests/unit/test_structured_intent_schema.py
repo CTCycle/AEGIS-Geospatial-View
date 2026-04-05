@@ -5,9 +5,8 @@ from AEGIS.server.services.llm.structured import normalize_structured_payload
 
 def test_structured_intent_defaults() -> None:
     normalized = normalize_structured_payload({})
-    assert normalized["display_area"]["mode"] == "inferred"
-    assert normalized["view"]["view_mode"] == "interactive_map"
-    assert normalized["view"]["map_type"] == "auto"
+    assert normalized["location"]["is_partial"] is False
+    assert normalized["map_preferences"]["map_type"] == "auto"
     assert normalized["planning"]["confidence"] == 0.0
 
 
@@ -21,7 +20,6 @@ def test_structured_intent_legacy_normalization() -> None:
             "datetime_inference": "2026-01-01T00:00:00Z",
         }
     )
-    assert normalized["location"]["text"] == "Rome"
+    assert normalized["location"]["name"] == "Rome"
     assert normalized["location"]["coordinates"]["latitude"] == 41.9
-    assert normalized["display_area"]["radius_m"] == 1000
-    assert normalized["overlays"]["requested"] == ["openaq_air_quality"]
+    assert normalized["map_preferences"]["overlay_candidates"] == ["openaq_air_quality"]
