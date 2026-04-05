@@ -5,14 +5,17 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -122,6 +125,38 @@ class ModelCredentialRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+###############################################################################
+class AccessKeyRecord(Base):
+    __tablename__ = "access_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    __table_args__ = (
+        CheckConstraint("provider IN ('openai', 'gemini')", name="ck_access_keys_provider"),
+        Index("ix_access_keys_provider", "provider"),
+        Index(
+            "ux_access_keys_provider_active",
+            "provider",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active = true"),
+        ),
+    )
 
 
 ###############################################################################
