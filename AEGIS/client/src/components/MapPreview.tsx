@@ -18,6 +18,12 @@ interface MapPreviewProps {
     payload?: SearchResponsePayload;
     isLoading: boolean;
     emptyMessage?: string;
+    initialOverlayVisibility?: Record<string, boolean>;
+    initialOverlayOpacity?: Record<string, number>;
+    onOverlayStateChange?: (state: {
+        overlayVisibility: Record<string, boolean>;
+        overlayOpacity: Record<string, number>;
+    }) => void;
 }
 
 type OverlayEntry = NonNullable<MapSession['overlays']>[number];
@@ -246,27 +252,56 @@ const MapPreview: React.FC<MapPreviewProps> = ({
     payload,
     isLoading,
     emptyMessage = 'Run a search to display the map.',
+    initialOverlayVisibility = {},
+    initialOverlayOpacity = {},
+    onOverlayStateChange,
 }) => {
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<Map | null>(null);
     const mapSession = payload?.map_session;
-    const [overlayVisibility, setOverlayVisibility] = useState<Record<string, boolean>>({});
-    const [overlayOpacity, setOverlayOpacity] = useState<Record<string, number>>({});
+    const [overlayVisibility, setOverlayVisibility] = useState<Record<string, boolean>>(initialOverlayVisibility);
+    const [overlayOpacity, setOverlayOpacity] = useState<Record<string, number>>(initialOverlayOpacity);
+    const [restoreNotice, setRestoreNotice] = useState('');
     const hasCenter = useMemo(() => {
         return typeof mapSession?.center?.latitude === 'number' && typeof mapSession?.center?.longitude === 'number';
     }, [mapSession]);
 
     useEffect(() => {
         const overlays = mapSession?.overlays || [];
-        const visibility: Record<string, boolean> = {};
-        const opacity: Record<string, number> = {};
-        overlays.forEach((overlay) => {
-            visibility[overlay.id] = true;
-            opacity[overlay.id] = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
+        const overlayIds = new Set(overlays.map((overlay) => overlay.id));
+        const staleVisibilityKeys = Object.keys(initialOverlayVisibility).filter((key) => !overlayIds.has(key));
+        const staleOpacityKeys = Object.keys(initialOverlayOpacity).filter((key) => !overlayIds.has(key));
+        const staleIds = new Set([...staleVisibilityKeys, ...staleOpacityKeys]);
+        if (staleIds.size > 0) {
+            setRestoreNotice(
+                `Some saved overlay preferences could not be restored (${staleIds.size} removed or unknown overlay id${staleIds.size === 1 ? '' : 's'}).`,
+            );
+        } else {
+            setRestoreNotice('');
+        }
+        setOverlayVisibility((current) => {
+            const next: Record<string, boolean> = {};
+            overlays.forEach((overlay) => {
+                next[overlay.id] = current[overlay.id] ?? initialOverlayVisibility[overlay.id] ?? true;
+            });
+            return next;
         });
-        setOverlayVisibility(visibility);
-        setOverlayOpacity(opacity);
-    }, [mapSession]);
+        setOverlayOpacity((current) => {
+            const next: Record<string, number> = {};
+            overlays.forEach((overlay) => {
+                const fallback = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
+                next[overlay.id] = current[overlay.id] ?? initialOverlayOpacity[overlay.id] ?? fallback;
+            });
+            return next;
+        });
+    }, [mapSession, initialOverlayVisibility, initialOverlayOpacity]);
+
+    useEffect(() => {
+        if (!onOverlayStateChange) {
+            return;
+        }
+        onOverlayStateChange({ overlayVisibility, overlayOpacity });
+    }, [overlayVisibility, overlayOpacity, onOverlayStateChange]);
 
     useEffect(() => {
         if (!mapContainerRef.current || !hasCenter || !mapSession?.center) {
@@ -375,6 +410,11 @@ const MapPreview: React.FC<MapPreviewProps> = ({
                         {mapSession.compliance_warnings.map((warning) => (
                             <p key={warning}>{warning}</p>
                         ))}
+                    </div>
+                )}
+                {!!restoreNotice && (
+                    <div className="compliance-panel" role="status" aria-live="polite">
+                        <p>{restoreNotice}</p>
                     </div>
                 )}
             </div>

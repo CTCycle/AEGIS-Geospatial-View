@@ -8,14 +8,32 @@ import ChatTranscript from './ChatTranscript';
 
 interface AgentChatPanelProps {
     onMapSession: (mapSession: MapSession | undefined) => void;
+    initialState: {
+        sessionId?: number;
+        messages: ChatMessage[];
+        status: string;
+        assistantDraft: string;
+        composerDraft: string;
+        transcriptScrollTop: number;
+    };
+    onStateChange: (state: {
+        sessionId?: number;
+        messages: ChatMessage[];
+        status: string;
+        assistantDraft: string;
+        composerDraft: string;
+        transcriptScrollTop: number;
+    }) => void;
 }
 
-const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession }) => {
-    const [sessionId, setSessionId] = useState<number | undefined>();
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [status, setStatus] = useState('Idle');
+const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession, initialState, onStateChange }) => {
+    const [sessionId, setSessionId] = useState<number | undefined>(initialState.sessionId);
+    const [messages, setMessages] = useState<ChatMessage[]>(initialState.messages);
+    const [status, setStatus] = useState(initialState.status);
     const [isLoading, setIsLoading] = useState(false);
-    const [assistantDraft, setAssistantDraft] = useState('');
+    const [assistantDraft, setAssistantDraft] = useState(initialState.assistantDraft);
+    const [composerDraft, setComposerDraft] = useState(initialState.composerDraft);
+    const [transcriptScrollTop, setTranscriptScrollTop] = useState(initialState.transcriptScrollTop);
 
     const renderedMessages = useMemo(() => {
         if (!assistantDraft.trim()) {
@@ -83,14 +101,29 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({ onMapSession }) => {
         }
     };
 
+    React.useEffect(() => {
+        onStateChange({
+            sessionId,
+            messages,
+            status,
+            assistantDraft,
+            composerDraft,
+            transcriptScrollTop,
+        });
+    }, [sessionId, messages, status, assistantDraft, composerDraft, transcriptScrollTop, onStateChange]);
+
     return (
         <div className="agent-chat-panel">
             <div className="agent-chat-panel__header">
                 <h2 className="panel-title">Agent Chat</h2>
                 <ChatStatusPill status={status} />
             </div>
-            <ChatTranscript messages={renderedMessages} />
-            <ChatComposer disabled={isLoading} onSend={sendMessage} />
+            <ChatTranscript
+                messages={renderedMessages}
+                initialScrollTop={initialState.transcriptScrollTop}
+                onScrollTopChange={setTranscriptScrollTop}
+            />
+            <ChatComposer disabled={isLoading} onSend={sendMessage} value={composerDraft} onChange={setComposerDraft} />
         </div>
     );
 };

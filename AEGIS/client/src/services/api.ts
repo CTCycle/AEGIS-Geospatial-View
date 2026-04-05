@@ -24,6 +24,7 @@ import {
     SearchResponsePayload,
     VectorizationResponse,
 } from '../types';
+import { clearPersistedAppState } from '../state/appState';
 
 class ApiRequestError extends Error {
     detail?: unknown;
@@ -346,6 +347,9 @@ const buildApiError = async (response: Response): Promise<ApiRequestError> => {
     const message = typeof detail === 'string'
         ? detail
         : `Error ${response.status}: ${response.statusText}`;
+    if (response.status === 401 || response.status === 403) {
+        clearPersistedAppState();
+    }
     return new ApiRequestError(message, {
         detail,
         raw: errorData,

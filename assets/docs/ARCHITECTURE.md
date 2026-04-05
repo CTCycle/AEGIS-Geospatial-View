@@ -112,6 +112,10 @@ Database backend choice:
 - Settings page: `AEGIS/client/src/pages/SettingsPage.tsx`.
 - Layout: left chat toolbar + right map canvas.
 - Service layer for API calls: `AEGIS/client/src/services/api.ts`.
+- Browser path routing:
+  - `/` for chat/map workspace
+  - `/settings` for settings workspace
+- Route/UI state persistence uses `sessionStorage` with schema + TTL guardrails. See `assets/docs/STATE_PRESERVATION.md`.
 
 ## 9. External Integrations
 
