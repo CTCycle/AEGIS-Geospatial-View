@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import AgentChatPanel from '../components/chat/AgentChatPanel';
 import MapPreview from '../components/MapPreview';
@@ -6,6 +6,7 @@ import { MapSession, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
 import { PersistedChatPageState } from '../state/appState';
 import { useActivePagePersistence } from '../hooks/useActivePagePersistence';
+import { useResizableToolbar } from '../hooks/useResizableToolbar';
 
 interface GeospatialPageProps {
     onOpenSettings: () => void;
@@ -16,59 +17,40 @@ interface GeospatialPageProps {
 
 function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: GeospatialPageProps) {
     const [payload, setPayload] = useState<SearchResponsePayload | undefined>(state.payload);
-    const [toolbarWidth, setToolbarWidth] = useState(state.toolbarWidth);
+    const [toolbarWidthState, setToolbarWidthState] = useState(state.toolbarWidth);
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(state.isToolbarCollapsed);
     const [chatPanelState, setChatPanelState] = useState(state.chatPanel);
     const [mapState, setMapState] = useState(state.mapState);
-    const [isResizing, setIsResizing] = useState(false);
     const [chatProgress, setChatProgress] = useState({ isLoading: false, progressPercent: 0 });
 
-    useEffect(() => {
-        if (!isResizing) {
-            return;
-        }
-
-        const minWidth = 280;
-        const maxWidth = 560;
-
-        const onMouseMove = (event: MouseEvent) => {
-            const viewportWidth = window.innerWidth;
-            const clamped = Math.max(minWidth, Math.min(maxWidth, Math.min(event.clientX, viewportWidth - 320)));
-            setToolbarWidth(clamped);
-        };
-
-        const onMouseUp = () => {
-            setIsResizing(false);
-        };
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-
-        return () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        };
-    }, [isResizing]);
+    const {
+        toolbarWidth,
+        isResizing,
+        startResize,
+    } = useResizableToolbar({
+        initialWidth: toolbarWidthState,
+        onWidthChange: setToolbarWidthState,
+    });
 
     const handleMapSession = (mapSession: MapSession | undefined) => {
         if (!mapSession) {
             return;
         }
-        setPayload({
-            satellite_imagery: payload?.satellite_imagery,
+        setPayload((current) => ({
+            satellite_imagery: current?.satellite_imagery,
             map_session: mapSession,
             compliance_warnings: mapSession.compliance_warnings,
-        });
+        }));
     };
 
     const buildState = useCallback((scrollY: number): PersistedChatPageState => ({
-        toolbarWidth,
+        toolbarWidth: toolbarWidthState,
         isToolbarCollapsed,
         payload,
         chatPanel: chatPanelState,
         mapState,
         scrollY,
-    }), [toolbarWidth, isToolbarCollapsed, payload, chatPanelState, mapState]);
+    }), [toolbarWidthState, isToolbarCollapsed, payload, chatPanelState, mapState]);
 
     const restoreState = useCallback(() => {
         window.scrollTo({ top: state.scrollY, behavior: 'auto' });
@@ -80,7 +62,7 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
         onStateChange,
         buildState,
         restoreState,
-        syncDeps: [toolbarWidth, isToolbarCollapsed, payload, chatPanelState, mapState],
+        syncDeps: [toolbarWidthState, isToolbarCollapsed, payload, chatPanelState, mapState],
     });
 
     return (
@@ -133,10 +115,11 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
                     ].filter(Boolean).join(' ')}
                     aria-hidden="true"
                     onMouseDown={() => {
-                        if (isToolbarCollapsed) {
-                            setIsToolbarCollapsed(false);
-                        }
-                        setIsResizing(true);
+                        startResize(() => {
+                            if (isToolbarCollapsed) {
+                                setIsToolbarCollapsed(false);
+                            }
+                        });
                     }}
                 />
 

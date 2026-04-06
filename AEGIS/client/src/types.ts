@@ -88,7 +88,7 @@ export interface CatalogResponse {
 
 export interface MapSession {
     center?: { latitude?: number | null; longitude?: number | null };
-    bounds?: number[];
+    bounds?: [number, number, number, number] | number[];
     basemap?: CatalogBasemap;
     overlays?: CatalogOverlay[];
     insights?: Record<string, JsonValue>;
@@ -109,6 +109,12 @@ export interface SearchResponsePayload {
     satellite_imagery?: SatelliteImageryPayload;
     map_session?: MapSession;
     compliance_warnings?: string[];
+    latitude?: number;
+    longitude?: number;
+    coordinates?: {
+        latitude?: number;
+        longitude?: number;
+    };
     [key: string]: unknown;
 }
 
@@ -228,6 +234,16 @@ export interface ModelSettingsUpdateRequest {
     openai_base_url?: string | null;
     google_base_url?: string | null;
     credentials: Record<string, { api_key?: string }>;
+}
+
+export interface OllamaHealthResponse {
+    ok?: boolean;
+    detail?: string;
+    [key: string]: unknown;
+}
+
+export interface GenericObjectResponse {
+    [key: string]: unknown;
 }
 
 export interface VectorizationResponse {
