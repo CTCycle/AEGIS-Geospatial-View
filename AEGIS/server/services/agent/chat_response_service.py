@@ -20,6 +20,7 @@ class ChatResponseService:
     def generate(
         self,
         *,
+        conversation_context: str,
         user_message: str,
         extracted_state: ExtractedIntent,
         decision: AgentDecision,
@@ -39,6 +40,7 @@ class ChatResponseService:
                 model=self.model,
                 messages=[
                     {"role": "system", "content": AGENT_RESPONSE_PROMPT},
+                    {"role": "user", "content": conversation_context},
                     {"role": "user", "content": json.dumps(payload)},
                 ],
             )

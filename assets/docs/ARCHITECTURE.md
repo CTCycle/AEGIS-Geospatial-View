@@ -82,6 +82,13 @@ Root behavior:
 7. Search session metadata is persisted through `DataSerializer`.
 8. JSON response returns `status_message` and `payload` with `satellite_imagery` content.
 
+Chat orchestration flow (`/chat/turn`, `/chat/stream`):
+- User turn is persisted in `chat_messages`.
+- Session-scoped in-memory history buffer is hydrated from DB on cache miss and capped by `chat.max_history_messages`.
+- A shared conversation context block (messages + `# extracted info`) is built and passed to parser, decision, and response models.
+- Assistant turn (message + structured/tool/map payloads) is persisted, then appended to the in-memory buffer.
+- DB remains the source of truth across process restarts.
+
 ## 6. Background Job Model
 
 - Job execution is thread-based via `AEGIS/server/services/jobs.py`.
@@ -101,6 +108,8 @@ Main SQLAlchemy entities in `AEGIS/server/repositories/schemas/models.py`:
 - `MODEL_CREDENTIALS` (encrypted values only)
 - `CHAT_SESSIONS`
 - `CHAT_MESSAGES`
+- `SESSION_CATALOG`
+- `SESSION_DETAILS`
 
 Database backend choice:
 - Embedded SQLite when `DB_EMBEDDED=true`
@@ -132,3 +141,4 @@ These integrations are network-dependent; failures are surfaced as request error
 - No built-in authentication/authorization middleware for map endpoints.
 - External API availability can affect E2E and manual runs.
 - Job execution is in-process and thread-based, not queue-worker distributed.
+- In-memory chat history buffering is process-local optimization and is not shared across workers.

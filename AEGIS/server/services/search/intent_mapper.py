@@ -13,6 +13,7 @@ def map_structured_intent_to_location_request(
     selected_overlay_ids: list[str],
     fallback_datetime: str,
 ) -> dict[str, Any]:
+    _ = user_message
     location = extracted_state.get("location") if isinstance(extracted_state.get("location"), dict) else {}
     coordinates = (
         extracted_state.get("coordinates") if isinstance(extracted_state.get("coordinates"), dict) else {}
@@ -22,7 +23,7 @@ def map_structured_intent_to_location_request(
         "datetime": fallback_datetime,
         "country": location.get("country"),
         "city": location.get("city"),
-        "address": location.get("address") or user_message,
+        "address": location.get("address"),
         "use_coordinates": has_coordinates,
         "latitude": coordinates.get("latitude"),
         "longitude": coordinates.get("longitude"),

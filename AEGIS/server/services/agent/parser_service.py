@@ -13,7 +13,13 @@ class ParserService:
         self.provider = provider
         self.model = model
 
-    def extract_patch(self, *, latest_state: ExtractedIntent, user_message: str) -> ExtractedIntentPatch:
+    def extract_patch(
+        self,
+        *,
+        conversation_context: str,
+        latest_state: ExtractedIntent,
+        user_message: str,
+    ) -> ExtractedIntentPatch:
         provider = self.llm_factory.get_parser_provider(self.provider)
         request = ChatCompletionRequest(
             model=self.model,
@@ -21,10 +27,14 @@ class ParserService:
                 {"role": "system", "content": AGENT_EXTRACTION_PROMPT},
                 {
                     "role": "user",
+                    "content": conversation_context,
+                },
+                {
+                    "role": "user",
                     "content": (
                         "latest_state="
                         + str(latest_state.model_dump(mode="json"))
-                        + "\nuser_message="
+                        + "\nlatest_user_message="
                         + user_message
                     ),
                 },

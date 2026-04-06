@@ -20,6 +20,7 @@ class DecisionService:
     def decide(
         self,
         *,
+        conversation_context: str,
         user_message: str,
         extracted_state: ExtractedIntent,
         retrieval: dict[str, list[dict[str, object]]],
@@ -51,6 +52,10 @@ class DecisionService:
             model=self.model,
             messages=[
                 {"role": "system", "content": AGENT_DECISION_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": conversation_context,
+                },
                 {
                     "role": "user",
                     "content": json.dumps(

@@ -5,6 +5,7 @@ from typing import Any
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
+from AEGIS.server.services.llm.context_builder import build_conversation_context
 from AEGIS.server.services.llm.factory import LLMFactory
 
 ###############################################################################
@@ -30,7 +31,12 @@ class AgentResponseGenerator:
             clarification_question=follow_up_question,
         )
         extracted_state = ExtractedIntent.model_validate(intent)
+        context = build_conversation_context(
+            messages=[{"role": "user", "content": user_message}],
+            extracted_info=extracted_state.model_dump_json(indent=2),
+        )
         return self.chat_service.generate(
+            conversation_context=context,
             user_message=user_message,
             extracted_state=extracted_state,
             decision=decision,

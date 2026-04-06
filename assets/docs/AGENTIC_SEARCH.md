@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-04-03
+Last updated: 2026-04-06
 
 ## Summary
 
@@ -24,16 +24,24 @@ AEGIS now uses a chat-first flow where each user turn can either:
 - Persistence:
   - provider/model settings persisted in database.
   - cloud credentials persisted encrypted at rest.
-  - chat sessions/messages persisted in database.
+  - chat sessions/messages persisted in database (`chat_sessions`, `chat_messages`).
+- Conversation memory:
+  - every parser/decision/response model call now receives a bounded transcript context.
+  - transcript depth is controlled by `chat.max_history_messages` in `AEGIS/settings/configurations.json`.
+  - in-memory history buffering is used per process/session for recent turns, while DB remains source of truth.
+- Location resolution:
+  - structured location mapping no longer falls back to raw user text as `address`.
+  - geocoding now supports city/country-only input (address can be empty).
+  - unresolved locations fail early with actionable 400 validation error instead of generic map-extent failure.
 
 ## Backend Flow
 
 1. `POST /chat/turn` or `POST /chat/stream` receives user turn.
-2. Agent orchestration extracts structured intent.
+2. Agent orchestration loads bounded prior transcript, then extracts structured intent.
 3. Vector retriever resolves relevant layer IDs.
 4. Intent mapper converts agent output to `LocationSearchRequest` shape.
 5. Shared location-search orchestrator executes map pipeline reused by `/maps/search`.
-6. Assistant response + structured payload + map session are persisted to chat history tables.
+6. Assistant response + structured payload + map session are persisted to chat history tables and in-process buffer.
 
 ## Streaming Events
 

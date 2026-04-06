@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import desc, func, select
 
 from AEGIS.server.repositories.database.backend import get_database
-from AEGIS.server.repositories.schemas.models import ChatMessageRecord, ChatSessionRecord
+from AEGIS.server.repositories.schemas.models import Base, ChatMessageRecord, ChatSessionRecord
 
 
 def _to_json_payload(value: Any) -> str | None:
@@ -27,7 +27,22 @@ def _from_json_payload(value: str | None) -> Any:
 
 class ChatHistoryRepository:
     def __init__(self) -> None:
-        self._session_factory = get_database().backend.session
+        backend = get_database().backend
+        Base.metadata.create_all(backend.engine)
+        self._session_factory = backend.session
+
+    def _to_message_dict(self, row: ChatMessageRecord) -> dict[str, Any]:
+        return {
+            "id": row.id,
+            "session_id": row.session_id,
+            "turn_index": row.turn_index,
+            "role": row.role,
+            "content": row.content,
+            "structured_payload": _from_json_payload(row.structured_payload_json),
+            "tool_payload": _from_json_payload(row.tool_payload_json),
+            "map_session": _from_json_payload(row.map_session_json),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
 
     def create_session(self, *, title: str | None = None) -> ChatSessionRecord:
         with self._session_factory() as session:
@@ -104,18 +119,7 @@ class ChatHistoryRepository:
                 .limit(max(1, limit))
             )
             rows = list(reversed(session.execute(statement).scalars().all()))
-        return [
-            {
-                "id": row.id,
-                "role": row.role,
-                "content": row.content,
-                "structured_payload": _from_json_payload(row.structured_payload_json),
-                "tool_payload": _from_json_payload(row.tool_payload_json),
-                "map_session": _from_json_payload(row.map_session_json),
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-            }
-            for row in rows
-        ]
+        return [self._to_message_dict(row) for row in rows]
 
     def get_latest_extracted_state(self, session_id: int) -> Any | None:
         with self._session_factory() as session:
@@ -155,17 +159,7 @@ class ChatHistoryRepository:
             row = session.execute(statement).scalars().first()
         if row is None:
             return None
-        return {
-            "id": row.id,
-            "session_id": row.session_id,
-            "turn_index": row.turn_index,
-            "role": row.role,
-            "content": row.content,
-            "structured_payload": _from_json_payload(row.structured_payload_json),
-            "tool_payload": _from_json_payload(row.tool_payload_json),
-            "map_session": _from_json_payload(row.map_session_json),
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-        }
+        return self._to_message_dict(row)
 
     def list_messages(self, *, session_id: int) -> list[dict[str, Any]]:
         with self._session_factory() as session:
@@ -175,17 +169,4 @@ class ChatHistoryRepository:
                 .order_by(ChatMessageRecord.turn_index.asc())
             )
             rows = session.execute(statement).scalars().all()
-            return [
-                {
-                    "id": row.id,
-                    "session_id": row.session_id,
-                    "turn_index": row.turn_index,
-                    "role": row.role,
-                    "content": row.content,
-                    "structured_payload": _from_json_payload(row.structured_payload_json),
-                    "tool_payload": _from_json_payload(row.tool_payload_json),
-                    "map_session": _from_json_payload(row.map_session_json),
-                    "created_at": row.created_at.isoformat() if row.created_at else None,
-                }
-                for row in rows
-            ]
+            return [self._to_message_dict(row) for row in rows]

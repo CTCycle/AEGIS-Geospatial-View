@@ -42,16 +42,17 @@ class NormatimService:
     # -----------------------------------------------------------------------------
     async def extract_coordinates(
         self,
-        address: str,
+        address: str | None,
         city: str | None,
         country_name: str | None,
         country_code: str | None,
         limit: int = 1,
     ) -> dict[str, Any] | None:
-        if not address:
+        query = self.compose_query(address, city, country_name)
+        if not query:
             return None
         params: dict[str, str] = {
-            "q": self.compose_query(address, city, country_name),
+            "q": query,
             "format": "jsonv2",
             "addressdetails": "1",
             "limit": str(limit),
@@ -102,10 +103,11 @@ class NormatimService:
 
     # -----------------------------------------------------------------------------
     def compose_query(
-        self, address: str, city: str | None, country_name: str | None
+        self, address: str | None, city: str | None, country_name: str | None
     ) -> str:
-        components = [address]
-        if city and city.lower() not in address.lower():
+        normalized_address = (address or "").strip()
+        components = [normalized_address] if normalized_address else []
+        if city and city.lower() not in normalized_address.lower():
             components.append(city)
         if country_name:
             lowered = " ".join(components).lower()
@@ -201,7 +203,7 @@ class NormatimService:
         self,
         data: dict[str, Any],
         *,
-        address: str,
+        address: str | None,
         city: str | None,
         country_name: str | None,
         country_code: str | None,
@@ -244,7 +246,7 @@ class NormatimService:
         self,
         *,
         data: dict[str, Any],
-        address: str,
+        address: str | None,
         city: str | None,
         country_name: str | None,
         country_code: str | None,
@@ -304,7 +306,7 @@ class NormatimService:
         self,
         data: dict[str, Any],
         *,
-        address: str,
+        address: str | None,
         city: str | None,
         country_name: str | None,
         country_code: str | None,
@@ -505,7 +507,7 @@ class NormatimService:
     # -----------------------------------------------------------------------------
     def derive_structured_alignment_score(
         self,
-        address: str,
+        address: str | None,
         data: dict[str, Any],
     ) -> float:
         address_tokens = self.tokenize(address)
@@ -517,7 +519,7 @@ class NormatimService:
         return self.compute_token_overlap(address_tokens, structured_tokens)
 
     # -----------------------------------------------------------------------------
-    def derive_house_number_score(self, address: str, data: dict[str, Any]) -> float:
+    def derive_house_number_score(self, address: str | None, data: dict[str, Any]) -> float:
         address_tokens = self.tokenize(address)
         number_tokens = [token for token in address_tokens if token.isdigit()]
         if not number_tokens:
