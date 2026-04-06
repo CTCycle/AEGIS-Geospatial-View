@@ -43,6 +43,8 @@ class ApiRequestError extends Error {
     }
 }
 
+const CHAT_STREAM_TIMEOUT_MS = 30_000;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
 
@@ -215,11 +217,24 @@ export const streamChatTurn = async (
     payload: ChatTurnRequest,
     onEvent: (event: ChatStreamEvent) => void,
 ): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}${API_CHAT_STREAM_PATH}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), CHAT_STREAM_TIMEOUT_MS);
+    let response: Response;
+    try {
+        response = await fetch(`${API_BASE_URL}${API_CHAT_STREAM_PATH}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+    } catch (error: unknown) {
+        if ((error as { name?: string })?.name === 'AbortError') {
+            throw new ApiRequestError('Streaming request timed out. Please retry.', { status: 408 });
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
     if (!response.ok) {
         throw await buildApiError(response);
     }

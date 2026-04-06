@@ -39,8 +39,11 @@ agent_orchestrator = AgentOrchestrator(search_orchestrator=search_endpoint.orche
 
 @router.post(CHAT_TURN_ROUTE, response_model=ChatTurnResponse, status_code=status.HTTP_200_OK)
 async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
-    vector_indexer.ensure_index_up_to_date()
-    return await agent_orchestrator.run_turn(payload)
+    try:
+        vector_indexer.ensure_index_up_to_date()
+        return await agent_orchestrator.run_turn(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
 @router.post(CHAT_STREAM_ROUTE, status_code=status.HTTP_200_OK)
@@ -77,6 +80,13 @@ async def chat_stream(payload: ChatTurnRequest):
                 ChatStreamEvent(
                     event="error",
                     data={"message": detail, "status": exc.status_code},
+                )
+            )
+        except ValueError as exc:
+            yield stream_event(
+                ChatStreamEvent(
+                    event="error",
+                    data={"message": str(exc), "status": status.HTTP_503_SERVICE_UNAVAILABLE},
                 )
             )
         except Exception:

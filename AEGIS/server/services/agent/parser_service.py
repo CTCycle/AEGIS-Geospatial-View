@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from AEGIS.server.domain.extraction.models import ExtractedIntent, ExtractedIntentPatch
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.prompts import PARSER_MODEL_SYSTEM_PROMPT
+from AEGIS.server.services.llm.prompts import AGENT_EXTRACTION_PROMPT
 from AEGIS.server.services.llm.structured import INTENT_SCHEMA
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
@@ -18,7 +18,7 @@ class ParserService:
         request = ChatCompletionRequest(
             model=self.model,
             messages=[
-                {"role": "system", "content": PARSER_MODEL_SYSTEM_PROMPT},
+                {"role": "system", "content": AGENT_EXTRACTION_PROMPT},
                 {
                     "role": "user",
                     "content": (

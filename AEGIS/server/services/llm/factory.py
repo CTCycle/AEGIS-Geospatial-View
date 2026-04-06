@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from AEGIS.server.repositories.credentials import CredentialRepository
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
 from AEGIS.server.repositories.serialization.access_keys import AccessKeySerializer
@@ -32,17 +34,23 @@ class LLMFactory:
             api_key = self.access_keys.decrypt_for_runtime("openai", mark_used=True)
             if not api_key:
                 credential = self.credentials_repo.get_active(provider="openai", label="api_key")
-                if credential is None:
-                    raise ValueError("OpenAI credentials are not configured.")
-                api_key = self.crypto_service.decrypt(credential.encrypted_value)
+                if credential is not None:
+                    api_key = self.crypto_service.decrypt(credential.encrypted_value)
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY", "").strip()
+            if not api_key:
+                raise ValueError("OpenAI credentials are not configured. Add an OpenAI API key in Settings.")
             return OpenAIProvider(api_key=api_key, base_url=settings.openai_base_url)
         if normalized == "google":
             api_key = self.access_keys.decrypt_for_runtime("gemini", mark_used=True)
             if not api_key:
                 credential = self.credentials_repo.get_active(provider="google", label="api_key")
-                if credential is None:
-                    raise ValueError("Google credentials are not configured.")
-                api_key = self.crypto_service.decrypt(credential.encrypted_value)
+                if credential is not None:
+                    api_key = self.crypto_service.decrypt(credential.encrypted_value)
+            if not api_key:
+                api_key = os.getenv("GOOGLE_API_KEY", "").strip() or os.getenv("GEMINI_API_KEY", "").strip()
+            if not api_key:
+                raise ValueError("Google credentials are not configured. Add a Google/Gemini API key in Settings.")
             return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
         raise ValueError(f"Unsupported model provider '{provider}'.")
 

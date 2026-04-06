@@ -6,16 +6,17 @@ from typing import Any
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.prompts import CHAT_RESPONSE_SYSTEM_PROMPT
+from AEGIS.server.services.llm.prompts import AGENT_RESPONSE_PROMPT
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
-
+###############################################################################
 class ChatResponseService:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
         self.provider = provider
         self.model = model
 
+    # -------------------------------------------------------------------------
     def generate(
         self,
         *,
@@ -37,7 +38,7 @@ class ChatResponseService:
             ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": CHAT_RESPONSE_SYSTEM_PROMPT},
+                    {"role": "system", "content": AGENT_RESPONSE_PROMPT},
                     {"role": "user", "content": json.dumps(payload)},
                 ],
             )

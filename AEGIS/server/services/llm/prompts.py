@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-PARSER_MODEL_SYSTEM_PROMPT = """
+AGENT_EXTRACTION_PROMPT = """
 You are the parser model for AEGIS, a location-driven geospatial research system.
 
 Your job is to extract or update structured geospatial intent from a user message.
@@ -41,7 +39,7 @@ Return JSON only with this shape:
 }
 """
 
-CHAT_RESPONSE_SYSTEM_PROMPT = """
+AGENT_RESPONSE_PROMPT = """
 You are the chat model for AEGIS.
 Turn the approved agent decision and optional search result into the user-facing response.
 
@@ -52,7 +50,3 @@ Rules:
 - If decision is search_and_complete, summarize what was searched and suggest useful refinements.
 """
 
-# Compatibility aliases during migration.
-AGENT_EXTRACTION_PROMPT = PARSER_MODEL_SYSTEM_PROMPT
-AGENT_RESPONSE_PROMPT = CHAT_RESPONSE_SYSTEM_PROMPT
-PLAIN_CHAT_PROMPT = CHAT_RESPONSE_SYSTEM_PROMPT

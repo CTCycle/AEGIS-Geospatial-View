@@ -28,6 +28,24 @@ interface MapPreviewProps {
 
 type OverlayEntry = NonNullable<MapSession['overlays']>[number];
 
+const recordBooleanEqual = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) {
+        return false;
+    }
+    return aKeys.every((key) => a[key] === b[key]);
+};
+
+const recordNumberEqual = (a: Record<string, number>, b: Record<string, number>): boolean => {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) {
+        return false;
+    }
+    return aKeys.every((key) => a[key] === b[key]);
+};
+
 const appendQuery = (baseUrl: string, query: string): string => {
     const separator = baseUrl.includes('?') ? '&' : '?';
     return `${baseUrl}${separator}${query}`;
@@ -284,7 +302,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
             overlays.forEach((overlay) => {
                 next[overlay.id] = current[overlay.id] ?? initialOverlayVisibility[overlay.id] ?? true;
             });
-            return next;
+            return recordBooleanEqual(current, next) ? current : next;
         });
         setOverlayOpacity((current) => {
             const next: Record<string, number> = {};
@@ -292,7 +310,7 @@ const MapPreview: React.FC<MapPreviewProps> = ({
                 const fallback = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
                 next[overlay.id] = current[overlay.id] ?? initialOverlayOpacity[overlay.id] ?? fallback;
             });
-            return next;
+            return recordNumberEqual(current, next) ? current : next;
         });
     }, [mapSession, initialOverlayVisibility, initialOverlayOpacity]);
 
