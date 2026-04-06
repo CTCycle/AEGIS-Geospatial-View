@@ -16,8 +16,10 @@ import {
     ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,
+    GenericObjectResponse,
     LocationSearchRequest,
     ModelCardDescriptor,
+    OllamaHealthResponse,
     ModelSettingsUpdateRequest,
     ModelSettingsResponse,
     JsonValue,
@@ -43,6 +45,27 @@ class ApiRequestError extends Error {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
+
+const isStringArray = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string, boolean>> => {
+    if (!isRecord(value)) {
+        return {};
+    }
+    const parsed: Record<string, Record<string, boolean>> = {};
+    Object.entries(value).forEach(([provider, providerValue]) => {
+        if (!isRecord(providerValue)) {
+            return;
+        }
+        const nextProvider: Record<string, boolean> = {};
+        Object.entries(providerValue).forEach(([key, flag]) => {
+            nextProvider[key] = Boolean(flag);
+        });
+        parsed[provider] = nextProvider;
+    });
+    return parsed;
+};
 
 const parseSearchResponse = (value: unknown): SearchResponse => {
     if (!isRecord(value)) {
@@ -116,10 +139,27 @@ const parseCatalogResponse = (value: unknown): CatalogResponse => {
                 wms_exceptions: typeof item.wms_exceptions === 'string' ? item.wms_exceptions : undefined,
                 bounds: Array.isArray(item.bounds) && item.bounds.length === 4
                     && item.bounds.every((value) => typeof value === 'number')
-                    ? item.bounds as [number, number, number, number]
+                    ? [item.bounds[0], item.bounds[1], item.bounds[2], item.bounds[3]]
                     : undefined,
                 attribution: typeof item.attribution === 'string' ? item.attribution : undefined,
             })),
+    };
+};
+
+const parseModelSettingsResponse = (value: unknown): ModelSettingsResponse => {
+    if (!isRecord(value)) {
+        throw new Error('Unexpected settings response format');
+    }
+    return {
+        active_provider_mode: (value.active_provider_mode === 'cloud' ? 'cloud' : 'local'),
+        chat_model_provider: String(value.chat_model_provider ?? 'ollama'),
+        chat_model_name: String(value.chat_model_name ?? ''),
+        agent_model_provider: String(value.agent_model_provider ?? 'ollama'),
+        agent_model_name: String(value.agent_model_name ?? ''),
+        ollama_url: String(value.ollama_url ?? 'http://localhost:11434'),
+        openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
+        google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
+        credentials: parseBooleanCredentialMap(value.credentials),
     };
 };
 
@@ -262,9 +302,7 @@ export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[];
                 name: String(item.name ?? item.id ?? ''),
                 description: buildDescription(item),
                 provider: String(item.provider ?? ''),
-                capabilities: Array.isArray(item.capabilities)
-                    ? item.capabilities.filter((entry): entry is string => typeof entry === 'string')
-                    : [],
+                capabilities: isStringArray(item.capabilities) ? item.capabilities : [],
                 metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
             }));
     };
@@ -276,20 +314,7 @@ export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[];
 
 export const fetchChatSettings = async (): Promise<ModelSettingsResponse> => {
     const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_SETTINGS_PATH}`, { method: 'GET' });
-    if (!isRecord(data)) {
-        throw new Error('Unexpected settings response format');
-    }
-    return {
-        active_provider_mode: (data.active_provider_mode === 'cloud' ? 'cloud' : 'local'),
-        chat_model_provider: String(data.chat_model_provider ?? 'ollama'),
-        chat_model_name: String(data.chat_model_name ?? ''),
-        agent_model_provider: String(data.agent_model_provider ?? 'ollama'),
-        agent_model_name: String(data.agent_model_name ?? ''),
-        ollama_url: String(data.ollama_url ?? 'http://localhost:11434'),
-        openai_base_url: typeof data.openai_base_url === 'string' ? data.openai_base_url : null,
-        google_base_url: typeof data.google_base_url === 'string' ? data.google_base_url : null,
-        credentials: isRecord(data.credentials) ? data.credentials as Record<string, Record<string, boolean>> : {},
-    };
+    return parseModelSettingsResponse(data);
 };
 
 export const updateChatSettings = async (payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> => {
@@ -298,28 +323,15 @@ export const updateChatSettings = async (payload: ModelSettingsUpdateRequest): P
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     });
-    if (!isRecord(data)) {
-        throw new Error('Unexpected settings response format');
-    }
-    return {
-        active_provider_mode: (data.active_provider_mode === 'cloud' ? 'cloud' : 'local'),
-        chat_model_provider: String(data.chat_model_provider ?? 'ollama'),
-        chat_model_name: String(data.chat_model_name ?? ''),
-        agent_model_provider: String(data.agent_model_provider ?? 'ollama'),
-        agent_model_name: String(data.agent_model_name ?? ''),
-        ollama_url: String(data.ollama_url ?? 'http://localhost:11434'),
-        openai_base_url: typeof data.openai_base_url === 'string' ? data.openai_base_url : null,
-        google_base_url: typeof data.google_base_url === 'string' ? data.google_base_url : null,
-        credentials: isRecord(data.credentials) ? data.credentials as Record<string, Record<string, boolean>> : {},
-    };
+    return parseModelSettingsResponse(data);
 };
 
-export const refreshOllamaModels = async (): Promise<Record<string, unknown>> => {
+export const refreshOllamaModels = async (): Promise<GenericObjectResponse> => {
     const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_REFRESH_PATH}`, { method: 'POST' });
     return isRecord(data) ? data : {};
 };
 
-export const pullOllamaModel = async (model: string): Promise<Record<string, unknown>> => {
+export const pullOllamaModel = async (model: string): Promise<GenericObjectResponse> => {
     const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_PULL_PATH}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,7 +352,7 @@ export const rebuildVectors = async (): Promise<VectorizationResponse> => {
     };
 };
 
-export const checkOllamaHealth = async (): Promise<Record<string, unknown>> => {
+export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {
     const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_HEALTH_PATH}`, { method: 'GET' });
     return isRecord(data) ? data : {};
 };

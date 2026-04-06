@@ -1,6 +1,6 @@
 # AEGIS Geospatial View Architecture
 
-Last updated: 2026-04-03  
+Last updated: 2026-04-06  
 Scope: `AEGIS/` and `tests/`
 
 ## 1. System Overview
@@ -73,20 +73,21 @@ Root behavior:
 
 ## 5. Core Backend Flow
 
-1. Request enters `MapSearchEndpoint` in `AEGIS/server/api/search.py`.
+1. Request enters FastAPI routes in `AEGIS/server/api/search.py`.
 2. Payload is validated via `LocationSearchRequest`.
 3. Location normalization/geocoding is performed by sanitization + Nominatim services.
-4. Overlay selection and map composition are performed by `MapRenderingService`.
-5. Optional enrichment is fetched from Open-Elevation and OpenAQ service integrations.
-6. Search session metadata is persisted through `DataSerializer`.
-7. JSON response returns `status_message` and `payload` with `satellite_imagery` content.
+4. Search orchestration and job lifecycle are executed by `MapSearchExecutionService` in `AEGIS/server/services/search/execution.py`.
+5. Overlay selection and map composition are performed by `MapRenderingService` in `AEGIS/server/services/geospatial/rendering.py`.
+6. Optional enrichment is fetched from Open-Elevation and OpenAQ service integrations.
+7. Search session metadata is persisted through `DataSerializer`.
+8. JSON response returns `status_message` and `payload` with `satellite_imagery` content.
 
 ## 6. Background Job Model
 
 - Job execution is thread-based via `AEGIS/server/services/jobs.py`.
 - `JobManager` tracks status, progress, result, and error per job.
 - Cancellation is cooperative (`stop_requested`) and must be checked by worker logic.
-- Job routes live in the same `MapSearchEndpoint` as synchronous search.
+- Job routes are declared in `AEGIS/server/api/search.py` and handled by `MapSearchExecutionService`.
 
 See `assets/docs/BACKGROUND_JOBS.md` for full details.
 

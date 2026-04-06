@@ -1,33 +1,15 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ModelGrid from '../components/settings/ModelGrid';
+import SettingsIconButton from '../components/settings/SettingsIconButton';
 import ModelProviderToggle from '../components/settings/ModelProviderToggle';
 import ModelSearchBar from '../components/settings/ModelSearchBar';
 import SettingsModal from '../components/settings/SettingsModal';
-import {
-    checkOllamaHealth,
-    fetchChatModels,
-    fetchChatSettings,
-    pullOllamaModel,
-    refreshOllamaModels,
-    updateChatSettings
-} from '../services/api';
-import { ModelCardDescriptor, ModelProviderMode, ModelSettingsResponse, ModelSettingsUpdateRequest } from '../types';
+import { ModelProviderMode } from '../types';
 import './SettingsPage.css';
 import { PersistedSettingsPageState } from '../state/appState';
 import { useActivePagePersistence } from '../hooks/useActivePagePersistence';
-
-const defaultSettings: ModelSettingsResponse = {
-    active_provider_mode: 'local',
-    chat_model_provider: 'ollama',
-    chat_model_name: '',
-    agent_model_provider: 'ollama',
-    agent_model_name: '',
-    ollama_url: 'http://localhost:11434',
-    openai_base_url: null,
-    google_base_url: null,
-    credentials: {},
-};
+import { useSettingsData } from '../hooks/useSettingsData';
 
 interface SettingsPageProps {
     onBack: () => void;
@@ -65,36 +47,38 @@ const writeSettingsQueryState = (searchText: string, providerMode: ModelProvider
 
 function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPageProps) {
     const queryState = readSettingsQueryState();
-    const [settings, setSettings] = useState<ModelSettingsResponse>(defaultSettings);
-    const [cloudModels, setCloudModels] = useState<ModelCardDescriptor[]>([]);
-    const [localModels, setLocalModels] = useState<ModelCardDescriptor[]>([]);
+    const {
+        settings,
+        cloudModels,
+        localModels,
+        providerMode,
+        statusText,
+        ollamaUrlDraft,
+        setProviderMode,
+        setOllamaUrlDraft,
+        handleProviderModeChange,
+        applyModelSelection,
+        saveKeys,
+        checkOllamaConnection,
+        refreshOllamaLibrary,
+        saveOllamaSettings,
+        pullLocalModel,
+    } = useSettingsData(state.statusText);
     const [searchText, setSearchText] = useState(queryState.searchText || state.searchText);
-    const [providerMode, setProviderMode] = useState<ModelProviderMode>(queryState.providerMode || state.providerMode);
-    const [statusText, setStatusText] = useState(state.statusText);
+    const [providerModeInitialized, setProviderModeInitialized] = useState(false);
     const modelGridRef = useRef<HTMLDivElement | null>(null);
     const [isKeysModalOpen, setIsKeysModalOpen] = useState(false);
     const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
     const [openaiKey, setOpenaiKey] = useState('');
     const [googleKey, setGoogleKey] = useState('');
-    const [ollamaUrlDraft, setOllamaUrlDraft] = useState(defaultSettings.ollama_url);
-
-    const loadData = async () => {
-        const [nextSettings, modelLibrary] = await Promise.all([
-            fetchChatSettings(),
-            fetchChatModels(),
-        ]);
-        setSettings(nextSettings);
-        setProviderMode(nextSettings.active_provider_mode);
-        setOllamaUrlDraft(nextSettings.ollama_url);
-        setCloudModels(modelLibrary.cloud);
-        setLocalModels(modelLibrary.local);
-    };
 
     useEffect(() => {
-        loadData().catch((error: unknown) => {
-            setStatusText(`Load failed: ${String((error as { message?: string })?.message ?? error)}`);
-        });
-    }, []);
+        if (providerModeInitialized) {
+            return;
+        }
+        setProviderMode(queryState.providerMode || state.providerMode);
+        setProviderModeInitialized(true);
+    }, [providerModeInitialized, queryState.providerMode, setProviderMode, state.providerMode]);
 
     useEffect(() => {
         if (!isActive) {
@@ -144,52 +128,14 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
 
     const localModelIds = useMemo(() => new Set(localModels.map((item) => item.id)), [localModels]);
 
-    const handleProviderModeChange = async (mode: ModelProviderMode) => {
-        setProviderMode(mode);
-        try {
-            const updated = await updateChatSettings({
-                ...settings,
-                active_provider_mode: mode,
-            });
-            setSettings(updated);
-            setStatusText(`Provider mode set to ${mode}`);
-        } catch (error: unknown) {
-            setStatusText(`Provider mode update failed: ${String((error as { message?: string })?.message ?? error)}`);
-        }
-    };
-
-    const applyModelSelection = async (kind: 'chat' | 'agent', model: ModelCardDescriptor) => {
-        const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
-        const payload: ModelSettingsUpdateRequest = {
-            ...settings,
-            active_provider_mode: nextProviderMode,
-            chat_model_provider: kind === 'chat' ? model.provider : settings.chat_model_provider,
-            chat_model_name: kind === 'chat' ? model.name : settings.chat_model_name,
-            agent_model_provider: kind === 'agent' ? model.provider : settings.agent_model_provider,
-            agent_model_name: kind === 'agent' ? model.name : settings.agent_model_name,
-        };
-        const updated = await updateChatSettings(payload);
-        setSettings(updated);
-        setProviderMode(updated.active_provider_mode);
-        setStatusText(`Selected ${model.name} for ${kind}`);
-    };
-
     const keysFooter: ReactNode = (
         <button
             type="button"
             className="primary-button"
             onClick={async () => {
-                const updated = await updateChatSettings({
-                    ...settings,
-                    credentials: {
-                        openai: openaiKey.trim() ? { api_key: openaiKey.trim() } : {},
-                        google: googleKey.trim() ? { api_key: googleKey.trim() } : {},
-                    },
-                });
-                setSettings(updated);
+                await saveKeys(openaiKey, googleKey);
                 setOpenaiKey('');
                 setGoogleKey('');
-                setStatusText('API keys saved');
                 setIsKeysModalOpen(false);
             }}
         >
@@ -203,8 +149,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 <button
                     type="button"
                     onClick={async () => {
-                        const health = await checkOllamaHealth();
-                        setStatusText(`Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`);
+                        await checkOllamaConnection();
                     }}
                 >
                     Check connection
@@ -212,9 +157,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 <button
                     type="button"
                     onClick={async () => {
-                        await refreshOllamaModels();
-                        await loadData();
-                        setStatusText('Ollama library refreshed');
+                        await refreshOllamaLibrary();
                     }}
                 >
                     Refresh models
@@ -224,13 +167,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 type="button"
                 className="primary-button"
                 onClick={async () => {
-                    const updated = await updateChatSettings({
-                        ...settings,
-                        ollama_url: ollamaUrlDraft.trim() || defaultSettings.ollama_url,
-                    });
-                    setSettings(updated);
-                    setOllamaUrlDraft(updated.ollama_url);
-                    setStatusText('Ollama settings saved');
+                    await saveOllamaSettings();
                     setIsOllamaModalOpen(false);
                 }}
             >
@@ -253,24 +190,18 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 <ModelProviderToggle value={providerMode} onChange={handleProviderModeChange} />
                 <div className="settings-page__search-with-actions">
                     <div className="settings-page__control-icons">
-                        <button
-                            type="button"
-                            className="settings-icon-button"
+                        <SettingsIconButton
                             onClick={() => setIsKeysModalOpen(true)}
-                            aria-label="Manage API keys"
+                            ariaLabel="Manage API keys"
                             title="API key settings"
-                        >
-                            <span className="settings-icon-button__glyph" aria-hidden="true">⌁</span>
-                        </button>
-                        <button
-                            type="button"
-                            className="settings-icon-button"
+                            glyph="⌁"
+                        />
+                        <SettingsIconButton
                             onClick={() => setIsOllamaModalOpen(true)}
-                            aria-label="Open Ollama settings"
+                            ariaLabel="Open Ollama settings"
                             title="Ollama settings"
-                        >
-                            <span className="settings-icon-button__glyph" aria-hidden="true">◉</span>
-                        </button>
+                            glyph="◉"
+                        />
                     </div>
                     <ModelSearchBar value={searchText} onChange={setSearchText} />
                 </div>
@@ -291,10 +222,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 onSelectChat={(model) => applyModelSelection('chat', model)}
                 onSelectAgent={(model) => applyModelSelection('agent', model)}
                 onPull={async (model) => {
-                    await pullOllamaModel(model.name);
-                    await refreshOllamaModels();
-                    await loadData();
-                    setStatusText(`Pulled ${model.name}`);
+                    await pullLocalModel(model);
                 }}
             />
 
