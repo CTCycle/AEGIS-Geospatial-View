@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from AEGIS.server.domain.agent.decision import AgentDecision
+from AEGIS.server.domain.extraction.models import ExtractedIntent
+from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.prompts import AGENT_RESPONSE_PROMPT
-from AEGIS.server.services.llm.types import ChatCompletionRequest
 
 
 class AgentResponseGenerator:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
-        self.llm_factory = llm_factory
-        self.provider = provider
-        self.model = model
+        self.chat_service = ChatResponseService(llm_factory=llm_factory, provider=provider, model=model)
 
     def generate(
         self,
@@ -23,30 +22,18 @@ class AgentResponseGenerator:
         map_session: dict[str, Any] | None,
         follow_up_question: str | None,
     ) -> str:
-        try:
-            provider = self.llm_factory.get_agent_provider(self.provider)
-            prompt_payload = {
-                "user_message": user_message,
-                "intent": intent,
-                "retrieval": retrieval,
-                "execution": execution,
-                "map_session": map_session,
-                "follow_up_question": follow_up_question,
-            }
-            result = provider.chat(
-                ChatCompletionRequest(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": AGENT_RESPONSE_PROMPT},
-                        {"role": "user", "content": str(prompt_payload)},
-                    ],
-                )
-            )
-            text = (result.content or "").strip()
-            if text:
-                return text
-        except Exception:
-            pass
-        if follow_up_question:
-            return follow_up_question
-        return "I processed the geospatial request."
+        decision = AgentDecision(
+            decision="search_and_complete" if execution == "search" else "clarify",
+            should_trigger_search=execution == "search",
+            location_status="valid" if execution == "search" else "partial",
+            requires_geocoding=False,
+            clarification_question=follow_up_question,
+        )
+        extracted_state = ExtractedIntent.model_validate(intent)
+        return self.chat_service.generate(
+            user_message=user_message,
+            extracted_state=extracted_state,
+            decision=decision,
+            retrieval=retrieval,
+            search_result={"map_session": map_session} if map_session else None,
+        )

@@ -1,0 +1,44 @@
+{
+  "id": "openaq_air_quality",
+  "name": "OpenAQ Air Quality",
+  "provider": "openaq",
+  "type": "point-insight",
+  "description": "Nearest available OpenAQ measurement summaries for selected AOI.",
+  "capabilities": [
+    "air-quality",
+    "point-insight"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "OpenAQ Air Quality",
+    "default_opacity": 1.0,
+    "requires_key": false,
+    "attribution": "\u00a9 OpenAQ and source providers",
+    "keywords": [
+      "air-quality",
+      "point-insight",
+      "openaq",
+      "openaq air quality"
+    ],
+    "intent_tags": [
+      "air-quality",
+      "point-insight"
+    ],
+    "task_tags": [
+      "air-quality",
+      "point-insight"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global-partial",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "8e07770793eb3ce9077833ec50826125a8304a9282f8368670eedba55402014b"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

@@ -3,29 +3,21 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from AEGIS.server.services.agent.prompts import AGENT_INTENT_SYSTEM_PROMPT
+from AEGIS.server.domain.extraction.models import ExtractedIntent
+from AEGIS.server.domain.extraction.patching import merge_extracted_intent
+from AEGIS.server.services.agent.parser_service import ParserService
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.structured import INTENT_SCHEMA, normalize_structured_payload
-from AEGIS.server.services.llm.types import ChatCompletionRequest
+from AEGIS.server.services.llm.structured import normalize_structured_payload
 
 
 class IntentExtractor:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
-        self.llm_factory = llm_factory
-        self.provider = provider
-        self.model = model
+        self.parser_service = ParserService(llm_factory=llm_factory, provider=provider, model=model)
 
     def extract(self, text: str, explicit_datetime: str | None = None) -> dict[str, Any]:
-        provider = self.llm_factory.get_agent_provider(self.provider)
-        request = ChatCompletionRequest(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": AGENT_INTENT_SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
-        )
-        payload = provider.structured_output(request, schema=INTENT_SCHEMA)
-        normalized = normalize_structured_payload(payload if isinstance(payload, dict) else {})
-        normalized.setdefault("temporal_context", {})
-        normalized["temporal_context"]["normalized_datetime"] = explicit_datetime or normalized["temporal_context"].get("normalized_datetime") or datetime.now(UTC).isoformat()
+        baseline = ExtractedIntent()
+        patch = self.parser_service.extract_patch(latest_state=baseline, user_message=text)
+        merged = merge_extracted_intent(baseline, patch)
+        normalized = normalize_structured_payload(merged.model_dump(mode="json"))
+        normalized["normalized_datetime"] = explicit_datetime or datetime.now(UTC).isoformat()
         return normalized

@@ -35,6 +35,15 @@
   "jobs": {
     "polling_interval": 1.0
   },
+  "chat": {
+    "max_history_messages": 12
+  },
+  "vectors": {
+    "auto_sync_on_start": true,
+    "default_ollama_embedding_model": "nomic-embed-text",
+    "default_openai_embedding_model": "text-embedding-3-small",
+    "default_google_embedding_model": "text-embedding-004"
+  },
   "gibs": {
     "user_agent": "AEGIS-GIBS/1.0",
     "timeout": 20.0,

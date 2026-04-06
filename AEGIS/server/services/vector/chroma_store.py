@@ -12,6 +12,7 @@ class VectorDocument:
     id: str
     text: str
     metadata: dict[str, Any]
+    embedding: list[float] | None = None
 
 
 class ChromaVectorStore:
@@ -60,7 +61,11 @@ class ChromaVectorStore:
             ids = [item.id for item in documents]
             texts = [item.text for item in documents]
             metadatas = [item.metadata for item in documents]
-            self._collection.add(ids=ids, documents=texts, metadatas=metadatas)
+            if any(item.embedding for item in documents):
+                embeddings = [item.embedding or [] for item in documents]
+                self._collection.add(ids=ids, documents=texts, metadatas=metadatas, embeddings=embeddings)
+            else:
+                self._collection.add(ids=ids, documents=texts, metadatas=metadatas)
             return
         self._memory_docs.extend(documents)
 

@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import asyncio
 
+from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.chat import ChatTurnRequest
+from AEGIS.server.domain.extraction.models import ExtractedIntent, ExtractedIntentPatch
+from AEGIS.server.services.agent.chat_response_service import ChatResponseService
+from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
+from AEGIS.server.services.agent.parser_service import ParserService
 
 
 class _SearchOrchestratorStub:
@@ -17,53 +22,69 @@ class _SearchOrchestratorStub:
         }
 
 
-def test_chat_orchestrator_executes_when_intent_complete(monkeypatch) -> None:
+def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None:
     orchestrator = AgentOrchestrator(search_orchestrator=_SearchOrchestratorStub())
 
-    def fake_intent(text: str, explicit_datetime: str | None = None):  # noqa: ANN001
-        return {
-            "request_text": text,
-            "location": {"name": "Rome, Italy", "coordinates": {"latitude": 41.9, "longitude": 12.5}, "bbox": None, "granularity": "city", "is_partial": False, "ambiguity_reason": None},
-            "map_preferences": {"map_type": "auto", "map_type_confidence": 0.8, "basemap_preference": None, "overlay_candidates": []},
-            "task": {"user_intent": "map_search", "scope": "concrete_area", "requires_external_fact_finding": False, "is_geographically_actionable": True},
-            "temporal_context": {"normalized_datetime": explicit_datetime or "2026-01-01T00:00:00Z"},
-            "planning": {
-                "missing_information": [],
-                "confidence": 0.8,
-                "should_execute_search": True,
-                "follow_up_question": None,
-                "fallback_mode": "none",
-            },
-        }
-
-    monkeypatch.setattr(orchestrator, "extract_intent", fake_intent)
-    result = asyncio.run(
-        orchestrator.run_turn(ChatTurnRequest(message="Find me Rome weather layers"))
+    monkeypatch.setattr(
+        ParserService,
+        "extract_patch",
+        lambda self, latest_state, user_message: ExtractedIntentPatch(
+            location={"address": "Rome, Italy"},
+            coordinates={"latitude": 41.9, "longitude": 12.5},
+            user_goal="traffic and weather",
+        ),
     )
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, user_message, extracted_state, retrieval: AgentDecision(
+            decision="search_and_complete",
+            should_trigger_search=True,
+            location_status="valid",
+            requires_geocoding=False,
+            selected_basemap_id="osm_default",
+            selected_overlay_ids=[],
+            reasoning_summary="test",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, user_message, extracted_state, decision, retrieval, search_result: "ok",
+    )
+
+    result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Find me Rome weather layers")))
     assert result.follow_up_required is False
     assert result.map_session is not None
+    assert result.extracted_state is not None
 
 
-def test_chat_orchestrator_follow_up_for_ambiguous_location(monkeypatch) -> None:
+def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
     orchestrator = AgentOrchestrator(search_orchestrator=_SearchOrchestratorStub())
 
-    def ambiguous_intent(text: str, explicit_datetime: str | None = None):  # noqa: ANN001
-        return {
-            "request_text": text,
-            "location": {"name": "Springfield", "coordinates": None, "bbox": None, "granularity": "city", "is_partial": True, "ambiguity_reason": "multiple_matches"},
-            "map_preferences": {"map_type": "auto", "map_type_confidence": 0.2, "basemap_preference": None, "overlay_candidates": []},
-            "task": {"user_intent": "map_search", "scope": "broad_but_usable_area", "requires_external_fact_finding": False, "is_geographically_actionable": True},
-            "temporal_context": {"normalized_datetime": explicit_datetime or "2026-01-01T00:00:00Z"},
-            "planning": {
-                "missing_information": ["location"],
-                "confidence": 0.2,
-                "should_execute_search": False,
-                "follow_up_question": "Which Springfield did you mean?",
-                "fallback_mode": "partial_location",
-            },
-        }
+    monkeypatch.setattr(
+        ParserService,
+        "extract_patch",
+        lambda self, latest_state, user_message: ExtractedIntentPatch(),
+    )
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, user_message, extracted_state, retrieval: AgentDecision(
+            decision="clarify",
+            should_trigger_search=False,
+            location_status="missing",
+            requires_geocoding=False,
+            clarification_question="Which location?",
+            reasoning_summary="missing",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, user_message, extracted_state, decision, retrieval, search_result: "Which location?",
+    )
 
-    monkeypatch.setattr(orchestrator, "extract_intent", ambiguous_intent)
-    result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Show traffic in Springfield")))
+    result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Show traffic")))
     assert result.follow_up_required is True
-    assert result.fallback_mode == "partial_location"
+    assert result.fallback_mode == "needs_clarification"

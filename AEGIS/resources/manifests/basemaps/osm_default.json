@@ -1,0 +1,44 @@
+{
+  "id": "osm_default",
+  "name": "OpenStreetMap",
+  "provider": "fallback",
+  "type": "tile",
+  "description": "Default OpenStreetMap streets basemap.",
+  "capabilities": [
+    "tile"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "OpenStreetMap",
+    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "attribution": "\u00a9 OpenStreetMap contributors",
+    "requires_key": false,
+    "keywords": [
+      "street",
+      "roads",
+      "addresses",
+      "navigation"
+    ],
+    "map_type_tags": [
+      "street"
+    ],
+    "intent_tags": [
+      "routing",
+      "address_lookup",
+      "city_context"
+    ],
+    "task_tags": [
+      "traffic",
+      "urban"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static tiles",
+    "constraints": "best default for general context",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "4d0687c289599cd801a61e9ed75ffce6bde974aee7046b14c9b85ead54db1ec4"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

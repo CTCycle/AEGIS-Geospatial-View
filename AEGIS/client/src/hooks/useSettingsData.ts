@@ -19,6 +19,8 @@ const defaultSettings: ModelSettingsResponse = {
     active_provider_mode: 'local',
     chat_model_provider: 'ollama',
     chat_model_name: '',
+    parser_model_provider: 'ollama',
+    parser_model_name: '',
     agent_model_provider: 'ollama',
     agent_model_name: '',
     ollama_url: 'http://localhost:11434',
@@ -39,7 +41,7 @@ export interface UseSettingsDataState {
     setOllamaUrlDraft: (value: string) => void;
     loadData: () => Promise<void>;
     handleProviderModeChange: (mode: ModelProviderMode) => Promise<void>;
-    applyModelSelection: (kind: 'chat' | 'agent', model: ModelCardDescriptor) => Promise<void>;
+    applyModelSelection: (kind: 'parser' | 'agent' | 'chat', model: ModelCardDescriptor) => Promise<void>;
     saveKeys: (openaiKey: string, googleKey: string) => Promise<void>;
     checkOllamaConnection: () => Promise<void>;
     refreshOllamaLibrary: () => Promise<void>;
@@ -90,13 +92,15 @@ export const useSettingsData = (initialStatusText: string): UseSettingsDataState
         }
     }, [settings]);
 
-    const applyModelSelection = useCallback(async (kind: 'chat' | 'agent', model: ModelCardDescriptor) => {
+    const applyModelSelection = useCallback(async (kind: 'parser' | 'agent' | 'chat', model: ModelCardDescriptor) => {
         const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
         const payload: ModelSettingsUpdateRequest = {
             ...settings,
             active_provider_mode: nextProviderMode,
             chat_model_provider: kind === 'chat' ? model.provider : settings.chat_model_provider,
             chat_model_name: kind === 'chat' ? model.name : settings.chat_model_name,
+            parser_model_provider: kind === 'parser' ? model.provider : settings.parser_model_provider,
+            parser_model_name: kind === 'parser' ? model.name : settings.parser_model_name,
             agent_model_provider: kind === 'agent' ? model.provider : settings.agent_model_provider,
             agent_model_name: kind === 'agent' ? model.name : settings.agent_model_name,
         };

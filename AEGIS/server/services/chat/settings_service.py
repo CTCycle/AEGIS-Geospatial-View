@@ -31,6 +31,8 @@ class ChatSettingsService:
             active_provider_mode=record.active_provider_mode,  # type: ignore[arg-type]
             chat_model_provider=record.chat_model_provider,
             chat_model_name=record.chat_model_name,
+            parser_model_provider=record.parser_model_provider,
+            parser_model_name=record.parser_model_name,
             agent_model_provider=record.agent_model_provider,
             agent_model_name=record.agent_model_name,
             ollama_url=record.ollama_url,
@@ -58,6 +60,8 @@ class ChatSettingsService:
             active_provider_mode=str(payload.get("active_provider_mode") or "local"),
             chat_model_provider=str(payload.get("chat_model_provider") or "ollama"),
             chat_model_name=str(payload.get("chat_model_name") or "llama3.2"),
+            parser_model_provider=str(payload.get("parser_model_provider") or "ollama"),
+            parser_model_name=str(payload.get("parser_model_name") or "llama3.2"),
             agent_model_provider=str(payload.get("agent_model_provider") or "ollama"),
             agent_model_name=str(payload.get("agent_model_name") or "llama3.2"),
             ollama_url=str(payload.get("ollama_url") or "http://localhost:11434"),

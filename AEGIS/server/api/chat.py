@@ -23,6 +23,7 @@ from AEGIS.server.utils.constants import (
     CHAT_STREAM_ROUTE,
     CHAT_TURN_ROUTE,
     CHAT_VECTORS_REBUILD_ROUTE,
+    CHAT_VECTORS_SYNC_ROUTE,
 )
 
 from AEGIS.server.api.search import search_endpoint
@@ -38,6 +39,7 @@ agent_orchestrator = AgentOrchestrator(search_orchestrator=search_endpoint.orche
 
 @router.post(CHAT_TURN_ROUTE, response_model=ChatTurnResponse, status_code=status.HTTP_200_OK)
 async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
+    vector_indexer.ensure_index_up_to_date()
     return await agent_orchestrator.run_turn(payload)
 
 
@@ -49,6 +51,7 @@ async def chat_stream(payload: ChatTurnRequest):
     async def event_stream():
         yield stream_event(ChatStreamEvent(event="status", data={"message": "received"}))
         try:
+            vector_indexer.ensure_index_up_to_date()
             result = await agent_orchestrator.run_turn(payload)
             for token in result.assistant_message.split():
                 yield stream_event(ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "}))
@@ -61,6 +64,7 @@ async def chat_stream(payload: ChatTurnRequest):
                         "session_id": result.session_id,
                         "assistant_message": result.assistant_message,
                         "structured_intent": result.structured_intent,
+                        "extracted_state": result.extracted_state,
                         "map_session": result.map_session,
                         "follow_up_required": result.follow_up_required,
                         "fallback_mode": result.fallback_mode,
@@ -123,6 +127,12 @@ def pull_ollama_model(payload: dict[str, Any] = Body(default_factory=dict)) -> d
 @router.post(CHAT_VECTORS_REBUILD_ROUTE, response_model=VectorizationResponse, status_code=status.HTTP_200_OK)
 def rebuild_vectors() -> VectorizationResponse:
     result = vector_indexer.rebuild()
+    return VectorizationResponse.model_validate(result)
+
+
+@router.post(CHAT_VECTORS_SYNC_ROUTE, response_model=VectorizationResponse, status_code=status.HTTP_200_OK)
+def sync_vectors() -> VectorizationResponse:
+    result = vector_indexer.sync()
     return VectorizationResponse.model_validate(result)
 
 

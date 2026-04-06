@@ -39,6 +39,7 @@ CHAT_SETTINGS_ROUTE = "/settings"
 CHAT_OLLAMA_REFRESH_ROUTE = "/models/ollama/refresh"
 CHAT_OLLAMA_PULL_ROUTE = "/models/ollama/pull"
 CHAT_VECTORS_REBUILD_ROUTE = "/vectors/rebuild"
+CHAT_VECTORS_SYNC_ROUTE = "/vectors/sync"
 CHAT_OLLAMA_HEALTH_ROUTE = "/models/ollama/health"
 
 # [SERVER URLS]
@@ -117,13 +118,13 @@ COMMON_FOLIUM_MAPS = {
 
 # [DATABASE TABLES]
 ###############################################################################
-GEONAMES_TABLE = "GEONAMES"
-GIBS_LAYERS_TABLE = "GIBS_LAYERS"
-SEARCH_SESSIONS_TABLE = "SEARCH_SESSIONS"
-MODEL_PROVIDER_SETTINGS_TABLE = "MODEL_PROVIDER_SETTINGS"
-MODEL_CREDENTIALS_TABLE = "MODEL_CREDENTIALS"
-CHAT_SESSIONS_TABLE = "CHAT_SESSIONS"
-CHAT_MESSAGES_TABLE = "CHAT_MESSAGES"
+GEONAMES_TABLE = "geonames"
+GIBS_LAYERS_TABLE = "gibs_layers"
+SEARCH_SESSIONS_TABLE = "search_sessions"
+MODEL_PROVIDER_SETTINGS_TABLE = "model_provider_settings"
+MODEL_CREDENTIALS_TABLE = "model_credentials"
+CHAT_SESSIONS_TABLE = "chat_sessions"
+CHAT_MESSAGES_TABLE = "chat_messages"
 
 
 # [DATABASE COLUMNS]
@@ -178,6 +179,8 @@ MODEL_PROVIDER_SETTINGS_COLUMNS = [
     "active_provider_mode",
     "chat_model_provider",
     "chat_model_name",
+    "parser_model_provider",
+    "parser_model_name",
     "agent_model_provider",
     "agent_model_name",
     "ollama_url",

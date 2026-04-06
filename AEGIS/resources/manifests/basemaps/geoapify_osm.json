@@ -1,0 +1,42 @@
+{
+  "id": "geoapify_osm",
+  "name": "Geoapify OSM Bright",
+  "provider": "geoapify",
+  "type": "tile",
+  "description": "Geoapify bright OSM basemap style.",
+  "capabilities": [
+    "tile"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Geoapify OSM Bright",
+    "tile_url_template": "https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey={api_key}",
+    "attribution": "\u00a9 OpenMapTiles \u00a9 OpenStreetMap contributors \u00a9 Geoapify",
+    "requires_key": true,
+    "keywords": [
+      "bright",
+      "light",
+      "clean"
+    ],
+    "map_type_tags": [
+      "light",
+      "street"
+    ],
+    "intent_tags": [
+      "presentation",
+      "clean_layout"
+    ],
+    "task_tags": [
+      "places"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static tiles",
+    "constraints": "requires API key",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "4f11d0b18992629c632c05b684843bd2a5646d7ef36a45216bcdb1d3b6b36509"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

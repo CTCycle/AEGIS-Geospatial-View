@@ -23,7 +23,7 @@ class VectorRetriever:
         overlay_k: int | None = None,
         provider_k: int | None = None,
     ) -> dict[str, list[dict[str, object]]]:
-        self.indexer.ensure_index()
+        self.indexer.ensure_index_up_to_date()
         matches = self.store.similarity_search(query, top_k=top_k)
         basemaps: list[dict[str, object]] = []
         overlays: list[dict[str, object]] = []

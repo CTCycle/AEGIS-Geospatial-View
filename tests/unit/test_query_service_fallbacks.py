@@ -21,11 +21,11 @@ def test_query_service_missing_location_triggers_fallback() -> None:
     )
     result = service.process(
         intent={
-            "request_text": "show weather",
-            "location": {"name": None, "coordinates": None, "bbox": None, "is_partial": False},
-            "map_preferences": {"map_type": "auto", "map_type_confidence": 0.0, "overlay_candidates": []},
-            "planning": {"confidence": 0.1, "should_execute_search": True, "fallback_mode": "none"},
-            "task": {"scope": "missing_area"},
+            "user_goal": "show weather",
+            "location": {"address": None, "city": None, "country": None},
+            "coordinates": {"latitude": None, "longitude": None},
+            "filters": [],
+            "certainty": 0.1,
         },
         user_text="show weather",
         manifests={"basemaps": [], "overlays": [], "providers": []},

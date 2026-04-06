@@ -61,8 +61,7 @@ def clone_settings_with_database(
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
     repository = SQLiteRepository(settings)
-    if repository.db_path and not sqlalchemy.inspect(repository.engine).get_table_names():
-        Base.metadata.create_all(repository.engine)
+    Base.metadata.create_all(repository.engine)
     logger.info("Initialized SQLite database at %s", repository.db_path)
 
 

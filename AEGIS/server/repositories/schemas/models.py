@@ -27,7 +27,7 @@ class Base(DeclarativeBase):
 
 ###############################################################################
 class GeonamesRecord(Base):
-    __tablename__ = "GEONAMES"
+    __tablename__ = "geonames"
 
     geonameid: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str | None] = mapped_column(String(200))
@@ -54,7 +54,7 @@ class GeonamesRecord(Base):
 
 ###############################################################################
 class GibsLayerRecord(Base):
-    __tablename__ = "GIBS_LAYERS"
+    __tablename__ = "gibs_layers"
 
     layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
     title: Mapped[str | None] = mapped_column(String(512))
@@ -69,7 +69,7 @@ class GibsLayerRecord(Base):
 
 ###############################################################################
 class SearchSessionRecord(Base):
-    __tablename__ = "SEARCH_SESSIONS"
+    __tablename__ = "search_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -89,12 +89,14 @@ class SearchSessionRecord(Base):
 
 ###############################################################################
 class ModelProviderSettingsRecord(Base):
-    __tablename__ = "MODEL_PROVIDER_SETTINGS"
+    __tablename__ = "model_provider_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     active_provider_mode: Mapped[str] = mapped_column(String(20), default="local")
     chat_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
     chat_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
+    parser_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
+    parser_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
     agent_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
     agent_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
     ollama_url: Mapped[str] = mapped_column(String(400), default="http://localhost:11434")
@@ -110,7 +112,7 @@ class ModelProviderSettingsRecord(Base):
 
 ###############################################################################
 class ModelCredentialRecord(Base):
-    __tablename__ = "MODEL_CREDENTIALS"
+    __tablename__ = "model_credentials"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -161,7 +163,7 @@ class AccessKeyRecord(Base):
 
 ###############################################################################
 class ChatSessionRecord(Base):
-    __tablename__ = "CHAT_SESSIONS"
+    __tablename__ = "chat_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str | None] = mapped_column(String(200))
@@ -177,12 +179,12 @@ class ChatSessionRecord(Base):
 
 ###############################################################################
 class ChatMessageRecord(Base):
-    __tablename__ = "CHAT_MESSAGES"
+    __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("CHAT_SESSIONS.id", ondelete="CASCADE"),
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
         nullable=False,
     )
     turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -193,4 +195,61 @@ class ChatMessageRecord(Base):
     map_session_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
+    )
+
+
+###############################################################################
+class SessionCatalogRecord(Base):
+    __tablename__ = "session_catalog"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str | None] = mapped_column(String(120))
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    models_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    duration_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    num_messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+###############################################################################
+class SessionDetailsRecord(Base):
+    __tablename__ = "session_details"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_message: Mapped[str] = mapped_column(Text, nullable=False)
+    chat_response: Mapped[str] = mapped_column(Text, nullable=False)
+    extracted_info_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    response_time: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    has_triggered_search: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+###############################################################################
+class ManifestEmbeddingRecord(Base):
+    __tablename__ = "manifest_embeddings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    manifest_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    manifest_kind: Mapped[str] = mapped_column(String(50), nullable=False)
+    manifest_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    content_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    embedding_provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(200), nullable=False)
+    last_embedded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    vector_collection: Mapped[str] = mapped_column(String(120), nullable=False)
+    vector_document_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("manifest_id", "manifest_kind", name="ux_manifest_embeddings_manifest"),
     )

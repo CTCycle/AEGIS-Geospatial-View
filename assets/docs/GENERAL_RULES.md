@@ -2,13 +2,8 @@
 
 This file defines mandatory rules for documentation and engineering work in this repository.
 
-## 1. Required Review Order
+## 1. Table of documents
 
-Before any task:
-1. Read `assets/docs/GENERAL_RULES.md`.
-2. Read only the additional docs required by the task scope.
-
-Use this map:
 - `ARCHITECTURE.md`: system layout, APIs, data flow, persistence.
 - `BACKGROUND_JOBS.md`: async/background search job lifecycle.
 - `GUIDELINES_PYTHON.md`: backend/service Python rules.
