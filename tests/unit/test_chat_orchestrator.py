@@ -28,7 +28,7 @@ def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None
     monkeypatch.setattr(
         ParserService,
         "extract_patch",
-        lambda self, latest_state, user_message: ExtractedIntentPatch(
+        lambda self, conversation_context, latest_state, user_message: ExtractedIntentPatch(
             location={"address": "Rome, Italy"},
             coordinates={"latitude": 41.9, "longitude": 12.5},
             user_goal="traffic and weather",
@@ -37,7 +37,7 @@ def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None
     monkeypatch.setattr(
         DecisionService,
         "decide",
-        lambda self, user_message, extracted_state, retrieval: AgentDecision(
+        lambda self, conversation_context, user_message, extracted_state, retrieval: AgentDecision(
             decision="search_and_complete",
             should_trigger_search=True,
             location_status="valid",
@@ -50,7 +50,7 @@ def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, user_message, extracted_state, decision, retrieval, search_result: "ok",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: "ok",
     )
 
     result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Find me Rome weather layers")))
@@ -65,12 +65,12 @@ def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
     monkeypatch.setattr(
         ParserService,
         "extract_patch",
-        lambda self, latest_state, user_message: ExtractedIntentPatch(),
+        lambda self, conversation_context, latest_state, user_message: ExtractedIntentPatch(),
     )
     monkeypatch.setattr(
         DecisionService,
         "decide",
-        lambda self, user_message, extracted_state, retrieval: AgentDecision(
+        lambda self, conversation_context, user_message, extracted_state, retrieval: AgentDecision(
             decision="clarify",
             should_trigger_search=False,
             location_status="missing",
@@ -82,9 +82,46 @@ def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, user_message, extracted_state, decision, retrieval, search_result: "Which location?",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: "Which location?",
     )
 
     result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Show traffic")))
     assert result.follow_up_required is True
     assert result.fallback_mode == "needs_clarification"
+
+
+def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None:
+    orchestrator = AgentOrchestrator(search_orchestrator=_SearchOrchestratorStub())
+    contexts: list[str] = []
+
+    def _capture_parser(self, conversation_context, latest_state, user_message):  # noqa: ANN001
+        contexts.append(conversation_context)
+        return ExtractedIntentPatch(location={"city": "Rome", "country": "Italy"})
+
+    monkeypatch.setattr(ParserService, "extract_patch", _capture_parser)
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, conversation_context, user_message, extracted_state, retrieval: AgentDecision(
+            decision="clarify",
+            should_trigger_search=False,
+            location_status="missing",
+            requires_geocoding=False,
+            clarification_question="Which location?",
+            reasoning_summary="missing",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: "Which location?",
+    )
+
+    first = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Find Rome")))
+    asyncio.run(
+        orchestrator.run_turn(
+            ChatTurnRequest(session_id=first.session_id, message="same place, show fires")
+        )
+    )
+    assert any("Find Rome" in context for context in contexts)
+    assert any("same place, show fires" in context for context in contexts)

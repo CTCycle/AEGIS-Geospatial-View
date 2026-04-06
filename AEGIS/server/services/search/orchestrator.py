@@ -149,6 +149,19 @@ class LocationSearchOrchestrator:
         if payload.datetime is None:
             payload = payload.model_copy(update={"datetime": datetime.now(UTC)})
         search_payload = await self.resolve_coordinates(payload)
+        lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
+        lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))
+        bbox_value = search_payload.get("bbox")
+        has_bbox = isinstance(bbox_value, list) and len(bbox_value) == 4
+        if lat_value is None or lon_value is None:
+            if not has_bbox:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Unable to resolve a usable location from the current request. "
+                        "Please provide a more specific place or coordinates."
+                    ),
+                )
         try:
             satellite_payload = await self.renderer.build_satellite_payload(payload, search_payload)
         except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
@@ -165,8 +178,6 @@ class LocationSearchOrchestrator:
         search_payload["map_session"] = map_session
         search_payload["compliance_warnings"] = map_session.get("compliance_warnings", [])
 
-        lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
-        lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))
         if lat_value is not None and lon_value is not None:
             try:
                 search_payload["elevation"] = await self.elevation_service.get_elevation(

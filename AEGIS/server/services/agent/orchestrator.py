@@ -17,19 +17,22 @@ from AEGIS.server.repositories.session_details import SessionDetailsRepository
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.agent.parser_service import ParserService
+from AEGIS.server.services.chat.history_buffer import ChatHistoryBuffer
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.llm.factory import LLMFactory
+from AEGIS.server.services.llm.context_builder import build_conversation_context
 from AEGIS.server.services.search.intent_mapper import map_structured_intent_to_location_request
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.services.vector.retriever import VectorRetriever
 
-
+###############################################################################
 class AgentOrchestrator:
     def __init__(
         self,
         *,
         search_orchestrator: LocationSearchOrchestrator,
         history_repo: ChatHistoryRepository | None = None,
+        history_buffer: ChatHistoryBuffer | None = None,
         settings_repo: ModelSettingsRepository | None = None,
         llm_factory: LLMFactory | None = None,
         vector_retriever: VectorRetriever | None = None,
@@ -39,6 +42,7 @@ class AgentOrchestrator:
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.history_repo = history_repo or ChatHistoryRepository()
+        self.history_buffer = history_buffer or ChatHistoryBuffer(history_repo=self.history_repo)
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.llm_factory = llm_factory or LLMFactory()
         self.vector_retriever = vector_retriever or VectorRetriever()
@@ -65,12 +69,29 @@ class AgentOrchestrator:
         settings = self.settings_repo.get_or_create()
         session = self.history_repo.upsert_session(request.session_id, title=request.title)
         user_row = self.history_repo.append_message(session_id=session.id, role="user", content=request.message)
-
-        _history = self.history_repo.list_recent_messages(
-            session_id=session.id,
-            limit=server_settings.chat.max_history_messages,
+        self.history_buffer.append(
+            session.id,
+            {
+                "id": user_row.id,
+                "session_id": session.id,
+                "turn_index": user_row.turn_index,
+                "role": user_row.role,
+                "content": user_row.content,
+                "structured_payload": None,
+                "tool_payload": None,
+                "map_session": None,
+                "created_at": user_row.created_at.isoformat() if user_row.created_at else None,
+            },
         )
+
+        _history = self.history_buffer.get_or_hydrate(session.id)
         latest_state = self.history_repo.get_latest_extracted_state(session.id) or ExtractedIntent()
+        latest_extracted_info = latest_state.model_dump_json(indent=2)
+        initial_context = build_conversation_context(
+            messages=_history,
+            extracted_info=latest_extracted_info,
+            max_messages=server_settings.chat.max_history_messages,
+        )
 
         parser_service = ParserService(
             llm_factory=self.llm_factory,
@@ -88,12 +109,23 @@ class AgentOrchestrator:
             model=settings.chat_model_name,
         )
 
-        patch = parser_service.extract_patch(latest_state=latest_state, user_message=request.message)
+        patch = parser_service.extract_patch(
+            conversation_context=initial_context,
+            latest_state=latest_state,
+            user_message=request.message,
+        )
         extracted_state = merge_extracted_intent(latest_state, patch)
+        merged_extracted_info = extracted_state.model_dump_json(indent=2)
+        context = build_conversation_context(
+            messages=_history,
+            extracted_info=merged_extracted_info,
+            max_messages=server_settings.chat.max_history_messages,
+        )
 
         retrieval_query = self._build_retrieval_query(user_message=request.message, state=extracted_state)
         retrieval = self.vector_retriever.retrieve_candidates(retrieval_query, top_k=10)
         decision = decision_service.decide(
+            conversation_context=context,
             user_message=request.message,
             extracted_state=extracted_state,
             retrieval=retrieval,
@@ -118,6 +150,7 @@ class AgentOrchestrator:
             tool_payload = {"execution": "follow_up", "fallback_mode": "missing_location"}
 
         assistant_message = chat_service.generate(
+            conversation_context=context,
             user_message=request.message,
             extracted_state=extracted_state,
             decision=decision,
@@ -131,6 +164,20 @@ class AgentOrchestrator:
             structured_payload=extracted_state.model_dump(mode="json"),
             tool_payload=tool_payload,
             map_session=map_session,
+        )
+        self.history_buffer.append(
+            session.id,
+            {
+                "id": assistant_row.id,
+                "session_id": session.id,
+                "turn_index": assistant_row.turn_index,
+                "role": assistant_row.role,
+                "content": assistant_row.content,
+                "structured_payload": extracted_state.model_dump(mode="json"),
+                "tool_payload": tool_payload,
+                "map_session": map_session,
+                "created_at": assistant_row.created_at.isoformat() if assistant_row.created_at else None,
+            },
         )
 
         elapsed = perf_counter() - started

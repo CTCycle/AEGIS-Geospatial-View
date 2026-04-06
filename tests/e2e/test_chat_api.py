@@ -67,7 +67,11 @@ def test_chat_turn_and_stream(api_context: APIRequestContext) -> None:
     if reuse_response.status in {400, 502}:
         pytest.skip("Search providers unavailable for session reuse.")
     assert reuse_response.ok, f"Expected 200, got {reuse_response.status}"
-    assert reuse_response.json().get("session_id") == turn_body["session_id"]
+    reuse_body = reuse_response.json()
+    assert reuse_body.get("session_id") == turn_body["session_id"]
+    assert "Unable to resolve map extent for the requested imagery." not in reuse_body.get(
+        "assistant_message", ""
+    )
 
     unsupported_response = api_context.post(
         "/chat/turn",
