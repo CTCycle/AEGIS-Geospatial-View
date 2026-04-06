@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import desc, func, select
 
 from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import ChatMessageRecord, ChatSessionRecord
@@ -72,10 +72,10 @@ class ChatHistoryRepository:
         map_session: Any = None,
     ) -> ChatMessageRecord:
         with self._session_factory() as session:
-            count_statement = select(ChatMessageRecord).where(
+            count_statement = select(func.count()).select_from(ChatMessageRecord).where(
                 ChatMessageRecord.session_id == session_id
             )
-            turn_index = len(session.execute(count_statement).scalars().all())
+            turn_index = int(session.scalar(count_statement) or 0)
             message = ChatMessageRecord(
                 session_id=session_id,
                 turn_index=turn_index,
@@ -94,6 +94,78 @@ class ChatHistoryRepository:
             session.commit()
             session.refresh(message)
             return message
+
+    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
+        with self._session_factory() as session:
+            statement = (
+                select(ChatMessageRecord)
+                .where(ChatMessageRecord.session_id == session_id)
+                .order_by(ChatMessageRecord.turn_index.desc())
+                .limit(max(1, limit))
+            )
+            rows = list(reversed(session.execute(statement).scalars().all()))
+        return [
+            {
+                "id": row.id,
+                "role": row.role,
+                "content": row.content,
+                "structured_payload": _from_json_payload(row.structured_payload_json),
+                "tool_payload": _from_json_payload(row.tool_payload_json),
+                "map_session": _from_json_payload(row.map_session_json),
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in rows
+        ]
+
+    def get_latest_extracted_state(self, session_id: int) -> Any | None:
+        with self._session_factory() as session:
+            statement = (
+                select(ChatMessageRecord)
+                .where(
+                    ChatMessageRecord.session_id == session_id,
+                    ChatMessageRecord.role == "assistant",
+                )
+                .order_by(desc(ChatMessageRecord.turn_index))
+                .limit(1)
+            )
+            row = session.execute(statement).scalars().first()
+        if row is None:
+            return None
+        payload = _from_json_payload(row.structured_payload_json)
+        if payload is None:
+            return None
+        from AEGIS.server.domain.extraction.models import ExtractedIntent
+
+        try:
+            return ExtractedIntent.model_validate(payload)
+        except Exception:
+            return None
+
+    def get_last_assistant_message(self, session_id: int) -> dict[str, Any] | None:
+        with self._session_factory() as session:
+            statement = (
+                select(ChatMessageRecord)
+                .where(
+                    ChatMessageRecord.session_id == session_id,
+                    ChatMessageRecord.role == "assistant",
+                )
+                .order_by(desc(ChatMessageRecord.turn_index))
+                .limit(1)
+            )
+            row = session.execute(statement).scalars().first()
+        if row is None:
+            return None
+        return {
+            "id": row.id,
+            "session_id": row.session_id,
+            "turn_index": row.turn_index,
+            "role": row.role,
+            "content": row.content,
+            "structured_payload": _from_json_payload(row.structured_payload_json),
+            "tool_payload": _from_json_payload(row.tool_payload_json),
+            "map_session": _from_json_payload(row.map_session_json),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
 
     def list_messages(self, *, session_id: int) -> list[dict[str, Any]]:
         with self._session_factory() as session:

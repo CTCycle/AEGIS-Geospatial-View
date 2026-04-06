@@ -49,6 +49,9 @@ class LLMFactory:
     def get_agent_provider(self, provider: str) -> LLMProvider:
         return self.get_provider(provider)
 
+    def get_parser_provider(self, provider: str) -> LLMProvider:
+        return self.get_provider(provider)
+
     def get_chat_provider(self, provider: str) -> LLMProvider:
         return _ChatOnlyProvider(self.get_provider(provider))
 

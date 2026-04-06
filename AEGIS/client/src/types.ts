@@ -188,6 +188,7 @@ export interface ChatTurnResponse {
     session_id: number;
     assistant_message: string;
     structured_intent?: StructuredSearchIntent | null;
+    extracted_state?: Record<string, JsonValue> | null;
     map_session?: MapSession | null;
     tool_payload?: Record<string, JsonValue> | null;
     follow_up_required?: boolean;
@@ -216,6 +217,8 @@ export interface ModelSettingsResponse {
     active_provider_mode: ModelProviderMode;
     chat_model_provider: string;
     chat_model_name: string;
+    parser_model_provider: string;
+    parser_model_name: string;
     agent_model_provider: string;
     agent_model_name: string;
     ollama_url: string;
@@ -228,6 +231,8 @@ export interface ModelSettingsUpdateRequest {
     active_provider_mode: ModelProviderMode;
     chat_model_provider: string;
     chat_model_name: string;
+    parser_model_provider: string;
+    parser_model_name: string;
     agent_model_provider: string;
     agent_model_name: string;
     ollama_url: string;

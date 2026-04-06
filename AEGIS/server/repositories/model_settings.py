@@ -11,7 +11,8 @@ from AEGIS.server.utils.constants import OLLAMA_DEFAULT_HOST
 
 class ModelSettingsRepository:
     def __init__(self) -> None:
-        self._session_factory = get_database().backend.session
+        backend = get_database().backend
+        self._session_factory = backend.session
 
     def get_or_create(self) -> ModelProviderSettingsRecord:
         with self._session_factory() as session:
@@ -26,6 +27,8 @@ class ModelSettingsRepository:
                 active_provider_mode="local",
                 chat_model_provider="ollama",
                 chat_model_name="llama3.2",
+                parser_model_provider="ollama",
+                parser_model_name="llama3.2",
                 agent_model_provider="ollama",
                 agent_model_name="llama3.2",
                 ollama_url=OLLAMA_DEFAULT_HOST,
@@ -41,6 +44,8 @@ class ModelSettingsRepository:
         active_provider_mode: str,
         chat_model_provider: str,
         chat_model_name: str,
+        parser_model_provider: str,
+        parser_model_name: str,
         agent_model_provider: str,
         agent_model_name: str,
         ollama_url: str,
@@ -59,6 +64,8 @@ class ModelSettingsRepository:
             record.active_provider_mode = active_provider_mode
             record.chat_model_provider = chat_model_provider
             record.chat_model_name = chat_model_name
+            record.parser_model_provider = parser_model_provider
+            record.parser_model_name = parser_model_name
             record.agent_model_provider = agent_model_provider
             record.agent_model_name = agent_model_name
             record.ollama_url = ollama_url

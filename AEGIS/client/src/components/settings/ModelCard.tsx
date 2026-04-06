@@ -5,8 +5,10 @@ import { ModelCardDescriptor } from '../../types';
 interface ModelCardProps {
     model: ModelCardDescriptor;
     isLocalAvailable: boolean;
+    isSelectedForParser: boolean;
     isSelectedForChat: boolean;
     isSelectedForAgent: boolean;
+    onSelectParser: (model: ModelCardDescriptor) => void;
     onSelectChat: (model: ModelCardDescriptor) => void;
     onSelectAgent: (model: ModelCardDescriptor) => void;
     onPull: (model: ModelCardDescriptor) => void;
@@ -15,8 +17,10 @@ interface ModelCardProps {
 const ModelCard: React.FC<ModelCardProps> = ({
     model,
     isLocalAvailable,
+    isSelectedForParser,
     isSelectedForChat,
     isSelectedForAgent,
+    onSelectParser,
     onSelectChat,
     onSelectAgent,
     onPull,
@@ -28,6 +32,9 @@ const ModelCard: React.FC<ModelCardProps> = ({
         </header>
         <p>{model.description}</p>
         <div className="model-card__actions">
+            <button type="button" className={isSelectedForParser ? 'active' : ''} onClick={() => onSelectParser(model)}>
+                {isSelectedForParser ? 'Parser model' : 'Use for parser'}
+            </button>
             <button type="button" className={isSelectedForChat ? 'active' : ''} onClick={() => onSelectChat(model)}>
                 {isSelectedForChat ? 'Chat model' : 'Use for chat'}
             </button>

@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "providers": "providers.json",
-  "basemaps": "basemaps.json",
-  "overlays": "overlays.json"
+  "version": 2,
+  "providers_dir": "providers",
+  "basemaps_dir": "basemaps",
+  "overlays_dir": "overlays"
 }

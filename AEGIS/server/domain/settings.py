@@ -48,6 +48,19 @@ class JobsSettings:
 
 
 @dataclass(frozen=True)
+class ChatRuntimeSettings:
+    max_history_messages: int
+
+
+@dataclass(frozen=True)
+class VectorRuntimeSettings:
+    auto_sync_on_start: bool
+    default_ollama_embedding_model: str
+    default_openai_embedding_model: str
+    default_google_embedding_model: str
+
+
+@dataclass(frozen=True)
 class GIBSSettings:
     user_agent: str
     timeout: float
@@ -74,6 +87,8 @@ class ServerSettings:
     geospatial: GeospatialSettings
     map: MapSettings
     jobs: JobsSettings
+    chat: ChatRuntimeSettings
+    vectors: VectorRuntimeSettings
     gibs: GIBSSettings
     credential_master_key: str
     credential_key_version: str

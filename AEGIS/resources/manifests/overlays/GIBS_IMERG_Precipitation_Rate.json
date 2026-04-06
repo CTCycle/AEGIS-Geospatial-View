@@ -1,0 +1,45 @@
+{
+  "id": "GIBS_IMERG_Precipitation_Rate",
+  "name": "Precipitation Rate (IMERG, 30min)",
+  "provider": "gibs",
+  "type": "legacy-image",
+  "description": "Near-real-time precipitation rate estimates from IMERG.",
+  "capabilities": [
+    "imagery",
+    "precipitation"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Precipitation Rate (IMERG, 30min)",
+    "source_layer_id": "IMERG_Precipitation_Rate",
+    "default_opacity": 0.68,
+    "requires_key": false,
+    "attribution": "\u00a9 NASA GIBS",
+    "keywords": [
+      "imagery",
+      "precipitation",
+      "gibs",
+      "precipitation rate (imerg, 30min)"
+    ],
+    "intent_tags": [
+      "imagery",
+      "precipitation"
+    ],
+    "task_tags": [
+      "imagery",
+      "precipitation"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "7feb8aca313af0ac5111e4a14fc8a7be4c9c60f88de3504690609051fb44a209"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

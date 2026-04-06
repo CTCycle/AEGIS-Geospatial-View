@@ -181,7 +181,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
             <header className="settings-page__header">
                 <div className="settings-page__heading">
                     <h1>Model Settings</h1>
-                    <p>Configure active providers and assign dedicated chat and agent models.</p>
+                    <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
                 </div>
                 <button type="button" className="settings-page__back" onClick={onBack}>Back to Chat</button>
             </header>
@@ -211,6 +211,10 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 containerRef={modelGridRef}
                 models={displayedModels}
                 localModelIds={localModelIds}
+                selectedParserModel={{
+                    provider: settings.parser_model_provider,
+                    name: settings.parser_model_name,
+                }}
                 selectedChatModel={{
                     provider: settings.chat_model_provider,
                     name: settings.chat_model_name,
@@ -219,6 +223,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                     provider: settings.agent_model_provider,
                     name: settings.agent_model_name,
                 }}
+                onSelectParser={(model) => applyModelSelection('parser', model)}
                 onSelectChat={(model) => applyModelSelection('chat', model)}
                 onSelectAgent={(model) => applyModelSelection('agent', model)}
                 onPull={async (model) => {

@@ -5,6 +5,7 @@ from typing import Any
 
 from AEGIS.server.configurations.base import ensure_mapping, load_configuration_data
 from AEGIS.server.domain.settings import (
+    ChatRuntimeSettings,
     DatabaseSettings,
     GIBSSettings,
     GeospatialSettings,
@@ -12,6 +13,7 @@ from AEGIS.server.domain.settings import (
     MapSettings,
     NominatimSettings,
     ServerSettings,
+    VectorRuntimeSettings,
 )
 
 from AEGIS.server.utils.constants import (
@@ -177,6 +179,29 @@ def build_jobs_settings(data: dict[str, Any]) -> JobsSettings:
     )
 
 
+def build_chat_runtime_settings(data: dict[str, Any]) -> ChatRuntimeSettings:
+    payload = ensure_mapping(data)
+    return ChatRuntimeSettings(
+        max_history_messages=coerce_int(payload.get("max_history_messages"), 12, minimum=1, maximum=100),
+    )
+
+
+def build_vector_runtime_settings(data: dict[str, Any]) -> VectorRuntimeSettings:
+    payload = ensure_mapping(data)
+    return VectorRuntimeSettings(
+        auto_sync_on_start=coerce_bool(payload.get("auto_sync_on_start"), True),
+        default_ollama_embedding_model=coerce_str(
+            payload.get("default_ollama_embedding_model"), "nomic-embed-text"
+        ),
+        default_openai_embedding_model=coerce_str(
+            payload.get("default_openai_embedding_model"), "text-embedding-3-small"
+        ),
+        default_google_embedding_model=coerce_str(
+            payload.get("default_google_embedding_model"), "text-embedding-004"
+        ),
+    )
+
+
 # -----------------------------------------------------------------------------
 def build_gibs_settings(data: dict[str, Any]) -> GIBSSettings:
     payload = ensure_mapping(data)
@@ -259,6 +284,8 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
     geospatial_payload = ensure_mapping(payload.get("geospatial"))
     map_payload = ensure_mapping(payload.get("map") or payload.get("maps"))
     jobs_payload = ensure_mapping(payload.get("jobs"))
+    chat_payload = ensure_mapping(payload.get("chat"))
+    vectors_payload = ensure_mapping(payload.get("vectors"))
     gibs_payload = ensure_mapping(payload.get("gibs"))
 
     return ServerSettings(
@@ -267,6 +294,8 @@ def build_server_settings(data: dict[str, Any] | Any) -> ServerSettings:
         geospatial=build_geospatial_settings(geospatial_payload),
         map=build_map_settings(map_payload),
         jobs=build_jobs_settings(jobs_payload),
+        chat=build_chat_runtime_settings(chat_payload),
+        vectors=build_vector_runtime_settings(vectors_payload),
         gibs=build_gibs_settings(gibs_payload),
         credential_master_key=coerce_str(
             os.getenv("AEGIS_CREDENTIAL_MASTER_KEY"),

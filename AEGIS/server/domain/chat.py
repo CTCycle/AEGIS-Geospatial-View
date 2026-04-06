@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from pydantic.config import ConfigDict
 
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
@@ -16,6 +17,7 @@ class ChatMessage(BaseModel):
 
 
 class StructuredSearchIntent(BaseModel):
+    model_config = ConfigDict(extra="allow")
     request_text: str = ""
     location: dict[str, Any] = Field(default_factory=dict)
     map_preferences: dict[str, Any] = Field(default_factory=dict)
@@ -41,6 +43,7 @@ class ChatTurnResponse(BaseModel):
     session_id: int
     assistant_message: str
     structured_intent: dict[str, Any] | None = None
+    extracted_state: dict[str, Any] | None = None
     map_session: dict[str, Any] | None = None
     tool_payload: dict[str, Any] | None = None
     follow_up_required: bool = False
@@ -65,6 +68,8 @@ class ModelSettingsResponse(BaseModel):
     active_provider_mode: ModelProviderMode
     chat_model_provider: str
     chat_model_name: str
+    parser_model_provider: str
+    parser_model_name: str
     agent_model_provider: str
     agent_model_name: str
     ollama_url: str

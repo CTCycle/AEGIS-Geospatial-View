@@ -9,11 +9,15 @@ def test_chat_settings_crud(api_context: APIRequestContext) -> None:
     assert get_response.ok, f"Expected 200, got {get_response.status}"
     body = get_response.json()
     assert "active_provider_mode" in body
+    assert "parser_model_provider" in body
+    assert "parser_model_name" in body
 
     put_response = api_context.put(
         "/chat/settings",
         data={
             **body,
+            "parser_model_provider": "ollama",
+            "parser_model_name": "llama3.2",
             "ollama_url": body.get("ollama_url", "http://localhost:11434"),
             "credentials": {"openai": {"api_key": "sk-test-value"}},
         },
@@ -22,6 +26,7 @@ def test_chat_settings_crud(api_context: APIRequestContext) -> None:
     updated = put_response.json()
     assert "credentials" in updated
     assert updated["credentials"].get("openai", {}).get("api_key") is True
+    assert updated.get("parser_model_provider") == "ollama"
 
 
 def test_chat_models_and_vector_rebuild(api_context: APIRequestContext) -> None:
@@ -30,6 +35,11 @@ def test_chat_models_and_vector_rebuild(api_context: APIRequestContext) -> None:
     models_body = models_response.json()
     assert isinstance(models_body.get("cloud"), list)
     assert isinstance(models_body.get("local"), list)
+
+    sync_response = api_context.post("/chat/vectors/sync")
+    assert sync_response.ok, f"Expected 200, got {sync_response.status}"
+    sync_body = sync_response.json()
+    assert "indexed_documents" in sync_body
 
     vector_response = api_context.post("/chat/vectors/rebuild")
     assert vector_response.ok, f"Expected 200, got {vector_response.status}"
@@ -48,6 +58,26 @@ def test_chat_turn_and_stream(api_context: APIRequestContext) -> None:
     turn_body = turn_response.json()
     assert "assistant_message" in turn_body
     assert "session_id" in turn_body
+    assert "extracted_state" in turn_body
+
+    reuse_response = api_context.post(
+        "/chat/turn",
+        data={"session_id": turn_body["session_id"], "message": "use same session near Rome"},
+    )
+    if reuse_response.status in {400, 502}:
+        pytest.skip("Search providers unavailable for session reuse.")
+    assert reuse_response.ok, f"Expected 200, got {reuse_response.status}"
+    assert reuse_response.json().get("session_id") == turn_body["session_id"]
+
+    unsupported_response = api_context.post(
+        "/chat/turn",
+        data={"message": "Find the absolute best weather area in Europe"},
+    )
+    if unsupported_response.status in {400, 502}:
+        pytest.skip("Search providers unavailable for unsupported request check.")
+    assert unsupported_response.ok, f"Expected 200, got {unsupported_response.status}"
+    unsupported_body = unsupported_response.json()
+    assert unsupported_body.get("follow_up_required") is True
 
     stream_response = api_context.post(
         "/chat/stream",
@@ -58,6 +88,7 @@ def test_chat_turn_and_stream(api_context: APIRequestContext) -> None:
     assert stream_response.ok, f"Expected 200, got {stream_response.status}"
     stream_text = stream_response.text()
     assert '"event": "final"' in stream_text
+    assert '"extracted_state"' in stream_text
 
 
 def test_ollama_refresh_pull_health(api_context: APIRequestContext) -> None:

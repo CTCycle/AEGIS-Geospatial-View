@@ -1,0 +1,45 @@
+{
+  "id": "GIBS_MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+  "name": "Land Cover Type (MODIS, Annual)",
+  "provider": "gibs",
+  "type": "legacy-image",
+  "description": "Annual MODIS IGBP land cover classification.",
+  "capabilities": [
+    "imagery",
+    "land-cover"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Land Cover Type (MODIS, Annual)",
+    "source_layer_id": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+    "default_opacity": 0.68,
+    "requires_key": false,
+    "attribution": "\u00a9 NASA GIBS",
+    "keywords": [
+      "imagery",
+      "land-cover",
+      "gibs",
+      "land cover type (modis, annual)"
+    ],
+    "intent_tags": [
+      "imagery",
+      "land-cover"
+    ],
+    "task_tags": [
+      "imagery",
+      "land-cover"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "f873d5b3140abc82b9b3c7f51f1d2ec1d50a86d63599e5f690982026bf15a231"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}
