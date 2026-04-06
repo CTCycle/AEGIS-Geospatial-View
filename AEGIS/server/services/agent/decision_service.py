@@ -9,13 +9,14 @@ from AEGIS.server.services.llm.factory import LLMFactory
 from AEGIS.server.services.llm.prompts import AGENT_DECISION_SYSTEM_PROMPT
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
-
+###############################################################################
 class DecisionService:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
         self.provider = provider
         self.model = model
 
+    # -------------------------------------------------------------------------
     def decide(
         self,
         *,

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface UseActivePagePersistenceOptions<TState extends { scrollY: number }> {
     isActive: boolean;
@@ -17,15 +17,31 @@ export function useActivePagePersistence<TState extends { scrollY: number }>({
     restoreState,
     syncDeps,
 }: UseActivePagePersistenceOptions<TState>): void {
+    const onStateChangeRef = useRef(onStateChange);
+    const buildStateRef = useRef(buildState);
+    const restoreStateRef = useRef(restoreState);
+
+    useEffect(() => {
+        onStateChangeRef.current = onStateChange;
+    }, [onStateChange]);
+
+    useEffect(() => {
+        buildStateRef.current = buildState;
+    }, [buildState]);
+
+    useEffect(() => {
+        restoreStateRef.current = restoreState;
+    }, [restoreState]);
+
     useEffect(() => {
         const scrollY = isActive ? window.scrollY : state.scrollY;
-        onStateChange(buildState(scrollY));
-    }, [isActive, state.scrollY, onStateChange, buildState, ...syncDeps]);
+        onStateChangeRef.current(buildStateRef.current(scrollY));
+    }, [isActive, state.scrollY, ...syncDeps]);
 
     useEffect(() => {
         if (!isActive) {
             return;
         }
-        restoreState();
-    }, [isActive, restoreState]);
+        restoreStateRef.current();
+    }, [isActive]);
 }
