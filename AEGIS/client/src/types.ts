@@ -218,6 +218,18 @@ export interface ModelSettingsResponse {
     credentials: Record<string, Record<string, boolean>>;
 }
 
+export interface ModelSettingsUpdateRequest {
+    active_provider_mode: ModelProviderMode;
+    chat_model_provider: string;
+    chat_model_name: string;
+    agent_model_provider: string;
+    agent_model_name: string;
+    ollama_url: string;
+    openai_base_url?: string | null;
+    google_base_url?: string | null;
+    credentials: Record<string, { api_key?: string }>;
+}
+
 export interface VectorizationResponse {
     status: string;
     indexed_documents: number;

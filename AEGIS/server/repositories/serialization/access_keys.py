@@ -39,7 +39,8 @@ class AccessKeySerializer:
             )
             return list(session.execute(statement).scalars().all())
 
-        def create_key(self, provider: str, plaintext_key: str) -> AccessKeyRecord:
+    # -------------------------------------------------------------------------
+    def create_key(self, provider: str, plaintext_key: str) -> AccessKeyRecord:
         normalized = self.normalize_provider(provider)
         ciphertext = encrypt_access_key(plaintext_key)
         row = AccessKeyRecord(

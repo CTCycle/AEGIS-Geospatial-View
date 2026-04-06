@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ModelGrid from '../components/settings/ModelGrid';
 import ModelProviderToggle from '../components/settings/ModelProviderToggle';
 import ModelSearchBar from '../components/settings/ModelSearchBar';
+import SettingsModal from '../components/settings/SettingsModal';
 import {
     checkOllamaHealth,
     fetchChatModels,
@@ -11,9 +12,10 @@ import {
     refreshOllamaModels,
     updateChatSettings
 } from '../services/api';
-import { ModelCardDescriptor, ModelProviderMode, ModelSettingsResponse } from '../types';
+import { ModelCardDescriptor, ModelProviderMode, ModelSettingsResponse, ModelSettingsUpdateRequest } from '../types';
 import './SettingsPage.css';
 import { PersistedSettingsPageState } from '../state/appState';
+import { useActivePagePersistence } from '../hooks/useActivePagePersistence';
 
 const defaultSettings: ModelSettingsResponse = {
     active_provider_mode: 'local',
@@ -101,25 +103,29 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         writeSettingsQueryState(searchText, providerMode);
     }, [searchText, providerMode, isActive]);
 
-    useEffect(() => {
-        onStateChange({
-            searchText,
-            providerMode,
-            statusText,
-            scrollY: isActive ? window.scrollY : state.scrollY,
-            modelGridScrollTop: modelGridRef.current?.scrollTop ?? state.modelGridScrollTop,
-        });
-    }, [searchText, providerMode, statusText, isActive, state.scrollY, state.modelGridScrollTop, onStateChange]);
+    const buildState = useCallback((scrollY: number): PersistedSettingsPageState => ({
+        searchText,
+        providerMode,
+        statusText,
+        scrollY,
+        modelGridScrollTop: modelGridRef.current?.scrollTop ?? state.modelGridScrollTop,
+    }), [searchText, providerMode, statusText, state.modelGridScrollTop]);
 
-    useEffect(() => {
-        if (!isActive) {
-            return;
-        }
+    const restoreState = useCallback(() => {
         window.scrollTo({ top: state.scrollY, behavior: 'auto' });
         if (modelGridRef.current) {
             modelGridRef.current.scrollTop = state.modelGridScrollTop;
         }
-    }, [isActive, state.scrollY, state.modelGridScrollTop]);
+    }, [state.scrollY, state.modelGridScrollTop]);
+
+    useActivePagePersistence({
+        isActive,
+        state,
+        onStateChange,
+        buildState,
+        restoreState,
+        syncDeps: [searchText, providerMode, statusText, state.modelGridScrollTop],
+    });
 
     const displayedModels = useMemo(() => {
         const source = providerMode === 'local' ? localModels : cloudModels;
@@ -153,9 +159,10 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
     };
 
     const applyModelSelection = async (kind: 'chat' | 'agent', model: ModelCardDescriptor) => {
-        const payload = {
+        const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
+        const payload: ModelSettingsUpdateRequest = {
             ...settings,
-            active_provider_mode: model.provider === 'ollama' ? 'local' : 'cloud',
+            active_provider_mode: nextProviderMode,
             chat_model_provider: kind === 'chat' ? model.provider : settings.chat_model_provider,
             chat_model_name: kind === 'chat' ? model.name : settings.chat_model_name,
             agent_model_provider: kind === 'agent' ? model.provider : settings.agent_model_provider,
@@ -166,6 +173,71 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         setProviderMode(updated.active_provider_mode);
         setStatusText(`Selected ${model.name} for ${kind}`);
     };
+
+    const keysFooter: ReactNode = (
+        <button
+            type="button"
+            className="primary-button"
+            onClick={async () => {
+                const updated = await updateChatSettings({
+                    ...settings,
+                    credentials: {
+                        openai: openaiKey.trim() ? { api_key: openaiKey.trim() } : {},
+                        google: googleKey.trim() ? { api_key: googleKey.trim() } : {},
+                    },
+                });
+                setSettings(updated);
+                setOpenaiKey('');
+                setGoogleKey('');
+                setStatusText('API keys saved');
+                setIsKeysModalOpen(false);
+            }}
+        >
+            Save keys
+        </button>
+    );
+
+    const ollamaFooter: ReactNode = (
+        <>
+            <div className="row-actions">
+                <button
+                    type="button"
+                    onClick={async () => {
+                        const health = await checkOllamaHealth();
+                        setStatusText(`Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`);
+                    }}
+                >
+                    Check connection
+                </button>
+                <button
+                    type="button"
+                    onClick={async () => {
+                        await refreshOllamaModels();
+                        await loadData();
+                        setStatusText('Ollama library refreshed');
+                    }}
+                >
+                    Refresh models
+                </button>
+            </div>
+            <button
+                type="button"
+                className="primary-button"
+                onClick={async () => {
+                    const updated = await updateChatSettings({
+                        ...settings,
+                        ollama_url: ollamaUrlDraft.trim() || defaultSettings.ollama_url,
+                    });
+                    setSettings(updated);
+                    setOllamaUrlDraft(updated.ollama_url);
+                    setStatusText('Ollama settings saved');
+                    setIsOllamaModalOpen(false);
+                }}
+            >
+                Save settings
+            </button>
+        </>
+    );
 
     return (
         <div className="settings-page" hidden={!isActive} aria-hidden={!isActive}>
@@ -227,112 +299,46 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
             />
 
             {isKeysModalOpen && (
-                <div className="settings-modal-backdrop" role="presentation" onClick={() => setIsKeysModalOpen(false)}>
-                    <section className="settings-modal" role="dialog" aria-modal="true" aria-label="API key management" onClick={(event) => event.stopPropagation()}>
-                        <header className="settings-modal__header">
-                            <h2>API keys</h2>
-                            <button type="button" className="settings-modal__close" onClick={() => setIsKeysModalOpen(false)}>Close</button>
-                        </header>
-                        <div className="settings-modal__body">
-                            <label>
-                                OpenAI API key {settings.credentials.openai?.api_key ? '(Configured)' : '(Not configured)'}
-                                <input
-                                    type="password"
-                                    value={openaiKey}
-                                    onChange={(event) => setOpenaiKey(event.target.value)}
-                                    placeholder="sk-..."
-                                />
-                            </label>
-                            <label>
-                                Google API key {settings.credentials.google?.api_key ? '(Configured)' : '(Not configured)'}
-                                <input
-                                    type="password"
-                                    value={googleKey}
-                                    onChange={(event) => setGoogleKey(event.target.value)}
-                                    placeholder="AIza..."
-                                />
-                            </label>
-                        </div>
-                        <footer className="settings-modal__footer">
-                            <button
-                                type="button"
-                                className="primary-button"
-                                onClick={async () => {
-                                    const updated = await updateChatSettings({
-                                        ...settings,
-                                        credentials: {
-                                            openai: openaiKey.trim() ? { api_key: openaiKey.trim() } : {},
-                                            google: googleKey.trim() ? { api_key: googleKey.trim() } : {},
-                                        },
-                                    });
-                                    setSettings(updated);
-                                    setOpenaiKey('');
-                                    setGoogleKey('');
-                                    setStatusText('API keys saved');
-                                    setIsKeysModalOpen(false);
-                                }}
-                            >
-                                Save keys
-                            </button>
-                        </footer>
-                    </section>
-                </div>
+                <SettingsModal
+                    title="API keys"
+                    ariaLabel="API key management"
+                    onClose={() => setIsKeysModalOpen(false)}
+                    footer={keysFooter}
+                >
+                    <label>
+                        OpenAI API key {settings.credentials.openai?.api_key ? '(Configured)' : '(Not configured)'}
+                        <input
+                            type="password"
+                            value={openaiKey}
+                            onChange={(event) => setOpenaiKey(event.target.value)}
+                            placeholder="sk-..."
+                        />
+                    </label>
+                    <label>
+                        Google API key {settings.credentials.google?.api_key ? '(Configured)' : '(Not configured)'}
+                        <input
+                            type="password"
+                            value={googleKey}
+                            onChange={(event) => setGoogleKey(event.target.value)}
+                            placeholder="AIza..."
+                        />
+                    </label>
+                </SettingsModal>
             )}
 
             {isOllamaModalOpen && (
-                <div className="settings-modal-backdrop" role="presentation" onClick={() => setIsOllamaModalOpen(false)}>
-                    <section className="settings-modal" role="dialog" aria-modal="true" aria-label="Ollama settings" onClick={(event) => event.stopPropagation()}>
-                        <header className="settings-modal__header">
-                            <h2>Ollama settings</h2>
-                            <button type="button" className="settings-modal__close" onClick={() => setIsOllamaModalOpen(false)}>Close</button>
-                        </header>
-                        <div className="settings-modal__body">
-                            <label>
-                                Ollama server URL
-                                <input value={ollamaUrlDraft} onChange={(event) => setOllamaUrlDraft(event.target.value)} />
-                            </label>
-                        </div>
-                        <footer className="settings-modal__footer settings-modal__footer--spread">
-                            <div className="row-actions">
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        const health = await checkOllamaHealth();
-                                        setStatusText(`Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`);
-                                    }}
-                                >
-                                    Check connection
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        await refreshOllamaModels();
-                                        await loadData();
-                                        setStatusText('Ollama library refreshed');
-                                    }}
-                                >
-                                    Refresh models
-                                </button>
-                            </div>
-                            <button
-                                type="button"
-                                className="primary-button"
-                                onClick={async () => {
-                                    const updated = await updateChatSettings({
-                                        ...settings,
-                                        ollama_url: ollamaUrlDraft.trim() || defaultSettings.ollama_url,
-                                    });
-                                    setSettings(updated);
-                                    setOllamaUrlDraft(updated.ollama_url);
-                                    setStatusText('Ollama settings saved');
-                                    setIsOllamaModalOpen(false);
-                                }}
-                            >
-                                Save settings
-                            </button>
-                        </footer>
-                    </section>
-                </div>
+                <SettingsModal
+                    title="Ollama settings"
+                    ariaLabel="Ollama settings"
+                    onClose={() => setIsOllamaModalOpen(false)}
+                    footer={ollamaFooter}
+                    footerClassName="settings-modal__footer settings-modal__footer--spread"
+                >
+                    <label>
+                        Ollama server URL
+                        <input value={ollamaUrlDraft} onChange={(event) => setOllamaUrlDraft(event.target.value)} />
+                    </label>
+                </SettingsModal>
             )}
 
             <footer className="settings-page__status">{statusText}</footer>
