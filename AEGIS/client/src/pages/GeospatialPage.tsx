@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import AgentChatPanel from '../components/chat/AgentChatPanel';
 import MapPreview from '../components/MapPreview';
 import { MapSession, SearchResponsePayload } from '../types';
 import './GeospatialPage.css';
 import { PersistedChatPageState } from '../state/appState';
+import { useActivePagePersistence } from '../hooks/useActivePagePersistence';
 
 interface GeospatialPageProps {
     onOpenSettings: () => void;
@@ -60,23 +61,27 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
         });
     };
 
-    useEffect(() => {
-        onStateChange({
-            toolbarWidth,
-            isToolbarCollapsed,
-            payload,
-            chatPanel: chatPanelState,
-            mapState,
-            scrollY: isActive ? window.scrollY : state.scrollY,
-        });
-    }, [toolbarWidth, isToolbarCollapsed, payload, chatPanelState, mapState, isActive, state.scrollY, onStateChange]);
+    const buildState = useCallback((scrollY: number): PersistedChatPageState => ({
+        toolbarWidth,
+        isToolbarCollapsed,
+        payload,
+        chatPanel: chatPanelState,
+        mapState,
+        scrollY,
+    }), [toolbarWidth, isToolbarCollapsed, payload, chatPanelState, mapState]);
 
-    useEffect(() => {
-        if (!isActive) {
-            return;
-        }
+    const restoreState = useCallback(() => {
         window.scrollTo({ top: state.scrollY, behavior: 'auto' });
-    }, [isActive, state.scrollY]);
+    }, [state.scrollY]);
+
+    useActivePagePersistence({
+        isActive,
+        state,
+        onStateChange,
+        buildState,
+        restoreState,
+        syncDeps: [toolbarWidth, isToolbarCollapsed, payload, chatPanelState, mapState],
+    });
 
     return (
         <div className="geospatial-page" hidden={!isActive} aria-hidden={!isActive}>

@@ -18,6 +18,7 @@ import {
     ChatTurnResponse,
     LocationSearchRequest,
     ModelCardDescriptor,
+    ModelSettingsUpdateRequest,
     ModelSettingsResponse,
     JsonValue,
     SearchResponse,
@@ -291,7 +292,7 @@ export const fetchChatSettings = async (): Promise<ModelSettingsResponse> => {
     };
 };
 
-export const updateChatSettings = async (payload: Record<string, unknown>): Promise<ModelSettingsResponse> => {
+export const updateChatSettings = async (payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> => {
     const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_SETTINGS_PATH}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
