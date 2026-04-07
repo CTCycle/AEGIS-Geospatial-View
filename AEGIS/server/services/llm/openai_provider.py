@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from AEGIS.server.services.llm.base import LLMProvider
@@ -27,8 +28,17 @@ class OpenAIProvider(LLMProvider):
             },
             method="POST",
         )
-        with urlopen(request, timeout=45) as response:
-            return json.loads(response.read().decode("utf-8"))
+        try:
+            with urlopen(request, timeout=45) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace").strip()
+            message = f"OpenAI request failed with HTTP {exc.code}"
+            if detail:
+                message = f"{message}: {detail}"
+            raise ValueError(message) from exc
+        except URLError as exc:
+            raise ValueError(f"OpenAI request failed: {exc.reason}") from exc
 
     def list_models(self) -> list[ModelDescriptor]:
         return [entry for entry in get_cloud_model_catalog() if entry.provider == "openai"]

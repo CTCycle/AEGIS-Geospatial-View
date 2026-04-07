@@ -1,15 +1,16 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ModelGrid from '../components/settings/ModelGrid';
+import CredentialField from '../components/settings/CredentialField';
 import SettingsIconButton from '../components/settings/SettingsIconButton';
 import ModelProviderToggle from '../components/settings/ModelProviderToggle';
 import ModelSearchBar from '../components/settings/ModelSearchBar';
 import SettingsModal from '../components/settings/SettingsModal';
-import { ModelProviderMode } from '../types';
 import './SettingsPage.css';
 import { PersistedSettingsPageState } from '../state/appState';
 import { useActivePagePersistence } from '../hooks/useActivePagePersistence';
 import { useSettingsData } from '../hooks/useSettingsData';
+import { useSettingsQueryState } from '../hooks/useSettingsQueryState';
 
 interface SettingsPageProps {
     onBack: () => void;
@@ -18,35 +19,7 @@ interface SettingsPageProps {
     isActive: boolean;
 }
 
-const isProviderMode = (value: string | null): value is ModelProviderMode =>
-    value === 'local' || value === 'cloud';
-
-const readSettingsQueryState = (): Pick<PersistedSettingsPageState, 'searchText' | 'providerMode'> => {
-    const params = new URLSearchParams(window.location.search);
-    const searchText = params.get('q') ?? '';
-    const providerMode = isProviderMode(params.get('mode')) ? (params.get('mode') as ModelProviderMode) : 'local';
-    return { searchText, providerMode };
-};
-
-const writeSettingsQueryState = (searchText: string, providerMode: ModelProviderMode) => {
-    const params = new URLSearchParams(window.location.search);
-    if (searchText.trim()) {
-        params.set('q', searchText);
-    } else {
-        params.delete('q');
-    }
-    if (providerMode !== 'local') {
-        params.set('mode', providerMode);
-    } else {
-        params.delete('mode');
-    }
-    const nextQuery = params.toString();
-    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
-    window.history.replaceState(window.history.state, '', nextUrl);
-};
-
 function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPageProps) {
-    const queryState = readSettingsQueryState();
     const {
         settings,
         cloudModels,
@@ -64,8 +37,12 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         saveOllamaSettings,
         pullLocalModel,
     } = useSettingsData(state.statusText);
-    const [searchText, setSearchText] = useState(queryState.searchText || state.searchText);
     const [providerModeInitialized, setProviderModeInitialized] = useState(false);
+    const { searchText, setSearchText, initialProviderMode } = useSettingsQueryState({
+        initialSearchText: state.searchText,
+        providerMode,
+        isActive,
+    });
     const modelGridRef = useRef<HTMLDivElement | null>(null);
     const [isKeysModalOpen, setIsKeysModalOpen] = useState(false);
     const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
@@ -76,16 +53,9 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         if (providerModeInitialized) {
             return;
         }
-        setProviderMode(queryState.providerMode || state.providerMode);
+        setProviderMode(initialProviderMode || state.providerMode);
         setProviderModeInitialized(true);
-    }, [providerModeInitialized, queryState.providerMode, setProviderMode, state.providerMode]);
-
-    useEffect(() => {
-        if (!isActive) {
-            return;
-        }
-        writeSettingsQueryState(searchText, providerMode);
-    }, [searchText, providerMode, isActive]);
+    }, [providerModeInitialized, initialProviderMode, setProviderMode, state.providerMode]);
 
     const buildState = useCallback((scrollY: number): PersistedSettingsPageState => ({
         searchText,
@@ -238,24 +208,20 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                     onClose={() => setIsKeysModalOpen(false)}
                     footer={keysFooter}
                 >
-                    <label>
-                        OpenAI API key {settings.credentials.openai?.api_key ? '(Configured)' : '(Not configured)'}
-                        <input
-                            type="password"
-                            value={openaiKey}
-                            onChange={(event) => setOpenaiKey(event.target.value)}
-                            placeholder="sk-..."
-                        />
-                    </label>
-                    <label>
-                        Google API key {settings.credentials.google?.api_key ? '(Configured)' : '(Not configured)'}
-                        <input
-                            type="password"
-                            value={googleKey}
-                            onChange={(event) => setGoogleKey(event.target.value)}
-                            placeholder="AIza..."
-                        />
-                    </label>
+                    <CredentialField
+                        label="OpenAI API key"
+                        configured={Boolean(settings.credentials.openai?.api_key)}
+                        placeholder="sk-..."
+                        value={openaiKey}
+                        onChange={setOpenaiKey}
+                    />
+                    <CredentialField
+                        label="Google API key"
+                        configured={Boolean(settings.credentials.google?.api_key)}
+                        placeholder="AIza..."
+                        value={googleKey}
+                        onChange={setGoogleKey}
+                    />
                 </SettingsModal>
             )}
 

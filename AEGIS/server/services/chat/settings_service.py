@@ -47,7 +47,10 @@ class ChatSettingsService:
             if not isinstance(labels, dict):
                 continue
             for label, raw_value in labels.items():
-                if not isinstance(raw_value, str) or not raw_value.strip():
+                if not isinstance(raw_value, str):
+                    continue
+                if not raw_value.strip():
+                    self.credentials_repo.deactivate(provider=str(provider), label=str(label))
                     continue
                 encrypted = self.crypto_service.encrypt(raw_value.strip())
                 self.credentials_repo.upsert(
