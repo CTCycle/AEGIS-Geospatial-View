@@ -13,7 +13,7 @@ from AEGIS.server.repositories.schemas.models import Base, ChatMessageRecord, Ch
 def _to_json_payload(value: Any) -> str | None:
     if value is None:
         return None
-    return json.dumps(value)
+    return json.dumps(value, default=str)
 
 
 def _from_json_payload(value: str | None) -> Any:
