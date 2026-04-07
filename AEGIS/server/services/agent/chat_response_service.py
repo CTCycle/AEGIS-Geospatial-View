@@ -41,7 +41,7 @@ class ChatResponseService:
                 messages=[
                     {"role": "system", "content": AGENT_RESPONSE_PROMPT},
                     {"role": "user", "content": conversation_context},
-                    {"role": "user", "content": json.dumps(payload)},
+                    {"role": "user", "content": json.dumps(payload, default=str)},
                 ],
             )
         )
