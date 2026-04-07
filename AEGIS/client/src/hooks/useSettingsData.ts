@@ -50,7 +50,7 @@ export interface UseSettingsDataState {
 }
 
 const toErrorText = (error: unknown): string =>
-    String((error as { message?: string })?.message ?? error);
+    error instanceof Error ? error.message : String(error);
 
 export const useSettingsData = (initialStatusText: string): UseSettingsDataState => {
     const [settings, setSettings] = useState<ModelSettingsResponse>(defaultSettings);

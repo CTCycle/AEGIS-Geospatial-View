@@ -55,6 +55,21 @@ class CredentialRepository:
             )
             return list(session.execute(statement).scalars().all())
 
+    def deactivate(self, *, provider: str, label: str) -> None:
+        with self._session_factory() as session:
+            statement = (
+                select(ModelCredentialRecord)
+                .where(ModelCredentialRecord.provider == provider)
+                .where(ModelCredentialRecord.label == label)
+                .where(ModelCredentialRecord.is_active.is_(True))
+            )
+            record = session.execute(statement).scalars().first()
+            if record is None:
+                return
+            record.is_active = False
+            record.updated_at = datetime.utcnow()
+            session.commit()
+
     def get_active(self, *, provider: str, label: str) -> ModelCredentialRecord | None:
         with self._session_factory() as session:
             statement = (
