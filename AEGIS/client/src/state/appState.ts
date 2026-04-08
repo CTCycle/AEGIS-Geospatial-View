@@ -57,7 +57,7 @@ export const defaultAppState = (): PersistedAppState => ({
     savedAt: Date.now(),
     tabId: '',
     chatPage: {
-        toolbarWidth: 360,
+        toolbarWidth: 720,
         isToolbarCollapsed: false,
         payload: undefined,
         chatPanel: {
@@ -183,7 +183,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
 
         if (isRecord(parsed.chatPage)) {
             next.chatPage.toolbarWidth = typeof parsed.chatPage.toolbarWidth === 'number'
-                ? Math.max(280, Math.min(560, parsed.chatPage.toolbarWidth))
+                ? Math.max(280, Math.min(760, parsed.chatPage.toolbarWidth))
                 : defaults.chatPage.toolbarWidth;
             next.chatPage.isToolbarCollapsed = Boolean(parsed.chatPage.isToolbarCollapsed);
             next.chatPage.payload = isRecord(parsed.chatPage.payload)

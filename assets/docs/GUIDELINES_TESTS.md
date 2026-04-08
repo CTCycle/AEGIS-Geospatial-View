@@ -1,6 +1,6 @@
 # Testing Guidelines
 
-Last updated: 2026-03-28  
+Last updated: 2026-04-08
 Scope: `tests/`, backend/frontend integration flows
 
 This project validates behavior primarily with end-to-end tests that exercise backend + frontend together.
@@ -9,7 +9,7 @@ This project validates behavior primarily with end-to-end tests that exercise ba
 
 - Framework: `pytest`
 - Browser automation and API client: Playwright for Python (`pytest-playwright`)
-- Main test suite location: `tests/e2e`
+- Main suite location: `tests/e2e`
 
 ## 2. Primary Runner
 
@@ -25,15 +25,13 @@ tests\run_tests.bat
 3. Backend startup
 4. Frontend startup/build as needed
 5. Pytest execution
-6. Cleanup (port/process shutdown)
+6. Cleanup
 
 ## 3. Runtime and Ports
 
 - Tests use portable runtimes from `runtimes/`.
 - If `AEGIS/settings/.env` exists, host/port values are loaded from it.
-- If no `.env` is present, test runner falls back to:
-  - backend: `127.0.0.1:8000`
-  - frontend: `127.0.0.1:7861`
+- If no `.env` is present, fallback is backend `127.0.0.1:8000`, frontend `127.0.0.1:7861`.
 
 ## 4. Manual Execution
 
@@ -53,19 +51,16 @@ Common options:
 
 - Place E2E tests in `tests/e2e`.
 - Name files `test_*.py`.
-- Reuse fixtures from `tests/conftest.py` (`page`, `api_context`, URL fixtures).
-- Cover:
-  - happy path
-  - validation failures
-  - external-service degradation behavior where applicable
+- Reuse fixtures from `tests/conftest.py`.
+- Cover happy path, validation failures, and degraded external-service behavior where relevant.
 
 ## 6. External Dependencies
 
-`/maps/search` and related flows call external services (Nominatim, NASA GIBS, OpenAQ, Open-Elevation).
+Map and geospatial flows call external services (Nominatim, NASA GIBS, OpenAQ, Open-Elevation, PVGIS).
 
 Implications:
 - Network availability affects E2E reliability.
-- Tests should gracefully skip or assert expected fallback behavior when upstream services are unavailable.
+- Tests should gracefully skip or assert expected fallback behavior when upstream dependencies are unavailable.
 
 ## 7. Troubleshooting
 
