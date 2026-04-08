@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from html.parser import HTMLParser
 from collections.abc import Iterable
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -30,6 +31,11 @@ class OllamaProvider(LLMProvider):
         request = Request(f"{self.base_url}{path}", method="GET")
         with urlopen(request, timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))
+
+    def _get_text(self, url: str) -> str:
+        request = Request(url, headers={"User-Agent": "AEGIS/1.0"}, method="GET")
+        with urlopen(request, timeout=20) as response:
+            return response.read().decode("utf-8", errors="ignore")
 
     def list_models(self) -> list[ModelDescriptor]:
         try:
@@ -68,6 +74,62 @@ class OllamaProvider(LLMProvider):
                 )
             )
         return models
+
+    def list_library_models(self) -> list[ModelDescriptor]:
+        class _LibraryParser(HTMLParser):
+            def __init__(self) -> None:
+                super().__init__()
+                self._active_model: str | None = None
+                self._chunks: list[str] = []
+                self.entries: dict[str, str] = {}
+
+            def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+                if tag != "a":
+                    return
+                attr_map = {key: value for key, value in attrs}
+                href = attr_map.get("href") or ""
+                if not href.startswith("/library/"):
+                    return
+                model = href.removeprefix("/library/").split("/", maxsplit=1)[0].strip()
+                if not model or model in self.entries:
+                    return
+                self._active_model = model
+                self._chunks = []
+
+            def handle_data(self, data: str) -> None:
+                if self._active_model is None:
+                    return
+                text = data.strip()
+                if text:
+                    self._chunks.append(text)
+
+            def handle_endtag(self, tag: str) -> None:
+                if tag != "a" or self._active_model is None:
+                    return
+                merged = " ".join(self._chunks).strip()
+                normalized = " ".join(merged.split())
+                if normalized.lower().startswith(self._active_model.lower()):
+                    normalized = normalized[len(self._active_model):].strip(" -:•")
+                self.entries[self._active_model] = normalized or f"Ollama library model {self._active_model}"
+                self._active_model = None
+                self._chunks = []
+
+        try:
+            html = self._get_text("https://registry.ollama.ai/library")
+            parser = _LibraryParser()
+            parser.feed(html)
+        except Exception:
+            return []
+        return [
+            ModelDescriptor(
+                name=name,
+                description=description,
+                provider="ollama",
+                capabilities=["chat", "stream", "embeddings"],
+                metadata={"source": "ollama-library"},
+            )
+            for name, description in parser.entries.items()
+        ]
 
     def pull_model(self, *, model: str) -> dict[str, Any]:
         return self._post_json("/api/pull", {"name": model, "stream": False})

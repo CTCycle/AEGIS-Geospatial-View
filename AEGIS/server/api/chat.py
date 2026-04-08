@@ -120,8 +120,13 @@ def update_settings(payload: dict[str, Any] = Body(default_factory=dict)) -> Mod
 def refresh_ollama_models() -> dict[str, Any]:
     settings = settings_repo.get_or_create()
     provider = OllamaProvider(base_url=settings.ollama_url)
-    models = provider.list_models()
-    return {"status": "ok", "models": [model.name for model in models]}
+    library_models = provider.list_library_models()
+    local_models = provider.list_models()
+    return {
+        "status": "ok",
+        "library_models": [model.name for model in library_models],
+        "local_models": [model.name for model in local_models],
+    }
 
 
 @router.post(CHAT_OLLAMA_PULL_ROUTE, status_code=status.HTTP_200_OK)

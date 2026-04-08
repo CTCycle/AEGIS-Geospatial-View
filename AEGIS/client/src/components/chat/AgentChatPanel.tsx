@@ -3,7 +3,6 @@ import React, { useMemo, useState } from 'react';
 import { streamChatTurn } from '../../services/api';
 import { ChatMessage, ChatRole, ChatStreamEvent, MapSession } from '../../types';
 import ChatComposer from './ChatComposer';
-import ChatStatusPill from './ChatStatusPill';
 import ChatTranscript from './ChatTranscript';
 
 interface AgentChatPanelProps {
@@ -134,9 +133,6 @@ const AgentChatPanel: React.FC<AgentChatPanelProps> = ({
 
     return (
         <div className="agent-chat-panel">
-            <div className="agent-chat-panel__header">
-                <ChatStatusPill status={status} />
-            </div>
             <ChatTranscript
                 messages={renderedMessages}
                 initialScrollTop={initialState.transcriptScrollTop}

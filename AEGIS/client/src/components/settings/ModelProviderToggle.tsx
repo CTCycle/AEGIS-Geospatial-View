@@ -1,27 +1,39 @@
 import React from 'react';
 
-import { ModelProviderMode } from '../../types';
-
 interface ModelProviderToggleProps {
-    value: ModelProviderMode;
-    onChange: (mode: ModelProviderMode) => void;
+    value: 'all' | 'ollama' | 'openai' | 'google';
+    onChange: (mode: 'all' | 'ollama' | 'openai' | 'google') => void;
 }
 
 const ModelProviderToggle: React.FC<ModelProviderToggleProps> = ({ value, onChange }) => (
-    <div className="provider-toggle" role="group" aria-label="Provider mode">
+    <div className="provider-toggle" role="group" aria-label="Model provider filter">
         <button
             type="button"
-            className={value === 'local' ? 'active' : ''}
-            onClick={() => onChange('local')}
+            className={value === 'all' ? 'active' : ''}
+            onClick={() => onChange('all')}
+        >
+            All
+        </button>
+        <button
+            type="button"
+            className={value === 'ollama' ? 'active' : ''}
+            onClick={() => onChange('ollama')}
         >
             Ollama
         </button>
         <button
             type="button"
-            className={value === 'cloud' ? 'active' : ''}
-            onClick={() => onChange('cloud')}
+            className={value === 'openai' ? 'active' : ''}
+            onClick={() => onChange('openai')}
         >
-            Cloud
+            OpenAI
+        </button>
+        <button
+            type="button"
+            className={value === 'google' ? 'active' : ''}
+            onClick={() => onChange('google')}
+        >
+            Google
         </button>
     </div>
 );

@@ -44,11 +44,9 @@ from AEGIS.server.utils.types import (
 
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
     embedded_default = coerce_bool(payload.get("embedded_database"), True)
-    embedded = coerce_bool(os.getenv("DB_EMBEDDED"), embedded_default)
+    embedded = embedded_default
 
-    raw_insert_batch_size = os.getenv("DB_INSERT_BATCH_SIZE")
-    if raw_insert_batch_size is None or raw_insert_batch_size.strip() == "":
-        raw_insert_batch_size = payload.get("insert_batch_size")
+    raw_insert_batch_size = payload.get("insert_batch_size")
 
     if embedded:
         # External fields are ignored entirely when embedded DB is active
@@ -69,46 +67,24 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
         )
 
     # External DB mode
-    raw_engine = os.getenv("DB_ENGINE")
-    engine_value = coerce_str_or_none(raw_engine)
-    if engine_value is None:
-        engine_value = coerce_str_or_none(payload.get("engine")) or "postgres"
+    engine_value = coerce_str_or_none(payload.get("engine")) or "postgres"
 
-    raw_host = os.getenv("DB_HOST")
-    host_value = coerce_str_or_none(raw_host)
-    if host_value is None:
-        host_value = coerce_str_or_none(payload.get("host"))
+    host_value = coerce_str_or_none(payload.get("host"))
 
-    raw_port = os.getenv("DB_PORT")
-    if raw_port is None or raw_port.strip() == "":
-        raw_port = payload.get("port")
+    raw_port = payload.get("port")
 
-    raw_database_name = os.getenv("DB_NAME")
-    database_name_value = coerce_str_or_none(raw_database_name)
-    if database_name_value is None:
-        database_name_value = coerce_str_or_none(payload.get("database_name"))
+    database_name_value = coerce_str_or_none(payload.get("database_name"))
 
-    raw_username = os.getenv("DB_USER")
-    username_value = coerce_str_or_none(raw_username)
-    if username_value is None:
-        username_value = coerce_str_or_none(payload.get("username"))
+    username_value = coerce_str_or_none(payload.get("username"))
 
-    raw_password = os.getenv("DB_PASSWORD")
-    password_value = coerce_str_or_none(raw_password)
-    if password_value is None:
-        password_value = coerce_str_or_none(payload.get("password"))
+    password_value = coerce_str_or_none(payload.get("password"))
 
     ssl_default = coerce_bool(payload.get("ssl"), False)
-    ssl_value = coerce_bool(os.getenv("DB_SSL"), ssl_default)
+    ssl_value = ssl_default
 
-    raw_ssl_ca = os.getenv("DB_SSL_CA")
-    ssl_ca_value = coerce_str_or_none(raw_ssl_ca)
-    if ssl_ca_value is None:
-        ssl_ca_value = coerce_str_or_none(payload.get("ssl_ca"))
+    ssl_ca_value = coerce_str_or_none(payload.get("ssl_ca"))
 
-    raw_connect_timeout = os.getenv("DB_CONNECT_TIMEOUT")
-    if raw_connect_timeout is None or raw_connect_timeout.strip() == "":
-        raw_connect_timeout = payload.get("connect_timeout")
+    raw_connect_timeout = payload.get("connect_timeout")
 
     normalized_engine = engine_value.lower() if engine_value else None
     return DatabaseSettings(
