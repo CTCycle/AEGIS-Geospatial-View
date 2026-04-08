@@ -33,13 +33,17 @@ const envFromSettings = parseEnvFile(settingsEnvPath)
 const apiHost = process.env.FASTAPI_HOST || envFromSettings.FASTAPI_HOST || '127.0.0.1'
 const apiPort = process.env.FASTAPI_PORT || envFromSettings.FASTAPI_PORT || '5002'
 const apiTarget = `http://${apiHost}:${apiPort}`
+const uiHost = process.env.UI_HOST || envFromSettings.UI_HOST || '127.0.0.1'
+const uiPortRaw = process.env.UI_PORT || envFromSettings.UI_PORT || '7861'
+const uiPort = Number.parseInt(uiPortRaw, 10)
+const resolvedUiPort = Number.isFinite(uiPort) ? uiPort : 7861
 
 
 export default defineConfig({
     plugins: [react()],
     server: {
-        host: '127.0.0.1',
-        port: 7861,
+        host: uiHost,
+        port: resolvedUiPort,
         strictPort: false,
         proxy: {
             '/api': {
@@ -50,8 +54,8 @@ export default defineConfig({
         },
     },
     preview: {
-        host: '127.0.0.1',
-        port: 7861,
+        host: uiHost,
+        port: resolvedUiPort,
         strictPort: false,
         proxy: {
             '/api': {

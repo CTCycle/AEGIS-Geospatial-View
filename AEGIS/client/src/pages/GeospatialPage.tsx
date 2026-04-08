@@ -73,19 +73,13 @@ function GeospatialPage({ onOpenSettings, state, onStateChange, isActive }: Geos
             >
                 <aside className="toolbar-panel" aria-label="Chat toolbar">
                     <header className="toolbar-brand" aria-label="Application identity">
-                        <div>
+                        <div className="toolbar-brand__identity">
+                            <span className="toolbar-brand__icon" aria-hidden="true">
+                                <span />
+                                <span />
+                                <span />
+                            </span>
                             <span className="toolbar-brand__logo">AEGIS</span>
-                            <p className="toolbar-brand__meta">Operations Console</p>
-                        </div>
-                        <div className="toolbar-actions">
-                            <button
-                                type="button"
-                                className="toolbar-collapse"
-                                aria-label={isToolbarCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
-                                onClick={() => setIsToolbarCollapsed((current) => !current)}
-                            >
-                                {isToolbarCollapsed ? '>' : '<'}
-                            </button>
                         </div>
                     </header>
 

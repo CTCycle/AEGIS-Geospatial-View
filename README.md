@@ -5,21 +5,31 @@ AEGIS Geospatial View is a chat-first geospatial assistant. Users ask for places
 
 Key behaviors:
 - Chat-first workflow for geospatial search and map updates.
-- Local Ollama and cloud providers supported for model selection.
+- Local Ollama and API-key providers supported for model selection.
 - Provider/model preferences are persisted.
 - Layer metadata is sourced from JSON manifests in `AEGIS/resources/manifests`.
 - Vector index is created on first use and can be rebuilt from Settings.
 
-## 2. Runtime Modes
+## 2. Configuration Split
 AEGIS uses one active runtime file: `AEGIS/settings/.env`.
 
 Profiles:
 - `AEGIS/settings/.env.local.example`
 - `AEGIS/settings/.env.local.tauri.example`
-- `AEGIS/settings/.env.cloud.example`
 - Active file: `AEGIS/settings/.env`
 
-Use local mode for development, cloud mode for Docker deployment, and Tauri profile for desktop packaging.
+Runtime/process values live in `.env` and are loaded with dotenv:
+- `FASTAPI_HOST`
+- `FASTAPI_PORT`
+- `UI_HOST`
+- `UI_PORT`
+- `KERAS_BACKEND`
+- `MPLBACKEND`
+
+Database settings live in `AEGIS/settings/configurations.json`:
+- SQLite vs PostgreSQL switch (`database.embedded_database`)
+- External PostgreSQL connection (`engine`, `host`, `port`, `database_name`, `username`, `password`, `ssl`, `ssl_ca`)
+- DB tuning (`connect_timeout`, `insert_batch_size`)
 
 ## 3. Local Setup (Default)
 
@@ -60,22 +70,7 @@ release\tauri\build_with_tauri.bat
 Outputs:
 - `release/windows/installers`
 - `release/windows/portable`
-
-## 5. Cloud Mode (Docker)
-
-```cmd
-copy /Y AEGIS\settings\.env.cloud.example AEGIS\settings\.env
-docker compose --env-file AEGIS/settings/.env build --no-cache
-docker compose --env-file AEGIS/settings/.env up -d
-```
-
-Stop:
-
-```cmd
-docker compose --env-file AEGIS/settings/.env down
-```
-
-## 6. Practical Usage
+## 5. Practical Usage
 1. Open the workspace.
 2. Ask a geospatial question in chat (place name, coordinates, or requested overlays).
 3. Review the rendered map and layer controls.
@@ -83,7 +78,7 @@ docker compose --env-file AEGIS/settings/.env down
 
 For full user-oriented guidance, see `assets/docs/USER_MANUAL.md`.
 
-## 7. Testing
+## 6. Testing
 Run end-to-end flow:
 
 ```cmd
@@ -105,7 +100,7 @@ npm install
 npm run build
 ```
 
-## 8. Screenshots
+## 7. Screenshots
 
 ![Geospatial search panel](figures/search_page.png)
 Search and chat workspace.
@@ -113,8 +108,8 @@ Search and chat workspace.
 ![Map preview output](figures/database_browser.png)
 Map canvas and output details.
 
-## 9. Maintenance
+## 8. Maintenance
 Run `AEGIS/setup_and_maintenance.bat` for routine maintenance tasks (cleanup, DB initialization, layer updates, and build artifact cleanup).
 
-## 10. License
+## 9. License
 This project is licensed under the MIT license. See `LICENSE`.

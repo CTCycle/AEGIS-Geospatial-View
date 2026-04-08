@@ -29,7 +29,6 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         ollamaUrlDraft,
         setProviderMode,
         setOllamaUrlDraft,
-        handleProviderModeChange,
         applyModelSelection,
         saveKeys,
         checkOllamaConnection,
@@ -48,7 +47,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
     const [isOllamaModalOpen, setIsOllamaModalOpen] = useState(false);
     const [openaiKey, setOpenaiKey] = useState('');
     const [googleKey, setGoogleKey] = useState('');
-    const [cloudProviderFilter, setCloudProviderFilter] = useState('all');
+    const [providerFilter, setProviderFilter] = useState<'all' | 'ollama' | 'openai' | 'google'>('all');
     const [showLocalOnly, setShowLocalOnly] = useState(false);
 
     useEffect(() => {
@@ -58,6 +57,12 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
         setProviderMode(initialProviderMode || state.providerMode);
         setProviderModeInitialized(true);
     }, [providerModeInitialized, initialProviderMode, setProviderMode, state.providerMode]);
+
+    useEffect(() => {
+        if (providerFilter !== 'ollama' && showLocalOnly) {
+            setShowLocalOnly(false);
+        }
+    }, [providerFilter, showLocalOnly]);
 
     const buildState = useCallback((scrollY: number): PersistedSettingsPageState => ({
         searchText,
@@ -84,20 +89,62 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
     });
 
     const localModelIds = useMemo(() => new Set(localModels.map((item) => item.id)), [localModels]);
+    const selectedModelStats = useMemo(() => {
+        const rows = new Map<string, { model: string; provider: string; local: boolean; assignedRoles: string[] }>();
+        const assignments = [
+            { role: 'Parser', provider: settings.parser_model_provider, name: settings.parser_model_name },
+            { role: 'Chat', provider: settings.chat_model_provider, name: settings.chat_model_name },
+            { role: 'Agent', provider: settings.agent_model_provider, name: settings.agent_model_name },
+        ];
 
-    const cloudProviderOptions = useMemo(() => {
-        const providers = Array.from(new Set(cloudModels.map((model) => model.provider))).sort((left, right) => left.localeCompare(right));
-        return [{ value: 'all', label: 'All providers' }, ...providers.map((provider) => ({ value: provider, label: provider }))];
-    }, [cloudModels]);
+        assignments.forEach(({ role, provider, name }) => {
+            const normalizedProvider = provider.trim();
+            const normalizedName = name.trim();
+            if (!normalizedProvider || !normalizedName) {
+                return;
+            }
+            const key = `${normalizedProvider}:${normalizedName}`;
+            const existing = rows.get(key);
+            const local = localModelIds.has(normalizedName);
+            if (existing) {
+                existing.local = existing.local || local;
+                if (!existing.assignedRoles.includes(role)) {
+                    existing.assignedRoles.push(role);
+                }
+                return;
+            }
+            rows.set(key, {
+                model: normalizedName,
+                provider: normalizedProvider,
+                local,
+                assignedRoles: [role],
+            });
+        });
+
+        return Array.from(rows.values());
+    }, [
+        settings.parser_model_provider,
+        settings.parser_model_name,
+        settings.chat_model_provider,
+        settings.chat_model_name,
+        settings.agent_model_provider,
+        settings.agent_model_name,
+        localModelIds,
+    ]);
 
     const displayedModels = useMemo(() => {
-        const source = providerMode === 'local' ? localModels : cloudModels;
+        const source = (() => {
+            if (providerFilter === 'all') {
+                return [...cloudModels];
+            }
+            if (providerFilter === 'ollama') {
+                return [...cloudModels.filter((model) => model.provider === 'ollama')];
+            }
+            return cloudModels.filter((model) => model.provider === providerFilter);
+        })();
         const query = searchText.trim().toLowerCase();
         return source.filter((model) => {
-            if (providerMode === 'cloud' && cloudProviderFilter !== 'all' && model.provider !== cloudProviderFilter) {
-                return false;
-            }
-            if (showLocalOnly && !localModelIds.has(model.id)) {
+            if (providerFilter === 'ollama' && showLocalOnly && !localModelIds.has(model.id)) {
                 return false;
             }
             if (!query) {
@@ -109,7 +156,7 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                 || model.provider.toLowerCase().includes(query)
             );
         });
-    }, [providerMode, localModels, cloudModels, searchText, cloudProviderFilter, localModelIds, showLocalOnly]);
+    }, [providerFilter, cloudModels, searchText, localModelIds, showLocalOnly]);
 
     const keysFooter: ReactNode = (
         <button
@@ -166,10 +213,31 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                     <h1>Model Settings</h1>
                     <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
                 </div>
-                <button type="button" className="settings-page__back" onClick={onBack}>
-                    <span className="settings-page__back-icon" aria-hidden="true">←</span>
-                    <span>Back to Chat</span>
-                </button>
+                <div className="settings-page__header-actions">
+                    <SettingsIconButton
+                        onClick={() => setIsOllamaModalOpen(true)}
+                        ariaLabel="Open Ollama settings"
+                        title="Ollama settings"
+                        icon={(
+                            <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
+                                <path d="M5 4h14a1 1 0 0 1 1 1v11a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V5a1 1 0 0 1 1-1zm1 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6H6zm4 2h4a1 1 0 1 1 0 2h-4a1 1 0 1 1 0-2z" fill="currentColor" />
+                            </svg>
+                        )}
+                    />
+                    <SettingsIconButton
+                        onClick={() => setIsKeysModalOpen(true)}
+                        ariaLabel="Manage API keys"
+                        title="API key settings"
+                        icon={(
+                            <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
+                                <path d="M14 3a7 7 0 1 0 5.5 11.3L23 17.8V21h-3v-2h-2v-2h-2.2A7 7 0 0 0 14 3zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" fill="currentColor" />
+                            </svg>
+                        )}
+                    />
+                    <button type="button" className="settings-page__back" onClick={onBack} aria-label="Back to chat" title="Back to chat">
+                        <span className="settings-page__back-icon" aria-hidden="true">←</span>
+                    </button>
+                </div>
             </header>
 
             <div className="settings-page__content">
@@ -177,46 +245,34 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                     <section className="settings-page__left-column">
                         <section className="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
                             <div className="settings-page__controls-left">
-                                <ModelProviderToggle value={providerMode} onChange={handleProviderModeChange} />
-                                <label className="settings-page__cloud-filter">
-                                    <span>Cloud provider</span>
-                                    <select
-                                        value={cloudProviderFilter}
-                                        onChange={(event) => setCloudProviderFilter(event.target.value)}
-                                        disabled={providerMode !== 'cloud'}
-                                    >
-                                        {cloudProviderOptions.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                                <label className="settings-page__local-filter">
-                                    <input
-                                        type="checkbox"
-                                        checked={showLocalOnly}
-                                        onChange={(event) => setShowLocalOnly(event.target.checked)}
-                                    />
-                                    <span>Locally available</span>
-                                </label>
+                                <ModelProviderToggle value={providerFilter} onChange={setProviderFilter} />
+                                {providerFilter === 'ollama' && (
+                                    <label className="settings-page__local-filter">
+                                        <input
+                                            type="checkbox"
+                                            checked={showLocalOnly}
+                                            onChange={(event) => setShowLocalOnly(event.target.checked)}
+                                        />
+                                        <span>Select all available</span>
+                                    </label>
+                                )}
                             </div>
                             <div className="settings-page__controls-spacer" aria-hidden="true" />
                             <div className="settings-page__controls-right">
-                                <div className="settings-page__control-icons">
-                                    <SettingsIconButton
-                                        onClick={() => setIsKeysModalOpen(true)}
-                                        ariaLabel="Manage API keys"
-                                        title="API key settings"
-                                        glyph="⌁"
-                                    />
-                                    <SettingsIconButton
-                                        onClick={() => setIsOllamaModalOpen(true)}
-                                        ariaLabel="Open Ollama settings"
-                                        title="Ollama settings"
-                                        glyph="◉"
-                                    />
-                                </div>
+                                <button
+                                    type="button"
+                                    className="settings-page__refresh"
+                                    onClick={refreshOllamaLibrary}
+                                    aria-label="Refresh from Ollama API"
+                                    title="Refresh from Ollama API"
+                                >
+                                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+                                        <path
+                                            d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z"
+                                            fill="currentColor"
+                                        />
+                                    </svg>
+                                </button>
                                 <ModelSearchBar value={searchText} onChange={setSearchText} />
                             </div>
                         </section>
@@ -247,7 +303,6 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                     </section>
 
                     <aside className="settings-page__right-column" aria-label="Model statistics">
-                        <h2>Model Stats</h2>
                         <div className="settings-page__stats-table-wrap">
                             <table className="settings-page__stats-table">
                                 <thead>
@@ -259,28 +314,18 @@ function SettingsPage({ onBack, state, onStateChange, isActive }: SettingsPagePr
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {displayedModels.length === 0 && (
+                                    {selectedModelStats.length === 0 && (
                                         <tr>
-                                            <td colSpan={4}>No models match the current filters.</td>
+                                            <td colSpan={4}>No models selected yet.</td>
                                         </tr>
                                     )}
-                                    {displayedModels.map((model) => {
-                                        const assignedRoles: string[] = [];
-                                        if (model.provider === settings.parser_model_provider && model.name === settings.parser_model_name) {
-                                            assignedRoles.push('Parser');
-                                        }
-                                        if (model.provider === settings.chat_model_provider && model.name === settings.chat_model_name) {
-                                            assignedRoles.push('Chat');
-                                        }
-                                        if (model.provider === settings.agent_model_provider && model.name === settings.agent_model_name) {
-                                            assignedRoles.push('Agent');
-                                        }
+                                    {selectedModelStats.map((row) => {
                                         return (
-                                            <tr key={`stats:${model.provider}:${model.id}`}>
-                                                <td>{model.name}</td>
-                                                <td>{model.provider}</td>
-                                                <td>{localModelIds.has(model.id) ? 'Yes' : 'No'}</td>
-                                                <td>{assignedRoles.length > 0 ? assignedRoles.join(', ') : '—'}</td>
+                                            <tr key={`stats:${row.provider}:${row.model}`}>
+                                                <td>{row.model}</td>
+                                                <td>{row.provider}</td>
+                                                <td>{row.local ? 'Yes' : 'No'}</td>
+                                                <td>{row.assignedRoles.join(', ')}</td>
                                             </tr>
                                         );
                                     })}

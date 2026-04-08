@@ -6,6 +6,7 @@ const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
 const TAB_HEARTBEAT_TTL_MS = 15000;
+const DEFAULT_CHAT_PANEL_RATIO = 0.3;
 
 export interface PersistedChatPanelState {
     sessionId?: number;
@@ -57,7 +58,13 @@ export const defaultAppState = (): PersistedAppState => ({
     savedAt: Date.now(),
     tabId: '',
     chatPage: {
-        toolbarWidth: 720,
+        toolbarWidth: (() => {
+            if (typeof window === 'undefined') {
+                return 480;
+            }
+            const width = Math.round(window.innerWidth * DEFAULT_CHAT_PANEL_RATIO);
+            return Math.max(280, Math.min(760, width));
+        })(),
         isToolbarCollapsed: false,
         payload: undefined,
         chatPanel: {

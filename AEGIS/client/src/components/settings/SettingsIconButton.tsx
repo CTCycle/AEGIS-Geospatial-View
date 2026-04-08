@@ -1,11 +1,13 @@
+import { ReactNode } from 'react';
+
 interface SettingsIconButtonProps {
     ariaLabel: string;
     title: string;
-    glyph: string;
+    icon: ReactNode;
     onClick: () => void;
 }
 
-function SettingsIconButton({ ariaLabel, title, glyph, onClick }: SettingsIconButtonProps) {
+function SettingsIconButton({ ariaLabel, title, icon, onClick }: SettingsIconButtonProps) {
     return (
         <button
             type="button"
@@ -14,7 +16,7 @@ function SettingsIconButton({ ariaLabel, title, glyph, onClick }: SettingsIconBu
             aria-label={ariaLabel}
             title={title}
         >
-            <span className="settings-icon-button__glyph" aria-hidden="true">{glyph}</span>
+            <span className="settings-icon-button__glyph" aria-hidden="true">{icon}</span>
         </button>
     );
 }

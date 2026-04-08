@@ -10,7 +10,6 @@ AEGIS uses a single active environment file:
 Profiles provided:
 - `AEGIS/settings/.env.local.example`
 - `AEGIS/settings/.env.local.tauri.example`
-- `AEGIS/settings/.env.cloud.example`
 
 Runtime switching is configuration-driven.
 
@@ -19,11 +18,6 @@ Runtime switching is configuration-driven.
 ### Local mode (default for development)
 - Start with `AEGIS/start_on_windows.bat`.
 - Uses portable runtimes under `runtimes/`.
-
-### Cloud mode (Docker)
-- Uses `docker compose` with env file values.
-- Backend and frontend run in separate containers.
-- Frontend serves SPA and proxies `/api` to backend.
 
 ### Desktop packaging (Tauri)
 - Uses local-tauri env profile and desktop build scripts.
@@ -36,50 +30,58 @@ Runtime switching is configuration-driven.
 | `FASTAPI_HOST`, `FASTAPI_PORT` | Backend host/port binding |
 | `UI_HOST`, `UI_PORT` | Frontend host/port binding |
 | `VITE_API_BASE_URL` | Frontend API base path |
+| `KERAS_BACKEND`, `MPLBACKEND` | Runtime library backend selection |
 | `RELOAD` | Backend hot reload toggle |
-| `DB_EMBEDDED` | SQLite vs external DB switch |
-| `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | External DB connection config |
-| `DB_SSL`, `DB_SSL_CA` | External DB TLS options |
-| `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE` | DB runtime tuning |
 | `OPTIONAL_DEPENDENCIES` | Optional install behavior in launcher |
-| `MPLBACKEND`, `KERAS_BACKEND` | Runtime backend configuration |
 | `AEGIS_CREDENTIAL_MASTER_KEY` | Credential encryption master key |
 | `AEGIS_CREDENTIAL_KEY_VERSION` | Credential key version tag |
 
-## 4. Local Workflow
+## 4. Database Configuration (JSON)
+
+Database behavior is configured only in:
+- `AEGIS/settings/configurations.json`
+
+Relevant keys under `database`:
+- `embedded_database`
+- `engine`
+- `host`
+- `port`
+- `database_name`
+- `username`
+- `password`
+- `ssl`
+- `ssl_ca`
+- `connect_timeout`
+- `insert_batch_size`
+
+## 5. Local Workflow
 
 ```cmd
 copy /Y AEGIS\settings\.env.local.example AEGIS\settings\.env
 AEGIS\start_on_windows.bat
 ```
 
-## 5. Cloud Workflow (Docker)
+## 6. Tauri Workflow
 
 ```cmd
-copy /Y AEGIS\settings\.env.cloud.example AEGIS\settings\.env
-docker compose --env-file AEGIS/settings/.env build --no-cache
-docker compose --env-file AEGIS/settings/.env up -d
+copy /Y AEGIS\settings\.env.local.tauri.example AEGIS\settings\.env
+AEGIS\start_on_windows.bat
+release\tauri\build_with_tauri.bat
 ```
 
-Stop:
-
-```cmd
-docker compose --env-file AEGIS/settings/.env down
-```
-
-## 6. Deterministic Build Notes
+## 7. Deterministic Build Notes
 
 - Python dependencies are lockfile-backed with `runtimes/uv.lock`.
 - Frontend dependencies are lockfile-backed with `AEGIS/client/package-lock.json`.
 - Do not commit environment secrets in `.env` files.
 
-## 7. Ollama Runtime Contract
+## 8. Ollama Runtime Contract
 
 - AEGIS does not auto-start Ollama.
 - Ollama integration is connection-only (health, refresh, pull).
 - Browser and desktop behavior are aligned.
 
-## 8. Validation Prerequisites
+## 9. Validation Prerequisites
 
 - Backend unit tests: `uv sync --extra test` then `uv run pytest -q tests/unit`.
 - Frontend production validation: install deps in `AEGIS/client`, then `npm run build`.
