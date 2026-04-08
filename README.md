@@ -1,55 +1,38 @@
 # AEGIS Geospatial View
 
 ## 1. Project Overview
-AEGIS Geospatial View is a chat-first geospatial assistant. User turns can execute map search (place name or coordinates), retrieve relevant layers, and update an interactive map session. The stack includes a FastAPI backend and React frontend with aligned browser/Tauri behavior.
+AEGIS Geospatial View is a chat-first geospatial assistant. Users ask for places, coordinates, and overlays in natural language, and the app returns an updated interactive map session with supporting metadata.
 
-Finalized behavior highlights:
-- Chat-first interaction replaces the old form-driven toolbar flow.
-- Ollama is treated as an external running service (connection-only, no auto-start).
-- Provider/model settings are persisted in the database.
-- Cloud credentials are encrypted at rest in the database.
-- Layer metadata source of truth is JSON manifests in `AEGIS/resources/manifests`.
-- Chroma vector index is auto-created on first chat use and manually rebuildable from settings.
-- Datetime defaults to present (UTC) when omitted, unless a follow-up is required for ambiguity.
+Key behaviors:
+- Chat-first workflow for geospatial search and map updates.
+- Local Ollama and cloud providers supported for model selection.
+- Provider/model preferences are persisted.
+- Layer metadata is sourced from JSON manifests in `AEGIS/resources/manifests`.
+- Vector index is created on first use and can be rebuilt from Settings.
 
-## 2. Runtime Model (Local Default + Docker Cloud)
+## 2. Runtime Modes
 AEGIS uses one active runtime file: `AEGIS/settings/.env`.
 
-- Local mode is the default workflow and runs without Docker.
-- Cloud mode runs with Docker (`backend` + `frontend`).
-- Desktop packaging runs with Tauri and a local packaged backend.
-- Mode switching is configuration-only: copy one profile into `AEGIS/settings/.env`.
-
-Runtime profiles:
+Profiles:
 - `AEGIS/settings/.env.local.example`
 - `AEGIS/settings/.env.local.tauri.example`
 - `AEGIS/settings/.env.cloud.example`
 - Active file: `AEGIS/settings/.env`
 
-## 3. Local Mode (Default)
+Use local mode for development, cloud mode for Docker deployment, and Tauri profile for desktop packaging.
 
-### 3.1 Windows One-Click Launcher
-Run:
+## 3. Local Setup (Default)
 
-```cmd
-AEGIS\start_on_windows.bat
-```
-
-The launcher:
-1. Downloads portable Python/uv/Node runtimes into `runtimes/` (repository root)
-2. Installs backend dependencies into `runtimes/.venv`
-3. Writes the runtime lockfile to `runtimes/uv.lock`
-4. Installs frontend dependencies (uses `npm ci` when lockfile exists, fallback to `npm install`)
-5. Builds frontend
-6. Starts backend + frontend
-
-Before running, set the active profile as local defaults:
+### Windows one-click launcher
 
 ```cmd
 copy /Y AEGIS\settings\.env.local.example AEGIS\settings\.env
+AEGIS\start_on_windows.bat
 ```
 
-### 3.2 macOS/Linux Manual Local Run
+The launcher prepares portable runtimes in `runtimes/`, installs dependencies, builds the frontend, and starts backend/frontend.
+
+### macOS/Linux manual run
 
 ```bash
 # from repository root
@@ -64,116 +47,57 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 5000
 ```
 
-### 3.3 Windows Desktop Packaging (Tauri)
-Prepare the desktop runtime profile:
+## 4. Desktop Packaging (Windows/Tauri)
 
 ```cmd
 copy /Y AEGIS\settings\.env.local.tauri.example AEGIS\settings\.env
-```
-
-Ensure the portable runtimes exist:
-
-```cmd
 AEGIS\start_on_windows.bat
-```
-
-Ensure Rust (MSVC toolchain) is installed for Tauri:
-
-```cmd
 rustup toolchain install stable-x86_64-pc-windows-msvc
 rustup default stable-x86_64-pc-windows-msvc
-```
-
-Build the packaged desktop artifacts:
-
-```cmd
 release\tauri\build_with_tauri.bat
 ```
 
-The user-facing outputs are exported to:
-
+Outputs:
 - `release/windows/installers`
 - `release/windows/portable`
 
-Regenerate desktop icon assets from the shared favicon source:
-
-```cmd
-cd AEGIS\client
-npm run tauri:icon
-```
-
-Clean desktop build outputs:
-
-```cmd
-cd AEGIS\client
-npm run tauri:clean
-```
-
-## 4. Cloud Mode (Docker)
-
-1. Activate cloud profile:
+## 5. Cloud Mode (Docker)
 
 ```cmd
 copy /Y AEGIS\settings\.env.cloud.example AEGIS\settings\.env
-```
-
-2. Build images:
-
-```bash
 docker compose --env-file AEGIS/settings/.env build --no-cache
-```
-
-3. Start containers:
-
-```bash
 docker compose --env-file AEGIS/settings/.env up -d
 ```
 
-4. Stop containers:
+Stop:
 
-```bash
+```cmd
 docker compose --env-file AEGIS/settings/.env down
 ```
 
-Cloud topology:
-- `backend`: FastAPI/Uvicorn (`:8000` internal)
-- `frontend`: Nginx serving SPA
-- Same-origin `/api/*` proxy from frontend to `http://backend:8000/`
+## 6. Practical Usage
+1. Open the workspace.
+2. Ask a geospatial question in chat (place name, coordinates, or requested overlays).
+3. Review the rendered map and layer controls.
+4. Open Settings to change model assignment, manage credentials, or configure Ollama.
 
-## 5. Configuration Contract
-Runtime keys in `AEGIS/settings/.env`:
+For full user-oriented guidance, see `assets/docs/USER_MANUAL.md`.
 
-- `FASTAPI_HOST`, `FASTAPI_PORT`, `UI_HOST`, `UI_PORT`, `VITE_API_BASE_URL`, `RELOAD`
-- `DB_EMBEDDED`, `DB_ENGINE`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- `DB_SSL`, `DB_SSL_CA`, `DB_CONNECT_TIMEOUT`, `DB_INSERT_BATCH_SIZE`
-- `OPTIONAL_DEPENDENCIES`, `MPLBACKEND`, `KERAS_BACKEND`
-
-`AEGIS/settings/configurations.json` remains the non-runtime fallback source.
-
-## 6. Tests
-Run automated E2E flow:
+## 7. Testing
+Run end-to-end flow:
 
 ```cmd
 tests\run_tests.bat
 ```
 
-The runner resolves host/port from `AEGIS/settings/.env`, exports:
-- `APP_TEST_FRONTEND_URL`
-- `APP_TEST_BACKEND_URL`
-
-and uses those URLs for readiness checks and pytest runtime config.
-
-Chat API coverage is in:
-- `tests/e2e/test_chat_api.py`
-
-Backend unit tests from a plain checkout:
+Run backend unit tests:
 
 ```cmd
 uv sync --extra test
 uv run pytest -q tests/unit
 ```
 
-Frontend production validation:
+Run frontend production validation:
 
 ```cmd
 cd AEGIS/client
@@ -181,22 +105,16 @@ npm install
 npm run build
 ```
 
-## 7. Screenshots
+## 8. Screenshots
 
 ![Geospatial search panel](figures/search_page.png)
-Search toolbar for entering a place or coordinates and selecting imagery options.
+Search and chat workspace.
 
 ![Map preview output](figures/database_browser.png)
-Map canvas area showing the generated output and summary metadata.
+Map canvas and output details.
 
-## 8. Setup and Maintenance
-Run `AEGIS/setup_and_maintenance.bat` for routine tasks:
+## 9. Maintenance
+Run `AEGIS/setup_and_maintenance.bat` for routine maintenance tasks (cleanup, DB initialization, layer updates, and build artifact cleanup).
 
-- Remove logs
-- Uninstall app runtime artifacts
-- Initialize database
-- Update NASA GIBS layers
-- Clean desktop build artifacts
-
-## 9. License
+## 10. License
 This project is licensed under the MIT license. See `LICENSE`.

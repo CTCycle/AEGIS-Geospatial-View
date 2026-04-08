@@ -1,144 +1,116 @@
 # AEGIS Geospatial View Architecture
 
-Last updated: 2026-04-06  
+Last updated: 2026-04-08
 Scope: `AEGIS/` and `tests/`
 
 ## 1. System Overview
 
-AEGIS Geospatial View accepts address or coordinate-based location searches, resolves location data, composes map overlays (NASA GIBS and OpenAQ), enriches results with elevation data, and returns a rendered map payload for the React UI.
+AEGIS Geospatial View is a chat-first geospatial application with a React frontend and FastAPI backend. The backend handles geospatial search orchestration, chat orchestration, model/provider settings, and map payload generation.
 
 Main stack:
 - Frontend: React 18 + TypeScript 5 + Vite 6 (`AEGIS/client`)
 - Backend: FastAPI (`AEGIS/server`)
 - Persistence: SQLAlchemy with SQLite (embedded) or PostgreSQL (external)
-- Mapping/rendering: Folium + Pillow
+- Rendering: Folium + Pillow
 
-## 2. Runtime and Deployment Assumptions
+## 2. Runtime and Deployment
 
 - Python requirement: `>=3.14` (`pyproject.toml`)
-- Frontend runtime: Node.js 22 (portable runtime installed by launcher)
+- Frontend runtime baseline: Node.js 22 (portable runtime in launcher flow)
+- Primary runtime config file: `AEGIS/settings/.env`
 - Local launcher: `AEGIS/start_on_windows.bat`
-- Test runner: `tests/run_tests.bat`
-- Default runtime configuration source: `AEGIS/settings/.env`
+- E2E runner: `tests/run_tests.bat`
 
-Important ports:
-- `.env` examples default to backend `5002`, frontend `5000`
-- launcher fallback defaults are also `5002`/`5000`
-- test runner fallback defaults are `8000`/`7861`, but `.env` overrides are applied when present
+Typical local defaults from env examples:
+- backend: `127.0.0.1:5002`
+- frontend: `127.0.0.1:5000`
 
 ## 3. Repository Layout
 
-- `AEGIS/client`: React application
-- `AEGIS/server`: FastAPI application
-- `AEGIS/server/api`: route handlers
+- `AEGIS/client`: frontend application
+- `AEGIS/server`: backend application
+- `AEGIS/server/api`: route modules (`search.py`, `chat.py`, `access_keys.py`)
+- `AEGIS/server/services`: orchestration, geospatial, jobs, llm/vector services
+- `AEGIS/server/repositories`: persistence and serializers
 - `AEGIS/server/domain`: request/response models
-- `AEGIS/server/services`: geospatial and job services
-- `AEGIS/server/repositories`: DB backends, schemas, serializers
-- `AEGIS/server/configurations`: server settings loader
-- `AEGIS/server/utils`: constants, logger, helpers
-- `AEGIS/settings`: `.env` and JSON configuration
-- `AEGIS/resources`: DB file, logs, templates, other local resources
-- `tests/e2e`: Playwright+pytest end-to-end tests
-- `runtimes`: portable Python/uv/Node and runtime lockfile
+- `AEGIS/settings`: runtime env and JSON settings
+- `AEGIS/resources`: local resources (manifests, runtime artifacts)
+- `tests/e2e`: Playwright + pytest end-to-end tests
 
-## 4. Backend API Surface
+## 4. API Surface
 
-Primary router prefix: `/maps`.
+Routers are mounted at both base and `/api` prefix in `AEGIS/server/app.py`.
 
-Routes:
-- `POST /maps/search`: synchronous location search and map payload generation
-- `POST /maps/jobs`: start async map search job
-- `GET /maps/jobs/{job_id}`: poll job status
-- `DELETE /maps/jobs/{job_id}`: request cooperative cancellation
+Maps router (`/maps`):
+- `GET /maps/catalog`
+- `POST /maps/search`
+- `POST /maps/jobs`
+- `GET /maps/jobs/{job_id}`
+- `DELETE /maps/jobs/{job_id}`
 
-Compatibility mount:
-- The same routes are also exposed under `/api` (for frontend proxy paths), for example `/api/maps/search`.
+Chat router (`/chat`):
+- `POST /chat/turn`
+- `POST /chat/stream`
+- `GET /chat/models`
+- `GET /chat/settings`
+- `PUT /chat/settings`
+- `POST /chat/models/ollama/refresh`
+- `POST /chat/models/ollama/pull`
+- `GET /chat/models/ollama/health`
+- `POST /chat/vectors/rebuild`
+- `POST /chat/vectors/sync`
 
-Chat router prefix: `/chat`.
-
-Routes:
-- `POST /chat/turn`: process one chat turn and optionally execute map search.
-- `POST /chat/stream`: stream turn events as NDJSON (`status`, `assistant_delta`, `tool_status`, `final`, `error`).
-- `GET /chat/models`: return cloud and local model catalogs.
-- `GET /chat/settings`: return persisted provider/model settings and masked credential presence.
-- `PUT /chat/settings`: update persisted provider/model settings and encrypted credentials.
-- `POST /chat/models/ollama/refresh`: refresh local Ollama model availability.
-- `POST /chat/models/ollama/pull`: request model pull from the configured Ollama server.
-- `GET /chat/models/ollama/health`: validate Ollama connectivity.
-- `POST /chat/vectors/rebuild`: rebuild vector index from manifests.
+Access keys router (`/access-keys`):
+- `GET /access-keys?provider=...`
+- `POST /access-keys`
+- `PUT /access-keys/{key_id}/activate?provider=...`
+- `DELETE /access-keys/{key_id}?provider=...`
 
 Root behavior:
-- If packaged SPA is available in Tauri mode, `/` serves frontend assets.
-- Otherwise `/` redirects to `/docs`.
+- In Tauri packaged mode with built frontend assets, `/` serves SPA files.
+- Otherwise, `/` redirects to `/docs`.
 
-## 5. Core Backend Flow
+## 5. Core Execution Flows
 
-1. Request enters FastAPI routes in `AEGIS/server/api/search.py`.
-2. Payload is validated via `LocationSearchRequest`.
-3. Location normalization/geocoding is performed by sanitization + Nominatim services.
-4. Search orchestration and job lifecycle are executed by `MapSearchExecutionService` in `AEGIS/server/services/search/execution.py`.
-5. Overlay selection and map composition are performed by `MapRenderingService` in `AEGIS/server/services/geospatial/rendering.py`.
-6. Optional enrichment is fetched from Open-Elevation and OpenAQ service integrations.
-7. Search session metadata is persisted through `DataSerializer`.
-8. JSON response returns `status_message` and `payload` with `satellite_imagery` content.
+Map search flow:
+1. Request validation in API/domain models.
+2. Location sanitization and geocoding.
+3. Search execution orchestration (`MapSearchExecutionService`).
+4. Layer/catalog composition and rendering (`MapRenderingService`).
+5. Optional external enrichment (OpenAQ, Open-Elevation, PVGIS).
+6. Persisted search session metadata and response payload return.
 
-Chat orchestration flow (`/chat/turn`, `/chat/stream`):
-- User turn is persisted in `chat_messages`.
-- Session-scoped in-memory history buffer is hydrated from DB on cache miss and capped by `chat.max_history_messages`.
-- A shared conversation context block (messages + `# extracted info`) is built and passed to parser, decision, and response models.
-- Assistant turn (message + structured/tool/map payloads) is persisted, then appended to the in-memory buffer.
-- DB remains the source of truth across process restarts.
+Chat flow:
+1. `chat_turn`/`chat_stream` receives a user turn.
+2. Vector index is ensured current (`VectorIndexer`).
+3. `AgentOrchestrator` processes parsing, decisioning, tool invocation, and assistant response.
+4. Structured/tool/map payloads are returned and persisted through repository-backed services.
 
-## 6. Background Job Model
+## 6. Background Jobs
 
-- Job execution is thread-based via `AEGIS/server/services/jobs.py`.
-- `JobManager` tracks status, progress, result, and error per job.
-- Cancellation is cooperative (`stop_requested`) and must be checked by worker logic.
-- Job routes are declared in `AEGIS/server/api/search.py` and handled by `MapSearchExecutionService`.
+- In-process, thread-based jobs are managed by `JobManager` (`AEGIS/server/services/jobs.py`).
+- Cancellation is cooperative and status is memory-backed.
+- Job state is not durable across process restarts.
 
-See `assets/docs/BACKGROUND_JOBS.md` for full details.
+## 7. Frontend Architecture
 
-## 7. Data Model Snapshot
+- Main shell: `AEGIS/client/src/App.tsx`
+- Route views:
+  - `/` chat + map workspace (`GeospatialPage.tsx`)
+  - `/settings` model/settings workspace (`SettingsPage.tsx`)
+- Chat panel drives map updates via assistant turns.
+- State persistence and navigation state are session-based (`sessionStorage`), with guardrails documented in `STATE_PRESERVATION.md`.
 
-Main SQLAlchemy entities in `AEGIS/server/repositories/schemas/models.py`:
-- `GEONAMES`
-- `GIBS_LAYERS`
-- `SEARCH_SESSIONS`
-- `MODEL_PROVIDER_SETTINGS`
-- `MODEL_CREDENTIALS` (encrypted values only)
-- `CHAT_SESSIONS`
-- `CHAT_MESSAGES`
-- `SESSION_CATALOG`
-- `SESSION_DETAILS`
+## 8. Integrations and Constraints
 
-Database backend choice:
-- Embedded SQLite when `DB_EMBEDDED=true`
-- PostgreSQL when `DB_EMBEDDED=false`
-
-## 8. Frontend Architecture
-
-- Single-page shell in `AEGIS/client/src/App.tsx`.
-- Primary workspace page: `AEGIS/client/src/pages/GeospatialPage.tsx`.
-- Settings page: `AEGIS/client/src/pages/SettingsPage.tsx`.
-- Layout: left chat toolbar + right map canvas.
-- Service layer for API calls: `AEGIS/client/src/services/api.ts`.
-- Browser path routing:
-  - `/` for chat/map workspace
-  - `/settings` for settings workspace
-- Route/UI state persistence uses `sessionStorage` with schema + TTL guardrails. See `assets/docs/STATE_PRESERVATION.md`.
-
-## 9. External Integrations
-
+External integrations:
 - OpenStreetMap Nominatim
 - NASA GIBS
 - OpenAQ
 - Open-Elevation
+- PVGIS
 
-These integrations are network-dependent; failures are surfaced as request errors (typically 400/502 depending on failure type).
-
-## 10. Known Constraints
-
-- No built-in authentication/authorization middleware for map endpoints.
-- External API availability can affect E2E and manual runs.
-- Job execution is in-process and thread-based, not queue-worker distributed.
-- In-memory chat history buffering is process-local optimization and is not shared across workers.
+Known constraints:
+- Background jobs are process-local.
+- External API availability impacts some runtime and test paths.
+- Cross-process distributed worker orchestration is not implemented in current architecture.

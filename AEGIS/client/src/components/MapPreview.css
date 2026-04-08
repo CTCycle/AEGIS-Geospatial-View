@@ -144,8 +144,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-muted);
-    font-size: 1rem;
+    color: #52688c;
+    font-size: 1.12rem;
 }
 
 @media (max-width: 700px) {

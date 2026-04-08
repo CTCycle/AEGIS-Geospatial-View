@@ -1,45 +1,37 @@
 # UI/UX Audit Report
 
-Date: 2026-04-03  
+Last updated: 2026-04-08
 Scope: `AEGIS/client/src`
 
-This report reflects the current implemented state (not a pre-implementation plan).
+This report reflects the current implemented state.
 
 ## 1. Current UI Baseline
 
-- App shell is minimal and switches between chat workspace and settings page.
-- Primary interface is a two-pane geospatial workspace:
-  - left agent chat toolbar
-  - right map canvas
+- Minimal app shell switching between workspace and settings.
+- Primary interface is a two-pane geospatial workspace.
 - Styling relies on centralized CSS variables in `src/index.css`.
-- Responsive behavior is implemented through breakpoints in page/component CSS.
+- Responsive behavior is implemented via component/page breakpoints.
 
 ## 2. Positive Findings
 
-- Shared design tokens exist for spacing, type scale, color, radius, and shadows.
-- Focus-visible styles are present for controls.
-- Reduced-motion fallback is implemented globally.
-- Layout structure uses semantic containers and clear region labeling.
+- Shared design tokens are in place.
+- Focus-visible styles exist for interactive controls.
+- Reduced-motion fallback exists globally.
+- Layout uses semantic containers and region labeling.
 
 ## 3. Remaining Improvement Areas
 
-### Medium
-- Some component CSS still uses literal values where equivalent tokens exist.
-- A small set of spacing/font-size literals could be normalized further for stricter consistency.
-
-### Medium
-- Validate keyboard traversal order and screen-reader verbosity across transcript streaming and settings model-card actions.
-
-### Low
-- Continue reducing ad-hoc visual variants unless tied to a documented UX requirement.
+- Normalize remaining literal spacing/font values to token usage.
+- Re-verify keyboard traversal and screen-reader verbosity during transcript streaming and settings actions.
+- Continue reducing ad-hoc visual variants unless they map to documented UX requirements.
 
 ## 4. Verification Recommendations
 
 After significant UI edits:
 1. Run `npm run build` in `AEGIS/client`.
-2. Run `tests/run_tests.bat` for E2E flow validation.
-3. Manually verify desktop and narrow viewport behavior for toolbar/canvas split.
+2. Run `tests/run_tests.bat` for E2E validation.
+3. Manually verify desktop and narrow viewport behavior.
 
 ## 5. Decision Record
 
-Older audit notes that referenced deprecated navigation/database-browser structures are considered obsolete and should not be used as implementation guidance.
+Deprecated notes tied to removed navigation/database-browser patterns are obsolete and should not guide implementation.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 const MIN_WIDTH = 280;
-const MAX_WIDTH = 560;
+const MAX_WIDTH = 760;
 const CANVAS_MIN_WIDTH = 320;
 
 interface UseResizableToolbarOptions {

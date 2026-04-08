@@ -1,49 +1,55 @@
 # AEGIS Documentation General Rules
 
-This file defines mandatory rules for documentation and engineering work in this repository.
+Last updated: 2026-04-08
 
-## 1. Table of documents
+This file defines mandatory documentation and engineering rules for this repository.
 
-- `ARCHITECTURE.md`: system layout, APIs, data flow, persistence.
-- `BACKGROUND_JOBS.md`: async/background search job lifecycle.
-- `GUIDELINES_PYTHON.md`: backend/service Python rules.
-- `GUIDELINES_TYPESCRIPT.md`: frontend/service TypeScript rules.
-- `GUIDELINES_TESTS.md`: test execution and test-writing conventions.
-- `PACKAGING_AND_RUNTIME_MODES.md`: launcher, Docker, and env profiles.
-- `UI_STANDARDS.md`: frontend visual, layout, and accessibility standards.
-- `README_WRITING.md`: README structure and quality requirements.
-- `UI_UX_AUDIT_REPORT.md`: current UI/UX status snapshot and known issues.
+## 1. Complete Documentation Inventory
+
+The `assets/docs` directory currently contains exactly these documentation files:
+
+- `AGENTIC_SEARCH.md`
+- `ARCHITECTURE.md`
+- `BACKGROUND_JOBS.md`
+- `GENERAL_RULES.md`
+- `GUIDELINES_PYTHON.md`
+- `GUIDELINES_TESTS.md`
+- `GUIDELINES_TYPESCRIPT.md`
+- `PACKAGING_AND_RUNTIME_MODES.md`
+- `STATE_PRESERVATION.md`
+- `UI_STANDARDS.md`
+- `UI_UX_AUDIT_REPORT.md`
+- `USER_MANUAL.md`
+
+This list is exhaustive and must be updated whenever files are added, removed, or renamed in `assets/docs`.
 
 ## 2. Source of Truth and Consistency
 
-- Keep `assets/docs` aligned with the actual code in `AEGIS/`, `tests/`, and runtime scripts.
-- Prefer concrete references (real paths, routes, env keys, versions) over generic guidance.
-- If two docs overlap, they must agree on terminology and behavior.
-- Remove stale product names and outdated implementation details.
+- Keep `assets/docs` aligned with actual code in `AEGIS/`, `tests/`, and runtime scripts.
+- Prefer concrete references (real paths, routes, env keys, versions).
+- If two docs overlap, terminology and behavior must remain consistent.
+- Remove stale or deprecated implementation guidance.
 
 ## 3. Documentation Update Triggers
 
-Update relevant docs whenever changes affect:
+Update affected docs when changes impact:
 - API routes, payloads, or error behavior.
-- Runtime setup, ports, environment variables, or packaging workflow.
-- UI structure, navigation model, or design tokens.
-- Test flow, tooling, or required prerequisites.
-- Architecture boundaries, service ownership, or persistence model.
+- Runtime setup, ports, environment variables, or packaging workflows.
+- UI structure, navigation model, settings workflow, or UX behavior.
+- Test tooling, runners, or prerequisites.
+- Architecture boundaries, persistence model, or external integrations.
 
 ## 4. Engineering Baselines
 
-- Use PowerShell for commands unless `.bat`/CMD syntax is required.
-- Keep changes small and scoped to the task.
-- Prefer reproducible commands and verifiable outcomes.
-- Follow secure defaults: validate inputs, do not hardcode secrets, minimize exposed surfaces.
+- Keep changes scoped and verifiable.
+- Use reproducible commands.
+- Validate inputs and avoid hardcoded secrets.
+- Preserve secure defaults and minimize accidental surface expansion.
 
-## 5. Skills Usage
+## 5. Completion Checks
 
-When a task maps to an available skill, use that skill guidance. Keep usage pragmatic and scoped.
-
-## 6. Final Check Before Completion
-
-Before finishing a docs task, ensure:
-- Terminology is consistent across files (project name, module names, runtime versions).
-- Route and path references match existing code.
-- Dates and scope labels reflect current intent (do not leave obsolete "pre-implementation" text when no longer true).
+Before closing documentation work:
+1. Verify doc references (paths/routes/commands) resolve to real code.
+2. Ensure all docs include `Last updated`.
+3. Ensure the inventory in this file is still complete and accurate.
+4. Ensure root `README.md` stays user-oriented (setup + practical usage first).
