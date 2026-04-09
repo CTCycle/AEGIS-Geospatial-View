@@ -10,6 +10,7 @@ import {
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import maplibregl, { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
 
 import {
@@ -291,9 +292,18 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private mapRef: Map | null = null;
   private viewInitialized = false;
 
+  constructor(private readonly sanitizer: DomSanitizer) {}
+
   get hasCenter(): boolean {
     return typeof this.mapSession?.center?.latitude === 'number'
       && typeof this.mapSession?.center?.longitude === 'number';
+  }
+
+  get embeddedMapHtml(): SafeHtml | null {
+    const mapHtml = this.payload?.satellite_imagery?.map_html;
+    return typeof mapHtml === 'string' && mapHtml.trim()
+      ? this.sanitizer.bypassSecurityTrustHtml(mapHtml)
+      : null;
   }
 
   ngAfterViewInit(): void {
@@ -376,6 +386,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private recreateMapIfPossible(): void {
+    if (this.embeddedMapHtml) {
+      this.destroyMap();
+      return;
+    }
     if (!this.viewInitialized || !this.mapContainerRef?.nativeElement || !this.hasCenter || !this.mapSession?.center) {
       return;
     }

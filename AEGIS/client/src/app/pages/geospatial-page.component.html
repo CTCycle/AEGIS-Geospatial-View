@@ -24,6 +24,17 @@
             aria-live="polite"
             (scroll)="onTranscriptScroll($event)"
           >
+            @if (!hasMessages) {
+              <section class="chat-welcome-card" aria-label="Suggested prompts">
+                <p class="chat-welcome-card__eyebrow">Operations Console</p>
+                <h2>Start with a place, coordinates, or overlay goal.</h2>
+                <ul class="chat-welcome-card__examples">
+                  <li>Show current satellite context for Rome, Italy.</li>
+                  <li>Map 41.9028, 12.4964 with environmental overlays.</li>
+                  <li>Compare air quality and traffic layers around Milan.</li>
+                </ul>
+              </section>
+            }
             @for (message of renderedMessages; track $index) {
               <article class="chat-message" [class]="'chat-message chat-message--' + message.role">
                 <header class="chat-message__role">{{ message.role }}</header>
@@ -72,7 +83,14 @@
     <section class="canvas-panel" aria-label="Map canvas">
       <header class="canvas-header" aria-label="Workspace header">
         <div class="canvas-header__actions">
-          <button type="button" class="canvas-header__icon-button" aria-label="Alerts">
+          <button
+            type="button"
+            class="canvas-header__icon-button"
+            [class.canvas-header__icon-button--active]="isAlertsOpen"
+            aria-label="Alerts"
+            [attr.aria-expanded]="isAlertsOpen"
+            (click)="toggleAlerts()"
+          >
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
               <path
                 d="M12 3.5a4.8 4.8 0 0 0-4.8 4.8v1.7c0 .8-.2 1.6-.6 2.3L5.1 15h13.8l-1.5-2.7a4.8 4.8 0 0 1-.6-2.3V8.3A4.8 4.8 0 0 0 12 3.5zm0 17a2.4 2.4 0 0 1-2.2-1.5h4.4A2.4 2.4 0 0 1 12 20.5z"
@@ -96,9 +114,26 @@
         </div>
       </header>
       <div class="canvas-panel__body">
+        @if (isAlertsOpen) {
+          <section class="workspace-alerts" role="status" aria-live="polite">
+            <header class="workspace-alerts__header">
+              <h2>Alerts</h2>
+              <p>{{ alertsSummary }}</p>
+            </header>
+            @if (activeAlertItems.length === 0) {
+              <p class="workspace-alerts__empty">No active alerts. Search results and map warnings will appear here.</p>
+            } @else {
+              <ul class="workspace-alerts__list">
+                @for (alert of activeAlertItems; track alert) {
+                  <li>{{ alert }}</li>
+                }
+              </ul>
+            }
+          </section>
+        }
         <app-map-preview
           [payload]="payload"
-          [isLoading]="false"
+          [isLoading]="isLoading"
           [emptyMessage]="'Ask the assistant for location-based map data or coordinates.'"
           [initialOverlayVisibility]="mapState.overlayVisibility"
           [initialOverlayOpacity]="mapState.overlayOpacity"
@@ -107,12 +142,14 @@
       </div>
     </section>
 
+    @if (showProgressIndicator) {
     <div class="chat-progress-indicator" aria-live="polite">
       @if (isLoading) {
         <span class="chat-progress-spinner" aria-hidden="true"></span>
       }
       <span>{{ progressPercent }}%</span>
     </div>
+    }
   </div>
 </div>
 

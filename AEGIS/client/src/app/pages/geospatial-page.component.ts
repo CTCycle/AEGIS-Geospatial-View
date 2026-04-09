@@ -5,8 +5,8 @@ import { Router } from '@angular/router';
 import { MapPreviewComponent } from '../components/map-preview.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedChatPageState } from '../core/app-state';
-import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatStreamEvent } from '../core/types';
-import { streamChatTurn } from '../core/api';
+import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse } from '../core/types';
+import { sendChatTurn } from '../core/api';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -33,6 +33,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   isLoading = false;
   progressPercent = 0;
   isResizing = false;
+  isAlertsOpen = false;
 
   private readonly minWidth = 280;
   private readonly maxWidth = 760;
@@ -82,9 +83,42 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     return [...this.messages, { role: 'assistant' as ChatRole, content: this.assistantDraft }];
   }
 
+  get hasMessages(): boolean {
+    return this.renderedMessages.length > 0;
+  }
+
+  get activeAlertItems(): string[] {
+    const alerts: string[] = [];
+    if (this.status === 'Failed') {
+      alerts.push('The last request failed before the map session updated.');
+    }
+    if (!this.payload?.map_session) {
+      alerts.push('No active map session is loaded yet.');
+    }
+    const warnings = this.payload?.compliance_warnings ?? this.payload?.map_session?.compliance_warnings ?? [];
+    warnings.forEach((warning) => alerts.push(String(warning)));
+    return alerts;
+  }
+
+  get alertsSummary(): string {
+    const count = this.activeAlertItems.length;
+    if (count === 0) {
+      return 'No active alerts';
+    }
+    return `${count} alert${count === 1 ? '' : 's'} active`;
+  }
+
+  get showProgressIndicator(): boolean {
+    return this.isLoading;
+  }
+
   navigateToSettings(): void {
     this.syncState();
     this.router.navigateByUrl('/settings');
+  }
+
+  toggleAlerts(): void {
+    this.isAlertsOpen = !this.isAlertsOpen;
   }
 
   startResize(): void {
@@ -145,20 +179,18 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     const message = trimmed;
     this.composerDraft = '';
     this.isLoading = true;
-    this.status = 'Submitting';
-    this.progressPercent = 8;
+    this.status = 'Searching map data';
+    this.progressPercent = 18;
     this.messages = [...this.messages, { role: 'user', content: message }];
     this.assistantDraft = '';
     this.syncState();
 
     try {
-      await streamChatTurn(
-        {
-          session_id: this.sessionId,
-          message,
-        },
-        (event) => this.pushEvent(event),
-      );
+      const result = await sendChatTurn({
+        session_id: this.sessionId,
+        message,
+      });
+      this.applyTurnResponse(result);
     } catch (error: unknown) {
       const fallback = String((error as { message?: string })?.message ?? error);
       this.status = 'Failed';
@@ -172,56 +204,32 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private pushEvent(event: ChatStreamEvent): void {
-    if (event.event === 'status') {
-      this.status = String(event.data.message ?? 'Running');
-      this.progressPercent = Math.max(this.progressPercent, 14);
-      this.syncState();
-      return;
+  private applyTurnResponse(result: ChatTurnResponse): void {
+    if (result.session_id > 0) {
+      this.sessionId = result.session_id;
     }
+    this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
-    if (event.event === 'assistant_delta') {
-      const delta = String(event.data.delta ?? '');
-      this.assistantDraft = `${this.assistantDraft}${delta}`;
-      this.progressPercent = Math.min(92, Math.max(this.progressPercent, 20 + Math.round(this.assistantDraft.length / 7)));
-      this.syncState();
-      return;
-    }
-
-    if (event.event === 'tool_status') {
-      this.status = 'Executing tools';
-      this.progressPercent = Math.max(this.progressPercent, 68);
-      this.syncState();
-      return;
-    }
-
-    if (event.event === 'error') {
-      this.status = 'Failed';
-      this.assistantDraft = '';
-      this.progressPercent = 0;
-      this.syncState();
-      return;
-    }
-
-    if (event.event === 'final') {
-      const finalMessage = String(event.data.assistant_message ?? this.assistantDraft ?? '');
-      const nextSessionId = Number(event.data.session_id ?? this.sessionId ?? 0);
-      const followUpRequired = Boolean(event.data.follow_up_required);
-      if (nextSessionId > 0) {
-        this.sessionId = nextSessionId;
+    if (result.tool_payload && typeof result.tool_payload === 'object') {
+      const nextPayload: SearchResponsePayload = {
+        ...this.payload,
+        ...(result.tool_payload as SearchResponsePayload),
+      };
+      if (result.map_session) {
+        nextPayload.map_session = result.map_session as MapSession;
       }
-      this.messages = [...this.messages, { role: 'assistant', content: finalMessage }];
-
-      const mapSession = event.data.map_session;
-      if (typeof mapSession === 'object' && mapSession !== null) {
-        this.handleMapSession(mapSession as MapSession);
-      }
-      this.assistantDraft = '';
-      this.status = followUpRequired ? 'Need more detail' : 'Complete';
-      this.progressPercent = 100;
-      this.syncState();
-      queueMicrotask(() => this.scrollTranscriptToBottom());
+      this.payload = nextPayload;
     }
+
+    const mapSession = result.map_session;
+    if (typeof mapSession === 'object' && mapSession !== null) {
+      this.handleMapSession(mapSession as MapSession);
+    }
+    this.assistantDraft = '';
+    this.status = result.follow_up_required ? 'Need more detail' : 'Complete';
+    this.progressPercent = 100;
+    this.syncState();
+    queueMicrotask(() => this.scrollTranscriptToBottom());
   }
 
   private handleMapSession(mapSession: MapSession | undefined): void {

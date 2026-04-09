@@ -200,6 +200,32 @@
     padding-right: 0.2rem;
 }
 
+.settings-empty-state {
+    display: grid;
+    gap: 0.55rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: rgb(245 249 255 / 92%);
+    box-shadow: var(--shadow-1);
+}
+
+.settings-empty-state h2,
+.settings-empty-state p {
+    margin: 0;
+}
+
+.settings-empty-state h2 {
+    font-size: 1rem;
+    color: var(--color-text-primary);
+}
+
+.settings-empty-state p {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+}
+
 .model-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -375,6 +401,11 @@
     padding: 0.9rem;
 }
 
+.settings-modal__form {
+    display: grid;
+    gap: 0.8rem;
+}
+
 .settings-modal__header,
 .settings-modal__footer {
     display: flex;
@@ -404,6 +435,21 @@
     color: var(--color-text-muted);
 }
 
+.settings-modal__body input {
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-sm);
+    background: rgb(255 255 255 / 94%);
+    min-height: 2.5rem;
+    padding: 0.55rem 0.7rem;
+}
+
+.settings-modal__status {
+    margin: 0;
+    font-size: var(--font-size-caption);
+    color: #35527c;
+    line-height: 1.45;
+}
+
 .settings-modal__footer--spread { justify-content: space-between; }
 
 @media (max-width: 1200px) {
@@ -419,6 +465,14 @@
     .settings-page__header {
         align-items: flex-start;
         flex-direction: column;
+        height: auto;
+        min-height: 0;
+        padding-bottom: 0.8rem;
+    }
+
+    .settings-page__header-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 
     .settings-page__content { padding-top: var(--space-3); }
@@ -431,6 +485,11 @@
         justify-content: flex-start;
     }
 
+    .provider-toggle {
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+
     .model-grid { grid-template-columns: 1fr; }
 
     .model-grid-scroll {
@@ -439,4 +498,13 @@
     }
 
     .model-search-bar { width: 100%; }
+
+    .settings-modal {
+        width: min(100vw - 1rem, 32rem);
+    }
+
+    .settings-modal__footer--spread {
+        align-items: stretch;
+        flex-direction: column;
+    }
 }

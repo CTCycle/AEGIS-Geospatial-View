@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = '/api';
+const DEFAULT_API_BASE_PATH = '/api';
 
 const trimTrailingSlashes = (value: string): string => {
   let normalized = value;
@@ -11,7 +11,7 @@ const trimTrailingSlashes = (value: string): string => {
 const normalizeApiBaseUrl = (value: string): string => {
   const candidate = value.trim();
   if (!candidate) {
-    return DEFAULT_API_BASE_URL;
+    return DEFAULT_API_BASE_PATH;
   }
   if (candidate.startsWith('/') && !candidate.startsWith('//')) {
     return trimTrailingSlashes(candidate);
@@ -19,14 +19,26 @@ const normalizeApiBaseUrl = (value: string): string => {
   if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
     return trimTrailingSlashes(candidate);
   }
-  return DEFAULT_API_BASE_URL;
+  return DEFAULT_API_BASE_PATH;
+};
+
+const computeDefaultApiBaseUrl = (): string => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_API_BASE_PATH;
+  }
+  const { protocol, hostname, port } = window.location;
+  const isLocalHost = hostname === '127.0.0.1' || hostname === 'localhost';
+  if (isLocalHost && port === '4980') {
+    return `${protocol}//${hostname}:6010/api`;
+  }
+  return DEFAULT_API_BASE_PATH;
 };
 
 const globalApiBase = typeof window !== 'undefined'
   ? String((window as Window & { __AEGIS_API_BASE_URL__?: string }).__AEGIS_API_BASE_URL__ || '')
   : '';
 
-export const API_BASE_URL = normalizeApiBaseUrl(globalApiBase);
+export const API_BASE_URL = normalizeApiBaseUrl(globalApiBase || computeDefaultApiBaseUrl());
 export const API_MAPS_SEARCH_PATH = '/maps/search';
 export const API_MAPS_CATALOG_PATH = '/maps/catalog';
 export const API_CHAT_TURN_PATH = '/chat/turn';
