@@ -1,0 +1,57 @@
+<div class="map-canvas">
+  <div class="map-content">
+    @if (isLoading) {
+      <div class="spinner-container">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+        <p class="loading-text">Rendering map...</p>
+      </div>
+    } @else if (!payload || (!payload.satellite_imagery && !payload.map_session)) {
+      <div class="empty-state">{{ emptyMessage }}</div>
+    } @else if (!hasCenter) {
+      <div class="empty-state">Map center unavailable for interactive rendering.</div>
+    } @else {
+      <div class="maplibre-wrap">
+        <div #mapContainer class="maplibre-container"></div>
+
+        @if (mapSession?.overlays?.length) {
+          <div class="overlay-controls">
+            @for (overlay of mapSession!.overlays!; track trackOverlay($index, overlay)) {
+              <div class="overlay-control-row">
+                <label>
+                  <input
+                    type="checkbox"
+                    [checked]="overlayVisibility[overlay.id]"
+                    (change)="setOverlayVisibility(overlay.id, $any($event.target).checked)"
+                  />
+                  {{ overlay.label }}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  [value]="getOpacityPercent(overlay)"
+                  (change)="setOverlayOpacity(overlay.id, $any($event.target).value)"
+                />
+              </div>
+            }
+          </div>
+        }
+
+        @if (mapSession?.compliance_warnings?.length) {
+          <div class="compliance-panel">
+            @for (warning of mapSession!.compliance_warnings!; track warning) {
+              <p>{{ warning }}</p>
+            }
+          </div>
+        }
+
+        @if (restoreNotice) {
+          <div class="compliance-panel" role="status" aria-live="polite">
+            <p>{{ restoreNotice }}</p>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+

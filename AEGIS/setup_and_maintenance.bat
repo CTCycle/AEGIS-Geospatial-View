@@ -82,10 +82,13 @@ goto :setup_menu
 
 :uninstall
 echo --------------------------------------------------------------------------
-echo This operation will remove uv artifacts, caches, local Python files in
-echo runtimes, the portable Node.js installation, and the runtime .venv
-echo directory. The embedded Python folder will be cleaned but the folder
-echo structure will be preserved.
+echo This operation will remove runtime/tooling artifacts for the app:
+echo - uv artifacts and caches
+echo - embeddable Python runtime and runtime .venv
+echo - portable Node.js runtime
+echo - Angular frontend build/cache artifacts (node_modules, dist, .angular)
+echo - frontend lockfile (package-lock.json)
+echo The repository source code is preserved.
 echo.
 set /p confirm="Type YES to continue: "
 if /i not "%confirm%"=="YES" (
@@ -128,6 +131,12 @@ if exist "%client_dir%\node_modules" (
   echo [INFO] Removed frontend node_modules at "%client_dir%\node_modules".
 ) else (
   echo [INFO] No frontend node_modules directory found to remove.
+)
+if exist "%client_dir%\.angular" (
+  rd /s /q "%client_dir%\.angular"
+  echo [INFO] Removed Angular cache directory "%client_dir%\.angular".
+) else (
+  echo [INFO] No Angular cache directory found to remove.
 )
 if exist "%nodejs_dir%" (
   rd /s /q "%nodejs_dir%"

@@ -317,7 +317,7 @@ echo [WARN] Timed out waiting for backend. Proceeding to launch frontend...
 echo [RUN] Launching frontend
 pushd "%FRONTEND_DIR%" >nul
 call :kill_port !UI_PORT!
-start "" /b "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT! --strictPort
+start "" /b "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT!
 popd >nul
 
 start "" "%UI_URL%"

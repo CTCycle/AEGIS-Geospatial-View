@@ -1,6 +1,6 @@
 # Web App State Preservation
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 Scope: `AEGIS/client/src`
 
 ## Overview
@@ -34,8 +34,8 @@ Settings workspace (`/settings`):
 
 - `/` -> chat/map workspace
 - `/settings` -> settings workspace
-- Back/forward handled via `popstate`.
-- Unknown paths normalize to `/`.
+- Back/forward is handled by Angular Router/browser history.
+- Unknown paths redirect to `/`.
 - Settings query-state deep links use:
   - `q=<search text>`
   - `mode=local|cloud`
@@ -48,7 +48,6 @@ Restore behavior:
 - transient runtime-only loading flags are not restored
 
 Clear behavior:
-- `401` or `403` API responses clear persisted state
 - corrupted storage payloads are discarded automatically
 
 ## Guardrails
