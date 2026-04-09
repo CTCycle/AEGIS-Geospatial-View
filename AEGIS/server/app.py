@@ -19,7 +19,6 @@ from AEGIS.server.utils.constants import (
     FASTAPI_TITLE,
     FASTAPI_VERSION,
 )
-from AEGIS.server.utils.variables import env_variables  # noqa: F401
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
