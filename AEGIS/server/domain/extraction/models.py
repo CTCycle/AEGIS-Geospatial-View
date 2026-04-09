@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
+###############################################################################
 class ExtractedLocation(BaseModel):
     address: str | None = None
     city: str | None = None
     country: str | None = None
 
-
+###############################################################################
 class ExtractedCoordinates(BaseModel):
     longitude: float | None = None
     latitude: float | None = None
 
-
+###############################################################################
 class ExtractedTimeReferences(BaseModel):
     year: int | None = None
     month: int | None = None
@@ -22,7 +22,7 @@ class ExtractedTimeReferences(BaseModel):
     start_time: list[str] = Field(default_factory=list)
     end_time: list[str] = Field(default_factory=list)
 
-
+###############################################################################
 class ExtractedIntent(BaseModel):
     location: ExtractedLocation = Field(default_factory=ExtractedLocation)
     coordinates: ExtractedCoordinates = Field(default_factory=ExtractedCoordinates)
@@ -33,7 +33,7 @@ class ExtractedIntent(BaseModel):
     area_of_interest: str | None = None
     certainty: float = Field(default=0.0, ge=0.0, le=1.0)
 
-
+###############################################################################
 class ExtractedIntentPatch(BaseModel):
     location: ExtractedLocation | None = None
     coordinates: ExtractedCoordinates | None = None

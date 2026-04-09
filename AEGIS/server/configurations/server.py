@@ -41,7 +41,7 @@ from AEGIS.server.utils.types import (
     coerce_str_or_none,
 )
 
-
+# -----------------------------------------------------------------------------
 def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
     embedded_default = coerce_bool(payload.get("embedded_database"), True)
     embedded = embedded_default

@@ -16,6 +16,7 @@ from AEGIS.server.repositories.session_details import SessionDetailsRepository
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.agent.parser_service import ParserService
+from AEGIS.server.services.agent.tools import AgentTools
 from AEGIS.server.services.chat.history_buffer import ChatHistoryBuffer
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.llm.factory import LLMFactory
@@ -38,6 +39,7 @@ class AgentOrchestrator:
         manifest_loader: GeospatialManifestLoader | None = None,
         session_catalog_repo: SessionCatalogRepository | None = None,
         session_details_repo: SessionDetailsRepository | None = None,
+        agent_tools: AgentTools | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.history_repo = history_repo or ChatHistoryRepository()
@@ -48,20 +50,46 @@ class AgentOrchestrator:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
         self.session_catalog_repo = session_catalog_repo or SessionCatalogRepository()
         self.session_details_repo = session_details_repo or SessionDetailsRepository()
+        self.agent_tools = agent_tools
+        nominatim_service = getattr(self.search_orchestrator, "nominatim_service", None)
+        catalog_service = getattr(self.search_orchestrator, "catalog_service", None)
+        if self.agent_tools is None and nominatim_service is not None and catalog_service is not None:
+            self.agent_tools = AgentTools(
+                nominatim_service=nominatim_service,
+                catalog_service=catalog_service,
+                search_orchestrator=self.search_orchestrator,
+            )
 
     def _build_retrieval_query(self, *, user_message: str, state: ExtractedIntent) -> str:
-        return " ".join(
-            [
-                user_message,
-                state.user_goal,
+        latest_request = user_message.strip()
+        resolved_location = ", ".join(
+            item
+            for item in [
+                state.location.address,
+                state.location.city,
+                state.location.country,
+            ]
+            if item
+        )
+        context_terms = " ".join(
+            item
+            for item in [
+                state.user_goal.strip(),
                 " ".join(state.filters),
                 state.base_map_type or "",
                 state.area_of_interest or "",
-                state.location.address or "",
-                state.location.city or "",
-                state.location.country or "",
             ]
-        ).strip()
+            if item
+        )
+        return " | ".join(
+            segment
+            for segment in [
+                latest_request,
+                f"resolved location: {resolved_location}" if resolved_location else "",
+                f"context: {context_terms}" if context_terms else "",
+            ]
+            if segment
+        )
 
     async def run_turn(self, request: ChatTurnRequest) -> ChatTurnResponse:
         started = perf_counter()
@@ -133,7 +161,7 @@ class AgentOrchestrator:
         search_result: dict[str, Any] | None = None
         map_session: dict[str, Any] | None = None
         tool_payload: dict[str, Any] | None = None
-        if decision.should_trigger_search:
+        if decision.execution_mode == "search" and decision.should_trigger_search:
             mapped_payload = map_structured_intent_to_location_request(
                 extracted_state=extracted_state.model_dump(mode="json"),
                 user_message=request.message,
@@ -145,7 +173,22 @@ class AgentOrchestrator:
             search_result = await self.search_orchestrator.execute(location_request)
             map_session = search_result.get("map_session")
             tool_payload = search_result.get("payload")
-        elif decision.decision == "clarify":
+        elif decision.execution_mode == "geocode":
+            geocode_result = (
+                await self.agent_tools.geocode_location(
+                    address=extracted_state.location.address,
+                    city=extracted_state.location.city,
+                    country_name=extracted_state.location.country,
+                )
+                if self.agent_tools is not None
+                else None
+            )
+            search_result = {"geocode_result": geocode_result}
+            tool_payload = {
+                "execution": "location_to_coordinates",
+                "result": geocode_result,
+            }
+        elif decision.execution_mode == "clarify":
             tool_payload = {"execution": "follow_up", "fallback_mode": "missing_location"}
 
         assistant_message = chat_service.generate(
@@ -198,7 +241,8 @@ class AgentOrchestrator:
             has_triggered_search=decision.should_trigger_search,
         )
 
-        follow_up_required = decision.decision in {"clarify", "search_with_follow_up"}
+        follow_up_required = decision.execution_mode == "clarify" or decision.decision == "search_with_follow_up"
+        fallback_mode = "needs_clarification" if follow_up_required else "none"
         return ChatTurnResponse(
             session_id=session.id,
             assistant_message=assistant_message,
@@ -207,5 +251,5 @@ class AgentOrchestrator:
             map_session=map_session,
             tool_payload=tool_payload,
             follow_up_required=follow_up_required,
-            fallback_mode="none" if decision.should_trigger_search else "needs_clarification",
+            fallback_mode=fallback_mode,
         )

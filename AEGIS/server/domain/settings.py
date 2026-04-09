@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
+###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
     embedded_database: bool
@@ -17,14 +17,14 @@ class DatabaseSettings:
     connect_timeout: int
     insert_batch_size: int
 
-
+###############################################################################
 @dataclass(frozen=True)
 class NominatimSettings:
     base_url: str
     user_agent: str
     timeout: float
 
-
+###############################################################################
 @dataclass(frozen=True)
 class GeospatialSettings:
     min_timeline_year: int
@@ -34,24 +34,24 @@ class GeospatialSettings:
     min_lon: float
     max_mercator_extent: float
 
-
+###############################################################################
 @dataclass(frozen=True)
 class MapSettings:
     default_size_m: float
     render_delay_s: float
     tiles: str
 
-
+###############################################################################
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
 
-
+###############################################################################
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
 
-
+###############################################################################
 @dataclass(frozen=True)
 class VectorRuntimeSettings:
     auto_sync_on_start: bool
@@ -59,7 +59,7 @@ class VectorRuntimeSettings:
     default_openai_embedding_model: str
     default_google_embedding_model: str
 
-
+###############################################################################
 @dataclass(frozen=True)
 class GIBSSettings:
     user_agent: str
@@ -79,7 +79,7 @@ class GIBSSettings:
     layer_sync_user_agent: str
     layer_sync_timeout: float
 
-
+###############################################################################
 @dataclass(frozen=True)
 class ServerSettings:
     database: DatabaseSettings

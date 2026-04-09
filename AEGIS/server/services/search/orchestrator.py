@@ -13,7 +13,7 @@ from AEGIS.server.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.services.geospatial.gibs import GIBSRequestError, GIBSValidationError
 from AEGIS.server.services.geospatial.layers import LayerProviderError
 from AEGIS.server.services.geospatial.maps import MapRequestError, MapValidationError
-from AEGIS.server.services.geospatial.normatim import NormatimService
+from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.sanitization import LocationSanitizationService
 from AEGIS.server.utils.constants import MAP_SEARCH_STATUS_MESSAGE
 from AEGIS.server.utils.logger import logger
@@ -26,14 +26,14 @@ class LocationSearchOrchestrator:
         self,
         *,
         sanitization_service: LocationSanitizationService,
-        normatim_service: NormatimService,
+        nominatim_service: NominatimService,
         catalog_service: GeospatialCatalogService,
         elevation_service: OpenElevationService,
         renderer: Any,
         toolkit: Any,
     ) -> None:
         self.sanitization_service = sanitization_service
-        self.normatim_service = normatim_service
+        self.nominatim_service = nominatim_service
         self.catalog_service = catalog_service
         self.elevation_service = elevation_service
         self.renderer = renderer
@@ -67,29 +67,29 @@ class LocationSearchOrchestrator:
                 payload.country,
             )
             response_payload["sanitized_location"] = sanitized_location
-            normatim_candidate = await self.normatim_service.extract_coordinates(
+            nominatim_candidate = await self.nominatim_service.extract_coordinates(
                 address=sanitized_location["address"] or "",
                 city=sanitized_location["city"],
                 country_name=sanitized_location["country"],
                 country_code=sanitized_location["country_code"],
             )
-            if normatim_candidate:
-                latitude = normatim_candidate.get("lat")
-                longitude = normatim_candidate.get("lon")
+            if nominatim_candidate:
+                latitude = nominatim_candidate.get("lat")
+                longitude = nominatim_candidate.get("lon")
                 if latitude is not None and longitude is not None:
                     try:
                         response_payload["latitude"] = float(latitude)
                         response_payload["longitude"] = float(longitude)
                     except (TypeError, ValueError):
                         pass
-                if normatim_candidate.get("bbox"):
-                    response_payload["bbox"] = normatim_candidate["bbox"]
-                if normatim_candidate.get("confidence") is not None:
-                    response_payload["confidence"] = normatim_candidate["confidence"]
+                if nominatim_candidate.get("bbox"):
+                    response_payload["bbox"] = nominatim_candidate["bbox"]
+                if nominatim_candidate.get("confidence") is not None:
+                    response_payload["confidence"] = nominatim_candidate["confidence"]
         elif payload.latitude is not None and payload.longitude is not None:
             response_payload["latitude"] = payload.latitude
             response_payload["longitude"] = payload.longitude
-            bbox = await self.normatim_service.extract_bbox_from_coordinates(
+            bbox = await self.nominatim_service.extract_bbox_from_coordinates(
                 latitude=payload.latitude,
                 longitude=payload.longitude,
             )

@@ -10,7 +10,7 @@ from AEGIS.server.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.services.geospatial.gibs import GIBSService
 from AEGIS.server.services.geospatial.layers import LayerProviderService
 from AEGIS.server.services.geospatial.maps import MapService
-from AEGIS.server.services.geospatial.normatim import NormatimService
+from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.geospatial.openaq import OpenAQService
 from AEGIS.server.services.geospatial.pvgis import PVGISService
 from AEGIS.server.services.geospatial.rendering import MapRenderingService, MapSearchToolkit
@@ -28,7 +28,7 @@ from AEGIS.server.utils.constants import (
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 
 sanitization_service = LocationSanitizationService()
-normatim_service = NormatimService()
+nominatim_service = NominatimService()
 gibs_service = GIBSService()
 map_service = MapService()
 layer_service = LayerProviderService(
@@ -55,7 +55,7 @@ rendering_service = MapRenderingService(
 search_execution = MapSearchExecutionService(
     router=router,
     sanitization_service=sanitization_service,
-    normatim_service=normatim_service,
+    nominatim_service=nominatim_service,
     toolkit=toolkit,
     rendering_service=rendering_service,
     job_manager=job_manager,
