@@ -3,13 +3,18 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@ang
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
+import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
+import {
+  ModelRole,
+  buildModelSelectionPayload,
+  buildSelectedModelStats,
+} from '../core/model-selection';
 import {
   ModelCardDescriptor,
   ModelProviderMode,
   ModelSettingsResponse,
-  ModelSettingsUpdateRequest,
 } from '../core/types';
 import {
   checkOllamaHealth,
@@ -23,7 +28,7 @@ import {
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ModelRoleActionsComponent],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
@@ -133,39 +138,7 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
   }
 
   get selectedModelStats(): Array<{ model: string; provider: string; local: boolean; assignedRoles: string[] }> {
-    const localModelIds = this.localModelIds;
-    const rows = new Map<string, { model: string; provider: string; local: boolean; assignedRoles: string[] }>();
-    const assignments = [
-      { role: 'Parser', provider: this.settings.parser_model_provider, name: this.settings.parser_model_name },
-      { role: 'Chat', provider: this.settings.chat_model_provider, name: this.settings.chat_model_name },
-      { role: 'Agent', provider: this.settings.agent_model_provider, name: this.settings.agent_model_name },
-    ];
-
-    assignments.forEach(({ role, provider, name }) => {
-      const normalizedProvider = provider.trim();
-      const normalizedName = name.trim();
-      if (!normalizedProvider || !normalizedName) {
-        return;
-      }
-      const key = `${normalizedProvider}:${normalizedName}`;
-      const existing = rows.get(key);
-      const local = localModelIds.has(normalizedName);
-      if (existing) {
-        existing.local = existing.local || local;
-        if (!existing.assignedRoles.includes(role)) {
-          existing.assignedRoles.push(role);
-        }
-        return;
-      }
-      rows.set(key, {
-        model: normalizedName,
-        provider: normalizedProvider,
-        local,
-        assignedRoles: [role],
-      });
-    });
-
-    return Array.from(rows.values());
+    return buildSelectedModelStats(this.settings, this.localModelIds);
   }
 
   setSearchText(value: string): void {
@@ -185,24 +158,18 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
     this.showLocalOnly = checked;
   }
 
-  async applyModelSelection(kind: 'parser' | 'agent' | 'chat', model: ModelCardDescriptor): Promise<void> {
-    const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
-    const payload: ModelSettingsUpdateRequest = {
-      ...this.settings,
-      active_provider_mode: nextProviderMode,
-      chat_model_provider: kind === 'chat' ? model.provider : this.settings.chat_model_provider,
-      chat_model_name: kind === 'chat' ? model.name : this.settings.chat_model_name,
-      parser_model_provider: kind === 'parser' ? model.provider : this.settings.parser_model_provider,
-      parser_model_name: kind === 'parser' ? model.name : this.settings.parser_model_name,
-      agent_model_provider: kind === 'agent' ? model.provider : this.settings.agent_model_provider,
-      agent_model_name: kind === 'agent' ? model.name : this.settings.agent_model_name,
-    };
+  onLocalOnlyChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.setShowLocalOnly(Boolean(target?.checked));
+  }
 
+  async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
+    const payload = buildModelSelectionPayload(this.settings, role, model);
     try {
       const updated = await updateChatSettings(payload);
       this.settings = updated;
       this.providerMode = updated.active_provider_mode;
-      this.statusText = `Selected ${model.name} for ${kind}`;
+      this.statusText = `Selected ${model.name} for ${role}`;
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
@@ -277,18 +244,6 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
     } catch (error: unknown) {
       this.statusText = this.toErrorText(error);
     }
-  }
-
-  isSelectedForParser(model: ModelCardDescriptor): boolean {
-    return model.provider === this.settings.parser_model_provider && model.name === this.settings.parser_model_name;
-  }
-
-  isSelectedForChat(model: ModelCardDescriptor): boolean {
-    return model.provider === this.settings.chat_model_provider && model.name === this.settings.chat_model_name;
-  }
-
-  isSelectedForAgent(model: ModelCardDescriptor): boolean {
-    return model.provider === this.settings.agent_model_provider && model.name === this.settings.agent_model_name;
   }
 
   navigateBack(): void {

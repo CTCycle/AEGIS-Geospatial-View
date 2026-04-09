@@ -14,3 +14,18 @@ from AEGIS.server.repositories.schemas.models import (
     SessionCatalogRecord,
     SessionDetailsRecord,
 )
+
+__all__ = [
+    "AccessKeyRecord",
+    "Base",
+    "ChatMessageRecord",
+    "ChatSessionRecord",
+    "GeonamesRecord",
+    "GibsLayerRecord",
+    "ManifestEmbeddingRecord",
+    "ModelCredentialRecord",
+    "ModelProviderSettingsRecord",
+    "SearchSessionRecord",
+    "SessionCatalogRecord",
+    "SessionDetailsRecord",
+]

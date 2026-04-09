@@ -119,6 +119,11 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.syncState();
   }
 
+  onComposerInput(event: Event): void {
+    const target = event.target as HTMLTextAreaElement | null;
+    this.onComposerChange(target?.value ?? '');
+  }
+
   onComposerKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();

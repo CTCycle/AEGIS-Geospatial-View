@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.extraction.models import ExtractedIntent

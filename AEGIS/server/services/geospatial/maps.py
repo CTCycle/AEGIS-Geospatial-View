@@ -16,7 +16,6 @@ from AEGIS.server.utils.constants import (
     MIN_GEO_LAT,
     MIN_LONGITUDE,
 )
-from AEGIS.server.utils.logger import logger
 
 type BBox = list[float]
 

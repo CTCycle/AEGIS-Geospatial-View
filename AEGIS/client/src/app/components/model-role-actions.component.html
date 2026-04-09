@@ -1,0 +1,7 @@
+<div class="model-card__actions">
+  @for (role of roles; track role) {
+    <button type="button" [class.active]="isSelected(role)" (click)="onSelect(role)">
+      {{ getLabel(role) }}
+    </button>
+  }
+</div>

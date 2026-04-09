@@ -5,7 +5,6 @@ import math
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -37,7 +36,10 @@ from AEGIS.server.repositories.database import database
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
-type ClampFn = Callable[[float, float, float], float]
+
+
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(min(value, upper), lower)
 
 
 ###############################################################################
@@ -886,7 +888,6 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def lonlat_to_mercator(self, lon: float, lat: float) -> tuple[float, float]:
-        clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lon_clamped = clamp(lon, MIN_LONGITUDE, MAX_LONGITUDE)
         lat_clamped = clamp(lat, MIN_MERCATOR_LAT, MAX_MERCATOR_LAT)
         x = (lon_clamped * ORIGIN_SHIFT) / 180.0
@@ -896,7 +897,6 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def compute_geographic_bbox(self, lon: float, lat: float, radius_m: float) -> BBox:
-        clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lat_clamped = clamp(lat, MIN_GEO_LAT, MAX_GEO_LAT)
         lat_rad = math.radians(lat_clamped)
         cos_lat = math.cos(lat_rad)

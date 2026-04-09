@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import operator
 from collections.abc import Callable
 from datetime import time
 from typing import Any
@@ -227,7 +228,7 @@ class LocationSearchRequest(BaseModel):
                 )
         if self.bbox:
             minx, miny, maxx, maxy = self.bbox
-            comparator: RangeComparator = lambda lower, upper: lower < upper
+            comparator: RangeComparator = operator.lt
             if not comparator(minx, maxx) or not comparator(miny, maxy):
                 raise ValueError("BBox min values must be smaller than max values.")
             if self.image_crs == "EPSG:3857":
