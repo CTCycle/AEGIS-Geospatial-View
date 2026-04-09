@@ -39,7 +39,7 @@ pnpm-debug.log*
 lerna-debug.log*
 package-lock.json
 yarn.lock
-.angular/cache/**
+**/.angular/
 
 # IDE / OS
 .vscode/
@@ -49,6 +49,7 @@ yarn.lock
 Thumbs.db
 
 # Misc
+.tmp_logs/
 Cargo.toml
 *.lock
 *.log
