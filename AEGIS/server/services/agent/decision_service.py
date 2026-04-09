@@ -46,31 +46,34 @@ class DecisionService:
                 reasoning_summary="Missing location",
             )
 
-        provider = self.llm_factory.get_agent_provider(self.provider)
-        request = ChatCompletionRequest(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": AGENT_DECISION_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": conversation_context,
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "user_message": user_message,
-                            "extracted_state": extracted_state.model_dump(mode="json"),
-                            "retrieval": retrieval,
-                        }
-                    ),
-                },
-            ],
-        )
-        raw = provider.chat(request).content
         try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
+            provider = self.llm_factory.get_agent_provider(self.provider)
+            request = ChatCompletionRequest(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": AGENT_DECISION_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": conversation_context,
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "user_message": user_message,
+                                "extracted_state": extracted_state.model_dump(mode="json"),
+                                "retrieval": retrieval,
+                            }
+                        ),
+                    },
+                ],
+            )
+            raw = provider.chat(request).content
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                payload = {}
+        except Exception:
             payload = {}
         if not isinstance(payload, dict):
             payload = {}

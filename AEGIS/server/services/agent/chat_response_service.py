@@ -27,27 +27,33 @@ class ChatResponseService:
         retrieval: dict[str, list[dict[str, object]]],
         search_result: dict[str, Any] | None,
     ) -> str:
-        provider = self.llm_factory.get_chat_provider(self.provider)
-        payload = {
-            "user_message": user_message,
-            "extracted_state": extracted_state.model_dump(mode="json"),
-            "decision": decision.model_dump(mode="json"),
-            "retrieval": retrieval,
-            "search_result": search_result,
-        }
-        result = provider.chat(
-            ChatCompletionRequest(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": AGENT_RESPONSE_PROMPT},
-                    {"role": "user", "content": conversation_context},
-                    {"role": "user", "content": json.dumps(payload, default=str)},
-                ],
+        try:
+            provider = self.llm_factory.get_chat_provider(self.provider)
+            payload = {
+                "user_message": user_message,
+                "extracted_state": extracted_state.model_dump(mode="json"),
+                "decision": decision.model_dump(mode="json"),
+                "retrieval": retrieval,
+                "search_result": search_result,
+            }
+            result = provider.chat(
+                ChatCompletionRequest(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": AGENT_RESPONSE_PROMPT},
+                        {"role": "user", "content": conversation_context},
+                        {"role": "user", "content": json.dumps(payload, default=str)},
+                    ],
+                )
             )
-        )
-        text = (result.content or "").strip()
-        if text:
-            return text
+            text = (result.content or "").strip()
+            if text:
+                return text
+        except Exception:
+            pass
+
+        if search_result is not None:
+            return "Search executed successfully."
         if decision.clarification_question:
             return decision.clarification_question
         return "I completed this geospatial turn."
