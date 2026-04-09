@@ -39,7 +39,7 @@ pnpm-debug.log*
 lerna-debug.log*
 package-lock.json
 yarn.lock
-**/.angular/
+.angular/**
 
 # IDE / OS
 .vscode/

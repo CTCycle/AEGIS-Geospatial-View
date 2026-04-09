@@ -23,7 +23,7 @@ from AEGIS.server.utils.logger import logger
 
 
 ###############################################################################
-class NormatimService:
+class NominatimService:
     base_url = server_settings.nominatim.base_url
 
     def __init__(
@@ -163,12 +163,12 @@ class NormatimService:
             with urlopen(request, timeout=self.timeout) as response:
                 payload = response.read()
         except (HTTPError, URLError, socket.timeout, TimeoutError) as exc:
-            logger.warning("Normatim %s request failed: %s", request_kind, exc)
+            logger.warning("Nominatim %s request failed: %s", request_kind, exc)
             return None
         try:
             data = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            logger.warning("Normatim %s response parsing failed: %s", request_kind, exc)
+            logger.warning("Nominatim %s response parsing failed: %s", request_kind, exc)
             return None
         self._cache_set(cache, cache_key, data)
         return data

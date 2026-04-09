@@ -52,6 +52,18 @@ class ChatResponseService:
         except Exception:
             pass
 
+        if not decision.feasibility.is_supported:
+            return (
+                decision.feasibility.blocking_reason
+                or "I can only help with location-based geospatial requests."
+            )
+        geocode_result = search_result.get("geocode_result") if isinstance(search_result, dict) else None
+        if isinstance(geocode_result, dict):
+            latitude = geocode_result.get("lat")
+            longitude = geocode_result.get("lon")
+            if latitude is not None and longitude is not None:
+                return f"Coordinates: {latitude}, {longitude}."
+            return "I could not resolve coordinates for that location."
         if search_result is not None:
             return "Search executed successfully."
         if decision.clarification_question:

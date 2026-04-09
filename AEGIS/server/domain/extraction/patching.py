@@ -8,7 +8,7 @@ from AEGIS.server.domain.extraction.models import (
     ExtractedTimeReferences,
 )
 
-
+###############################################################################
 def _merge_location(base: ExtractedLocation, patch: ExtractedLocation | None) -> ExtractedLocation:
     if patch is None:
         return base
@@ -18,7 +18,7 @@ def _merge_location(base: ExtractedLocation, patch: ExtractedLocation | None) ->
         country=patch.country if patch.country is not None else base.country,
     )
 
-
+###############################################################################
 def _merge_coordinates(
     base: ExtractedCoordinates, patch: ExtractedCoordinates | None
 ) -> ExtractedCoordinates:
@@ -29,7 +29,7 @@ def _merge_coordinates(
         latitude=patch.latitude if patch.latitude is not None else base.latitude,
     )
 
-
+###############################################################################
 def _merge_time(
     base: ExtractedTimeReferences, patch: ExtractedTimeReferences | None
 ) -> ExtractedTimeReferences:
@@ -44,7 +44,7 @@ def _merge_time(
         end_time=list(patch.end_time) if patch.end_time else list(base.end_time),
     )
 
-
+###############################################################################
 def merge_extracted_intent(base: ExtractedIntent, patch: ExtractedIntentPatch) -> ExtractedIntent:
     merged_coordinates = _merge_coordinates(base.coordinates, patch.coordinates)
     merged_location = _merge_location(base.location, patch.location)

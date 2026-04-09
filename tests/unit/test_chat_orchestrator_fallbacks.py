@@ -6,7 +6,15 @@ from AEGIS.server.domain.chat import ChatTurnRequest
 from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
 
 
+class _VectorRetrieverStub:
+    def retrieve_candidates(self, query, *, top_k=8):  # noqa: ANN001
+        return {"basemaps": [], "overlays": [], "providers": []}
+
+
 class _SearchOrchestratorStub:
+    nominatim_service = object()
+    catalog_service = object()
+
     async def execute(self, payload):  # noqa: ANN001
         return {
             "payload": {"ok": True},
@@ -32,6 +40,7 @@ def test_chat_orchestrator_falls_back_when_llm_unavailable_for_coordinate_prompt
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
         llm_factory=_FailingFactory(),
+        vector_retriever=_VectorRetrieverStub(),
     )
 
     result = asyncio.run(

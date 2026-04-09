@@ -27,7 +27,6 @@ class VectorRetriever:
         matches = self.store.similarity_search(query, top_k=top_k)
         basemaps: list[dict[str, object]] = []
         overlays: list[dict[str, object]] = []
-        providers: list[dict[str, object]] = []
         seen: set[str] = set()
         for item in matches:
             metadata = item.get("metadata", {})
@@ -41,16 +40,14 @@ class VectorRetriever:
             score = float(item.get("score", 0.0) or 0.0)
             candidate = {"id": entry_id, "score": score, "distance": distance, "metadata": metadata}
             document_kind = str(metadata.get("document_kind") or "")
-            if document_kind == "provider":
-                providers.append(candidate)
-            elif document_kind == "basemap":
+            if document_kind == "basemap":
                 basemaps.append(candidate)
-            else:
+            elif document_kind == "overlay":
                 overlays.append(candidate)
         return {
             "basemaps": self._limit_ranked(basemaps, basemap_k or top_k),
             "overlays": self._limit_ranked(overlays, overlay_k or top_k),
-            "providers": self._limit_ranked(providers, provider_k or top_k),
+            "providers": [],
         }
 
     def retrieve_layers(self, query: str, *, top_k: int = 8) -> dict[str, list[str]]:

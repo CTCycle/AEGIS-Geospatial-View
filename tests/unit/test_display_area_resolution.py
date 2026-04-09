@@ -36,7 +36,7 @@ class _SanitizationStub:
         return {"address": address, "city": city, "country": country, "country_code": "it"}
 
 
-class _NormatimCitySuccessStub:
+class _NominatimCitySuccessStub:
     async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
         if city == "Rome":
             return {"lat": 41.9, "lon": 12.5, "bbox": [12.4, 41.8, 12.6, 42.0], "confidence": 0.9}
@@ -46,7 +46,7 @@ class _NormatimCitySuccessStub:
         return [longitude - 0.1, latitude - 0.1, longitude + 0.1, latitude + 0.1]
 
 
-class _NormatimFailStub:
+class _NominatimFailStub:
     async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
         return None
 
@@ -85,10 +85,10 @@ def _build_renderer_service() -> MapRenderingService:
     return service
 
 
-def _build_orchestrator(normatim_service) -> LocationSearchOrchestrator:  # noqa: ANN001
+def _build_orchestrator(nominatim_service) -> LocationSearchOrchestrator:  # noqa: ANN001
     return LocationSearchOrchestrator(
         sanitization_service=_SanitizationStub(),
-        normatim_service=normatim_service,
+        nominatim_service=nominatim_service,
         catalog_service=_CatalogStub(),
         elevation_service=_ElevationStub(),
         renderer=_RendererStub(),
@@ -114,7 +114,7 @@ def test_derive_map_bbox_prefers_explicit_bbox() -> None:
 
 
 def test_city_only_location_resolves_without_generic_extent_error() -> None:
-    orchestrator = _build_orchestrator(_NormatimCitySuccessStub())
+    orchestrator = _build_orchestrator(_NominatimCitySuccessStub())
     payload = LocationSearchRequest(city="Rome")
     result = asyncio.run(orchestrator.execute(payload))
     assert result["payload"].get("latitude") is not None
@@ -122,7 +122,7 @@ def test_city_only_location_resolves_without_generic_extent_error() -> None:
 
 
 def test_unresolved_location_fails_with_actionable_error() -> None:
-    orchestrator = _build_orchestrator(_NormatimFailStub())
+    orchestrator = _build_orchestrator(_NominatimFailStub())
     payload = LocationSearchRequest(city="Unknown Place", country="Nowhere Land")
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(orchestrator.execute(payload))

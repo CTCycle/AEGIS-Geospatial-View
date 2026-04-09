@@ -21,7 +21,7 @@ from AEGIS.server.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.services.geospatial.gibs import GIBSRequestError, GIBSValidationError
 from AEGIS.server.services.geospatial.layers import LayerProviderError
 from AEGIS.server.services.geospatial.maps import MapRequestError, MapValidationError
-from AEGIS.server.services.geospatial.normatim import NormatimService
+from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.geospatial.rendering import (
     CoordinatePair,
     MapRenderingService,
@@ -82,7 +82,7 @@ class MapSearchExecutionService:
         self,
         router: APIRouter,
         sanitization_service: LocationSanitizationService,
-        normatim_service: NormatimService,
+        nominatim_service: NominatimService,
         toolkit: MapSearchToolkit,
         rendering_service: MapRenderingService,
         job_manager: JobManager,
@@ -91,7 +91,7 @@ class MapSearchExecutionService:
     ) -> None:
         self.router = router
         self.sanitization_service = sanitization_service
-        self.normatim_service = normatim_service
+        self.nominatim_service = nominatim_service
         self.toolkit = toolkit
         self.renderer = rendering_service
         self.job_manager = job_manager
@@ -100,7 +100,7 @@ class MapSearchExecutionService:
         self.serializer = DataSerializer()
         self.orchestrator = LocationSearchOrchestrator(
             sanitization_service=sanitization_service,
-            normatim_service=normatim_service,
+            nominatim_service=nominatim_service,
             catalog_service=catalog_service,
             elevation_service=elevation_service,
             renderer=rendering_service,

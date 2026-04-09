@@ -39,7 +39,7 @@
               (input)="onComposerInput($event)"
               (keydown)="onComposerKeydown($event)"
               [disabled]="isLoading"
-              placeholder="Ask for a place, coordinates, or environmental overlay."
+              placeholder="Ask for a location, map data, or coordinates for a place."
             ></textarea>
             <button
               type="button"
@@ -99,7 +99,7 @@
         <app-map-preview
           [payload]="payload"
           [isLoading]="false"
-          [emptyMessage]="'Ask the assistant to run a geospatial search.'"
+          [emptyMessage]="'Ask the assistant for location-based map data or coordinates.'"
           [initialOverlayVisibility]="mapState.overlayVisibility"
           [initialOverlayOpacity]="mapState.overlayOpacity"
           (overlayStateChange)="onOverlayStateChange($event)"
