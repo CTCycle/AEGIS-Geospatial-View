@@ -39,6 +39,7 @@ pnpm-debug.log*
 lerna-debug.log*
 package-lock.json
 yarn.lock
+.angular/cache/**
 
 # IDE / OS
 .vscode/
@@ -55,10 +56,6 @@ Cargo.toml
 *.sqlite*
 *.exe
 
-
 !.gitkeep
 
 
-
-
-AEGIS/settings/.env
