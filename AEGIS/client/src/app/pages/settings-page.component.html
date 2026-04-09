@@ -41,7 +41,7 @@
 
             @if (providerFilter === 'ollama') {
               <label class="settings-page__local-filter">
-                <input type="checkbox" [checked]="showLocalOnly" (change)="setShowLocalOnly($any($event.target).checked)" />
+                <input type="checkbox" [checked]="showLocalOnly" (change)="onLocalOnlyChange($event)" />
                 <span>Select all available</span>
               </label>
             }
@@ -82,17 +82,11 @@
 
                     <p>{{ model.description }}</p>
 
-                    <div class="model-card__actions">
-                      <button type="button" [class.active]="isSelectedForParser(model)" (click)="applyModelSelection('parser', model)">
-                        {{ isSelectedForParser(model) ? 'Parser model' : 'Use for parser' }}
-                      </button>
-                      <button type="button" [class.active]="isSelectedForChat(model)" (click)="applyModelSelection('chat', model)">
-                        {{ isSelectedForChat(model) ? 'Chat model' : 'Use for chat' }}
-                      </button>
-                      <button type="button" [class.active]="isSelectedForAgent(model)" (click)="applyModelSelection('agent', model)">
-                        {{ isSelectedForAgent(model) ? 'Agent model' : 'Use for agent' }}
-                      </button>
-                    </div>
+                    <app-model-role-actions
+                      [model]="model"
+                      [settings]="settings"
+                      (selectRole)="applyModelSelection($event, model)"
+                    ></app-model-role-actions>
                   </article>
                 }
               </div>

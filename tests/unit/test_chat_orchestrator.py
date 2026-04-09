@@ -4,7 +4,7 @@ import asyncio
 
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.chat import ChatTurnRequest
-from AEGIS.server.domain.extraction.models import ExtractedIntent, ExtractedIntentPatch
+from AEGIS.server.domain.extraction.models import ExtractedIntentPatch
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.agent.orchestrator import AgentOrchestrator

@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 import warnings
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,12 +10,17 @@ from fastapi.staticfiles import StaticFiles
 from AEGIS.server.api.access_keys import router as access_keys_router
 from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
+from AEGIS.server.configurations import server_settings
+from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
+from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.utils.constants import (
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
     FASTAPI_VERSION,
 )
 from AEGIS.server.utils.variables import env_variables  # noqa: F401
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def tauri_mode_enabled() -> bool:
@@ -40,6 +43,16 @@ app = FastAPI(
     version=FASTAPI_VERSION,
     description=FASTAPI_DESCRIPTION,
 )
+
+
+@app.on_event("startup")
+def initialize_embedded_database_on_first_startup() -> None:
+    settings = server_settings.database
+    if not settings.embedded_database:
+        return
+    db_path = SQLiteRepository(settings).db_path
+    if db_path and not os.path.exists(db_path):
+        initialize_sqlite_database(settings)
 
 routers = [search_router, chat_router, access_keys_router]
 

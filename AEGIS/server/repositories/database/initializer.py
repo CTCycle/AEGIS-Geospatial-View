@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import urllib.parse
 
 import sqlalchemy
@@ -66,6 +67,15 @@ def initialize_sqlite_database(settings: DatabaseSettings) -> None:
 
 
 # -----------------------------------------------------------------------------
+def should_initialize_sqlite_database(settings: DatabaseSettings) -> bool:
+    repository = SQLiteRepository(settings)
+    db_path = repository.db_path
+    if not db_path:
+        return False
+    return not os.path.exists(db_path)
+
+
+# -----------------------------------------------------------------------------
 def build_postgres_database_exists_statement() -> TextClause:
     return sqlalchemy.text("SELECT 1 FROM pg_database WHERE datname=:name")
 
@@ -108,6 +118,9 @@ def validate_postgres_schema(settings: DatabaseSettings) -> None:
 def run_database_initialization() -> None:
     settings = server_settings.database
     if settings.embedded_database:
+        if not should_initialize_sqlite_database(settings):
+            logger.info("SQLite database already exists, skipping initialization.")
+            return
         initialize_sqlite_database(settings)
         return
 

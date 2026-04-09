@@ -36,7 +36,7 @@
             <textarea
               aria-label="Chat message"
               [value]="composerDraft"
-              (input)="onComposerChange($any($event.target).value)"
+              (input)="onComposerInput($event)"
               (keydown)="onComposerKeydown($event)"
               [disabled]="isLoading"
               placeholder="Ask for a place, coordinates, or environmental overlay."

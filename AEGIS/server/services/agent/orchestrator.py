@@ -5,7 +5,6 @@ from time import perf_counter
 from typing import Any
 
 from AEGIS.server.configurations import server_settings
-from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.domain.extraction.patching import merge_extracted_intent
