@@ -54,7 +54,7 @@ uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002
 # terminal 2
 cd AEGIS/client
 npm install
-npm run dev -- --host 127.0.0.1 --port 5000
+npm run start -- --host 127.0.0.1 --port 5000
 ```
 
 ## 4. Desktop Packaging (Windows/Tauri)
@@ -70,6 +70,7 @@ release\tauri\build_with_tauri.bat
 Outputs:
 - `release/windows/installers`
 - `release/windows/portable`
+
 ## 5. Practical Usage
 1. Open the workspace.
 2. Ask a geospatial question in chat (place name, coordinates, or requested overlays).

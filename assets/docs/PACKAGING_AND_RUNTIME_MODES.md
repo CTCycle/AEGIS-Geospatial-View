@@ -1,6 +1,6 @@
 # AEGIS Packaging and Runtime Modes
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 ## 1. Runtime Strategy
 
@@ -29,12 +29,15 @@ Runtime switching is configuration-driven.
 |---|---|
 | `FASTAPI_HOST`, `FASTAPI_PORT` | Backend host/port binding |
 | `UI_HOST`, `UI_PORT` | Frontend host/port binding |
-| `VITE_API_BASE_URL` | Frontend API base path |
 | `KERAS_BACKEND`, `MPLBACKEND` | Runtime library backend selection |
 | `RELOAD` | Backend hot reload toggle |
 | `OPTIONAL_DEPENDENCIES` | Optional install behavior in launcher |
 | `AEGIS_CREDENTIAL_MASTER_KEY` | Credential encryption master key |
 | `AEGIS_CREDENTIAL_KEY_VERSION` | Credential key version tag |
+
+Frontend proxying:
+- Angular dev server reads backend host/port from `AEGIS/settings/.env` via `AEGIS/client/proxy.conf.cjs`.
+- API requests are served through `/api` and proxied to backend.
 
 ## 4. Database Configuration (JSON)
 

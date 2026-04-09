@@ -1,31 +1,31 @@
 # TypeScript Guidelines (AEGIS Frontend)
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 Scope: `AEGIS/client/src`
 
 Project baseline:
-- React 18
+- Angular 19 (standalone APIs)
 - TypeScript 5
-- Vite 6
+- Angular CLI build pipeline
 - Strict TypeScript configuration
 
 ## 1. Type Safety
 
 - Keep `strict` mode enabled.
 - Avoid `any`; use `unknown` for untrusted data and narrow before use.
-- Type exported component props, service responses, and helper interfaces.
-- Keep shared contracts in `src/types.ts`.
+- Type exported component inputs/outputs, service responses, and helper interfaces.
+- Keep shared contracts in `src/app/core/types.ts`.
 
 ## 2. Component and Page Boundaries
 
-- Keep page-level orchestration in `src/pages`.
-- Keep reusable UI in `src/components`.
-- Keep API/network logic in `src/services`.
+- Keep page-level orchestration in `src/app/pages`.
+- Keep reusable UI blocks in `src/app/components`.
+- Keep API/network and persistence logic in `src/app/core`.
 - Keep components focused on rendering and interaction.
 
 ## 3. API Usage
 
-- Route HTTP calls through shared service modules.
+- Route HTTP calls through shared API modules.
 - Assume backend responses are untrusted and validate required fields before render.
 - Handle fallback states explicitly.
 - Use `/api` base semantics expected by backend mounting/proxying.
@@ -39,12 +39,12 @@ Project baseline:
 ## 5. Styling and UI Consistency
 
 - Follow `assets/docs/UI_STANDARDS.md`.
-- Use design tokens from `src/index.css` instead of one-off literals.
+- Use design tokens from `src/styles.css` instead of one-off literals.
 - Keep accessibility behavior explicit (`:focus-visible`, semantic elements, labels).
 
 ## 6. Build and Quality Gates
 
-- Keep `npm run build` green (`tsc && vite build`).
+- Keep `npm run build` green (`ng build`).
 - Keep lint checks green when lint rules are present.
 - Prefer small, clear modules over abstraction-heavy patterns.
 

@@ -1,14 +1,14 @@
 # AEGIS Geospatial View Architecture
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 Scope: `AEGIS/` and `tests/`
 
 ## 1. System Overview
 
-AEGIS Geospatial View is a chat-first geospatial application with a React frontend and FastAPI backend. The backend handles geospatial search orchestration, chat orchestration, model/provider settings, and map payload generation.
+AEGIS Geospatial View is a chat-first geospatial application with an Angular frontend and FastAPI backend. The backend handles geospatial search orchestration, chat orchestration, model/provider settings, and map payload generation.
 
 Main stack:
-- Frontend: React 18 + TypeScript 5 + Vite 6 (`AEGIS/client`)
+- Frontend: Angular 19 (standalone APIs) + TypeScript 5 (`AEGIS/client`)
 - Backend: FastAPI (`AEGIS/server`)
 - Persistence: SQLAlchemy with SQLite (embedded) or PostgreSQL (external)
 - Rendering: Folium + Pillow
@@ -94,11 +94,13 @@ Chat flow:
 
 ## 7. Frontend Architecture
 
-- Main shell: `AEGIS/client/src/App.tsx`
+- Main shell: `AEGIS/client/src/app/app.component.ts`
 - Route views:
-  - `/` chat + map workspace (`GeospatialPage.tsx`)
-  - `/settings` model/settings workspace (`SettingsPage.tsx`)
-- Chat panel drives map updates via assistant turns.
+  - `/` chat + map workspace (`geospatial-page.component.ts`)
+  - `/settings` model/settings workspace (`settings-page.component.ts`)
+- Router config: `AEGIS/client/src/app/app.routes.ts`
+- API and persistence core modules: `AEGIS/client/src/app/core`
+- Chat panel drives map updates via assistant streaming events.
 - State persistence and navigation state are session-based (`sessionStorage`), with guardrails documented in `STATE_PRESERVATION.md`.
 
 ## 8. Integrations and Constraints
