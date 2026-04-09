@@ -6,9 +6,27 @@
         <p class="loading-text">Rendering map...</p>
       </div>
     } @else if (!payload || (!payload.satellite_imagery && !payload.map_session)) {
-      <div class="empty-state">{{ emptyMessage }}</div>
+      <div class="empty-state">
+        <div class="empty-state__card">
+          <p class="empty-state__eyebrow">Map Workspace</p>
+          <p class="empty-state__message">{{ emptyMessage }}</p>
+        </div>
+      </div>
+    } @else if (embeddedMapHtml) {
+      <div class="map-html-frame-wrap">
+        <iframe
+          class="map-html-frame"
+          title="Rendered map preview"
+          [attr.srcdoc]="embeddedMapHtml"
+        ></iframe>
+      </div>
     } @else if (!hasCenter) {
-      <div class="empty-state">Map center unavailable for interactive rendering.</div>
+      <div class="empty-state">
+        <div class="empty-state__card">
+          <p class="empty-state__eyebrow">Map Workspace</p>
+          <p class="empty-state__message">Map center unavailable for interactive rendering.</p>
+        </div>
+      </div>
     } @else {
       <div class="maplibre-wrap">
         <div #mapContainer class="maplibre-container"></div>

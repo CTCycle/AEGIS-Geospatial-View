@@ -5,7 +5,7 @@
       <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
     </div>
     <div class="settings-page__header-actions">
-      <button class="settings-icon-button" type="button" aria-label="Open Ollama settings" title="Ollama settings" (click)="isOllamaModalOpen = true">
+      <button class="settings-icon-button" type="button" aria-label="Open Ollama settings" title="Ollama settings" (click)="ollamaModalStatusText = ''; isOllamaModalOpen = true">
         <span class="settings-icon-button__glyph" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
             <path d="M5 4h14a1 1 0 0 1 1 1v11a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V5a1 1 0 0 1 1-1zm1 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6H6zm4 2h4a1 1 0 1 1 0 2h-4a1 1 0 1 1 0-2z" fill="currentColor" />
@@ -13,7 +13,7 @@
         </span>
       </button>
 
-      <button class="settings-icon-button" type="button" aria-label="Manage API keys" title="API key settings" (click)="isKeysModalOpen = true">
+      <button class="settings-icon-button" type="button" aria-label="Manage API keys" title="API key settings" (click)="keysModalStatusText = ''; isKeysModalOpen = true">
         <span class="settings-icon-button__glyph" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
             <path d="M14 3a7 7 0 1 0 5.5 11.3L23 17.8V21h-3v-2h-2v-2h-2.2A7 7 0 0 0 14 3zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" fill="currentColor" />
@@ -58,39 +58,51 @@
         </section>
 
         <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
-          @for (provider of providerKeys; track provider) {
-            <section class="model-grid-provider">
-              @if (providerKeys.length > 1) {
-                <header class="model-grid-provider__separator">
-                  <span></span>
-                  <p>{{ provider }}</p>
-                </header>
-              }
-              <div class="model-grid">
-                @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
-                  <article class="model-card" [class.model-card--local]="localModelIds.has(model.id)">
-                    <header>
-                      <h3>{{ model.name }}</h3>
-                      @if (model.provider === 'ollama' && !localModelIds.has(model.id)) {
-                        <button type="button" class="model-card__pull" (click)="pullLocalModel(model)" [attr.aria-label]="'Pull ' + model.name" title="Pull model">
-                          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
-                            <path d="M12 3.5a1 1 0 0 1 1 1v8l2.7-2.7a1 1 0 1 1 1.4 1.4l-4.4 4.4a1 1 0 0 1-1.4 0l-4.4-4.4a1 1 0 0 1 1.4-1.4L11 12.5v-8a1 1 0 0 1 1-1zm-6 14h12a1 1 0 1 1 0 2H6a1 1 0 1 1 0-2z" fill="currentColor" />
-                          </svg>
-                        </button>
-                      }
-                    </header>
-
-                    <p>{{ model.description }}</p>
-
-                    <app-model-role-actions
-                      [model]="model"
-                      [settings]="settings"
-                      (selectRole)="applyModelSelection($event, model)"
-                    ></app-model-role-actions>
-                  </article>
-                }
-              </div>
+          @if (isLoadingModels) {
+            <section class="settings-empty-state" aria-live="polite">
+              <h2>Loading model catalog</h2>
+              <p>Fetching model assignments and provider metadata.</p>
             </section>
+          } @else if (!hasDisplayedModels) {
+            <section class="settings-empty-state" aria-live="polite">
+              <h2>No models match this filter</h2>
+              <p>Adjust the provider tabs or search query to show available models.</p>
+            </section>
+          } @else {
+            @for (provider of providerKeys; track provider) {
+              <section class="model-grid-provider">
+                @if (providerKeys.length > 1) {
+                  <header class="model-grid-provider__separator">
+                    <span></span>
+                    <p>{{ provider }}</p>
+                  </header>
+                }
+                <div class="model-grid">
+                  @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
+                    <article class="model-card" [class.model-card--local]="localModelIds.has(model.id)">
+                      <header>
+                        <h3>{{ model.name }}</h3>
+                        @if (model.provider === 'ollama' && !localModelIds.has(model.id)) {
+                          <button type="button" class="model-card__pull" (click)="pullLocalModel(model)" [attr.aria-label]="'Pull ' + model.name" title="Pull model">
+                            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+                              <path d="M12 3.5a1 1 0 0 1 1 1v8l2.7-2.7a1 1 0 1 1 1.4 1.4l-4.4 4.4a1 1 0 0 1-1.4 0l-4.4-4.4a1 1 0 0 1 1.4-1.4L11 12.5v-8a1 1 0 0 1 1-1zm-6 14h12a1 1 0 1 1 0 2H6a1 1 0 1 1 0-2z" fill="currentColor" />
+                            </svg>
+                          </button>
+                        }
+                      </header>
+
+                      <p>{{ model.description }}</p>
+
+                      <app-model-role-actions
+                        [model]="model"
+                        [settings]="settings"
+                        (selectRole)="applyModelSelection($event, model)"
+                      ></app-model-role-actions>
+                    </article>
+                  }
+                </div>
+              </section>
+            }
           }
         </div>
       </section>
@@ -135,19 +147,24 @@
           <h2>API keys</h2>
           <button type="button" class="settings-modal__close" (click)="closeModal()">Close</button>
         </header>
-        <div class="settings-modal__body">
-          <label>
-            OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
-            <input type="password" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" placeholder="sk-..." />
-          </label>
-          <label>
-            Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
-            <input type="password" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" placeholder="AIza..." />
-          </label>
-        </div>
-        <footer class="settings-modal__footer">
-          <button type="button" class="primary-button" (click)="saveKeys()">Save keys</button>
-        </footer>
+        <form class="settings-modal__form" (ngSubmit)="saveKeys()">
+          <div class="settings-modal__body">
+            <label>
+              OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
+              <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" name="openai_api_key" placeholder="sk-..." />
+            </label>
+            <label>
+              Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
+              <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" name="google_api_key" placeholder="AIza..." />
+            </label>
+            @if (keysModalStatusText) {
+              <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>
+            }
+          </div>
+          <footer class="settings-modal__footer">
+            <button type="submit" class="primary-button">Save keys</button>
+          </footer>
+        </form>
       </section>
     </div>
   }
@@ -159,19 +176,24 @@
           <h2>Ollama settings</h2>
           <button type="button" class="settings-modal__close" (click)="closeModal()">Close</button>
         </header>
-        <div class="settings-modal__body">
-          <label>
-            Ollama server URL
-            <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" />
-          </label>
-        </div>
-        <footer class="settings-modal__footer settings-modal__footer--spread">
-          <div class="row-actions">
-            <button type="button" (click)="checkOllamaConnection()">Check connection</button>
-            <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
+        <form class="settings-modal__form" (ngSubmit)="saveOllamaSettings()">
+          <div class="settings-modal__body">
+            <label>
+              Ollama server URL
+              <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
+            </label>
+            @if (ollamaModalStatusText) {
+              <p class="settings-modal__status" aria-live="polite">{{ ollamaModalStatusText }}</p>
+            }
           </div>
-          <button type="button" class="primary-button" (click)="saveOllamaSettings()">Save settings</button>
-        </footer>
+          <footer class="settings-modal__footer settings-modal__footer--spread">
+            <div class="row-actions">
+              <button type="button" (click)="checkOllamaConnection()">Check connection</button>
+              <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
+            </div>
+            <button type="submit" class="primary-button">Save settings</button>
+          </footer>
+        </form>
       </section>
     </div>
   }

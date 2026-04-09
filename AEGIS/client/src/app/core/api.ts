@@ -42,7 +42,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-const CHAT_STREAM_TIMEOUT_MS = 30_000;
+const CHAT_STREAM_TIMEOUT_MS = 120_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;

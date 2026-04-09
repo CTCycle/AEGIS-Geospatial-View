@@ -14,6 +14,17 @@ class VectorRetriever:
         self.store = store or ChromaVectorStore()
         self.indexer = indexer or VectorIndexer(store=self.store)
 
+    def _empty_result(self) -> dict[str, list[dict[str, object]]]:
+        return {
+            "basemaps": [],
+            "overlays": [],
+            "providers": [],
+        }
+
+    def _should_rebuild_after_error(self, error: Exception) -> bool:
+        message = str(error).lower()
+        return "expecting embedding with dimension" in message or "embedding dimension" in message
+
     def retrieve_candidates(
         self,
         query: str,
@@ -24,12 +35,24 @@ class VectorRetriever:
         provider_k: int | None = None,
     ) -> dict[str, list[dict[str, object]]]:
         self.indexer.ensure_index_up_to_date()
-        matches = self.store.similarity_search(query, top_k=top_k)
+        try:
+            matches = self.store.similarity_search(query, top_k=top_k)
+        except Exception as error:
+            if self._should_rebuild_after_error(error):
+                try:
+                    self.indexer.rebuild()
+                    matches = self.store.similarity_search(query, top_k=top_k)
+                except Exception:
+                    return self._empty_result()
+            else:
+                return self._empty_result()
         basemaps: list[dict[str, object]] = []
         overlays: list[dict[str, object]] = []
         seen: set[str] = set()
         for item in matches:
             metadata = item.get("metadata", {})
+            if not isinstance(metadata, dict):
+                continue
             entry_id = metadata.get("id")
             if not isinstance(entry_id, str):
                 continue
@@ -44,11 +67,12 @@ class VectorRetriever:
                 basemaps.append(candidate)
             elif document_kind == "overlay":
                 overlays.append(candidate)
-        return {
+        result = {
             "basemaps": self._limit_ranked(basemaps, basemap_k or top_k),
             "overlays": self._limit_ranked(overlays, overlay_k or top_k),
             "providers": [],
         }
+        return result
 
     def retrieve_layers(self, query: str, *, top_k: int = 8) -> dict[str, list[str]]:
         candidates = self.retrieve_candidates(query, top_k=top_k)

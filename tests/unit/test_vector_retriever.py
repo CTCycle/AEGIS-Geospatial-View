@@ -97,3 +97,56 @@ def test_vector_retriever_candidate_pools_are_separate(tmp_path) -> None:
     traffic_overlays = {str(item["id"]) for item in traffic["overlays"]}
     assert "tomtom_traffic_flow" in traffic_overlays
     assert "tomtom_traffic_flow" not in traffic_basemaps
+
+
+def test_vector_retriever_rebuilds_after_dimension_mismatch(tmp_path, monkeypatch) -> None:
+    store = _build_memory_store(tmp_path)
+    indexer = VectorIndexer(
+        store=store,
+        manifest_loader=_ManifestLoaderStub(),
+        embedding_factory=_EmbeddingFactoryStub(),
+    )
+    indexer.rebuild()
+    retriever = VectorRetriever(store=store, indexer=indexer)
+
+    call_count = {"count": 0}
+    original_similarity_search = store.similarity_search
+
+    def flaky_similarity_search(query_text, *, top_k=5):  # noqa: ANN001
+        call_count["count"] += 1
+        if call_count["count"] == 1:
+            raise RuntimeError("Collection expecting embedding with dimension of 768, got 384")
+        return original_similarity_search(query_text, top_k=top_k)
+
+    rebuild_calls = {"count": 0}
+    original_rebuild = indexer.rebuild
+
+    def tracked_rebuild():  # noqa: ANN202
+        rebuild_calls["count"] += 1
+        return original_rebuild()
+
+    monkeypatch.setattr(store, "similarity_search", flaky_similarity_search)
+    monkeypatch.setattr(indexer, "rebuild", tracked_rebuild)
+
+    matches = retriever.retrieve_candidates("air quality overlay")
+
+    assert rebuild_calls["count"] == 1
+    assert call_count["count"] == 2
+    assert "openaq_air_quality" in [str(item["id"]) for item in matches["overlays"]]
+
+
+def test_vector_retriever_returns_empty_candidates_when_search_fails(tmp_path, monkeypatch) -> None:
+    store = _build_memory_store(tmp_path)
+    indexer = VectorIndexer(
+        store=store,
+        manifest_loader=_ManifestLoaderStub(),
+        embedding_factory=_EmbeddingFactoryStub(),
+    )
+    indexer.rebuild()
+    retriever = VectorRetriever(store=store, indexer=indexer)
+
+    monkeypatch.setattr(store, "similarity_search", lambda query_text, *, top_k=5: (_ for _ in ()).throw(RuntimeError("store offline")))
+
+    matches = retriever.retrieve_candidates("air quality overlay")
+
+    assert matches == {"basemaps": [], "overlays": [], "providers": []}

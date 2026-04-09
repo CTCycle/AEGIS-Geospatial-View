@@ -146,9 +146,16 @@
     background: #f4f8fd;
 }
 
+.canvas-header__icon-button--active {
+    border-color: #7c99c9;
+    background: #edf4ff;
+    color: #214c9d;
+}
+
 .canvas-panel__body {
     flex: 1;
     min-height: 0;
+    position: relative;
 }
 
 .agent-chat-panel {
@@ -173,6 +180,43 @@
     border: none;
     border-radius: 0;
     background: transparent;
+}
+
+.chat-welcome-card {
+    display: grid;
+    gap: 0.65rem;
+    padding: 1rem;
+    border: 1px solid #bfd0e2;
+    border-radius: 0.9rem;
+    background: linear-gradient(180deg, rgb(245 249 255 / 96%), rgb(236 243 251 / 96%));
+    color: #20324d;
+}
+
+.chat-welcome-card__eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #5d7395;
+    font-weight: 700;
+}
+
+.chat-welcome-card h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.35;
+    color: #213555;
+}
+
+.chat-welcome-card__examples {
+    margin: 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.45rem;
+    color: #425978;
+    font-size: 0.9rem;
+    line-height: 1.45;
 }
 
 .chat-message {
@@ -293,6 +337,57 @@
     font-weight: 700;
 }
 
+.workspace-alerts {
+    position: absolute;
+    top: 0.85rem;
+    right: 1rem;
+    z-index: 7;
+    width: min(24rem, calc(100% - 2rem));
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #b7c8df;
+    border-radius: 0.85rem;
+    background: rgb(245 249 255 / 97%);
+    box-shadow: 0 18px 34px rgb(29 49 88 / 16%);
+}
+
+.workspace-alerts__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.workspace-alerts__header h2,
+.workspace-alerts__header p,
+.workspace-alerts__empty,
+.workspace-alerts__list {
+    margin: 0;
+}
+
+.workspace-alerts__header h2 {
+    font-size: 0.92rem;
+    color: #24385a;
+}
+
+.workspace-alerts__header p {
+    font-size: 0.74rem;
+    color: #5b7292;
+    font-weight: 700;
+}
+
+.workspace-alerts__empty,
+.workspace-alerts__list {
+    color: #3d5575;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.workspace-alerts__list {
+    padding-left: 1rem;
+}
+
 .chat-progress-spinner {
     width: 0.72rem;
     height: 0.72rem;
@@ -351,6 +446,12 @@
 
     .canvas-panel__body {
         min-height: 24rem;
+    }
+
+    .workspace-alerts {
+        left: 0.7rem;
+        right: 0.7rem;
+        width: auto;
     }
 }
 

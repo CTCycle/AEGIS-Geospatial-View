@@ -4,6 +4,7 @@ import os
 import warnings
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -21,6 +22,21 @@ from AEGIS.server.utils.constants import (
 from AEGIS.server.utils.variables import env_variables  # noqa: F401
 
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+
+def build_cors_origins() -> list[str]:
+    ui_host = os.getenv("UI_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    ui_port = os.getenv("UI_PORT", "4980").strip() or "4980"
+    host_variants = {ui_host}
+    if ui_host == "127.0.0.1":
+        host_variants.add("localhost")
+    elif ui_host == "localhost":
+        host_variants.add("127.0.0.1")
+    origins: list[str] = []
+    for host in host_variants:
+        origins.append(f"http://{host}:{ui_port}")
+        origins.append(f"https://{host}:{ui_port}")
+    return origins
 
 
 def tauri_mode_enabled() -> bool:
@@ -42,6 +58,14 @@ app = FastAPI(
     title=FASTAPI_TITLE,
     version=FASTAPI_VERSION,
     description=FASTAPI_DESCRIPTION,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=build_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

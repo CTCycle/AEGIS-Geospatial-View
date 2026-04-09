@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, status
@@ -29,6 +30,7 @@ from AEGIS.server.utils.constants import (
 from AEGIS.server.api.search import search_endpoint
 
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
+logger = logging.getLogger(__name__)
 
 settings_repo = ModelSettingsRepository()
 settings_service = ChatSettingsService(settings_repo=settings_repo)
@@ -48,6 +50,24 @@ async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
 
 @router.post(CHAT_STREAM_ROUTE, status_code=status.HTTP_200_OK)
 async def chat_stream(payload: ChatTurnRequest):
+    def build_tool_status_payload(tool_payload: dict[str, Any] | None) -> dict[str, Any]:
+        if not isinstance(tool_payload, dict):
+            return {"available": False}
+        satellite_imagery = tool_payload.get("satellite_imagery")
+        map_session = tool_payload.get("map_session")
+        overlay_count = 0
+        if isinstance(map_session, dict):
+            overlays = map_session.get("overlays")
+            if isinstance(overlays, list):
+                overlay_count = len(overlays)
+        return {
+            "available": True,
+            "execution": tool_payload.get("execution"),
+            "has_satellite_imagery": isinstance(satellite_imagery, dict),
+            "has_map_session": isinstance(map_session, dict),
+            "overlay_count": overlay_count,
+        }
+
     def stream_event(event: ChatStreamEvent) -> str:
         return json.dumps(event.model_dump(mode="json")) + "\n"
 
@@ -59,7 +79,12 @@ async def chat_stream(payload: ChatTurnRequest):
             for token in result.assistant_message.split():
                 yield stream_event(ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "}))
             if result.tool_payload is not None:
-                yield stream_event(ChatStreamEvent(event="tool_status", data={"tool_payload": result.tool_payload}))
+                yield stream_event(
+                    ChatStreamEvent(
+                        event="tool_status",
+                        data=build_tool_status_payload(result.tool_payload),
+                    )
+                )
             yield stream_event(
                 ChatStreamEvent(
                     event="final",
@@ -89,11 +114,12 @@ async def chat_stream(payload: ChatTurnRequest):
                     data={"message": str(exc), "status": status.HTTP_503_SERVICE_UNAVAILABLE},
                 )
             )
-        except Exception:
+        except Exception as exc:
+            logger.exception("Chat stream failed")
             yield stream_event(
                 ChatStreamEvent(
                     event="error",
-                    data={"message": "Unexpected server error while streaming response.", "status": 500},
+                    data={"message": str(exc) or "Unexpected server error while streaming response.", "status": 500},
                 )
             )
 

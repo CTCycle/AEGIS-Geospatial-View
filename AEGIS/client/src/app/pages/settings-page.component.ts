@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
@@ -32,7 +32,7 @@ import {
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
-export class SettingsPageComponent implements AfterViewInit, OnDestroy {
+export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('modelGridScroll', { static: false }) modelGridRef?: ElementRef<HTMLDivElement>;
 
   readonly state: PersistedSettingsPageState;
@@ -56,12 +56,15 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
   providerMode: ModelProviderMode;
   searchText: string;
   statusText: string;
+  isLoadingModels = false;
 
   isKeysModalOpen = false;
   isOllamaModalOpen = false;
   openaiKey = '';
   googleKey = '';
   ollamaUrlDraft = 'http://localhost:11434';
+  keysModalStatusText = '';
+  ollamaModalStatusText = '';
 
   providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
   showLocalOnly = false;
@@ -78,13 +81,16 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
     this.statusText = this.state.statusText;
   }
 
+  ngOnInit(): void {
+    void this.loadData();
+    this.syncState();
+  }
+
   ngAfterViewInit(): void {
     window.scrollTo({ top: this.state.scrollY, behavior: 'auto' });
     if (this.modelGridRef?.nativeElement) {
       this.modelGridRef.nativeElement.scrollTop = this.state.modelGridScrollTop;
     }
-    this.loadData();
-    this.syncState();
   }
 
   ngOnDestroy(): void {
@@ -133,6 +139,10 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
     return Object.keys(this.groupedDisplayedModels);
   }
 
+  get hasDisplayedModels(): boolean {
+    return this.displayedModels.length > 0;
+  }
+
   get localModelIds(): Set<string> {
     return new Set(this.localModels.map((item) => item.id));
   }
@@ -152,6 +162,7 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
     if (filter !== 'ollama') {
       this.showLocalOnly = false;
     }
+    this.syncState();
   }
 
   setShowLocalOnly(checked: boolean): void {
@@ -190,20 +201,26 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
       this.openaiKey = '';
       this.googleKey = '';
       this.statusText = 'API keys saved';
+      this.keysModalStatusText = 'API keys saved';
       this.isKeysModalOpen = false;
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toErrorText(error);
+      const detail = this.toErrorText(error);
+      this.statusText = detail;
+      this.keysModalStatusText = detail;
     }
   }
 
   async checkOllamaConnection(): Promise<void> {
     try {
       const health = await checkOllamaHealth();
+      this.ollamaModalStatusText = `Connection status: ${String(health.detail ?? health.ok ?? 'unknown')}`;
       this.statusText = `Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`;
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toErrorText(error);
+      const detail = this.toErrorText(error);
+      this.statusText = detail;
+      this.ollamaModalStatusText = detail;
     }
   }
 
@@ -212,9 +229,12 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
       await refreshOllamaModels();
       await this.loadData();
       this.statusText = 'Ollama library refreshed';
+      this.ollamaModalStatusText = 'Model library refreshed.';
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toErrorText(error);
+      const detail = this.toErrorText(error);
+      this.statusText = detail;
+      this.ollamaModalStatusText = detail;
     }
   }
 
@@ -227,10 +247,13 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
       this.settings = updated;
       this.ollamaUrlDraft = updated.ollama_url;
       this.statusText = 'Ollama settings saved';
+      this.ollamaModalStatusText = 'Ollama settings saved.';
       this.isOllamaModalOpen = false;
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toErrorText(error);
+      const detail = this.toErrorText(error);
+      this.statusText = detail;
+      this.ollamaModalStatusText = detail;
     }
   }
 
@@ -254,6 +277,8 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
   closeModal(): void {
     this.isKeysModalOpen = false;
     this.isOllamaModalOpen = false;
+    this.keysModalStatusText = '';
+    this.ollamaModalStatusText = '';
   }
 
   onBackdropClick(event: MouseEvent): void {
@@ -276,6 +301,7 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private async loadData(): Promise<void> {
+    this.isLoadingModels = true;
     try {
       const [nextSettings, modelLibrary] = await Promise.all([
         fetchChatSettings(),
@@ -291,6 +317,8 @@ export class SettingsPageComponent implements AfterViewInit, OnDestroy {
     } catch (error: unknown) {
       this.statusText = `Load failed: ${this.toErrorText(error)}`;
       this.syncState();
+    } finally {
+      this.isLoadingModels = false;
     }
   }
 
