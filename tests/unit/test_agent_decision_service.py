@@ -45,6 +45,20 @@ def test_decision_service_rejects_non_geospatial_requests() -> None:
     assert decision.should_trigger_search is False
 
 
+def test_decision_service_routes_direct_weather_tool_with_location() -> None:
+    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    decision = service.decide(
+        conversation_context="# message 1\nweather forecast in Rome\n\n# extracted info\n{}",
+        user_message="Give me the weather forecast for Rome",
+        extracted_state=ExtractedIntent(location={"city": "Rome", "country": "Italy"}),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        available_tools=[{"name": "get_weather_forecast", "description": "Forecast weather"}],
+    )
+    assert decision.execution_mode == "search"
+    assert decision.tool_target == "get_weather_forecast"
+    assert decision.should_trigger_search is False
+
+
 def test_decision_service_requests_integration_when_explicit_and_unavailable() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(

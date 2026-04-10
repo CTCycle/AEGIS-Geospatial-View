@@ -58,6 +58,15 @@ class ChatResponseService:
                     "status": "ready",
                 }
             }
+        tool_result = search_result.get("tool_result")
+        if isinstance(tool_result, dict):
+            sanitized = dict(tool_result)
+            if "items" in sanitized and isinstance(sanitized["items"], list):
+                sanitized["items"] = sanitized["items"][:8]
+            return {
+                "tool_result": sanitized,
+                "resolved_coordinates": search_result.get("resolved_coordinates"),
+            }
         return {"status": "completed"}
 
     def _normalize_plain_text_response(self, text: str) -> str:
@@ -86,6 +95,17 @@ class ChatResponseService:
                     return f"The coordinates are latitude {latitude} and longitude {longitude}."
             return "I could not resolve coordinates for that location. Please share a more specific place name."
         if decision.execution_mode == "search" and search_result is not None:
+            if isinstance(search_result, dict) and isinstance(search_result.get("tool_result"), dict):
+                tool_result = search_result["tool_result"]
+                if tool_result.get("kind") == "weather_forecast":
+                    return "I retrieved the weather forecast for that location."
+                if tool_result.get("kind") == "air_quality_forecast":
+                    return "I retrieved the air-quality forecast for that location."
+                if tool_result.get("kind") == "poi_amenities":
+                    total = tool_result.get("total_results")
+                    if isinstance(total, int):
+                        return f"I found {total} nearby points of interest for that location."
+                    return "I retrieved nearby points of interest for that location."
             return "I completed the map search and prepared the requested geospatial view."
         if decision.clarification_question:
             return decision.clarification_question

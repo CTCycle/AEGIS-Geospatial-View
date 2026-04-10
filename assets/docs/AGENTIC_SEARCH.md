@@ -27,9 +27,15 @@ AEGIS uses a chat-first flow where each user turn can either:
 - Direct coordinates tool:
   - explicit coordinate-lookup requests route to direct geocoding.
   - geocoding responses return plain text coordinates and do not create `map_session`.
+- Direct runtime tools:
+  - location-scoped weather, air-quality forecast, and nearby POI requests can route to direct tools.
+  - direct tool responses remain plain text and never expose internal tool IDs.
 - Retrieval availability:
   - retrieved basemap/overlay candidates are annotated with runtime availability before decisioning.
   - keyed integrations trigger clarification only when required and no available alternative can satisfy the same intent.
+- Runtime provider overlays:
+  - `openmeteo_weather_forecast`, `openmeteo_air_quality_forecast`, `overpass_poi_amenities`, and `rainviewer_precipitation_radar` are normalized into `map_session.insights`.
+  - each overlay in `map_session.overlays` includes a `runtime` block with freshness/availability and provider-safe error envelopes.
 - Plain text response safety:
   - chat response payloads are sanitized before model generation.
   - assistant output is normalized to plain text and falls back to deterministic plain text when needed.

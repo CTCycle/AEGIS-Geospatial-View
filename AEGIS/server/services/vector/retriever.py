@@ -13,6 +13,7 @@ class VectorRetriever:
     ) -> None:
         self.store = store or ChromaVectorStore()
         self.indexer = indexer or VectorIndexer(store=self.store)
+        self._bootstrap_checked = False
 
     def _empty_result(self) -> dict[str, list[dict[str, object]]]:
         return {
@@ -34,7 +35,9 @@ class VectorRetriever:
         overlay_k: int | None = None,
         provider_k: int | None = None,
     ) -> dict[str, list[dict[str, object]]]:
-        self.indexer.bootstrap_if_missing()
+        if not self._bootstrap_checked:
+            self.indexer.bootstrap_if_missing()
+            self._bootstrap_checked = True
         try:
             matches = self.store.similarity_search(query, top_k=top_k)
         except Exception as error:

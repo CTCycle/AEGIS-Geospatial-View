@@ -294,3 +294,54 @@ def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(monkeypa
     assert result.tool_payload["execution"] == "location_to_coordinates"
     assert result.tool_payload["result"]["lat"] == 41.9
     assert result.tool_payload["result"]["lon"] == 12.5
+
+
+def test_chat_orchestrator_executes_direct_weather_tool(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
+
+    class _AgentToolsStub:
+        def describe_tools(self):  # noqa: ANN201
+            return [{"name": "get_weather_forecast", "description": "weather"}]
+
+        async def geocode_location(self, *, address, city, country_name, country_code=None):  # noqa: ANN001
+            return {"lat": 41.9, "lon": 12.5}
+
+        async def get_weather_forecast(self, *, latitude: float, longitude: float):  # noqa: ANN001
+            return {"kind": "weather_forecast", "latitude": latitude, "longitude": longitude}
+
+    orchestrator = AgentOrchestrator(
+        search_orchestrator=_SearchOrchestratorStub(),
+        vector_retriever=_VectorRetrieverStub(),
+        agent_tools=_AgentToolsStub(),
+    )
+    monkeypatch.setattr(
+        ParserService,
+        "extract_patch",
+        lambda self, conversation_context, latest_state, user_message: ExtractedIntentPatch(
+            location={"city": "Rome", "country": "Italy"},
+            user_goal="weather forecast",
+        ),
+    )
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, conversation_context, user_message, extracted_state, retrieval, available_tools=None: AgentDecision(
+            decision="search_and_complete",
+            execution_mode="search",
+            tool_target="get_weather_forecast",
+            should_trigger_search=False,
+            location_status="valid",
+            requires_geocoding=True,
+            reasoning_summary="direct weather",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: "Forecast ready.",
+    )
+
+    result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="weather forecast in Rome")))
+    assert result.map_session is None
+    assert result.tool_payload is not None
+    assert result.tool_payload["execution"] == "get_weather_forecast"

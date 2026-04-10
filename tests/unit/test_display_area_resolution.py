@@ -67,7 +67,11 @@ class _CatalogStub:
         return {"id": basemap_id or "osm_default"}
 
     async def fetch_insights(self, latitude, longitude, overlay_ids, radius_m):  # noqa: ANN001
-        return []
+        return {}
+
+    async def fetch_overlay_runtime(self, latitude, longitude, overlay_ids, radius_m):  # noqa: ANN001
+        _ = latitude, longitude, radius_m
+        return {str(overlay_id): {"availability": "available"} for overlay_id in overlay_ids}
 
     def resolve_compliance_warnings(self, basemap, overlays):  # noqa: ANN001
         return []

@@ -16,6 +16,15 @@ class DecisionService:
         re.compile(r"\b(coordinates?|latitude|longitude|lat\s*/\s*lon|lat[- ]?lon)\b", re.IGNORECASE),
         re.compile(r"\b(where is\b|\bgeocode\b|\blocat(?:e|ion of)\b)", re.IGNORECASE),
     )
+    DIRECT_WEATHER_PATTERNS = (
+        re.compile(r"\b(weather forecast|forecast weather|weather outlook)\b", re.IGNORECASE),
+    )
+    DIRECT_AIR_QUALITY_PATTERNS = (
+        re.compile(r"\b(air quality forecast|forecast air quality|pollution forecast)\b", re.IGNORECASE),
+    )
+    DIRECT_POI_PATTERNS = (
+        re.compile(r"\b(nearby poi|nearby amenities|points of interest|nearby places)\b", re.IGNORECASE),
+    )
     AMBIGUOUS_REQUEST_PATTERNS = (
         re.compile(r"\b(best|ideal|optimum|optimize|most suitable)\b", re.IGNORECASE),
     )
@@ -142,6 +151,25 @@ class DecisionService:
             reasoning_summary="Direct coordinate lookup request",
         )
 
+    def _build_direct_tool_decision(
+        self,
+        *,
+        tool_target: str,
+        has_text_location: bool,
+        has_coordinates: bool,
+        summary: str,
+    ) -> AgentDecision:
+        return AgentDecision(
+            decision="search_and_complete",
+            execution_mode="search",
+            tool_target=tool_target,
+            should_trigger_search=False,
+            location_status="valid" if (has_text_location or has_coordinates) else "missing",
+            requires_geocoding=has_text_location and not has_coordinates,
+            clarification_question=None,
+            reasoning_summary=summary,
+        )
+
     def _select_available_candidate_ids(self, retrieval: dict[str, list[dict[str, object]]], kind: str) -> list[str]:
         selected: list[str] = []
         for item in retrieval.get(kind, []):
@@ -231,6 +259,27 @@ class DecisionService:
             return self._build_geocode_decision(has_text_location, has_coordinates)
         if not has_coordinates and not has_text_location:
             return self._build_missing_location_decision()
+        if any(pattern.search(user_message) for pattern in self.DIRECT_WEATHER_PATTERNS):
+            return self._build_direct_tool_decision(
+                tool_target="get_weather_forecast",
+                has_text_location=has_text_location,
+                has_coordinates=has_coordinates,
+                summary="Direct weather forecast request",
+            )
+        if any(pattern.search(user_message) for pattern in self.DIRECT_AIR_QUALITY_PATTERNS):
+            return self._build_direct_tool_decision(
+                tool_target="get_air_quality_forecast",
+                has_text_location=has_text_location,
+                has_coordinates=has_coordinates,
+                summary="Direct air-quality forecast request",
+            )
+        if any(pattern.search(user_message) for pattern in self.DIRECT_POI_PATTERNS):
+            return self._build_direct_tool_decision(
+                tool_target="get_nearby_poi",
+                has_text_location=has_text_location,
+                has_coordinates=has_coordinates,
+                summary="Direct nearby POI request",
+            )
 
         requested_integration = self._requested_integration(user_message)
         if requested_integration is not None:
