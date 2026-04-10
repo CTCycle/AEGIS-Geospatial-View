@@ -3,7 +3,7 @@
   "name": "Precipitation Rate (IMERG, 30min)",
   "provider": "gibs",
   "type": "legacy-image",
-  "description": "Near-real-time precipitation rate estimates from IMERG.",
+  "description": "NASA GIBS precipitation-rate overlay showing near-real-time rainfall intensity.",
   "capabilities": [
     "imagery",
     "precipitation"
@@ -38,7 +38,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "7feb8aca313af0ac5111e4a14fc8a7be4c9c60f88de3504690609051fb44a209"
+    "content_hash": "7feb8aca313af0ac5111e4a14fc8a7be4c9c60f88de3504690609051fb44a209",
+    "human_summary": "Dynamic precipitation intensity layer for rainfall pattern monitoring.",
+    "primary_use_cases": [
+      "weather impact monitoring",
+      "rainfall hotspot identification",
+      "storm context"
+    ],
+    "search_examples": [
+      "show rainfall intensity over Rome",
+      "where is precipitation strongest today"
+    ],
+    "disambiguation_notes": [
+      "Choose this for rainfall-rate questions, not for long-term climate normals."
+    ],
+    "location_dependency": "Location-dependent and time-sensitive.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import base64
-import os
 import hashlib
 from dataclasses import dataclass
 
 from cryptography.fernet import Fernet, InvalidToken
+from sqlalchemy import select
 
 from AEGIS.server.configurations import server_settings
+from AEGIS.server.repositories.database.backend import get_database
+from AEGIS.server.repositories.schemas import SystemSecretRecord
+
+ACCESS_KEY_ENCRYPTION_SECRET_NAME = "access_key_encryption_key"
 
 # -------------------------------------------------------------------------
 def _derive_fernet_key(master_key: str) -> bytes:
@@ -16,13 +20,24 @@ def _derive_fernet_key(master_key: str) -> bytes:
 
 # -------------------------------------------------------------------------
 def _load_access_key_fernet() -> Fernet:
-    raw_key = (os.getenv("ACCESS_KEY_ENCRYPTION_KEY") or "").strip()
+    raw_key = ""
+    try:
+        session_factory = get_database().backend.session
+        with session_factory() as session:
+            statement = select(SystemSecretRecord).where(
+                SystemSecretRecord.name == ACCESS_KEY_ENCRYPTION_SECRET_NAME
+            )
+            record = session.execute(statement).scalars().first()
+            if record is not None and isinstance(record.value, str):
+                raw_key = record.value.strip()
+    except Exception as exc:
+        raise RuntimeError("Failed to load access key encryption secret from database") from exc
     if not raw_key:
-        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is not configured")
+        raise RuntimeError("Database access key encryption secret is not configured")
     try:
         return Fernet(raw_key.encode("utf-8"))
     except Exception as exc:
-        raise RuntimeError("ACCESS_KEY_ENCRYPTION_KEY is invalid") from exc
+        raise RuntimeError("Database access key encryption secret is invalid") from exc
 
 
 def encrypt_access_key(plaintext: str) -> str:

@@ -34,7 +34,7 @@ class VectorRetriever:
         overlay_k: int | None = None,
         provider_k: int | None = None,
     ) -> dict[str, list[dict[str, object]]]:
-        self.indexer.ensure_index_up_to_date()
+        self.indexer.bootstrap_if_missing()
         try:
             matches = self.store.similarity_search(query, top_k=top_k)
         except Exception as error:

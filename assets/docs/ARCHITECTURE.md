@@ -1,6 +1,6 @@
 # AEGIS Geospatial View Architecture
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 Scope: `AEGIS/` and `tests/`
 
 ## 1. System Overview
@@ -82,9 +82,19 @@ Map search flow:
 
 Chat flow:
 1. `chat_turn`/`chat_stream` receives a user turn.
-2. Vector index is ensured current (`VectorIndexer`).
-3. `AgentOrchestrator` processes parsing, decisioning, tool invocation, and assistant response.
+2. Startup lifecycle bootstraps SQLite (first run) and vector index bootstrap (`VectorIndexer.bootstrap_if_missing`) when enabled by `vectors.auto_sync_on_start`.
+3. `AgentOrchestrator` processes parsing, raw-prompt retrieval, retrieval-availability annotation, decisioning, tool invocation, and assistant response.
 4. Structured/tool/map payloads are returned and persisted through repository-backed services.
+
+Vector subsystem responsibilities:
+- `ManifestPreparationService` composes one embedding chunk per basemap/overlay manifest entry.
+- `VectorIndexer` owns bootstrap, rebuild, sync, and startup-oriented metadata (`manifest_index_metadata.json`).
+- `VectorRetriever` performs similarity search and uses bootstrap as defensive fallback only.
+- `EmbeddingFactory` enforces one provider/model selection per persisted index build.
+
+Agent tool awareness:
+- `AgentTools.describe_tools()` exposes `location_to_coordinates` and `map_search` descriptions to decisioning.
+- Direct geocode execution path is first-class and can complete without map search execution.
 
 ## 6. Background Jobs
 

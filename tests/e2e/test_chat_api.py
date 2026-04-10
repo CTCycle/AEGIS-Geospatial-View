@@ -48,6 +48,21 @@ def test_chat_models_and_vector_rebuild(api_context: APIRequestContext) -> None:
 
 
 def test_chat_turn_and_stream(api_context: APIRequestContext) -> None:
+    geocode_response = api_context.post(
+        "/chat/turn",
+        data={"message": "Give me the coordinates of Rome, Italy"},
+    )
+    if geocode_response.status in {400, 502}:
+        pytest.skip("Providers unavailable for geocode request check.")
+    assert geocode_response.ok, f"Expected 200, got {geocode_response.status}"
+    geocode_body = geocode_response.json()
+    assert geocode_body.get("map_session") is None
+    assistant_text = str(geocode_body.get("assistant_message") or "")
+    assert "latitude" in assistant_text.lower() or "coordinates" in assistant_text.lower()
+    assert "overlay_ids" not in assistant_text
+    assert "gibs_layer_" not in assistant_text
+    assert "{" not in assistant_text
+
     turn_response = api_context.post(
         "/chat/turn",
         data={"message": "show map at 41.9028, 12.4964"},

@@ -3,7 +3,7 @@
   "name": "OpenAQ Air Quality",
   "provider": "openaq",
   "type": "point-insight",
-  "description": "Nearest available OpenAQ measurement summaries for selected AOI.",
+  "description": "OpenAQ air-quality overlay based on available measurement and station data.",
   "capabilities": [
     "air-quality",
     "point-insight"
@@ -37,7 +37,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "8e07770793eb3ce9077833ec50826125a8304a9282f8368670eedba55402014b"
+    "content_hash": "8e07770793eb3ce9077833ec50826125a8304a9282f8368670eedba55402014b",
+    "human_summary": "Point-insight air quality layer reflecting available pollutant observations.",
+    "primary_use_cases": [
+      "air quality screening",
+      "pollution hotspot awareness",
+      "public health context"
+    ],
+    "search_examples": [
+      "show air quality around Rome",
+      "find polluted areas near Milan"
+    ],
+    "disambiguation_notes": [
+      "Prefer this for local measured air-quality insights; use aerosol overlays for broader atmospheric patterns."
+    ],
+    "location_dependency": "Location-specific and dependent on station/data availability.",
+    "integration_requirements": [
+      "No API key required for configured OpenAQ access"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

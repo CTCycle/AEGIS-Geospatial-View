@@ -6,6 +6,8 @@ from AEGIS.server.services.vector.retriever import VectorRetriever
 
 
 class _ManifestLoaderStub:
+    root_path = "/tmp/manifests"
+
     def load_all(self):  # noqa: ANN001
         return {
             "providers": [],
@@ -53,9 +55,17 @@ class _ManifestLoaderStub:
 
 
 class _EmbeddingFactoryStub:
-    def get_embedding(self, *, provider: str, input_text: str):  # noqa: ANN001
+    def normalize_provider(self, provider):  # noqa: ANN001
         _ = provider
-        return [float(len(input_text)), 0.0, 1.0], "stub-embedding"
+        return "ollama"
+
+    def resolve_default_model(self, provider):  # noqa: ANN001
+        _ = provider
+        return "stub-embedding"
+
+    def get_embedding(self, *, provider: str, input_text: str, model: str | None = None):  # noqa: ANN001
+        _ = provider
+        return [float(len(input_text)), 0.0, 1.0], model or "stub-embedding"
 
 
 def _build_memory_store(tmp_path) -> ChromaVectorStore:  # noqa: ANN001
@@ -97,6 +107,19 @@ def test_vector_retriever_candidate_pools_are_separate(tmp_path) -> None:
     traffic_overlays = {str(item["id"]) for item in traffic["overlays"]}
     assert "tomtom_traffic_flow" in traffic_overlays
     assert "tomtom_traffic_flow" not in traffic_basemaps
+
+
+def test_vector_retriever_raw_prompt_finds_thematic_overlay(tmp_path) -> None:
+    store = _build_memory_store(tmp_path)
+    indexer = VectorIndexer(
+        store=store,
+        manifest_loader=_ManifestLoaderStub(),
+        embedding_factory=_EmbeddingFactoryStub(),
+    )
+    indexer.rebuild()
+    retriever = VectorRetriever(store=store, indexer=indexer)
+    matches = retriever.retrieve_candidates("show traffic around Zurich", top_k=6)
+    assert "tomtom_traffic_flow" in [str(item["id"]) for item in matches["overlays"]]
 
 
 def test_vector_retriever_rebuilds_after_dimension_mismatch(tmp_path, monkeypatch) -> None:

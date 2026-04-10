@@ -1,6 +1,6 @@
 # User Manual
 
-Last updated: 2026-04-08
+Last updated: 2026-04-10
 Scope: End-user operation of AEGIS Geospatial View
 
 ## 1. What the Application Does
@@ -27,6 +27,11 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 2. Include desired context (imagery/overlay intent).
 3. Send message.
 4. Review updated map output.
+
+### Journey D: Direct coordinate lookup
+1. Ask directly for coordinates of a place (example: "Give me the coordinates of Rome, Italy").
+2. The assistant returns plain-text coordinates.
+3. This path does not require map rendering and may return without a map session.
 
 ### Journey B: Iterative refinement
 1. Start with a broad location request.
@@ -67,6 +72,7 @@ Examples:
 - "Show current satellite context for Rome, Italy."
 - "Analyze this coordinate area: 41.9028, 12.4964 and include relevant overlays."
 - "Refine the previous result to focus on environmental overlays."
+- "Give me the coordinates of Rome, Italy."
 
 ## 7. Key Features
 
@@ -82,6 +88,8 @@ Examples:
 - Local model issues: confirm Ollama URL and run connection check in Settings.
 - Missing expected model: refresh model list or pull model in Ollama settings.
 - Unexpected state after auth failures: app clears persisted state on 401/403 for safety.
+- If asked for location: provide a city, address, region, or coordinate pair.
+- If asked for missing integration: add the requested API key in Settings or ask for an available alternative layer.
 
 ## 9. Operational Notes
 

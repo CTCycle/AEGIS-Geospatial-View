@@ -3,7 +3,7 @@
   "name": "Land Cover Type (MODIS, Annual)",
   "provider": "gibs",
   "type": "legacy-image",
-  "description": "Annual MODIS IGBP land cover classification.",
+  "description": "NASA GIBS annual land-cover classification overlay from MODIS IGBP categories.",
   "capabilities": [
     "imagery",
     "land-cover"
@@ -38,7 +38,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "f873d5b3140abc82b9b3c7f51f1d2ec1d50a86d63599e5f690982026bf15a231"
+    "content_hash": "f873d5b3140abc82b9b3c7f51f1d2ec1d50a86d63599e5f690982026bf15a231",
+    "human_summary": "Thematic land-cover map distinguishing vegetation, urban, water, and other cover classes.",
+    "primary_use_cases": [
+      "land-use context",
+      "environmental classification",
+      "ecological baseline mapping"
+    ],
+    "search_examples": [
+      "show land cover around Turin",
+      "classify vegetation and urban areas in region"
+    ],
+    "disambiguation_notes": [
+      "Use for annual thematic land classification, not for real-time change events."
+    ],
+    "location_dependency": "Location-dependent; annual temporal cadence.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

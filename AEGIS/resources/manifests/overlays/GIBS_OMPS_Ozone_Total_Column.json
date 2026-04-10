@@ -3,7 +3,7 @@
   "name": "Ozone Column (OMPS, Daily)",
   "provider": "gibs",
   "type": "legacy-image",
-  "description": "Daily total ozone column observations from OMPS.",
+  "description": "NASA GIBS total-column ozone overlay showing atmospheric ozone distribution.",
   "capabilities": [
     "imagery",
     "ozone"
@@ -38,7 +38,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "ae6f30d6311599032aec9cfdd48cb862e75851925f8870a728ee238a4875d086"
+    "content_hash": "ae6f30d6311599032aec9cfdd48cb862e75851925f8870a728ee238a4875d086",
+    "human_summary": "Global ozone distribution layer for atmospheric composition context.",
+    "primary_use_cases": [
+      "ozone distribution review",
+      "atmospheric condition awareness",
+      "environmental science context"
+    ],
+    "search_examples": [
+      "show ozone over Europe",
+      "display atmospheric ozone in Mediterranean"
+    ],
+    "disambiguation_notes": [
+      "Use for ozone column patterns; OpenAQ overlays are better for local ground-level station data."
+    ],
+    "location_dependency": "Location-dependent and dynamic.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

@@ -3,7 +3,7 @@
   "name": "ESA WorldCover",
   "provider": "esa",
   "type": "wmts",
-  "description": "ESA WorldCover global land cover classification.",
+  "description": "ESA WorldCover global land-cover overlay with thematic surface classes.",
   "capabilities": [
     "wmts",
     "land-cover"
@@ -42,7 +42,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "d155f809aaf624f14b66d5f9900844890a719d514b7e46ea507e3b4b0cfe835e"
+    "content_hash": "d155f809aaf624f14b66d5f9900844890a719d514b7e46ea507e3b4b0cfe835e",
+    "human_summary": "Global land-cover classification layer for consistent thematic surface analysis.",
+    "primary_use_cases": [
+      "global land-cover comparison",
+      "habitat and land-use context",
+      "thematic base analysis"
+    ],
+    "search_examples": [
+      "show worldcover classes near Florence",
+      "display urban versus vegetation cover"
+    ],
+    "disambiguation_notes": [
+      "Prefer this for broad land-cover questions when annual thematic categories are needed."
+    ],
+    "location_dependency": "Location-dependent with periodic dataset updates.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

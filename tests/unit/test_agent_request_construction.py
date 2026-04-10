@@ -102,6 +102,7 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
         user_message="show fires",
         extracted_state=state,
         retrieval=retrieval,
+        available_tools=[{"name": "map_search", "description": "Map search tool"}],
     )
 
     request = agent_provider.last_request
@@ -110,6 +111,7 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
     payload = json.loads(request.messages[2]["content"])
     assert payload["user_message"] == "show fires"
     assert payload["retrieval"] == retrieval
+    assert payload["available_tools"] == [{"name": "map_search", "description": "Map search tool"}]
 
 
 def test_chat_response_service_includes_context_and_decision_payload() -> None:
@@ -130,8 +132,12 @@ def test_chat_response_service_includes_context_and_decision_payload() -> None:
         reasoning_summary="ok",
     )
     state = ExtractedIntent.model_validate({"location": {"city": "Rome"}})
-    retrieval = {"basemaps": [], "overlays": [], "providers": []}
-    search_result = {"map_session": {"center": {"latitude": 41.9, "longitude": 12.5}}}
+    retrieval = {
+        "basemaps": [{"id": "osm_default", "label": "OpenStreetMap", "provider": "fallback", "is_available": True}],
+        "overlays": [{"id": "fires", "label": "Fires", "provider": "gibs", "is_available": True}],
+        "providers": [],
+    }
+    search_result = {"map_session": {"center": {"latitude": 41.9, "longitude": 12.5}, "overlays": ["fires"]}}
 
     service.generate(
         conversation_context=context,
@@ -147,4 +153,6 @@ def test_chat_response_service_includes_context_and_decision_payload() -> None:
     assert request.messages[1]["content"] == context
     payload = json.loads(request.messages[2]["content"])
     assert payload["decision"]["decision"] == "search_and_complete"
-    assert payload["search_result"] == search_result
+    assert payload["retrieval"]["basemaps"][0]["label"] == "OpenStreetMap"
+    assert "id" not in payload["retrieval"]["basemaps"][0]
+    assert payload["search_result"]["map_session"]["overlay_count"] == 1

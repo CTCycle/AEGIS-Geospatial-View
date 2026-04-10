@@ -3,7 +3,7 @@
   "name": "Land/Water Mask (MODIS, Daily)",
   "provider": "gibs",
   "type": "legacy-image",
-  "description": "MODIS land/water classification for coastline and hydrology context.",
+  "description": "NASA GIBS land-water mask overlay distinguishing terrestrial and water surfaces.",
   "capabilities": [
     "imagery",
     "land-water"
@@ -38,7 +38,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "13785d1dfc732def6ef18e35c877dd36a520c1508219330eecca86c449b95aad"
+    "content_hash": "13785d1dfc732def6ef18e35c877dd36a520c1508219330eecca86c449b95aad",
+    "human_summary": "Binary thematic layer useful for separating land and water domains in analysis.",
+    "primary_use_cases": [
+      "coastal context",
+      "hydrology-aware filtering",
+      "land-water segmentation"
+    ],
+    "search_examples": [
+      "show land-water mask near Venice",
+      "separate coastal water areas"
+    ],
+    "disambiguation_notes": [
+      "Prefer when analysis depends on distinguishing water bodies from land, not for terrain detail."
+    ],
+    "location_dependency": "Location-dependent; mostly static thematic content.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

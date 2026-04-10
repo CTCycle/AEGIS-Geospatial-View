@@ -11,10 +11,12 @@ from AEGIS.server.repositories.manifest_embeddings import ManifestEmbeddingsRepo
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.vector.chroma_store import ChromaVectorStore, VectorDocument
 from AEGIS.server.services.vector.embedding_factory import EmbeddingFactory
+from AEGIS.server.services.vector.manifest_preparation import ManifestPreparationService
 
 
 class VectorIndexer:
     METADATA_FILENAME = "manifest_index_metadata.json"
+    INDEX_SCHEMA_VERSION = 2
     SEARCHABLE_KINDS = ("basemaps", "overlays")
 
     def __init__(
@@ -24,11 +26,13 @@ class VectorIndexer:
         store: ChromaVectorStore | None = None,
         embeddings_repo: ManifestEmbeddingsRepository | None = None,
         embedding_factory: EmbeddingFactory | None = None,
+        manifest_preparation: ManifestPreparationService | None = None,
     ) -> None:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
         self.store = store or ChromaVectorStore()
         self.embeddings_repo = embeddings_repo or ManifestEmbeddingsRepository()
         self.embedding_factory = embedding_factory or EmbeddingFactory()
+        self.manifest_preparation = manifest_preparation or ManifestPreparationService()
 
     def _content_hash(self, entry: dict[str, Any]) -> str:
         payload = json.dumps(entry, sort_keys=True, separators=(",", ":"))
@@ -36,72 +40,6 @@ class VectorIndexer:
 
     def _metadata_path(self) -> str:
         return os.path.join(self.store.persist_path, self.METADATA_FILENAME)
-
-    def _normalize_list(self, value: Any) -> list[str]:
-        if not isinstance(value, list):
-            return []
-        return [str(item).strip() for item in value if str(item).strip()]
-
-    def _compose_document_text(self, *, entry: dict[str, Any], kind: str) -> str:
-        metadata = dict(entry.get("metadata") or {})
-        capabilities = self._normalize_list(entry.get("capabilities"))
-        keywords = self._normalize_list(metadata.get("keywords"))
-        intent_tags = self._normalize_list(metadata.get("intent_tags"))
-        task_tags = self._normalize_list(metadata.get("task_tags"))
-        map_type_tags = self._normalize_list(metadata.get("map_type_tags"))
-        kind_label = kind[:-1] if kind.endswith("s") else kind
-        lines = [
-            f"Resource type: {kind_label}",
-            f"Name: {entry.get('name') or 'Unknown resource'}",
-            f"Provider: {entry.get('provider') or 'Unknown provider'}",
-            f"Description: {entry.get('description') or 'No description provided.'}",
-        ]
-        if capabilities:
-            lines.append(f"Capabilities: {', '.join(capabilities)}")
-        if entry.get("coverage"):
-            lines.append(f"Coverage: {entry['coverage']}")
-        if keywords:
-            lines.append(f"Keywords: {', '.join(keywords)}")
-        if intent_tags:
-            lines.append(f"Intent tags: {', '.join(intent_tags)}")
-        if task_tags:
-            lines.append(f"Task tags: {', '.join(task_tags)}")
-        if map_type_tags:
-            lines.append(f"Map styles: {', '.join(map_type_tags)}")
-        return "\n".join(lines).strip()
-
-    def _entry_to_document(self, *, entry: dict[str, Any], kind: str) -> VectorDocument:
-        metadata = dict(entry.get("metadata") or {})
-        keywords = self._normalize_list(metadata.get("keywords"))
-        text = self._compose_document_text(entry=entry, kind=kind)
-        embedding_provider = str(metadata.get("embedding_provider") or "ollama")
-        try:
-            embedding_vector, embedding_model = self.embedding_factory.get_embedding(
-                provider=embedding_provider,
-                input_text=text,
-            )
-        except Exception:
-            embedding_vector, embedding_model = (
-                [],
-                server_settings.vectors.default_ollama_embedding_model,
-            )
-        return VectorDocument(
-            id=f"{kind}:{entry['id']}",
-            text=text,
-            metadata={
-                "id": entry.get("id"),
-                "name": entry.get("name"),
-                "provider": entry.get("provider"),
-                "type": entry.get("type"),
-                "document_kind": kind[:-1] if kind.endswith("s") else kind,
-                "capabilities": ",".join(self._normalize_list(entry.get("capabilities"))),
-                "coverage": entry.get("coverage"),
-                "keywords": ",".join(keywords),
-                "embedding_provider": embedding_provider,
-                "embedding_model": embedding_model,
-            },
-            embedding=embedding_vector or None,
-        )
 
     def _manifest_summary(self, catalog: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
         summary: list[dict[str, Any]] = []
@@ -118,44 +56,43 @@ class VectorIndexer:
         summary.sort(key=lambda item: (item["kind"], item["id"]))
         return summary
 
-    def _resolve_embedding_settings(
-        self,
-        catalog: dict[str, list[dict[str, Any]]],
-    ) -> tuple[str, str]:
+    def _resolve_index_embedding_settings(self, catalog: dict[str, list[dict[str, Any]]]) -> tuple[str, str]:
+        providers: set[str] = set()
         for kind in self.SEARCHABLE_KINDS:
             for entry in catalog.get(kind, []):
                 metadata = dict(entry.get("metadata") or {})
-                provider = str(metadata.get("embedding_provider") or "ollama")
-                if provider == "openai":
-                    model = server_settings.vectors.default_openai_embedding_model
-                elif provider == "google":
-                    model = server_settings.vectors.default_google_embedding_model
-                else:
-                    provider = "ollama"
-                    model = server_settings.vectors.default_ollama_embedding_model
-                return provider, model
-        return "ollama", server_settings.vectors.default_ollama_embedding_model
+                providers.add(self.embedding_factory.normalize_provider(metadata.get("embedding_provider")))
+        if len(providers) > 1:
+            detected = ", ".join(sorted(providers))
+            raise ValueError(f"Mixed embedding providers are not supported in one vector index: {detected}")
+        provider = next(iter(providers), "ollama")
+        return provider, self.embedding_factory.resolve_default_model(provider)
 
     def _metadata_payload(
         self,
         *,
         catalog: dict[str, list[dict[str, Any]]],
-        document_count: int,
+        chunk_count: int,
+        embedding_provider: str,
+        embedding_model: str,
     ) -> dict[str, Any]:
         summary = self._manifest_summary(catalog)
         fingerprint = hashlib.sha256(
             json.dumps(summary, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
-        embedding_provider, embedding_model = self._resolve_embedding_settings(catalog)
         return {
-            "generated_at": datetime.now(UTC).isoformat(),
+            "index_schema_version": self.INDEX_SCHEMA_VERSION,
+            "last_update_timestamp": datetime.now(UTC).isoformat(),
             "manifest_count": len(summary),
-            "indexed_document_count": document_count,
+            "chunk_count": chunk_count,
+            "searchable_kinds": [kind[:-1] for kind in self.SEARCHABLE_KINDS],
             "embedding_provider": embedding_provider,
             "embedding_model": embedding_model,
-            "manifest_summary": {
-                "fingerprint": fingerprint,
-                "items": summary,
+            "manifest_fingerprint": fingerprint,
+            "manifest_summary": summary,
+            "source_directories": {
+                "basemaps": os.path.abspath(os.path.join(self.manifest_loader.root_path, "basemaps")),
+                "overlays": os.path.abspath(os.path.join(self.manifest_loader.root_path, "overlays")),
             },
         }
 
@@ -163,12 +100,19 @@ class VectorIndexer:
         self,
         *,
         catalog: dict[str, list[dict[str, Any]]],
-        document_count: int,
+        chunk_count: int,
+        embedding_provider: str,
+        embedding_model: str,
     ) -> None:
         os.makedirs(self.store.persist_path, exist_ok=True)
         with open(self._metadata_path(), "w", encoding="utf-8") as handle:
             json.dump(
-                self._metadata_payload(catalog=catalog, document_count=document_count),
+                self._metadata_payload(
+                    catalog=catalog,
+                    chunk_count=chunk_count,
+                    embedding_provider=embedding_provider,
+                    embedding_model=embedding_model,
+                ),
                 handle,
                 indent=2,
             )
@@ -187,80 +131,140 @@ class VectorIndexer:
     def _metadata_is_valid(self, payload: dict[str, Any] | None) -> bool:
         if not isinstance(payload, dict):
             return False
-        summary = payload.get("manifest_summary")
-        if not isinstance(summary, dict):
-            return False
         required_fields = {
-            "generated_at",
+            "index_schema_version",
+            "last_update_timestamp",
             "manifest_count",
+            "chunk_count",
+            "searchable_kinds",
             "embedding_provider",
             "embedding_model",
+            "manifest_fingerprint",
+            "manifest_summary",
+            "source_directories",
         }
         if not required_fields.issubset(payload):
             return False
-        items = summary.get("items")
-        if not isinstance(items, list):
+        if int(payload.get("index_schema_version") or 0) != self.INDEX_SCHEMA_VERSION:
             return False
-        manifest_count = payload.get("manifest_count")
-        if not isinstance(manifest_count, int) or manifest_count != len(items):
+        summary = payload.get("manifest_summary")
+        if not isinstance(summary, list):
             return False
-        return isinstance(summary.get("fingerprint"), str) and bool(summary["fingerprint"].strip())
+        if not isinstance(payload.get("manifest_count"), int) or payload["manifest_count"] != len(summary):
+            return False
+        return isinstance(payload.get("manifest_fingerprint"), str) and bool(str(payload["manifest_fingerprint"]).strip())
 
-    def _index_documents(self, catalog: dict[str, list[dict[str, Any]]]) -> list[VectorDocument]:
+    def _bootstrap_artifacts_present(self) -> bool:
+        return bool(self.store.exists() and self._metadata_is_valid(self._read_metadata()))
+
+    def _entry_to_document(
+        self,
+        *,
+        entry: dict[str, Any],
+        kind: str,
+        embedding_provider: str,
+        embedding_model: str,
+    ) -> VectorDocument:
+        prepared = self.manifest_preparation.prepare_entry(entry=entry, kind=kind)
+        try:
+            embedding_vector, _ = self.embedding_factory.get_embedding(
+                provider=embedding_provider,
+                model=embedding_model,
+                input_text=prepared.text,
+            )
+        except Exception:
+            embedding_vector = []
+        return VectorDocument(
+            id=prepared.id,
+            text=prepared.text,
+            metadata={
+                **prepared.metadata,
+                "embedding_provider": embedding_provider,
+                "embedding_model": embedding_model,
+            },
+            embedding=embedding_vector or None,
+        )
+
+    def _index_documents(
+        self,
+        catalog: dict[str, list[dict[str, Any]]],
+        *,
+        embedding_provider: str,
+        embedding_model: str,
+    ) -> list[VectorDocument]:
         documents: list[VectorDocument] = []
         for kind in self.SEARCHABLE_KINDS:
             for entry in catalog.get(kind, []):
-                documents.append(self._entry_to_document(entry=entry, kind=kind))
+                documents.append(
+                    self._entry_to_document(
+                        entry=entry,
+                        kind=kind,
+                        embedding_provider=embedding_provider,
+                        embedding_model=embedding_model,
+                    )
+                )
         return documents
+
+    def _upsert_embedding_records(
+        self,
+        *,
+        catalog: dict[str, list[dict[str, Any]]],
+        embedding_provider: str,
+        embedding_model: str,
+    ) -> None:
+        for kind in self.SEARCHABLE_KINDS:
+            manifest_kind = kind[:-1]
+            for entry in catalog.get(kind, []):
+                self.embeddings_repo.upsert(
+                    manifest_id=str(entry["id"]),
+                    manifest_kind=manifest_kind,
+                    manifest_version=int(entry.get("version") or 1),
+                    content_hash=self._content_hash(entry),
+                    embedding_provider=embedding_provider,
+                    embedding_model=embedding_model,
+                    vector_collection=self.store.collection_name,
+                    vector_document_id=f"{kind}:{entry['id']}",
+                )
 
     def rebuild(self) -> dict[str, Any]:
         catalog = self.manifest_loader.load_all()
+        embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
         self.store.clear()
-        documents = self._index_documents(catalog)
+        documents = self._index_documents(
+            catalog,
+            embedding_provider=embedding_provider,
+            embedding_model=embedding_model,
+        )
         self.store.add_documents(documents)
-        for kind in self.SEARCHABLE_KINDS:
-            for entry in catalog.get(kind, []):
-                metadata = dict(entry.get("metadata") or {})
-                document_id = f"{kind}:{entry['id']}"
-                embedding_provider = (
-                    documents[0].metadata.get("embedding_provider")
-                    if documents
-                    else str(metadata.get("embedding_provider") or "ollama")
-                )
-                embedding_model = next(
-                    (
-                        str(document.metadata.get("embedding_model"))
-                        for document in documents
-                        if document.id == document_id
-                    ),
-                    str(metadata.get("embedding_model") or server_settings.vectors.default_ollama_embedding_model),
-                )
-                self.embeddings_repo.upsert(
-                    manifest_id=str(entry["id"]),
-                    manifest_kind=kind[:-1],
-                    manifest_version=int(entry.get("version") or 1),
-                    content_hash=self._content_hash(entry),
-                    embedding_provider=str(metadata.get("embedding_provider") or embedding_provider),
-                    embedding_model=embedding_model,
-                    vector_collection=self.store.collection_name,
-                    vector_document_id=document_id,
-                )
-        self._write_metadata(catalog=catalog, document_count=len(documents))
+        self._upsert_embedding_records(
+            catalog=catalog,
+            embedding_provider=embedding_provider,
+            embedding_model=embedding_model,
+        )
+        self._write_metadata(
+            catalog=catalog,
+            chunk_count=len(documents),
+            embedding_provider=embedding_provider,
+            embedding_model=embedding_model,
+        )
         return {
             "status": "ok",
             "indexed_documents": len(documents),
             "vector_path": self.store.persist_path,
         }
 
+    def bootstrap_if_missing(self) -> dict[str, Any] | None:
+        if self._bootstrap_artifacts_present():
+            return None
+        return self.rebuild()
+
     def ensure_index_up_to_date(self) -> dict[str, Any] | None:
-        metadata = self._read_metadata()
-        if not self.store.exists() or not self._metadata_is_valid(metadata):
-            return self.rebuild()
-        return None
+        return self.bootstrap_if_missing()
 
     def sync(self) -> dict[str, Any]:
         catalog = self.manifest_loader.load_all()
         updated = 0
+        embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
         for kind in self.SEARCHABLE_KINDS:
             manifest_kind = kind[:-1]
             for entry in catalog.get(kind, []):
@@ -273,13 +277,20 @@ class VectorIndexer:
                     existing
                     and existing.content_hash == content_hash
                     and int(entry.get("version") or 1) == existing.manifest_version
+                    and existing.embedding_provider == embedding_provider
+                    and existing.embedding_model == embedding_model
                 ):
                     continue
                 updated += 1
         if updated > 0 or not self._metadata_is_valid(self._read_metadata()):
             return self.rebuild()
         document_count = sum(len(catalog.get(kind, [])) for kind in self.SEARCHABLE_KINDS)
-        self._write_metadata(catalog=catalog, document_count=document_count)
+        self._write_metadata(
+            catalog=catalog,
+            chunk_count=document_count,
+            embedding_provider=embedding_provider,
+            embedding_model=embedding_model,
+        )
         return {
             "status": "ok",
             "indexed_documents": 0,

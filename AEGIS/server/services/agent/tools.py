@@ -19,6 +19,18 @@ class AgentTools:
         self.catalog_service = catalog_service
         self.search_orchestrator = search_orchestrator
 
+    def describe_tools(self) -> list[dict[str, str]]:
+        return [
+            {
+                "name": "location_to_coordinates",
+                "description": "Resolve a human place description into latitude and longitude using Nominatim geocoding.",
+            },
+            {
+                "name": "map_search",
+                "description": "Run an orchestrated geospatial search and produce map layers, basemap selection, and optional insights.",
+            },
+        ]
+
     async def geocode_location(
         self,
         *,

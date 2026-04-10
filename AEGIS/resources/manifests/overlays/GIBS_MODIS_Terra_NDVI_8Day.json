@@ -3,7 +3,7 @@
   "name": "Vegetation Index NDVI (MODIS, 8-day)",
   "provider": "gibs",
   "type": "legacy-image",
-  "description": "8-day NDVI vegetation vigor composite from MODIS.",
+  "description": "NASA GIBS NDVI vegetation index overlay aggregated on an 8-day cadence.",
   "capabilities": [
     "imagery",
     "vegetation"
@@ -38,7 +38,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "13e6f165dc3d6a6b1fdcd08d818e0e88c6be9435f3ee74c2ff2bb4a79263fe68"
+    "content_hash": "13e6f165dc3d6a6b1fdcd08d818e0e88c6be9435f3ee74c2ff2bb4a79263fe68",
+    "human_summary": "Vegetation vigor layer indicating relative greenness and plant activity.",
+    "primary_use_cases": [
+      "vegetation health context",
+      "agricultural monitoring",
+      "seasonal greenness comparison"
+    ],
+    "search_examples": [
+      "show NDVI over Tuscany",
+      "where is vegetation stress visible"
+    ],
+    "disambiguation_notes": [
+      "Use for vegetation condition questions, not direct air quality or temperature analysis."
+    ],
+    "location_dependency": "Location-dependent with periodic refresh.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

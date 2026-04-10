@@ -104,6 +104,11 @@ class GeospatialCatalogService:
                         if geoapify_key
                         else None
                     )
+            requires_key = bool(metadata.get("requires_key", False))
+            is_available = not requires_key or bool(tile_url)
+            availability_reason = None
+            if requires_key and not is_available:
+                availability_reason = f"{provider.capitalize()} API key is not configured."
             mapped.append(
                 {
                     "id": entry["id"],
@@ -112,7 +117,9 @@ class GeospatialCatalogService:
                     "type": entry["type"],
                     "tile_url": tile_url,
                     "attribution": metadata.get("attribution"),
-                    "requires_key": bool(metadata.get("requires_key", False)),
+                    "requires_key": requires_key,
+                    "is_available": is_available,
+                    "availability_reason": availability_reason,
                 }
             )
         return mapped
@@ -146,6 +153,13 @@ class GeospatialCatalogService:
                 overlay["url"] = (
                     url_template.replace("{api_key}", tomtom_key) if tomtom_key else None
                 )
+            is_available = not overlay["requires_key"] or bool(overlay.get("url"))
+            overlay["is_available"] = is_available
+            overlay["availability_reason"] = (
+                f"{entry.get('provider', 'Provider').capitalize()} API key is not configured."
+                if overlay["requires_key"] and not is_available
+                else None
+            )
             mapped.append(overlay)
         return mapped
 

@@ -21,6 +21,7 @@ from AEGIS.server.services.chat.history_buffer import ChatHistoryBuffer
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.llm.factory import LLMFactory
 from AEGIS.server.services.llm.context_builder import build_conversation_context
+from AEGIS.server.services.llm.ollama import OllamaProvider
 from AEGIS.server.services.search.intent_mapper import map_structured_intent_to_location_request
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.services.vector.retriever import VectorRetriever
@@ -52,7 +53,8 @@ class AgentOrchestrator:
         self.session_details_repo = session_details_repo or SessionDetailsRepository()
         self.agent_tools = agent_tools
         nominatim_service = getattr(self.search_orchestrator, "nominatim_service", None)
-        catalog_service = getattr(self.search_orchestrator, "catalog_service", None)
+        self.catalog_service = getattr(self.search_orchestrator, "catalog_service", None)
+        catalog_service = self.catalog_service
         if self.agent_tools is None and nominatim_service is not None and catalog_service is not None:
             self.agent_tools = AgentTools(
                 nominatim_service=nominatim_service,
@@ -60,36 +62,73 @@ class AgentOrchestrator:
                 search_orchestrator=self.search_orchestrator,
             )
 
-    def _build_retrieval_query(self, *, user_message: str, state: ExtractedIntent) -> str:
-        latest_request = user_message.strip()
-        resolved_location = ", ".join(
-            item
-            for item in [
-                state.location.address,
-                state.location.city,
-                state.location.country,
-            ]
-            if item
-        )
-        context_terms = " ".join(
-            item
-            for item in [
-                state.user_goal.strip(),
-                " ".join(state.filters),
-                state.base_map_type or "",
-                state.area_of_interest or "",
-            ]
-            if item
-        )
-        return " | ".join(
-            segment
-            for segment in [
-                latest_request,
-                f"resolved location: {resolved_location}" if resolved_location else "",
-                f"context: {context_terms}" if context_terms else "",
-            ]
-            if segment
-        )
+    def _check_ollama_availability(self, settings) -> tuple[bool, str | None]:
+        configured_providers = {
+            str(settings.chat_model_provider).strip().lower(),
+            str(settings.parser_model_provider).strip().lower(),
+            str(settings.agent_model_provider).strip().lower(),
+        }
+        if "ollama" not in configured_providers:
+            return True, None
+        health = OllamaProvider(base_url=settings.ollama_url).health_check()
+        if bool(health.get("ok")):
+            return True, None
+        detail = str(health.get("detail") or "connection failed").strip()
+        return False, detail
+
+    def _catalog_lookup(self, kind: str) -> dict[str, dict[str, Any]]:
+        if self.catalog_service is None:
+            return {}
+        try:
+            catalog = self.catalog_service.list_catalog()
+        except Exception:
+            return {}
+        key = "basemaps" if kind == "basemaps" else "overlays"
+        return {
+            str(item.get("id")): item
+            for item in catalog.get(key, [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+
+    def _annotate_retrieval_candidates(self, retrieval: dict[str, list[dict[str, object]]]) -> dict[str, list[dict[str, object]]]:
+        annotated: dict[str, list[dict[str, object]]] = {"basemaps": [], "overlays": [], "providers": []}
+        for kind in ("basemaps", "overlays"):
+            lookup = self._catalog_lookup(kind)
+            for candidate in retrieval.get(kind, []):
+                if not isinstance(candidate, dict):
+                    continue
+                item_id = str(candidate.get("id") or "").strip()
+                if not item_id:
+                    continue
+                metadata = candidate.get("metadata")
+                metadata_dict = metadata if isinstance(metadata, dict) else {}
+                catalog_item = lookup.get(item_id, {})
+                label = (
+                    catalog_item.get("label")
+                    or metadata_dict.get("name")
+                    or item_id
+                )
+                provider_name = catalog_item.get("provider") or metadata_dict.get("provider")
+                is_available = bool(catalog_item.get("is_available", True))
+                availability_reason = catalog_item.get("availability_reason")
+                summary = (
+                    metadata_dict.get("human_summary")
+                    if isinstance(metadata_dict.get("human_summary"), str)
+                    else metadata_dict.get("keywords")
+                )
+                annotated[kind].append(
+                    {
+                        "id": item_id,
+                        "score": float(candidate.get("score", 0.0) or 0.0),
+                        "distance": float(candidate.get("distance", 0.0) or 0.0),
+                        "label": str(label),
+                        "provider": str(provider_name) if provider_name else None,
+                        "is_available": is_available,
+                        "availability_reason": availability_reason if not is_available else None,
+                        "summary": summary,
+                    }
+                )
+        return annotated
 
     async def run_turn(self, request: ChatTurnRequest) -> ChatTurnResponse:
         started = perf_counter()
@@ -113,6 +152,62 @@ class AgentOrchestrator:
 
         _history = self.history_buffer.get_or_hydrate(session.id)
         latest_state = self.history_repo.get_latest_extracted_state(session.id) or ExtractedIntent()
+        ollama_ok, ollama_detail = self._check_ollama_availability(settings)
+        if not ollama_ok:
+            assistant_message = (
+                "I cannot reach your local Ollama service right now, so I cannot process this request with the current model settings. "
+                f"Please start Ollama at {settings.ollama_url} or switch to a cloud model in Settings, then try again."
+            )
+            assistant_row = self.history_repo.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                structured_payload=latest_state.model_dump(mode="json"),
+                tool_payload={"execution": "provider_error", "provider": "ollama", "detail": ollama_detail},
+                map_session=None,
+            )
+            self.history_buffer.append(
+                session.id,
+                {
+                    "id": assistant_row.id,
+                    "session_id": session.id,
+                    "turn_index": assistant_row.turn_index,
+                    "role": assistant_row.role,
+                    "content": assistant_row.content,
+                    "structured_payload": latest_state.model_dump(mode="json"),
+                    "tool_payload": {"execution": "provider_error", "provider": "ollama", "detail": ollama_detail},
+                    "map_session": None,
+                    "created_at": assistant_row.created_at.isoformat() if assistant_row.created_at else None,
+                },
+            )
+            elapsed = perf_counter() - started
+            self.session_catalog_repo.upsert_for_session(
+                session_id=session.id,
+                models={
+                    "parser": {"provider": settings.parser_model_provider, "name": settings.parser_model_name},
+                    "agent": {"provider": settings.agent_model_provider, "name": settings.agent_model_name},
+                    "chat": {"provider": settings.chat_model_provider, "name": settings.chat_model_name},
+                },
+            )
+            self.session_details_repo.insert_turn(
+                session_id=session.id,
+                message_id=assistant_row.id,
+                user_message=request.message,
+                chat_response=assistant_message,
+                extracted_info=latest_state.model_dump(mode="json"),
+                response_time=elapsed,
+                has_triggered_search=False,
+            )
+            return ChatTurnResponse(
+                session_id=session.id,
+                assistant_message=assistant_message,
+                structured_intent=latest_state.model_dump(mode="json"),
+                extracted_state=latest_state.model_dump(mode="json"),
+                map_session=None,
+                tool_payload={"execution": "provider_error", "provider": "ollama", "detail": ollama_detail},
+                follow_up_required=False,
+                fallback_mode="provider_unavailable",
+            )
         latest_extracted_info = latest_state.model_dump_json(indent=2)
         initial_context = build_conversation_context(
             messages=_history,
@@ -149,13 +244,16 @@ class AgentOrchestrator:
             max_messages=server_settings.chat.max_history_messages,
         )
 
-        retrieval_query = self._build_retrieval_query(user_message=request.message, state=extracted_state)
+        retrieval_query = request.message.strip()
         retrieval = self.vector_retriever.retrieve_candidates(retrieval_query, top_k=10)
+        annotated_retrieval = self._annotate_retrieval_candidates(retrieval)
+        available_tools = self.agent_tools.describe_tools() if self.agent_tools is not None else []
         decision = decision_service.decide(
             conversation_context=context,
             user_message=request.message,
             extracted_state=extracted_state,
-            retrieval=retrieval,
+            retrieval=annotated_retrieval,
+            available_tools=available_tools,
         )
 
         search_result: dict[str, Any] | None = None
@@ -196,7 +294,7 @@ class AgentOrchestrator:
             user_message=request.message,
             extracted_state=extracted_state,
             decision=decision,
-            retrieval=retrieval,
+            retrieval=annotated_retrieval,
             search_result=search_result,
         )
         assistant_row = self.history_repo.append_message(
