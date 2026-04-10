@@ -12,7 +12,10 @@ from AEGIS.server.services.geospatial.layers import LayerProviderService
 from AEGIS.server.services.geospatial.maps import MapService
 from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.geospatial.openaq import OpenAQService
+from AEGIS.server.services.geospatial.openmeteo import OpenMeteoService
+from AEGIS.server.services.geospatial.overpass import OverpassService
 from AEGIS.server.services.geospatial.pvgis import PVGISService
+from AEGIS.server.services.geospatial.rainviewer import RainViewerService
 from AEGIS.server.services.geospatial.rendering import MapRenderingService, MapSearchToolkit
 from AEGIS.server.services.jobs import job_manager
 from AEGIS.server.services.sanitization import LocationSanitizationService
@@ -37,9 +40,15 @@ layer_service = LayerProviderService(
 elevation_service = OpenElevationService()
 openaq_service = OpenAQService()
 pvgis_service = PVGISService()
+openmeteo_service = OpenMeteoService()
+overpass_service = OverpassService()
+rainviewer_service = RainViewerService()
 catalog_service = GeospatialCatalogService(
     openaq_service=openaq_service,
     pvgis_service=pvgis_service,
+    openmeteo_service=openmeteo_service,
+    overpass_service=overpass_service,
+    rainviewer_service=rainviewer_service,
 )
 
 toolkit = MapSearchToolkit(

@@ -7,7 +7,10 @@ from typing import Any
 
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.geospatial.openaq import OpenAQService
+from AEGIS.server.services.geospatial.openmeteo import OpenMeteoRequestError, OpenMeteoService
+from AEGIS.server.services.geospatial.overpass import OverpassRequestError, OverpassService
 from AEGIS.server.services.geospatial.pvgis import PVGISService
+from AEGIS.server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
 from AEGIS.server.utils.logger import logger
 
 type JsonDict = dict[str, Any]
@@ -19,11 +22,17 @@ class GeospatialCatalogService:
         *,
         openaq_service: OpenAQService,
         pvgis_service: PVGISService,
+        openmeteo_service: OpenMeteoService | None = None,
+        overpass_service: OverpassService | None = None,
+        rainviewer_service: RainViewerService | None = None,
         manifest_loader: GeospatialManifestLoader | None = None,
         ttl_seconds: float = 300.0,
     ) -> None:
         self.openaq_service = openaq_service
         self.pvgis_service = pvgis_service
+        self.openmeteo_service = openmeteo_service or OpenMeteoService()
+        self.overpass_service = overpass_service or OverpassService()
+        self.rainviewer_service = rainviewer_service or RainViewerService()
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
         self.ttl_seconds = max(ttl_seconds, 30.0)
         self._cache: dict[str, tuple[float, JsonDict]] = {}
@@ -105,6 +114,8 @@ class GeospatialCatalogService:
                         else None
                     )
             requires_key = bool(metadata.get("requires_key", False))
+            if not tile_url and isinstance(tile_url_template, str) and not requires_key:
+                tile_url = tile_url_template
             is_available = not requires_key or bool(tile_url)
             availability_reason = None
             if requires_key and not is_available:
@@ -153,6 +164,8 @@ class GeospatialCatalogService:
                 overlay["url"] = (
                     url_template.replace("{api_key}", tomtom_key) if tomtom_key else None
                 )
+            elif isinstance(url_template, str) and not overlay.get("url"):
+                overlay["url"] = url_template
             is_available = not overlay["requires_key"] or bool(overlay.get("url"))
             overlay["is_available"] = is_available
             overlay["availability_reason"] = (
@@ -212,6 +225,18 @@ class GeospatialCatalogService:
         return list(dict.fromkeys(warnings))
 
     # -------------------------------------------------------------------------
+    async def get_weather_forecast(self, *, latitude: float, longitude: float) -> JsonDict:
+        return await self._fetch_openmeteo_weather_insight(latitude=latitude, longitude=longitude)
+
+    # -------------------------------------------------------------------------
+    async def get_air_quality_forecast(self, *, latitude: float, longitude: float) -> JsonDict:
+        return await self._fetch_openmeteo_air_quality_insight(latitude=latitude, longitude=longitude)
+
+    # -------------------------------------------------------------------------
+    async def get_nearby_poi(self, *, latitude: float, longitude: float, radius_m: float) -> JsonDict:
+        return await self._fetch_overpass_poi_insight(latitude=latitude, longitude=longitude, radius_m=radius_m)
+
+    # -------------------------------------------------------------------------
     async def fetch_insights(
         self,
         *,
@@ -231,6 +256,24 @@ class GeospatialCatalogService:
             return cached
 
         insights: JsonDict = {}
+        if "openmeteo_weather_forecast" in overlay_ids:
+            insights["weather_forecast"] = await self._fetch_openmeteo_weather_insight(
+                latitude=latitude,
+                longitude=longitude,
+            )
+        if "openmeteo_air_quality_forecast" in overlay_ids:
+            insights["air_quality_forecast"] = await self._fetch_openmeteo_air_quality_insight(
+                latitude=latitude,
+                longitude=longitude,
+            )
+        if "overpass_poi_amenities" in overlay_ids:
+            insights["poi_amenities"] = await self._fetch_overpass_poi_insight(
+                latitude=latitude,
+                longitude=longitude,
+                radius_m=radius_m,
+            )
+        if "rainviewer_precipitation_radar" in overlay_ids:
+            insights["rain_radar"] = await self._fetch_rainviewer_insight()
         if "openaq_air_quality" in overlay_ids:
             insights["air_quality"] = await self._fetch_openaq_insight(
                 latitude=latitude, longitude=longitude, radius_m=radius_m
@@ -242,6 +285,40 @@ class GeospatialCatalogService:
 
         self._cache_set(cache_key, insights)
         return insights
+
+    # -------------------------------------------------------------------------
+    async def fetch_overlay_runtime(
+        self,
+        *,
+        latitude: float | None,
+        longitude: float | None,
+        overlay_ids: list[str],
+        radius_m: float,
+    ) -> JsonDict:
+        runtime: JsonDict = {}
+        if latitude is None or longitude is None:
+            for overlay_id in overlay_ids:
+                runtime[overlay_id] = {
+                    "provider": self._provider_by_overlay_id(overlay_id),
+                    "resolved_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "data_freshness": "unknown",
+                    "availability": "error",
+                    "error": {
+                        "provider": self._provider_by_overlay_id(overlay_id),
+                        "code": "missing_location",
+                        "user_message": "Location is required to resolve this layer.",
+                        "retryable": False,
+                    },
+                }
+            return runtime
+        for overlay_id in overlay_ids:
+            runtime[overlay_id] = await self._resolve_overlay_runtime_entry(
+                overlay_id=overlay_id,
+                latitude=latitude,
+                longitude=longitude,
+                radius_m=radius_m,
+            )
+        return runtime
 
     # -------------------------------------------------------------------------
     async def _apply_rate_limit(self, key: str) -> None:
@@ -273,3 +350,132 @@ class GeospatialCatalogService:
         except Exception as exc:
             logger.warning("PVGIS insight failed: %s", exc)
             return {"error": "PVGIS data unavailable"}
+
+    # -------------------------------------------------------------------------
+    async def _fetch_openmeteo_weather_insight(self, *, latitude: float, longitude: float) -> JsonDict:
+        try:
+            await self._apply_rate_limit("openmeteo_weather")
+            return await self.openmeteo_service.get_weather_forecast(
+                latitude=latitude,
+                longitude=longitude,
+            )
+        except Exception as exc:
+            logger.warning("Open-Meteo weather insight failed: %s", exc)
+            return {"error": "Weather forecast unavailable"}
+
+    # -------------------------------------------------------------------------
+    async def _fetch_openmeteo_air_quality_insight(self, *, latitude: float, longitude: float) -> JsonDict:
+        try:
+            await self._apply_rate_limit("openmeteo_air_quality")
+            return await self.openmeteo_service.get_air_quality_forecast(
+                latitude=latitude,
+                longitude=longitude,
+            )
+        except Exception as exc:
+            logger.warning("Open-Meteo air-quality insight failed: %s", exc)
+            return {"error": "Air-quality forecast unavailable"}
+
+    # -------------------------------------------------------------------------
+    async def _fetch_overpass_poi_insight(self, *, latitude: float, longitude: float, radius_m: float) -> JsonDict:
+        try:
+            await self._apply_rate_limit("overpass")
+            return await self.overpass_service.get_nearby_poi(
+                latitude=latitude,
+                longitude=longitude,
+                radius_m=radius_m,
+            )
+        except Exception as exc:
+            logger.warning("Overpass POI insight failed: %s", exc)
+            return {"error": "Nearby points of interest unavailable"}
+
+    # -------------------------------------------------------------------------
+    async def _fetch_rainviewer_insight(self) -> JsonDict:
+        try:
+            await self._apply_rate_limit("rainviewer")
+            return await self.rainviewer_service.get_latest_radar_metadata()
+        except Exception as exc:
+            logger.warning("RainViewer insight failed: %s", exc)
+            return {"error": "Rain radar metadata unavailable"}
+
+    # -------------------------------------------------------------------------
+    def _provider_by_overlay_id(self, overlay_id: str) -> str:
+        if overlay_id.startswith("openmeteo_"):
+            return "openmeteo"
+        if overlay_id.startswith("overpass_"):
+            return "overpass"
+        if overlay_id.startswith("rainviewer_"):
+            return "rainviewer"
+        if overlay_id.startswith("openaq_"):
+            return "openaq"
+        if overlay_id.startswith("pvgis_"):
+            return "pvgis"
+        return "unknown"
+
+    # -------------------------------------------------------------------------
+    async def _resolve_overlay_runtime_entry(
+        self,
+        *,
+        overlay_id: str,
+        latitude: float,
+        longitude: float,
+        radius_m: float,
+    ) -> JsonDict:
+        timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        provider = self._provider_by_overlay_id(overlay_id)
+        base_payload: JsonDict = {
+            "provider": provider,
+            "resolved_timestamp": timestamp,
+            "data_freshness": "near_real_time",
+            "availability": "available",
+            "error": None,
+        }
+        try:
+            if overlay_id == "openmeteo_weather_forecast":
+                await self.openmeteo_service.get_weather_forecast(
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+            elif overlay_id == "openmeteo_air_quality_forecast":
+                await self.openmeteo_service.get_air_quality_forecast(
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+            elif overlay_id == "overpass_poi_amenities":
+                await self.overpass_service.get_nearby_poi(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius_m=radius_m,
+                )
+            elif overlay_id == "rainviewer_precipitation_radar":
+                radar = await self.rainviewer_service.get_latest_radar_metadata()
+                base_payload["tile_url_template"] = radar.get("tile_url_template")
+                base_payload["latest_time"] = radar.get("latest_time")
+            elif overlay_id == "openaq_air_quality":
+                await self.openaq_service.get_nearby_measurements(latitude, longitude, radius_m)
+            elif overlay_id == "pvgis_solar":
+                await self.pvgis_service.get_point_estimate(latitude, longitude)
+            else:
+                base_payload["data_freshness"] = "static"
+            return base_payload
+        except (OpenMeteoRequestError, OverpassRequestError, RainViewerRequestError) as exc:
+            return {
+                **base_payload,
+                "availability": "error",
+                "error": {
+                    "provider": provider,
+                    "code": "provider_unavailable",
+                    "user_message": str(exc),
+                    "retryable": True,
+                },
+            }
+        except Exception as exc:
+            return {
+                **base_payload,
+                "availability": "error",
+                "error": {
+                    "provider": provider,
+                    "code": "runtime_error",
+                    "user_message": str(exc) or "Runtime data unavailable.",
+                    "retryable": True,
+                },
+            }

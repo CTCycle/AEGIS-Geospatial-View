@@ -26,6 +26,18 @@ class AgentTools:
                 "description": "Resolve a human place description into latitude and longitude using Nominatim geocoding.",
             },
             {
+                "name": "get_weather_forecast",
+                "description": "Fetch weather forecast insight for resolved coordinates.",
+            },
+            {
+                "name": "get_air_quality_forecast",
+                "description": "Fetch air-quality forecast insight for resolved coordinates.",
+            },
+            {
+                "name": "get_nearby_poi",
+                "description": "Fetch nearby points of interest around resolved coordinates.",
+            },
+            {
                 "name": "map_search",
                 "description": "Run an orchestrated geospatial search and produce map layers, basemap selection, and optional insights.",
             },
@@ -44,4 +56,23 @@ class AgentTools:
             city=city,
             country_name=country_name,
             country_code=country_code,
+        )
+
+    async def get_weather_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:
+        return await self.catalog_service.get_weather_forecast(latitude=latitude, longitude=longitude)
+
+    async def get_air_quality_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:
+        return await self.catalog_service.get_air_quality_forecast(latitude=latitude, longitude=longitude)
+
+    async def get_nearby_poi(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        radius_m: float,
+    ) -> dict[str, Any]:
+        return await self.catalog_service.get_nearby_poi(
+            latitude=latitude,
+            longitude=longitude,
+            radius_m=radius_m,
         )

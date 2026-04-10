@@ -303,6 +303,51 @@ class AgentOrchestrator:
                 "execution": "location_to_coordinates",
                 "result": geocode_result,
             }
+        elif decision.execution_mode == "search" and not decision.should_trigger_search:
+            tool_target = str(decision.tool_target or "").strip()
+            direct_tool_targets = {"get_weather_forecast", "get_air_quality_forecast", "get_nearby_poi"}
+            if tool_target in direct_tool_targets and self.agent_tools is not None:
+                latitude = extracted_state.coordinates.latitude
+                longitude = extracted_state.coordinates.longitude
+                if latitude is None or longitude is None:
+                    geocode_result = await self.agent_tools.geocode_location(
+                        address=extracted_state.location.address,
+                        city=extracted_state.location.city,
+                        country_name=extracted_state.location.country,
+                    )
+                    if isinstance(geocode_result, dict):
+                        latitude = geocode_result.get("lat")
+                        longitude = geocode_result.get("lon")
+                if latitude is None or longitude is None:
+                    tool_payload = {
+                        "execution": "follow_up",
+                        "fallback_mode": "missing_location",
+                    }
+                else:
+                    if tool_target == "get_weather_forecast":
+                        direct_result = await self.agent_tools.get_weather_forecast(
+                            latitude=float(latitude),
+                            longitude=float(longitude),
+                        )
+                    elif tool_target == "get_air_quality_forecast":
+                        direct_result = await self.agent_tools.get_air_quality_forecast(
+                            latitude=float(latitude),
+                            longitude=float(longitude),
+                        )
+                    else:
+                        direct_result = await self.agent_tools.get_nearby_poi(
+                            latitude=float(latitude),
+                            longitude=float(longitude),
+                            radius_m=2500.0,
+                        )
+                    search_result = {
+                        "tool_result": direct_result,
+                        "resolved_coordinates": {"lat": float(latitude), "lon": float(longitude)},
+                    }
+                    tool_payload = {
+                        "execution": tool_target,
+                        "result": direct_result,
+                    }
         elif decision.execution_mode == "clarify":
             tool_payload = {"execution": "follow_up", "fallback_mode": "missing_location"}
 
@@ -356,7 +401,11 @@ class AgentOrchestrator:
             has_triggered_search=decision.should_trigger_search,
         )
 
-        follow_up_required = decision.execution_mode == "clarify" or decision.decision == "search_with_follow_up"
+        follow_up_required = (
+            decision.execution_mode == "clarify"
+            or decision.decision == "search_with_follow_up"
+            or (isinstance(tool_payload, dict) and tool_payload.get("execution") == "follow_up")
+        )
         fallback_mode = "needs_clarification" if follow_up_required else "none"
         return ChatTurnResponse(
             session_id=session.id,

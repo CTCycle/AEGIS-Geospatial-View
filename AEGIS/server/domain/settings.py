@@ -93,6 +93,42 @@ class VectorRuntimeSettings:
 
 ###############################################################################
 @dataclass(frozen=True)
+class OpenMeteoSettings:
+    weather_base_url: str
+    air_quality_base_url: str
+    user_agent: str
+    timeout: float
+    cache_ttl_s: float
+    min_call_interval_s: float
+
+
+###############################################################################
+@dataclass(frozen=True)
+class OverpassSettings:
+    base_url: str
+    user_agent: str
+    timeout: float
+    cache_ttl_s: float
+    min_call_interval_s: float
+    default_radius_m: float
+    default_limit: int
+
+
+###############################################################################
+@dataclass(frozen=True)
+class RainViewerSettings:
+    metadata_url: str
+    user_agent: str
+    timeout: float
+    cache_ttl_s: float
+    min_call_interval_s: float
+    tile_color_scheme: int
+    tile_smooth: int
+    tile_snow: int
+
+
+###############################################################################
+@dataclass(frozen=True)
 class GIBSSettings:
     user_agent: str
     timeout: float
@@ -122,6 +158,9 @@ class ServerSettings:
     jobs: JobsSettings
     chat: ChatRuntimeSettings
     vectors: VectorRuntimeSettings
+    openmeteo: OpenMeteoSettings
+    overpass: OverpassSettings
+    rainviewer: RainViewerSettings
     gibs: GIBSSettings
     credential_master_key: str
     credential_key_version: str
@@ -196,6 +235,39 @@ class JsonVectorRuntimeSettings(BaseModel):
     default_ollama_embedding_model: str = "nomic-embed-text"
     default_openai_embedding_model: str = "text-embedding-3-small"
     default_google_embedding_model: str = "text-embedding-004"
+
+
+###############################################################################
+class JsonOpenMeteoSettings(BaseModel):
+    weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
+    air_quality_base_url: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    user_agent: str = "AEGIS-OpenMeteo/1.0"
+    timeout: float = Field(default=15.0, ge=1.0)
+    cache_ttl_s: float = Field(default=600.0, ge=30.0)
+    min_call_interval_s: float = Field(default=0.15, ge=0.05)
+
+
+###############################################################################
+class JsonOverpassSettings(BaseModel):
+    base_url: str = "https://overpass-api.de/api/interpreter"
+    user_agent: str = "AEGIS-Overpass/1.0"
+    timeout: float = Field(default=20.0, ge=1.0)
+    cache_ttl_s: float = Field(default=600.0, ge=30.0)
+    min_call_interval_s: float = Field(default=0.2, ge=0.05)
+    default_radius_m: float = Field(default=2500.0, ge=100.0)
+    default_limit: int = Field(default=30, ge=1, le=200)
+
+
+###############################################################################
+class JsonRainViewerSettings(BaseModel):
+    metadata_url: str = "https://api.rainviewer.com/public/weather-maps.json"
+    user_agent: str = "AEGIS-RainViewer/1.0"
+    timeout: float = Field(default=15.0, ge=1.0)
+    cache_ttl_s: float = Field(default=300.0, ge=30.0)
+    min_call_interval_s: float = Field(default=0.2, ge=0.05)
+    tile_color_scheme: int = Field(default=2, ge=0, le=6)
+    tile_smooth: int = Field(default=1, ge=0, le=1)
+    tile_snow: int = Field(default=1, ge=0, le=1)
 
 
 ###############################################################################
@@ -281,6 +353,9 @@ class JsonConfigurationSettingsSource(PydanticBaseSettingsSource):
             "jobs": payload.get("jobs", {}),
             "chat": payload.get("chat", {}),
             "vectors": payload.get("vectors", {}),
+            "openmeteo": payload.get("openmeteo", {}),
+            "overpass": payload.get("overpass", {}),
+            "rainviewer": payload.get("rainviewer", {}),
             "gibs": payload.get("gibs", {}),
         }
 
@@ -302,6 +377,9 @@ class AppSettings(BaseSettings):
     jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
     chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
     vectors: JsonVectorRuntimeSettings = Field(default_factory=JsonVectorRuntimeSettings)
+    openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
+    overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
+    rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)
     gibs: JsonGIBSSettings = Field(default_factory=JsonGIBSSettings)
 
     fastapi_host: str = "127.0.0.1"
@@ -384,6 +462,33 @@ class AppSettings(BaseSettings):
                 default_ollama_embedding_model=self.vectors.default_ollama_embedding_model,
                 default_openai_embedding_model=self.vectors.default_openai_embedding_model,
                 default_google_embedding_model=self.vectors.default_google_embedding_model,
+            ),
+            openmeteo=OpenMeteoSettings(
+                weather_base_url=self.openmeteo.weather_base_url,
+                air_quality_base_url=self.openmeteo.air_quality_base_url,
+                user_agent=self.openmeteo.user_agent,
+                timeout=self.openmeteo.timeout,
+                cache_ttl_s=self.openmeteo.cache_ttl_s,
+                min_call_interval_s=self.openmeteo.min_call_interval_s,
+            ),
+            overpass=OverpassSettings(
+                base_url=self.overpass.base_url,
+                user_agent=self.overpass.user_agent,
+                timeout=self.overpass.timeout,
+                cache_ttl_s=self.overpass.cache_ttl_s,
+                min_call_interval_s=self.overpass.min_call_interval_s,
+                default_radius_m=self.overpass.default_radius_m,
+                default_limit=self.overpass.default_limit,
+            ),
+            rainviewer=RainViewerSettings(
+                metadata_url=self.rainviewer.metadata_url,
+                user_agent=self.rainviewer.user_agent,
+                timeout=self.rainviewer.timeout,
+                cache_ttl_s=self.rainviewer.cache_ttl_s,
+                min_call_interval_s=self.rainviewer.min_call_interval_s,
+                tile_color_scheme=self.rainviewer.tile_color_scheme,
+                tile_smooth=self.rainviewer.tile_smooth,
+                tile_snow=self.rainviewer.tile_snow,
             ),
             gibs=GIBSSettings(
                 user_agent=self.gibs.user_agent,
@@ -469,4 +574,3 @@ def _normalize_key_mapping(
         if k and v:
             normalized[k] = v
     return normalized or dict(fallback)
-

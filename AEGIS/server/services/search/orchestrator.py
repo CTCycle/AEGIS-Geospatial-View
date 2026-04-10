@@ -132,15 +132,36 @@ class LocationSearchOrchestrator:
             overlay_ids=[item["id"] for item in overlays],
             radius_m=float(payload.radius_m or 2500.0),
         )
+        overlay_runtime = await self.catalog_service.fetch_overlay_runtime(
+            latitude=lat_value,
+            longitude=lon_value,
+            overlay_ids=[item["id"] for item in overlays],
+            radius_m=float(payload.radius_m or 2500.0),
+        )
+        enriched_overlays: list[dict[str, Any]] = []
+        for overlay in overlays:
+            enriched = dict(overlay)
+            runtime_payload = overlay_runtime.get(str(overlay.get("id")))
+            if isinstance(runtime_payload, dict):
+                enriched["runtime"] = runtime_payload
+            else:
+                enriched["runtime"] = {
+                    "provider": overlay.get("provider"),
+                    "resolved_timestamp": datetime.now(UTC).isoformat(),
+                    "data_freshness": "unknown",
+                    "availability": "unknown",
+                    "error": None,
+                }
+            enriched_overlays.append(enriched)
         compliance_warnings = self.catalog_service.resolve_compliance_warnings(
             basemap=basemap,
-            overlays=overlays,
+            overlays=enriched_overlays,
         )
         return {
             "center": {"latitude": lat_value, "longitude": lon_value},
             "bounds": satellite_payload.get("bbox"),
             "basemap": basemap,
-            "overlays": overlays,
+            "overlays": enriched_overlays,
             "insights": insights,
             "compliance_warnings": compliance_warnings,
         }

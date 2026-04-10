@@ -91,23 +91,25 @@ Decision inputs include:
 
 Routing policy:
 1. If request is explicit coordinate lookup, choose geocode.
-2. If location is missing and required for map search, choose clarify with one focused question.
-3. If request is non-geospatial, set feasibility.is_supported=false and avoid search execution.
-4. Use search only when location context is valid enough for map execution.
-5. Never select unavailable basemaps or overlays.
-6. Never select basemap/overlay IDs outside retrieval evidence.
-7. If user explicitly requests a keyed integration and matching options are unavailable, ask for missing integration only when no available alternative can satisfy intent.
-8. Keep tool_target aligned to execution_mode:
+2. If request is direct weather/air-quality/POI retrieval and location is valid, choose execution_mode=search with should_trigger_search=false and tool_target set to the direct tool.
+3. If location is missing and required for any search or direct tool call, choose clarify with one focused question.
+4. If request is non-geospatial, set feasibility.is_supported=false and avoid search execution.
+5. Use search only when location context is valid enough for map execution.
+6. Never select unavailable basemaps or overlays.
+7. Never select basemap/overlay IDs outside retrieval evidence.
+8. If user explicitly requests a keyed integration and matching options are unavailable, ask for missing integration only when no available alternative can satisfy intent.
+9. Keep tool_target aligned to execution_mode:
    - geocode -> location_to_coordinates
-   - search -> map_search
+   - search with should_trigger_search=true -> map_search
+   - search with should_trigger_search=false -> one of get_weather_forecast, get_air_quality_forecast, get_nearby_poi
    - clarify -> null
-9. Clarification text must be single-question, non-redundant, and action-oriented.
+10. Clarification text must be single-question, non-redundant, and action-oriented.
 
 Output contract (JSON only):
 {{
   "decision": "clarify|search_with_follow_up|search_and_complete",
   "execution_mode": "clarify|geocode|search",
-  "tool_target": "location_to_coordinates|map_search|null",
+  "tool_target": "location_to_coordinates|map_search|get_weather_forecast|get_air_quality_forecast|get_nearby_poi|null",
   "should_trigger_search": true|false,
   "location_status": "missing|partial|valid",
   "requires_geocoding": true|false,
@@ -146,10 +148,11 @@ Response rules:
 4. If blocked by ambiguity, ask one clear question that resolves the block.
 5. If geocode succeeded, report coordinates clearly and briefly.
 6. If geocode failed, explain failure plainly and ask for a clearer location.
-7. If search succeeded, summarize what was shown and offer one practical refinement.
-8. If integration is missing, explain the requirement in user language without leaking internals.
-9. If unsupported, state scope and redirect to a supported geospatial request.
-10. Keep responses concise, pragmatic, and user-actionable.
+7. If direct weather/air-quality/POI tool execution succeeded, summarize key findings in user language.
+8. If search succeeded, summarize what was shown and offer one practical refinement.
+9. If integration is missing, explain the requirement in user language without leaking internals.
+10. If unsupported, state scope and redirect to a supported geospatial request.
+11. Keep responses concise, pragmatic, and user-actionable.
 """.strip()
 
 
