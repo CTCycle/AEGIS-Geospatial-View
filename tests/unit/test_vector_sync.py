@@ -7,6 +7,8 @@ from AEGIS.server.services.vector.indexer import VectorIndexer
 
 
 class _ManifestLoaderStub:
+    root_path = "/tmp/manifests"
+
     def load_all(self):  # noqa: ANN001
         return {
             "providers": [],
@@ -42,9 +44,17 @@ class _ManifestLoaderStub:
 
 
 class _EmbeddingFactoryStub:
-    def get_embedding(self, *, provider: str, input_text: str):  # noqa: ANN001
+    def normalize_provider(self, provider):  # noqa: ANN001
         _ = provider
-        return [float(len(input_text)), 0.0, 1.0], "stub-embedding"
+        return "ollama"
+
+    def resolve_default_model(self, provider):  # noqa: ANN001
+        _ = provider
+        return "stub-embedding"
+
+    def get_embedding(self, *, provider: str, input_text: str, model: str | None = None):  # noqa: ANN001
+        _ = provider
+        return [float(len(input_text)), 0.0, 1.0], model or "stub-embedding"
 
 
 def _build_memory_store(tmp_path) -> ChromaVectorStore:  # noqa: ANN001
@@ -63,8 +73,10 @@ def test_vector_sync_is_idempotent(tmp_path) -> None:
     )
     first = indexer.rebuild()
     second = indexer.sync()
+    third = indexer.bootstrap_if_missing()
     assert first["status"] == "ok"
     assert second["status"] == "ok"
     assert second["indexed_documents"] >= 0
+    assert third is None
     metadata = json.loads((tmp_path / "vectors" / "manifest_index_metadata.json").read_text(encoding="utf-8"))
-    assert metadata["manifest_summary"]["fingerprint"]
+    assert metadata["manifest_fingerprint"]

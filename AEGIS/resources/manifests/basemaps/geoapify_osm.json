@@ -3,7 +3,7 @@
   "name": "Geoapify OSM Bright",
   "provider": "geoapify",
   "type": "tile",
-  "description": "Geoapify bright OSM basemap style.",
+  "description": "Geoapify OpenStreetMap-based basemap optimized for modern street and place context.",
   "capabilities": [
     "tile"
   ],
@@ -35,7 +35,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "4f11d0b18992629c632c05b684843bd2a5646d7ef36a45216bcdb1d3b6b36509"
+    "content_hash": "4f11d0b18992629c632c05b684843bd2a5646d7ef36a45216bcdb1d3b6b36509",
+    "human_summary": "Detailed street-oriented basemap for everyday city navigation and place finding.",
+    "primary_use_cases": [
+      "street-level exploration",
+      "address and POI context",
+      "urban planning views"
+    ],
+    "search_examples": [
+      "show restaurants near Milan city center",
+      "map bike routes in Rome"
+    ],
+    "disambiguation_notes": [
+      "Use this when users ask for places, roads, or urban context rather than terrain or satellite detail."
+    ],
+    "location_dependency": "Location-specific; best when a city, address, or area is provided.",
+    "integration_requirements": [
+      "Requires Geoapify API key"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

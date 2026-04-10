@@ -6,6 +6,7 @@ AEGIS/client/node_modules/
 AEGIS/client/dist/
 AEGIS/client/dist-ssr/
 AEGIS/client/logs/
+AEGIS/client/.angular/
 AEGIS/client/src-tauri/r/
 AEGIS/client/src-tauri/target/
 release/windows/

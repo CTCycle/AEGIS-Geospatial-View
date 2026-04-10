@@ -3,7 +3,7 @@
   "name": "Nighttime Lights (VIIRS, Monthly)",
   "provider": "gibs",
   "type": "legacy-image",
-  "description": "Monthly VIIRS day-night band lights for nighttime activity mapping.",
+  "description": "NASA GIBS Day/Night Band overlay emphasizing low-light nighttime earth observations.",
   "capabilities": [
     "imagery",
     "night-lights"
@@ -38,7 +38,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "849fcdae718938c6c37d827aa16d10329522b037e3d8a0229d7e94f41b047a35"
+    "content_hash": "849fcdae718938c6c37d827aa16d10329522b037e3d8a0229d7e94f41b047a35",
+    "human_summary": "Nighttime radiance-style overlay useful for lights-at-night and low-light monitoring.",
+    "primary_use_cases": [
+      "nighttime observation",
+      "light emission context",
+      "after-dark situational overview"
+    ],
+    "search_examples": [
+      "show nighttime lights over Europe",
+      "display night observation around Rome"
+    ],
+    "disambiguation_notes": [
+      "Prefer this for nighttime and low-light requests rather than daytime reflectance use cases."
+    ],
+    "location_dependency": "Location-dependent and dynamic.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

@@ -14,6 +14,7 @@ from AEGIS.server.api.search import router as search_router
 from AEGIS.server.configurations import server_settings
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
+from AEGIS.server.services.vector.indexer import VectorIndexer
 from AEGIS.server.utils.constants import (
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
@@ -73,9 +74,14 @@ def initialize_embedded_database_on_first_startup() -> None:
     settings = server_settings.database
     if not settings.embedded_database:
         return
-    db_path = SQLiteRepository(settings).db_path
-    if db_path and not os.path.exists(db_path):
-        initialize_sqlite_database(settings)
+    initialize_sqlite_database(settings)
+
+
+@app.on_event("startup")
+def bootstrap_vector_index_on_first_startup() -> None:
+    if not server_settings.vectors.auto_sync_on_start:
+        return
+    VectorIndexer().bootstrap_if_missing()
 
 routers = [search_router, chat_router, access_keys_router]
 

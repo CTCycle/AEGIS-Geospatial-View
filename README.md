@@ -8,7 +8,8 @@ Key behaviors:
 - Local Ollama and API-key providers supported for model selection.
 - Provider/model preferences are persisted.
 - Layer metadata is sourced from JSON manifests in `AEGIS/resources/manifests`.
-- Vector index is created on first use and can be rebuilt from Settings.
+- Vector index bootstrap runs on first backend startup when artifacts are missing and can be rebuilt/synced manually from chat vector endpoints.
+- Direct location-to-coordinates requests are supported as plain-text replies without map search execution.
 
 ## 2. Configuration Split
 AEGIS uses one active runtime file: `AEGIS/settings/.env`.
@@ -76,6 +77,9 @@ Outputs:
 2. Ask a geospatial question in chat (place name, coordinates, or requested overlays).
 3. Review the rendered map and layer controls.
 4. Open Settings to change model assignment, manage credentials, or configure Ollama.
+5. Optional vector maintenance endpoints:
+   - `POST /chat/vectors/rebuild`
+   - `POST /chat/vectors/sync`
 
 For full user-oriented guidance, see `assets/docs/USER_MANUAL.md`.
 

@@ -3,7 +3,7 @@
   "name": "EEA Noise Exposure 2019",
   "provider": "eea",
   "type": "wms",
-  "description": "EEA strategic noise exposure map for EU/EEA regions (2019).",
+  "description": "European Environment Agency 2019 environmental noise overlay for EU/EEA areas.",
   "capabilities": [
     "noise",
     "wms"
@@ -47,7 +47,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "7118230a6eb24577193ea1130f6a6cb1a0efd8c8ba257a65afa9d42f8cabc271"
+    "content_hash": "7118230a6eb24577193ea1130f6a6cb1a0efd8c8ba257a65afa9d42f8cabc271",
+    "human_summary": "Thematic environmental noise map focused on European coverage.",
+    "primary_use_cases": [
+      "urban noise exposure context",
+      "transport noise screening",
+      "policy-oriented environmental review"
+    ],
+    "search_examples": [
+      "show noise exposure in Milan",
+      "map transport noise around Paris"
+    ],
+    "disambiguation_notes": [
+      "Use for Europe-focused noise questions; coverage may not apply outside EU/EEA datasets."
+    ],
+    "location_dependency": "Strongly location-dependent and region-limited to European datasets.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

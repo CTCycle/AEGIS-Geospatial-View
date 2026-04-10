@@ -3,7 +3,7 @@
   "name": "Terrain Context",
   "provider": "fallback",
   "type": "tile",
-  "description": "Terrain-oriented style for elevation and relief interpretation.",
+  "description": "Terrain-focused OpenStreetMap basemap highlighting elevation and landform context.",
   "capabilities": [
     "tile"
   ],
@@ -36,7 +36,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "78436aa4ec76d2188f3525ec7ac3559e45e9e9300e9c5ec21c97844cd5be120b"
+    "content_hash": "78436aa4ec76d2188f3525ec7ac3559e45e9e9300e9c5ec21c97844cd5be120b",
+    "human_summary": "Terrain basemap that helps interpret relief, slopes, and natural landform structure.",
+    "primary_use_cases": [
+      "terrain interpretation",
+      "outdoor planning",
+      "landform-aware overlay analysis"
+    ],
+    "search_examples": [
+      "show terrain around the Alps",
+      "map elevation-sensitive routes"
+    ],
+    "disambiguation_notes": [
+      "Prefer this over standard street maps when topography and landform are important to the user intent."
+    ],
+    "location_dependency": "Location-specific; useful from local to continental extents.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

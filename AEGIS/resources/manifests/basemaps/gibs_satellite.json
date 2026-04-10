@@ -3,7 +3,7 @@
   "name": "Satellite Imagery Basemap",
   "provider": "gibs",
   "type": "tile",
-  "description": "Satellite-oriented visual context for realistic or photographic map requests.",
+  "description": "NASA GIBS true-color satellite basemap for visual earth-surface context.",
   "capabilities": [
     "tile",
     "imagery"
@@ -37,7 +37,24 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "293c6d23aa1556a75b91919dd4293596a15feb2322dbc760d2cd3a47e422f7d4"
+    "content_hash": "293c6d23aa1556a75b91919dd4293596a15feb2322dbc760d2cd3a47e422f7d4",
+    "human_summary": "Satellite imagery basemap for natural-color visual inspection of land, coasts, and clouds.",
+    "primary_use_cases": [
+      "satellite visual context",
+      "environmental situational awareness",
+      "regional overview"
+    ],
+    "search_examples": [
+      "show satellite view over Sicily",
+      "display earth imagery around Athens"
+    ],
+    "disambiguation_notes": [
+      "Prefer this over street basemaps when the user asks for imagery, land cover context, or large-area visual inspection."
+    ],
+    "location_dependency": "Location-specific; supports local and regional map extents.",
+    "integration_requirements": [
+      "No API key required"
+    ]
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

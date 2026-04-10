@@ -42,7 +42,6 @@ agent_orchestrator = AgentOrchestrator(search_orchestrator=search_endpoint.orche
 @router.post(CHAT_TURN_ROUTE, response_model=ChatTurnResponse, status_code=status.HTTP_200_OK)
 async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
     try:
-        vector_indexer.ensure_index_up_to_date()
         return await agent_orchestrator.run_turn(payload)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
@@ -74,7 +73,6 @@ async def chat_stream(payload: ChatTurnRequest):
     async def event_stream():
         yield stream_event(ChatStreamEvent(event="status", data={"message": "received"}))
         try:
-            vector_indexer.ensure_index_up_to_date()
             result = await agent_orchestrator.run_turn(payload)
             for token in result.assistant_message.split():
                 yield stream_event(ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "}))
@@ -162,7 +160,10 @@ def pull_ollama_model(payload: dict[str, Any] = Body(default_factory=dict)) -> d
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="model is required")
     settings = settings_repo.get_or_create()
     provider = OllamaProvider(base_url=settings.ollama_url)
-    return provider.pull_model(model=model_name.strip())
+    try:
+        return provider.pull_model(model=model_name.strip())
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc) or "Ollama pull failed") from exc
 
 
 @router.post(CHAT_VECTORS_REBUILD_ROUTE, response_model=VectorizationResponse, status_code=status.HTTP_200_OK)

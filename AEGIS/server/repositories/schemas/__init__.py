@@ -11,6 +11,7 @@ from AEGIS.server.repositories.schemas.models import (
     ModelCredentialRecord,
     ModelProviderSettingsRecord,
     SearchSessionRecord,
+    SystemSecretRecord,
     SessionCatalogRecord,
     SessionDetailsRecord,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "ModelCredentialRecord",
     "ModelProviderSettingsRecord",
     "SearchSessionRecord",
+    "SystemSecretRecord",
     "SessionCatalogRecord",
     "SessionDetailsRecord",
 ]
