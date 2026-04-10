@@ -36,7 +36,8 @@ class _FailingFactory:
         raise RuntimeError("chat unavailable")
 
 
-def test_chat_orchestrator_falls_back_when_llm_unavailable_for_coordinate_prompt() -> None:
+def test_chat_orchestrator_falls_back_when_llm_unavailable_for_coordinate_prompt(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(AgentOrchestrator, "_check_ollama_availability", lambda self, settings: (True, None))
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
         llm_factory=_FailingFactory(),
@@ -48,7 +49,7 @@ def test_chat_orchestrator_falls_back_when_llm_unavailable_for_coordinate_prompt
     )
 
     assert result.map_session is not None
-    assert result.assistant_message == "Search executed successfully."
+    assert "map search" in result.assistant_message.lower()
     assert result.extracted_state is not None
     assert result.extracted_state["coordinates"]["latitude"] == 41.9028
     assert result.extracted_state["coordinates"]["longitude"] == 12.4964

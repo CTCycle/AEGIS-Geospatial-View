@@ -7,7 +7,7 @@ from typing import Any
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.prompts import AGENT_DECISION_SYSTEM_PROMPT
+from AEGIS.server.services.llm.prompts import get_agent_decision_system_prompt
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
 
@@ -99,7 +99,7 @@ class DecisionService:
             should_trigger_search=False,
             location_status="partial",
             requires_geocoding=False,
-            clarification_question="Which exact location or area should I focus on, and what geospatial factor matters most?",
+            clarification_question="Which specific location should I focus on for this request?",
             reasoning_summary="Ambiguous geospatial goal",
         )
 
@@ -111,7 +111,7 @@ class DecisionService:
             should_trigger_search=False,
             location_status="missing",
             requires_geocoding=False,
-            clarification_question="Which location should I search on the map?",
+            clarification_question="Which location should I search on the map? You can provide a city, full address, or coordinates.",
             reasoning_summary="Missing location",
         )
 
@@ -244,7 +244,7 @@ class DecisionService:
             request = ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": AGENT_DECISION_SYSTEM_PROMPT},
+                    {"role": "system", "content": get_agent_decision_system_prompt(provider=self.provider, model=self.model)},
                     {"role": "user", "content": conversation_context},
                     {
                         "role": "user",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.prompts import AGENT_RESPONSE_PROMPT
+from AEGIS.server.services.llm.prompts import get_agent_response_prompt
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
 
@@ -17,7 +17,7 @@ class PlainResponder:
             ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": AGENT_RESPONSE_PROMPT},
+                    {"role": "system", "content": get_agent_response_prompt(provider=self.provider, model=self.model)},
                     {"role": "user", "content": user_text},
                 ],
             )

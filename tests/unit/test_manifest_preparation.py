@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from AEGIS.server.services.vector.manifest_preparation import ManifestPreparationService
+import pytest
+
+from AEGIS.server.services.vector.manifest_preparation import (
+    ManifestEmbeddingValidationError,
+    ManifestPreparationService,
+)
 
 
 def test_prepare_entry_creates_single_chunk_for_manifest() -> None:
@@ -17,6 +22,9 @@ def test_prepare_entry_creates_single_chunk_for_manifest() -> None:
         "source_filename": "osm_default.json",
         "metadata": {
             "keywords": ["streets", "roads"],
+            "intent_tags": ["routing", "city-context"],
+            "task_tags": ["navigation", "orientation"],
+            "map_type_tags": ["street"],
             "human_summary": "Best baseline for routing and city context.",
             "primary_use_cases": ["routing", "city orientation"],
             "search_examples": ["show roads in Rome"],
@@ -32,3 +40,21 @@ def test_prepare_entry_creates_single_chunk_for_manifest() -> None:
     assert chunk.metadata["document_kind"] == "basemap"
     assert chunk.metadata["source_filename"] == "osm_default.json"
     assert chunk.metadata["source_path"] == "/tmp/manifests/basemaps/osm_default.json"
+
+
+def test_prepare_entry_rejects_embedding_incomplete_manifest() -> None:
+    service = ManifestPreparationService()
+    entry = {
+        "id": "broken_overlay",
+        "name": "Broken Overlay",
+        "provider": "fallback",
+        "type": "overlay",
+        "description": "",
+        "coverage": "global",
+        "capabilities": ["overlay"],
+        "metadata": {
+            "keywords": ["overlay"]
+        },
+    }
+    with pytest.raises(ManifestEmbeddingValidationError):
+        service.prepare_entry(entry=entry, kind="overlays")
