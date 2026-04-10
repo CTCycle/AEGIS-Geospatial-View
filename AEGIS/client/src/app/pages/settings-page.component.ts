@@ -151,6 +151,17 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return buildSelectedModelStats(this.settings, this.localModelIds);
   }
 
+  get visibleStatusText(): string {
+    return this.normalizeDisplayText(this.statusText);
+  }
+
+  get visibleOllamaModalStatusText(): string {
+    return this.normalizeDisplayText(
+      this.ollamaModalStatusText,
+      `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`,
+    );
+  }
+
   setSearchText(value: string): void {
     this.searchText = value;
     this.syncQueryState();
@@ -184,7 +195,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toErrorText(error);
+      this.statusText = this.toUserFacingError(error, `Could not select ${model.name} for ${role}.`);
     }
   }
 
@@ -205,7 +216,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.isKeysModalOpen = false;
       this.syncState();
     } catch (error: unknown) {
-      const detail = this.toErrorText(error);
+      const detail = this.toUserFacingError(error, 'Could not save API keys right now.');
       this.statusText = detail;
       this.keysModalStatusText = detail;
     }
@@ -214,11 +225,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   async checkOllamaConnection(): Promise<void> {
     try {
       const health = await checkOllamaHealth();
-      this.ollamaModalStatusText = `Connection status: ${String(health.detail ?? health.ok ?? 'unknown')}`;
-      this.statusText = `Ollama: ${String(health.detail ?? health.ok ?? 'unknown')}`;
+      const summary = this.formatOllamaHealthSummary(health);
+      this.ollamaModalStatusText = summary;
+      this.statusText = `Ollama: ${summary}`;
       this.syncState();
     } catch (error: unknown) {
-      const detail = this.toErrorText(error);
+      const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaModalStatusText = detail;
     }
@@ -232,7 +244,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ollamaModalStatusText = 'Model library refreshed.';
       this.syncState();
     } catch (error: unknown) {
-      const detail = this.toErrorText(error);
+      const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaModalStatusText = detail;
     }
@@ -251,7 +263,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.isOllamaModalOpen = false;
       this.syncState();
     } catch (error: unknown) {
-      const detail = this.toErrorText(error);
+      const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaModalStatusText = detail;
     }
@@ -265,7 +277,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.statusText = `Pulled ${model.name}`;
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toErrorText(error);
+      this.statusText = this.toUserFacingError(error, `Could not pull ${model.name}.`);
     }
   }
 
@@ -315,7 +327,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = `Load failed: ${this.toErrorText(error)}`;
+      this.statusText = this.toUserFacingError(error, 'Could not load model settings right now.');
       this.syncState();
     } finally {
       this.isLoadingModels = false;
@@ -350,6 +362,41 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       modelGridScrollTop: this.modelGridRef?.nativeElement.scrollTop ?? this.state.modelGridScrollTop,
     };
     this.appStateStore.updateSettingsPage(next);
+  }
+
+  private getOllamaFailureMessage(error: unknown): string {
+    return this.toUserFacingError(
+      error,
+      `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`,
+    );
+  }
+
+  private formatOllamaHealthSummary(health: { ok?: unknown; detail?: unknown }): string {
+    if (Boolean(health.ok)) {
+      return 'Connection is healthy.';
+    }
+
+    const detail = typeof health.detail === 'string' ? health.detail : 'an unknown status';
+    if (this.isLowLevelConnectionError(detail)) {
+      return `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`;
+    }
+    return `Connection check returned ${detail}.`;
+  }
+
+  private normalizeDisplayText(text: string, fallback = 'Could not complete this action right now.'): string {
+    return this.isLowLevelConnectionError(text) ? fallback : text;
+  }
+
+  private toUserFacingError(error: unknown, fallback: string): string {
+    const message = this.toErrorText(error);
+    if (this.isLowLevelConnectionError(message)) {
+      return fallback;
+    }
+    return message;
+  }
+
+  private isLowLevelConnectionError(message: string): boolean {
+    return /winerror\s*10061|connection refused|econnrefused|urlopen error|failed to establish a new connection/i.test(message);
   }
 
   private toErrorText(error: unknown): string {

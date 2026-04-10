@@ -137,7 +137,7 @@
         </div>
       </aside>
     </div>
-    <footer class="settings-page__status">{{ statusText }}</footer>
+    <footer class="settings-page__status">{{ visibleStatusText }}</footer>
   </div>
 
   @if (isKeysModalOpen) {
@@ -182,8 +182,8 @@
               Ollama server URL
               <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
             </label>
-            @if (ollamaModalStatusText) {
-              <p class="settings-modal__status" aria-live="polite">{{ ollamaModalStatusText }}</p>
+            @if (visibleOllamaModalStatusText) {
+              <p class="settings-modal__status" aria-live="polite">{{ visibleOllamaModalStatusText }}</p>
             }
           </div>
           <footer class="settings-modal__footer settings-modal__footer--spread">
