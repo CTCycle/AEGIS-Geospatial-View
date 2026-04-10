@@ -202,11 +202,21 @@
     font-weight: 700;
 }
 
-.chat-welcome-card h2 {
+.chat-welcome-card__prompt {
     margin: 0;
-    font-size: 1.05rem;
-    line-height: 1.35;
-    color: #213555;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    color: #35506f;
+}
+
+.chat-welcome-card__examples-label {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7b8ea9;
+    font-weight: 700;
 }
 
 .chat-welcome-card__examples {
@@ -214,9 +224,13 @@
     padding-left: 1rem;
     display: grid;
     gap: 0.45rem;
-    color: #425978;
-    font-size: 0.9rem;
+    color: #687d99;
+    font-size: 0.84rem;
     line-height: 1.45;
+}
+
+.chat-welcome-card__examples li {
+    opacity: 0.9;
 }
 
 .chat-message {
