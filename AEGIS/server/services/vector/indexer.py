@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any
 
 from AEGIS.server.configurations import server_settings
@@ -16,7 +17,7 @@ from AEGIS.server.services.vector.manifest_preparation import ManifestPreparatio
 
 class VectorIndexer:
     METADATA_FILENAME = "manifest_index_metadata.json"
-    INDEX_SCHEMA_VERSION = 2
+    INDEX_SCHEMA_VERSION = 3
     SEARCHABLE_KINDS = ("basemaps", "overlays")
 
     def __init__(
@@ -75,26 +76,42 @@ class VectorIndexer:
         chunk_count: int,
         embedding_provider: str,
         embedding_model: str,
+        build_duration_ms: int | None = None,
     ) -> dict[str, Any]:
         summary = self._manifest_summary(catalog)
+        versions_summary: dict[str, dict[str, int]] = {}
+        for kind in self.SEARCHABLE_KINDS:
+            entries = catalog.get(kind, [])
+            versions = [int(entry.get("version") or 1) for entry in entries]
+            versions_summary[kind[:-1]] = {
+                "count": len(entries),
+                "min_version": min(versions) if versions else 0,
+                "max_version": max(versions) if versions else 0,
+            }
         fingerprint = hashlib.sha256(
             json.dumps(summary, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
-        return {
+        payload = {
             "index_schema_version": self.INDEX_SCHEMA_VERSION,
             "last_update_timestamp": datetime.now(UTC).isoformat(),
             "manifest_count": len(summary),
             "chunk_count": chunk_count,
+            "chunking_strategy": "one_manifest_per_chunk",
+            "document_id_strategy": "kind_prefixed_manifest_id",
             "searchable_kinds": [kind[:-1] for kind in self.SEARCHABLE_KINDS],
             "embedding_provider": embedding_provider,
             "embedding_model": embedding_model,
             "manifest_fingerprint": fingerprint,
             "manifest_summary": summary,
+            "manifest_versions_summary": versions_summary,
             "source_directories": {
                 "basemaps": os.path.abspath(os.path.join(self.manifest_loader.root_path, "basemaps")),
                 "overlays": os.path.abspath(os.path.join(self.manifest_loader.root_path, "overlays")),
             },
         }
+        if isinstance(build_duration_ms, int) and build_duration_ms >= 0:
+            payload["index_build_duration_ms"] = build_duration_ms
+        return payload
 
     def _write_metadata(
         self,
@@ -103,6 +120,7 @@ class VectorIndexer:
         chunk_count: int,
         embedding_provider: str,
         embedding_model: str,
+        build_duration_ms: int | None = None,
     ) -> None:
         os.makedirs(self.store.persist_path, exist_ok=True)
         with open(self._metadata_path(), "w", encoding="utf-8") as handle:
@@ -112,6 +130,7 @@ class VectorIndexer:
                     chunk_count=chunk_count,
                     embedding_provider=embedding_provider,
                     embedding_model=embedding_model,
+                    build_duration_ms=build_duration_ms,
                 ),
                 handle,
                 indent=2,
@@ -136,11 +155,14 @@ class VectorIndexer:
             "last_update_timestamp",
             "manifest_count",
             "chunk_count",
+            "chunking_strategy",
+            "document_id_strategy",
             "searchable_kinds",
             "embedding_provider",
             "embedding_model",
             "manifest_fingerprint",
             "manifest_summary",
+            "manifest_versions_summary",
             "source_directories",
         }
         if not required_fields.issubset(payload):
@@ -227,6 +249,7 @@ class VectorIndexer:
                 )
 
     def rebuild(self) -> dict[str, Any]:
+        started = perf_counter()
         catalog = self.manifest_loader.load_all()
         embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
         self.store.clear()
@@ -246,6 +269,7 @@ class VectorIndexer:
             chunk_count=len(documents),
             embedding_provider=embedding_provider,
             embedding_model=embedding_model,
+            build_duration_ms=int((perf_counter() - started) * 1000),
         )
         return {
             "status": "ok",

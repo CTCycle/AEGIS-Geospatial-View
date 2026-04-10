@@ -34,7 +34,12 @@ class _SearchOrchestratorStub:
         }
 
 
+def _allow_provider_checks(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(AgentOrchestrator, "_check_ollama_availability", lambda self, settings: (True, None))
+
+
 def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
     retriever = _VectorRetrieverStub()
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
@@ -79,6 +84,7 @@ def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None
 
 
 def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
         vector_retriever=_VectorRetrieverStub(),
@@ -114,6 +120,7 @@ def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
 
 
 def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
         vector_retriever=_VectorRetrieverStub(),
@@ -155,6 +162,7 @@ def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None
 
 
 def test_chat_orchestrator_returns_coordinate_lookup_without_map_session(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
     class _AgentToolsStub:
         def describe_tools(self):  # noqa: ANN201
             return [{"name": "location_to_coordinates", "description": "geocode"}]
@@ -204,6 +212,7 @@ def test_chat_orchestrator_returns_coordinate_lookup_without_map_session(monkeyp
 
 
 def test_chat_orchestrator_integration_blocker_returns_follow_up(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
         vector_retriever=_VectorRetrieverStub(),
@@ -236,3 +245,52 @@ def test_chat_orchestrator_integration_blocker_returns_follow_up(monkeypatch) ->
     )
     result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="show TomTom traffic in Rome")))
     assert result.follow_up_required is True
+
+
+def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
+    class _AgentToolsStub:
+        def describe_tools(self):  # noqa: ANN201
+            return [{"name": "location_to_coordinates", "description": "geocode"}]
+
+        async def geocode_location(self, *, address, city, country_name, country_code=None):  # noqa: ANN001
+            raise AssertionError("geocode service should not be called for direct coordinates")
+
+    orchestrator = AgentOrchestrator(
+        search_orchestrator=_SearchOrchestratorStub(),
+        vector_retriever=_VectorRetrieverStub(),
+        agent_tools=_AgentToolsStub(),
+    )
+    monkeypatch.setattr(
+        ParserService,
+        "extract_patch",
+        lambda self, conversation_context, latest_state, user_message: ExtractedIntentPatch(
+            coordinates={"latitude": 41.9, "longitude": 12.5},
+            user_goal="coordinates lookup",
+        ),
+    )
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, conversation_context, user_message, extracted_state, retrieval, available_tools=None: AgentDecision(
+            decision="search_and_complete",
+            execution_mode="geocode",
+            tool_target="location_to_coordinates",
+            should_trigger_search=False,
+            location_status="valid",
+            requires_geocoding=False,
+            reasoning_summary="test",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: "The coordinates are latitude 41.9 and longitude 12.5.",
+    )
+
+    result = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="coordinates 41.9, 12.5")))
+    assert result.map_session is None
+    assert result.tool_payload is not None
+    assert result.tool_payload["execution"] == "location_to_coordinates"
+    assert result.tool_payload["result"]["lat"] == 41.9
+    assert result.tool_payload["result"]["lon"] == 12.5

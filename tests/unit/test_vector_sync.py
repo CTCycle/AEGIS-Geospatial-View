@@ -23,7 +23,18 @@ class _ManifestLoaderStub:
                     "coverage": "global",
                     "version": 1,
                     "last_modified": "2026-04-01T00:00:00Z",
-                    "metadata": {"keywords": ["street", "city"]},
+                    "metadata": {
+                        "keywords": ["street", "city"],
+                        "intent_tags": ["routing"],
+                        "task_tags": ["orientation"],
+                        "map_type_tags": ["street"],
+                        "human_summary": "Default city basemap.",
+                        "primary_use_cases": ["city context"],
+                        "search_examples": ["show roads in Rome"],
+                        "disambiguation_notes": ["Use satellite for imagery-heavy tasks."],
+                        "location_dependency": "Location-specific context.",
+                        "integration_requirements": ["No API key required"],
+                    },
                 }
             ],
             "overlays": [
@@ -37,7 +48,18 @@ class _ManifestLoaderStub:
                     "coverage": "global",
                     "version": 1,
                     "last_modified": "2026-04-01T00:00:00Z",
-                    "metadata": {"keywords": ["air", "quality"]},
+                    "metadata": {
+                        "keywords": ["air", "quality"],
+                        "intent_tags": ["air-quality"],
+                        "task_tags": ["pollution checks"],
+                        "map_type_tags": ["thematic"],
+                        "human_summary": "Air-quality overlay for pollution context.",
+                        "primary_use_cases": ["air quality awareness"],
+                        "search_examples": ["show air quality in Rome"],
+                        "disambiguation_notes": ["Use forecast overlays for future outlooks."],
+                        "location_dependency": "Location-specific and data-dependent.",
+                        "integration_requirements": ["No API key required"],
+                    },
                 }
             ],
         }

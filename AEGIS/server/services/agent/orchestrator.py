@@ -272,15 +272,32 @@ class AgentOrchestrator:
             map_session = search_result.get("map_session")
             tool_payload = search_result.get("payload")
         elif decision.execution_mode == "geocode":
-            geocode_result = (
-                await self.agent_tools.geocode_location(
-                    address=extracted_state.location.address,
-                    city=extracted_state.location.city,
-                    country_name=extracted_state.location.country,
+            if (
+                extracted_state.coordinates.latitude is not None
+                and extracted_state.coordinates.longitude is not None
+                and not any(
+                    [
+                        extracted_state.location.address,
+                        extracted_state.location.city,
+                        extracted_state.location.country,
+                    ]
                 )
-                if self.agent_tools is not None
-                else None
-            )
+            ):
+                geocode_result = {
+                    "lat": extracted_state.coordinates.latitude,
+                    "lon": extracted_state.coordinates.longitude,
+                    "display_name": "Coordinates from your request",
+                }
+            else:
+                geocode_result = (
+                    await self.agent_tools.geocode_location(
+                        address=extracted_state.location.address,
+                        city=extracted_state.location.city,
+                        country_name=extracted_state.location.country,
+                    )
+                    if self.agent_tools is not None
+                    else None
+                )
             search_result = {"geocode_result": geocode_result}
             tool_payload = {
                 "execution": "location_to_coordinates",

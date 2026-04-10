@@ -1,0 +1,64 @@
+{
+  "id": "openmeteo_air_quality_forecast",
+  "name": "Open-Meteo Air Quality Forecast",
+  "provider": "openmeteo",
+  "type": "time-series-insight",
+  "description": "Location-driven air quality forecast layer for PM and gas concentration trends based on Open-Meteo models.",
+  "capabilities": [
+    "air-quality",
+    "forecast",
+    "time-series-insight"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Open-Meteo Air Quality Forecast",
+    "default_opacity": 0.74,
+    "requires_key": false,
+    "attribution": "© Open-Meteo",
+    "keywords": [
+      "air quality",
+      "forecast",
+      "pm2.5",
+      "pm10",
+      "open-meteo"
+    ],
+    "intent_tags": [
+      "air-quality",
+      "pollution forecast"
+    ],
+    "task_tags": [
+      "air quality planning",
+      "exposure awareness",
+      "pollution trend checks"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "dynamic",
+    "constraints": "Forecast-based environmental layer; verify usage limits and non-commercial terms before production.",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "openmeteo_air_quality_forecast_overlay_v1",
+    "human_summary": "Forecast air-quality layer that helps anticipate pollutant conditions in a selected area.",
+    "primary_use_cases": [
+      "air quality outlook",
+      "pollution-sensitive activity planning",
+      "city-level environmental monitoring"
+    ],
+    "search_examples": [
+      "forecast air quality in Turin",
+      "show PM trends around Florence"
+    ],
+    "disambiguation_notes": [
+      "Prefer this for predictive air-quality requests; use OpenAQ for station-based observed measurements."
+    ],
+    "location_dependency": "Location-specific and forecast-time dependent.",
+    "integration_requirements": [
+      "No API key required in the free Open-Meteo flow"
+    ]
+  },
+  "version": 1,
+  "last_modified": "2026-04-10T16:45:00+00:00"
+}

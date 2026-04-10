@@ -11,11 +11,48 @@ class PreparedManifestChunk:
     metadata: dict[str, Any]
 
 
+class ManifestEmbeddingValidationError(ValueError):
+    pass
+
+
 class ManifestPreparationService:
+    REQUIRED_TEXT_FIELDS = ("description",)
+    REQUIRED_METADATA_LIST_FIELDS = (
+        "keywords",
+        "intent_tags",
+        "task_tags",
+        "map_type_tags",
+        "primary_use_cases",
+        "search_examples",
+        "disambiguation_notes",
+        "integration_requirements",
+    )
+    REQUIRED_METADATA_STRING_FIELDS = ("human_summary", "location_dependency")
+
     def _normalize_list(self, value: Any) -> list[str]:
         if not isinstance(value, list):
             return []
         return [str(item).strip() for item in value if str(item).strip()]
+
+    def validate_embedding_quality(self, entry: dict[str, Any], *, kind: str) -> None:
+        source = str(entry.get("source_filename") or entry.get("id") or "unknown")
+        missing: list[str] = []
+        for field in self.REQUIRED_TEXT_FIELDS:
+            if not isinstance(entry.get(field), str) or not str(entry.get(field)).strip():
+                missing.append(field)
+        metadata = dict(entry.get("metadata") or {})
+        for field in self.REQUIRED_METADATA_STRING_FIELDS:
+            if not isinstance(metadata.get(field), str) or not str(metadata.get(field)).strip():
+                missing.append(f"metadata.{field}")
+        for field in self.REQUIRED_METADATA_LIST_FIELDS:
+            if not self._normalize_list(metadata.get(field)):
+                missing.append(f"metadata.{field}")
+        if missing:
+            manifest_kind = kind[:-1] if kind.endswith("s") else kind
+            raise ManifestEmbeddingValidationError(
+                f"Manifest '{source}' ({manifest_kind}:{entry.get('id')}) is missing embedding-critical fields: "
+                + ", ".join(sorted(missing))
+            )
 
     def compose_embedding_text(self, entry: dict[str, Any], kind: str) -> str:
         metadata = dict(entry.get("metadata") or {})
@@ -66,8 +103,12 @@ class ManifestPreparationService:
         }
 
     def prepare_entry(self, entry: dict[str, Any], kind: str) -> PreparedManifestChunk:
+        self.validate_embedding_quality(entry, kind=kind)
+        entry_id = str(entry.get("id") or "").strip()
+        if not entry_id:
+            raise ManifestEmbeddingValidationError("Manifest entry is missing a stable id.")
         return PreparedManifestChunk(
-            id=f"{kind}:{entry['id']}",
+            id=f"{kind}:{entry_id}",
             text=self.compose_embedding_text(entry, kind),
             metadata=self.compose_chunk_metadata(entry, kind),
         )
