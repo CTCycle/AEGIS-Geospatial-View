@@ -18,19 +18,19 @@ from AEGIS.server.utils.constants import (
     NOMINATIM_REVERSE_PATH,
     NOMINATIM_SEARCH_PATH,
 )
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.utils.logger import logger
 
 
 ###############################################################################
 class NominatimService:
-    base_url = server_settings.nominatim.base_url
+    base_url = get_server_settings().nominatim.base_url
 
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
-        self.user_agent = user_agent or server_settings.nominatim.user_agent
-        default_timeout = server_settings.nominatim.timeout
+        self.user_agent = user_agent or get_server_settings().nominatim.user_agent
+        default_timeout = get_server_settings().nominatim.timeout
         self.timeout = timeout if timeout is not None else default_timeout
         self._request_lock = threading.Lock()
         self._last_request_started_at = 0.0

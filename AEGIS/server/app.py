@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from AEGIS.server.api.access_keys import router as access_keys_router
 from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.services.vector.indexer import VectorIndexer
@@ -71,7 +71,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def initialize_embedded_database_on_first_startup() -> None:
-    settings = server_settings.database
+    settings = get_server_settings().database
     if not settings.embedded_database:
         return
     initialize_sqlite_database(settings)
@@ -79,7 +79,7 @@ def initialize_embedded_database_on_first_startup() -> None:
 
 @app.on_event("startup")
 def bootstrap_vector_index_on_first_startup() -> None:
-    if not server_settings.vectors.auto_sync_on_start:
+    if not get_server_settings().vectors.auto_sync_on_start:
         return
     VectorIndexer().bootstrap_if_missing()
 

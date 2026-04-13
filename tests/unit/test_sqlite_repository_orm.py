@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from AEGIS.server.configurations.server import DatabaseSettings
+from AEGIS.server.configurations import DatabaseSettings
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.utils.constants import GIBS_LAYERS_TABLE, SEARCH_SESSIONS_TABLE
 
@@ -28,6 +28,7 @@ def test_upsert_uses_orm_and_updates_existing_rows(monkeypatch, tmp_path) -> Non
         "AEGIS.server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
     )
     repository = SQLiteRepository(build_test_settings(insert_batch_size=1))
+    repository.ensure_schema()
 
     repository.upsert_into_database(
         [
@@ -70,6 +71,7 @@ def test_upsert_adds_new_rows_and_updates_existing_rows(monkeypatch, tmp_path) -
         "AEGIS.server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
     )
     repository = SQLiteRepository(build_test_settings())
+    repository.ensure_schema()
 
     repository.upsert_into_database(
         [
@@ -112,6 +114,7 @@ def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> N
         "AEGIS.server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
     )
     repository = SQLiteRepository(build_test_settings())
+    repository.ensure_schema()
 
     repository.upsert_into_database(
         [

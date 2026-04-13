@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 
 
 class OpenMeteoServiceError(Exception):
@@ -32,7 +32,7 @@ class OpenMeteoService:
         cache_ttl_s: float | None = None,
         min_call_interval_s: float | None = None,
     ) -> None:
-        settings = server_settings.openmeteo
+        settings = get_server_settings().openmeteo
         self.weather_base_url = weather_base_url or settings.weather_base_url
         self.air_quality_base_url = air_quality_base_url or settings.air_quality_base_url
         self.user_agent = user_agent or settings.user_agent

@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
-from AEGIS.server.configurations import DatabaseSettings, server_settings
+from AEGIS.server.configurations import DatabaseSettings, get_server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.repositories.schemas import Base, SystemSecretRecord
@@ -140,7 +140,7 @@ def validate_postgres_schema(settings: DatabaseSettings) -> None:
 
 # -----------------------------------------------------------------------------
 def run_database_initialization() -> None:
-    settings = server_settings.database
+    settings = get_server_settings().database
     if settings.embedded_database:
         repository = SQLiteRepository(settings)
         Base.metadata.create_all(repository.engine)

@@ -8,7 +8,7 @@ from typing import Any, Mapping, Sequence
 from fastapi import APIRouter, Body, HTTPException, status
 from pydantic import ValidationError
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import (
     GeospatialCatalogResponse,
     LocationSearchRequest,
@@ -496,7 +496,7 @@ class MapSearchExecutionService:
             job_type=job_status["job_type"],
             status=job_status["status"],
             message=MAP_SEARCH_JOB_START_MESSAGE,
-            poll_interval=server_settings.jobs.polling_interval,
+            poll_interval=get_server_settings().jobs.polling_interval,
         )
 
     async def get_search_job_status(self, job_id: str) -> JobStatusResponse:

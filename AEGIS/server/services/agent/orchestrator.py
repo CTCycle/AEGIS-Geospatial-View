@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.domain.extraction.patching import merge_extracted_intent
@@ -212,7 +212,7 @@ class AgentOrchestrator:
         initial_context = build_conversation_context(
             messages=_history,
             extracted_info=latest_extracted_info,
-            max_messages=server_settings.chat.max_history_messages,
+            max_messages=get_server_settings().chat.max_history_messages,
         )
 
         parser_service = ParserService(
@@ -241,7 +241,7 @@ class AgentOrchestrator:
         context = build_conversation_context(
             messages=_history,
             extracted_info=merged_extracted_info,
-            max_messages=server_settings.chat.max_history_messages,
+            max_messages=get_server_settings().chat.max_history_messages,
         )
 
         retrieval_query = request.message.strip()

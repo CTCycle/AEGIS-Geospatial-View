@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 
 
 def map_structured_intent_to_location_request(
@@ -30,6 +30,6 @@ def map_structured_intent_to_location_request(
         "filters": extracted_state.get("filters") or [],
         "overlay_ids": selected_overlay_ids,
         "basemap_id": selected_basemap_id,
-        "map_size_m": server_settings.map.default_size_m,
+        "map_size_m": get_server_settings().map.default_size_m,
         "image_crs": "EPSG:3857",
     }

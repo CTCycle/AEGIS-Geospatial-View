@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas import SystemSecretRecord
 
@@ -77,8 +77,8 @@ class CredentialEncryptionService:
         master_key: str | None = None,
         key_version: str | None = None,
     ) -> None:
-        self.master_key = master_key or server_settings.credential_master_key
-        self.key_version = key_version or server_settings.credential_key_version
+        self.master_key = master_key or get_server_settings().credential_master_key
+        self.key_version = key_version or get_server_settings().credential_key_version
         self.fernet = Fernet(_derive_fernet_key(self.master_key))
 
     def encrypt(self, raw_value: str) -> EncryptedSecret:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import GeospatialCatalogResponse, SearchByLocationResponse
 from AEGIS.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
@@ -53,7 +53,7 @@ catalog_service = GeospatialCatalogService(
 
 toolkit = MapSearchToolkit(
     gibs_service=gibs_service,
-    default_layer=server_settings.gibs.default_layer,
+    default_layer=get_server_settings().gibs.default_layer,
 )
 rendering_service = MapRenderingService(
     toolkit=toolkit,

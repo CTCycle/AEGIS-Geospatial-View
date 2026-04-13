@@ -7,7 +7,7 @@ from typing import Any
 
 import folium
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.utils.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
@@ -59,13 +59,13 @@ class MapService:
         attribution: str | None = None,
         default_delay_s: float | None = None,
     ) -> None:
-        config_tiles = (server_settings.map.tiles or "").strip()
+        config_tiles = (get_server_settings().map.tiles or "").strip()
         self.tiles = (tiles or config_tiles or "OpenStreetMap").strip()
         self.attribution = (
             attribution or "(c) OpenStreetMap contributors, rendered by Folium"
         )
         if default_delay_s is None:
-            default_delay_s = server_settings.map.render_delay_s
+            default_delay_s = get_server_settings().map.render_delay_s
         self.default_delay_s = max(float(default_delay_s), 0.0)
 
     # -------------------------------------------------------------------------
@@ -150,7 +150,7 @@ class MapService:
         tiles: str | None = None,
         overlays: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        map_size_value = map_size_m or server_settings.map.default_size_m
+        map_size_value = map_size_m or get_server_settings().map.default_size_m
         if bbox is not None:
             map_bbox = self.normalize_bbox(bbox)
             map_size_value = map_size_m or self.estimate_bbox_span_m(map_bbox)
@@ -167,12 +167,12 @@ class MapService:
             width_value = (
                 int(width)
                 if width is not None
-                else int(server_settings.gibs.image_width)
+                else int(get_server_settings().gibs.image_width)
             )
             height_value = (
                 int(height)
                 if height is not None
-                else int(server_settings.gibs.image_height)
+                else int(get_server_settings().gibs.image_height)
             )
         except (TypeError, ValueError) as exc:
             raise MapValidationError("Image dimensions must be integers.") from exc

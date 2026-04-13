@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 
 type BBox = list[float]
 type RangeComparator = Callable[[float, float], bool]
@@ -59,7 +59,7 @@ class LocationSearchRequest(BaseModel):
     datetime: dt.datetime | None = Field(default=None)
     time_of_day: time | None = Field(default=None)
     timeline_year: int | None = Field(
-        default=None, ge=server_settings.geospatial.min_timeline_year
+        default=None, ge=get_server_settings().geospatial.min_timeline_year
     )
     country: str | None = Field(default=None, max_length=200)
     city: str | None = Field(default=None, max_length=200)
@@ -71,15 +71,15 @@ class LocationSearchRequest(BaseModel):
     geospatial_filter: list[str] = Field(default_factory=list)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
-    map_size_m: float = Field(default=server_settings.map.default_size_m, gt=0)
-    map_tiles: str | None = Field(default=server_settings.map.tiles, max_length=200)
+    map_size_m: float = Field(default=get_server_settings().map.default_size_m, gt=0)
+    map_tiles: str | None = Field(default=get_server_settings().map.tiles, max_length=200)
     basemap_id: str | None = Field(default=None, max_length=120)
     overlay_ids: list[str] = Field(default_factory=list)
     aoi: dict[str, Any] | None = Field(default=None)
     commute: dict[str, Any] | None = Field(default=None)
-    image_width: int = Field(default=server_settings.gibs.image_width, ge=512, le=2048)
+    image_width: int = Field(default=get_server_settings().gibs.image_width, ge=512, le=2048)
     image_height: int = Field(
-        default=server_settings.gibs.image_height, ge=512, le=2048
+        default=get_server_settings().gibs.image_height, ge=512, le=2048
     )
     image_crs: str = Field(default="EPSG:3857")
     image_format: str = Field(default="image/png")
@@ -188,9 +188,9 @@ class LocationSearchRequest(BaseModel):
     @classmethod
     def normalize_map_tiles(cls, value: str | None) -> str:
         if value is None:
-            return server_settings.map.tiles
+            return get_server_settings().map.tiles
         normalized = str(value).strip()
-        return normalized or server_settings.map.tiles
+        return normalized or get_server_settings().map.tiles
 
     # -------------------------------------------------------------------------
     @field_validator("basemap_id", mode="before")
@@ -233,19 +233,19 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError("BBox min values must be smaller than max values.")
             if self.image_crs == "EPSG:3857":
                 for value in (minx, maxx, miny, maxy):
-                    if abs(value) > server_settings.geospatial.max_mercator_extent:
+                    if abs(value) > get_server_settings().geospatial.max_mercator_extent:
                         raise ValueError(
                             "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
                         )
             elif self.image_crs == "EPSG:4326":
                 if (
-                    miny < server_settings.geospatial.min_lat
-                    or maxy > server_settings.geospatial.max_lat
+                    miny < get_server_settings().geospatial.min_lat
+                    or maxy > get_server_settings().geospatial.max_lat
                 ):
                     raise ValueError("Latitude values must be within [-90, 90].")
                 if (
-                    minx < server_settings.geospatial.min_lon
-                    or maxx > server_settings.geospatial.max_lon
+                    minx < get_server_settings().geospatial.min_lon
+                    or maxx > get_server_settings().geospatial.max_lon
                 ):
                     raise ValueError("Longitude values must be within [-180, 180].")
         return self

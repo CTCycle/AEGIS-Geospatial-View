@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 
 from tqdm import tqdm
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.updater import LayerAggregate
 from AEGIS.server.utils.constants import GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M
 from AEGIS.server.utils.logger import logger
@@ -36,7 +36,7 @@ class GIBSLayersUpdater:
         max_attempts: int | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
-        settings = server_settings.gibs
+        settings = get_server_settings().gibs
         self.endpoints = copy.deepcopy(endpoints or settings.capabilities_endpoints)
         self.ows_namespaces = copy.deepcopy(ows_namespaces or settings.ows_namespaces)
         self.user_agent = user_agent or settings.layer_sync_user_agent

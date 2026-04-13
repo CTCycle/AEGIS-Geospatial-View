@@ -3,7 +3,7 @@ from __future__ import annotations
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
 from AEGIS.server.services.llm.factory import LLMFactory
 
@@ -40,10 +40,10 @@ class EmbeddingFactory:
     def resolve_default_model(self, provider: str | None) -> str:
         normalized = self.normalize_provider(provider)
         if normalized == "openai":
-            return server_settings.vectors.default_openai_embedding_model
+            return get_server_settings().vectors.default_openai_embedding_model
         if normalized == "google":
-            return server_settings.vectors.default_google_embedding_model
-        return server_settings.vectors.default_ollama_embedding_model
+            return get_server_settings().vectors.default_google_embedding_model
+        return get_server_settings().vectors.default_ollama_embedding_model
 
     def get_embedding(self, *, provider: str, input_text: str, model: str | None = None) -> tuple[list[float], str]:
         normalized = self.normalize_provider(provider)
