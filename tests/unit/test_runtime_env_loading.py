@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-from AEGIS.server.utils.variables import EnvironmentVariables
+from AEGIS.server.configurations.environment import (
+    ensure_environment_loaded,
+    reset_environment_loader_for_tests,
+)
 
 
 def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
@@ -31,13 +35,12 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     ):
         monkeypatch.delenv(key, raising=False)
 
-    monkeypatch.setattr("AEGIS.server.utils.variables.ENV_FILE_PATH", str(env_file))
+    reset_environment_loader_for_tests()
+    ensure_environment_loaded(env_path=env_file)
 
-    env_variables = EnvironmentVariables()
-
-    assert env_variables.get("FASTAPI_HOST") == "127.0.0.1"
-    assert env_variables.get("FASTAPI_PORT") == "6100"
-    assert env_variables.get("UI_HOST") == "127.0.0.1"
-    assert env_variables.get("UI_PORT") == "4980"
-    assert env_variables.get("KERAS_BACKEND") == "tensorflow"
-    assert env_variables.get("MPLBACKEND") == "Agg"
+    assert os.getenv("FASTAPI_HOST") == "127.0.0.1"
+    assert os.getenv("FASTAPI_PORT") == "6100"
+    assert os.getenv("UI_HOST") == "127.0.0.1"
+    assert os.getenv("UI_PORT") == "4980"
+    assert os.getenv("KERAS_BACKEND") == "tensorflow"
+    assert os.getenv("MPLBACKEND") == "Agg"

@@ -7,7 +7,7 @@ from typing import Any
 
 from PIL import Image
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.services.geospatial.gibs import GIBSService, GIBSValidationError
 from AEGIS.server.services.geospatial.layers import (
@@ -286,7 +286,7 @@ class MapRenderingService:
             )
         lon = coordinate_pair[0] if coordinate_pair else None
         lat = coordinate_pair[1] if coordinate_pair else None
-        map_size_value = payload.map_size_m or server_settings.map.default_size_m
+        map_size_value = payload.map_size_m or get_server_settings().map.default_size_m
         map_arguments = {
             "lon": lon,
             "lat": lat,
@@ -461,7 +461,7 @@ class MapRenderingService:
             return harmonized
         if coordinates is not None:
             lon, lat = coordinates
-            map_size_value = payload.map_size_m or server_settings.map.default_size_m
+            map_size_value = payload.map_size_m or get_server_settings().map.default_size_m
             return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
         return None
 

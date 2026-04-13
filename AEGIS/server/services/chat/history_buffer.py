@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from typing import Any
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.chat_history import ChatHistoryRepository
 
 ###############################################################################
@@ -15,7 +15,7 @@ class ChatHistoryBuffer:
         max_messages: int | None = None,
     ) -> None:
         self.history_repo = history_repo
-        self.max_messages = max_messages or server_settings.chat.max_history_messages
+        self.max_messages = max_messages or get_server_settings().chat.max_history_messages
         self._buffers: dict[int, deque[dict[str, Any]]] = defaultdict(
             lambda: deque(maxlen=self.max_messages)
         )

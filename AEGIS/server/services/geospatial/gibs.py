@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.gibs import Capabilities, LayerCatalogEntry, LayerMetadata
 from AEGIS.server.utils.constants import (
     CAPABILITIES_QUERY,
@@ -123,7 +123,7 @@ class GIBSService:
         bbox_precision: int | None = None,
         min_visual_radius_m: float | None = None,
     ) -> None:
-        settings = server_settings.gibs
+        settings = get_server_settings().gibs
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
         ttl_value = (
@@ -237,8 +237,8 @@ class GIBSService:
         radius_m: float | None,
         date: str,
         layer: str,
-        width: int = server_settings.gibs.image_width,
-        height: int = server_settings.gibs.image_height,
+        width: int = get_server_settings().gibs.image_width,
+        height: int = get_server_settings().gibs.image_height,
         crs: str = "EPSG:3857",
         format: str = "image/png",
         style: str | None = None,

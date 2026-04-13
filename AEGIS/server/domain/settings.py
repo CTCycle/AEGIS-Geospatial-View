@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
-from pydantic.fields import FieldInfo
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from AEGIS.server.utils.constants import (
-    CONFIGURATIONS_FILE,
     DEFAULT_DB_CONNECT_TIMEOUT,
     DEFAULT_DB_INSERT_BATCH_SIZE,
     DEFAULT_GIBS_DEFAULT_LAYER,
@@ -321,54 +317,12 @@ def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
     return _to_database_settings(db)
 
 
-###############################################################################
-class JsonConfigurationSettingsSource(PydanticBaseSettingsSource):
-    def __init__(self, settings_cls: type[BaseSettings]) -> None:
-        super().__init__(settings_cls)
-        raw_path = getattr(settings_cls, "_configuration_file", CONFIGURATIONS_FILE)
-        self.configuration_file = Path(raw_path)
-
-    # -------------------------------------------------------------------------
-    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
-        return None, field_name, False
-
-    # -------------------------------------------------------------------------
-    def __call__(self) -> dict[str, Any]:
-        if not self.configuration_file.exists():
-            raise RuntimeError(f"Configuration file not found: {self.configuration_file}")
-
-        try:
-            payload = json.loads(self.configuration_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"Unable to load configuration from {self.configuration_file}") from exc
-
-        if not isinstance(payload, dict):
-            raise RuntimeError("Configuration must be a JSON object.")
-
-        return {
-            "database": payload.get("database", {}),
-            "nominatim": payload.get("nominatim", {}),
-            "geospatial": payload.get("geospatial", {}),
-            "map": payload.get("map") or payload.get("maps", {}),
-            "jobs": payload.get("jobs", {}),
-            "chat": payload.get("chat", {}),
-            "vectors": payload.get("vectors", {}),
-            "openmeteo": payload.get("openmeteo", {}),
-            "overpass": payload.get("overpass", {}),
-            "rainviewer": payload.get("rainviewer", {}),
-            "gibs": payload.get("gibs", {}),
-        }
-
-
-###############################################################################
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
         case_sensitive=False,
         extra="ignore",
     )
-
-    _configuration_file: ClassVar[str] = CONFIGURATIONS_FILE
 
     database: JsonDatabaseSettings = Field(default_factory=JsonDatabaseSettings)
     nominatim: JsonNominatimSettings = Field(default_factory=JsonNominatimSettings)
@@ -403,24 +357,6 @@ class AppSettings(BaseSettings):
         text = str(value).strip() if value is not None else ""
         return text
 
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        _ = dotenv_settings
-        return (
-            init_settings,
-            env_settings,
-            JsonConfigurationSettingsSource(settings_cls),
-            file_secret_settings,
-        )
-
-    # -------------------------------------------------------------------------
     def to_server_settings(self) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
             self.gibs.wms_base_endpoints,

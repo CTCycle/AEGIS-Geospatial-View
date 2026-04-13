@@ -9,7 +9,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 
 
 class RainViewerServiceError(Exception):
@@ -33,7 +33,7 @@ class RainViewerService:
         tile_smooth: int | None = None,
         tile_snow: int | None = None,
     ) -> None:
-        settings = server_settings.rainviewer
+        settings = get_server_settings().rainviewer
         self.metadata_url = metadata_url or settings.metadata_url
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout

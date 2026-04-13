@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, time
 from typing import Any
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.utils.constants import MAP_SEARCH_STATUS_MESSAGE
 
@@ -30,7 +30,7 @@ def build_request_context(
         "geospatial_layers": list(geospatial_layers),
         "overlay_ids": list(overlay_ids),
         "basemap_id": basemap_id,
-        "map_tiles": map_tiles or server_settings.map.tiles,
+        "map_tiles": map_tiles or get_server_settings().map.tiles,
     }
 
 
@@ -57,7 +57,7 @@ def build_location_search_payload_data(
     image_crs: str | None,
     image_format: str | None,
 ) -> dict[str, Any]:
-    resolved_tiles = _resolve_tiles_from_basemap(basemap_id) or map_tiles or server_settings.map.tiles
+    resolved_tiles = _resolve_tiles_from_basemap(basemap_id) or map_tiles or get_server_settings().map.tiles
     payload_data: dict[str, Any] = {
         "datetime": datetime_value,
         "time_of_day": time_of_day,
@@ -74,9 +74,9 @@ def build_location_search_payload_data(
         "aoi": aoi,
         "commute": commute,
         "bbox": bbox,
-        "image_width": server_settings.gibs.image_width,
-        "image_height": server_settings.gibs.image_height,
-        "map_size_m": map_size_m if map_size_m is not None else server_settings.map.default_size_m,
+        "image_width": get_server_settings().gibs.image_width,
+        "image_height": get_server_settings().gibs.image_height,
+        "map_size_m": map_size_m if map_size_m is not None else get_server_settings().map.default_size_m,
         "map_tiles": resolved_tiles,
     }
     if radius_m is not None:

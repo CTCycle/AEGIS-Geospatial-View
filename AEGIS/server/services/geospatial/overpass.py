@@ -11,7 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
 
 
 class OverpassServiceError(Exception):
@@ -46,7 +46,7 @@ class OverpassService:
         default_radius_m: float | None = None,
         default_limit: int | None = None,
     ) -> None:
-        settings = server_settings.overpass
+        settings = get_server_settings().overpass
         self.base_url = base_url or settings.base_url
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout

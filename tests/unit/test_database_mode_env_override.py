@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from AEGIS.server.configurations.server import build_database_settings
+from AEGIS.server.configurations import build_database_settings
 
 
 def test_db_settings_use_json_payload_for_embedded_mode() -> None:

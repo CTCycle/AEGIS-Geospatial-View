@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from AEGIS.server.configurations import DatabaseSettings, server_settings
+from AEGIS.server.configurations import DatabaseSettings, get_server_settings
 from AEGIS.server.repositories.database.initializer import validate_postgres_schema
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
@@ -53,7 +53,7 @@ BACKEND_FACTORIES: dict[str, BackendFactory] = {
 ###############################################################################
 class AEGISDatabase:
     def __init__(self) -> None:
-        self.settings = server_settings.database
+        self.settings = get_server_settings().database
         self.backend = self._build_backend(self.settings.embedded_database)
 
     # -------------------------------------------------------------------------
