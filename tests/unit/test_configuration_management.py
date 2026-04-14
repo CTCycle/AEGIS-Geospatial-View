@@ -8,11 +8,12 @@ import pytest
 from AEGIS.server import configurations
 from AEGIS.server.configurations.environment import (
     ensure_environment_loaded,
-    reset_environment_loader_for_tests,
+    reset_environment_bootstrap_for_tests,
 )
 from AEGIS.server.configurations.management import ConfigurationManager
 from AEGIS.server.configurations.startup import (
-    get_app_settings,
+    get_configuration_manager,
+    get_server_settings,
     reload_settings_for_tests,
 )
 
@@ -32,7 +33,8 @@ def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
     )
 
     manager = ConfigurationManager(config_path=config_file)
-    app_settings = manager.load()
+    manager.load()
+    app_settings = manager.configuration
 
     assert app_settings.map.tiles == "CartoDB Positron"
     assert manager.get_block("jobs") == {"polling_interval": 2.5}
@@ -47,10 +49,11 @@ def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
     manager.load()
 
     _write_json(config_file, {"jobs": {"polling_interval": 3.0}})
-    app_settings = manager.reload()
+    manager.reload()
+    app_settings = manager.configuration
 
     assert app_settings.jobs.polling_interval == 3.0
-    assert manager.get_server_settings().jobs.polling_interval == 3.0
+    assert manager.server_settings.jobs.polling_interval == 3.0
 
 
 def test_configuration_manager_fails_on_missing_file(tmp_path: Path) -> None:
@@ -67,9 +70,9 @@ def test_startup_loads_environment_before_settings(monkeypatch, tmp_path: Path) 
 
     monkeypatch.delenv("FASTAPI_PORT", raising=False)
     monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file))
-    reset_environment_loader_for_tests()
+    reset_environment_bootstrap_for_tests()
 
-    app_settings = get_app_settings(config_path=config_file)
+    app_settings = get_configuration_manager(config_path=config_file).configuration
     assert app_settings.fastapi_port == 6100
 
 
@@ -83,10 +86,20 @@ def test_environment_loader_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     env_file.write_text("UI_PORT=4555\n", encoding="utf-8")
     _write_json(config_file, {})
     monkeypatch.delenv("UI_PORT", raising=False)
-    reset_environment_loader_for_tests()
+    reset_environment_bootstrap_for_tests()
+    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file))
 
-    ensure_environment_loaded(env_path=env_file)
-    ensure_environment_loaded(env_path=env_file)
+    ensure_environment_loaded()
+    ensure_environment_loaded()
 
-    assert get_app_settings(config_path=config_file).ui_port == 4555
+    assert get_configuration_manager(config_path=config_file, force=True).configuration.ui_port == 4555
     reload_settings_for_tests()
+
+
+def test_get_server_settings_returns_runtime_settings(monkeypatch, tmp_path: Path) -> None:
+    config_file = tmp_path / "configurations.json"
+    _write_json(config_file, {"jobs": {"polling_interval": 4.0}})
+    reset_environment_bootstrap_for_tests()
+    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(tmp_path / ".env"))
+
+    assert get_server_settings(config_file).jobs.polling_interval == 4.0

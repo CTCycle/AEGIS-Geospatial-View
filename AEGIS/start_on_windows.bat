@@ -18,6 +18,7 @@ set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
 set "UV_CACHE_DIR=%runtimes_dir%\.uv-cache"
 set "venv_dir=%runtimes_dir%\.venv"
+set "venv_python_exe=%venv_dir%\Scripts\python.exe"
 set "UV_PROJECT_ENVIRONMENT=%venv_dir%"
 set "runtime_uv_lock=%root_folder%runtimes\uv.lock"
 set "uv_lock_file=%root_folder%uv.lock"
@@ -302,8 +303,14 @@ if not exist "%python_exe%" (
 
 echo [RUN] Launching backend via uvicorn (!UVICORN_MODULE!)
 call :kill_port !FASTAPI_PORT!
-set "backend_args=run --no-sync --python ""%python_exe%"" python -m uvicorn %UVICORN_MODULE% --host !FASTAPI_HOST! --port !FASTAPI_PORT! !RELOAD_FLAG! --log-level info"
-for /f "usebackq delims=" %%P in (`powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPPID%" "%uv_exe%" !backend_args!`) do set "backend_pid=%%P"
+set "backend_exe=%python_exe%"
+if exist "%venv_python_exe%" (
+  set "backend_exe=%venv_python_exe%"
+) else (
+  echo [WARN] Virtual environment Python not found at "%venv_python_exe%". Falling back to embeddable Python.
+)
+set "backend_args=-m uvicorn %UVICORN_MODULE% --host !FASTAPI_HOST! --port !FASTAPI_PORT! !RELOAD_FLAG! --log-level info"
+for /f "usebackq delims=" %%P in (`powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPPID%" "!backend_exe!" !backend_args!`) do set "backend_pid=%%P"
 if not defined backend_pid (
   echo [FATAL] Could not start backend process.
   goto error
@@ -315,16 +322,11 @@ REM Wait for backend
 REM ============================================================================
 echo [WAIT] Waiting for backend to be ready on port !FASTAPI_PORT!...
 for /L %%i in (1,1,20) do (
-  tasklist /FI "PID eq !backend_pid!" | findstr /I "!backend_pid!" >nul
-  if !errorlevel! neq 0 (
-    echo [FATAL] Backend process !backend_pid! exited before binding port !FASTAPI_PORT!.
-    goto error
-  )
-  call :port_owned_by_pid !FASTAPI_PORT! !backend_pid!
+  call :port_listening !FASTAPI_PORT!
   if !errorlevel! equ 0 goto :backend_ready_check
   timeout /t 1 /nobreak >nul
 )
-echo [FATAL] Timed out waiting for backend PID !backend_pid! to bind port !FASTAPI_PORT!.
+echo [FATAL] Timed out waiting for backend to bind port !FASTAPI_PORT!.
 goto error
 :backend_ready_check
 echo [OK] Backend is listening on !FASTAPI_HOST!:!FASTAPI_PORT! (PID !backend_pid!).
@@ -381,11 +383,10 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R ":!target_port!"') do (
 )
 goto :eof
 
-:port_owned_by_pid
+:port_listening
 set "check_port=%~1"
-set "check_pid=%~2"
 if not defined check_port exit /b 1
-if not defined check_pid exit /b 1
-netstat -ano | findstr /R /C:":%check_port% .*LISTENING *%check_pid%" >nul
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$c=Get-NetTCPConnection -LocalPort %check_port% -State Listen -ErrorAction SilentlyContinue; if($c){exit 0}else{exit 1}" >nul 2>&1
 if errorlevel 1 exit /b 1
 exit /b 0

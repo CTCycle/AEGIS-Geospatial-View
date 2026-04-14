@@ -14,20 +14,20 @@ from AEGIS.server.utils.logger import logger
 @dataclass
 class _EnvironmentState:
     lock: Lock = field(default_factory=Lock)
-    loaded: bool = False
+    bootstrapped: bool = False
 
 
 @lru_cache(maxsize=1)
-def _environment_state() -> _EnvironmentState:
+def _bootstrap_state() -> _EnvironmentState:
     return _EnvironmentState()
 
 
-def ensure_environment_loaded(*, force: bool = False, env_path: str | Path | None = None) -> Path | None:
-    state = _environment_state()
-    path = Path(env_path) if env_path is not None else Path(ENV_FILE_PATH)
+def ensure_environment_loaded(*, force: bool = False) -> Path | None:
+    state = _bootstrap_state()
+    path = Path(ENV_FILE_PATH)
 
     with state.lock:
-        if state.loaded and not force:
+        if state.bootstrapped and not force:
             return path if path.exists() else None
 
         if path.exists():
@@ -35,11 +35,11 @@ def ensure_environment_loaded(*, force: bool = False, env_path: str | Path | Non
         else:
             logger.warning(".env file not found at: %s", path)
 
-        state.loaded = True
+        state.bootstrapped = True
         return path if path.exists() else None
 
 
-def reset_environment_loader_for_tests() -> None:
-    state = _environment_state()
+def reset_environment_bootstrap_for_tests() -> None:
+    state = _bootstrap_state()
     with state.lock:
-        state.loaded = False
+        state.bootstrapped = False
