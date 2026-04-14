@@ -5,7 +5,7 @@ from pathlib import Path
 
 from AEGIS.server.configurations.environment import (
     ensure_environment_loaded,
-    reset_environment_loader_for_tests,
+    reset_environment_bootstrap_for_tests,
 )
 
 
@@ -35,8 +35,9 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     ):
         monkeypatch.delenv(key, raising=False)
 
-    reset_environment_loader_for_tests()
-    ensure_environment_loaded(env_path=env_file)
+    reset_environment_bootstrap_for_tests()
+    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file))
+    ensure_environment_loaded()
 
     assert os.getenv("FASTAPI_HOST") == "127.0.0.1"
     assert os.getenv("FASTAPI_PORT") == "6100"

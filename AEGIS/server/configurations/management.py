@@ -12,7 +12,7 @@ from AEGIS.server.utils.constants import CONFIGURATIONS_FILE
 
 def _ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
-        return value
+        return dict(value)
     return {}
 
 
@@ -33,59 +33,80 @@ def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
 
 
 class ConfigurationManager:
-    def __init__(self, config_path: str | Path | None = None) -> None:
-        self._config_path = Path(config_path or CONFIGURATIONS_FILE)
-        self._raw_payload: dict[str, Any] = {}
-        self._settings_payload: dict[str, Any] = {}
-        self._app_settings: AppSettings | None = None
-        self._server_settings: ServerSettings | None = None
+    def __init__(self, config_path: str | Path = CONFIGURATIONS_FILE) -> None:
+        self.config_path = Path(config_path)
+        self._payload: dict[str, Any] = {}
+        self._configuration = AppSettings()
+        self._server_settings = self._configuration.to_server_settings()
+        self._loaded = False
 
     @property
-    def config_path(self) -> Path:
-        return self._config_path
+    def is_loaded(self) -> bool:
+        return self._loaded
 
-    def load(self) -> AppSettings:
-        self._raw_payload = self._load_raw_json()
-        self._settings_payload = _build_settings_payload(self._raw_payload)
-        try:
-            self._app_settings = AppSettings(**self._settings_payload)
-        except ValidationError as exc:
-            raise RuntimeError(f"Invalid application settings: {exc}") from exc
-        self._server_settings = self._app_settings.to_server_settings()
-        return self._app_settings
+    @property
+    def configuration(self) -> AppSettings:
+        self._ensure_loaded()
+        return self._configuration
 
-    def reload(self) -> AppSettings:
+    @property
+    def server_settings(self) -> ServerSettings:
+        self._ensure_loaded()
+        return self._server_settings
+
+    def load(self) -> "ConfigurationManager":
+        payload = self._read_payload()
+        configuration = self._validate_configuration(payload)
+        self._payload = payload
+        self._configuration = configuration
+        self._server_settings = configuration.to_server_settings()
+        self._loaded = True
+        return self
+
+    def reload(self) -> "ConfigurationManager":
         return self.load()
+
+    def update(self, payload: dict[str, Any], *, persist: bool = True) -> "ConfigurationManager":
+        if not isinstance(payload, dict):
+            raise RuntimeError("Configuration must be a JSON object.")
+
+        configuration = self._validate_configuration(payload)
+        self._payload = dict(payload)
+        self._configuration = configuration
+        self._server_settings = configuration.to_server_settings()
+        self._loaded = True
+
+        if persist:
+            self.config_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return self
 
     def get_block(self, block_name: str) -> dict[str, Any]:
         self._ensure_loaded()
-        return _ensure_mapping(self._raw_payload.get(block_name))
+        return _ensure_mapping(self._payload.get(block_name))
 
     def get_value(self, block_name: str, key: str, default: Any = None) -> Any:
         block = self.get_block(block_name)
         return block.get(key, default)
 
-    def get_app_settings(self) -> AppSettings:
-        self._ensure_loaded()
-        assert self._app_settings is not None
-        return self._app_settings
-
-    def get_server_settings(self) -> ServerSettings:
-        self._ensure_loaded()
-        assert self._server_settings is not None
-        return self._server_settings
-
     def _ensure_loaded(self) -> None:
-        if self._app_settings is None:
+        if not self._loaded:
             self.load()
 
-    def _load_raw_json(self) -> dict[str, Any]:
-        if not self._config_path.exists():
-            raise RuntimeError(f"Configuration file not found: {self._config_path}")
+    def _read_payload(self) -> dict[str, Any]:
+        if not self.config_path.exists():
+            raise RuntimeError(f"Configuration file not found: {self.config_path}")
+
         try:
-            payload = json.loads(self._config_path.read_text(encoding="utf-8"))
+            payload = json.loads(self.config_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"Unable to load configuration from {self._config_path}") from exc
+            raise RuntimeError(f"Unable to load configuration from {self.config_path}") from exc
+
         if not isinstance(payload, dict):
             raise RuntimeError("Configuration must be a JSON object.")
         return payload
+
+    def _validate_configuration(self, payload: dict[str, Any]) -> AppSettings:
+        try:
+            return AppSettings(**_build_settings_payload(payload))
+        except ValidationError as exc:
+            raise RuntimeError(f"Invalid application settings: {exc}") from exc
