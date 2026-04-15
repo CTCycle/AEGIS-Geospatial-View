@@ -397,7 +397,7 @@
 
     .geospatial-workspace {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(22rem, auto) minmax(24rem, 1fr);
+        grid-template-rows: auto minmax(18rem, 1fr);
         height: auto;
         min-height: 100dvh;
     }
@@ -405,7 +405,7 @@
     .toolbar-panel {
         border-right: none;
         border-bottom: 1px solid #bcc7d8;
-        min-height: 22rem;
+        min-height: 0;
         max-height: none;
     }
 
@@ -428,11 +428,11 @@
     }
 
     .canvas-panel {
-        min-height: 24rem;
+        min-height: 18rem;
     }
 
     .canvas-panel__body {
-        min-height: 24rem;
+        min-height: 18rem;
     }
 
     .workspace-alerts {
@@ -444,11 +444,11 @@
 
 @media (max-width: 700px) {
     .geospatial-workspace {
-        grid-template-rows: minmax(19rem, auto) minmax(20rem, 1fr);
+        grid-template-rows: auto minmax(16rem, 1fr);
     }
 
     .toolbar-panel {
-        min-height: 19rem;
+        min-height: 0;
     }
 
     .toolbar-panel__content {
@@ -464,6 +464,6 @@
     }
 
     .canvas-panel__body {
-        min-height: 20rem;
+        min-height: 16rem;
     }
 }

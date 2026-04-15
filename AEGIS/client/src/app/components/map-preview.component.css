@@ -186,6 +186,7 @@
     .maplibre-container,
     .spinner-container,
     .empty-state {
-        height: 56vh;
+        min-height: 15rem;
+        height: min(42vh, 22rem);
     }
 }

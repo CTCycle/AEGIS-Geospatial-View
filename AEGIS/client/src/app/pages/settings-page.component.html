@@ -13,7 +13,7 @@
         </span>
       </button>
 
-      <button class="settings-icon-button" type="button" aria-label="Manage API keys" title="API key settings" (click)="keysModalStatusText = ''; isKeysModalOpen = true">
+      <button class="settings-icon-button" type="button" aria-label="Manage API keys" title="API key settings" (click)="keysModalStatusText = ''; keyValidationErrors = {}; isKeysModalOpen = true">
         <span class="settings-icon-button__glyph" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
             <path d="M14 3a7 7 0 1 0 5.5 11.3L23 17.8V21h-3v-2h-2v-2h-2.2A7 7 0 0 0 14 3zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" fill="currentColor" />
@@ -135,6 +135,33 @@
             </tbody>
           </table>
         </div>
+
+        <div class="settings-page__stats-mobile-list" aria-label="Model statistics mobile">
+          @if (selectedModelStats.length === 0) {
+            <article class="settings-page__stats-mobile-card">
+              <p class="settings-page__stats-mobile-empty">No models selected yet.</p>
+            </article>
+          }
+          @for (row of selectedModelStats; track row.provider + ':' + row.model) {
+            <article class="settings-page__stats-mobile-card">
+              <h3>{{ row.model }}</h3>
+              <dl>
+                <div>
+                  <dt>Provider</dt>
+                  <dd>{{ row.provider }}</dd>
+                </div>
+                <div>
+                  <dt>Local</dt>
+                  <dd>{{ row.local ? 'Yes' : 'No' }}</dd>
+                </div>
+                <div>
+                  <dt>Assigned</dt>
+                  <dd>{{ row.assignedRoles.join(', ') }}</dd>
+                </div>
+              </dl>
+            </article>
+          }
+        </div>
       </aside>
     </div>
     <footer class="settings-page__status">{{ visibleStatusText }}</footer>
@@ -146,11 +173,17 @@
         <div class="settings-modal__body">
           <label>
             OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
-            <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" name="openai_api_key" placeholder="sk-..." />
+            <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event; keyValidationErrors.openai = undefined" name="openai_api_key" placeholder="sk-..." [class.input-invalid]="!!keyValidationErrors.openai" />
+            @if (keyValidationErrors.openai) {
+              <span class="settings-modal__field-error">{{ keyValidationErrors.openai }}</span>
+            }
           </label>
           <label>
             Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
-            <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" name="google_api_key" placeholder="AIza..." />
+            <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event; keyValidationErrors.google = undefined" name="google_api_key" placeholder="AIza..." [class.input-invalid]="!!keyValidationErrors.google" />
+            @if (keyValidationErrors.google) {
+              <span class="settings-modal__field-error">{{ keyValidationErrors.google }}</span>
+            }
           </label>
           @if (keysModalStatusText) {
             <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>

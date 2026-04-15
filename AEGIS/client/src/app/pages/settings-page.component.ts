@@ -67,6 +67,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ollamaUrlDraft = 'http://localhost:11434';
   keysModalStatusText = '';
   ollamaModalStatusText = '';
+  keyValidationErrors: { openai?: string; google?: string } = {};
 
   providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
   showLocalOnly = false;
@@ -205,6 +206,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async saveKeys(): Promise<void> {
+    this.keyValidationErrors = this.validateKeyInputs();
+    if (this.keyValidationErrors.openai || this.keyValidationErrors.google) {
+      this.keysModalStatusText = 'Fix the highlighted API key fields before saving.';
+      return;
+    }
+
     try {
       const updated = await updateChatSettings({
         ...this.settings,
@@ -296,6 +303,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isOllamaModalOpen = false;
     this.keysModalStatusText = '';
     this.ollamaModalStatusText = '';
+    this.keyValidationErrors = {};
   }
 
   onModelGridScroll(event: Event): void {
@@ -309,6 +317,22 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   googleConfigured(): boolean {
     return Boolean(this.settings.credentials['google']?.['api_key']);
+  }
+
+  private validateKeyInputs(): { openai?: string; google?: string } {
+    const errors: { openai?: string; google?: string } = {};
+    const openAiValue = this.openaiKey.trim();
+    const googleValue = this.googleKey.trim();
+
+    if (openAiValue && !openAiValue.startsWith('sk-')) {
+      errors.openai = 'OpenAI key must start with "sk-".';
+    }
+
+    if (googleValue && !googleValue.startsWith('AIza')) {
+      errors.google = 'Google key must start with "AIza".';
+    }
+
+    return errors;
   }
 
   private async loadData(): Promise<void> {

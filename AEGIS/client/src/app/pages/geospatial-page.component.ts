@@ -93,8 +93,12 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   get activeAlertItems(): string[] {
     const alerts: string[] = [];
+    const latestAssistantMessage = [...this.messages].reverse().find((entry) => entry.role === 'assistant')?.content?.trim() ?? '';
     if (this.status === 'Failed') {
       alerts.push('The last request failed before the map session updated.');
+    }
+    if (latestAssistantMessage && this.looksLikeRuntimeFailure(latestAssistantMessage)) {
+      alerts.push(latestAssistantMessage);
     }
     if (!this.payload?.map_session) {
       alerts.push('No active map session is loaded yet.');
@@ -303,5 +307,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     container.scrollTop = container.scrollHeight;
     this.transcriptScrollTop = container.scrollTop;
+  }
+
+  private looksLikeRuntimeFailure(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return normalized.includes('cannot reach')
+      || normalized.includes('could not reach')
+      || normalized.includes('cannot process this request')
+      || normalized.includes('failed')
+      || normalized.includes('error');
   }
 }
