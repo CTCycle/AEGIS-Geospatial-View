@@ -1,138 +1,69 @@
-# HOW TO TEST
+# Testing Guidelines
 
-This document describes the testing strategy and instructions for the project.
-Tests must cover end-to-end scenarios that exercise both the UI and backend.
-Coverage includes REST APIs, UI widgets, input validation, database interactions,
-and geospatial search flows.
+Last updated: 2026-04-08
+Scope: `tests/`, backend/frontend integration flows
 
-## Overview
-We use **End-to-End (E2E)** testing to validate the entire application stack
-(Frontend + Backend + Database).
-- **Framework**: [Playwright](https://playwright.dev/python/) with
-  [pytest](https://docs.pytest.org/).
-- **Language**: Python.
+This project validates behavior primarily with end-to-end tests that exercise backend + frontend together.
 
-## Test Suite Structure
-```
-tests/
-|-- run_tests.bat             # Automated test runner (Windows)
-|-- conftest.py               # Pytest configuration and fixtures
-`-- e2e/
-    |-- test_app_flow.py       # UI navigation + search flows
-    |-- test_database_api.py   # /browser API tests
-    `-- test_maps_api.py       # /maps/search validation + overlays
-```
+## 1. Test Stack
 
-## Quick Start (Recommended)
+- Framework: `pytest`
+- Browser automation and API client: Playwright for Python (`pytest-playwright`)
+- Main suite location: `tests/e2e`
 
-### Fully Automated Testing
-Run the batch file. It handles setup, server startup, and cleanup:
+## 2. Primary Runner
+
+Recommended command on Windows:
+
 ```cmd
 tests\run_tests.bat
 ```
 
-This script will:
-1. Check that prerequisites are installed
-2. Install Playwright browsers if needed
-3. Start the backend server
-4. Start the frontend server
-5. Run all tests
-6. Stop the servers and report results
+`run_tests.bat` performs:
+1. Runtime prerequisite checks
+2. Playwright browser availability check/install
+3. Backend startup
+4. Frontend startup/build as needed
+5. Pytest execution
+6. Cleanup
 
-> [!TIP]
-> Run `AEGIS\start_on_windows.bat` at least once before running tests to ensure
-> all dependencies are installed.
+## 3. Runtime and Ports
 
----
+- Tests use portable runtimes from `runtimes/`.
+- If `AEGIS/settings/.env` exists, host/port values are loaded from it.
+- If no `.env` is present, fallback is backend `127.0.0.1:8000`, frontend `127.0.0.1:7861`.
 
-## Manual Testing
+## 4. Manual Execution
 
-### Prerequisites
-- Python 3.14+ with `pytest` and `pytest-playwright`
-- Playwright browsers installed
+Typical manual invocation from repo root:
 
-### Setup
-1. **Install Test Dependencies**:
-   ```cmd
-   pip install .[test]
-   ```
-
-2. **Install Playwright Browsers**:
-   ```cmd
-   python -m playwright install
-   ```
-
-### Running Tests Manually
-1. **Start the Application**:
-   ```cmd
-   AEGIS\start_on_windows.bat
-   ```
-
-2. **Run Tests** (in a separate terminal):
-   ```cmd
-   pytest tests
-   ```
-
-### Useful Options
-| Option | Description |
-|--------|-------------|
-| `--headed` | Run with browser visible |
-| `--slowmo 1000` | Slow down execution (ms) |
-| `--video on` | Record video of tests |
-| `-v` | Verbose output |
-| `-x` | Stop on first failure |
-| `-k "test_name"` | Run specific test by name |
-
-**Example**: Run UI tests with visible browser:
 ```cmd
-pytest tests/e2e/test_app_flow.py --headed --slowmo 500
+uv run pytest tests -v --tb=short
 ```
 
----
+Common options:
+- `--headed`
+- `--slowmo 500`
+- `-k "name_fragment"`
+- `-x`
 
-## Writing New Tests
+## 5. Writing Tests
 
-- **Location**: Place tests in `tests/e2e/`
-- **Naming**: Files must start with `test_`
-- **Fixtures**:
-  - `page`: Playwright browser automation
-  - `api_context`: API request context
-  - `base_url`: UI base URL
-  - `api_base_url`: API base URL
+- Place E2E tests in `tests/e2e`.
+- Name files `test_*.py`.
+- Reuse fixtures from `tests/conftest.py`.
+- Cover happy path, validation failures, and degraded external-service behavior where relevant.
 
-### Example API Test
-```python
-def test_map_search(api_context):
-    payload = {
-        "datetime": "2024-06-15T12:00:00",
-        "use_coordinates": True,
-        "latitude": 41.9028,
-        "longitude": 12.4964,
-    }
-    response = api_context.post("/maps/search", data=payload)
-    assert response.ok
-```
-Note: Playwright Python serializes dicts passed via `data=` as JSON; `json=`
-is not a valid argument for `APIRequestContext.post`.
+## 6. External Dependencies
 
-### Example UI Test
-```python
-from playwright.sync_api import expect
+Map and geospatial flows call external services (Nominatim, NASA GIBS, OpenAQ, Open-Elevation, PVGIS).
 
-def test_navigation(page, base_url):
-    page.goto(base_url)
-    page.get_by_role("button", name="Database Browser").click()
-    expect(page.get_by_role("heading", name="Database Browser")).to_be_visible()
-```
-If a text locator matches multiple nodes, prefer `get_by_role` or
-`get_by_text(..., exact=True)` to avoid strict-mode collisions.
+Implications:
+- Network availability affects E2E reliability.
+- Tests should gracefully skip or assert expected fallback behavior when upstream dependencies are unavailable.
 
-### External Dependencies
-`/maps/search` uses external geospatial services (Nominatim, OpenAQ,
-Open-Elevation, and optionally NASA GIBS overlays). Ensure network access is
-available when running E2E tests.
+## 7. Troubleshooting
 
-## Troubleshooting
-- **Connection Refused**: Ensure the app is running before tests.
-- **Playwright not found**: Use `python -m playwright install`.
-- **Timeouts on map search**: Verify external network access for geospatial APIs.
+- Connection refused: verify backend/frontend startup logs and resolved ports.
+- Browser install issues: run `uv run python -m playwright install`.
+- Timeout-heavy runs: check network access and external API responsiveness.

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "AEGIS"
-version = "1.7.0"
+version = "2.0.0"
 requires-python = ">=3.14"
 
 dependencies = [
@@ -18,14 +18,21 @@ dependencies = [
     "python-dotenv==1.2.1",
     "folium==0.17.0",
     "pillow==12.0.0",
+    "cryptography>=43.0.0",
+    "chromadb>=0.5.0",
 ]
 
 [project.optional-dependencies]
 test = [
-    "pytest>=8.0.0",
+    "pytest>=8.0",
     "pytest-playwright>=0.5.0",
+    "psutil>=6.1.1",
+    "ruff==0.15.9"
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["AEGIS"] 
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 

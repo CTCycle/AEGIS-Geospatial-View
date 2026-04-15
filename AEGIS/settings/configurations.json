@@ -35,6 +35,42 @@
   "jobs": {
     "polling_interval": 1.0
   },
+  "chat": {
+    "max_history_messages": 12
+  },
+  "vectors": {
+    "auto_sync_on_start": true,
+    "default_ollama_embedding_model": "nomic-embed-text",
+    "default_openai_embedding_model": "text-embedding-3-small",
+    "default_google_embedding_model": "text-embedding-004"
+  },
+  "openmeteo": {
+    "weather_base_url": "https://api.open-meteo.com/v1/forecast",
+    "air_quality_base_url": "https://air-quality-api.open-meteo.com/v1/air-quality",
+    "user_agent": "AEGIS-OpenMeteo/1.0",
+    "timeout": 15.0,
+    "cache_ttl_s": 600.0,
+    "min_call_interval_s": 0.15
+  },
+  "overpass": {
+    "base_url": "https://overpass-api.de/api/interpreter",
+    "user_agent": "AEGIS-Overpass/1.0",
+    "timeout": 20.0,
+    "cache_ttl_s": 600.0,
+    "min_call_interval_s": 0.2,
+    "default_radius_m": 2500.0,
+    "default_limit": 30
+  },
+  "rainviewer": {
+    "metadata_url": "https://api.rainviewer.com/public/weather-maps.json",
+    "user_agent": "AEGIS-RainViewer/1.0",
+    "timeout": 15.0,
+    "cache_ttl_s": 300.0,
+    "min_call_interval_s": 0.2,
+    "tile_color_scheme": 2,
+    "tile_smooth": 1,
+    "tile_snow": 1
+  },
   "gibs": {
     "user_agent": "AEGIS-GIBS/1.0",
     "timeout": 20.0,
@@ -60,16 +96,6 @@
     },
     "retry_backoff_s": 2.0,
     "default_layer": "VIIRS_SNPP_CorrectedReflectance_TrueColor"
-  },
-  "llm_runtime_defaults": {
-    "agent_model": "llama3.1:8b",
-    "llm_provider": "openai",
-    "cloud_model": "gpt-4o-mini",
-    "use_cloud_services": false,
-    "ollama_temperature": 0.7,
-    "ollama_reasoning": false,
-    "ollama_host_default": "http://localhost:11434"   
   }
- 
 }
 

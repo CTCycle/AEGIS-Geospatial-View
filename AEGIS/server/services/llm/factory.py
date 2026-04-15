@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import os
+
+from AEGIS.server.repositories.credentials import CredentialRepository
+from AEGIS.server.repositories.model_settings import ModelSettingsRepository
+from AEGIS.server.repositories.serialization.access_keys import AccessKeySerializer
+from AEGIS.server.services.cryptography import CredentialEncryptionService
+from AEGIS.server.services.llm.base import LLMProvider
+from AEGIS.server.services.llm.google_provider import GoogleProvider
+from AEGIS.server.services.llm.ollama import OllamaProvider
+from AEGIS.server.services.llm.openai_provider import OpenAIProvider
+
+
+class LLMFactory:
+    def __init__(
+        self,
+        *,
+        settings_repo: ModelSettingsRepository | None = None,
+        credentials_repo: CredentialRepository | None = None,
+        crypto_service: CredentialEncryptionService | None = None,
+    ) -> None:
+        self.settings_repo = settings_repo or ModelSettingsRepository()
+        self.credentials_repo = credentials_repo or CredentialRepository()
+        self.crypto_service = crypto_service or CredentialEncryptionService()
+        self.access_keys = AccessKeySerializer()
+
+    def get_provider(self, provider: str) -> LLMProvider:
+        normalized = provider.strip().lower()
+        settings = self.settings_repo.get_or_create()
+        if normalized == "ollama":
+            return OllamaProvider(base_url=settings.ollama_url)
+        if normalized == "openai":
+            api_key = self.access_keys.decrypt_for_runtime("openai", mark_used=True)
+            if not api_key:
+                credential = self.credentials_repo.get_active(provider="openai", label="api_key")
+                if credential is not None:
+                    api_key = self.crypto_service.decrypt(credential.encrypted_value)
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY", "").strip()
+            if not api_key:
+                raise ValueError("OpenAI credentials are not configured. Add an OpenAI API key in Settings.")
+            return OpenAIProvider(api_key=api_key, base_url=settings.openai_base_url)
+        if normalized == "google":
+            api_key = self.access_keys.decrypt_for_runtime("gemini", mark_used=True)
+            if not api_key:
+                credential = self.credentials_repo.get_active(provider="google", label="api_key")
+                if credential is not None:
+                    api_key = self.crypto_service.decrypt(credential.encrypted_value)
+            if not api_key:
+                api_key = os.getenv("GOOGLE_API_KEY", "").strip() or os.getenv("GEMINI_API_KEY", "").strip()
+            if not api_key:
+                raise ValueError("Google credentials are not configured. Add a Google/Gemini API key in Settings.")
+            return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
+        raise ValueError(f"Unsupported model provider '{provider}'.")
+
+    def get_agent_provider(self, provider: str) -> LLMProvider:
+        return self.get_provider(provider)
+
+    def get_parser_provider(self, provider: str) -> LLMProvider:
+        return self.get_provider(provider)
+
+    def get_chat_provider(self, provider: str) -> LLMProvider:
+        return _ChatOnlyProvider(self.get_provider(provider))
+
+
+class _ChatOnlyProvider:
+    def __init__(self, delegate: LLMProvider) -> None:
+        self._delegate = delegate
+        self.provider_name = getattr(delegate, "provider_name", "chat")
+
+    def __getattr__(self, item: str):  # noqa: ANN001
+        return getattr(self._delegate, item)
+
+    def structured_output(self, request, schema):  # noqa: ANN001
+        raise RuntimeError("Structured extraction is forbidden on chat-model path.")

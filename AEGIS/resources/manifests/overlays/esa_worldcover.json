@@ -1,0 +1,66 @@
+{
+  "id": "esa_worldcover",
+  "name": "ESA WorldCover",
+  "provider": "esa",
+  "type": "wmts",
+  "description": "ESA WorldCover global land-cover overlay with thematic surface classes.",
+  "capabilities": [
+    "wmts",
+    "land-cover"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "ESA WorldCover",
+    "default_opacity": 0.45,
+    "requires_key": false,
+    "url": "https://services.terrascope.be/wmts/v2",
+    "layer_id": "WORLDCOVER_2021_MAP",
+    "tile_matrix_set": "EPSG:3857",
+    "wmts_format": "image/png",
+    "wmts_style": "",
+    "attribution": "\u00a9 ESA WorldCover / Terrascope",
+    "keywords": [
+      "wmts",
+      "land-cover",
+      "esa",
+      "esa worldcover"
+    ],
+    "intent_tags": [
+      "wmts",
+      "land-cover"
+    ],
+    "task_tags": [
+      "wmts",
+      "land-cover"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "d155f809aaf624f14b66d5f9900844890a719d514b7e46ea507e3b4b0cfe835e",
+    "human_summary": "Global land-cover classification layer for consistent thematic surface analysis.",
+    "primary_use_cases": [
+      "global land-cover comparison",
+      "habitat and land-use context",
+      "thematic base analysis"
+    ],
+    "search_examples": [
+      "show worldcover classes near Florence",
+      "display urban versus vegetation cover"
+    ],
+    "disambiguation_notes": [
+      "Prefer this for broad land-cover questions when annual thematic categories are needed."
+    ],
+    "location_dependency": "Location-dependent with periodic dataset updates.",
+    "integration_requirements": [
+      "No API key required"
+    ]
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

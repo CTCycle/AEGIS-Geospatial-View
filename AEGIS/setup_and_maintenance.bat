@@ -30,8 +30,8 @@ set "scripts_dir=%project_folder%\scripts"
 set "desktop_clean_script=%root_folder%release\tauri\scripts\clean-tauri-build.ps1"
 set "init_db_script=%scripts_dir%\initialize_database.py"
 set "gibs_script=%scripts_dir%\update_gibs_layers.py"
-set "init_db_module=AEGIS.server.scripts.initialize_database"
-set "gibs_module=AEGIS.server.scripts.update_gibs_layers"
+set "init_db_module=AEGIS.scripts.initialize_database"
+set "gibs_module=AEGIS.scripts.update_gibs_layers"
 
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -42,20 +42,20 @@ cls
 echo ==========================================================================
 echo                         Setup and Maintenance
 echo ==========================================================================
-echo 1. Remove logs
-echo 2. Uninstall app
-echo 3. Initialize database
-echo 4. Update NASA GIBS layers
-echo 5. Clean desktop build artifacts
+echo 1. Initialize database
+echo 2. Update NASA GIBS layers
+echo 3. Clean desktop build artifacts
+echo 4. Remove logs
+echo 5. Uninstall app
 echo 6. Exit
 echo.
 set /p sub_choice="Select an option (1-6): "
 
-if "%sub_choice%"=="1" goto :logs
-if "%sub_choice%"=="2" goto :uninstall
-if "%sub_choice%"=="3" goto :run_init_db
-if "%sub_choice%"=="4" goto :run_gibs
-if "%sub_choice%"=="5" goto :clean_desktop
+if "%sub_choice%"=="1" goto :run_init_db
+if "%sub_choice%"=="2" goto :run_gibs
+if "%sub_choice%"=="3" goto :clean_desktop
+if "%sub_choice%"=="4" goto :logs
+if "%sub_choice%"=="5" goto :uninstall
 if "%sub_choice%"=="6" goto :exit
 echo Invalid option, try again.
 pause
@@ -82,10 +82,13 @@ goto :setup_menu
 
 :uninstall
 echo --------------------------------------------------------------------------
-echo This operation will remove uv artifacts, caches, local Python files in
-echo runtimes, the portable Node.js installation, and the runtime .venv
-echo directory. The embedded Python folder will be cleaned but the folder
-echo structure will be preserved.
+echo This operation will remove runtime/tooling artifacts for the app:
+echo - uv artifacts and caches
+echo - embeddable Python runtime and runtime .venv
+echo - portable Node.js runtime
+echo - Angular frontend build/cache artifacts (node_modules, dist, .angular)
+echo - frontend lockfile (package-lock.json)
+echo The repository source code is preserved.
 echo.
 set /p confirm="Type YES to continue: "
 if /i not "%confirm%"=="YES" (
@@ -128,6 +131,12 @@ if exist "%client_dir%\node_modules" (
   echo [INFO] Removed frontend node_modules at "%client_dir%\node_modules".
 ) else (
   echo [INFO] No frontend node_modules directory found to remove.
+)
+if exist "%client_dir%\.angular" (
+  rd /s /q "%client_dir%\.angular"
+  echo [INFO] Removed Angular cache directory "%client_dir%\.angular".
+) else (
+  echo [INFO] No Angular cache directory found to remove.
 )
 if exist "%nodejs_dir%" (
   rd /s /q "%nodejs_dir%"

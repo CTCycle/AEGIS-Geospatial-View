@@ -1,0 +1,65 @@
+{
+  "id": "openmeteo_weather_forecast",
+  "name": "Open-Meteo Weather Forecast",
+  "provider": "openmeteo",
+  "type": "time-series-insight",
+  "description": "Location-based weather forecast layer for temperature and precipitation context sourced from Open-Meteo.",
+  "capabilities": [
+    "weather",
+    "forecast",
+    "time-series-insight"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Open-Meteo Weather Forecast",
+    "default_opacity": 0.72,
+    "requires_key": false,
+    "attribution": "© Open-Meteo",
+    "keywords": [
+      "weather",
+      "forecast",
+      "temperature",
+      "precipitation",
+      "open-meteo"
+    ],
+    "intent_tags": [
+      "weather",
+      "temperature",
+      "precipitation"
+    ],
+    "task_tags": [
+      "weather outlook",
+      "rain planning",
+      "temperature trend checks"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "dynamic",
+    "constraints": "Useful for forecast context. Validate non-commercial limits and attribution requirements.",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "openmeteo_weather_forecast_overlay_v1",
+    "human_summary": "Forecast-oriented weather overlay for location-specific temperature and precipitation context.",
+    "primary_use_cases": [
+      "near-term weather awareness",
+      "trip weather planning",
+      "storm and rainfall context"
+    ],
+    "search_examples": [
+      "show weather forecast around Milan",
+      "display rain outlook for Rome tonight"
+    ],
+    "disambiguation_notes": [
+      "Use this when users ask for weather evolution over time rather than static satellite imagery."
+    ],
+    "location_dependency": "Location-specific and time-dependent forecast data.",
+    "integration_requirements": [
+      "No API key required in the free Open-Meteo flow"
+    ]
+  },
+  "version": 1,
+  "last_modified": "2026-04-10T16:45:00+00:00"
+}

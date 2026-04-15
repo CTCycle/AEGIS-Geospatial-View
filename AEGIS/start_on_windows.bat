@@ -18,6 +18,7 @@ set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
 set "UV_CACHE_DIR=%runtimes_dir%\.uv-cache"
 set "venv_dir=%runtimes_dir%\.venv"
+set "venv_python_exe=%venv_dir%\Scripts\python.exe"
 set "UV_PROJECT_ENVIRONMENT=%venv_dir%"
 set "runtime_uv_lock=%root_folder%runtimes\uv.lock"
 set "uv_lock_file=%root_folder%uv.lock"
@@ -52,6 +53,7 @@ set "TMPEXP=%TEMP%\app_expand.ps1"
 set "TMPTXT=%TEMP%\app_txt.ps1"
 set "TMPFIND=%TEMP%\app_find_uv.ps1"
 set "TMPVER=%TEMP%\app_pyver.ps1"
+set "TMPPID=%TEMP%\app_pid.ps1"
 
 set "UV_LINK_MODE=copy"
 
@@ -76,6 +78,7 @@ echo $ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $args[0] -Destin
 echo $ErrorActionPreference='Stop'; (Get-Content -LiteralPath $args[0]) -replace '#import site','import site' ^| Set-Content -LiteralPath $args[0] > "%TMPTXT%"
 echo $ErrorActionPreference='Stop'; (Get-ChildItem -LiteralPath $args[0] -Recurse -Filter 'uv.exe' ^| Select-Object -First 1).FullName > "%TMPFIND%"
 echo $ErrorActionPreference='Stop'; ^& $args[0] -c "import platform;print(platform.python_version())" > "%TMPVER%"
+echo $ErrorActionPreference='Stop'; $p=Start-Process -FilePath $args[0] -ArgumentList $args[1..($args.Length-1)] -PassThru -WindowStyle Hidden; $p.Id > "%TMPPID%"
 
 REM ============================================================================
 REM == Step 1: Ensure Python (embeddable)
@@ -159,7 +162,7 @@ set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
 set "UI_PORT=8001"
-set "RELOAD=true"
+set "RELOAD=false"
 set "OPTIONAL_DEPENDENCIES=false"
 
 if exist "%DOTENV%" (
@@ -300,24 +303,38 @@ if not exist "%python_exe%" (
 
 echo [RUN] Launching backend via uvicorn (!UVICORN_MODULE!)
 call :kill_port !FASTAPI_PORT!
-start "" /b "%uv_exe%" run --no-sync --python "%python_exe%" python -m uvicorn %UVICORN_MODULE% --host !FASTAPI_HOST! --port !FASTAPI_PORT! !RELOAD_FLAG! --log-level info
+set "backend_exe=%python_exe%"
+if exist "%venv_python_exe%" (
+  set "backend_exe=%venv_python_exe%"
+) else (
+  echo [WARN] Virtual environment Python not found at "%venv_python_exe%". Falling back to embeddable Python.
+)
+set "backend_args=-m uvicorn %UVICORN_MODULE% --host !FASTAPI_HOST! --port !FASTAPI_PORT! !RELOAD_FLAG! --log-level info"
+for /f "usebackq delims=" %%P in (`powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPPID%" "!backend_exe!" !backend_args!`) do set "backend_pid=%%P"
+if not defined backend_pid (
+  echo [FATAL] Could not start backend process.
+  goto error
+)
+echo [INFO] Backend process started with PID !backend_pid!.
 
 REM ============================================================================
 REM Wait for backend
 REM ============================================================================
 echo [WAIT] Waiting for backend to be ready on port !FASTAPI_PORT!...
 for /L %%i in (1,1,20) do (
-  netstat -ano | findstr ":!FASTAPI_PORT!" | findstr "LISTENING" >nul
+  call :port_listening !FASTAPI_PORT!
   if !errorlevel! equ 0 goto :backend_ready_check
   timeout /t 1 /nobreak >nul
 )
-echo [WARN] Timed out waiting for backend. Proceeding to launch frontend...
+echo [FATAL] Timed out waiting for backend to bind port !FASTAPI_PORT!.
+goto error
 :backend_ready_check
+echo [OK] Backend is listening on !FASTAPI_HOST!:!FASTAPI_PORT! (PID !backend_pid!).
 
 echo [RUN] Launching frontend
 pushd "%FRONTEND_DIR%" >nul
 call :kill_port !UI_PORT!
-start "" /b "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT! --strictPort
+start "" /b "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT!
 popd >nul
 
 start "" "%UI_URL%"
@@ -345,7 +362,7 @@ REM Cleanup temp helpers
 REM ============================================================================
 :cleanup
 if exist "%uv_lock_file%" del /q "%uv_lock_file%" >nul 2>&1
-del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" >nul 2>&1
+del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" "%TMPPID%" >nul 2>&1
 endlocal & exit /b 0
 
 REM ============================================================================
@@ -355,7 +372,7 @@ REM ============================================================================
 echo.
 echo !!! An error occurred during execution. !!!
 pause
-del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" >nul 2>&1
+del /q "%TMPDL%" "%TMPEXP%" "%TMPTXT%" "%TMPFIND%" "%TMPVER%" "%TMPPID%" >nul 2>&1
 endlocal & exit /b 1
 
 :kill_port
@@ -365,3 +382,11 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R ":!target_port!"') do (
   taskkill /PID %%P /F >nul 2>&1
 )
 goto :eof
+
+:port_listening
+set "check_port=%~1"
+if not defined check_port exit /b 1
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$c=Get-NetTCPConnection -LocalPort %check_port% -State Listen -ErrorAction SilentlyContinue; if($c){exit 0}else{exit 1}" >nul 2>&1
+if errorlevel 1 exit /b 1
+exit /b 0

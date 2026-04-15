@@ -1,52 +1,54 @@
-## TypeScript Guidelines (ADSMOD Webapp)
+# TypeScript Guidelines (AEGIS Frontend)
 
-Project stack baseline:
-- React 18 + TypeScript 5
-- Vite 6 build/runtime configuration
-- Strict compiler settings from `ADSMOD/client/tsconfig.json`
+Last updated: 2026-04-09
+Scope: `AEGIS/client/src`
 
-## 1. Type Safety Rules
+Project baseline:
+- Angular 19 (standalone APIs)
+- TypeScript 5
+- Angular CLI build pipeline
+- Strict TypeScript configuration
+
+## 1. Type Safety
 
 - Keep `strict` mode enabled.
-- Prefer `unknown` over `any` for external/untrusted values.
-- Narrow values explicitly before use (type guards, `typeof`, `in`, discriminated unions).
-- Type all exported functions, component props, and service layer responses.
-- Use `type`/`interface` definitions in `src/types.ts` for shared API contracts.
+- Avoid `any`; use `unknown` for untrusted data and narrow before use.
+- Type exported component inputs/outputs, service responses, and helper interfaces.
+- Keep shared contracts in `src/app/core/types.ts`.
 
-## 2. React and State Management
+## 2. Component and Page Boundaries
 
-- Keep components presentational when possible; move API and transformation logic to `src/services/`.
-- Use `useCallback`/`useMemo` only where there is clear rerender or dependency benefit.
-- Keep page-level orchestration in `src/pages/` and shared UI in `src/components/`.
-- Avoid implicit `any` in event handlers and callback props.
+- Keep page-level orchestration in `src/app/pages`.
+- Keep reusable UI blocks in `src/app/components`.
+- Keep API/network and persistence logic in `src/app/core`.
+- Keep components focused on rendering and interaction.
 
-## 3. API and Networking
+## 3. API Usage
 
-- Route all HTTP calls through service modules in `src/services/`.
-- Use the shared HTTP helpers (`fetchWithTimeout`, error extraction) to keep behavior consistent.
-- Treat backend responses as untrusted: validate required fields before rendering.
-- Keep frontend URLs relative to `API_BASE_URL` (`/api` proxy path).
+- Route HTTP calls through shared API modules.
+- Assume backend responses are untrusted and validate required fields before render.
+- Handle fallback states explicitly.
+- Use `/api` base semantics expected by backend mounting/proxying.
 
-## 4. Error Handling and UX
+## 4. State and UX
 
-- Never swallow errors silently; return structured `{ data, error }` style results from services.
-- Show actionable, user-facing status messages for async operations (start/progress/success/failure).
-- Keep job polling logic centralized in service helpers rather than scattered across components.
+- Keep async state explicit (`loading`, `success`, `error`).
+- Show actionable errors for failed requests.
+- Prevent duplicate request spam with disabled/loading states.
 
-## 5. Security
+## 5. Styling and UI Consistency
 
-- Do not trust client inputs; backend remains source of truth.
-- Avoid injecting unsanitized HTML.
-- Validate and encode user-provided strings before rendering in markdown/table contexts.
+- Follow `assets/docs/UI_STANDARDS.md`.
+- Use design tokens from `src/styles.css` instead of one-off literals.
+- Keep accessibility behavior explicit (`:focus-visible`, semantic elements, labels).
 
-## 6. Tooling and Quality Gates
+## 6. Build and Quality Gates
 
-- Keep `npm run build` green (`tsc && vite build`).
-- Keep lint script green when lint config is present (`npm run lint`).
-- Prefer small, focused modules and clear naming over abstractions.
+- Keep `npm run build` green (`ng build`).
+- Keep lint checks green when lint rules are present.
+- Prefer small, clear modules over abstraction-heavy patterns.
 
-## 7. Testing Guidance
+## 7. Testing Impact
 
-- Frontend end-to-end behavior is primarily validated through Python Playwright tests in `tests/e2e`.
-- When adding frontend behavior, update/add E2E coverage for user-visible flows.
-- Keep unit-style logic isolated in service/helper functions so it is easy to test.
+- Frontend behavior is validated primarily via Playwright E2E in `tests/e2e`.
+- Update E2E coverage when user-visible behavior changes.

@@ -6,7 +6,7 @@ import time
 
 from AEGIS.server.configurations import server_settings
 from AEGIS.server.repositories.database.initializer import initialize_database
-from AEGIS.server.common.utils.logger import logger
+from AEGIS.server.utils.logger import logger
 
 
 ###############################################################################

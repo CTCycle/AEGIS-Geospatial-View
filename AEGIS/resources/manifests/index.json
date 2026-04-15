@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "providers_dir": "providers",
+  "basemaps_dir": "basemaps",
+  "overlays_dir": "overlays"
+}

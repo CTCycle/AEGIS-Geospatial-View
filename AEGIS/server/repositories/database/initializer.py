@@ -1,17 +1,40 @@
 from __future__ import annotations
 
+import os
 import urllib.parse
 
 import sqlalchemy
+from cryptography.fernet import Fernet
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
-from AEGIS.server.configurations import DatabaseSettings, server_settings
+from AEGIS.server.configurations import DatabaseSettings, get_server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
-from AEGIS.server.repositories.schemas import Base
+from AEGIS.server.repositories.schemas import Base, SystemSecretRecord
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
 from AEGIS.server.utils.logger import logger
+
+ACCESS_KEY_ENCRYPTION_SECRET_NAME = "access_key_encryption_key"
+
+
+def seed_access_key_encryption_key(engine) -> None:  # noqa: ANN001
+    session_factory = sessionmaker(bind=engine, future=True)
+    with session_factory() as session:
+        statement = sqlalchemy.select(SystemSecretRecord).where(
+            SystemSecretRecord.name == ACCESS_KEY_ENCRYPTION_SECRET_NAME
+        )
+        existing = session.execute(statement).scalars().first()
+        if existing is not None:
+            return
+        seeded = SystemSecretRecord(
+            name=ACCESS_KEY_ENCRYPTION_SECRET_NAME,
+            value=Fernet.generate_key().decode("utf-8"),
+        )
+        session.add(seeded)
+        session.commit()
+    logger.info("Seeded database-backed access key encryption secret.")
 
 
 ###############################################################################
@@ -61,7 +84,18 @@ def clone_settings_with_database(
 # -----------------------------------------------------------------------------
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
     repository = SQLiteRepository(settings)
+    Base.metadata.create_all(repository.engine)
+    seed_access_key_encryption_key(repository.engine)
     logger.info("Initialized SQLite database at %s", repository.db_path)
+
+
+# -----------------------------------------------------------------------------
+def should_initialize_sqlite_database(settings: DatabaseSettings) -> bool:
+    repository = SQLiteRepository(settings)
+    db_path = repository.db_path
+    if not db_path:
+        return False
+    return not os.path.exists(db_path)
 
 
 # -----------------------------------------------------------------------------
@@ -86,42 +120,35 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
     if not settings.database_name:
         raise ValueError("Database name is required for PostgreSQL initialization.")
 
-    target_database = settings.database_name
-    connect_args = build_postgres_connect_args(settings)
-
-    admin_url = build_postgres_url(settings, "postgres")
-    admin_engine = sqlalchemy.create_engine(
-        admin_url,
-        echo=False,
-        future=True,
-        connect_args=connect_args,
-        isolation_level="AUTOCOMMIT",
-        pool_pre_ping=True,
-    )
-
-    with admin_engine.connect() as conn:
-        exists = conn.execute(
-            build_postgres_database_exists_statement(),
-            {"name": target_database},
-        ).scalar()
-        if exists:
-            logger.info("PostgreSQL database %s already exists", target_database)
-        else:
-            conn.execute(build_postgres_create_database_statement(target_database))
-            logger.info("Created PostgreSQL database %s", target_database)
-
-    normalized_settings = clone_settings_with_database(settings, target_database)
-    repository = PostgresRepository(normalized_settings)
+    repository = PostgresRepository(settings)
     Base.metadata.create_all(repository.engine)
-    logger.info("Ensured PostgreSQL tables exist in %s", target_database)
+    seed_access_key_encryption_key(repository.engine)
+    logger.info("Ensured PostgreSQL tables exist in %s", settings.database_name)
+    return str(settings.database_name)
 
-    return target_database
+
+def validate_postgres_schema(settings: DatabaseSettings) -> None:
+    repository = PostgresRepository(settings)
+    existing = set(sqlalchemy.inspect(repository.engine).get_table_names())
+    required = set(Base.metadata.tables.keys())
+    missing = sorted(required - existing)
+    if missing:
+        raise ValueError(
+            "PostgreSQL schema is missing required tables. "
+            f"Run the external initialization script first. Missing: {', '.join(missing)}"
+        )
 
 # -----------------------------------------------------------------------------
 def run_database_initialization() -> None:
-    settings = server_settings.database
+    settings = get_server_settings().database
     if settings.embedded_database:
-        initialize_sqlite_database(settings)
+        repository = SQLiteRepository(settings)
+        Base.metadata.create_all(repository.engine)
+        seed_access_key_encryption_key(repository.engine)
+        if should_initialize_sqlite_database(settings):
+            logger.info("Initialized SQLite database at %s", repository.db_path)
+        else:
+            logger.info("SQLite database already exists; schema and secrets ensured.")
         return
 
     engine_name = normalize_postgres_engine(settings.engine).lower()

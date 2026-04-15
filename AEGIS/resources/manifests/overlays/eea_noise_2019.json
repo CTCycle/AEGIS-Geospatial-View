@@ -1,0 +1,71 @@
+{
+  "id": "eea_noise_2019",
+  "name": "EEA Noise Exposure 2019",
+  "provider": "eea",
+  "type": "wms",
+  "description": "European Environment Agency 2019 environmental noise overlay for EU/EEA areas.",
+  "capabilities": [
+    "noise",
+    "wms"
+  ],
+  "coverage": "eu-eea",
+  "metadata": {
+    "label": "EEA Noise Exposure 2019",
+    "default_opacity": 0.55,
+    "requires_key": false,
+    "url": "https://noise.discomap.eea.europa.eu/arcgis/services/noiseStoryMap/noise_exposure_2019/MapServer/WMSServer",
+    "layers": "0",
+    "wms_version": "1.1.1",
+    "wms_exceptions": "application/vnd.ogc.se_inimage",
+    "bounds": [
+      -35.0,
+      24.0,
+      45.0,
+      72.0
+    ],
+    "attribution": "\u00a9 European Environment Agency (CC BY 4.0 where applicable)",
+    "keywords": [
+      "noise",
+      "wms",
+      "eea",
+      "eea noise exposure 2019"
+    ],
+    "intent_tags": [
+      "noise",
+      "wms"
+    ],
+    "task_tags": [
+      "noise",
+      "wms"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "eu-eea",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "7118230a6eb24577193ea1130f6a6cb1a0efd8c8ba257a65afa9d42f8cabc271",
+    "human_summary": "Thematic environmental noise map focused on European coverage.",
+    "primary_use_cases": [
+      "urban noise exposure context",
+      "transport noise screening",
+      "policy-oriented environmental review"
+    ],
+    "search_examples": [
+      "show noise exposure in Milan",
+      "map transport noise around Paris"
+    ],
+    "disambiguation_notes": [
+      "Use for Europe-focused noise questions; coverage may not apply outside EU/EEA datasets."
+    ],
+    "location_dependency": "Strongly location-dependent and region-limited to European datasets.",
+    "integration_requirements": [
+      "No API key required"
+    ]
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

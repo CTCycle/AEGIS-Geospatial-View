@@ -1,0 +1,189 @@
+<div class="settings-page">
+  <header class="settings-page__header">
+    <div class="settings-page__heading">
+      <h1>Model Settings</h1>
+      <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
+    </div>
+    <div class="settings-page__header-actions">
+      <button class="settings-icon-button" type="button" aria-label="Open Ollama settings" title="Ollama settings" (click)="ollamaModalStatusText = ''; isOllamaModalOpen = true">
+        <span class="settings-icon-button__glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
+            <path d="M5 4h14a1 1 0 0 1 1 1v11a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V5a1 1 0 0 1 1-1zm1 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6H6zm4 2h4a1 1 0 1 1 0 2h-4a1 1 0 1 1 0-2z" fill="currentColor" />
+          </svg>
+        </span>
+      </button>
+
+      <button class="settings-icon-button" type="button" aria-label="Manage API keys" title="API key settings" (click)="keysModalStatusText = ''; isKeysModalOpen = true">
+        <span class="settings-icon-button__glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
+            <path d="M14 3a7 7 0 1 0 5.5 11.3L23 17.8V21h-3v-2h-2v-2h-2.2A7 7 0 0 0 14 3zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" fill="currentColor" />
+          </svg>
+        </span>
+      </button>
+
+      <button type="button" class="settings-page__back" (click)="navigateBack()" aria-label="Back to chat" title="Back to chat">
+        <span class="settings-page__back-icon" aria-hidden="true">←</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="settings-page__content">
+    <div class="settings-page__layout">
+      <section class="settings-page__left-column">
+        <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
+          <div class="settings-page__controls-left">
+            <div class="provider-filter-toggle provider-toggle" role="group" aria-label="Model provider filter">
+              <button type="button" [class.active]="providerFilter === 'all'" (click)="setProviderFilter('all')">All</button>
+              <button type="button" [class.active]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
+              <button type="button" [class.active]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
+              <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
+            </div>
+
+            @if (providerFilter === 'ollama') {
+              <label class="settings-page__local-filter">
+                <input type="checkbox" [checked]="showLocalOnly" (change)="onLocalOnlyChange($event)" />
+                <span>Select all available</span>
+              </label>
+            }
+          </div>
+
+          <div class="settings-page__controls-right">
+            <button type="button" class="settings-page__refresh" aria-label="Refresh from Ollama API" title="Refresh from Ollama API" (click)="refreshOllamaLibrary()">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+                <path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8z" fill="currentColor" />
+              </svg>
+            </button>
+            <input class="model-search-bar" placeholder="Search models" [ngModel]="searchText" (ngModelChange)="setSearchText($event)" />
+          </div>
+        </section>
+
+        <div #modelGridScroll class="model-grid-scroll" (scroll)="onModelGridScroll($event)">
+          @if (isLoadingModels) {
+            <section class="settings-empty-state" aria-live="polite">
+              <h2>Loading model catalog</h2>
+              <p>Fetching model assignments and provider metadata.</p>
+            </section>
+          } @else if (!hasDisplayedModels) {
+            <section class="settings-empty-state" aria-live="polite">
+              <h2>No models match this filter</h2>
+              <p>Adjust the provider tabs or search query to show available models.</p>
+            </section>
+          } @else {
+            @for (provider of providerKeys; track provider) {
+              <section class="model-grid-provider">
+                @if (providerKeys.length > 1) {
+                  <header class="model-grid-provider__separator">
+                    <span></span>
+                    <p>{{ provider }}</p>
+                  </header>
+                }
+                <div class="model-grid">
+                  @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
+                    <article class="model-card" [class.model-card--local]="localModelIds.has(model.id)">
+                      <header>
+                        <h3>{{ model.name }}</h3>
+                        @if (model.provider === 'ollama' && !localModelIds.has(model.id)) {
+                          <button type="button" class="model-card__pull" (click)="pullLocalModel(model)" [attr.aria-label]="'Pull ' + model.name" title="Pull model">
+                            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+                              <path d="M12 3.5a1 1 0 0 1 1 1v8l2.7-2.7a1 1 0 1 1 1.4 1.4l-4.4 4.4a1 1 0 0 1-1.4 0l-4.4-4.4a1 1 0 0 1 1.4-1.4L11 12.5v-8a1 1 0 0 1 1-1zm-6 14h12a1 1 0 1 1 0 2H6a1 1 0 1 1 0-2z" fill="currentColor" />
+                            </svg>
+                          </button>
+                        }
+                      </header>
+
+                      <p>{{ model.description }}</p>
+
+                      <app-model-role-actions
+                        [model]="model"
+                        [settings]="settings"
+                        (selectRole)="applyModelSelection($event, model)"
+                      ></app-model-role-actions>
+                    </article>
+                  }
+                </div>
+              </section>
+            }
+          }
+        </div>
+      </section>
+
+      <aside class="settings-page__right-column" aria-label="Model statistics">
+        <div class="settings-page__stats-table-wrap">
+          <table class="settings-page__stats-table">
+            <thead>
+              <tr>
+                <th scope="col">Model</th>
+                <th scope="col">Provider</th>
+                <th scope="col">Local</th>
+                <th scope="col">Assigned</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (selectedModelStats.length === 0) {
+                <tr>
+                  <td colSpan="4">No models selected yet.</td>
+                </tr>
+              }
+              @for (row of selectedModelStats; track row.provider + ':' + row.model) {
+                <tr>
+                  <td>{{ row.model }}</td>
+                  <td>{{ row.provider }}</td>
+                  <td>{{ row.local ? 'Yes' : 'No' }}</td>
+                  <td>{{ row.assignedRoles.join(', ') }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </aside>
+    </div>
+    <footer class="settings-page__status">{{ visibleStatusText }}</footer>
+  </div>
+
+  @if (isKeysModalOpen) {
+    <app-settings-modal-shell title="API keys" ariaLabel="API key management" (requestClose)="closeModal()">
+      <form class="settings-modal__form" (ngSubmit)="saveKeys()">
+        <div class="settings-modal__body">
+          <label>
+            OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
+            <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" name="openai_api_key" placeholder="sk-..." />
+          </label>
+          <label>
+            Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
+            <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" name="google_api_key" placeholder="AIza..." />
+          </label>
+          @if (keysModalStatusText) {
+            <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>
+          }
+        </div>
+        <footer class="settings-modal__footer">
+          <button type="submit" class="primary-button">Save keys</button>
+        </footer>
+      </form>
+    </app-settings-modal-shell>
+  }
+
+  @if (isOllamaModalOpen) {
+    <app-settings-modal-shell title="Ollama settings" ariaLabel="Ollama settings" (requestClose)="closeModal()">
+      <form class="settings-modal__form" (ngSubmit)="saveOllamaSettings()">
+        <div class="settings-modal__body">
+          <label>
+            Ollama server URL
+            <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
+          </label>
+          @if (visibleOllamaModalStatusText) {
+            <p class="settings-modal__status" aria-live="polite">{{ visibleOllamaModalStatusText }}</p>
+          }
+        </div>
+        <footer class="settings-modal__footer settings-modal__footer--spread">
+          <div class="row-actions">
+            <button type="button" (click)="checkOllamaConnection()">Check connection</button>
+            <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
+          </div>
+          <button type="submit" class="primary-button">Save settings</button>
+        </footer>
+      </form>
+    </app-settings-modal-shell>
+  }
+</div>
+

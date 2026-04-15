@@ -1,11 +1,12 @@
 # Project-specific generated/runtime artifacts
 runtimes/**
-runtimes/uv_cache/**
 AEGIS/resources/logs/**
+AEGIS/resources/vectors/**
 AEGIS/client/node_modules/
 AEGIS/client/dist/
 AEGIS/client/dist-ssr/
 AEGIS/client/logs/
+AEGIS/client/.angular/
 AEGIS/client/src-tauri/r/
 AEGIS/client/src-tauri/target/
 release/windows/
@@ -39,6 +40,7 @@ pnpm-debug.log*
 lerna-debug.log*
 package-lock.json
 yarn.lock
+.angular/**
 
 # IDE / OS
 .vscode/
@@ -47,20 +49,15 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-# Agents
-.agent/skills/**
-
 # Misc
+.tmp_logs/
+Cargo.toml
 *.lock
 *.log
 *.db
 *.sqlite*
 *.exe
 
-
 !.gitkeep
 
 
-
-
-AEGIS/settings/.env
