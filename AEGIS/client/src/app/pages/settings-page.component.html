@@ -141,61 +141,49 @@
   </div>
 
   @if (isKeysModalOpen) {
-    <div class="settings-modal-backdrop" role="presentation" (click)="onBackdropClick($event)">
-      <section class="settings-modal" role="dialog" aria-modal="true" aria-label="API key management">
-        <header class="settings-modal__header">
-          <h2>API keys</h2>
-          <button type="button" class="settings-modal__close" (click)="closeModal()">Close</button>
-        </header>
-        <form class="settings-modal__form" (ngSubmit)="saveKeys()">
-          <div class="settings-modal__body">
-            <label>
-              OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
-              <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" name="openai_api_key" placeholder="sk-..." />
-            </label>
-            <label>
-              Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
-              <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" name="google_api_key" placeholder="AIza..." />
-            </label>
-            @if (keysModalStatusText) {
-              <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>
-            }
-          </div>
-          <footer class="settings-modal__footer">
-            <button type="submit" class="primary-button">Save keys</button>
-          </footer>
-        </form>
-      </section>
-    </div>
+    <app-settings-modal-shell title="API keys" ariaLabel="API key management" (requestClose)="closeModal()">
+      <form class="settings-modal__form" (ngSubmit)="saveKeys()">
+        <div class="settings-modal__body">
+          <label>
+            OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
+            <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" name="openai_api_key" placeholder="sk-..." />
+          </label>
+          <label>
+            Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
+            <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" name="google_api_key" placeholder="AIza..." />
+          </label>
+          @if (keysModalStatusText) {
+            <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>
+          }
+        </div>
+        <footer class="settings-modal__footer">
+          <button type="submit" class="primary-button">Save keys</button>
+        </footer>
+      </form>
+    </app-settings-modal-shell>
   }
 
   @if (isOllamaModalOpen) {
-    <div class="settings-modal-backdrop" role="presentation" (click)="onBackdropClick($event)">
-      <section class="settings-modal" role="dialog" aria-modal="true" aria-label="Ollama settings">
-        <header class="settings-modal__header">
-          <h2>Ollama settings</h2>
-          <button type="button" class="settings-modal__close" (click)="closeModal()">Close</button>
-        </header>
-        <form class="settings-modal__form" (ngSubmit)="saveOllamaSettings()">
-          <div class="settings-modal__body">
-            <label>
-              Ollama server URL
-              <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
-            </label>
-            @if (visibleOllamaModalStatusText) {
-              <p class="settings-modal__status" aria-live="polite">{{ visibleOllamaModalStatusText }}</p>
-            }
+    <app-settings-modal-shell title="Ollama settings" ariaLabel="Ollama settings" (requestClose)="closeModal()">
+      <form class="settings-modal__form" (ngSubmit)="saveOllamaSettings()">
+        <div class="settings-modal__body">
+          <label>
+            Ollama server URL
+            <input [ngModel]="ollamaUrlDraft" (ngModelChange)="ollamaUrlDraft = $event" name="ollama_server_url" />
+          </label>
+          @if (visibleOllamaModalStatusText) {
+            <p class="settings-modal__status" aria-live="polite">{{ visibleOllamaModalStatusText }}</p>
+          }
+        </div>
+        <footer class="settings-modal__footer settings-modal__footer--spread">
+          <div class="row-actions">
+            <button type="button" (click)="checkOllamaConnection()">Check connection</button>
+            <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
           </div>
-          <footer class="settings-modal__footer settings-modal__footer--spread">
-            <div class="row-actions">
-              <button type="button" (click)="checkOllamaConnection()">Check connection</button>
-              <button type="button" (click)="refreshOllamaLibrary()">Refresh models</button>
-            </div>
-            <button type="submit" class="primary-button">Save settings</button>
-          </footer>
-        </form>
-      </section>
-    </div>
+          <button type="submit" class="primary-button">Save settings</button>
+        </footer>
+      </form>
+    </app-settings-modal-shell>
   }
 </div>
 

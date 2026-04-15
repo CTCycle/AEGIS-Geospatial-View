@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
+import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
 import {
@@ -24,11 +25,12 @@ import {
   refreshOllamaModels,
   updateChatSettings,
 } from '../core/api';
+import { UserFacingErrorService } from '../core/user-facing-error.service';
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModelRoleActionsComponent],
+  imports: [CommonModule, FormsModule, ModelRoleActionsComponent, SettingsModalShellComponent],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
@@ -72,6 +74,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private readonly router: Router,
     private readonly appStateStore: AppStateStoreService,
+    private readonly userFacingErrorService: UserFacingErrorService,
   ) {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
@@ -152,11 +155,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get visibleStatusText(): string {
-    return this.normalizeDisplayText(this.statusText);
+    return this.userFacingErrorService.normalizeDisplayText(this.statusText);
   }
 
   get visibleOllamaModalStatusText(): string {
-    return this.normalizeDisplayText(
+    return this.userFacingErrorService.normalizeDisplayText(
       this.ollamaModalStatusText,
       `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`,
     );
@@ -197,7 +200,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toUserFacingError(error, `Could not select ${model.name} for ${role}.`);
+      this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} for ${role}.`);
     }
   }
 
@@ -218,7 +221,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.isKeysModalOpen = false;
       this.syncState();
     } catch (error: unknown) {
-      const detail = this.toUserFacingError(error, 'Could not save API keys right now.');
+      const detail = this.userFacingErrorService.toUserFacingError(error, 'Could not save API keys right now.');
       this.statusText = detail;
       this.keysModalStatusText = detail;
     }
@@ -279,7 +282,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.statusText = `Pulled ${model.name}`;
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toUserFacingError(error, `Could not pull ${model.name}.`);
+      this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not pull ${model.name}.`);
     }
   }
 
@@ -293,12 +296,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isOllamaModalOpen = false;
     this.keysModalStatusText = '';
     this.ollamaModalStatusText = '';
-  }
-
-  onBackdropClick(event: MouseEvent): void {
-    if ((event.target as HTMLElement).classList.contains('settings-modal-backdrop')) {
-      this.closeModal();
-    }
   }
 
   onModelGridScroll(event: Event): void {
@@ -329,7 +326,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
-      this.statusText = this.toUserFacingError(error, 'Could not load model settings right now.');
+      this.statusText = this.userFacingErrorService.toUserFacingError(error, 'Could not load model settings right now.');
       this.syncState();
     } finally {
       this.isLoadingModels = false;
@@ -367,7 +364,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getOllamaFailureMessage(error: unknown): string {
-    return this.toUserFacingError(
+    return this.userFacingErrorService.toUserFacingError(
       error,
       `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`,
     );
@@ -379,29 +376,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     const detail = typeof health.detail === 'string' ? health.detail : 'an unknown status';
-    if (this.isLowLevelConnectionError(detail)) {
+    if (this.userFacingErrorService.isLowLevelConnectionError(detail)) {
       return `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`;
     }
     return `Connection check returned ${detail}.`;
-  }
-
-  private normalizeDisplayText(text: string, fallback = 'Could not complete this action right now.'): string {
-    return this.isLowLevelConnectionError(text) ? fallback : text;
-  }
-
-  private toUserFacingError(error: unknown, fallback: string): string {
-    const message = this.toErrorText(error);
-    if (this.isLowLevelConnectionError(message)) {
-      return fallback;
-    }
-    return message;
-  }
-
-  private isLowLevelConnectionError(message: string): boolean {
-    return /winerror\s*10061|connection refused|econnrefused|urlopen error|failed to establish a new connection/i.test(message);
-  }
-
-  private toErrorText(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
   }
 }

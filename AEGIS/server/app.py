@@ -13,7 +13,6 @@ from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
-from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.services.vector.indexer import VectorIndexer
 from AEGIS.server.utils.constants import (
     FASTAPI_DESCRIPTION,

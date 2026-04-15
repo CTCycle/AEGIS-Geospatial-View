@@ -39,6 +39,81 @@ vector_indexer = VectorIndexer()
 agent_orchestrator = AgentOrchestrator(search_orchestrator=search_endpoint.orchestrator)
 
 
+def _build_tool_status_payload(tool_payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(tool_payload, dict):
+        return {"available": False}
+    satellite_imagery = tool_payload.get("satellite_imagery")
+    map_session = tool_payload.get("map_session")
+    overlay_count = 0
+    if isinstance(map_session, dict):
+        overlays = map_session.get("overlays")
+        if isinstance(overlays, list):
+            overlay_count = len(overlays)
+    return {
+        "available": True,
+        "execution": tool_payload.get("execution"),
+        "has_satellite_imagery": isinstance(satellite_imagery, dict),
+        "has_map_session": isinstance(map_session, dict),
+        "overlay_count": overlay_count,
+    }
+
+
+def _stream_event(event: ChatStreamEvent) -> str:
+    return json.dumps(event.model_dump(mode="json")) + "\n"
+
+
+async def _chat_event_stream(payload: ChatTurnRequest):
+    yield _stream_event(ChatStreamEvent(event="status", data={"message": "received"}))
+    try:
+        result = await agent_orchestrator.run_turn(payload)
+        for token in result.assistant_message.split():
+            yield _stream_event(ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "}))
+        if result.tool_payload is not None:
+            yield _stream_event(
+                ChatStreamEvent(
+                    event="tool_status",
+                    data=_build_tool_status_payload(result.tool_payload),
+                )
+            )
+        yield _stream_event(
+            ChatStreamEvent(
+                event="final",
+                data={
+                    "session_id": result.session_id,
+                    "assistant_message": result.assistant_message,
+                    "structured_intent": result.structured_intent,
+                    "extracted_state": result.extracted_state,
+                    "map_session": result.map_session,
+                    "follow_up_required": result.follow_up_required,
+                    "fallback_mode": result.fallback_mode,
+                },
+            )
+        )
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else "Request failed."
+        yield _stream_event(
+            ChatStreamEvent(
+                event="error",
+                data={"message": detail, "status": exc.status_code},
+            )
+        )
+    except ValueError as exc:
+        yield _stream_event(
+            ChatStreamEvent(
+                event="error",
+                data={"message": str(exc), "status": status.HTTP_503_SERVICE_UNAVAILABLE},
+            )
+        )
+    except Exception as exc:
+        logger.exception("Chat stream failed")
+        yield _stream_event(
+            ChatStreamEvent(
+                event="error",
+                data={"message": str(exc) or "Unexpected server error while streaming response.", "status": 500},
+            )
+        )
+
+
 @router.post(CHAT_TURN_ROUTE, response_model=ChatTurnResponse, status_code=status.HTTP_200_OK)
 async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
     try:
@@ -49,79 +124,7 @@ async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
 
 @router.post(CHAT_STREAM_ROUTE, status_code=status.HTTP_200_OK)
 async def chat_stream(payload: ChatTurnRequest):
-    def build_tool_status_payload(tool_payload: dict[str, Any] | None) -> dict[str, Any]:
-        if not isinstance(tool_payload, dict):
-            return {"available": False}
-        satellite_imagery = tool_payload.get("satellite_imagery")
-        map_session = tool_payload.get("map_session")
-        overlay_count = 0
-        if isinstance(map_session, dict):
-            overlays = map_session.get("overlays")
-            if isinstance(overlays, list):
-                overlay_count = len(overlays)
-        return {
-            "available": True,
-            "execution": tool_payload.get("execution"),
-            "has_satellite_imagery": isinstance(satellite_imagery, dict),
-            "has_map_session": isinstance(map_session, dict),
-            "overlay_count": overlay_count,
-        }
-
-    def stream_event(event: ChatStreamEvent) -> str:
-        return json.dumps(event.model_dump(mode="json")) + "\n"
-
-    async def event_stream():
-        yield stream_event(ChatStreamEvent(event="status", data={"message": "received"}))
-        try:
-            result = await agent_orchestrator.run_turn(payload)
-            for token in result.assistant_message.split():
-                yield stream_event(ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "}))
-            if result.tool_payload is not None:
-                yield stream_event(
-                    ChatStreamEvent(
-                        event="tool_status",
-                        data=build_tool_status_payload(result.tool_payload),
-                    )
-                )
-            yield stream_event(
-                ChatStreamEvent(
-                    event="final",
-                    data={
-                        "session_id": result.session_id,
-                        "assistant_message": result.assistant_message,
-                        "structured_intent": result.structured_intent,
-                        "extracted_state": result.extracted_state,
-                        "map_session": result.map_session,
-                        "follow_up_required": result.follow_up_required,
-                        "fallback_mode": result.fallback_mode,
-                    },
-                )
-            )
-        except HTTPException as exc:
-            detail = exc.detail if isinstance(exc.detail, str) else "Request failed."
-            yield stream_event(
-                ChatStreamEvent(
-                    event="error",
-                    data={"message": detail, "status": exc.status_code},
-                )
-            )
-        except ValueError as exc:
-            yield stream_event(
-                ChatStreamEvent(
-                    event="error",
-                    data={"message": str(exc), "status": status.HTTP_503_SERVICE_UNAVAILABLE},
-                )
-            )
-        except Exception as exc:
-            logger.exception("Chat stream failed")
-            yield stream_event(
-                ChatStreamEvent(
-                    event="error",
-                    data={"message": str(exc) or "Unexpected server error while streaming response.", "status": 500},
-                )
-            )
-
-    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
+    return StreamingResponse(_chat_event_stream(payload), media_type="application/x-ndjson")
 
 
 @router.get(CHAT_MODELS_ROUTE, status_code=status.HTTP_200_OK)
