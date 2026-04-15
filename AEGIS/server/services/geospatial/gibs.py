@@ -5,19 +5,20 @@ import math
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable
-from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from AEGIS.server.configurations import server_settings
+from AEGIS.server.configurations import get_server_settings
+from AEGIS.server.domain.gibs import Capabilities, LayerCatalogEntry, LayerMetadata
 from AEGIS.server.utils.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
+    GIBS_LAYER_DATE_FALLBACK_DAYS,
+    GIBS_LAYER_NATIVE_RESOLUTION_M,
     GIBS_LAYERS_TABLE,
     GIBS_MAX_IMAGE_DIMENSION,
     GIBS_MIN_IMAGE_DIMENSION,
@@ -35,7 +36,10 @@ from AEGIS.server.repositories.database import database
 
 type BBox = list[float]
 type LayerStore = dict[str, "LayerMetadata"]
-type ClampFn = Callable[[float, float, float], float]
+
+
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(min(value, upper), lower)
 
 
 ###############################################################################
@@ -58,32 +62,6 @@ class GIBSPayloadIntegrityError(GIBSRequestError):
     """Raised when NASA returns incomplete imagery payloads."""
 
 
-###############################################################################
-@dataclass(frozen=True)
-class LayerMetadata:
-    name: str
-    supported_crs: frozenset[str]
-    formats: frozenset[str]
-    time_extent: str | None
-
-
-###############################################################################
-@dataclass(frozen=True)
-class LayerCatalogEntry:
-    name: str
-    projections: frozenset[str]
-    meters_per_pixel: tuple[float, ...]
-
-
-###############################################################################
-@dataclass(frozen=True)
-class Capabilities:
-    layers: LayerStore
-    supported_formats: frozenset[str]
-    retrieved_at: float
-
-
-###############################################################################
 class CapabilitiesCache:
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
@@ -145,7 +123,7 @@ class GIBSService:
         bbox_precision: int | None = None,
         min_visual_radius_m: float | None = None,
     ) -> None:
-        settings = server_settings.gibs
+        settings = get_server_settings().gibs
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
         ttl_value = (
@@ -170,22 +148,8 @@ class GIBSService:
             else settings.min_visual_radius_m
         )
         self.layer_catalog = self.load_layer_catalog()
-        self.layer_native_resolution_m = {
-            # Daily/NRT layers
-            "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
-            "MODIS_Terra_Aerosol": 10000.0,
-            "MODIS_Terra_Land_Surface_Temp_Day": 1000.0,
-            "MODIS_Terra_Land_Surface_Temp_Night": 1000.0,
-            "MODIS_Terra_NDVI_8Day": 250.0,
-            "MODIS_Terra_L3_Land_Water_Mask": 250.0,
-            "IMERG_Precipitation_Rate": 11000.0,
-            "VIIRS_SNPP_DayNightBand_ENCC": 500.0,
-            "MODIS_Combined_Thermal_Anomalies_Fire": 1000.0,
-            "OMPS_Ozone_Total_Column": 50000.0,
-            # Annual/static layers
-            "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
-            "SRTM_Color_Index": 30.0,
-        }
+        self.layer_native_resolution_m = dict(GIBS_LAYER_NATIVE_RESOLUTION_M)
+        self.layer_date_fallback_days = dict(GIBS_LAYER_DATE_FALLBACK_DAYS)
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
@@ -273,8 +237,8 @@ class GIBSService:
         radius_m: float | None,
         date: str,
         layer: str,
-        width: int = server_settings.gibs.image_width,
-        height: int = server_settings.gibs.image_height,
+        width: int = get_server_settings().gibs.image_width,
+        height: int = get_server_settings().gibs.image_height,
         crs: str = "EPSG:3857",
         format: str = "image/png",
         style: str | None = None,
@@ -324,49 +288,63 @@ class GIBSService:
         supported_imagery_date = self.resolve_supported_imagery_date(
             imagery_date_value, layer_meta
         )
-        imagery_date_token = supported_imagery_date.isoformat()
-        cache_key = self.build_cache_key(
-            layer=layer,
-            imagery_date=imagery_date_token,
-            bbox=bbox_for_request,
-            crs=actual_crs,
-            width=width,
-            height=height,
-            format_value=format_lower,
-            style_value=style_value,
-        )
-        cached = self.response_cache.get(cache_key)
-        if cached:
-            return dict(cached)
-        query = self.build_query(
-            base_url=self.resolve_base_url(actual_crs),
-            bbox=bbox_for_request,
-            crs=actual_crs,
-            width=width,
-            height=height,
-            layer=layer,
-            imagery_date=imagery_date_token,
-            format_value=format_lower,
-            style_value=style_value,
-            wms_version=wms_version,
-        )
         timeout = timeout_s or self.timeout_s
-        image_bytes, mime, final_url = self.execute_request(query, timeout)
-        response = {
-            "image_bytes": image_bytes,
-            "mime": mime,
-            "bbox": bbox_for_request,
-            "crs": actual_crs,
-            "date": imagery_date_token,
-            "layer": layer,
-            "width": width,
-            "height": height,
-            "wms_url": final_url,
-            "attribution": self.nasa_attribution,
-            "meters_per_pixel": meters_per_pixel,
-        }
-        self.response_cache.set(cache_key, dict(response))
-        return response
+        last_error: GIBSRequestError | None = None
+        for imagery_date_value in self.resolve_request_dates(
+            layer=layer,
+            imagery_date=supported_imagery_date,
+        ):
+            imagery_date_token = imagery_date_value.isoformat()
+            cache_key = self.build_cache_key(
+                layer=layer,
+                imagery_date=imagery_date_token,
+                bbox=bbox_for_request,
+                crs=actual_crs,
+                width=width,
+                height=height,
+                format_value=format_lower,
+                style_value=style_value,
+            )
+            cached = self.response_cache.get(cache_key)
+            if cached:
+                return dict(cached)
+            query = self.build_query(
+                base_url=self.resolve_base_url(actual_crs),
+                bbox=bbox_for_request,
+                crs=actual_crs,
+                width=width,
+                height=height,
+                layer=layer,
+                imagery_date=imagery_date_token,
+                format_value=format_lower,
+                style_value=style_value,
+                wms_version=wms_version,
+            )
+            try:
+                image_bytes, mime, final_url = self.execute_request(query, timeout)
+            except GIBSRequestError as exc:
+                last_error = exc
+                if self.should_retry_previous_date(layer=layer, error=exc):
+                    continue
+                raise
+            response = {
+                "image_bytes": image_bytes,
+                "mime": mime,
+                "bbox": bbox_for_request,
+                "crs": actual_crs,
+                "date": imagery_date_token,
+                "layer": layer,
+                "width": width,
+                "height": height,
+                "wms_url": final_url,
+                "attribution": self.nasa_attribution,
+                "meters_per_pixel": meters_per_pixel,
+            }
+            self.response_cache.set(cache_key, dict(response))
+            return response
+        if last_error is not None:
+            raise last_error
+        raise GIBSRequestError("GIBS GetMap failed without a usable fallback date.")
 
     # -------------------------------------------------------------------------
     def normalize_bbox(
@@ -725,6 +703,22 @@ class GIBSService:
         return imagery_date
 
     # -------------------------------------------------------------------------
+    def resolve_request_dates(self, *, layer: str, imagery_date: date) -> list[date]:
+        fallback_days = self.layer_date_fallback_days.get(layer, 0)
+        return [imagery_date - timedelta(days=offset) for offset in range(fallback_days + 1)]
+
+    # -------------------------------------------------------------------------
+    def should_retry_previous_date(self, *, layer: str, error: GIBSRequestError) -> bool:
+        if self.layer_date_fallback_days.get(layer, 0) <= 0:
+            return False
+        message = str(error).lower()
+        return (
+            "gibs getmap returned non image payload" in message
+            or "shapefile cannot be found" in message
+            or "failed to draw layer named" in message
+        )
+
+    # -------------------------------------------------------------------------
     def ensure_layer_temporal_support(
         self, imagery_date: date, metadata: LayerMetadata
     ) -> None:
@@ -894,7 +888,6 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def lonlat_to_mercator(self, lon: float, lat: float) -> tuple[float, float]:
-        clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lon_clamped = clamp(lon, MIN_LONGITUDE, MAX_LONGITUDE)
         lat_clamped = clamp(lat, MIN_MERCATOR_LAT, MAX_MERCATOR_LAT)
         x = (lon_clamped * ORIGIN_SHIFT) / 180.0
@@ -904,7 +897,6 @@ class GIBSService:
 
     # -------------------------------------------------------------------------
     def compute_geographic_bbox(self, lon: float, lat: float, radius_m: float) -> BBox:
-        clamp: ClampFn = lambda value, lower, upper: max(min(value, upper), lower)
         lat_clamped = clamp(lat, MIN_GEO_LAT, MAX_GEO_LAT)
         lat_rad = math.radians(lat_clamped)
         cos_lat = math.cos(lat_rad)

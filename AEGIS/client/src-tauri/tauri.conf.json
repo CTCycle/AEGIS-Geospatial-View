@@ -33,15 +33,14 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "r/pyproject.toml": "pyproject.toml",
-      "r/uv.lock": "uv.lock",
-      "r/server": "AEGIS/server",
-      "r/scripts": "AEGIS/scripts",
-      "r/settings": "AEGIS/settings",
-      "r/client/dist": "AEGIS/client/dist",
-      "r/resources/database.db": "AEGIS/resources/database.db",
-      "r/runtimes/python": "runtimes/python",
-      "r/runtimes/uv": "runtimes/uv"
+      "../../../pyproject.toml": "r/pyproject.toml",
+      "../../../runtimes/uv.lock": "r/uv.lock",
+      "../../server": "r/server",
+      "../../scripts": "r/scripts",
+      "../../settings": "r/settings",
+      "../../resources/database.db": "r/resources/database.db",
+      "../../../runtimes/python": "r/runtimes/python",
+      "../../../runtimes/uv": "r/runtimes/uv"
     }
   }
 }

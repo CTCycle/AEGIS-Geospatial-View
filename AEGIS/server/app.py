@@ -3,20 +3,39 @@ from __future__ import annotations
 import os
 import warnings
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from AEGIS.server.routes.browser import router as browser_router
-from AEGIS.server.routes.search import router as search_router
+from AEGIS.server.api.access_keys import router as access_keys_router
+from AEGIS.server.api.chat import router as chat_router
+from AEGIS.server.api.search import router as search_router
+from AEGIS.server.configurations import get_server_settings
+from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
+from AEGIS.server.services.vector.indexer import VectorIndexer
 from AEGIS.server.utils.constants import (
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
     FASTAPI_VERSION,
 )
-from AEGIS.server.utils.variables import env_variables  # noqa: F401
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+
+def build_cors_origins() -> list[str]:
+    ui_host = os.getenv("UI_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    ui_port = os.getenv("UI_PORT", "4980").strip() or "4980"
+    host_variants = {ui_host}
+    if ui_host == "127.0.0.1":
+        host_variants.add("localhost")
+    elif ui_host == "localhost":
+        host_variants.add("127.0.0.1")
+    origins: list[str] = []
+    for host in host_variants:
+        origins.append(f"http://{host}:{ui_port}")
+        origins.append(f"https://{host}:{ui_port}")
+    return origins
 
 
 def tauri_mode_enabled() -> bool:
@@ -40,7 +59,30 @@ app = FastAPI(
     description=FASTAPI_DESCRIPTION,
 )
 
-routers = [search_router, browser_router]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=build_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+def initialize_embedded_database_on_first_startup() -> None:
+    settings = get_server_settings().database
+    if not settings.embedded_database:
+        return
+    initialize_sqlite_database(settings)
+
+
+@app.on_event("startup")
+def bootstrap_vector_index_on_first_startup() -> None:
+    if not get_server_settings().vectors.auto_sync_on_start:
+        return
+    VectorIndexer().bootstrap_if_missing()
+
+routers = [search_router, chat_router, access_keys_router]
 
 for router in routers:
     app.include_router(router)

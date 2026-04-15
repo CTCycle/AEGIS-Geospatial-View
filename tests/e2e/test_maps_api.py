@@ -23,6 +23,9 @@ def build_coordinate_payload(**overrides: object) -> dict[str, object]:
 def post_search(api_context: APIRequestContext, payload: dict[str, object]):
     return api_context.post("/maps/search", data=payload)
 
+def get_catalog(api_context: APIRequestContext):
+    return api_context.get("/maps/catalog")
+
 
 def assert_error_contains(response, expected: str) -> None:
     body = response.json()
@@ -61,21 +64,6 @@ class TestMapSearchSuccess:
         assert isinstance(imagery.get("map_html"), str)
         assert imagery.get("map_html"), "Expected map HTML to be populated."
 
-    def test_search_with_openaq_overlay_includes_overlays(
-        self, api_context: APIRequestContext
-    ):
-        payload = build_coordinate_payload(geospatial_layers=["OpenAQ_Air_Quality"])
-        response = post_search(api_context, payload)
-        assert response.ok, f"Expected 200, got {response.status}"
-
-        data = response.json()
-        overlays = (
-            data.get("payload", {}).get("satellite_imagery", {}).get("overlays", [])
-        )
-        assert isinstance(overlays, list)
-        assert overlays, "Expected at least one overlay entry."
-        assert any(entry.get("provider") == "openaq" for entry in overlays)
-
     def test_search_with_gibs_overlay_includes_overlays(
         self, api_context: APIRequestContext
     ):
@@ -97,27 +85,42 @@ class TestMapSearchSuccess:
         assert overlays, "Expected at least one overlay entry."
         assert any(entry.get("provider") == "gibs" for entry in overlays)
 
-    def test_search_records_session(self, api_context: APIRequestContext):
-        before = api_context.get("/browser/tables/SEARCH_SESSIONS/stats").json()
-        before_count = int(before.get("rowCount", 0))
-
-        response = post_search(api_context, build_coordinate_payload())
+    def test_catalog_returns_core_collections(self, api_context: APIRequestContext):
+        response = get_catalog(api_context)
         assert response.ok, f"Expected 200, got {response.status}"
+        data = response.json()
+        assert isinstance(data.get("providers"), list)
+        assert isinstance(data.get("basemaps"), list)
+        assert isinstance(data.get("overlays"), list)
 
-        after = api_context.get("/browser/tables/SEARCH_SESSIONS/stats").json()
-        after_count = int(after.get("rowCount", 0))
-        assert after_count >= before_count + 1
-
+    def test_search_accepts_overlay_ids(self, api_context: APIRequestContext):
+        payload = build_coordinate_payload(
+            overlay_ids=["openaq_air_quality", "pvgis_solar"],
+            basemap_id="osm_default",
+        )
+        response = post_search(api_context, payload)
+        assert response.ok, f"Expected 200, got {response.status}"
+        data = response.json()
+        map_session = data.get("payload", {}).get("map_session", {})
+        overlays = map_session.get("overlays", [])
+        assert isinstance(overlays, list)
+        overlay_ids = {entry.get("id") for entry in overlays if isinstance(entry, dict)}
+        assert "openaq_air_quality" in overlay_ids
+        assert "pvgis_solar" in overlay_ids
 
 class TestMapSearchValidation:
     """Validation error handling for map search."""
 
-    def test_search_missing_datetime_returns_422(self, api_context: APIRequestContext):
+    def test_search_missing_datetime_defaults_to_present(self, api_context: APIRequestContext):
         payload = build_coordinate_payload()
         payload.pop("datetime", None)
         response = post_search(api_context, payload)
-        assert response.status == 422
-        assert_error_contains(response, "Provide datetime")
+        if response.status == 502:
+            pytest.skip("GIBS service unavailable for datetime default check.")
+        assert response.ok, f"Expected 200, got {response.status}"
+        body = response.json()
+        date_value = body.get("payload", {}).get("satellite_imagery", {}).get("date")
+        assert isinstance(date_value, str)
 
     def test_search_requires_coordinates_when_enabled(
         self, api_context: APIRequestContext
@@ -142,3 +145,9 @@ class TestMapSearchValidation:
         assert response.status == 400
         assert_error_contains(response, "Unsupported")
         assert_error_contains(response, "EPSG:9999")
+
+    def test_search_rejects_removed_layer(self, api_context: APIRequestContext):
+        payload = build_coordinate_payload(geospatial_layers=["OpenAQ_Air_Quality"])
+        response = post_search(api_context, payload)
+        assert response.status == 400
+        assert_error_contains(response, "not available")

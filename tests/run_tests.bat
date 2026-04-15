@@ -62,11 +62,12 @@ if exist "%DOTENV%" (
     for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
         set "line=%%L"
         if not "!line!"=="" if "!line:~0,1!" NEQ "#" if "!line:~0,1!" NEQ ";" (
-            for /f "tokens=1* delims==" %%K in ("!line!") do (
+            for /f "tokens=1,* delims==" %%K in ("!line!") do (
                 set "k=%%K"
                 set "v=%%L"
                 if defined v (
-                    if "!v:~0,1!"=="\"" set "v=!v:~1,-1!"
+                    for /f "tokens=* delims= " %%Q in ("!v!") do set "v=%%Q"
+                    set "v=!v:"=!"
                     if "!v:~0,1!"=="'" set "v=!v:~1,-1!"
                 )
                 set "!k!=!v!"
@@ -123,7 +124,7 @@ echo [STEP 1/4] Checking Playwright browsers...
 "%uv_exe%" run --python "%python_exe%" python -m playwright install chromium >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [INFO] Installing Playwright browsers...
-    "%uv_exe%" run --python "%python_exe%" python -m playwright install
+    "%uv_exe%" run --extra test --python "%python_exe%" python -m playwright install
 )
 echo [OK] Playwright browsers ready.
 
@@ -181,7 +182,7 @@ if not exist "%FRONTEND_DIST%" (
 
 call :kill_port %UI_PORT%
 pushd "%FRONTEND_DIR%" >nul
-start "" /b "%npm_cmd%" run preview -- --host %UI_HOST% --port %UI_PORT% --strictPort
+start "" /b "%npm_cmd%" run preview -- --host %UI_HOST% --port %UI_PORT%
 popd >nul
 
 REM Wait for frontend to be ready
@@ -202,7 +203,7 @@ echo.
 echo ============================================================================
 
 pushd "%root_folder%" >nul
-"%uv_exe%" run --python "%python_exe%" python -m pytest %PYTEST_ARGS%
+"%uv_exe%" run --extra test --python "%python_exe%" python -m pytest %PYTEST_ARGS%
 set "test_result=%ERRORLEVEL%"
 popd >nul
 

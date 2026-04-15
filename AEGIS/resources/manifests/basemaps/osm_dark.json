@@ -1,0 +1,59 @@
+{
+  "id": "osm_dark",
+  "name": "Dark Basemap",
+  "provider": "fallback",
+  "type": "tile",
+  "description": "Dark-themed OpenStreetMap basemap designed for high-contrast thematic overlays.",
+  "capabilities": [
+    "tile"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Dark Basemap",
+    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "attribution": "\u00a9 OpenStreetMap contributors",
+    "requires_key": false,
+    "keywords": [
+      "dark",
+      "night",
+      "contrast"
+    ],
+    "map_type_tags": [
+      "dark"
+    ],
+    "intent_tags": [
+      "night_mode",
+      "traffic_focus"
+    ],
+    "task_tags": [
+      "traffic",
+      "incidents"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static tiles",
+    "constraints": "visual dark mode semantics mapped to OSM fallback tiles",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "782aa1d485b7e990b3df88c848b84169ca6751108e23a07c1efc81feed99c3cc",
+    "human_summary": "Dark visual style that improves readability of bright overlays such as traffic, heat, or event layers.",
+    "primary_use_cases": [
+      "night-friendly visualization",
+      "overlay-focused analysis",
+      "presentation-ready contrast"
+    ],
+    "search_examples": [
+      "show traffic on a dark map in Berlin",
+      "view fire overlay with dark basemap"
+    ],
+    "disambiguation_notes": [
+      "Choose this when the user emphasizes overlay visibility or dark style aesthetics."
+    ],
+    "location_dependency": "Location-specific but globally usable for map rendering.",
+    "integration_requirements": [
+      "No API key required"
+    ]
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

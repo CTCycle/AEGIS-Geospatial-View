@@ -1,0 +1,47 @@
+{
+  "id": "gibs",
+  "name": "NASA GIBS",
+  "provider": "gibs",
+  "type": "provider",
+  "description": "NASA Global Imagery Browse Services for satellite imagery layers.",
+  "capabilities": [
+    "imagery",
+    "wms",
+    "wmts"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "docs_url": "https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs",
+    "commercial_notes": "NASA imagery requires attribution and service-aware usage.",
+    "warning_level": "low",
+    "keywords": [
+      "imagery",
+      "wms",
+      "wmts",
+      "gibs",
+      "nasa gibs"
+    ],
+    "intent_tags": [
+      "imagery",
+      "wms",
+      "wmts"
+    ],
+    "task_tags": [
+      "imagery",
+      "wms",
+      "wmts"
+    ],
+    "map_type_tags": [
+      "auto"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "ddcc5f9fb5eb78592deca4a078bf0cf4d6a7a8c99ec15edcd92f4b96f49946e0"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

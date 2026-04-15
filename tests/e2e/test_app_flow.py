@@ -1,61 +1,63 @@
 """
-E2E tests for AEGIS UI navigation and key user flows.
-Exercises sidebar navigation, form validation, and map rendering.
+E2E tests for AEGIS chat-first UI flow.
 """
 
 from playwright.sync_api import Page, expect
 
 
 class TestAppShell:
-    """Smoke tests for the main UI layout."""
-
-    def test_homepage_loads_with_core_panels(self, page: Page, base_url: str):
+    def test_homepage_loads_chat_and_map_layout(self, page: Page, base_url: str):
         page.goto(base_url)
         expect(page.get_by_text("AEGIS", exact=True)).to_be_visible()
-        expect(page.get_by_role("heading", name="AEGIS Geographics")).to_be_visible()
-        expect(page.get_by_text("Location search")).to_be_visible()
-        expect(page.get_by_text("Map statistics")).to_be_visible()
+        expect(page.get_by_text("Operations Console")).to_be_visible()
+        expect(page.get_by_text("Agent Chat")).to_be_visible()
+        expect(page.locator(".map-canvas")).to_be_visible()
 
 
-class TestNavigation:
-    """Navigation tests for sidebar page switching."""
-
-    def test_navigate_to_database_browser(self, page: Page, base_url: str):
+class TestChatFlow:
+    def test_chat_composer_visible_and_send_prompt(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("button", name="Database Browser").click()
-        expect(page.get_by_role("heading", name="Database Browser")).to_be_visible()
-        expect(page.get_by_label("Select Table")).to_be_visible()
+        composer = page.get_by_label("Chat message")
+        expect(composer).to_be_visible()
+        composer.fill("show map at 41.9028, 12.4964")
+        page.get_by_role("button", name="Send").click()
+        expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
+        expect(page.get_by_text("Search executed successfully.")).to_be_visible(timeout=45000)
 
-    def test_return_to_maps_page(self, page: Page, base_url: str):
+    def test_settings_page_opens_from_toolbar(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("button", name="Database Browser").click()
-        page.get_by_role("button", name="Geospatial View").click()
-        expect(page.get_by_role("heading", name="AEGIS Geographics")).to_be_visible()
+        page.get_by_role("button", name="Open settings").click()
+        expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
+        expect(page.get_by_text("Model Settings")).to_be_visible()
+        expect(page.get_by_text("Vectorize all available manifests")).to_be_visible()
 
-
-class TestDatabaseBrowserUI:
-    """UI tests for database table browsing."""
-
-    def test_refresh_loads_table_stats(self, page: Page, base_url: str):
+    def test_back_forward_restores_route_and_settings_search(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("button", name="Database Browser").click()
-        expect(page.locator("#table-select")).to_be_enabled()
-        page.get_by_title("Refresh data").click()
-        expect(page.locator(".stats-row")).to_be_visible(timeout=15000)
+        page.get_by_role("button", name="Open settings").click()
+        search = page.get_by_placeholder("Search models")
+        search.fill("gpt")
+        page.go_back()
+        expect(page.get_by_text("Agent Chat")).to_be_visible()
+        page.go_forward()
+        expect(page.get_by_text("Model Settings")).to_be_visible()
+        expect(search).to_have_value("gpt")
 
-
-class TestSearchUI:
-    """UI tests for location search inputs and rendering."""
-
-    def test_empty_address_shows_validation(self, page: Page, base_url: str):
+    def test_refresh_restores_chat_draft(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("button", name="Search").click()
-        expect(page.get_by_text("Enter an address")).to_be_visible()
+        composer = page.get_by_label("Chat message")
+        composer.fill("draft message should persist")
+        page.reload()
+        expect(page.get_by_label("Chat message")).to_have_value("draft message should persist")
 
-    def test_coordinate_search_renders_map(self, page: Page, base_url: str):
+    def test_settings_query_deeplink_restores_search_and_mode(self, page: Page, base_url: str):
+        page.goto(f"{base_url.rstrip('/')}/settings?q=gpt&mode=cloud")
+        expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
+        expect(page.locator(".provider-toggle button.active", has_text="Cloud")).to_be_visible()
+
+    def test_model_selection_persists(self, page: Page, base_url: str):
         page.goto(base_url)
-        page.get_by_role("button", name="Coordinates").click()
-        page.get_by_label("Latitude").fill("41.9028")
-        page.get_by_label("Longitude").fill("12.4964")
-        page.get_by_role("button", name="Search").click()
-        expect(page.locator("iframe.map-iframe")).to_be_visible(timeout=45000)
+        page.get_by_role("button", name="Open settings").click()
+        page.get_by_role("button", name="Cloud").click()
+        first_card_button = page.locator(".model-card__actions button", has_text="Use for chat").first
+        first_card_button.click()
+        expect(page.get_by_text("Selected")).to_be_visible(timeout=15000)

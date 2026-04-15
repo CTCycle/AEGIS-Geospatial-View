@@ -1,0 +1,164 @@
+<div class="geospatial-page">
+  <div
+    class="geospatial-workspace"
+    [class.geospatial-workspace--toolbar-collapsed]="isToolbarCollapsed"
+    [style.--toolbar-width.px]="toolbarWidth"
+  >
+    <aside class="toolbar-panel" aria-label="Chat toolbar">
+      <header class="toolbar-brand" aria-label="Application identity">
+        <div class="toolbar-brand__identity">
+          <span class="toolbar-brand__icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+          <span class="toolbar-brand__logo">AEGIS</span>
+        </div>
+        <button
+          type="button"
+          class="toolbar-brand__new-chat"
+          aria-label="Start new chat"
+          (click)="startNewChat()"
+        >
+          New chat
+        </button>
+      </header>
+
+      <div class="toolbar-panel__content">
+        <section class="agent-chat-panel" aria-label="Agent Chat">
+          <div
+            #transcript
+            class="chat-transcript"
+            aria-live="polite"
+            (scroll)="onTranscriptScroll($event)"
+          >
+            @if (!hasMessages) {
+              <section class="chat-welcome-card" aria-label="Suggested prompts">
+                <p class="chat-welcome-card__eyebrow">Operations Console</p>
+                <p class="chat-welcome-card__prompt"><em>Try a place, coordinates, or overlay goal to begin.</em></p>
+                <p class="chat-welcome-card__examples-label">Examples</p>
+                <ul class="chat-welcome-card__examples">
+                  <li>Show current satellite context for Rome, Italy.</li>
+                  <li>Map 41.9028, 12.4964 with environmental overlays.</li>
+                  <li>Compare air quality and traffic layers around Milan.</li>
+                </ul>
+              </section>
+            }
+            @for (message of renderedMessages; track $index) {
+              <article class="chat-message" [class]="'chat-message chat-message--' + message.role">
+                <header class="chat-message__role">{{ message.role }}</header>
+                <p class="chat-message__content">{{ message.content }}</p>
+              </article>
+            }
+          </div>
+
+          <div class="chat-composer">
+            <textarea
+              aria-label="Chat message"
+              [value]="composerDraft"
+              (input)="onComposerInput($event)"
+              (keydown)="onComposerKeydown($event)"
+              [disabled]="isLoading"
+              placeholder="Ask for a location, map data, or coordinates for a place."
+            ></textarea>
+            <button
+              type="button"
+              class="primary-button"
+              aria-label="Send"
+              (click)="sendMessage()"
+              [disabled]="isLoading || !composerDraft.trim()"
+            >
+              <span class="sr-only">Send message</span>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                <path
+                  d="M21.7 3.3a1 1 0 0 0-1-.2L3.6 9.7a1 1 0 0 0 0 1.9l7.8 2.6 2.6 7.8a1 1 0 0 0 .9.7h.1a1 1 0 0 0 .9-.6l6.8-17.8a1 1 0 0 0-.2-1zM15 18.8l-1.8-5.5 4.6-4.6-5.9 3.6-5.5-1.8L19.2 5 15 18.8z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <div
+      class="toolbar-resize-handle"
+      [class.is-active]="isResizing"
+      [class.is-collapsed]="isToolbarCollapsed"
+      aria-hidden="true"
+      (mousedown)="startResize()"
+    ></div>
+
+    <section class="canvas-panel" aria-label="Map canvas">
+      <header class="canvas-header" aria-label="Workspace header">
+        <div class="canvas-header__actions">
+          <button
+            type="button"
+            class="canvas-header__icon-button"
+            [class.canvas-header__icon-button--active]="isAlertsOpen"
+            aria-label="Alerts"
+            [attr.aria-expanded]="isAlertsOpen"
+            (click)="toggleAlerts()"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+              <path
+                d="M12 3.5a4.8 4.8 0 0 0-4.8 4.8v1.7c0 .8-.2 1.6-.6 2.3L5.1 15h13.8l-1.5-2.7a4.8 4.8 0 0 1-.6-2.3V8.3A4.8 4.8 0 0 0 12 3.5zm0 17a2.4 2.4 0 0 1-2.2-1.5h4.4A2.4 2.4 0 0 1 12 20.5z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="canvas-header__icon-button"
+            aria-label="Open settings"
+            (click)="navigateToSettings()"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+              <path
+                d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5l-.3-2.6h-4l-.3 2.6a8 8 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.3 2.6h4l.3-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5zM12 15.1a3.1 3.1 0 1 1 0-6.2 3.1 3.1 0 0 1 0 6.2z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+        </div>
+      </header>
+      <div class="canvas-panel__body">
+        @if (isAlertsOpen) {
+          <section class="workspace-alerts" role="status" aria-live="polite">
+            <header class="workspace-alerts__header">
+              <h2>Alerts</h2>
+              <p>{{ alertsSummary }}</p>
+            </header>
+            @if (activeAlertItems.length === 0) {
+              <p class="workspace-alerts__empty">No active alerts. Search results and map warnings will appear here.</p>
+            } @else {
+              <ul class="workspace-alerts__list">
+                @for (alert of activeAlertItems; track alert) {
+                  <li>{{ alert }}</li>
+                }
+              </ul>
+            }
+          </section>
+        }
+        <app-map-preview
+          [payload]="payload"
+          [isLoading]="isLoading"
+          [emptyMessage]="'Ask the assistant for location-based map data or coordinates.'"
+          [initialOverlayVisibility]="mapState.overlayVisibility"
+          [initialOverlayOpacity]="mapState.overlayOpacity"
+          (overlayStateChange)="onOverlayStateChange($event)"
+        ></app-map-preview>
+      </div>
+    </section>
+
+    @if (showProgressIndicator) {
+    <div class="chat-progress-indicator" aria-live="polite">
+      @if (isLoading) {
+        <span class="chat-progress-spinner" aria-hidden="true"></span>
+      }
+      <span>{{ progressPercent }}%</span>
+    </div>
+    }
+  </div>
+</div>
+

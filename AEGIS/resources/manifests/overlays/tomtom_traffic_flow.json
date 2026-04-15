@@ -1,0 +1,62 @@
+{
+  "id": "tomtom_traffic_flow",
+  "name": "TomTom Traffic Flow",
+  "provider": "tomtom",
+  "type": "tile",
+  "description": "TomTom traffic flow overlay showing live congestion intensity on road networks.",
+  "capabilities": [
+    "tile",
+    "traffic"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "TomTom Traffic Flow",
+    "default_opacity": 0.7,
+    "requires_key": true,
+    "url_template": "https://api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.png?key={api_key}",
+    "attribution": "\u00a9 TomTom",
+    "keywords": [
+      "tile",
+      "traffic",
+      "tomtom",
+      "tomtom traffic flow"
+    ],
+    "intent_tags": [
+      "tile",
+      "traffic"
+    ],
+    "task_tags": [
+      "tile",
+      "traffic"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "dynamic",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "e345f92cef1f6cfc55c74a6b178799313690670855782b6e513edfc0c097bc01",
+    "human_summary": "Dynamic traffic layer for near-real-time road congestion and flow conditions.",
+    "primary_use_cases": [
+      "traffic congestion monitoring",
+      "mobility planning",
+      "road-network status checks"
+    ],
+    "search_examples": [
+      "show TomTom traffic in Rome",
+      "display congestion in central Milan"
+    ],
+    "disambiguation_notes": [
+      "Choose this for traffic flow requests requiring TomTom data; free alternatives may exist with less detail."
+    ],
+    "location_dependency": "Location-specific and dynamic in time.",
+    "integration_requirements": [
+      "Requires TomTom API key"
+    ]
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+}

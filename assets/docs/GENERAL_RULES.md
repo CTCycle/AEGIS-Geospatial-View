@@ -1,41 +1,55 @@
-## WEB SEARCH
-Use web search to verify facts and stay current on tools, frameworks, and industry standards when it improves accuracy.
+# AEGIS Documentation General Rules
 
-## REQUIRED DOCUMENTATION REVIEW
-Before any task, review the relevant files in `assets/docs`:
+Last updated: 2026-04-08
 
-- `GENERAL_RULES.md`, mandatory for every task
-- `GUIDELINES_PYTHON.md`, when using Python
-- `GUIDELINES_TYPESCRIPT.md`, when using TypeScript
-- `GUIDELINES_TESTS.md`, when writing tests
-- `ARCHITECTURE.md`, system structure and APIs
-- `BACKGROUND_JOBS.md`, background job management
-- `README_WRITING.md`, required README structure and standards
+This file defines mandatory documentation and engineering rules for this repository.
 
-## SKILLS REFERENCE
-When task-specific reusable workflows or capabilities are needed, check skills repository and use the relevant skill guidance.
+## 1. Complete Documentation Inventory
 
-## DOCUMENTATION UPDATES
-If changes materially affect behavior, architecture, or usage, update the relevant `assets/docs` files and notify the user.
+The `assets/docs` directory currently contains exactly these documentation files:
 
-## CROSS-LANGUAGE PRINCIPLES
+- `AGENTIC_SEARCH.md`
+- `ARCHITECTURE.md`
+- `BACKGROUND_JOBS.md`
+- `GENERAL_RULES.md`
+- `GUIDELINES_PYTHON.md`
+- `GUIDELINES_TESTS.md`
+- `GUIDELINES_TYPESCRIPT.md`
+- `PACKAGING_AND_RUNTIME_MODES.md`
+- `STATE_PRESERVATION.md`
+- `UI_STANDARDS.md`
+- `UI_UX_AUDIT_REPORT.md`
+- `USER_MANUAL.md`
 
-### Code quality
-- Prefer consistent style, clear naming, and small single-purpose components.
-- Optimize for readability, testability, and low coupling.
+This list is exhaustive and must be updated whenever files are added, removed, or renamed in `assets/docs`.
 
-### Testing and automation
-- Enforce CI checks: formatting, linting, type checks, tests, and security scans.
+## 2. Source of Truth and Consistency
 
-### Security
-- Apply standard secure coding practices: input validation, correct auth handling, secret protection, minimal attack surface.
+- Keep `assets/docs` aligned with actual code in `AEGIS/`, `tests/`, and runtime scripts.
+- Prefer concrete references (real paths, routes, env keys, versions).
+- If two docs overlap, terminology and behavior must remain consistent.
+- Remove stale or deprecated implementation guidance.
 
-## EXECUTION RULES
-- Use PowerShell by default for terminal commands in this repository.
-- Use `cmd /c` only when invoking `.bat` scripts or CMD-specific syntax.
+## 3. Documentation Update Triggers
 
-## FILE CHANGE NOTICE
-- Any significant change requires updating `assets/docs` and informing the user.
+Update affected docs when changes impact:
+- API routes, payloads, or error behavior.
+- Runtime setup, ports, environment variables, or packaging workflows.
+- UI structure, navigation model, settings workflow, or UX behavior.
+- Test tooling, runners, or prerequisites.
+- Architecture boundaries, persistence model, or external integrations.
 
+## 4. Engineering Baselines
 
+- Keep changes scoped and verifiable.
+- Use reproducible commands.
+- Validate inputs and avoid hardcoded secrets.
+- Preserve secure defaults and minimize accidental surface expansion.
 
+## 5. Completion Checks
+
+Before closing documentation work:
+1. Verify doc references (paths/routes/commands) resolve to real code.
+2. Ensure all docs include `Last updated`.
+3. Ensure the inventory in this file is still complete and accurate.
+4. Ensure root `README.md` stays user-oriented (setup + practical usage first).
