@@ -36,7 +36,9 @@
     "polling_interval": 1.0
   },
   "chat": {
-    "max_history_messages": 12
+    "max_history_messages": 12,
+    "parser_certainty_threshold": 0.75,
+    "parser_max_retries": 2
   },
   "vectors": {
     "auto_sync_on_start": true,

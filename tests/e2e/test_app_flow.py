@@ -9,7 +9,7 @@ class TestAppShell:
     def test_homepage_loads_chat_and_map_layout(self, page: Page, base_url: str):
         page.goto(base_url)
         expect(page.get_by_text("AEGIS", exact=True)).to_be_visible()
-        expect(page.get_by_text("Operations Console")).to_be_visible()
+        expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
         expect(page.get_by_text("Agent Chat")).to_be_visible()
         expect(page.locator(".map-canvas")).to_be_visible()
 

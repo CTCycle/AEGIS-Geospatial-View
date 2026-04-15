@@ -9,8 +9,7 @@ from typing import Any
 
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.chat import ChatTurnRequest, ChatTurnResponse
-from AEGIS.server.domain.extraction.models import ExtractedIntent
-from AEGIS.server.domain.extraction.patching import merge_extracted_intent
+from AEGIS.server.domain.extraction.models import ExtractedIntent, StageAParserIntent, StageBSearchExtraction
 from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.repositories.chat_history import ChatHistoryRepository
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
@@ -181,10 +180,10 @@ class AgentOrchestrator:
         self,
         *,
         user_message: str,
-        extracted_state: ExtractedIntent,
+        stage_b: StageBSearchExtraction,
         retrieval: dict[str, list[dict[str, object]]],
     ) -> list[str]:
-        normalized = f"{user_message} {' '.join(extracted_state.filters)}".lower()
+        normalized = f"{user_message} {' '.join(stage_b.required_overlays)}".lower()
         requested: list[str] = []
         for keyword, overlay_ids in self.OVERLAY_KEYWORD_TO_IDS.items():
             if keyword in normalized:
@@ -285,6 +284,32 @@ class AgentOrchestrator:
                     }
                 )
         return annotated
+
+    def _overlay_candidates_by_provider(self, overlays: list[dict[str, object]], *, per_provider_limit: int = 3) -> list[dict[str, object]]:
+        grouped: dict[str, list[dict[str, object]]] = {}
+        for item in overlays:
+            if not isinstance(item, dict):
+                continue
+            provider = str(item.get("provider") or "unknown").strip().lower()
+            grouped.setdefault(provider, []).append(item)
+        selected: list[dict[str, object]] = []
+        for provider_items in grouped.values():
+            ranked = sorted(provider_items, key=lambda it: float(it.get("score", 0.0) or 0.0), reverse=True)
+            selected.extend(ranked[: max(1, per_provider_limit)])
+        return selected
+
+    def _select_direct_tool_from_stage_a(
+        self,
+        stage_a: StageAParserIntent,
+        available_tools: list[dict[str, str]],
+    ) -> str | None:
+        if stage_a.requires_search:
+            return None
+        available_names = {str(item.get("name") or "").strip() for item in available_tools}
+        for requested in stage_a.required_tools:
+            if requested in available_names:
+                return requested
+        return None
 
     async def run_turn(self, request: ChatTurnRequest) -> ChatTurnResponse:
         started = perf_counter()
@@ -387,42 +412,122 @@ class AgentOrchestrator:
             model=settings.chat_model_name,
         )
 
-        patch = parser_service.extract_patch(
+        available_tools = self.agent_tools.describe_tools() if self.agent_tools is not None else []
+        stage_a = parser_service.parse_stage_a_intent(
             conversation_context=initial_context,
-            latest_state=latest_state,
             user_message=request.message,
+            available_tools=available_tools,
+            certainty_threshold=get_server_settings().chat.parser_certainty_threshold,
+            max_retries=get_server_settings().chat.parser_max_retries,
         )
-        extracted_state = merge_extracted_intent(latest_state, patch)
-        extracted_state = self._normalize_extracted_state_for_turn(
-            extracted_state=extracted_state,
+        retrieval: dict[str, list[dict[str, object]]] = {"basemaps": [], "overlays": [], "providers": []}
+        if stage_a.requires_data or stage_a.requires_search:
+            try:
+                retrieval = self.vector_retriever.retrieve_candidates(
+                    request.message.strip(),
+                    top_k=10,
+                    basemap_k=1,
+                    overlay_k=10,
+                )
+            except TypeError:
+                retrieval = self.vector_retriever.retrieve_candidates(
+                    request.message.strip(),
+                    top_k=10,
+                )
+        annotated_retrieval = self._annotate_retrieval_candidates(retrieval)
+        annotated_retrieval["overlays"] = self._overlay_candidates_by_provider(annotated_retrieval.get("overlays", []))
+        if annotated_retrieval.get("basemaps"):
+            annotated_retrieval["basemaps"] = sorted(
+                annotated_retrieval["basemaps"],
+                key=lambda item: float(item.get("score", 0.0) or 0.0),
+                reverse=True,
+            )[:1]
+        stage_b = parser_service.parse_stage_b_enrichment(
+            conversation_context=initial_context,
             user_message=request.message,
+            retrieval=annotated_retrieval,
+            fallback_datetime=request.datetime or datetime.now(UTC).isoformat(),
         )
-        self._debug_log(
-            "extracted_state",
+        extracted_state = ExtractedIntent.model_validate(
             {
-                "session_id": session.id,
-                "message": request.message,
-                "state": extracted_state.model_dump(mode="json"),
-            },
+                "location": {
+                    "address": stage_b.location.address,
+                    "city": stage_b.location.city,
+                    "country": stage_b.location.country,
+                },
+                "coordinates": {
+                    "latitude": stage_b.coordinates.latitude,
+                    "longitude": stage_b.coordinates.longitude,
+                },
+                "base_map_type": stage_b.base_map,
+                "user_goal": request.message.strip(),
+                "filters": list(stage_b.required_overlays),
+                "certainty": stage_a.certainty,
+            }
         )
-        merged_extracted_info = extracted_state.model_dump_json(indent=2)
         context = build_conversation_context(
             messages=_history,
-            extracted_info=merged_extracted_info,
+            extracted_info=ExtractedIntent.model_validate(extracted_state).model_dump_json(indent=2),
             max_messages=get_server_settings().chat.max_history_messages,
         )
 
-        retrieval_query = request.message.strip()
-        retrieval = self.vector_retriever.retrieve_candidates(retrieval_query, top_k=10)
-        annotated_retrieval = self._annotate_retrieval_candidates(retrieval)
-        available_tools = self.agent_tools.describe_tools() if self.agent_tools is not None else []
-        decision = decision_service.decide(
-            conversation_context=context,
-            user_message=request.message,
-            extracted_state=extracted_state,
-            retrieval=annotated_retrieval,
-            available_tools=available_tools,
-        )
+        if not stage_a.has_location:
+            decision = decision_service._build_missing_location_decision()
+        elif not stage_a.requires_search:
+            direct_tool = self._select_direct_tool_from_stage_a(stage_a, available_tools)
+            if direct_tool:
+                if direct_tool == "location_to_coordinates":
+                    decision = decision_service._build_geocode_decision(
+                        has_text_location=bool(stage_b.location.address or stage_b.location.city or stage_b.location.country),
+                        has_coordinates=bool(stage_b.coordinates.latitude is not None and stage_b.coordinates.longitude is not None),
+                    )
+                else:
+                    decision = decision_service._build_direct_tool_decision(
+                        tool_target=direct_tool,
+                        has_text_location=bool(stage_b.location.address or stage_b.location.city or stage_b.location.country),
+                        has_coordinates=bool(stage_b.coordinates.latitude is not None and stage_b.coordinates.longitude is not None),
+                        summary="Routed from parser required_tools",
+                    )
+            else:
+                decision = decision_service._build_missing_location_decision().model_copy(
+                    update={
+                        "clarification_question": "What should I do with this location request: search the map or run a specific tool?",
+                        "location_status": "valid",
+                    }
+                )
+        else:
+            has_coordinates = (
+                stage_b.coordinates.latitude is not None
+                and stage_b.coordinates.longitude is not None
+            )
+            if stage_a.requires_search and has_coordinates:
+                decision = decision_service.decide(
+                    conversation_context=context,
+                    user_message=request.message,
+                    extracted_state=extracted_state,
+                    retrieval=annotated_retrieval,
+                    available_tools=available_tools,
+                )
+                decision = decision.model_copy(
+                    update={
+                        "execution_mode": "search",
+                        "tool_target": "map_search",
+                        "should_trigger_search": True,
+                        "decision": "search_and_complete",
+                    }
+                )
+            else:
+                decision = decision_service.decide(
+                    conversation_context=context,
+                    user_message=request.message,
+                    extracted_state=extracted_state,
+                    retrieval=annotated_retrieval,
+                    available_tools=available_tools,
+                )
+        if decision.execution_mode == "search" and decision.should_trigger_search and not decision.selected_basemap_id:
+            top_basemap = annotated_retrieval.get("basemaps", [])
+            if top_basemap:
+                decision = decision.model_copy(update={"selected_basemap_id": str(top_basemap[0].get("id") or "") or None})
         if (
             decision.execution_mode == "search"
             and decision.should_trigger_search
@@ -430,7 +535,7 @@ class AgentOrchestrator:
         ):
             inferred_overlay_ids = self._fallback_overlay_ids_from_retrieval(
                 user_message=request.message,
-                extracted_state=extracted_state,
+                stage_b=stage_b,
                 retrieval=annotated_retrieval,
             )
             if inferred_overlay_ids:
@@ -446,6 +551,7 @@ class AgentOrchestrator:
         search_result: dict[str, Any] | None = None
         map_session: dict[str, Any] | None = None
         tool_payload: dict[str, Any] | None = None
+        execution_feedback: dict[str, Any] = {"status": "pending", "errors": [], "ambiguities": []}
         if decision.execution_mode == "search" and decision.should_trigger_search:
             mapped_payload = map_structured_intent_to_location_request(
                 extracted_state=extracted_state.model_dump(mode="json"),
@@ -465,6 +571,7 @@ class AgentOrchestrator:
                 "unmet_filters": list(search_payload.get("unmet_filters") or []),
                 "fallback_mode": search_payload.get("fallback_mode"),
             }
+            execution_feedback = {"status": "success", "errors": [], "ambiguities": []}
         elif decision.execution_mode == "geocode":
             if (
                 extracted_state.coordinates.latitude is not None
@@ -499,6 +606,11 @@ class AgentOrchestrator:
                 "execution": "location_to_coordinates",
                 "result": geocode_result,
                 "fallback_mode": "geocode_failed" if geocode_result is None else None,
+            }
+            execution_feedback = {
+                "status": "success" if geocode_result is not None else "failure",
+                "errors": [] if geocode_result is not None else ["geocode_failed"],
+                "ambiguities": [] if geocode_result is not None else ["location_unresolved"],
             }
             if (
                 isinstance(geocode_result, dict)
@@ -544,6 +656,7 @@ class AgentOrchestrator:
                     "unmet_filters": list(promoted_payload_data.get("unmet_filters") or []),
                     "fallback_mode": promoted_payload_data.get("fallback_mode"),
                 }
+                execution_feedback = {"status": "success", "errors": [], "ambiguities": []}
                 decision = decision.model_copy(
                     update={
                         "decision": "search_and_complete",
@@ -573,6 +686,11 @@ class AgentOrchestrator:
                         "execution": "follow_up",
                         "fallback_mode": "missing_location",
                     }
+                    execution_feedback = {
+                        "status": "failure",
+                        "errors": ["missing_location"],
+                        "ambiguities": ["location_required"],
+                    }
                 else:
                     if tool_target == "get_weather_forecast":
                         direct_result = await self.agent_tools.get_weather_forecast(
@@ -598,17 +716,34 @@ class AgentOrchestrator:
                         "execution": tool_target,
                         "result": direct_result,
                     }
+                    execution_feedback = {"status": "success", "errors": [], "ambiguities": []}
         elif decision.execution_mode == "clarify":
             tool_payload = {"execution": "follow_up", "fallback_mode": "missing_location"}
+            execution_feedback = {
+                "status": "failure",
+                "errors": ["needs_clarification"],
+                "ambiguities": [decision.clarification_question or "missing_information"],
+            }
 
-        assistant_message = chat_service.generate(
-            conversation_context=context,
-            user_message=request.message,
-            extracted_state=extracted_state,
-            decision=decision,
-            retrieval=annotated_retrieval,
-            search_result=search_result,
-        )
+        try:
+            assistant_message = chat_service.generate(
+                conversation_context=context,
+                user_message=request.message,
+                extracted_state=extracted_state,
+                decision=decision,
+                retrieval=annotated_retrieval,
+                search_result=search_result,
+                execution_feedback=execution_feedback,
+            )
+        except TypeError:
+            assistant_message = chat_service.generate(
+                conversation_context=context,
+                user_message=request.message,
+                extracted_state=extracted_state,
+                decision=decision,
+                retrieval=annotated_retrieval,
+                search_result=search_result,
+            )
         self._debug_log(
             "turn_outcome",
             {
@@ -622,7 +757,11 @@ class AgentOrchestrator:
             session_id=session.id,
             role="assistant",
             content=assistant_message,
-            structured_payload=extracted_state.model_dump(mode="json"),
+            structured_payload={
+                "stage_a": stage_a.model_dump(mode="json"),
+                "stage_b": stage_b.model_dump(mode="json"),
+                "extracted_state": extracted_state.model_dump(mode="json"),
+            },
             tool_payload=tool_payload,
             map_session=map_session,
         )
@@ -634,7 +773,11 @@ class AgentOrchestrator:
                 "turn_index": assistant_row.turn_index,
                 "role": assistant_row.role,
                 "content": assistant_row.content,
-                "structured_payload": extracted_state.model_dump(mode="json"),
+                "structured_payload": {
+                    "stage_a": stage_a.model_dump(mode="json"),
+                    "stage_b": stage_b.model_dump(mode="json"),
+                    "extracted_state": extracted_state.model_dump(mode="json"),
+                },
                 "tool_payload": tool_payload,
                 "map_session": map_session,
                 "created_at": assistant_row.created_at.isoformat() if assistant_row.created_at else None,
@@ -655,7 +798,10 @@ class AgentOrchestrator:
             message_id=assistant_row.id,
             user_message=request.message,
             chat_response=assistant_message,
-            extracted_info=extracted_state.model_dump(mode="json"),
+            extracted_info={
+                "stage_a": stage_a.model_dump(mode="json"),
+                "stage_b": stage_b.model_dump(mode="json"),
+            },
             response_time=elapsed,
             has_triggered_search=decision.should_trigger_search,
         )
@@ -669,7 +815,10 @@ class AgentOrchestrator:
         return ChatTurnResponse(
             session_id=session.id,
             assistant_message=assistant_message,
-            structured_intent=extracted_state.model_dump(mode="json"),
+            structured_intent={
+                "stage_a": stage_a.model_dump(mode="json"),
+                "stage_b": stage_b.model_dump(mode="json"),
+            },
             extracted_state=extracted_state.model_dump(mode="json"),
             map_session=map_session,
             tool_payload=tool_payload,

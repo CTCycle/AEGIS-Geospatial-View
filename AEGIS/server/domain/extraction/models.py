@@ -43,3 +43,37 @@ class ExtractedIntentPatch(BaseModel):
     filters: list[str] | None = None
     area_of_interest: str | None = None
     certainty: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+###############################################################################
+class StageAParserIntent(BaseModel):
+    has_location: bool = False
+    location_type: str | None = None
+    has_time_reference: bool = False
+    requires_search: bool = False
+    requires_data: bool = False
+    required_tools: list[str] = Field(default_factory=list)
+    certainty: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+###############################################################################
+class StageBLocation(BaseModel):
+    address: str | None = None
+    city: str | None = None
+    country: str | None = None
+    location_type: str | None = None
+
+
+###############################################################################
+class StageBCoordinates(BaseModel):
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+###############################################################################
+class StageBSearchExtraction(BaseModel):
+    location: StageBLocation = Field(default_factory=StageBLocation)
+    coordinates: StageBCoordinates = Field(default_factory=StageBCoordinates)
+    time_reference: str | None = None
+    base_map: str | None = None
+    required_overlays: list[str] = Field(default_factory=list)

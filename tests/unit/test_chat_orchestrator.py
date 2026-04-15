@@ -4,7 +4,7 @@ import asyncio
 
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.chat import ChatTurnRequest
-from AEGIS.server.domain.extraction.models import ExtractedIntentPatch
+from AEGIS.server.domain.extraction.models import ExtractedIntentPatch, StageAParserIntent, StageBSearchExtraction
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
@@ -127,11 +127,27 @@ def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None
     )
     contexts: list[str] = []
 
-    def _capture_parser(self, conversation_context, latest_state, user_message):  # noqa: ANN001
+    def _capture_stage_a(self, conversation_context, user_message, available_tools, certainty_threshold, max_retries):  # noqa: ANN001
         contexts.append(conversation_context)
-        return ExtractedIntentPatch(location={"city": "Rome", "country": "Italy"})
+        return StageAParserIntent(
+            has_location=True,
+            location_type="city",
+            has_time_reference=False,
+            requires_search=True,
+            requires_data=True,
+            required_tools=[],
+            certainty=0.95,
+        )
 
-    monkeypatch.setattr(ParserService, "extract_patch", _capture_parser)
+    monkeypatch.setattr(ParserService, "parse_stage_a_intent", _capture_stage_a)
+    monkeypatch.setattr(
+        ParserService,
+        "parse_stage_b_enrichment",
+        lambda self, conversation_context, user_message, retrieval, fallback_datetime: StageBSearchExtraction(
+            location={"city": "Rome", "country": "Italy"},
+            time_reference=fallback_datetime,
+        ),
+    )
     monkeypatch.setattr(
         DecisionService,
         "decide",
