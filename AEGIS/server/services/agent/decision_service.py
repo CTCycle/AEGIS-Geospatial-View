@@ -63,6 +63,24 @@ class DecisionService:
         "latitude",
         "longitude",
     }
+    ACTION_VERBS = {
+        "find",
+        "show",
+        "center",
+        "near",
+        "around",
+        "check",
+        "compare",
+        "locate",
+        "map",
+        "inspect",
+    }
+    LOCATION_CUE_PATTERNS = (
+        re.compile(r"\b(?:near|nearby|around|at|in)\s+[a-z0-9][a-z0-9\s,'\-]{2,}", re.IGNORECASE),
+        re.compile(r"\b\d{1,5}\s+[a-z0-9][a-z0-9\s.'\-]{2,}", re.IGNORECASE),
+        re.compile(r"\b(?:street|st|road|rd|avenue|ave|via|boulevard|blvd|lane|ln|square|piazza)\b", re.IGNORECASE),
+        re.compile(r"[+-]?\d{1,2}(?:\.\d+)?\s*[, ]\s*[+-]?\d{1,3}(?:\.\d+)?", re.IGNORECASE),
+    )
 
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
@@ -82,7 +100,20 @@ class DecisionService:
                 extracted_state.base_map_type or "",
             ]
         ).lower()
-        return any(keyword in haystack for keyword in self.GEOSPATIAL_KEYWORDS)
+        if any(keyword in haystack for keyword in self.GEOSPATIAL_KEYWORDS):
+            return True
+        if self._looks_like_location_phrase(user_message):
+            normalized = user_message.lower()
+            return any(verb in normalized for verb in self.ACTION_VERBS)
+        return False
+
+    def _looks_like_location_phrase(self, user_message: str) -> bool:
+        normalized = user_message.strip().lower()
+        if any(pattern.search(normalized) for pattern in self.LOCATION_CUE_PATTERNS):
+            return True
+        if "," in normalized and any(token in normalized for token in ("switzerland", "italy", "france", "usa", "uk")):
+            return True
+        return False
 
     def _unsupported_request_decision(self) -> AgentDecision:
         return AgentDecision(
@@ -122,6 +153,18 @@ class DecisionService:
             requires_geocoding=False,
             clarification_question="Which location should I search on the map? You can provide a city, full address, or coordinates.",
             reasoning_summary="Missing location",
+        )
+
+    def _build_low_confidence_geocode_attempt_decision(self) -> AgentDecision:
+        return AgentDecision(
+            decision="search_and_complete",
+            execution_mode="geocode",
+            tool_target="location_to_coordinates",
+            should_trigger_search=False,
+            location_status="partial",
+            requires_geocoding=True,
+            clarification_question=None,
+            reasoning_summary="Low-confidence parse with likely location intent; attempt geocode once",
         )
 
     def _build_missing_integration_decision(self, integration_name: str) -> AgentDecision:
@@ -257,7 +300,20 @@ class DecisionService:
             return self._ambiguous_request_decision()
         if is_geocode_request:
             return self._build_geocode_decision(has_text_location, has_coordinates)
+        if has_coordinates:
+            return AgentDecision(
+                decision="search_and_complete",
+                execution_mode="search",
+                tool_target="map_search",
+                should_trigger_search=True,
+                location_status="valid",
+                requires_geocoding=False,
+                clarification_question=None,
+                reasoning_summary="Coordinates available for deterministic map search",
+            )
         if not has_coordinates and not has_text_location:
+            if self._looks_like_location_phrase(user_message) and extracted_state.certainty < 0.55:
+                return self._build_low_confidence_geocode_attempt_decision()
             return self._build_missing_location_decision()
         if any(pattern.search(user_message) for pattern in self.DIRECT_WEATHER_PATTERNS):
             return self._build_direct_tool_decision(
@@ -321,6 +377,19 @@ class DecisionService:
             payload = self._default_search_payload(has_coordinates, has_text_location)
         payload.setdefault("execution_mode", "search" if payload.get("should_trigger_search") else "clarify")
         payload.setdefault("tool_target", "map_search" if payload.get("execution_mode") == "search" else None)
+        if has_coordinates and payload.get("execution_mode") == "clarify":
+            payload.update(
+                {
+                    "decision": "search_and_complete",
+                    "execution_mode": "search",
+                    "tool_target": "map_search",
+                    "should_trigger_search": True,
+                    "location_status": "valid",
+                    "requires_geocoding": False,
+                    "clarification_question": None,
+                    "reasoning_summary": "Coordinates provided; force map-search execution",
+                }
+            )
         allowed_basemaps = set(self._select_available_candidate_ids(retrieval, "basemaps"))
         allowed_overlays = set(self._select_available_candidate_ids(retrieval, "overlays"))
         selected_basemap_id = payload.get("selected_basemap_id")

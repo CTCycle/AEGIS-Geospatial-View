@@ -89,6 +89,22 @@
     color: #2954d1;
 }
 
+.toolbar-brand__new-chat {
+    border: 1px solid #aebede;
+    background: #f8fbff;
+    color: #35527a;
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.toolbar-brand__new-chat:hover {
+    border-color: #7fa0d3;
+    background: #eef5ff;
+    color: #244778;
+}
+
 .toolbar-panel__content {
     padding: 0.8rem;
     flex: 1;

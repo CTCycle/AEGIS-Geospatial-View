@@ -10,6 +10,7 @@ const DEFAULT_CHAT_PANEL_RATIO = 0.3;
 
 export interface PersistedChatPanelState {
   sessionId?: number;
+  conversationNonce: number;
   messages: ChatMessage[];
   status: string;
   assistantDraft: string;
@@ -69,6 +70,7 @@ export const defaultAppState = (): PersistedAppState => ({
     payload: undefined,
     chatPanel: {
       sessionId: undefined,
+      conversationNonce: 1,
       messages: [],
       status: 'Idle',
       assistantDraft: '',
@@ -217,6 +219,9 @@ export const loadPersistedAppState = (): PersistedAppState => {
           sessionId: typeof parsed.chatPage.chatPanel.sessionId === 'number'
             ? parsed.chatPage.chatPanel.sessionId
             : undefined,
+          conversationNonce: typeof parsed.chatPage.chatPanel.conversationNonce === 'number'
+            ? parsed.chatPage.chatPanel.conversationNonce
+            : 1,
           messages: messages as PersistedChatPanelState['messages'],
           status: typeof parsed.chatPage.chatPanel.status === 'string'
             ? parsed.chatPage.chatPanel.status

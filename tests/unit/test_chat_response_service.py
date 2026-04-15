@@ -94,3 +94,23 @@ def test_chat_response_service_fallback_for_missing_integration_is_plain_text() 
         search_result=None,
     )
     assert response == "TomTom key needed."
+
+
+def test_chat_response_service_reports_overlay_unmet_filters() -> None:
+    class _FailingFactory:
+        def get_chat_provider(self, provider: str):  # noqa: ANN001
+            raise RuntimeError("chat unavailable")
+
+    service = ChatResponseService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")  # type: ignore[arg-type]
+    response = service.generate(
+        conversation_context="# message",
+        user_message="show pm2.5 overlay",
+        extracted_state=ExtractedIntent(),
+        decision=_decision(selected_overlay_ids=["openmeteo_air_quality_forecast"]),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        search_result={
+            "map_session": {"center": {"latitude": 1, "longitude": 1}, "overlays": []},
+            "payload": {"unmet_filters": ["pm2.5"]},
+        },
+    )
+    assert "Unmet filters" in response

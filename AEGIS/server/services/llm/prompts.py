@@ -59,6 +59,7 @@ Inputs:
 Rules:
 1. Output JSON patch only.
 2. Keep existing valid values unless the user clearly overrides them.
+2b. When the user clearly replaces a previously extracted location/coordinate field, explicitly emit null for the field being cleared.
 3. Resolve references such as "same place", "there", "that city", and "as before" from prior turns.
 4. Never invent place names, coordinates, temporal values, map layers, or unavailable integrations.
 5. If location is unresolved, keep location fields null or unchanged; do not force fake precision.

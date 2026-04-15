@@ -45,13 +45,10 @@ class LocationSearchOrchestrator:
         return None
 
     def _resolve_overlay_ids(self, payload: LocationSearchRequest) -> list[str]:
-        legacy_layers = self.toolkit.normalize_layers(payload.filters)
         explicit_overlays = self.toolkit.normalize_layers(payload.overlay_ids)
-        resolved = list(explicit_overlays)
-        for layer in legacy_layers:
-            if layer not in resolved:
-                resolved.append(layer)
-        return resolved
+        if explicit_overlays:
+            return list(explicit_overlays)
+        return self.catalog_service.suggest_overlay_ids_from_filters(payload.semantic_filters)
 
     async def resolve_coordinates(self, payload: LocationSearchRequest) -> dict[str, Any]:
         response_payload = payload.model_dump()
@@ -103,8 +100,13 @@ class LocationSearchOrchestrator:
         payload: LocationSearchRequest,
         search_payload: dict[str, Any],
         satellite_payload: dict[str, Any],
-    ) -> dict[str, Any]:
-        overlays = self.catalog_service.resolve_overlays(self._resolve_overlay_ids(payload))
+    ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
+        selected_overlay_ids = self._resolve_overlay_ids(payload)
+        selected_overlay_ids, unmet_filters = self.catalog_service.filter_overlay_ids_by_semantics(
+            overlay_ids=selected_overlay_ids,
+            semantic_filters=payload.semantic_filters,
+        )
+        overlays = self.catalog_service.resolve_overlays(selected_overlay_ids)
         if not overlays:
             legacy_overlays = satellite_payload.get("overlays", [])
             if isinstance(legacy_overlays, list):
@@ -157,7 +159,7 @@ class LocationSearchOrchestrator:
             basemap=basemap,
             overlays=enriched_overlays,
         )
-        return {
+        map_session = {
             "center": {"latitude": lat_value, "longitude": lon_value},
             "bounds": satellite_payload.get("bbox"),
             "basemap": basemap,
@@ -165,6 +167,7 @@ class LocationSearchOrchestrator:
             "insights": insights,
             "compliance_warnings": compliance_warnings,
         }
+        return map_session, selected_overlay_ids, payload.semantic_filters, unmet_filters
 
     async def execute(self, payload: LocationSearchRequest) -> dict[str, Any]:
         if payload.datetime is None:
@@ -191,13 +194,18 @@ class LocationSearchOrchestrator:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
         search_payload["satellite_imagery"] = satellite_payload
-        map_session = await self.assemble_map_session(
+        map_session, selected_overlay_ids, applied_filters, unmet_filters = await self.assemble_map_session(
             payload=payload,
             search_payload=search_payload,
             satellite_payload=satellite_payload,
         )
         search_payload["map_session"] = map_session
         search_payload["compliance_warnings"] = map_session.get("compliance_warnings", [])
+        search_payload["selected_overlay_ids"] = selected_overlay_ids
+        search_payload["applied_filters"] = applied_filters
+        search_payload["unmet_filters"] = unmet_filters
+        if applied_filters and not selected_overlay_ids:
+            search_payload["fallback_mode"] = "overlay_unavailable"
 
         if lat_value is not None and lon_value is not None:
             try:

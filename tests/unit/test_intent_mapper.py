@@ -19,7 +19,8 @@ def test_intent_mapper_supports_coordinates_and_filters() -> None:
     assert mapped["latitude"] == 41.9
     assert mapped["longitude"] == 12.5
     assert mapped["overlay_ids"] == ["openaq_air_quality"]
-    assert mapped["filters"] == ["openaq_air_quality"]
+    assert mapped["filters"] == []
+    assert mapped["semantic_filters"] == ["openaq_air_quality"]
 
 
 def test_intent_mapper_uses_bbox_when_present() -> None:

@@ -29,16 +29,19 @@ export const isModelSelectedForRole = (
 
 export const buildModelSelectionPayload = (
   settings: ModelSettingsResponse,
-  role: ModelRole,
+  _role: ModelRole,
   model: ModelCardDescriptor,
 ): ModelSettingsUpdateRequest => {
   const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
-  const roleFields = ROLE_FIELD_MAP[role];
   return {
     ...settings,
     active_provider_mode: nextProviderMode,
-    [roleFields.provider]: model.provider,
-    [roleFields.name]: model.name,
+    parser_model_provider: model.provider,
+    parser_model_name: model.name,
+    chat_model_provider: model.provider,
+    chat_model_name: model.name,
+    agent_model_provider: model.provider,
+    agent_model_name: model.name,
   };
 };
 

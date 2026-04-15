@@ -108,7 +108,6 @@ export interface SearchResponsePayload {
     latitude?: number;
     longitude?: number;
   };
-  [key: string]: unknown;
 }
 
 export interface SearchResponse {
@@ -139,7 +138,14 @@ export interface ChatTurnResponse {
   assistant_message: string;
   extracted_state?: Record<string, JsonValue> | null;
   map_session?: MapSession | null;
-  tool_payload?: Record<string, JsonValue> | null;
+  tool_payload?: {
+    execution?: string;
+    selected_overlay_ids?: string[];
+    applied_filters?: string[];
+    unmet_filters?: string[];
+    fallback_mode?: string | null;
+    result?: Record<string, JsonValue> | null;
+  } | null;
   follow_up_required?: boolean;
   fallback_mode?: string | null;
 }

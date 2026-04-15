@@ -24,6 +24,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   mapState = { overlayVisibility: {}, overlayOpacity: {} } as PersistedChatPageState['mapState'];
 
   sessionId?: number;
+  conversationNonce = 1;
   messages: ChatMessage[] = [];
   status = 'Idle';
   assistantDraft = '';
@@ -53,6 +54,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.mapState = this.chatPageState.mapState;
 
     this.sessionId = this.chatPageState.chatPanel.sessionId;
+    this.conversationNonce = this.chatPageState.chatPanel.conversationNonce;
     this.messages = this.chatPageState.chatPanel.messages;
     this.status = this.chatPageState.chatPanel.status;
     this.assistantDraft = this.chatPageState.chatPanel.assistantDraft;
@@ -117,6 +119,23 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.router.navigateByUrl('/settings');
   }
 
+  startNewChat(): void {
+    this.sessionId = undefined;
+    this.conversationNonce += 1;
+    this.messages = [];
+    this.payload = undefined;
+    this.status = 'Idle';
+    this.assistantDraft = '';
+    this.composerDraft = '';
+    this.transcriptScrollTop = 0;
+    this.mapState = { overlayVisibility: {}, overlayOpacity: {} };
+    this.progressPercent = 0;
+    this.isAlertsOpen = false;
+    this.appStateStore.resetChatPage();
+    this.syncState();
+    queueMicrotask(() => this.scrollTranscriptToBottom());
+  }
+
   toggleAlerts(): void {
     this.isAlertsOpen = !this.isAlertsOpen;
   }
@@ -177,6 +196,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
 
     const message = trimmed;
+    const requestNonce = this.conversationNonce;
     this.composerDraft = '';
     this.isLoading = true;
     this.status = 'Searching map data';
@@ -190,7 +210,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         session_id: this.sessionId,
         message,
       });
-      this.applyTurnResponse(result);
+      this.applyTurnResponse(result, requestNonce);
     } catch (error: unknown) {
       const fallback = String((error as { message?: string })?.message ?? error);
       this.status = 'Failed';
@@ -204,22 +224,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private applyTurnResponse(result: ChatTurnResponse): void {
+  private applyTurnResponse(result: ChatTurnResponse, requestNonce: number): void {
+    if (requestNonce !== this.conversationNonce) {
+      return;
+    }
     if (result.session_id > 0) {
       this.sessionId = result.session_id;
     }
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
-
-    if (result.tool_payload && typeof result.tool_payload === 'object') {
-      const nextPayload: SearchResponsePayload = {
-        ...this.payload,
-        ...(result.tool_payload as SearchResponsePayload),
-      };
-      if (result.map_session) {
-        nextPayload.map_session = result.map_session as MapSession;
-      }
-      this.payload = nextPayload;
-    }
 
     const mapSession = result.map_session;
     if (typeof mapSession === 'object' && mapSession !== null) {
@@ -250,6 +262,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       payload: this.payload,
       chatPanel: {
         sessionId: this.sessionId,
+        conversationNonce: this.conversationNonce,
         messages: this.messages,
         status: this.status,
         assistantDraft: this.assistantDraft,

@@ -86,3 +86,43 @@ def test_decision_service_requests_integration_when_explicit_and_unavailable() -
     assert decision.should_trigger_search is False
     assert decision.clarification_question is not None
     assert "API key" in decision.clarification_question
+
+
+def test_decision_service_treats_place_lookup_as_geospatial() -> None:
+    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    decision = service.decide(
+        conversation_context="# message 1\nfind area near Tour Eiffel\n\n# extracted info\n{}",
+        user_message="I need to find the area nearby the Tour Eiffel",
+        extracted_state=ExtractedIntent(certainty=0.2),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        available_tools=[],
+    )
+    assert decision.execution_mode in {"geocode", "search", "clarify"}
+    assert decision.feasibility.is_supported is True
+    assert decision.decision != "clarify" or decision.clarification_question is not None
+
+
+def test_decision_service_treats_street_address_as_geocodable() -> None:
+    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    decision = service.decide(
+        conversation_context="# message 1\ncheck via tesserete\n\n# extracted info\n{}",
+        user_message="I need to check Via Tesserete 16 in Ticino, Switzerland",
+        extracted_state=ExtractedIntent(certainty=0.1),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        available_tools=[],
+    )
+    assert decision.feasibility.is_supported is True
+    assert decision.execution_mode in {"geocode", "search", "clarify"}
+
+
+def test_decision_service_forces_search_when_coordinates_exist() -> None:
+    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    decision = service.decide(
+        conversation_context="# message 1\nrestaurants near coords\n\n# extracted info\n{}",
+        user_message="Find restaurants near 40.7580, -73.9855",
+        extracted_state=ExtractedIntent(coordinates={"latitude": 40.7580, "longitude": -73.9855}),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        available_tools=[],
+    )
+    assert decision.execution_mode == "search"
+    assert decision.should_trigger_search is True

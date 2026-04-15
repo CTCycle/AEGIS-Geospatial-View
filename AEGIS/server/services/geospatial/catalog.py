@@ -203,6 +203,69 @@ class GeospatialCatalogService:
         return resolved
 
     # -------------------------------------------------------------------------
+    def suggest_overlay_ids_from_filters(self, filters: list[str]) -> list[str]:
+        normalized_filters = [str(item).strip().lower() for item in filters if str(item).strip()]
+        if not normalized_filters:
+            return []
+        catalog = self.list_catalog()
+        selected: list[str] = []
+        for overlay in catalog["overlays"]:
+            overlay_id = str(overlay.get("id") or "")
+            if not overlay_id:
+                continue
+            if overlay.get("requires_key") and not overlay.get("url"):
+                continue
+            haystack = " ".join(
+                [
+                    overlay_id,
+                    str(overlay.get("label") or ""),
+                    str(overlay.get("provider") or ""),
+                    str(overlay.get("type") or ""),
+                ]
+            ).lower()
+            if any(filter_value in haystack for filter_value in normalized_filters):
+                selected.append(overlay_id)
+        return list(dict.fromkeys(selected))
+
+    # -------------------------------------------------------------------------
+    def filter_overlay_ids_by_semantics(
+        self,
+        *,
+        overlay_ids: list[str],
+        semantic_filters: list[str],
+    ) -> tuple[list[str], list[str]]:
+        normalized_filters = [str(item).strip().lower() for item in semantic_filters if str(item).strip()]
+        if not normalized_filters:
+            return list(overlay_ids), []
+        catalog = self.list_catalog()
+        overlay_lookup = {str(item.get("id")): item for item in catalog["overlays"]}
+        applied: list[str] = []
+        unmet: list[str] = []
+        for overlay_id in overlay_ids:
+            overlay = overlay_lookup.get(overlay_id)
+            if overlay is None:
+                continue
+            metadata_text = " ".join(
+                [
+                    str(overlay.get("id") or ""),
+                    str(overlay.get("label") or ""),
+                    str(overlay.get("provider") or ""),
+                    str(overlay.get("type") or ""),
+                ]
+            ).lower()
+            matches = [term for term in normalized_filters if term in metadata_text]
+            if matches:
+                applied.append(overlay_id)
+            elif not normalized_filters:
+                applied.append(overlay_id)
+        if not applied and overlay_ids:
+            applied = list(overlay_ids)
+        for term in normalized_filters:
+            if not any(term in " ".join([str(overlay_lookup.get(overlay_id, {}).get("id", "")), str(overlay_lookup.get(overlay_id, {}).get("label", "")), str(overlay_lookup.get(overlay_id, {}).get("provider", ""))]).lower() for overlay_id in applied):
+                unmet.append(term)
+        return list(dict.fromkeys(applied)), list(dict.fromkeys(unmet))
+
+    # -------------------------------------------------------------------------
     def resolve_compliance_warnings(
         self, basemap: JsonDict, overlays: list[JsonDict]
     ) -> list[str]:
