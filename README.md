@@ -1,4 +1,9 @@
 # AEGIS Geospatial View
+[![Release](https://img.shields.io/github/v/release/CTCycle/AEGIS-geographics?display_name=tag)](https://github.com/CTCycle/AEGIS-geographics/releases)
+[![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)](./pyproject.toml)
+[![Angular](https://img.shields.io/badge/Angular-19.2-red?logo=angular&logoColor=white)](./AEGIS/client/package.json)
+[![License](https://img.shields.io/github/license/CTCycle/AEGIS-geographics)](./LICENSE)
+[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml)
 
 ## 1. Project Overview
 AEGIS Geospatial View is a chat-first geospatial assistant. Users ask for places, coordinates, and overlays in natural language, and the app returns an updated interactive map session with supporting metadata.
