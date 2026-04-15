@@ -175,7 +175,7 @@ const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     assistant_message: String(value.assistant_message ?? ''),
     extracted_state: isRecord(value.extracted_state) ? value.extracted_state as Record<string, JsonValue> : undefined,
     map_session: isRecord(value.map_session) ? value.map_session : undefined,
-    tool_payload: isRecord(value.tool_payload) ? value.tool_payload as Record<string, JsonValue> : undefined,
+    tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
     follow_up_required: Boolean(value.follow_up_required),
     fallback_mode: typeof value.fallback_mode === 'string' ? value.fallback_mode : undefined,
   };

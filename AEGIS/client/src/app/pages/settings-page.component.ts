@@ -191,7 +191,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       const updated = await updateChatSettings(payload);
       this.settings = updated;
       this.providerMode = updated.active_provider_mode;
-      this.statusText = `Selected ${model.name} for ${role}`;
+      this.statusText = model.provider === 'ollama'
+        ? `Selected ${model.name} for ${role}`
+        : `Selected ${model.name} for parser, chat, and agent`;
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {

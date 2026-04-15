@@ -68,6 +68,7 @@ class LocationSearchRequest(BaseModel):
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     filters: list[str] = Field(default_factory=list)
+    semantic_filters: list[str] = Field(default_factory=list)
     geospatial_filter: list[str] = Field(default_factory=list)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
@@ -130,6 +131,14 @@ class LocationSearchRequest(BaseModel):
     @field_validator("overlay_ids", mode="before")
     @classmethod
     def normalize_overlay_ids(
+        cls, value: list[str] | tuple[str, ...] | str | None
+    ) -> list[str]:
+        return cls.normalize_filters(value)
+
+    # -------------------------------------------------------------------------
+    @field_validator("semantic_filters", mode="before")
+    @classmethod
+    def normalize_semantic_filters(
         cls, value: list[str] | tuple[str, ...] | str | None
     ) -> list[str]:
         return cls.normalize_filters(value)

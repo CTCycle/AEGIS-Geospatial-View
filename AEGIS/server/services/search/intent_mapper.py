@@ -18,6 +18,9 @@ def map_structured_intent_to_location_request(
     coordinates = (
         extracted_state.get("coordinates") if isinstance(extracted_state.get("coordinates"), dict) else {}
     )
+    semantic_filters = extracted_state.get("filters") if isinstance(extracted_state.get("filters"), list) else []
+    selected_overlay_filters = [str(value) for value in selected_overlay_ids if isinstance(value, str)]
+    layer_filters = [value for value in selected_overlay_filters if value.lower().startswith("gibs_")]
     has_coordinates = coordinates.get("latitude") is not None and coordinates.get("longitude") is not None
     return {
         "datetime": fallback_datetime,
@@ -27,7 +30,8 @@ def map_structured_intent_to_location_request(
         "use_coordinates": has_coordinates,
         "latitude": coordinates.get("latitude"),
         "longitude": coordinates.get("longitude"),
-        "filters": extracted_state.get("filters") or [],
+        "filters": layer_filters,
+        "semantic_filters": semantic_filters,
         "overlay_ids": selected_overlay_ids,
         "basemap_id": selected_basemap_id,
         "map_size_m": get_server_settings().map.default_size_m,

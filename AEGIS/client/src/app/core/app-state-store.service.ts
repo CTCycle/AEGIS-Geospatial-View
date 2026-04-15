@@ -50,6 +50,15 @@ export class AppStateStoreService implements OnDestroy {
     persistAppState(this.state);
   }
 
+  resetChatPage(): void {
+    const defaults = defaultAppState();
+    this.state = {
+      ...this.state,
+      chatPage: defaults.chatPage,
+    };
+    persistAppState(this.state);
+  }
+
   private readonly onStorage = (event: StorageEvent): void => {
     if (event.key !== null) {
       return;

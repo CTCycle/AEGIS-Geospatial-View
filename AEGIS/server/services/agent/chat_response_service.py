@@ -106,6 +106,26 @@ class ChatResponseService:
                     if isinstance(total, int):
                         return f"I found {total} nearby points of interest for that location."
                     return "I retrieved nearby points of interest for that location."
+            map_session = search_result.get("map_session") if isinstance(search_result, dict) else None
+            payload = search_result.get("payload") if isinstance(search_result, dict) else None
+            overlay_count = 0
+            if isinstance(map_session, dict):
+                overlays = map_session.get("overlays")
+                if isinstance(overlays, list):
+                    overlay_count = len(overlays)
+            unmet_filters: list[str] = []
+            if isinstance(payload, dict) and isinstance(payload.get("unmet_filters"), list):
+                unmet_filters = [str(value) for value in payload["unmet_filters"] if str(value).strip()]
+            requested_overlay_intent = bool(
+                isinstance(decision.selected_overlay_ids, list) and decision.selected_overlay_ids
+            )
+            if requested_overlay_intent and overlay_count == 0:
+                if unmet_filters:
+                    return (
+                        "I could not apply all requested overlays for this location. "
+                        f"Unmet filters: {', '.join(unmet_filters)}. Try a narrower overlay request."
+                    )
+                return "I completed the map search, but no matching overlays were available for this request."
             return "I completed the map search and prepared the requested geospatial view."
         if decision.clarification_question:
             return decision.clarification_question

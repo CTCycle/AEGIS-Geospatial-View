@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+import os
+import re
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -26,8 +29,26 @@ from AEGIS.server.services.search.intent_mapper import map_structured_intent_to_
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.services.vector.retriever import VectorRetriever
 
+logger = logging.getLogger(__name__)
+
 ###############################################################################
 class AgentOrchestrator:
+    SAME_LOCATION_PATTERNS = (
+        re.compile(r"\b(same place|same area|as before|there|that place|same location)\b", re.IGNORECASE),
+    )
+    COORDINATE_RE = re.compile(r"[+-]?\d{1,2}(?:\.\d+)?\s*[, ]\s*[+-]?\d{1,3}(?:\.\d+)?")
+    OVERLAY_KEYWORD_TO_IDS: dict[str, tuple[str, ...]] = {
+        "traffic": ("tomtom_traffic_flow",),
+        "air quality": ("openmeteo_air_quality_forecast", "openaq_air_quality"),
+        "pm2.5": ("openmeteo_air_quality_forecast", "openaq_air_quality"),
+        "weather": ("openmeteo_weather_forecast", "rainviewer_precipitation_radar"),
+        "radar": ("rainviewer_precipitation_radar",),
+        "rain": ("rainviewer_precipitation_radar",),
+        "poi": ("overpass_poi_amenities",),
+        "amenit": ("overpass_poi_amenities",),
+        "solar": ("pvgis_solar",),
+    }
+
     def __init__(
         self,
         *,
@@ -61,6 +82,141 @@ class AgentOrchestrator:
                 catalog_service=catalog_service,
                 search_orchestrator=self.search_orchestrator,
             )
+        self._debug_logs_enabled = str(os.getenv("AEGIS_AGENT_DEBUG", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+    def _debug_log(self, event: str, payload: dict[str, Any]) -> None:
+        if not self._debug_logs_enabled:
+            return
+        logger.info("agent_debug %s %s", event, payload)
+
+    def _references_prior_location(self, user_message: str) -> bool:
+        return any(pattern.search(user_message) for pattern in self.SAME_LOCATION_PATTERNS)
+
+    def _message_has_coordinates(self, user_message: str) -> bool:
+        return bool(self.COORDINATE_RE.search(user_message))
+
+    def _looks_like_location_phrase(self, user_message: str) -> bool:
+        normalized = user_message.strip()
+        if len(normalized) < 3:
+            return False
+        if re.search(r"\b(?:near|nearby|around|at|in|via|street|road|avenue|square|piazza)\b", normalized, re.IGNORECASE):
+            return True
+        if re.search(r"\d{1,5}\s+[a-zA-Z]", normalized):
+            return True
+        return "," in normalized
+
+    def _normalize_extracted_state_for_turn(
+        self,
+        *,
+        extracted_state: ExtractedIntent,
+        user_message: str,
+    ) -> ExtractedIntent:
+        references_prior = self._references_prior_location(user_message)
+        has_message_coordinates = self._message_has_coordinates(user_message)
+        has_text_location = any(
+            [
+                extracted_state.location.address,
+                extracted_state.location.city,
+                extracted_state.location.country,
+            ]
+        )
+        has_coordinates = (
+            extracted_state.coordinates.latitude is not None
+            and extracted_state.coordinates.longitude is not None
+        )
+        if references_prior:
+            return extracted_state
+        if has_message_coordinates and has_coordinates:
+            return extracted_state.model_copy(
+                update={
+                    "location": extracted_state.location.model_copy(
+                        update={
+                            "address": None,
+                            "city": None,
+                            "country": None,
+                        }
+                    )
+                }
+            )
+        if has_text_location and not has_message_coordinates and self._looks_like_location_phrase(user_message):
+            return extracted_state.model_copy(
+                update={
+                    "coordinates": extracted_state.coordinates.model_copy(
+                        update={"latitude": None, "longitude": None}
+                    )
+                }
+            )
+        if (
+            has_coordinates
+            and not has_text_location
+            and not has_message_coordinates
+            and self._looks_like_location_phrase(user_message)
+        ):
+            return extracted_state.model_copy(
+                update={
+                    "coordinates": extracted_state.coordinates.model_copy(
+                        update={"latitude": None, "longitude": None}
+                    )
+                }
+            )
+        return extracted_state
+
+    def _derive_location_query_from_message(self, user_message: str) -> str | None:
+        normalized = user_message.strip()
+        if not normalized:
+            return None
+        around_match = re.search(r"\b(?:near|around|in|at)\s+([a-z0-9][a-z0-9\s,'\-]{2,})$", normalized, re.IGNORECASE)
+        if around_match:
+            return around_match.group(1).strip(" .")
+        stripped = re.sub(
+            r"^(?:please\s+)?(?:find|show|check|locate|center|map|i need to check|i need to find)\s+",
+            "",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        stripped = re.sub(r"\b(?:and show|with)\b.*$", "", stripped, flags=re.IGNORECASE).strip()
+        return stripped or normalized
+
+    def _fallback_overlay_ids_from_retrieval(
+        self,
+        *,
+        user_message: str,
+        extracted_state: ExtractedIntent,
+        retrieval: dict[str, list[dict[str, object]]],
+    ) -> list[str]:
+        normalized = f"{user_message} {' '.join(extracted_state.filters)}".lower()
+        requested: list[str] = []
+        for keyword, overlay_ids in self.OVERLAY_KEYWORD_TO_IDS.items():
+            if keyword in normalized:
+                requested.extend(overlay_ids)
+        if not requested:
+            return []
+        available_ids = {
+            str(item.get("id"))
+            for item in retrieval.get("overlays", [])
+            if isinstance(item, dict) and bool(item.get("is_available", True))
+        }
+        selected: list[str] = []
+        for overlay_id in requested:
+            if overlay_id in available_ids and overlay_id not in selected:
+                selected.append(overlay_id)
+        return selected
+
+    def _message_requests_map_context(self, user_message: str) -> bool:
+        normalized = user_message.lower()
+        return any(
+            token in normalized
+            for token in (
+                "map",
+                "layer",
+                "overlay",
+                "traffic",
+                "air quality",
+                "weather",
+                "compare",
+                "satellite",
+            )
+        )
 
     def _check_ollama_availability(self, settings) -> tuple[bool, str | None]:
         configured_providers = {
@@ -237,6 +393,18 @@ class AgentOrchestrator:
             user_message=request.message,
         )
         extracted_state = merge_extracted_intent(latest_state, patch)
+        extracted_state = self._normalize_extracted_state_for_turn(
+            extracted_state=extracted_state,
+            user_message=request.message,
+        )
+        self._debug_log(
+            "extracted_state",
+            {
+                "session_id": session.id,
+                "message": request.message,
+                "state": extracted_state.model_dump(mode="json"),
+            },
+        )
         merged_extracted_info = extracted_state.model_dump_json(indent=2)
         context = build_conversation_context(
             messages=_history,
@@ -255,6 +423,25 @@ class AgentOrchestrator:
             retrieval=annotated_retrieval,
             available_tools=available_tools,
         )
+        if (
+            decision.execution_mode == "search"
+            and decision.should_trigger_search
+            and not decision.selected_overlay_ids
+        ):
+            inferred_overlay_ids = self._fallback_overlay_ids_from_retrieval(
+                user_message=request.message,
+                extracted_state=extracted_state,
+                retrieval=annotated_retrieval,
+            )
+            if inferred_overlay_ids:
+                decision = decision.model_copy(update={"selected_overlay_ids": inferred_overlay_ids})
+        self._debug_log(
+            "decision",
+            {
+                "session_id": session.id,
+                "decision": decision.model_dump(mode="json"),
+            },
+        )
 
         search_result: dict[str, Any] | None = None
         map_session: dict[str, Any] | None = None
@@ -270,7 +457,14 @@ class AgentOrchestrator:
             location_request = LocationSearchRequest.model_validate(mapped_payload)
             search_result = await self.search_orchestrator.execute(location_request)
             map_session = search_result.get("map_session")
-            tool_payload = search_result.get("payload")
+            search_payload = search_result.get("payload") if isinstance(search_result.get("payload"), dict) else {}
+            tool_payload = {
+                "execution": "map_search",
+                "selected_overlay_ids": list(search_payload.get("selected_overlay_ids") or decision.selected_overlay_ids),
+                "applied_filters": list(search_payload.get("applied_filters") or []),
+                "unmet_filters": list(search_payload.get("unmet_filters") or []),
+                "fallback_mode": search_payload.get("fallback_mode"),
+            }
         elif decision.execution_mode == "geocode":
             if (
                 extracted_state.coordinates.latitude is not None
@@ -289,9 +483,11 @@ class AgentOrchestrator:
                     "display_name": "Coordinates from your request",
                 }
             else:
+                location_query = self._derive_location_query_from_message(request.message)
+                geocode_address = extracted_state.location.address or location_query
                 geocode_result = (
                     await self.agent_tools.geocode_location(
-                        address=extracted_state.location.address,
+                        address=geocode_address,
                         city=extracted_state.location.city,
                         country_name=extracted_state.location.country,
                     )
@@ -302,7 +498,61 @@ class AgentOrchestrator:
             tool_payload = {
                 "execution": "location_to_coordinates",
                 "result": geocode_result,
+                "fallback_mode": "geocode_failed" if geocode_result is None else None,
             }
+            if (
+                isinstance(geocode_result, dict)
+                and geocode_result.get("lat") is not None
+                and geocode_result.get("lon") is not None
+                and self._message_requests_map_context(request.message)
+            ):
+                inferred_overlay_ids = (
+                    decision.selected_overlay_ids
+                    if decision.selected_overlay_ids
+                    else self._fallback_overlay_ids_from_retrieval(
+                        user_message=request.message,
+                        extracted_state=extracted_state,
+                        retrieval=annotated_retrieval,
+                    )
+                )
+                promoted_payload = LocationSearchRequest.model_validate(
+                    {
+                        "datetime": request.datetime or datetime.now(UTC).isoformat(),
+                        "use_coordinates": True,
+                        "latitude": float(geocode_result["lat"]),
+                        "longitude": float(geocode_result["lon"]),
+                        "filters": [],
+                        "semantic_filters": list(extracted_state.filters),
+                        "overlay_ids": list(inferred_overlay_ids),
+                        "basemap_id": decision.selected_basemap_id,
+                        "map_size_m": get_server_settings().map.default_size_m,
+                        "image_crs": "EPSG:3857",
+                    }
+                )
+                promoted_search = await self.search_orchestrator.execute(promoted_payload)
+                promoted_payload_data = (
+                    promoted_search.get("payload")
+                    if isinstance(promoted_search.get("payload"), dict)
+                    else {}
+                )
+                map_session = promoted_search.get("map_session")
+                search_result = promoted_search
+                tool_payload = {
+                    "execution": "map_search",
+                    "selected_overlay_ids": list(promoted_payload_data.get("selected_overlay_ids") or inferred_overlay_ids),
+                    "applied_filters": list(promoted_payload_data.get("applied_filters") or extracted_state.filters),
+                    "unmet_filters": list(promoted_payload_data.get("unmet_filters") or []),
+                    "fallback_mode": promoted_payload_data.get("fallback_mode"),
+                }
+                decision = decision.model_copy(
+                    update={
+                        "decision": "search_and_complete",
+                        "execution_mode": "search",
+                        "tool_target": "map_search",
+                        "should_trigger_search": True,
+                        "requires_geocoding": False,
+                    }
+                )
         elif decision.execution_mode == "search" and not decision.should_trigger_search:
             tool_target = str(decision.tool_target or "").strip()
             direct_tool_targets = {"get_weather_forecast", "get_air_quality_forecast", "get_nearby_poi"}
@@ -358,6 +608,15 @@ class AgentOrchestrator:
             decision=decision,
             retrieval=annotated_retrieval,
             search_result=search_result,
+        )
+        self._debug_log(
+            "turn_outcome",
+            {
+                "session_id": session.id,
+                "map_center": map_session.get("center") if isinstance(map_session, dict) else None,
+                "tool_payload": tool_payload,
+                "follow_up": decision.execution_mode == "clarify",
+            },
         )
         assistant_row = self.history_repo.append_message(
             session_id=session.id,
