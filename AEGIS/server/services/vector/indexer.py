@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
 
-from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.manifest_embeddings import ManifestEmbeddingsRepository
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.vector.chroma_store import ChromaVectorStore, VectorDocument

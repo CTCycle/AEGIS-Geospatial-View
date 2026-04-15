@@ -31,15 +31,15 @@
       <div class="maplibre-wrap">
         <div #mapContainer class="maplibre-container"></div>
 
-        @if (mapSession?.overlays?.length) {
+        @if (overlays.length) {
           <div class="overlay-controls">
-            @for (overlay of mapSession!.overlays!; track trackOverlay($index, overlay)) {
+            @for (overlay of overlays; track trackOverlay($index, overlay)) {
               <div class="overlay-control-row">
                 <label>
                   <input
                     type="checkbox"
                     [checked]="overlayVisibility[overlay.id]"
-                    (change)="setOverlayVisibility(overlay.id, $any($event.target).checked)"
+                    (change)="onOverlayVisibilityChange(overlay.id, $event)"
                   />
                   {{ overlay.label }}
                 </label>
@@ -48,16 +48,16 @@
                   min="0"
                   max="100"
                   [value]="getOpacityPercent(overlay)"
-                  (change)="setOverlayOpacity(overlay.id, $any($event.target).value)"
+                  (change)="onOverlayOpacityChange(overlay.id, $event)"
                 />
               </div>
             }
           </div>
         }
 
-        @if (mapSession?.compliance_warnings?.length) {
+        @if (complianceWarnings.length) {
           <div class="compliance-panel">
-            @for (warning of mapSession!.compliance_warnings!; track warning) {
+            @for (warning of complianceWarnings; track warning) {
               <p>{{ warning }}</p>
             }
           </div>

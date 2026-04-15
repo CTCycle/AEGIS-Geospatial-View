@@ -26,6 +26,7 @@ import {
 import { MapSession, SearchResponsePayload } from '../core/types';
 
 type OverlayEntry = NonNullable<MapSession['overlays']>[number];
+type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
 
 const recordBooleanEqual = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
   const aKeys = Object.keys(a);
@@ -139,84 +140,7 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
     const layerId = `overlay-layer-${overlay.id}`;
     const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
     const sourceBounds = normalizeOverlayBounds(overlay.bounds);
-
-    if (overlay.type === 'tile' && overlay.url) {
-      const rasterSource: {
-        type: 'raster';
-        tiles: string[];
-        tileSize: number;
-        bounds?: [number, number, number, number];
-      } = {
-        type: 'raster',
-        tiles: [overlay.url],
-        tileSize: 256,
-      };
-      if (sourceBounds) {
-        rasterSource.bounds = sourceBounds;
-      }
-      map.addSource(sourceId, rasterSource);
-      map.addLayer({
-        id: layerId,
-        source: sourceId,
-        type: 'raster',
-        paint: { 'raster-opacity': opacity },
-      });
-      return;
-    }
-
-    if (overlay.type === 'wms' && overlay.url) {
-      const wmsTiles = buildWmsTileUrl(overlay);
-      if (!wmsTiles) {
-        return;
-      }
-      const rasterSource: {
-        type: 'raster';
-        tiles: string[];
-        tileSize: number;
-        bounds?: [number, number, number, number];
-      } = {
-        type: 'raster',
-        tiles: [wmsTiles],
-        tileSize: 256,
-      };
-      if (sourceBounds) {
-        rasterSource.bounds = sourceBounds;
-      }
-      map.addSource(sourceId, rasterSource);
-      map.addLayer({
-        id: layerId,
-        source: sourceId,
-        type: 'raster',
-        paint: { 'raster-opacity': opacity },
-      });
-      return;
-    }
-
-    if (overlay.type === 'wmts' && overlay.url) {
-      const wmtsTiles = buildWmtsTileUrl(overlay);
-      if (!wmtsTiles) {
-        return;
-      }
-      const rasterSource: {
-        type: 'raster';
-        tiles: string[];
-        tileSize: number;
-        bounds?: [number, number, number, number];
-      } = {
-        type: 'raster',
-        tiles: [wmtsTiles],
-        tileSize: 256,
-      };
-      if (sourceBounds) {
-        rasterSource.bounds = sourceBounds;
-      }
-      map.addSource(sourceId, rasterSource);
-      map.addLayer({
-        id: layerId,
-        source: sourceId,
-        type: 'raster',
-        paint: { 'raster-opacity': opacity },
-      });
+    if (addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)) {
       return;
     }
 
@@ -257,7 +181,58 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
   });
 };
 
-const normalizeBounds = (bounds?: number[]): LngLatBoundsLike | null => {
+const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
+  const overlayType = overlay.type as RasterOverlayKind;
+  if (overlayType === 'tile' && overlay.url) {
+    return [overlay.url];
+  }
+  if (overlayType === 'wms' && overlay.url) {
+    const wmsTiles = buildWmsTileUrl(overlay);
+    return wmsTiles ? [wmsTiles] : null;
+  }
+  if (overlayType === 'wmts' && overlay.url) {
+    const wmtsTiles = buildWmtsTileUrl(overlay);
+    return wmtsTiles ? [wmtsTiles] : null;
+  }
+  return null;
+};
+
+const addRasterOverlayLayer = (
+  map: Map,
+  overlay: OverlayEntry,
+  sourceId: string,
+  layerId: string,
+  opacity: number,
+  sourceBounds?: [number, number, number, number],
+): boolean => {
+  const tiles = buildRasterOverlayTiles(overlay);
+  if (!tiles) {
+    return false;
+  }
+  const rasterSource: {
+    type: 'raster';
+    tiles: string[];
+    tileSize: number;
+    bounds?: [number, number, number, number];
+  } = {
+    type: 'raster',
+    tiles,
+    tileSize: 256,
+  };
+  if (sourceBounds) {
+    rasterSource.bounds = sourceBounds;
+  }
+  map.addSource(sourceId, rasterSource);
+  map.addLayer({
+    id: layerId,
+    source: sourceId,
+    type: 'raster',
+    paint: { 'raster-opacity': opacity },
+  });
+  return true;
+};
+
+const normalizeBounds = (bounds: unknown): LngLatBoundsLike | null => {
   if (!Array.isArray(bounds) || bounds.length !== 4) {
     return null;
   }
@@ -297,6 +272,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   get hasCenter(): boolean {
     return typeof this.mapSession?.center?.latitude === 'number'
       && typeof this.mapSession?.center?.longitude === 'number';
+  }
+
+  get overlays(): OverlayEntry[] {
+    return this.mapSession?.overlays || [];
+  }
+
+  get complianceWarnings(): string[] {
+    return this.mapSession?.compliance_warnings || [];
   }
 
   get embeddedMapHtml(): SafeHtml | null {
@@ -341,6 +324,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.overlayOpacity = { ...this.overlayOpacity, [overlayId]: value };
     this.emitOverlayState();
     this.applyOverlayStateToMap();
+  }
+
+  onOverlayVisibilityChange(overlayId: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.setOverlayVisibility(overlayId, Boolean(target?.checked));
+  }
+
+  onOverlayOpacityChange(overlayId: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.setOverlayOpacity(overlayId, target?.value ?? '0');
   }
 
   getOpacityPercent(overlay: OverlayEntry): number {
@@ -390,7 +383,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.destroyMap();
       return;
     }
-    if (!this.viewInitialized || !this.mapContainerRef?.nativeElement || !this.hasCenter || !this.mapSession?.center) {
+    const center = this.mapSession?.center;
+    if (
+      !this.viewInitialized
+      || !this.mapContainerRef?.nativeElement
+      || typeof center?.longitude !== 'number'
+      || typeof center.latitude !== 'number'
+    ) {
       return;
     }
 
@@ -399,14 +398,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const map = new maplibregl.Map({
       container: this.mapContainerRef.nativeElement,
       style: buildStyle(this.mapSession),
-      center: [this.mapSession.center.longitude!, this.mapSession.center.latitude!],
+      center: [center.longitude, center.latitude],
       zoom: 12,
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
     map.on('load', () => {
       addOverlayLayers(map, this.mapSession);
-      const bounds = normalizeBounds(this.mapSession?.bounds as number[] | undefined);
+      const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
         map.fitBounds(bounds, { padding: 30, duration: 0 });
       }

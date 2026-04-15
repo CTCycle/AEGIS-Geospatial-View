@@ -7,6 +7,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedChatPageState } from '../core/app-state';
 import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse } from '../core/types';
 import { sendChatTurn } from '../core/api';
+import { UserFacingErrorService } from '../core/user-facing-error.service';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -46,6 +47,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   constructor(
     private readonly router: Router,
     private readonly appStateStore: AppStateStoreService,
+    private readonly userFacingErrorService: UserFacingErrorService,
   ) {
     this.chatPageState = this.appStateStore.getChatPage();
     this.payload = this.chatPageState.payload;
@@ -212,7 +214,10 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       });
       this.applyTurnResponse(result, requestNonce);
     } catch (error: unknown) {
-      const fallback = String((error as { message?: string })?.message ?? error);
+      const fallback = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not complete this request right now.',
+      );
       this.status = 'Failed';
       this.assistantDraft = '';
       this.messages = [...this.messages, { role: 'assistant', content: fallback }];

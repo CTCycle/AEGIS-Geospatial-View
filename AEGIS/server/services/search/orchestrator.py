@@ -48,7 +48,10 @@ class LocationSearchOrchestrator:
         explicit_overlays = self.toolkit.normalize_layers(payload.overlay_ids)
         if explicit_overlays:
             return list(explicit_overlays)
-        return self.catalog_service.suggest_overlay_ids_from_filters(payload.semantic_filters)
+        suggest_overlay_ids = getattr(self.catalog_service, "suggest_overlay_ids_from_filters", None)
+        if callable(suggest_overlay_ids):
+            return self.toolkit.normalize_layers(suggest_overlay_ids(payload.semantic_filters))
+        return self.toolkit.normalize_layers(payload.semantic_filters)
 
     async def resolve_coordinates(self, payload: LocationSearchRequest) -> dict[str, Any]:
         response_payload = payload.model_dump()
@@ -102,10 +105,13 @@ class LocationSearchOrchestrator:
         satellite_payload: dict[str, Any],
     ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
         selected_overlay_ids = self._resolve_overlay_ids(payload)
-        selected_overlay_ids, unmet_filters = self.catalog_service.filter_overlay_ids_by_semantics(
-            overlay_ids=selected_overlay_ids,
-            semantic_filters=payload.semantic_filters,
-        )
+        unmet_filters: list[str] = []
+        filter_overlay_ids = getattr(self.catalog_service, "filter_overlay_ids_by_semantics", None)
+        if callable(filter_overlay_ids):
+            selected_overlay_ids, unmet_filters = filter_overlay_ids(
+                overlay_ids=selected_overlay_ids,
+                semantic_filters=payload.semantic_filters,
+            )
         overlays = self.catalog_service.resolve_overlays(selected_overlay_ids)
         if not overlays:
             legacy_overlays = satellite_payload.get("overlays", [])
