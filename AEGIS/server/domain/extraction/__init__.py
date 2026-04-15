@@ -4,6 +4,8 @@ from .models import (
     ExtractedIntentPatch,
     ExtractedLocation,
     ExtractedTimeReferences,
+    StageAParserIntent,
+    StageBSearchExtraction,
 )
 from .patching import merge_extracted_intent
 
@@ -13,5 +15,7 @@ __all__ = [
     "ExtractedIntentPatch",
     "ExtractedLocation",
     "ExtractedTimeReferences",
+    "StageAParserIntent",
+    "StageBSearchExtraction",
     "merge_extracted_intent",
 ]

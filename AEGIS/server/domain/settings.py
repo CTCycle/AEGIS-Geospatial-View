@@ -76,6 +76,8 @@ class JobsSettings:
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
+    parser_certainty_threshold: float
+    parser_max_retries: int
 
 
 ###############################################################################
@@ -223,6 +225,8 @@ class JsonJobsSettings(BaseModel):
 ###############################################################################
 class JsonChatRuntimeSettings(BaseModel):
     max_history_messages: int = Field(default=12, ge=1, le=100)
+    parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    parser_max_retries: int = Field(default=2, ge=0, le=5)
 
 
 ###############################################################################
@@ -392,7 +396,11 @@ class AppSettings(BaseSettings):
                 tiles=self.map.tiles,
             ),
             jobs=JobsSettings(polling_interval=self.jobs.polling_interval),
-            chat=ChatRuntimeSettings(max_history_messages=self.chat.max_history_messages),
+            chat=ChatRuntimeSettings(
+                max_history_messages=self.chat.max_history_messages,
+                parser_certainty_threshold=self.chat.parser_certainty_threshold,
+                parser_max_retries=self.chat.parser_max_retries,
+            ),
             vectors=VectorRuntimeSettings(
                 auto_sync_on_start=self.vectors.auto_sync_on_start,
                 default_ollama_embedding_model=self.vectors.default_ollama_embedding_model,

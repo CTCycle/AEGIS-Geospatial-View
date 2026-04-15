@@ -198,55 +198,12 @@
     background: transparent;
 }
 
-.chat-welcome-card {
-    display: grid;
-    gap: 0.65rem;
-    padding: 1rem;
-    border: 1px solid #bfd0e2;
-    border-radius: 0.9rem;
-    background: linear-gradient(180deg, rgb(245 249 255 / 96%), rgb(236 243 251 / 96%));
-    color: #20324d;
-}
-
-.chat-welcome-card__eyebrow {
+.chat-welcome-message {
     margin: 0;
-    font-size: 0.72rem;
-    line-height: 1;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #5d7395;
-    font-weight: 700;
-}
-
-.chat-welcome-card__prompt {
-    margin: 0;
-    font-size: 0.92rem;
-    line-height: 1.45;
-    color: #35506f;
-}
-
-.chat-welcome-card__examples-label {
-    margin: 0;
-    font-size: 0.68rem;
-    line-height: 1;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #7b8ea9;
-    font-weight: 700;
-}
-
-.chat-welcome-card__examples {
-    margin: 0;
-    padding-left: 1rem;
-    display: grid;
-    gap: 0.45rem;
-    color: #687d99;
-    font-size: 0.84rem;
-    line-height: 1.45;
-}
-
-.chat-welcome-card__examples li {
-    opacity: 0.9;
+    padding: 0.1rem 0.1rem 0.4rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: #5b6f8b;
 }
 
 .chat-message {

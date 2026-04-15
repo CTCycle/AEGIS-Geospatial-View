@@ -142,6 +142,7 @@ class ChatResponseService:
         decision: AgentDecision,
         retrieval: dict[str, list[dict[str, object]]],
         search_result: dict[str, Any] | None,
+        execution_feedback: dict[str, Any] | None = None,
     ) -> str:
         sanitized_retrieval = self._sanitize_retrieval_for_chat(retrieval)
         sanitized_search_result = self._sanitize_search_result_for_chat(search_result)
@@ -153,6 +154,7 @@ class ChatResponseService:
                 "decision": decision.model_dump(mode="json"),
                 "retrieval": sanitized_retrieval,
                 "search_result": sanitized_search_result,
+                "execution_feedback": execution_feedback or {"status": "unknown", "errors": [], "ambiguities": []},
             }
             result = provider.chat(
                 ChatCompletionRequest(
