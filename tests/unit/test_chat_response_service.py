@@ -5,6 +5,7 @@ from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 
 
+###############################################################################
 class _ChatProviderStub:
     def __init__(self, content: str) -> None:
         self.content = content
@@ -17,6 +18,7 @@ class _ChatProviderStub:
         return _Result(self.content)
 
 
+###############################################################################
 class _FactoryStub:
     def __init__(self, content: str) -> None:
         self._provider = _ChatProviderStub(content)
@@ -25,6 +27,7 @@ class _FactoryStub:
         return self._provider
 
 
+###############################################################################
 def _decision(**kwargs):  # noqa: ANN003, ANN202
     payload = {
         "decision": "search_and_complete",
@@ -38,6 +41,7 @@ def _decision(**kwargs):  # noqa: ANN003, ANN202
     return AgentDecision(**payload)
 
 
+###############################################################################
 def test_chat_response_service_normalizes_plain_text_output() -> None:
     service = ChatResponseService(
         llm_factory=_FactoryStub("```json\n{\"foo\": \"bar\"}\n```\n**Map ready**"),  # type: ignore[arg-type]
@@ -55,6 +59,7 @@ def test_chat_response_service_normalizes_plain_text_output() -> None:
     assert response == "Map ready"
 
 
+###############################################################################
 def test_chat_response_service_fallback_for_geocode_success_is_plain_text() -> None:
     class _FailingFactory:
         def get_chat_provider(self, provider: str):  # noqa: ANN001
@@ -73,6 +78,7 @@ def test_chat_response_service_fallback_for_geocode_success_is_plain_text() -> N
     assert "longitude 12.5" in response
 
 
+###############################################################################
 def test_chat_response_service_fallback_for_missing_integration_is_plain_text() -> None:
     class _FailingFactory:
         def get_chat_provider(self, provider: str):  # noqa: ANN001
@@ -96,6 +102,7 @@ def test_chat_response_service_fallback_for_missing_integration_is_plain_text() 
     assert response == "TomTom key needed."
 
 
+###############################################################################
 def test_chat_response_service_reports_overlay_unmet_filters() -> None:
     class _FailingFactory:
         def get_chat_provider(self, provider: str):  # noqa: ANN001
@@ -116,6 +123,7 @@ def test_chat_response_service_reports_overlay_unmet_filters() -> None:
     assert "Unmet filters" in response
 
 
+###############################################################################
 def test_chat_response_service_missing_location_is_single_human_question() -> None:
     class _FailingFactory:
         def get_chat_provider(self, provider: str):  # noqa: ANN001

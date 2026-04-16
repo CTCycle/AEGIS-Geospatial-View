@@ -4,6 +4,7 @@ from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.services.agent.task_scope_service import TaskScopeService
 
 
+###############################################################################
 def test_task_scope_reuses_location_for_referential_phrase() -> None:
     service = TaskScopeService()
     history = [
@@ -21,6 +22,7 @@ def test_task_scope_reuses_location_for_referential_phrase() -> None:
     assert decision.history_start_index == 0
 
 
+###############################################################################
 def test_task_scope_starts_new_task_for_new_address() -> None:
     service = TaskScopeService()
     history = [

@@ -5,6 +5,7 @@ from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.llm.factory import LLMFactory
 
 
+###############################################################################
 def test_decision_service_requires_location() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -18,6 +19,7 @@ def test_decision_service_requires_location() -> None:
     assert decision.should_trigger_search is False
 
 
+###############################################################################
 def test_decision_service_routes_coordinate_lookup_requests() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -32,6 +34,7 @@ def test_decision_service_routes_coordinate_lookup_requests() -> None:
     assert decision.should_trigger_search is False
 
 
+###############################################################################
 def test_decision_service_rejects_non_geospatial_requests() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -45,6 +48,7 @@ def test_decision_service_rejects_non_geospatial_requests() -> None:
     assert decision.should_trigger_search is False
 
 
+###############################################################################
 def test_decision_service_routes_direct_weather_tool_with_location() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -59,6 +63,7 @@ def test_decision_service_routes_direct_weather_tool_with_location() -> None:
     assert decision.should_trigger_search is False
 
 
+###############################################################################
 def test_decision_service_requests_integration_when_explicit_and_unavailable() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -88,6 +93,7 @@ def test_decision_service_requests_integration_when_explicit_and_unavailable() -
     assert "API key" in decision.clarification_question
 
 
+###############################################################################
 def test_decision_service_treats_place_lookup_as_geospatial() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -102,6 +108,7 @@ def test_decision_service_treats_place_lookup_as_geospatial() -> None:
     assert decision.decision != "clarify" or decision.clarification_question is not None
 
 
+###############################################################################
 def test_decision_service_treats_street_address_as_geocodable() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -115,6 +122,7 @@ def test_decision_service_treats_street_address_as_geocodable() -> None:
     assert decision.execution_mode in {"geocode", "search", "clarify"}
 
 
+###############################################################################
 def test_decision_service_forces_search_when_coordinates_exist() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(
@@ -128,6 +136,7 @@ def test_decision_service_forces_search_when_coordinates_exist() -> None:
     assert decision.should_trigger_search is True
 
 
+###############################################################################
 def test_decision_service_routes_map_request_without_meta_question() -> None:
     service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
     decision = service.decide(

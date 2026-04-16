@@ -7,6 +7,7 @@ from AEGIS.server.repositories.chat_history import ChatHistoryRepository
 from AEGIS.server.repositories.schemas.models import Base
 
 
+###############################################################################
 class _Backend:
     def __init__(self) -> None:
         self.engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
@@ -14,11 +15,13 @@ class _Backend:
         self.session = sessionmaker(bind=self.engine, future=True)
 
 
+###############################################################################
 class _Database:
     def __init__(self) -> None:
         self.backend = _Backend()
 
 
+###############################################################################
 def test_get_latest_extracted_state_reads_nested_payload(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(
         "AEGIS.server.repositories.chat_history.get_database",
@@ -50,6 +53,7 @@ def test_get_latest_extracted_state_reads_nested_payload(monkeypatch) -> None:  
     assert latest.location_type == "city"
 
 
+###############################################################################
 def test_get_latest_extracted_state_still_supports_legacy_payload(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(
         "AEGIS.server.repositories.chat_history.get_database",

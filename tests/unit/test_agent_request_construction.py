@@ -11,6 +11,7 @@ from AEGIS.server.services.agent.parser_service import ParserService
 from AEGIS.server.services.llm.types import ChatCompletionResult
 
 
+###############################################################################
 class _ParserProviderStub:
     def __init__(self) -> None:
         self.last_request = None
@@ -22,6 +23,7 @@ class _ParserProviderStub:
         return {}
 
 
+###############################################################################
 class _ChatProviderStub:
     def __init__(self, *, content: str) -> None:
         self.content = content
@@ -32,6 +34,7 @@ class _ChatProviderStub:
         return ChatCompletionResult(content=self.content, raw={})
 
 
+###############################################################################
 class _FactoryStub:
     def __init__(self, *, parser: Any = None, agent: Any = None, chat: Any = None) -> None:
         self._parser = parser
@@ -48,6 +51,7 @@ class _FactoryStub:
         return self._chat
 
 
+###############################################################################
 def test_parser_service_includes_context_then_machine_readable_inputs() -> None:
     parser_provider = _ParserProviderStub()
     service = ParserService(
@@ -69,6 +73,7 @@ def test_parser_service_includes_context_then_machine_readable_inputs() -> None:
     assert "latest_user_message=same place" in request.messages[2]["content"]
 
 
+###############################################################################
 def test_decision_service_includes_context_and_retrieval_payload() -> None:
     agent_payload = {
         "decision": "search_and_complete",
@@ -114,6 +119,7 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
     assert payload["available_tools"] == [{"name": "map_search", "description": "Map search tool"}]
 
 
+###############################################################################
 def test_chat_response_service_includes_context_and_decision_payload() -> None:
     chat_provider = _ChatProviderStub(content="Done")
     service = ChatResponseService(

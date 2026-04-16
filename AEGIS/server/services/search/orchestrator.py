@@ -22,6 +22,7 @@ from AEGIS.server.utils.logger import logger
 type CoordinatePair = tuple[float, float]
 
 
+###############################################################################
 class LocationSearchOrchestrator:
     def __init__(
         self,

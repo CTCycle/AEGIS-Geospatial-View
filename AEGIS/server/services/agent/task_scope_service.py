@@ -7,6 +7,7 @@ from AEGIS.server.domain.agent.task_scope import TaskScopeDecision
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 
 
+###############################################################################
 class TaskScopeService:
     REFERENTIAL_PATTERNS = (
         re.compile(r"\b(same place|same area|there|that area|that place|around it|nearby|same coordinates)\b", re.IGNORECASE),

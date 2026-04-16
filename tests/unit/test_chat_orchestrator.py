@@ -11,6 +11,7 @@ from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
 from AEGIS.server.services.agent.parser_service import ParserService
 
 
+###############################################################################
 class _VectorRetrieverStub:
     def __init__(self) -> None:
         self.last_query = None
@@ -20,6 +21,7 @@ class _VectorRetrieverStub:
         return {"basemaps": [], "overlays": [], "providers": []}
 
 
+###############################################################################
 class _SearchOrchestratorStub:
     nominatim_service = object()
     catalog_service = object()
@@ -34,10 +36,12 @@ class _SearchOrchestratorStub:
         }
 
 
+###############################################################################
 def _allow_provider_checks(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(AgentOrchestrator, "_check_ollama_availability", lambda self, settings: (True, None))
 
 
+###############################################################################
 def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     retriever = _VectorRetrieverStub()
@@ -83,6 +87,7 @@ def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None
     assert retriever.last_query == "Find me Rome weather layers"
 
 
+###############################################################################
 def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
@@ -119,6 +124,7 @@ def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
     assert result.fallback_mode == "needs_clarification"
 
 
+###############################################################################
 def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
@@ -177,6 +183,7 @@ def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None
     assert any("same place, show fires" in context for context in contexts)
 
 
+###############################################################################
 def test_chat_orchestrator_returns_coordinate_lookup_without_map_session(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     class _AgentToolsStub:
@@ -227,6 +234,7 @@ def test_chat_orchestrator_returns_coordinate_lookup_without_map_session(monkeyp
     assert result.tool_payload["execution"] == "location_to_coordinates"
 
 
+###############################################################################
 def test_chat_orchestrator_integration_blocker_returns_follow_up(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
@@ -263,6 +271,7 @@ def test_chat_orchestrator_integration_blocker_returns_follow_up(monkeypatch) ->
     assert result.follow_up_required is True
 
 
+###############################################################################
 def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     class _AgentToolsStub:
@@ -312,6 +321,7 @@ def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(monkeypa
     assert result.tool_payload["result"]["lon"] == 12.5
 
 
+###############################################################################
 def test_chat_orchestrator_executes_direct_weather_tool(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
 
@@ -363,6 +373,7 @@ def test_chat_orchestrator_executes_direct_weather_tool(monkeypatch) -> None:
     assert result.tool_payload["execution"] == "get_weather_forecast"
 
 
+###############################################################################
 def test_chat_orchestrator_clears_stale_coordinates_for_new_text_location(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
 
@@ -427,6 +438,7 @@ def test_chat_orchestrator_clears_stale_coordinates_for_new_text_location(monkey
         assert second.tool_payload["result"].get("lat") != 40.7580
 
 
+###############################################################################
 def test_chat_orchestrator_infers_overlay_ids_from_retrieval(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
 
@@ -503,6 +515,7 @@ def test_chat_orchestrator_infers_overlay_ids_from_retrieval(monkeypatch) -> Non
     assert "tomtom_traffic_flow" in (result.tool_payload.get("selected_overlay_ids") or [])
 
 
+###############################################################################
 def test_chat_orchestrator_same_place_reuses_location(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(
@@ -556,6 +569,7 @@ def test_chat_orchestrator_same_place_reuses_location(monkeypatch) -> None:
     assert second.extracted_state["location"]["city"] == "Rome"
 
 
+###############################################################################
 def test_chat_orchestrator_new_task_clears_stale_filters_and_coordinates(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
     orchestrator = AgentOrchestrator(

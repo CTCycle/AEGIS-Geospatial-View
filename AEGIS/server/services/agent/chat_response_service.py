@@ -11,6 +11,7 @@ from AEGIS.server.services.llm.prompts import get_agent_response_prompt
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
 
+###############################################################################
 class ChatResponseService:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
