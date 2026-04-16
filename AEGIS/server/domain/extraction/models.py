@@ -26,6 +26,7 @@ class ExtractedTimeReferences(BaseModel):
 class ExtractedIntent(BaseModel):
     location: ExtractedLocation = Field(default_factory=ExtractedLocation)
     coordinates: ExtractedCoordinates = Field(default_factory=ExtractedCoordinates)
+    location_type: str | None = None
     base_map_type: str | None = None
     time_references: ExtractedTimeReferences = Field(default_factory=ExtractedTimeReferences)
     user_goal: str = Field(default="", max_length=1000)
@@ -37,6 +38,7 @@ class ExtractedIntent(BaseModel):
 class ExtractedIntentPatch(BaseModel):
     location: ExtractedLocation | None = None
     coordinates: ExtractedCoordinates | None = None
+    location_type: str | None = None
     base_map_type: str | None = None
     time_references: ExtractedTimeReferences | None = None
     user_goal: str | None = Field(default=None, max_length=1000)

@@ -31,6 +31,8 @@ class AgentDecision(BaseModel):
     selected_basemap_id: str | None = None
     selected_overlay_ids: list[str] = Field(default_factory=list)
     clarification_question: str | None = None
+    missing_fields: list[str] = Field(default_factory=list)
+    clarification_kind: str | None = None
     chat_instructions: ChatInstructionPayload = Field(default_factory=ChatInstructionPayload)
     reasoning_summary: str = ""
     feasibility: Feasibility = Field(default_factory=Feasibility)

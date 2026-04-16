@@ -81,6 +81,9 @@ class DecisionService:
         re.compile(r"\b(?:street|st|road|rd|avenue|ave|via|boulevard|blvd|lane|ln|square|piazza)\b", re.IGNORECASE),
         re.compile(r"[+-]?\d{1,2}(?:\.\d+)?\s*[, ]\s*[+-]?\d{1,3}(?:\.\d+)?", re.IGNORECASE),
     )
+    MAP_SEARCH_PATTERNS = (
+        re.compile(r"\b(show|see|search|open|view|display|map)\b", re.IGNORECASE),
+    )
 
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
@@ -152,6 +155,8 @@ class DecisionService:
             location_status="missing",
             requires_geocoding=False,
             clarification_question="Which location should I search on the map? You can provide a city, full address, or coordinates.",
+            missing_fields=["location"],
+            clarification_kind="missing_location",
             reasoning_summary="Missing location",
         )
 
@@ -179,6 +184,8 @@ class DecisionService:
                 f"I can use {integration_name} for this request, but its API key is not configured. "
                 f"Would you like to add the key or use an available alternative layer?"
             ),
+            missing_fields=["integration_key"],
+            clarification_kind="integration_blocked",
             reasoning_summary="Missing required integration",
         )
 
@@ -191,6 +198,8 @@ class DecisionService:
             location_status="valid" if has_text_location else "partial",
             requires_geocoding=has_text_location and not has_coordinates,
             clarification_question=None,
+            missing_fields=[],
+            clarification_kind=None,
             reasoning_summary="Direct coordinate lookup request",
         )
 
@@ -210,8 +219,42 @@ class DecisionService:
             location_status="valid" if (has_text_location or has_coordinates) else "missing",
             requires_geocoding=has_text_location and not has_coordinates,
             clarification_question=None,
+            missing_fields=[],
+            clarification_kind=None,
             reasoning_summary=summary,
         )
+
+    def _is_map_search_request(self, user_message: str) -> bool:
+        return any(pattern.search(user_message) for pattern in self.MAP_SEARCH_PATTERNS)
+
+    def _post_validate_decision(
+        self,
+        *,
+        decision: AgentDecision,
+        user_message: str,
+        has_text_location: bool,
+        has_coordinates: bool,
+    ) -> AgentDecision:
+        if decision.execution_mode == "clarify":
+            clarification = str(decision.clarification_question or "").lower()
+            if "search the map or run a specific tool" in clarification:
+                return self._build_missing_location_decision()
+            if (has_text_location or has_coordinates) and self._is_map_search_request(user_message):
+                return AgentDecision(
+                    decision="search_and_complete",
+                    execution_mode="search",
+                    tool_target="map_search",
+                    should_trigger_search=True,
+                    location_status="valid",
+                    requires_geocoding=bool(has_text_location and not has_coordinates),
+                    selected_basemap_id=decision.selected_basemap_id,
+                    selected_overlay_ids=list(decision.selected_overlay_ids),
+                    clarification_question=None,
+                    missing_fields=[],
+                    clarification_kind=None,
+                    reasoning_summary="Post-validation: direct map-search routing for explicit map request with location.",
+                )
+        return decision
 
     def _select_available_candidate_ids(self, retrieval: dict[str, list[dict[str, object]]], kind: str) -> list[str]:
         selected: list[str] = []
@@ -300,6 +343,25 @@ class DecisionService:
             return self._ambiguous_request_decision()
         if is_geocode_request:
             return self._build_geocode_decision(has_text_location, has_coordinates)
+        requested_integration = self._requested_integration(user_message)
+        if requested_integration is not None:
+            keyword, label = requested_integration
+            any_available = bool(self._select_available_candidate_ids(retrieval, "basemaps") or self._select_available_candidate_ids(retrieval, "overlays"))
+            if self._integration_blocked(retrieval=retrieval, keyword=keyword) and not any_available:
+                return self._build_missing_integration_decision(label)
+        if self._is_map_search_request(user_message) and (has_coordinates or has_text_location):
+            return AgentDecision(
+                decision="search_and_complete",
+                execution_mode="search",
+                tool_target="map_search",
+                should_trigger_search=True,
+                location_status="valid",
+                requires_geocoding=bool(has_text_location and not has_coordinates),
+                clarification_question=None,
+                missing_fields=[],
+                clarification_kind=None,
+                reasoning_summary="Deterministic map-search routing from explicit map action and resolvable location.",
+            )
         if has_coordinates:
             return AgentDecision(
                 decision="search_and_complete",
@@ -309,6 +371,8 @@ class DecisionService:
                 location_status="valid",
                 requires_geocoding=False,
                 clarification_question=None,
+                missing_fields=[],
+                clarification_kind=None,
                 reasoning_summary="Coordinates available for deterministic map search",
             )
         if not has_coordinates and not has_text_location:
@@ -336,13 +400,6 @@ class DecisionService:
                 has_coordinates=has_coordinates,
                 summary="Direct nearby POI request",
             )
-
-        requested_integration = self._requested_integration(user_message)
-        if requested_integration is not None:
-            keyword, label = requested_integration
-            any_available = bool(self._select_available_candidate_ids(retrieval, "basemaps") or self._select_available_candidate_ids(retrieval, "overlays"))
-            if self._integration_blocked(retrieval=retrieval, keyword=keyword) and not any_available:
-                return self._build_missing_integration_decision(label)
 
         try:
             provider = self.llm_factory.get_agent_provider(self.provider)
@@ -398,4 +455,10 @@ class DecisionService:
         selected_overlays = payload.get("selected_overlay_ids")
         if isinstance(selected_overlays, list):
             payload["selected_overlay_ids"] = [item for item in selected_overlays if isinstance(item, str) and item in allowed_overlays]
-        return AgentDecision.model_validate(payload)
+        decision = AgentDecision.model_validate(payload)
+        return self._post_validate_decision(
+            decision=decision,
+            user_message=user_message,
+            has_text_location=has_text_location,
+            has_coordinates=has_coordinates,
+        )

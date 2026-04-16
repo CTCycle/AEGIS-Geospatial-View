@@ -133,6 +133,24 @@ class ChatResponseService:
             return "I need a required integration key to complete this exact request."
         return "I need a bit more detail to continue with the map request."
 
+    def _deterministic_clarification(
+        self,
+        *,
+        decision: AgentDecision,
+        search_result: dict[str, Any] | None,
+    ) -> str | None:
+        if "location" in decision.missing_fields:
+            if decision.tool_target == "location_to_coordinates":
+                return "Which location should I convert to coordinates?"
+            return "Which location should I show on the map?"
+        if decision.clarification_kind == "integration_blocked":
+            return decision.clarification_question
+        if decision.execution_mode == "geocode":
+            geocode_result = search_result.get("geocode_result") if isinstance(search_result, dict) else None
+            if geocode_result is None:
+                return "I couldn't resolve that place yet. Can you share a more specific location?"
+        return None
+
     def generate(
         self,
         *,
@@ -144,6 +162,12 @@ class ChatResponseService:
         search_result: dict[str, Any] | None,
         execution_feedback: dict[str, Any] | None = None,
     ) -> str:
+        deterministic_clarification = self._deterministic_clarification(
+            decision=decision,
+            search_result=search_result,
+        )
+        if deterministic_clarification:
+            return deterministic_clarification
         sanitized_retrieval = self._sanitize_retrieval_for_chat(retrieval)
         sanitized_search_result = self._sanitize_search_result_for_chat(search_result)
         try:
@@ -160,11 +184,11 @@ class ChatResponseService:
                 ChatCompletionRequest(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": get_agent_response_prompt(provider=self.provider, model=self.model)},
-                        {"role": "user", "content": conversation_context},
-                        {"role": "user", "content": json.dumps(payload, default=str)},
-                    ],
-                )
+                    {"role": "system", "content": get_agent_response_prompt(provider=self.provider, model=self.model)},
+                    {"role": "user", "content": conversation_context},
+                    {"role": "user", "content": json.dumps(payload, default=str)},
+                ],
+            )
             )
             text = self._normalize_plain_text_response((result.content or "").strip())
             if text:

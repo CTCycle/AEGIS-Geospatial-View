@@ -59,6 +59,7 @@ def merge_extracted_intent(base: ExtractedIntent, patch: ExtractedIntentPatch) -
     return ExtractedIntent(
         location=merged_location,
         coordinates=merged_coordinates,
+        location_type=patch.location_type if "location_type" in patch.model_fields_set else base.location_type,
         base_map_type=patch.base_map_type if "base_map_type" in patch.model_fields_set else base.base_map_type,
         time_references=_merge_time(base.time_references, patch.time_references),
         user_goal=patch.user_goal if "user_goal" in patch.model_fields_set else base.user_goal,

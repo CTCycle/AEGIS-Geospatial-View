@@ -56,7 +56,7 @@ def test_parser_service_includes_context_then_machine_readable_inputs() -> None:
         model="llama3.2",
     )
     state = ExtractedIntent.model_validate({"location": {"city": "Rome", "country": "Italy"}})
-    context = "# message 1\nFind Rome\n\n# extracted info\n{}"
+    context = "user: Find Rome\n\n# current extracted state\n{}"
 
     service.extract_patch(conversation_context=context, latest_state=state, user_message="same place")
 
@@ -93,13 +93,13 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
         provider="ollama",
         model="llama3.2",
     )
-    context = "# message 1\nFind Rome\n\n# extracted info\n{}"
+    context = "user: Find Rome\n\n# current extracted state\n{}"
     retrieval = {"basemaps": [{"id": "osm_default"}], "overlays": [{"id": "fires"}], "providers": []}
     state = ExtractedIntent.model_validate({"location": {"city": "Rome"}})
 
     service.decide(
         conversation_context=context,
-        user_message="show fires",
+        user_message="compare air quality and weather in Rome",
         extracted_state=state,
         retrieval=retrieval,
         available_tools=[{"name": "map_search", "description": "Map search tool"}],
@@ -109,7 +109,7 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
     assert request is not None
     assert request.messages[1]["content"] == context
     payload = json.loads(request.messages[2]["content"])
-    assert payload["user_message"] == "show fires"
+    assert payload["user_message"] == "compare air quality and weather in Rome"
     assert payload["retrieval"] == retrieval
     assert payload["available_tools"] == [{"name": "map_search", "description": "Map search tool"}]
 
@@ -121,7 +121,7 @@ def test_chat_response_service_includes_context_and_decision_payload() -> None:
         provider="ollama",
         model="llama3.2",
     )
-    context = "# message 1\nFind Rome\n\n# extracted info\n{}"
+    context = "user: Find Rome\n\n# current extracted state\n{}"
     decision = AgentDecision(
         decision="search_and_complete",
         should_trigger_search=True,

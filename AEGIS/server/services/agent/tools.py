@@ -50,12 +50,14 @@ class AgentTools:
         city: str | None,
         country_name: str | None,
         country_code: str | None = None,
+        expected_location_type: str | None = None,
     ) -> dict[str, Any] | None:
         return await self.nominatim_service.extract_coordinates(
             address=address,
             city=city,
             country_name=country_name,
             country_code=country_code,
+            expected_location_type=expected_location_type,
         )
 
     async def get_weather_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:

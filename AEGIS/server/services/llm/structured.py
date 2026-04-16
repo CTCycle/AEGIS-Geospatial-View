@@ -30,6 +30,7 @@ INTENT_SCHEMA: dict[str, Any] = {
             },
             "required": ["longitude", "latitude"],
         },
+        "location_type": {"type": ["string", "null"]},
         "base_map_type": {"type": ["string", "null"]},
         "time_references": {
             "type": "object",
@@ -51,6 +52,7 @@ INTENT_SCHEMA: dict[str, Any] = {
     "required": [
         "location",
         "coordinates",
+        "location_type",
         "base_map_type",
         "time_references",
         "user_goal",

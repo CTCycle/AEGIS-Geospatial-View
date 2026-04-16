@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 from datetime import UTC, datetime
 from typing import Any
 
@@ -53,6 +54,31 @@ class LocationSearchOrchestrator:
             return self.toolkit.normalize_layers(suggest_overlay_ids(payload.semantic_filters))
         return self.toolkit.normalize_layers(payload.semantic_filters)
 
+    def _bbox_area_degrees(self, bbox: list[float] | None) -> float:
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            return 0.0
+        try:
+            minx, miny, maxx, maxy = [float(value) for value in bbox]
+        except (TypeError, ValueError):
+            return 0.0
+        return max(0.0, abs(maxx - minx) * abs(maxy - miny))
+
+    def _derive_local_bbox(self, *, latitude: float, longitude: float, map_size_m: float) -> list[float]:
+        half_span_m = max(250.0, float(map_size_m) / 2.0)
+        deg_lat = half_span_m / 111_320.0
+        cos_lat = max(0.2, math.cos(math.radians(latitude)))
+        deg_lon = half_span_m / (111_320.0 * cos_lat)
+        return [longitude - deg_lon, latitude - deg_lat, longitude + deg_lon, latitude + deg_lat]
+
+    def _should_force_local_bbox(self, payload: LocationSearchRequest, nominatim_candidate: dict[str, Any]) -> bool:
+        location_type = str(nominatim_candidate.get("selected_result_type") or "").lower()
+        is_point_like = location_type in {"house", "building", "amenity", "attraction", "road", "residential"}
+        address_like = bool(payload.address and any(char.isdigit() for char in payload.address))
+        nearby_like = bool(payload.address and any(token in payload.address.lower() for token in ("nearby", "around")))
+        bbox_area = self._bbox_area_degrees(nominatim_candidate.get("bbox"))
+        oversized = bbox_area > 0.05
+        return bool((is_point_like or address_like or nearby_like) and oversized)
+
     async def resolve_coordinates(self, payload: LocationSearchRequest) -> dict[str, Any]:
         response_payload = payload.model_dump()
         normalized_filters = list(payload.filters or [])
@@ -84,6 +110,17 @@ class LocationSearchOrchestrator:
                         pass
                 if nominatim_candidate.get("bbox"):
                     response_payload["bbox"] = nominatim_candidate["bbox"]
+                if (
+                    response_payload.get("latitude") is not None
+                    and response_payload.get("longitude") is not None
+                    and self._should_force_local_bbox(payload, nominatim_candidate)
+                ):
+                    response_payload["bbox"] = self._derive_local_bbox(
+                        latitude=float(response_payload["latitude"]),
+                        longitude=float(response_payload["longitude"]),
+                        map_size_m=float(payload.map_size_m or 2500.0),
+                    )
+                    response_payload["bbox_source"] = "derived_local"
                 if nominatim_candidate.get("confidence") is not None:
                     response_payload["confidence"] = nominatim_candidate["confidence"]
         elif payload.latitude is not None and payload.longitude is not None:
