@@ -50,5 +50,12 @@ class ChatHistoryBuffer:
         return list(self._buffers.get(session_id, deque()))
 
     # -------------------------------------------------------------------------
+    def list_scoped(self, session_id: int, *, start_index: int) -> list[dict[str, Any]]:
+        messages = self.list_recent(session_id)
+        if start_index <= 0:
+            return messages
+        return messages[start_index:]
+
+    # -------------------------------------------------------------------------
     def reset(self, session_id: int) -> None:
         self._buffers.pop(session_id, None)

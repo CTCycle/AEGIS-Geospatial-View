@@ -46,6 +46,23 @@ class _NominatimCitySuccessStub:
         return [longitude - 0.1, latitude - 0.1, longitude + 0.1, latitude + 0.1]
 
 
+class _NominatimPoiOversizedBBoxStub:
+    async def extract_coordinates(self, address, city, country_name, country_code, limit=1, expected_location_type=None):  # noqa: ANN001
+        _ = city, country_name, country_code, limit, expected_location_type
+        if address and "Coliseum" in address:
+            return {
+                "lat": 41.8902,
+                "lon": 12.4922,
+                "bbox": [12.2, 41.7, 12.8, 42.0],
+                "selected_result_type": "attraction",
+                "confidence": 0.88,
+            }
+        return None
+
+    async def extract_bbox_from_coordinates(self, latitude, longitude):  # noqa: ANN001
+        return [longitude - 0.1, latitude - 0.1, longitude + 0.1, latitude + 0.1]
+
+
 class _NominatimFailStub:
     async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
         return None
@@ -133,3 +150,14 @@ def test_unresolved_location_fails_with_actionable_error() -> None:
     assert exc_info.value.status_code == 400
     assert "Unable to resolve a usable location" in str(exc_info.value.detail)
     assert "Unable to resolve map extent for the requested imagery." not in str(exc_info.value.detail)
+
+
+def test_point_like_query_uses_local_bbox_instead_of_oversized_city_bbox() -> None:
+    orchestrator = _build_orchestrator(_NominatimPoiOversizedBBoxStub())
+    payload = LocationSearchRequest(address="Coliseum, Rome")
+    result = asyncio.run(orchestrator.execute(payload))
+    bbox = result["payload"].get("bbox")
+    assert isinstance(bbox, list)
+    assert len(bbox) == 4
+    assert (bbox[2] - bbox[0]) < 0.2
+    assert (bbox[3] - bbox[1]) < 0.2

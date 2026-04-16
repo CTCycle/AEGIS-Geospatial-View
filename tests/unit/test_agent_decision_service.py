@@ -126,3 +126,17 @@ def test_decision_service_forces_search_when_coordinates_exist() -> None:
     )
     assert decision.execution_mode == "search"
     assert decision.should_trigger_search is True
+
+
+def test_decision_service_routes_map_request_without_meta_question() -> None:
+    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    decision = service.decide(
+        conversation_context="user: I want to see the area nearby the Coliseum",
+        user_message="I want to see the area nearby the Coliseum",
+        extracted_state=ExtractedIntent(location={"address": "Coliseum, Rome"}, location_type="poi"),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        available_tools=[{"name": "map_search", "description": "Run map search"}],
+    )
+    assert decision.execution_mode == "search"
+    assert decision.tool_target == "map_search"
+    assert decision.should_trigger_search is True

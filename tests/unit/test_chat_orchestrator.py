@@ -183,7 +183,7 @@ def test_chat_orchestrator_returns_coordinate_lookup_without_map_session(monkeyp
         def describe_tools(self):  # noqa: ANN201
             return [{"name": "location_to_coordinates", "description": "geocode"}]
 
-        async def geocode_location(self, *, address, city, country_name, country_code=None):  # noqa: ANN001
+        async def geocode_location(self, *, address, city, country_name, country_code=None, expected_location_type=None):  # noqa: ANN001
             assert city == "Rome"
             return {"lat": 41.9, "lon": 12.5, "bbox": [12.4, 41.8, 12.6, 42.0]}
 
@@ -269,7 +269,7 @@ def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(monkeypa
         def describe_tools(self):  # noqa: ANN201
             return [{"name": "location_to_coordinates", "description": "geocode"}]
 
-        async def geocode_location(self, *, address, city, country_name, country_code=None):  # noqa: ANN001
+        async def geocode_location(self, *, address, city, country_name, country_code=None, expected_location_type=None):  # noqa: ANN001
             raise AssertionError("geocode service should not be called for direct coordinates")
 
     orchestrator = AgentOrchestrator(
@@ -319,7 +319,7 @@ def test_chat_orchestrator_executes_direct_weather_tool(monkeypatch) -> None:
         def describe_tools(self):  # noqa: ANN201
             return [{"name": "get_weather_forecast", "description": "weather"}]
 
-        async def geocode_location(self, *, address, city, country_name, country_code=None):  # noqa: ANN001
+        async def geocode_location(self, *, address, city, country_name, country_code=None, expected_location_type=None):  # noqa: ANN001
             return {"lat": 41.9, "lon": 12.5}
 
         async def get_weather_forecast(self, *, latitude: float, longitude: float):  # noqa: ANN001
@@ -370,7 +370,7 @@ def test_chat_orchestrator_clears_stale_coordinates_for_new_text_location(monkey
         def describe_tools(self):  # noqa: ANN201
             return [{"name": "location_to_coordinates", "description": "geocode"}]
 
-        async def geocode_location(self, *, address, city, country_name, country_code=None):  # noqa: ANN001
+        async def geocode_location(self, *, address, city, country_name, country_code=None, expected_location_type=None):  # noqa: ANN001
             if address and "Amphitheatre" in address:
                 return {"lat": 37.422, "lon": -122.084}
             return None
@@ -501,3 +501,117 @@ def test_chat_orchestrator_infers_overlay_ids_from_retrieval(monkeypatch) -> Non
     assert result.tool_payload is not None
     assert result.tool_payload["execution"] == "map_search"
     assert "tomtom_traffic_flow" in (result.tool_payload.get("selected_overlay_ids") or [])
+
+
+def test_chat_orchestrator_same_place_reuses_location(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
+    orchestrator = AgentOrchestrator(
+        search_orchestrator=_SearchOrchestratorStub(),
+        vector_retriever=_VectorRetrieverStub(),
+    )
+
+    def _stage_a(self, conversation_context, user_message, available_tools, certainty_threshold, max_retries):  # noqa: ANN001
+        _ = conversation_context, available_tools, certainty_threshold, max_retries
+        return StageAParserIntent(
+            has_location="same place" not in user_message.lower(),
+            location_type="city",
+            has_time_reference=False,
+            requires_search=True,
+            requires_data=True,
+            required_tools=[],
+            certainty=0.92,
+        )
+
+    def _stage_b(self, conversation_context, user_message, retrieval, fallback_datetime):  # noqa: ANN001
+        _ = conversation_context, retrieval
+        if "same place" in user_message.lower():
+            return StageBSearchExtraction(time_reference=fallback_datetime)
+        return StageBSearchExtraction(
+            location={"city": "Rome", "country": "Italy", "location_type": "city"},
+            time_reference=fallback_datetime,
+        )
+
+    monkeypatch.setattr(ParserService, "parse_stage_a_intent", _stage_a)
+    monkeypatch.setattr(ParserService, "parse_stage_b_enrichment", _stage_b)
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, conversation_context, user_message, extracted_state, retrieval, available_tools=None: AgentDecision(
+            decision="search_and_complete",
+            execution_mode="search",
+            tool_target="map_search",
+            should_trigger_search=True,
+            location_status="valid",
+            requires_geocoding=False,
+            reasoning_summary="ok",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: "ok",
+    )
+    first = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="The Coliseum in Rome, Italy")))
+    second = asyncio.run(orchestrator.run_turn(ChatTurnRequest(session_id=first.session_id, message="same place, show traffic")))
+    assert second.extracted_state["location"]["city"] == "Rome"
+
+
+def test_chat_orchestrator_new_task_clears_stale_filters_and_coordinates(monkeypatch) -> None:
+    _allow_provider_checks(monkeypatch)
+    orchestrator = AgentOrchestrator(
+        search_orchestrator=_SearchOrchestratorStub(),
+        vector_retriever=_VectorRetrieverStub(),
+    )
+
+    def _stage_a(self, conversation_context, user_message, available_tools, certainty_threshold, max_retries):  # noqa: ANN001
+        _ = conversation_context, available_tools, certainty_threshold, max_retries
+        return StageAParserIntent(
+            has_location=True,
+            location_type="address" if "Via San Bernardo" in user_message else "coordinates",
+            has_time_reference=False,
+            requires_search=True,
+            requires_data=True,
+            required_tools=[],
+            certainty=0.94,
+        )
+
+    def _stage_b(self, conversation_context, user_message, retrieval, fallback_datetime):  # noqa: ANN001
+        _ = conversation_context, retrieval
+        if "Via San Bernardo" in user_message:
+            return StageBSearchExtraction(
+                location={"address": "Via San Bernardo 17 Canobbio", "city": "Canobbio", "country": "Switzerland", "location_type": "address"},
+                required_overlays=[],
+                time_reference=fallback_datetime,
+            )
+        return StageBSearchExtraction(
+            coordinates={"latitude": 41.9, "longitude": 12.5},
+            location={"location_type": "coordinates"},
+            required_overlays=["traffic"],
+            time_reference=fallback_datetime,
+        )
+
+    monkeypatch.setattr(ParserService, "parse_stage_a_intent", _stage_a)
+    monkeypatch.setattr(ParserService, "parse_stage_b_enrichment", _stage_b)
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, conversation_context, user_message, extracted_state, retrieval, available_tools=None: AgentDecision(
+            decision="search_and_complete",
+            execution_mode="search",
+            tool_target="map_search",
+            should_trigger_search=True,
+            location_status="valid",
+            requires_geocoding=False,
+            reasoning_summary="ok",
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: "ok",
+    )
+    first = asyncio.run(orchestrator.run_turn(ChatTurnRequest(message="Find restaurants near 41.9, 12.5 with traffic")))
+    second = asyncio.run(orchestrator.run_turn(ChatTurnRequest(session_id=first.session_id, message="Via San Bernardo 17 Canobbio")))
+    assert second.extracted_state["coordinates"]["latitude"] is None
+    assert second.extracted_state["coordinates"]["longitude"] is None
+    assert second.extracted_state["filters"] == []

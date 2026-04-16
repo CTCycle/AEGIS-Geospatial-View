@@ -114,3 +114,31 @@ def test_chat_response_service_reports_overlay_unmet_filters() -> None:
         },
     )
     assert "Unmet filters" in response
+
+
+def test_chat_response_service_missing_location_is_single_human_question() -> None:
+    class _FailingFactory:
+        def get_chat_provider(self, provider: str):  # noqa: ANN001
+            raise RuntimeError("chat unavailable")
+
+    service = ChatResponseService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")  # type: ignore[arg-type]
+    response = service.generate(
+        conversation_context="# context",
+        user_message="show traffic",
+        extracted_state=ExtractedIntent(),
+        decision=_decision(
+            decision="clarify",
+            execution_mode="clarify",
+            should_trigger_search=False,
+            location_status="missing",
+            tool_target="map_search",
+            missing_fields=["location"],
+            clarification_kind="missing_location",
+            clarification_question="Which location should I search?",
+        ),
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        search_result=None,
+    )
+    assert response.endswith("?")
+    assert response.count("?") == 1
+    assert "location" in response.lower()
