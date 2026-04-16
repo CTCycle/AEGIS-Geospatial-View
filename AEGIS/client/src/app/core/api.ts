@@ -42,15 +42,15 @@ export class ApiRequestError extends Error {
   }
 }
 
-const CHAT_STREAM_TIMEOUT_MS = 120_000;
+export const CHAT_STREAM_TIMEOUT_MS = 120_000;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const isStringArray = (value: unknown): value is string[] =>
+export const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string, boolean>> => {
+export const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string, boolean>> => {
   if (!isRecord(value)) {
     return {};
   }
@@ -68,7 +68,7 @@ const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string
   return parsed;
 };
 
-const parseSearchResponse = (value: unknown): SearchResponse => {
+export const parseSearchResponse = (value: unknown): SearchResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected search response format');
   }
@@ -92,7 +92,7 @@ const parseSearchResponse = (value: unknown): SearchResponse => {
   };
 };
 
-const parseCatalogResponse = (value: unknown): CatalogResponse => {
+export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
   }
@@ -147,7 +147,7 @@ const parseCatalogResponse = (value: unknown): CatalogResponse => {
   };
 };
 
-const parseModelSettingsResponse = (value: unknown): ModelSettingsResponse => {
+export const parseModelSettingsResponse = (value: unknown): ModelSettingsResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected settings response format');
   }
@@ -166,7 +166,7 @@ const parseModelSettingsResponse = (value: unknown): ModelSettingsResponse => {
   };
 };
 
-const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
+export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected chat response format');
   }
@@ -181,7 +181,7 @@ const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   };
 };
 
-const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
+export const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
   const response = await fetch(url, init);
   if (!response.ok) {
     throw await buildApiError(response);
@@ -189,7 +189,7 @@ const executeApiRequest = async (url: string, init: RequestInit): Promise<unknow
   return response.json();
 };
 
-const buildApiError = async (response: Response): Promise<ApiRequestError> => {
+export const buildApiError = async (response: Response): Promise<ApiRequestError> => {
   const errorData = await response.json().catch(() => ({ detail: response.statusText }));
   const detail = typeof errorData === 'object' && errorData !== null && 'detail' in errorData
     ? errorData.detail
