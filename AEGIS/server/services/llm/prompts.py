@@ -130,26 +130,31 @@ Response rules:
 """.strip()
 
 
+###############################################################################
 def get_agent_extraction_prompt(provider: str | None = None, model: str | None = None) -> str:
     _ = provider, model
     return AGENT_EXTRACTION_PROMPT
 
 
+###############################################################################
 def get_agent_enrichment_prompt(provider: str | None = None, model: str | None = None) -> str:
     _ = provider, model
     return AGENT_ENRICHMENT_PROMPT
 
 
+###############################################################################
 def get_agent_decision_system_prompt(provider: str | None = None, model: str | None = None) -> str:
     _ = provider, model
     return AGENT_DECISION_SYSTEM_PROMPT
 
 
+###############################################################################
 def get_agent_response_prompt(provider: str | None = None, model: str | None = None) -> str:
     _ = provider, model
     return AGENT_RESPONSE_PROMPT
 
 
+###############################################################################
 def prompt_within_budget(prompt: str, *, max_tokens: int = 2000) -> bool:
     estimated_tokens = max(1, len(prompt) // 4)
     return estimated_tokens < max_tokens

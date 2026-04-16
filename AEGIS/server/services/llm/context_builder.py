@@ -5,6 +5,7 @@ from typing import Any
 from AEGIS.server.configurations import get_server_settings
 
 
+###############################################################################
 def build_conversation_context(
     *,
     messages: list[dict[str, Any]],

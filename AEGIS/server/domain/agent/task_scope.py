@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+###############################################################################
 class TaskScopeDecision(BaseModel):
     starts_new_task: bool = False
     carry_forward_location: bool = True

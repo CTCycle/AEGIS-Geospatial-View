@@ -3,6 +3,7 @@ from __future__ import annotations
 from AEGIS.server.services.llm.context_builder import build_conversation_context
 
 
+###############################################################################
 def test_context_builder_formats_messages_and_extracted_info() -> None:
     context = build_conversation_context(
         messages=[
@@ -19,6 +20,7 @@ def test_context_builder_formats_messages_and_extracted_info() -> None:
     assert "# current user message\nFind Rome" in context
 
 
+###############################################################################
 def test_context_builder_keeps_most_recent_messages_only() -> None:
     context = build_conversation_context(
         messages=[

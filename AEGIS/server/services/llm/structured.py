@@ -113,6 +113,7 @@ STAGE_B_SCHEMA: dict[str, Any] = {
 }
 
 
+###############################################################################
 def _to_bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
@@ -126,6 +127,7 @@ def _to_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
+###############################################################################
 def _to_float(value: Any, default: float = 0.0) -> float:
     if isinstance(value, (int, float)):
         return float(value)
@@ -135,6 +137,7 @@ def _to_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+###############################################################################
 def _to_str_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
@@ -143,6 +146,7 @@ def _to_str_list(value: Any) -> list[str]:
     return []
 
 
+###############################################################################
 def parse_structured_json(raw: str) -> dict[str, Any]:
     try:
         payload = json.loads(raw)
@@ -153,16 +157,19 @@ def parse_structured_json(raw: str) -> dict[str, Any]:
     return normalize_structured_payload(payload)
 
 
+###############################################################################
 def normalize_structured_payload(payload: dict[str, Any]) -> dict[str, Any]:
     model = ExtractedIntent.model_validate(payload)
     return model.model_dump(mode="json")
 
 
+###############################################################################
 def normalize_patch_payload(payload: dict[str, Any]) -> dict[str, Any]:
     model = ExtractedIntentPatch.model_validate(payload)
     return model.model_dump(mode="json", exclude_none=True)
 
 
+###############################################################################
 def normalize_stage_a_payload(payload: dict[str, Any]) -> dict[str, Any]:
     aliases = {
         "location_present": "has_location",
@@ -194,6 +201,7 @@ def normalize_stage_a_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return model.model_dump(mode="json")
 
 
+###############################################################################
 def normalize_stage_b_payload(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
     if "base_map" not in normalized and "basemap" in normalized:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from AEGIS.server.services.search.intent_mapper import map_structured_intent_to_location_request
 
 
+###############################################################################
 def test_intent_mapper_supports_coordinates_and_filters() -> None:
     mapped = map_structured_intent_to_location_request(
         extracted_state={
@@ -26,6 +27,7 @@ def test_intent_mapper_supports_coordinates_and_filters() -> None:
     assert mapped["radius_m"] == 1500.0
 
 
+###############################################################################
 def test_intent_mapper_uses_bbox_when_present() -> None:
     mapped = map_structured_intent_to_location_request(
         extracted_state={
@@ -41,6 +43,7 @@ def test_intent_mapper_uses_bbox_when_present() -> None:
     assert mapped["address"] == "Berlin"
 
 
+###############################################################################
 def test_intent_mapper_nearby_phrase_sets_local_radius() -> None:
     mapped = map_structured_intent_to_location_request(
         extracted_state={

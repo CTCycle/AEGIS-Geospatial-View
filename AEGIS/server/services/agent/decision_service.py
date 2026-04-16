@@ -11,6 +11,7 @@ from AEGIS.server.services.llm.prompts import get_agent_decision_system_prompt
 from AEGIS.server.services.llm.types import ChatCompletionRequest
 
 
+###############################################################################
 class DecisionService:
     GEOCODE_PATTERNS = (
         re.compile(r"\b(coordinates?|latitude|longitude|lat\s*/\s*lon|lat[- ]?lon)\b", re.IGNORECASE),

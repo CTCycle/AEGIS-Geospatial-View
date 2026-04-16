@@ -10,12 +10,14 @@ from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import Base, ChatMessageRecord, ChatSessionRecord
 
 
+###############################################################################
 def _to_json_payload(value: Any) -> str | None:
     if value is None:
         return None
     return json.dumps(value, default=str)
 
 
+###############################################################################
 def _from_json_payload(value: str | None) -> Any:
     if not value:
         return None
@@ -25,6 +27,7 @@ def _from_json_payload(value: str | None) -> Any:
         return None
 
 
+###############################################################################
 def _extract_extracted_state_from_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
     extracted_state = payload.get("extracted_state")
     if isinstance(extracted_state, dict):
@@ -32,6 +35,7 @@ def _extract_extracted_state_from_payload(payload: dict[str, Any]) -> dict[str, 
     return None
 
 
+###############################################################################
 class ChatHistoryRepository:
     def __init__(self) -> None:
         backend = get_database().backend

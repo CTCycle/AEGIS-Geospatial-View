@@ -5,6 +5,7 @@ from typing import Any
 from AEGIS.server.configurations import get_server_settings
 
 
+###############################################################################
 def map_structured_intent_to_location_request(
     *,
     extracted_state: dict[str, Any],
