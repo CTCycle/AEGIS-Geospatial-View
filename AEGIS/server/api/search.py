@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
 from fastapi import APIRouter, status
+from fastapi.responses import Response
 
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import GeospatialCatalogResponse, SearchByLocationResponse
@@ -24,6 +28,7 @@ from AEGIS.server.utils.constants import (
     MAPS_CATALOG_ROUTE,
     MAPS_JOB_ROUTE,
     MAPS_JOBS_ROUTE,
+    MAPS_OSM_BASEMAP_TILE_ROUTE,
     MAPS_ROUTER_PREFIX,
     MAPS_SEARCH_ROUTE,
 )
@@ -80,6 +85,38 @@ router.add_api_route(
     response_model=GeospatialCatalogResponse,
     status_code=status.HTTP_200_OK,
 )
+@router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
+def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
+    if z < 0 or x < 0 or y < 0:
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
+
+    tile_url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    request = Request(
+        tile_url,
+        headers={
+            "User-Agent": "AEGIS Geospatial View/2.0 (+https://github.com/CTCycle/AEGIS-geographics)",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+    )
+    try:
+        with urlopen(request, timeout=10) as upstream:
+            media_type = upstream.headers.get_content_type() or "image/png"
+            cache_control = upstream.headers.get("Cache-Control", "public, max-age=3600")
+            return Response(
+                content=upstream.read(),
+                media_type=media_type,
+                headers={"Cache-Control": cache_control},
+            )
+    except HTTPError as exc:
+        detail = f"OSM basemap tile request failed with status {exc.code}."
+        return Response(content=detail, status_code=status.HTTP_502_BAD_GATEWAY, media_type="text/plain")
+    except URLError:
+        return Response(
+            content="OSM basemap tile provider is unavailable.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            media_type="text/plain",
+        )
+
 router.add_api_route(
     MAPS_SEARCH_ROUTE,
     search_execution.search_by_location,
