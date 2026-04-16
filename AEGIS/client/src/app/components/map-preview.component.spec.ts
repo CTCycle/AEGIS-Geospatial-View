@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import maplibregl from 'maplibre-gl';
 
+import { DEFAULT_BASE_TILE_MAX_ZOOM, DEFAULT_BASE_TILE_PROXY_URL, DEFAULT_MAP_FIT_MAX_ZOOM } from '../core/constants';
 import { MapPreviewComponent } from './map-preview.component';
 
 describe('components/map-preview.component', () => {
@@ -15,6 +16,7 @@ describe('components/map-preview.component', () => {
     getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    resize: jasmine.Spy;
     remove: jasmine.Spy;
   };
 
@@ -28,6 +30,7 @@ describe('components/map-preview.component', () => {
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      resize: jasmine.createSpy('resize'),
       remove: jasmine.createSpy('remove'),
     };
     spyOn(maplibregl, 'Map').and.returnValue(fakeMap as never);
@@ -50,7 +53,27 @@ describe('components/map-preview.component', () => {
     fixture.detectChanges();
     expect(maplibregl.Map).toHaveBeenCalled();
     const style = (maplibregl.Map as jasmine.Spy).calls.mostRecent().args[0].style;
-    expect(style.sources.basemap.tiles[0]).toContain('openstreetmap.org');
+    expect(style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
+    expect(style.sources.basemap.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
+    expect(style.layers.find((layer: { id: string }) => layer.id === 'basemap')?.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
+  });
+
+  it('fits bounds with a capped max zoom and resizes after load', () => {
+    component.payload = {
+      map_session: {
+        center: { latitude: 41.9028, longitude: 12.4964 },
+        bounds: [12.4963044, 41.902725, 12.4964044, 41.902825],
+        overlays: [],
+      },
+    };
+
+    fixture.detectChanges();
+
+    expect(fakeMap.resize).toHaveBeenCalled();
+    expect(fakeMap.fitBounds).toHaveBeenCalledWith(
+      [[12.4963044, 41.902725], [12.4964044, 41.902825]],
+      { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM },
+    );
   });
 
   it('rebuilds overlay state from session and emits notice for stale ids', () => {

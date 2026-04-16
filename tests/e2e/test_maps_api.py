@@ -61,6 +61,18 @@ def test_catalog_success_and_prefix_parity(api_context: APIRequestContext) -> No
     assert set(body.keys()) == set(prefixed.json().keys())
 
 
+def test_osm_basemap_tile_proxy_returns_png_and_prefix_parity(api_context: APIRequestContext) -> None:
+    base = _get(api_context, "/maps/basemaps/osm/13/4380/3043.png")
+    prefixed = _get(api_context, "/api/maps/basemaps/osm/13/4380/3043.png")
+    if base.status in {502, 503, 504} or prefixed.status in {502, 503, 504}:
+        pytest.skip("OSM tile provider unavailable during test run")
+    assert base.ok and prefixed.ok
+    assert base.headers["content-type"].startswith("image/png")
+    assert prefixed.headers["content-type"].startswith("image/png")
+    assert int(base.headers.get("content-length", "1")) > 0
+    assert int(prefixed.headers.get("content-length", "1")) > 0
+
+
 def test_malformed_search_payload_returns_422(api_context: APIRequestContext) -> None:
     response = _post(api_context, "/maps/search", _payload(latitude=None))
     assert response.status == 422

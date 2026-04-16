@@ -15,7 +15,10 @@ import maplibregl, { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-
 
 import {
   DEFAULT_BASE_ATTRIBUTION,
+  DEFAULT_BASE_TILE_MAX_ZOOM,
+  DEFAULT_BASE_TILE_PROXY_URL,
   DEFAULT_BASE_TILE_URL,
+  DEFAULT_MAP_FIT_MAX_ZOOM,
   DEFAULT_OVERLAY_OPACITY,
   DEFAULT_WMS_EXCEPTIONS,
   DEFAULT_WMS_LAYER_ID,
@@ -108,9 +111,26 @@ const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
   return appendQuery(overlay.url, query);
 };
 
+const buildBasemapTileUrl = (mapSession?: MapSession): string => {
+  const basemap = mapSession?.basemap;
+  const tileUrl = basemap?.tile_url || DEFAULT_BASE_TILE_URL;
+  if (tileUrl === DEFAULT_BASE_TILE_URL) {
+    return DEFAULT_BASE_TILE_PROXY_URL;
+  }
+  try {
+    const parsed = new URL(tileUrl);
+    if (parsed.hostname === 'tile.openstreetmap.org') {
+      return DEFAULT_BASE_TILE_PROXY_URL;
+    }
+  } catch {
+    return tileUrl;
+  }
+  return tileUrl;
+};
+
 const buildStyle = (mapSession?: MapSession): StyleSpecification => {
   const basemap = mapSession?.basemap;
-  const baseTileUrl = basemap?.tile_url || DEFAULT_BASE_TILE_URL;
+  const baseTileUrl = buildBasemapTileUrl(mapSession);
   return {
     version: 8,
     sources: {
@@ -118,6 +138,7 @@ const buildStyle = (mapSession?: MapSession): StyleSpecification => {
         type: 'raster',
         tiles: [baseTileUrl],
         tileSize: 256,
+        maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
         attribution: basemap?.attribution || DEFAULT_BASE_ATTRIBUTION,
       },
     },
@@ -127,7 +148,7 @@ const buildStyle = (mapSession?: MapSession): StyleSpecification => {
         type: 'raster',
         source: 'basemap',
         minzoom: 0,
-        maxzoom: 22,
+        maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
       },
     ],
   };
@@ -257,7 +278,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }>();
 
   @ViewChild('mapContainer', { static: false })
-  private mapContainerRef?: ElementRef<HTMLDivElement>;
+  private set mapContainer(value: ElementRef<HTMLDivElement> | undefined) {
+    this.mapContainerRef = value;
+    if (value && this.viewInitialized) {
+      queueMicrotask(() => this.recreateMapIfPossible());
+    }
+  }
 
   mapSession?: MapSession;
   overlayVisibility: Record<string, boolean> = {};
@@ -265,6 +291,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   restoreNotice = '';
 
   private mapRef: Map | null = null;
+  private mapContainerRef?: ElementRef<HTMLDivElement>;
   private viewInitialized = false;
 
   constructor(private readonly sanitizer: DomSanitizer) {}
@@ -384,12 +411,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       return;
     }
     const center = this.mapSession?.center;
-    if (
-      !this.viewInitialized
-      || !this.mapContainerRef?.nativeElement
-      || typeof center?.longitude !== 'number'
-      || typeof center.latitude !== 'number'
-    ) {
+    if (!this.viewInitialized) {
+      return;
+    }
+    if (typeof center?.longitude !== 'number' || typeof center.latitude !== 'number') {
+      this.destroyMap();
+      return;
+    }
+    if (!this.mapContainerRef?.nativeElement) {
       return;
     }
 
@@ -404,10 +433,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
     map.on('load', () => {
+      map.resize();
       addOverlayLayers(map, this.mapSession);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
-        map.fitBounds(bounds, { padding: 30, duration: 0 });
+        map.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
       }
       this.applyOverlayStateToMap();
     });

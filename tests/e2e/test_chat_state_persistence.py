@@ -129,6 +129,7 @@ def test_refresh_same_tab_restores_chat_and_map_state(page: Page, base_url: str)
     expect(page.get_by_label("Chat message")).to_have_value("draft should persist")
     expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
     expect(page.locator(".overlay-controls")).to_be_visible()
+    expect(page.locator(".maplibregl-canvas")).to_be_visible()
     slider_value = page.locator(".overlay-control-row input[type='range']").first.input_value()
     assert int(slider_value) == 33
 
