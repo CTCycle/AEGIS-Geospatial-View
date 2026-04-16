@@ -11,6 +11,8 @@ set "project_folder=%tests_folder%..\AEGIS\"
 set "root_folder=%tests_folder%..\"
 set "runtimes_dir=%root_folder%runtimes"
 set "settings_dir=%project_folder%settings"
+set "artifacts_dir=%tests_folder%artifacts"
+set "artifacts_logs_dir=%artifacts_dir%\logs"
 
 set "python_dir=%runtimes_dir%\python"
 set "python_exe=%python_dir%\python.exe"
@@ -24,6 +26,8 @@ set "DOTENV=%settings_dir%\.env"
 set "FRONTEND_DIR=%project_folder%client"
 set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
 set "UVICORN_MODULE=AEGIS.server.app:app"
+set "BACKEND_LOG=%artifacts_logs_dir%\backend.log"
+set "FRONTEND_LOG=%artifacts_logs_dir%\frontend.log"
 
 title AEGIS Test Runner
 echo.
@@ -49,6 +53,11 @@ if not exist "%node_exe%" (
 )
 
 echo [OK] All prerequisites found.
+
+if not exist "%artifacts_dir%" mkdir "%artifacts_dir%"
+if not exist "%artifacts_logs_dir%" mkdir "%artifacts_logs_dir%"
+break > "%BACKEND_LOG%"
+break > "%FRONTEND_LOG%"
 
 REM ============================================================================
 REM == Load environment variables
@@ -133,7 +142,7 @@ REM == Start backend
 REM ============================================================================
 echo [STEP 2/4] Starting backend server...
 call :kill_port %FASTAPI_PORT%
-start "" /b "%uv_exe%" run --python "%python_exe%" python -m uvicorn %UVICORN_MODULE% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
+start "" /b cmd /c "\"%uv_exe%\" run --python \"%python_exe%\" python -m uvicorn %UVICORN_MODULE% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning 1>>\"%BACKEND_LOG%\" 2>&1"
 
 REM Wait for backend to be ready
 echo [INFO] Waiting for backend to start...
@@ -182,7 +191,7 @@ if not exist "%FRONTEND_DIST%" (
 
 call :kill_port %UI_PORT%
 pushd "%FRONTEND_DIR%" >nul
-start "" /b "%npm_cmd%" run preview -- --host %UI_HOST% --port %UI_PORT%
+start "" /b cmd /c "\"%npm_cmd%\" run preview -- --host %UI_HOST% --port %UI_PORT% 1>>\"%FRONTEND_LOG%\" 2>&1"
 popd >nul
 
 REM Wait for frontend to be ready
