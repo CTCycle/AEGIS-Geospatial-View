@@ -153,6 +153,7 @@ describe('pages/settings-page.component', () => {
   });
 
   it('syncQueryState and persistence update URL and store', async () => {
+    window.history.replaceState({}, '', '/settings');
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();

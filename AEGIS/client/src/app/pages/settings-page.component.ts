@@ -16,6 +16,7 @@ import {
   ModelCardDescriptor,
   ModelProviderMode,
   ModelSettingsResponse,
+  ModelSettingsUpdateRequest,
 } from '../core/types';
 import {
   checkOllamaHealth,
@@ -71,6 +72,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
   showLocalOnly = false;
+  private isDestroyed = false;
 
   constructor(
     private readonly router: Router,
@@ -98,6 +100,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.isDestroyed = true;
     this.syncState();
   }
 
@@ -192,15 +195,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
     const payload = buildModelSelectionPayload(this.settings, role, model);
     try {
-      const updated = await updateChatSettings(payload);
+      const updated = await this.saveModelSettings(payload);
+      if (this.isDestroyed) {
+        return;
+      }
       this.settings = updated;
       this.providerMode = updated.active_provider_mode;
-      this.statusText = model.provider === 'ollama'
-        ? `Selected ${model.name} for ${role}`
-        : `Selected ${model.name} for parser, chat, and agent`;
+      this.statusText = `Selected ${model.name} for ${this.roleLabel(role)}`;
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} for ${role}.`);
     }
   }
@@ -342,6 +349,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         fetchChatSettings(),
         fetchChatModels(),
       ]);
+      if (this.isDestroyed) {
+        return;
+      }
       this.settings = nextSettings;
       this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
@@ -350,15 +360,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
       this.statusText = this.userFacingErrorService.toUserFacingError(error, 'Could not load model settings right now.');
       this.syncState();
     } finally {
+      if (this.isDestroyed) {
+        return;
+      }
       this.isLoadingModels = false;
     }
   }
 
   private syncQueryState(): void {
-    const params = new URLSearchParams(window.location.search);
+    const currentPath = this.router.url.split('?')[0];
+    if (currentPath !== '/settings') {
+      return;
+    }
+
+    const params = new URLSearchParams();
     if (this.searchText.trim()) {
       params.set('q', this.searchText);
     } else {
@@ -371,9 +392,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       params.delete('mode');
     }
 
-    const nextQuery = params.toString();
-    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+    const queryParams: Record<string, string> = {};
+    params.forEach((value, key) => {
+      queryParams[key] = value;
+    });
+    const nextUrl = this.router.serializeUrl(this.router.createUrlTree(['/settings'], { queryParams }));
     window.history.replaceState(window.history.state, '', nextUrl);
+  }
+
+  private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
+    return updateChatSettings(payload);
+  }
+
+  private roleLabel(role: ModelRole): string {
+    if (role === 'parser') {
+      return 'parser';
+    }
+    if (role === 'chat') {
+      return 'chat';
+    }
+    return 'agent';
   }
 
   private syncState(): void {
