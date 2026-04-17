@@ -42,29 +42,29 @@ Typical local defaults from env examples:
 Routers are mounted at both base and `/api` prefix in `AEGIS/server/app.py`.
 
 Maps router (`/maps`):
-- `GET /maps/catalog`
-- `POST /maps/search`
-- `POST /maps/jobs`
-- `GET /maps/jobs/{job_id}`
-- `DELETE /maps/jobs/{job_id}`
+- `GET /api/maps/catalog`
+- `POST /api/maps/search`
+- `POST /api/maps/jobs`
+- `GET /api/maps/jobs/{job_id}`
+- `DELETE /api/maps/jobs/{job_id}`
 
 Chat router (`/chat`):
-- `POST /chat/turn`
-- `POST /chat/stream`
-- `GET /chat/models`
-- `GET /chat/settings`
-- `PUT /chat/settings`
-- `POST /chat/models/ollama/refresh`
-- `POST /chat/models/ollama/pull`
-- `GET /chat/models/ollama/health`
-- `POST /chat/vectors/rebuild`
-- `POST /chat/vectors/sync`
+- `POST /api/chat/turn`
+- `POST /api/chat/stream`
+- `GET /api/chat/models`
+- `GET /api/chat/settings`
+- `PUT /api/chat/settings`
+- `POST /api/chat/models/ollama/refresh`
+- `POST /api/chat/models/ollama/pull`
+- `GET /api/chat/models/ollama/health`
+- `POST /api/chat/vectors/rebuild`
+- `POST /api/chat/vectors/sync`
 
-Access keys router (`/access-keys`):
-- `GET /access-keys?provider=...`
-- `POST /access-keys`
-- `PUT /access-keys/{key_id}/activate?provider=...`
-- `DELETE /access-keys/{key_id}?provider=...`
+Access keys router (`/api/access-keys`):
+- `GET /api/access-keys?provider=...`
+- `POST /api/access-keys`
+- `PUT /api/access-keys/{key_id}/activate?provider=...`
+- `DELETE /api/access-keys/{key_id}?provider=...`
 
 Root behavior:
 - In Tauri packaged mode with built frontend assets, `/` serves SPA files.

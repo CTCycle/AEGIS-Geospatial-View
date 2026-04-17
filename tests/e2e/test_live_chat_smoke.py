@@ -17,7 +17,7 @@ from tests.e2e.helpers.artifacts import (
 
 def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     response = page.request.post(
-        f"{api_base_url.rstrip('/')}/chat/turn",
+        f"{api_base_url.rstrip('/')}/api/chat/turn",
         data={"message": "Give me the coordinates of Rome, Italy"},
     )
     if response.status == 200:
@@ -142,7 +142,7 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
 
 def test_live_degraded_path_shows_user_failure_without_crash(page: Page, base_url: str) -> None:
     page.route(
-        "**/chat/turn",
+        "**/api/chat/turn",
         lambda route: route.fulfill(
             status=503,
             content_type="application/json",

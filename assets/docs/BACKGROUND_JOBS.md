@@ -30,9 +30,9 @@ State fields include:
 ## 3. API Endpoints
 
 Exposed by map routes:
-- `POST /maps/jobs`: start async map search
-- `GET /maps/jobs/{job_id}`: fetch state snapshot
-- `DELETE /maps/jobs/{job_id}`: request cancellation
+- `POST /api/maps/jobs`: start async map search
+- `GET /api/maps/jobs/{job_id}`: fetch state snapshot
+- `DELETE /api/maps/jobs/{job_id}`: request cancellation
 
 Routes are also available under `/api`.
 

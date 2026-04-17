@@ -62,21 +62,21 @@ def _turn_payload() -> dict[str, Any]:
 
 
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
-    page.route(re.compile(r".*/(?:api/)?chat/turn$"), lambda route: _json_ok(route, _turn_payload()))
-    page.route(re.compile(r".*/(?:api/)?chat/settings$"), lambda route: _json_ok(route, model_settings_payload()))
-    page.route(re.compile(r".*/(?:api/)?chat/models$"), lambda route: _json_ok(route, _models_payload()))
+    page.route(re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload()))
+    page.route(re.compile(r".*/api/chat/settings$"), lambda route: _json_ok(route, model_settings_payload()))
+    page.route(re.compile(r".*/api/chat/models$"), lambda route: _json_ok(route, _models_payload()))
     page.route(
-        re.compile(r".*/(?:api/)?maps/catalog$"),
+        re.compile(r".*/api/maps/catalog$"),
         lambda route: _json_ok(route, {"providers": [], "basemaps": [], "overlays": []}),
     )
 
     def handle_osm_proxy(route: Route) -> None:
-        match = re.search(r"/maps/basemaps/osm/(\d+)/\d+/\d+\.png$", route.request.url)
+        match = re.search(r"/api/maps/basemaps/osm/(\d+)/\d+/\d+\.png$", route.request.url)
         if match:
             record_tile_zoom(int(match.group(1)))
         route.fulfill(status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT)
 
-    page.route(re.compile(r".*/(?:api/)?maps/basemaps/osm/\d+/\d+/\d+\.png$"), handle_osm_proxy)
+    page.route(re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"), handle_osm_proxy)
 
 
 def _collect_console_errors(page: Page) -> list[str]:

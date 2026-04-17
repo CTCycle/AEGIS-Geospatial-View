@@ -22,8 +22,8 @@ AEGIS uses a chat-first flow where each user turn can either:
   - vector index bootstrap runs at backend startup when `vectors.auto_sync_on_start=true`.
   - bootstrap runs once when artifacts are missing and is skipped when both collection and metadata are valid.
   - similarity retrieval uses the raw user prompt text.
-  - manual rebuild is exposed at `POST /chat/vectors/rebuild`.
-  - incremental sync is exposed at `POST /chat/vectors/sync`.
+  - manual rebuild is exposed at `POST /api/chat/vectors/rebuild`.
+  - incremental sync is exposed at `POST /api/chat/vectors/sync`.
 - Direct coordinates tool:
   - explicit coordinate-lookup requests route to direct geocoding.
   - geocoding responses return plain text coordinates and do not create `map_session`.
@@ -53,18 +53,18 @@ AEGIS uses a chat-first flow where each user turn can either:
 
 ## Backend Flow
 
-1. `POST /chat/turn` or `POST /chat/stream` receives user turn.
+1. `POST /api/chat/turn` or `POST /api/chat/stream` receives user turn.
 2. Agent orchestration loads bounded transcript context and extracts intent.
 3. Vector retriever resolves candidates from the raw user message.
 4. Candidate availability and tool descriptions are passed into decisioning.
 5. Decision selects geocode/search/clarify without exposing internal IDs.
 6. Intent mapper converts agent output to `LocationSearchRequest` shape for search mode.
-7. Shared location-search orchestrator executes map pipeline reused by `/maps/search`.
+7. Shared location-search orchestrator executes map pipeline reused by `/api/maps/search`.
 8. Assistant response + structured payload + map session are persisted.
 
 ## Streaming Events
 
-`/chat/stream` returns NDJSON events:
+`/api/chat/stream` returns NDJSON events:
 - `status`
 - `assistant_delta`
 - `tool_status`

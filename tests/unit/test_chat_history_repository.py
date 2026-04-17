@@ -52,28 +52,3 @@ def test_get_latest_extracted_state_reads_nested_payload(monkeypatch) -> None:  
     assert latest.filters == ["traffic"]
     assert latest.location_type == "city"
 
-
-###############################################################################
-def test_get_latest_extracted_state_still_supports_legacy_payload(monkeypatch) -> None:  # noqa: ANN001
-    monkeypatch.setattr(
-        "AEGIS.server.repositories.chat_history.get_database",
-        lambda: _Database(),
-    )
-    repo = ChatHistoryRepository()
-    session = repo.create_session(title="legacy")
-    repo.append_message(
-        session_id=session.id,
-        role="assistant",
-        content="legacy",
-        structured_payload={
-            "location": {"city": "Zurich", "country": "Switzerland"},
-            "coordinates": {"latitude": None, "longitude": None},
-            "location_type": "city",
-            "filters": [],
-            "user_goal": "show weather",
-            "certainty": 0.7,
-        },
-    )
-    latest = repo.get_latest_extracted_state(session.id)
-    assert latest is not None
-    assert latest.location.city == "Zurich"

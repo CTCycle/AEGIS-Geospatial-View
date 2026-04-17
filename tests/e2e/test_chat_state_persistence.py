@@ -21,11 +21,11 @@ def _json_ok(route: Route, payload: dict[str, Any]) -> None:
 
 def _stub_settings_api(page: Page) -> None:
     page.route(
-        re.compile(r".*/(?:api/)?chat/settings$"),
+        re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),
     )
     page.route(
-        re.compile(r".*/(?:api/)?chat/models$"),
+        re.compile(r".*/api/chat/models$"),
         lambda route: _json_ok(
             route,
             {
