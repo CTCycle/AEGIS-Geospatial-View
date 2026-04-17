@@ -45,6 +45,7 @@ Update affected docs when changes impact:
 - Use reproducible commands.
 - Validate inputs and avoid hardcoded secrets.
 - Preserve secure defaults and minimize accidental surface expansion.
+- Do not introduce mutable module-level global state (for example `global` variables or singleton caches backed by mutable globals); prefer explicit dependency injection or function-level caching utilities.
 
 ## 5. Completion Checks
 

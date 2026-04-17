@@ -23,6 +23,7 @@ Scope: `AEGIS/server`, Python tooling in repo root
 - Avoid conditional imports unless required for optional runtime paths.
 - Keep API, service, repository, and utility concerns separated.
 - Keep business logic out of route handlers.
+- Avoid mutable module-level globals and `global` declarations; pass dependencies explicitly or use immutable/config-driven patterns.
 
 ## 4. FastAPI Conventions
 
