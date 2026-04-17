@@ -22,7 +22,7 @@ jobs:
       - name: Sanity check
         run: python --version
 
-  map-render-regression:
+  frontend-regressions:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,7 +67,7 @@ jobs:
           cat frontend.ci.log
           exit 1
 
-      - name: Run map render regression
+      - name: Run frontend regression suites
         env:
           APP_TEST_FRONTEND_URL: http://127.0.0.1:7861
-        run: pytest -q tests/e2e/test_map_render_regressions.py --browser chromium
+        run: pytest -q tests/e2e/test_map_render_regressions.py tests/e2e/test_settings_regressions.py --browser chromium

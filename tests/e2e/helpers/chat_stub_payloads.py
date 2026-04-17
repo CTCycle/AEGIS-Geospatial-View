@@ -86,6 +86,71 @@ def model_settings_payload() -> dict[str, Any]:
     }
 
 
+def model_catalog_payload() -> dict[str, Any]:
+    return {
+        "cloud": [
+            {
+                "id": "gpt-5-mini",
+                "name": "gpt-5-mini",
+                "description": "Low-latency OpenAI cloud model.",
+                "provider": "openai",
+                "capabilities": ["chat", "tool_use"],
+                "metadata": {"tier": "mini"},
+            },
+            {
+                "id": "gpt-4.1-mini",
+                "name": "gpt-4.1-mini",
+                "description": "General purpose OpenAI cloud model.",
+                "provider": "openai",
+                "capabilities": ["chat"],
+                "metadata": {"tier": "mini"},
+            },
+            {
+                "id": "gemini-2.5-flash",
+                "name": "gemini-2.5-flash",
+                "description": "Fast Google cloud model.",
+                "provider": "google",
+                "capabilities": ["chat"],
+                "metadata": {"tier": "flash"},
+            },
+            {
+                "id": "llama3.2",
+                "name": "llama3.2",
+                "description": "Local Ollama model available in cloud catalog.",
+                "provider": "ollama",
+                "capabilities": ["chat"],
+                "metadata": {"family": "llama"},
+            },
+        ],
+        "local": [
+            {
+                "id": "llama3.2",
+                "name": "llama3.2",
+                "description": "Installed local Ollama model.",
+                "provider": "ollama",
+                "capabilities": ["chat"],
+                "metadata": {"family": "llama"},
+            }
+        ],
+    }
+
+
+def split_role_settings_payload() -> dict[str, Any]:
+    return {
+        "active_provider_mode": "cloud",
+        "chat_model_provider": "openai",
+        "chat_model_name": "gpt-4.1-mini",
+        "parser_model_provider": "google",
+        "parser_model_name": "gemini-2.5-flash",
+        "agent_model_provider": "ollama",
+        "agent_model_name": "llama3.2",
+        "ollama_url": "http://localhost:11434",
+        "openai_base_url": "https://api.openai.com/v1",
+        "google_base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "credentials": {"openai": {"api_key": False}, "google": {"api_key": True}},
+    }
+
+
 def chat_stream_events(session_id: int, assistant_message: str, include_tool_status: bool = True) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = [{"event": "status", "data": {"message": "received"}}]
     for token in assistant_message.split():
