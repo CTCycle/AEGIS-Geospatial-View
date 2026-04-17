@@ -72,28 +72,13 @@ class GeospatialManifestLoader:
             entries.append(self._validate_entry(payload, source=filename, source_path=path))
         return entries
 
-    def _load_legacy_manifest(self, filename: str) -> list[JsonDict]:
-        path = os.path.join(self.root_path, filename)
-        payload = self._load_json(path)
-        if not isinstance(payload, list):
-            raise ManifestValidationError(f"Manifest '{filename}' must contain an array.")
-        return [self._validate_entry(item, source=filename, source_path=path) for item in payload if isinstance(item, dict)]
-
     def load_all(self) -> JsonDict:
         index = self.load_index()
-        version = int(index.get("version") or 1)
-        if version >= 2:
-            providers = self._load_directory_entries(str(index.get("providers_dir") or "providers"))
-            basemaps = self._load_directory_entries(str(index.get("basemaps_dir") or "basemaps"))
-            overlays = self._load_directory_entries(str(index.get("overlays_dir") or "overlays"))
-            return {"providers": providers, "basemaps": basemaps, "overlays": overlays}
-
-        # compatibility for old index format
-        providers_file = str(index.get("providers") or "providers.json")
-        basemaps_file = str(index.get("basemaps") or "basemaps.json")
-        overlays_file = str(index.get("overlays") or "overlays.json")
+        providers = self._load_directory_entries(str(index.get("providers_dir") or "providers"))
+        basemaps = self._load_directory_entries(str(index.get("basemaps_dir") or "basemaps"))
+        overlays = self._load_directory_entries(str(index.get("overlays_dir") or "overlays"))
         return {
-            "providers": self._load_legacy_manifest(providers_file),
-            "basemaps": self._load_legacy_manifest(basemaps_file),
-            "overlays": self._load_legacy_manifest(overlays_file),
+            "providers": providers,
+            "basemaps": basemaps,
+            "overlays": overlays,
         }

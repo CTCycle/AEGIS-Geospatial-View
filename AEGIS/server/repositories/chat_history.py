@@ -27,15 +27,6 @@ def _from_json_payload(value: str | None) -> Any:
         return None
 
 
-###############################################################################
-def _extract_extracted_state_from_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
-    extracted_state = payload.get("extracted_state")
-    if isinstance(extracted_state, dict):
-        return extracted_state
-    return None
-
-
-###############################################################################
 class ChatHistoryRepository:
     def __init__(self) -> None:
         backend = get_database().backend
@@ -147,15 +138,13 @@ class ChatHistoryRepository:
         if row is None:
             return None
         payload = _from_json_payload(row.structured_payload_json)
-        if payload is None:
+        if not isinstance(payload, dict):
             return None
         from AEGIS.server.domain.extraction.models import ExtractedIntent
 
-        extracted_state_payload = payload if isinstance(payload, dict) else None
-        if isinstance(payload, dict):
-            nested_extracted_state = _extract_extracted_state_from_payload(payload)
-            if nested_extracted_state is not None:
-                extracted_state_payload = nested_extracted_state
+        extracted_state_payload = payload.get("extracted_state")
+        if not isinstance(extracted_state_payload, dict):
+            return None
 
         try:
             return ExtractedIntent.model_validate(extracted_state_payload)

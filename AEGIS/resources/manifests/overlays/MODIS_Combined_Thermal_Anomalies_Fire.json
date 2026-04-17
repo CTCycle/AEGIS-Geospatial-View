@@ -1,8 +1,8 @@
 {
-  "id": "GIBS_MODIS_Combined_Thermal_Anomalies_Fire",
+  "id": "MODIS_Combined_Thermal_Anomalies_Fire",
   "name": "Active Fires (MODIS, Daily)",
   "provider": "gibs",
-  "type": "legacy-image",
+  "type": "wms",
   "description": "NASA GIBS thermal anomaly overlay highlighting potential active fire detections.",
   "capabilities": [
     "imagery",
@@ -11,10 +11,9 @@
   "coverage": "global",
   "metadata": {
     "label": "Active Fires (MODIS, Daily)",
-    "source_layer_id": "MODIS_Combined_Thermal_Anomalies_Fire",
     "default_opacity": 0.68,
     "requires_key": false,
-    "attribution": "\u00a9 NASA GIBS",
+    "attribution": "© NASA GIBS",
     "keywords": [
       "imagery",
       "fires",
@@ -55,8 +54,13 @@
     "location_dependency": "Location-dependent and dynamic.",
     "integration_requirements": [
       "No API key required"
-    ]
+    ],
+    "layer_id": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "layers": "MODIS_Combined_Thermal_Anomalies_Fire",
+    "url": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+    "wms_version": "1.1.1",
+    "wms_exceptions": "application/vnd.ogc.se_inimage"
   },
   "version": 1,
-  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+  "last_modified": "2026-04-06T17:08:00.882573+02:00"
 }

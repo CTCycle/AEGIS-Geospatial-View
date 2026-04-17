@@ -15,7 +15,7 @@ def _payload() -> dict[str, object]:
 
 
 def test_start_poll_cancel_and_idempotence(api_context: APIRequestContext) -> None:
-    start = api_context.post("/maps/jobs", data=_payload())
+    start = api_context.post("/api/maps/jobs", data=_payload())
     assert start.status in {202, 502, 503, 504}
     if start.status != 202:
         return
@@ -23,7 +23,7 @@ def test_start_poll_cancel_and_idempotence(api_context: APIRequestContext) -> No
 
     latest = None
     for _ in range(30):
-        status_resp = api_context.get(f"/maps/jobs/{job_id}")
+        status_resp = api_context.get(f"/api/maps/jobs/{job_id}")
         assert status_resp.ok
         latest = status_resp.json()
         if latest["status"] in {"completed", "failed", "cancelled"}:
@@ -32,21 +32,21 @@ def test_start_poll_cancel_and_idempotence(api_context: APIRequestContext) -> No
     assert latest is not None
     assert latest["job_id"] == job_id
 
-    cancel_resp = api_context.delete(f"/maps/jobs/{job_id}")
+    cancel_resp = api_context.delete(f"/api/maps/jobs/{job_id}")
     assert cancel_resp.ok
-    cancel_again = api_context.delete(f"/maps/jobs/{job_id}")
+    cancel_again = api_context.delete(f"/api/maps/jobs/{job_id}")
     assert cancel_again.ok
 
 
 def test_unknown_job_id_behavior(api_context: APIRequestContext) -> None:
-    status_missing = api_context.get("/maps/jobs/unknown-job-id")
-    cancel_missing = api_context.delete("/maps/jobs/unknown-job-id")
+    status_missing = api_context.get("/api/maps/jobs/unknown-job-id")
+    cancel_missing = api_context.delete("/api/maps/jobs/unknown-job-id")
     assert status_missing.status == 404
     assert cancel_missing.status == 404
 
 
 def test_memory_backed_non_durable_semantics_shape(api_context: APIRequestContext) -> None:
-    start = api_context.post("/maps/jobs", data=_payload())
+    start = api_context.post("/api/maps/jobs", data=_payload())
     assert start.status in {202, 502, 503, 504}
     if start.status != 202:
         return

@@ -151,24 +151,6 @@ class LocationSearchOrchestrator:
                 semantic_filters=payload.semantic_filters,
             )
         overlays = self.catalog_service.resolve_overlays(selected_overlay_ids)
-        if not overlays:
-            legacy_overlays = satellite_payload.get("overlays", [])
-            if isinstance(legacy_overlays, list):
-                for entry in legacy_overlays:
-                    if not isinstance(entry, dict):
-                        continue
-                    overlays.append(
-                        {
-                            "id": str(entry.get("name") or "legacy_overlay"),
-                            "label": str(entry.get("label") or "Legacy Overlay"),
-                            "provider": str(entry.get("provider") or "gibs"),
-                            "type": "legacy-image",
-                            "default_opacity": float(entry.get("opacity", 0.68)),
-                            "coverage": "dynamic",
-                            "requires_key": False,
-                            "attribution": entry.get("attribution"),
-                        }
-                    )
         basemap = self.catalog_service.resolve_basemap(payload.basemap_id)
         lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
         lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))
@@ -301,7 +283,7 @@ class LocationSearchOrchestrator:
             layers = list(dict.fromkeys([*layers, *overlay_ids]))
         basemap_id = payload.basemap_id if payload else fallback.get("basemap_id")
         persisted_selection = {
-            "legacy_layers": layers,
+            "filters": layers,
             "overlay_ids": overlay_ids,
             "basemap_id": basemap_id,
         }

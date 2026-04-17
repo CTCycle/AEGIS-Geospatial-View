@@ -32,13 +32,13 @@ def _stub_ui_api(page: Page) -> None:
         state["session_id"] = payload["session_id"]
         _json_ok(route, payload)
 
-    page.route(re.compile(r".*/(?:api/)?chat/turn$"), handle_turn)
+    page.route(re.compile(r".*/api/chat/turn$"), handle_turn)
     page.route(
-        re.compile(r".*/(?:api/)?chat/settings$"),
+        re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),
     )
     page.route(
-        re.compile(r".*/(?:api/)?chat/models$"),
+        re.compile(r".*/api/chat/models$"),
         lambda route: _json_ok(
             route,
             {
@@ -80,7 +80,7 @@ def test_rapid_double_submit_does_not_duplicate_assistant_state(page: Page, base
         time.sleep(0.15)
         _json_ok(route, chat_turn_map_response(999, "Search executed successfully."))
 
-    page.route(re.compile(r".*/(?:api/)?chat/turn$"), delayed_turn)
+    page.route(re.compile(r".*/api/chat/turn$"), delayed_turn)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map quickly")
     send = page.get_by_role("button", name="Send")

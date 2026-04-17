@@ -8,7 +8,7 @@ def _turn(api_context: APIRequestContext, message: str, session_id: int | None =
     payload = {"message": message}
     if session_id is not None:
         payload["session_id"] = session_id
-    response = api_context.post("/chat/turn", data=payload)
+    response = api_context.post("/api/chat/turn", data=payload)
     if response.status in {400, 502, 503}:
         pytest.skip(f"Provider unavailable for orchestration check ({response.status}).")
     assert response.ok, f"Expected 200, got {response.status}"

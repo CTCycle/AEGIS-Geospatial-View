@@ -1,7 +1,6 @@
 import { ModelProviderMode, SearchResponsePayload, ChatMessage } from './types';
 
 const STORAGE_KEY = 'aegis:webapp-state:v2';
-const LEGACY_STORAGE_KEYS = ['aegis:webapp-state:v1'];
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
@@ -146,7 +145,6 @@ export const loadPersistedAppState = (): PersistedAppState => {
   }
   const raw = window.sessionStorage.getItem(STORAGE_KEY);
   let currentTabId = ensureTabId();
-  LEGACY_STORAGE_KEYS.forEach((key) => window.sessionStorage.removeItem(key));
   if (hasActiveOwner(currentTabId)) {
     currentTabId = rotateTabId();
     window.sessionStorage.removeItem(STORAGE_KEY);

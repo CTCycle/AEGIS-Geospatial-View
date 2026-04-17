@@ -85,8 +85,7 @@ def bootstrap_vector_index_on_first_startup() -> None:
 routers = [search_router, chat_router, access_keys_router]
 
 for router in routers:
-    app.include_router(router)
-    app.include_router(router, prefix="/api", include_in_schema=False)
+    app.include_router(router, prefix="/api")
 
 
 if packaged_client_available():

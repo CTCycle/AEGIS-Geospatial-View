@@ -82,11 +82,11 @@ def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
         ],
     }
 
-    page.route(re.compile(r".*/(?:api/)?chat/turn$"), handle_turn)
-    page.route(re.compile(r".*/(?:api/)?chat/settings$"), lambda route: _json_ok(route, model_settings_payload()))
-    page.route(re.compile(r".*/(?:api/)?chat/models$"), lambda route: _json_ok(route, models_payload))
+    page.route(re.compile(r".*/api/chat/turn$"), handle_turn)
+    page.route(re.compile(r".*/api/chat/settings$"), lambda route: _json_ok(route, model_settings_payload()))
+    page.route(re.compile(r".*/api/chat/models$"), lambda route: _json_ok(route, models_payload))
     page.route(
-        re.compile(r".*/(?:api/)?maps/catalog$"),
+        re.compile(r".*/api/maps/catalog$"),
         lambda route: _json_ok(route, {"providers": [], "basemaps": [], "overlays": []}),
     )
     return state
