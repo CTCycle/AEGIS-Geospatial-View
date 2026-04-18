@@ -4,7 +4,10 @@ from collections.abc import Callable
 from typing import Any
 
 from AEGIS.server.domain.layers import LayerProviderEntry
-from AEGIS.server.utils.constants import COMMON_GEOSPATIAL_LAYERS, DEFAULT_LAYER_DEFINITIONS
+from AEGIS.server.utils.constants import (
+    COMMON_GEOSPATIAL_LAYERS,
+    DEFAULT_LAYER_DEFINITIONS,
+)
 
 type LayerDefinition = dict[str, Any]
 type ResolutionProvider = Callable[[str], tuple[float, ...] | list[float]]
@@ -16,6 +19,7 @@ __all__ = [
     "LayerProviderService",
 ]
 
+
 ###############################################################################
 class LayerProviderError(Exception):
     """Base exception raised when a layer provider cannot fulfill a request."""
@@ -24,6 +28,7 @@ class LayerProviderError(Exception):
 ###############################################################################
 class LayerProviderNotFoundError(LayerProviderError):
     """Raised when a requested layer does not have a registered provider."""
+
 
 ###############################################################################
 class LayerProviderService:
@@ -60,9 +65,7 @@ class LayerProviderService:
                 provider=provider,
                 label=label,
                 aliases=aliases,
-                provider_name=str(
-                    specification.get("provider_name") or name
-                ).strip()
+                provider_name=str(specification.get("provider_name") or name).strip()
                 or name,
                 resolution_m=resolution_value,
             )
@@ -82,7 +85,7 @@ class LayerProviderService:
         for value in values:
             try:
                 numeric = float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if numeric > 0:
                 normalized.append(numeric)

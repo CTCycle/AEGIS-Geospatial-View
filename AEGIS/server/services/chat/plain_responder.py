@@ -17,7 +17,12 @@ class PlainResponder:
             ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": get_agent_response_prompt(provider=self.provider, model=self.model)},
+                    {
+                        "role": "system",
+                        "content": get_agent_response_prompt(
+                            provider=self.provider, model=self.model
+                        ),
+                    },
                     {"role": "user", "content": user_text},
                 ],
             )

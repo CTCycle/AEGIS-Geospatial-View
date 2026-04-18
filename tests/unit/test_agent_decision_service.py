@@ -7,7 +7,9 @@ from AEGIS.server.services.llm.factory import LLMFactory
 
 ###############################################################################
 def test_decision_service_requires_location() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\nshow traffic\n\n# extracted info\n{}",
         user_message="show traffic",
@@ -21,7 +23,9 @@ def test_decision_service_requires_location() -> None:
 
 ###############################################################################
 def test_decision_service_routes_coordinate_lookup_requests() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\ncoordinates for Rome\n\n# extracted info\n{}",
         user_message="What are the coordinates for Rome, Italy?",
@@ -36,7 +40,9 @@ def test_decision_service_routes_coordinate_lookup_requests() -> None:
 
 ###############################################################################
 def test_decision_service_rejects_non_geospatial_requests() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\nwrite a poem\n\n# extracted info\n{}",
         user_message="Write a poem about spring.",
@@ -50,13 +56,17 @@ def test_decision_service_rejects_non_geospatial_requests() -> None:
 
 ###############################################################################
 def test_decision_service_routes_direct_weather_tool_with_location() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\nweather forecast in Rome\n\n# extracted info\n{}",
         user_message="Give me the weather forecast for Rome",
         extracted_state=ExtractedIntent(location={"city": "Rome", "country": "Italy"}),
         retrieval={"basemaps": [], "overlays": [], "providers": []},
-        available_tools=[{"name": "get_weather_forecast", "description": "Forecast weather"}],
+        available_tools=[
+            {"name": "get_weather_forecast", "description": "Forecast weather"}
+        ],
     )
     assert decision.execution_mode == "search"
     assert decision.tool_target == "get_weather_forecast"
@@ -65,7 +75,9 @@ def test_decision_service_routes_direct_weather_tool_with_location() -> None:
 
 ###############################################################################
 def test_decision_service_requests_integration_when_explicit_and_unavailable() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\ntomtom traffic in Rome\n\n# extracted info\n{}",
         user_message="Show TomTom traffic in Rome",
@@ -95,7 +107,9 @@ def test_decision_service_requests_integration_when_explicit_and_unavailable() -
 
 ###############################################################################
 def test_decision_service_treats_place_lookup_as_geospatial() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\nfind area near Tour Eiffel\n\n# extracted info\n{}",
         user_message="I need to find the area nearby the Tour Eiffel",
@@ -110,7 +124,9 @@ def test_decision_service_treats_place_lookup_as_geospatial() -> None:
 
 ###############################################################################
 def test_decision_service_treats_street_address_as_geocodable() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\ncheck via tesserete\n\n# extracted info\n{}",
         user_message="I need to check Via Tesserete 16 in Ticino, Switzerland",
@@ -124,11 +140,15 @@ def test_decision_service_treats_street_address_as_geocodable() -> None:
 
 ###############################################################################
 def test_decision_service_forces_search_when_coordinates_exist() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="# message 1\nrestaurants near coords\n\n# extracted info\n{}",
         user_message="Find restaurants near 40.7580, -73.9855",
-        extracted_state=ExtractedIntent(coordinates={"latitude": 40.7580, "longitude": -73.9855}),
+        extracted_state=ExtractedIntent(
+            coordinates={"latitude": 40.7580, "longitude": -73.9855}
+        ),
         retrieval={"basemaps": [], "overlays": [], "providers": []},
         available_tools=[],
     )
@@ -138,11 +158,15 @@ def test_decision_service_forces_search_when_coordinates_exist() -> None:
 
 ###############################################################################
 def test_decision_service_routes_map_request_without_meta_question() -> None:
-    service = DecisionService(llm_factory=LLMFactory(), provider="ollama", model="llama3.2")
+    service = DecisionService(
+        llm_factory=LLMFactory(), provider="ollama", model="llama3.2"
+    )
     decision = service.decide(
         conversation_context="user: I want to see the area nearby the Coliseum",
         user_message="I want to see the area nearby the Coliseum",
-        extracted_state=ExtractedIntent(location={"address": "Coliseum, Rome"}, location_type="poi"),
+        extracted_state=ExtractedIntent(
+            location={"address": "Coliseum, Rome"}, location_type="poi"
+        ),
         retrieval={"basemaps": [], "overlays": [], "providers": []},
         available_tools=[{"name": "map_search", "description": "Run map search"}],
     )

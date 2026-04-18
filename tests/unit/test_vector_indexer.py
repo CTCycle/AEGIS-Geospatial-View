@@ -59,7 +59,9 @@ class _ManifestLoaderStub:
                         "human_summary": "Air-quality overlay for station-level pollution context.",
                         "primary_use_cases": ["pollution checks"],
                         "search_examples": ["show air quality in Rome"],
-                        "disambiguation_notes": ["Prefer forecast layers for future projections."],
+                        "disambiguation_notes": [
+                            "Prefer forecast layers for future projections."
+                        ],
                         "location_dependency": "Location-dependent and data-availability dependent.",
                         "integration_requirements": ["No API key required"],
                         "embedding_provider": "ollama",
@@ -80,7 +82,9 @@ class _EmbeddingFactoryStub:
         _ = provider
         return "stub-embedding-model"
 
-    def get_embedding(self, *, provider: str, input_text: str, model: str | None = None):  # noqa: ANN001
+    def get_embedding(
+        self, *, provider: str, input_text: str, model: str | None = None
+    ):  # noqa: ANN001
         _ = provider
         _ = input_text
         return [0.1, 0.2, 0.3], model or "stub-embedding-model"
@@ -115,7 +119,9 @@ def test_bootstrap_if_missing_rebuilds_when_artifacts_missing(tmp_path) -> None:
     assert metadata["embedding_model"] == "stub-embedding-model"
 
 
-def test_bootstrap_if_missing_skips_when_collection_and_metadata_exist(tmp_path, monkeypatch) -> None:
+def test_bootstrap_if_missing_skips_when_collection_and_metadata_exist(
+    tmp_path, monkeypatch
+) -> None:
     store = _build_memory_store(tmp_path)
     indexer = VectorIndexer(
         store=store,
@@ -123,11 +129,17 @@ def test_bootstrap_if_missing_skips_when_collection_and_metadata_exist(tmp_path,
         embedding_factory=_EmbeddingFactoryStub(),
     )
     indexer.rebuild()
-    monkeypatch.setattr(indexer, "rebuild", lambda: (_ for _ in ()).throw(AssertionError("rebuild should not run")))
+    monkeypatch.setattr(
+        indexer,
+        "rebuild",
+        lambda: (_ for _ in ()).throw(AssertionError("rebuild should not run")),
+    )
     assert indexer.bootstrap_if_missing() is None
 
 
-def test_bootstrap_if_missing_rebuilds_when_metadata_invalid(tmp_path, monkeypatch) -> None:
+def test_bootstrap_if_missing_rebuilds_when_metadata_invalid(
+    tmp_path, monkeypatch
+) -> None:
     store = _build_memory_store(tmp_path)
     indexer = VectorIndexer(
         store=store,

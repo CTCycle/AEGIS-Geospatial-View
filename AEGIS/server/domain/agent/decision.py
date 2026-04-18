@@ -8,6 +8,7 @@ AgentDecisionType = Literal["clarify", "search_with_follow_up", "search_and_comp
 ExecutionMode = Literal["clarify", "geocode", "search"]
 LocationStatus = Literal["missing", "partial", "valid"]
 
+
 ###############################################################################
 class ChatInstructionPayload(BaseModel):
     tone: str = "clear_and_direct"
@@ -15,10 +16,12 @@ class ChatInstructionPayload(BaseModel):
     must_offer_refinements: bool = True
     must_confirm_search_start: bool = False
 
+
 ###############################################################################
 class Feasibility(BaseModel):
     is_supported: bool = True
     blocking_reason: str | None = None
+
 
 ###############################################################################
 class AgentDecision(BaseModel):
@@ -33,6 +36,8 @@ class AgentDecision(BaseModel):
     clarification_question: str | None = None
     missing_fields: list[str] = Field(default_factory=list)
     clarification_kind: str | None = None
-    chat_instructions: ChatInstructionPayload = Field(default_factory=ChatInstructionPayload)
+    chat_instructions: ChatInstructionPayload = Field(
+        default_factory=ChatInstructionPayload
+    )
     reasoning_summary: str = ""
     feasibility: Feasibility = Field(default_factory=Feasibility)

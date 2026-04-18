@@ -24,7 +24,10 @@ class VectorRetriever:
 
     def _should_rebuild_after_error(self, error: Exception) -> bool:
         message = str(error).lower()
-        return "expecting embedding with dimension" in message or "embedding dimension" in message
+        return (
+            "expecting embedding with dimension" in message
+            or "embedding dimension" in message
+        )
 
     def retrieve_candidates(
         self,
@@ -64,7 +67,12 @@ class VectorRetriever:
             seen.add(entry_id)
             distance = float(item.get("distance", 0.0) or 0.0)
             score = float(item.get("score", 0.0) or 0.0)
-            candidate = {"id": entry_id, "score": score, "distance": distance, "metadata": metadata}
+            candidate = {
+                "id": entry_id,
+                "score": score,
+                "distance": distance,
+                "metadata": metadata,
+            }
             document_kind = str(metadata.get("document_kind") or "")
             if document_kind == "basemap":
                 basemaps.append(candidate)
@@ -84,5 +92,9 @@ class VectorRetriever:
             "overlay_ids": [str(item["id"]) for item in candidates["overlays"]],
         }
 
-    def _limit_ranked(self, items: list[dict[str, object]], budget: int) -> list[dict[str, object]]:
-        return sorted(items, key=lambda item: float(item.get("score", 0.0) or 0.0), reverse=True)[: max(1, budget)]
+    def _limit_ranked(
+        self, items: list[dict[str, object]], budget: int
+    ) -> list[dict[str, object]]:
+        return sorted(
+            items, key=lambda item: float(item.get("score", 0.0) or 0.0), reverse=True
+        )[: max(1, budget)]

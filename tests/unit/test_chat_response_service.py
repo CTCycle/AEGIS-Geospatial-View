@@ -44,7 +44,7 @@ def _decision(**kwargs):  # noqa: ANN003, ANN202
 ###############################################################################
 def test_chat_response_service_normalizes_plain_text_output() -> None:
     service = ChatResponseService(
-        llm_factory=_FactoryStub("```json\n{\"foo\": \"bar\"}\n```\n**Map ready**"),  # type: ignore[arg-type]
+        llm_factory=_FactoryStub('```json\n{"foo": "bar"}\n```\n**Map ready**'),  # type: ignore[arg-type]
         provider="ollama",
         model="llama3.2",
     )
@@ -54,7 +54,9 @@ def test_chat_response_service_normalizes_plain_text_output() -> None:
         extracted_state=ExtractedIntent(),
         decision=_decision(),
         retrieval={"basemaps": [], "overlays": [], "providers": []},
-        search_result={"map_session": {"center": {"latitude": 1, "longitude": 1}, "overlays": []}},
+        search_result={
+            "map_session": {"center": {"latitude": 1, "longitude": 1}, "overlays": []}
+        },
     )
     assert response == "Map ready"
 
@@ -65,12 +67,18 @@ def test_chat_response_service_fallback_for_geocode_success_is_plain_text() -> N
         def get_chat_provider(self, provider: str):  # noqa: ANN001
             raise RuntimeError("chat unavailable")
 
-    service = ChatResponseService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")  # type: ignore[arg-type]
+    service = ChatResponseService(
+        llm_factory=_FailingFactory(), provider="ollama", model="llama3.2"
+    )  # type: ignore[arg-type]
     response = service.generate(
         conversation_context="# message",
         user_message="coordinates of Rome",
         extracted_state=ExtractedIntent(),
-        decision=_decision(execution_mode="geocode", should_trigger_search=False, tool_target="location_to_coordinates"),
+        decision=_decision(
+            execution_mode="geocode",
+            should_trigger_search=False,
+            tool_target="location_to_coordinates",
+        ),
         retrieval={"basemaps": [], "overlays": [], "providers": []},
         search_result={"geocode_result": {"lat": 41.9, "lon": 12.5}},
     )
@@ -84,7 +92,9 @@ def test_chat_response_service_fallback_for_missing_integration_is_plain_text() 
         def get_chat_provider(self, provider: str):  # noqa: ANN001
             raise RuntimeError("chat unavailable")
 
-    service = ChatResponseService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")  # type: ignore[arg-type]
+    service = ChatResponseService(
+        llm_factory=_FailingFactory(), provider="ollama", model="llama3.2"
+    )  # type: ignore[arg-type]
     response = service.generate(
         conversation_context="# message",
         user_message="tomtom traffic",
@@ -108,7 +118,9 @@ def test_chat_response_service_reports_overlay_unmet_filters() -> None:
         def get_chat_provider(self, provider: str):  # noqa: ANN001
             raise RuntimeError("chat unavailable")
 
-    service = ChatResponseService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")  # type: ignore[arg-type]
+    service = ChatResponseService(
+        llm_factory=_FailingFactory(), provider="ollama", model="llama3.2"
+    )  # type: ignore[arg-type]
     response = service.generate(
         conversation_context="# message",
         user_message="show pm2.5 overlay",
@@ -129,7 +141,9 @@ def test_chat_response_service_missing_location_is_single_human_question() -> No
         def get_chat_provider(self, provider: str):  # noqa: ANN001
             raise RuntimeError("chat unavailable")
 
-    service = ChatResponseService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")  # type: ignore[arg-type]
+    service = ChatResponseService(
+        llm_factory=_FailingFactory(), provider="ollama", model="llama3.2"
+    )  # type: ignore[arg-type]
     response = service.generate(
         conversation_context="# context",
         user_message="show traffic",

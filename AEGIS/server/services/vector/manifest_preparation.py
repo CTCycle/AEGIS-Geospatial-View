@@ -38,11 +38,17 @@ class ManifestPreparationService:
         source = str(entry.get("source_filename") or entry.get("id") or "unknown")
         missing: list[str] = []
         for field in self.REQUIRED_TEXT_FIELDS:
-            if not isinstance(entry.get(field), str) or not str(entry.get(field)).strip():
+            if (
+                not isinstance(entry.get(field), str)
+                or not str(entry.get(field)).strip()
+            ):
                 missing.append(field)
         metadata = dict(entry.get("metadata") or {})
         for field in self.REQUIRED_METADATA_STRING_FIELDS:
-            if not isinstance(metadata.get(field), str) or not str(metadata.get(field)).strip():
+            if (
+                not isinstance(metadata.get(field), str)
+                or not str(metadata.get(field)).strip()
+            ):
                 missing.append(f"metadata.{field}")
         for field in self.REQUIRED_METADATA_LIST_FIELDS:
             if not self._normalize_list(metadata.get(field)):
@@ -76,18 +82,33 @@ class ManifestPreparationService:
             ("Disambiguation notes", "disambiguation_notes"),
             ("Integration requirements", "integration_requirements"),
         ):
-            values = self._normalize_list(entry.get(key) if key == "capabilities" else metadata.get(key))
+            values = self._normalize_list(
+                entry.get(key) if key == "capabilities" else metadata.get(key)
+            )
             if values:
                 lines.append(f"{label}: {', '.join(values)}")
-        if isinstance(metadata.get("human_summary"), str) and metadata["human_summary"].strip():
+        if (
+            isinstance(metadata.get("human_summary"), str)
+            and metadata["human_summary"].strip()
+        ):
             lines.append(f"Human summary: {metadata['human_summary'].strip()}")
-        if isinstance(metadata.get("location_dependency"), str) and metadata["location_dependency"].strip():
-            lines.append(f"Location dependency: {metadata['location_dependency'].strip()}")
-        if isinstance(metadata.get("temporal_behavior"), str) and metadata["temporal_behavior"].strip():
+        if (
+            isinstance(metadata.get("location_dependency"), str)
+            and metadata["location_dependency"].strip()
+        ):
+            lines.append(
+                f"Location dependency: {metadata['location_dependency'].strip()}"
+            )
+        if (
+            isinstance(metadata.get("temporal_behavior"), str)
+            and metadata["temporal_behavior"].strip()
+        ):
             lines.append(f"Temporal behavior: {metadata['temporal_behavior'].strip()}")
         return "\n".join(lines).strip()
 
-    def compose_chunk_metadata(self, entry: dict[str, Any], kind: str) -> dict[str, Any]:
+    def compose_chunk_metadata(
+        self, entry: dict[str, Any], kind: str
+    ) -> dict[str, Any]:
         metadata = dict(entry.get("metadata") or {})
         return {
             "id": entry.get("id"),
@@ -106,7 +127,9 @@ class ManifestPreparationService:
         self.validate_embedding_quality(entry, kind=kind)
         entry_id = str(entry.get("id") or "").strip()
         if not entry_id:
-            raise ManifestEmbeddingValidationError("Manifest entry is missing a stable id.")
+            raise ManifestEmbeddingValidationError(
+                "Manifest entry is missing a stable id."
+            )
         return PreparedManifestChunk(
             id=f"{kind}:{entry_id}",
             text=self.compose_embedding_text(entry, kind),

@@ -11,7 +11,9 @@ class _HistoryRepoStub:
             {"role": "assistant", "content": "second"},
         ]
 
-    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, object]]:
+    def list_recent_messages(
+        self, session_id: int, limit: int
+    ) -> list[dict[str, object]]:
         self.calls += 1
         return self.messages[-limit:]
 

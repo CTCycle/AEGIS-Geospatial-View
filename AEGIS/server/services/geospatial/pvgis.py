@@ -27,7 +27,9 @@ class PVGISService:
         self.timeout_s = timeout_s
 
     # -------------------------------------------------------------------------
-    async def get_point_estimate(self, latitude: float, longitude: float) -> dict[str, Any]:
+    async def get_point_estimate(
+        self, latitude: float, longitude: float
+    ) -> dict[str, Any]:
         return await asyncio.to_thread(
             self._fetch_point_estimate,
             latitude,
@@ -35,7 +37,9 @@ class PVGISService:
         )
 
     # -------------------------------------------------------------------------
-    def _fetch_point_estimate(self, latitude: float, longitude: float) -> dict[str, Any]:
+    def _fetch_point_estimate(
+        self, latitude: float, longitude: float
+    ) -> dict[str, Any]:
         params = {
             "lat": f"{latitude:.6f}",
             "lon": f"{longitude:.6f}",
@@ -66,7 +70,7 @@ class PVGISService:
             for entry in fixed:
                 try:
                     yearly_kwh += float(entry.get("E_m", 0.0) or 0.0)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     continue
         return {
             "provider": "pvgis",
@@ -76,4 +80,3 @@ class PVGISService:
             "raw": outputs,
             "attribution": "PVGIS (European Commission JRC)",
         }
-

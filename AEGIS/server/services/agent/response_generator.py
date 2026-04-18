@@ -8,10 +8,13 @@ from AEGIS.server.services.agent.chat_response_service import ChatResponseServic
 from AEGIS.server.services.llm.context_builder import build_conversation_context
 from AEGIS.server.services.llm.factory import LLMFactory
 
+
 ###############################################################################
 class AgentResponseGenerator:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
-        self.chat_service = ChatResponseService(llm_factory=llm_factory, provider=provider, model=model)
+        self.chat_service = ChatResponseService(
+            llm_factory=llm_factory, provider=provider, model=model
+        )
 
     def generate(
         self,

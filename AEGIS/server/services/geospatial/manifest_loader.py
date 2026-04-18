@@ -42,7 +42,9 @@ class GeospatialManifestLoader:
             raise ManifestValidationError("Manifest index must be an object.")
         return payload
 
-    def _validate_entry(self, entry: JsonDict, *, source: str, source_path: str | None = None) -> JsonDict:
+    def _validate_entry(
+        self, entry: JsonDict, *, source: str, source_path: str | None = None
+    ) -> JsonDict:
         missing = [field for field in self.REQUIRED_FIELDS if field not in entry]
         if missing:
             raise ManifestValidationError(
@@ -68,15 +70,25 @@ class GeospatialManifestLoader:
             path = os.path.join(folder, filename)
             payload = self._load_json(path)
             if not isinstance(payload, dict):
-                raise ManifestValidationError(f"Manifest document '{path}' must be an object.")
-            entries.append(self._validate_entry(payload, source=filename, source_path=path))
+                raise ManifestValidationError(
+                    f"Manifest document '{path}' must be an object."
+                )
+            entries.append(
+                self._validate_entry(payload, source=filename, source_path=path)
+            )
         return entries
 
     def load_all(self) -> JsonDict:
         index = self.load_index()
-        providers = self._load_directory_entries(str(index.get("providers_dir") or "providers"))
-        basemaps = self._load_directory_entries(str(index.get("basemaps_dir") or "basemaps"))
-        overlays = self._load_directory_entries(str(index.get("overlays_dir") or "overlays"))
+        providers = self._load_directory_entries(
+            str(index.get("providers_dir") or "providers")
+        )
+        basemaps = self._load_directory_entries(
+            str(index.get("basemaps_dir") or "basemaps")
+        )
+        overlays = self._load_directory_entries(
+            str(index.get("overlays_dir") or "overlays")
+        )
         return {
             "providers": providers,
             "basemaps": basemaps,

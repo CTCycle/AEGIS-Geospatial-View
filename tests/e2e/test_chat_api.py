@@ -13,6 +13,7 @@ def _post(api_context: APIRequestContext, path: str, payload: dict):
 def _get(api_context: APIRequestContext, path: str):
     return api_context.get(path)
 
+
 def _put(api_context: APIRequestContext, path: str, payload: dict):
     return api_context.put(path, data=payload)
 
@@ -26,7 +27,9 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
     base = _get(api_context, "/api/chat/settings")
     prefixed = _get(api_context, "/api/chat/settings")
     if not base.ok or not prefixed.ok:
-        pytest.skip(f"Chat settings endpoint unavailable ({base.status}/{prefixed.status}).")
+        pytest.skip(
+            f"Chat settings endpoint unavailable ({base.status}/{prefixed.status})."
+        )
     assert base.ok and prefixed.ok
     base_body = base.json()
     prefixed_body = prefixed.json()
@@ -50,14 +53,20 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
 
 
 def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) -> None:
-    response = _put(api_context, "/api/chat/settings", {"active_provider_mode": 1, "credentials": "bad"})
+    response = _put(
+        api_context,
+        "/api/chat/settings",
+        {"active_provider_mode": 1, "credentials": "bad"},
+    )
     assert response.status in {200, 400, 422, 500}
     if response.ok:
         body = response.json()
         assert "active_provider_mode" in body
 
 
-def test_chat_models_and_vectors_sync_rebuild_with_prefix_parity(api_context: APIRequestContext) -> None:
+def test_chat_models_and_vectors_sync_rebuild_with_prefix_parity(
+    api_context: APIRequestContext,
+) -> None:
     models_base = _get(api_context, "/api/chat/models")
     models_prefixed = _get(api_context, "/api/chat/models")
     assert models_base.ok and models_prefixed.ok
@@ -86,8 +95,12 @@ def test_chat_models_and_vectors_sync_rebuild_with_prefix_parity(api_context: AP
     assert set(rebuild_base.json().keys()) == set(rebuild_prefixed.json().keys())
 
 
-def test_chat_turn_stream_event_order_and_contract_parity(api_context: APIRequestContext) -> None:
-    turn_response = _post(api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"})
+def test_chat_turn_stream_event_order_and_contract_parity(
+    api_context: APIRequestContext,
+) -> None:
+    turn_response = _post(
+        api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
+    )
     _require_provider_or_skip(turn_response)
     assert turn_response.ok
     turn_body = turn_response.json()
@@ -95,7 +108,9 @@ def test_chat_turn_stream_event_order_and_contract_parity(api_context: APIReques
     assert "session_id" in turn_body
     assert "extracted_state" in turn_body
 
-    prefixed_turn = _post(api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"})
+    prefixed_turn = _post(
+        api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
+    )
     _require_provider_or_skip(prefixed_turn)
     assert prefixed_turn.ok
     assert set(turn_body.keys()) == set(prefixed_turn.json().keys())
@@ -103,14 +118,15 @@ def test_chat_turn_stream_event_order_and_contract_parity(api_context: APIReques
     stream_response = _post(
         api_context,
         "/api/chat/stream",
-        {"session_id": turn_body["session_id"], "message": "show map at 41.9028, 12.4964"},
+        {
+            "session_id": turn_body["session_id"],
+            "message": "show map at 41.9028, 12.4964",
+        },
     )
     _require_provider_or_skip(stream_response)
     assert stream_response.ok
     events = [
-        json.loads(line)
-        for line in stream_response.text().splitlines()
-        if line.strip()
+        json.loads(line) for line in stream_response.text().splitlines() if line.strip()
     ]
     event_names = [entry.get("event") for entry in events]
     assert event_names[0] == "status"
@@ -122,14 +138,23 @@ def test_chat_turn_stream_event_order_and_contract_parity(api_context: APIReques
     prefixed_stream = _post(
         api_context,
         "/api/chat/stream",
-        {"session_id": turn_body["session_id"], "message": "show map at 41.9028, 12.4964"},
+        {
+            "session_id": turn_body["session_id"],
+            "message": "show map at 41.9028, 12.4964",
+        },
     )
     _require_provider_or_skip(prefixed_stream)
     assert prefixed_stream.ok
 
 
-def test_chat_turn_coordinate_lookup_and_follow_up(api_context: APIRequestContext) -> None:
-    geocode_response = _post(api_context, "/api/chat/turn", {"message": "Give me the coordinates of Rome, Italy"})
+def test_chat_turn_coordinate_lookup_and_follow_up(
+    api_context: APIRequestContext,
+) -> None:
+    geocode_response = _post(
+        api_context,
+        "/api/chat/turn",
+        {"message": "Give me the coordinates of Rome, Italy"},
+    )
     _require_provider_or_skip(geocode_response)
     assert geocode_response.ok
     geocode_body = geocode_response.json()
@@ -141,7 +166,11 @@ def test_chat_turn_coordinate_lookup_and_follow_up(api_context: APIRequestContex
         or "ollama" in assistant_text
     )
 
-    unsupported = _post(api_context, "/api/chat/turn", {"message": "Find the absolute best weather area in Europe"})
+    unsupported = _post(
+        api_context,
+        "/api/chat/turn",
+        {"message": "Find the absolute best weather area in Europe"},
+    )
     _require_provider_or_skip(unsupported)
     assert unsupported.ok
     unsupported_body = unsupported.json()
@@ -157,8 +186,12 @@ def test_ollama_refresh_pull_health(api_context: APIRequestContext) -> None:
     refresh_prefixed = _post(api_context, "/api/chat/models/ollama/refresh", {})
     assert refresh_base.ok and refresh_prefixed.ok
 
-    pull_base = _post(api_context, "/api/chat/models/ollama/pull", {"model": "llama3.2"})
-    pull_prefixed = _post(api_context, "/api/chat/models/ollama/pull", {"model": "llama3.2"})
+    pull_base = _post(
+        api_context, "/api/chat/models/ollama/pull", {"model": "llama3.2"}
+    )
+    pull_prefixed = _post(
+        api_context, "/api/chat/models/ollama/pull", {"model": "llama3.2"}
+    )
     assert pull_base.status in {200, 400, 502}
     assert pull_prefixed.status in {200, 400, 502}
 

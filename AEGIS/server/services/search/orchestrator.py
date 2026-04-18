@@ -50,9 +50,13 @@ class LocationSearchOrchestrator:
         explicit_overlays = self.toolkit.normalize_layers(payload.overlay_ids)
         if explicit_overlays:
             return list(explicit_overlays)
-        suggest_overlay_ids = getattr(self.catalog_service, "suggest_overlay_ids_from_filters", None)
+        suggest_overlay_ids = getattr(
+            self.catalog_service, "suggest_overlay_ids_from_filters", None
+        )
         if callable(suggest_overlay_ids):
-            return self.toolkit.normalize_layers(suggest_overlay_ids(payload.semantic_filters))
+            return self.toolkit.normalize_layers(
+                suggest_overlay_ids(payload.semantic_filters)
+            )
         return self.toolkit.normalize_layers(payload.semantic_filters)
 
     def _bbox_area_degrees(self, bbox: list[float] | None) -> float:
@@ -60,27 +64,52 @@ class LocationSearchOrchestrator:
             return 0.0
         try:
             minx, miny, maxx, maxy = [float(value) for value in bbox]
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0.0
         return max(0.0, abs(maxx - minx) * abs(maxy - miny))
 
-    def _derive_local_bbox(self, *, latitude: float, longitude: float, map_size_m: float) -> list[float]:
+    def _derive_local_bbox(
+        self, *, latitude: float, longitude: float, map_size_m: float
+    ) -> list[float]:
         half_span_m = max(250.0, float(map_size_m) / 2.0)
         deg_lat = half_span_m / 111_320.0
         cos_lat = max(0.2, math.cos(math.radians(latitude)))
         deg_lon = half_span_m / (111_320.0 * cos_lat)
-        return [longitude - deg_lon, latitude - deg_lat, longitude + deg_lon, latitude + deg_lat]
+        return [
+            longitude - deg_lon,
+            latitude - deg_lat,
+            longitude + deg_lon,
+            latitude + deg_lat,
+        ]
 
-    def _should_force_local_bbox(self, payload: LocationSearchRequest, nominatim_candidate: dict[str, Any]) -> bool:
-        location_type = str(nominatim_candidate.get("selected_result_type") or "").lower()
-        is_point_like = location_type in {"house", "building", "amenity", "attraction", "road", "residential"}
-        address_like = bool(payload.address and any(char.isdigit() for char in payload.address))
-        nearby_like = bool(payload.address and any(token in payload.address.lower() for token in ("nearby", "around")))
+    def _should_force_local_bbox(
+        self, payload: LocationSearchRequest, nominatim_candidate: dict[str, Any]
+    ) -> bool:
+        location_type = str(
+            nominatim_candidate.get("selected_result_type") or ""
+        ).lower()
+        is_point_like = location_type in {
+            "house",
+            "building",
+            "amenity",
+            "attraction",
+            "road",
+            "residential",
+        }
+        address_like = bool(
+            payload.address and any(char.isdigit() for char in payload.address)
+        )
+        nearby_like = bool(
+            payload.address
+            and any(token in payload.address.lower() for token in ("nearby", "around"))
+        )
         bbox_area = self._bbox_area_degrees(nominatim_candidate.get("bbox"))
         oversized = bbox_area > 0.05
         return bool((is_point_like or address_like or nearby_like) and oversized)
 
-    async def resolve_coordinates(self, payload: LocationSearchRequest) -> dict[str, Any]:
+    async def resolve_coordinates(
+        self, payload: LocationSearchRequest
+    ) -> dict[str, Any]:
         response_payload = payload.model_dump()
         normalized_filters = list(payload.filters or [])
         response_payload["geospatial_filter"] = normalized_filters
@@ -107,7 +136,7 @@ class LocationSearchOrchestrator:
                     try:
                         response_payload["latitude"] = float(latitude)
                         response_payload["longitude"] = float(longitude)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
                 if nominatim_candidate.get("bbox"):
                     response_payload["bbox"] = nominatim_candidate["bbox"]
@@ -144,7 +173,9 @@ class LocationSearchOrchestrator:
     ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
         selected_overlay_ids = self._resolve_overlay_ids(payload)
         unmet_filters: list[str] = []
-        filter_overlay_ids = getattr(self.catalog_service, "filter_overlay_ids_by_semantics", None)
+        filter_overlay_ids = getattr(
+            self.catalog_service, "filter_overlay_ids_by_semantics", None
+        )
         if callable(filter_overlay_ids):
             selected_overlay_ids, unmet_filters = filter_overlay_ids(
                 overlay_ids=selected_overlay_ids,
@@ -193,7 +224,12 @@ class LocationSearchOrchestrator:
             "insights": insights,
             "compliance_warnings": compliance_warnings,
         }
-        return map_session, selected_overlay_ids, payload.semantic_filters, unmet_filters
+        return (
+            map_session,
+            selected_overlay_ids,
+            payload.semantic_filters,
+            unmet_filters,
+        )
 
     async def execute(self, payload: LocationSearchRequest) -> dict[str, Any]:
         if payload.datetime is None:
@@ -213,20 +249,33 @@ class LocationSearchOrchestrator:
                     ),
                 )
         try:
-            satellite_payload = await self.renderer.build_satellite_payload(payload, search_payload)
+            satellite_payload = await self.renderer.build_satellite_payload(
+                payload, search_payload
+            )
         except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            ) from exc
         except (GIBSRequestError, MapRequestError) as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+            ) from exc
 
         search_payload["satellite_imagery"] = satellite_payload
-        map_session, selected_overlay_ids, applied_filters, unmet_filters = await self.assemble_map_session(
+        (
+            map_session,
+            selected_overlay_ids,
+            applied_filters,
+            unmet_filters,
+        ) = await self.assemble_map_session(
             payload=payload,
             search_payload=search_payload,
             satellite_payload=satellite_payload,
         )
         search_payload["map_session"] = map_session
-        search_payload["compliance_warnings"] = map_session.get("compliance_warnings", [])
+        search_payload["compliance_warnings"] = map_session.get(
+            "compliance_warnings", []
+        )
         search_payload["selected_overlay_ids"] = selected_overlay_ids
         search_payload["applied_filters"] = applied_filters
         search_payload["unmet_filters"] = unmet_filters
@@ -235,9 +284,9 @@ class LocationSearchOrchestrator:
 
         if lat_value is not None and lon_value is not None:
             try:
-                search_payload["elevation"] = await self.elevation_service.get_elevation(
-                    lat_value, lon_value
-                )
+                search_payload[
+                    "elevation"
+                ] = await self.elevation_service.get_elevation(lat_value, lon_value)
             except Exception as exc:
                 logger.warning("Failed to fetch elevation: %s", exc)
                 search_payload["elevation"] = None
@@ -257,16 +306,24 @@ class LocationSearchOrchestrator:
         fallback: dict[str, Any],
         state: str,
     ) -> dict[str, Any]:
-        payload_snapshot = response_payload.get("payload", {}) if response_payload else {}
+        payload_snapshot = (
+            response_payload.get("payload", {}) if response_payload else {}
+        )
         coordinates: CoordinatePair | None = None
         if payload:
-            coordinates = self.toolkit.extract_coordinate_pair(payload, payload_snapshot)
+            coordinates = self.toolkit.extract_coordinate_pair(
+                payload, payload_snapshot
+            )
             if not coordinates:
-                coordinates = self.toolkit.extract_coordinate_pair(payload, payload.model_dump())
+                coordinates = self.toolkit.extract_coordinate_pair(
+                    payload, payload.model_dump()
+                )
         if coordinates is None:
             lon_candidate = fallback.get("longitude")
             lat_candidate = fallback.get("latitude")
-            if isinstance(lon_candidate, (int, float)) and isinstance(lat_candidate, (int, float)):
+            if isinstance(lon_candidate, (int, float)) and isinstance(
+                lat_candidate, (int, float)
+            ):
                 coordinates = (float(lon_candidate), float(lat_candidate))
 
         layers = (

@@ -131,25 +131,33 @@ Response rules:
 
 
 ###############################################################################
-def get_agent_extraction_prompt(provider: str | None = None, model: str | None = None) -> str:
+def get_agent_extraction_prompt(
+    provider: str | None = None, model: str | None = None
+) -> str:
     _ = provider, model
     return AGENT_EXTRACTION_PROMPT
 
 
 ###############################################################################
-def get_agent_enrichment_prompt(provider: str | None = None, model: str | None = None) -> str:
+def get_agent_enrichment_prompt(
+    provider: str | None = None, model: str | None = None
+) -> str:
     _ = provider, model
     return AGENT_ENRICHMENT_PROMPT
 
 
 ###############################################################################
-def get_agent_decision_system_prompt(provider: str | None = None, model: str | None = None) -> str:
+def get_agent_decision_system_prompt(
+    provider: str | None = None, model: str | None = None
+) -> str:
     _ = provider, model
     return AGENT_DECISION_SYSTEM_PROMPT
 
 
 ###############################################################################
-def get_agent_response_prompt(provider: str | None = None, model: str | None = None) -> str:
+def get_agent_response_prompt(
+    provider: str | None = None, model: str | None = None
+) -> str:
     _ = provider, model
     return AGENT_RESPONSE_PROMPT
 

@@ -73,12 +73,16 @@ class LocationSearchRequest(BaseModel):
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
     map_size_m: float = Field(default=get_server_settings().map.default_size_m, gt=0)
-    map_tiles: str | None = Field(default=get_server_settings().map.tiles, max_length=200)
+    map_tiles: str | None = Field(
+        default=get_server_settings().map.tiles, max_length=200
+    )
     basemap_id: str | None = Field(default=None, max_length=120)
     overlay_ids: list[str] = Field(default_factory=list)
     aoi: dict[str, Any] | None = Field(default=None)
     commute: dict[str, Any] | None = Field(default=None)
-    image_width: int = Field(default=get_server_settings().gibs.image_width, ge=512, le=2048)
+    image_width: int = Field(
+        default=get_server_settings().gibs.image_width, ge=512, le=2048
+    )
     image_height: int = Field(
         default=get_server_settings().gibs.image_height, ge=512, le=2048
     )
@@ -242,7 +246,10 @@ class LocationSearchRequest(BaseModel):
                 raise ValueError("BBox min values must be smaller than max values.")
             if self.image_crs == "EPSG:3857":
                 for value in (minx, maxx, miny, maxy):
-                    if abs(value) > get_server_settings().geospatial.max_mercator_extent:
+                    if (
+                        abs(value)
+                        > get_server_settings().geospatial.max_mercator_extent
+                    ):
                         raise ValueError(
                             "BBox exceeds EPSG:3857 valid extent +/-20037508.3427892."
                         )

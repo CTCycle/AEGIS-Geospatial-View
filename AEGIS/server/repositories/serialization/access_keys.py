@@ -14,6 +14,7 @@ from AEGIS.server.services.cryptography import (
 
 SUPPORTED_PROVIDERS = {"openai", "gemini"}
 
+
 ###############################################################################
 class AccessKeySerializer:
     def __init__(self) -> None:
@@ -92,7 +93,9 @@ class AccessKeySerializer:
             session.commit()
 
     # -------------------------------------------------------------------------
-    def get_active_key(self, provider: str, mark_used: bool = False) -> AccessKeyRecord | None:
+    def get_active_key(
+        self, provider: str, mark_used: bool = False
+    ) -> AccessKeyRecord | None:
         normalized = self.normalize_provider(provider)
         with self._session_factory() as session:
             statement = (
@@ -113,7 +116,9 @@ class AccessKeySerializer:
             return row
 
     # -------------------------------------------------------------------------
-    def decrypt_for_runtime(self, provider: str, *, mark_used: bool = True) -> str | None:
+    def decrypt_for_runtime(
+        self, provider: str, *, mark_used: bool = True
+    ) -> str | None:
         row = self.get_active_key(provider, mark_used=mark_used)
         if row is None:
             return None

@@ -26,9 +26,13 @@ def _stub_ui_api(page: Page) -> None:
         message = str(body.get("message") or "")
         session_id = int(body.get("session_id") or state["session_id"])
         if "ambiguous" in message.lower() or "weather only" in message.lower():
-            payload = chat_turn_clarification_response(session_id, "Please clarify location and time.")
+            payload = chat_turn_clarification_response(
+                session_id, "Please clarify location and time."
+            )
         else:
-            payload = chat_turn_map_response(session_id, "Search executed successfully.")
+            payload = chat_turn_map_response(
+                session_id, "Search executed successfully."
+            )
         state["session_id"] = payload["session_id"]
         _json_ok(route, payload)
 
@@ -58,7 +62,9 @@ def _stub_ui_api(page: Page) -> None:
     )
 
 
-def test_25_sequential_turns_mixed_with_new_chat_resets(page: Page, base_url: str) -> None:
+def test_25_sequential_turns_mixed_with_new_chat_resets(
+    page: Page, base_url: str
+) -> None:
     _stub_ui_api(page)
     page.goto(base_url)
     composer = page.get_by_label("Chat message")
@@ -69,11 +75,15 @@ def test_25_sequential_turns_mixed_with_new_chat_resets(page: Page, base_url: st
         expect(page.locator(".chat-message--assistant").last).to_be_visible()
         if idx in {9, 18}:
             page.get_by_role("button", name="Start new chat").click()
-            expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
+            expect(
+                page.get_by_text("Enter a location-based request to begin.")
+            ).to_be_visible()
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 
-def test_rapid_double_submit_does_not_duplicate_assistant_state(page: Page, base_url: str) -> None:
+def test_rapid_double_submit_does_not_duplicate_assistant_state(
+    page: Page, base_url: str
+) -> None:
     _stub_ui_api(page)
 
     def delayed_turn(route: Route) -> None:
@@ -101,7 +111,9 @@ def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> Non
         expect(page.locator(".chat-message--assistant").first).to_be_visible()
 
 
-def test_route_switching_20_cycles_preserves_query_and_chat_state(page: Page, base_url: str) -> None:
+def test_route_switching_20_cycles_preserves_query_and_chat_state(
+    page: Page, base_url: str
+) -> None:
     _stub_ui_api(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map state before route cycles")
@@ -130,7 +142,9 @@ def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> N
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 
-def test_overlay_toggle_and_opacity_restore_after_refresh(page: Page, base_url: str) -> None:
+def test_overlay_toggle_and_opacity_restore_after_refresh(
+    page: Page, base_url: str
+) -> None:
     _stub_ui_api(page)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map with overlays")
@@ -145,6 +159,10 @@ def test_overlay_toggle_and_opacity_restore_after_refresh(page: Page, base_url: 
     )
     page.reload()
     expect(page.locator(".overlay-controls")).to_be_visible()
-    expect(page.locator(".overlay-control-row input[type='checkbox']").first).not_to_be_checked()
-    restored = page.locator(".overlay-control-row input[type='range']").first.input_value()
+    expect(
+        page.locator(".overlay-control-row input[type='checkbox']").first
+    ).not_to_be_checked()
+    restored = page.locator(
+        ".overlay-control-row input[type='range']"
+    ).first.input_value()
     assert int(restored) == 25

@@ -27,7 +27,9 @@ def write_snapshot(page: Any, screenshot_dir: Path, name: str) -> Path:
     return target
 
 
-def write_http_capture(http_dir: Path, name: str, request_body: Any, response_body: Any) -> Path:
+def write_http_capture(
+    http_dir: Path, name: str, request_body: Any, response_body: Any
+) -> Path:
     target = http_dir / f"{name}.json"
     target.write_text(
         json.dumps(

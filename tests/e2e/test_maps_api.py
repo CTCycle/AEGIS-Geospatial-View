@@ -61,7 +61,9 @@ def test_catalog_success_and_prefix_parity(api_context: APIRequestContext) -> No
     assert set(body.keys()) == set(prefixed.json().keys())
 
 
-def test_osm_basemap_tile_proxy_returns_png_and_prefix_parity(api_context: APIRequestContext) -> None:
+def test_osm_basemap_tile_proxy_returns_png_and_prefix_parity(
+    api_context: APIRequestContext,
+) -> None:
     base = _get(api_context, "/api/maps/basemaps/osm/13/4380/3043.png")
     prefixed = _get(api_context, "/api/maps/basemaps/osm/13/4380/3043.png")
     if base.status in {502, 503, 504} or prefixed.status in {502, 503, 504}:
@@ -78,7 +80,9 @@ def test_malformed_search_payload_returns_422(api_context: APIRequestContext) ->
     assert response.status == 422
 
 
-def test_jobs_start_status_cancel_and_idempotence(api_context: APIRequestContext) -> None:
+def test_jobs_start_status_cancel_and_idempotence(
+    api_context: APIRequestContext,
+) -> None:
     start = _post(api_context, "/api/maps/jobs", _payload())
     _assert_degraded_or_ok(start)
     assert start.status == 202
@@ -119,8 +123,14 @@ def test_jobs_prefix_parity_and_unknown_job(api_context: APIRequestContext) -> N
     assert missing.status == 404
 
 
-def test_search_graceful_behavior_when_provider_degrades(api_context: APIRequestContext) -> None:
-    response = _post(api_context, "/api/maps/search", _payload(geospatial_layers=["VIIRS_SNPP_CorrectedReflectance_TrueColor"]))
+def test_search_graceful_behavior_when_provider_degrades(
+    api_context: APIRequestContext,
+) -> None:
+    response = _post(
+        api_context,
+        "/api/maps/search",
+        _payload(geospatial_layers=["VIIRS_SNPP_CorrectedReflectance_TrueColor"]),
+    )
     if response.ok:
         assert "status_message" in response.json()
         return
@@ -129,7 +139,9 @@ def test_search_graceful_behavior_when_provider_degrades(api_context: APIRequest
     assert detail
 
 
-def test_search_with_overlay_ids_includes_overlays(api_context: APIRequestContext) -> None:
+def test_search_with_overlay_ids_includes_overlays(
+    api_context: APIRequestContext,
+) -> None:
     response = _post(
         api_context,
         "/api/maps/search",
@@ -140,11 +152,15 @@ def test_search_with_overlay_ids_includes_overlays(api_context: APIRequestContex
     )
     _assert_degraded_or_ok(response)
     assert response.ok
-    overlays = response.json().get("payload", {}).get("map_session", {}).get("overlays", [])
+    overlays = (
+        response.json().get("payload", {}).get("map_session", {}).get("overlays", [])
+    )
     assert isinstance(overlays, list)
 
 
-def test_job_status_poll_until_terminal_or_timeout(api_context: APIRequestContext) -> None:
+def test_job_status_poll_until_terminal_or_timeout(
+    api_context: APIRequestContext,
+) -> None:
     start = _post(api_context, "/api/maps/jobs", _payload())
     _assert_degraded_or_ok(start)
     assert start.status == 202

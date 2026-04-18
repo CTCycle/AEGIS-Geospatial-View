@@ -13,10 +13,12 @@ from AEGIS.server.repositories.schemas import SystemSecretRecord
 
 ACCESS_KEY_ENCRYPTION_SECRET_NAME = "access_key_encryption_key"
 
+
 # -------------------------------------------------------------------------
 def _derive_fernet_key(master_key: str) -> bytes:
     digest = hashlib.sha256(master_key.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest)
+
 
 # -------------------------------------------------------------------------
 def _load_access_key_fernet() -> Fernet:
@@ -31,7 +33,9 @@ def _load_access_key_fernet() -> Fernet:
             if record is not None and isinstance(record.value, str):
                 raw_key = record.value.strip()
     except Exception as exc:
-        raise RuntimeError("Failed to load access key encryption secret from database") from exc
+        raise RuntimeError(
+            "Failed to load access key encryption secret from database"
+        ) from exc
     if not raw_key:
         raise RuntimeError("Database access key encryption secret is not configured")
     try:
@@ -89,7 +93,9 @@ class CredentialEncryptionService:
         try:
             decrypted = self.fernet.decrypt(encrypted_value.encode("utf-8"))
         except InvalidToken as exc:
-            raise ValueError("Credential cannot be decrypted with current key.") from exc
+            raise ValueError(
+                "Credential cannot be decrypted with current key."
+            ) from exc
         return decrypted.decode("utf-8")
 
     def mask(self, encrypted_value: str | None) -> str | None:

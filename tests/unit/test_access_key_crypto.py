@@ -53,7 +53,9 @@ def test_access_key_crypto_roundtrip(monkeypatch: pytest.MonkeyPatch) -> None:
     assert build_access_key_fingerprint(ciphertext)
 
 
-def test_access_key_crypto_requires_database_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_access_key_crypto_requires_database_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _FakeResult:
         @staticmethod
         def scalars():
@@ -85,5 +87,7 @@ def test_access_key_crypto_requires_database_secret(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(
         "AEGIS.server.services.cryptography.get_database", lambda: _FakeDatabase()
     )
-    with pytest.raises(RuntimeError, match="Database access key encryption secret is not configured"):
+    with pytest.raises(
+        RuntimeError, match="Database access key encryption secret is not configured"
+    ):
         encrypt_access_key("sk-secret-value")

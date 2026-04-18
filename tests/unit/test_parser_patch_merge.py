@@ -39,7 +39,9 @@ def test_parser_patch_merge_clears_location_when_explicitly_null() -> None:
         location={"address": "Via Roma 1", "city": "Rome", "country": "Italy"},
         coordinates={"latitude": 41.9, "longitude": 12.5},
     )
-    patch = ExtractedIntentPatch(location={"address": None, "city": None, "country": None})
+    patch = ExtractedIntentPatch(
+        location={"address": None, "city": None, "country": None}
+    )
     merged = merge_extracted_intent(base, patch)
     assert merged.location.address is None
     assert merged.location.city is None

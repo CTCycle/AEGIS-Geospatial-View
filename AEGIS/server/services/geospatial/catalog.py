@@ -7,10 +7,19 @@ from typing import Any
 
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from AEGIS.server.services.geospatial.openaq import OpenAQService
-from AEGIS.server.services.geospatial.openmeteo import OpenMeteoRequestError, OpenMeteoService
-from AEGIS.server.services.geospatial.overpass import OverpassRequestError, OverpassService
+from AEGIS.server.services.geospatial.openmeteo import (
+    OpenMeteoRequestError,
+    OpenMeteoService,
+)
+from AEGIS.server.services.geospatial.overpass import (
+    OverpassRequestError,
+    OverpassService,
+)
 from AEGIS.server.services.geospatial.pvgis import PVGISService
-from AEGIS.server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
+from AEGIS.server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 from AEGIS.server.utils.logger import logger
 
 type JsonDict = dict[str, Any]
@@ -92,7 +101,11 @@ class GeospatialCatalogService:
 
     # -------------------------------------------------------------------------
     def _map_basemaps(
-        self, basemaps: list[JsonDict], *, tomtom_key: str | None, geoapify_key: str | None
+        self,
+        basemaps: list[JsonDict],
+        *,
+        tomtom_key: str | None,
+        geoapify_key: str | None,
     ) -> list[JsonDict]:
         mapped: list[JsonDict] = []
         for entry in basemaps:
@@ -119,7 +132,9 @@ class GeospatialCatalogService:
             is_available = not requires_key or bool(tile_url)
             availability_reason = None
             if requires_key and not is_available:
-                availability_reason = f"{provider.capitalize()} API key is not configured."
+                availability_reason = (
+                    f"{provider.capitalize()} API key is not configured."
+                )
             mapped.append(
                 {
                     "id": entry["id"],
@@ -136,7 +151,9 @@ class GeospatialCatalogService:
         return mapped
 
     # -------------------------------------------------------------------------
-    def _map_overlays(self, overlays: list[JsonDict], *, tomtom_key: str | None) -> list[JsonDict]:
+    def _map_overlays(
+        self, overlays: list[JsonDict], *, tomtom_key: str | None
+    ) -> list[JsonDict]:
         mapped: list[JsonDict] = []
         for entry in overlays:
             metadata = dict(entry.get("metadata") or {})
@@ -162,7 +179,9 @@ class GeospatialCatalogService:
             url_template = metadata.get("url_template")
             if isinstance(url_template, str) and entry.get("provider") == "tomtom":
                 overlay["url"] = (
-                    url_template.replace("{api_key}", tomtom_key) if tomtom_key else None
+                    url_template.replace("{api_key}", tomtom_key)
+                    if tomtom_key
+                    else None
                 )
             elif isinstance(url_template, str) and not overlay.get("url"):
                 overlay["url"] = url_template
@@ -204,7 +223,9 @@ class GeospatialCatalogService:
 
     # -------------------------------------------------------------------------
     def suggest_overlay_ids_from_filters(self, filters: list[str]) -> list[str]:
-        normalized_filters = [str(item).strip().lower() for item in filters if str(item).strip()]
+        normalized_filters = [
+            str(item).strip().lower() for item in filters if str(item).strip()
+        ]
         if not normalized_filters:
             return []
         catalog = self.list_catalog()
@@ -234,7 +255,9 @@ class GeospatialCatalogService:
         overlay_ids: list[str],
         semantic_filters: list[str],
     ) -> tuple[list[str], list[str]]:
-        normalized_filters = [str(item).strip().lower() for item in semantic_filters if str(item).strip()]
+        normalized_filters = [
+            str(item).strip().lower() for item in semantic_filters if str(item).strip()
+        ]
         if not normalized_filters:
             return list(overlay_ids), []
         catalog = self.list_catalog()
@@ -261,7 +284,17 @@ class GeospatialCatalogService:
         if not applied and overlay_ids:
             applied = list(overlay_ids)
         for term in normalized_filters:
-            if not any(term in " ".join([str(overlay_lookup.get(overlay_id, {}).get("id", "")), str(overlay_lookup.get(overlay_id, {}).get("label", "")), str(overlay_lookup.get(overlay_id, {}).get("provider", ""))]).lower() for overlay_id in applied):
+            if not any(
+                term
+                in " ".join(
+                    [
+                        str(overlay_lookup.get(overlay_id, {}).get("id", "")),
+                        str(overlay_lookup.get(overlay_id, {}).get("label", "")),
+                        str(overlay_lookup.get(overlay_id, {}).get("provider", "")),
+                    ]
+                ).lower()
+                for overlay_id in applied
+            ):
                 unmet.append(term)
         return list(dict.fromkeys(applied)), list(dict.fromkeys(unmet))
 
@@ -288,16 +321,28 @@ class GeospatialCatalogService:
         return list(dict.fromkeys(warnings))
 
     # -------------------------------------------------------------------------
-    async def get_weather_forecast(self, *, latitude: float, longitude: float) -> JsonDict:
-        return await self._fetch_openmeteo_weather_insight(latitude=latitude, longitude=longitude)
+    async def get_weather_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> JsonDict:
+        return await self._fetch_openmeteo_weather_insight(
+            latitude=latitude, longitude=longitude
+        )
 
     # -------------------------------------------------------------------------
-    async def get_air_quality_forecast(self, *, latitude: float, longitude: float) -> JsonDict:
-        return await self._fetch_openmeteo_air_quality_insight(latitude=latitude, longitude=longitude)
+    async def get_air_quality_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> JsonDict:
+        return await self._fetch_openmeteo_air_quality_insight(
+            latitude=latitude, longitude=longitude
+        )
 
     # -------------------------------------------------------------------------
-    async def get_nearby_poi(self, *, latitude: float, longitude: float, radius_m: float) -> JsonDict:
-        return await self._fetch_overpass_poi_insight(latitude=latitude, longitude=longitude, radius_m=radius_m)
+    async def get_nearby_poi(
+        self, *, latitude: float, longitude: float, radius_m: float
+    ) -> JsonDict:
+        return await self._fetch_overpass_poi_insight(
+            latitude=latitude, longitude=longitude, radius_m=radius_m
+        )
 
     # -------------------------------------------------------------------------
     async def fetch_insights(
@@ -310,9 +355,8 @@ class GeospatialCatalogService:
     ) -> JsonDict:
         if latitude is None or longitude is None:
             return {}
-        cache_key = (
-            f"{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:"
-            + ",".join(sorted(overlay_ids))
+        cache_key = f"{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:" + ",".join(
+            sorted(overlay_ids)
         )
         cached = self._cache_get(cache_key)
         if cached is not None:
@@ -325,7 +369,9 @@ class GeospatialCatalogService:
                 longitude=longitude,
             )
         if "openmeteo_air_quality_forecast" in overlay_ids:
-            insights["air_quality_forecast"] = await self._fetch_openmeteo_air_quality_insight(
+            insights[
+                "air_quality_forecast"
+            ] = await self._fetch_openmeteo_air_quality_insight(
                 latitude=latitude,
                 longitude=longitude,
             )
@@ -363,7 +409,9 @@ class GeospatialCatalogService:
             for overlay_id in overlay_ids:
                 runtime[overlay_id] = {
                     "provider": self._provider_by_overlay_id(overlay_id),
-                    "resolved_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "resolved_timestamp": time.strftime(
+                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                    ),
                     "data_freshness": "unknown",
                     "availability": "error",
                     "error": {
@@ -406,7 +454,9 @@ class GeospatialCatalogService:
             return {"error": "OpenAQ data unavailable"}
 
     # -------------------------------------------------------------------------
-    async def _fetch_pvgis_insight(self, *, latitude: float, longitude: float) -> JsonDict:
+    async def _fetch_pvgis_insight(
+        self, *, latitude: float, longitude: float
+    ) -> JsonDict:
         try:
             await self._apply_rate_limit("pvgis")
             return await self.pvgis_service.get_point_estimate(latitude, longitude)
@@ -415,7 +465,9 @@ class GeospatialCatalogService:
             return {"error": "PVGIS data unavailable"}
 
     # -------------------------------------------------------------------------
-    async def _fetch_openmeteo_weather_insight(self, *, latitude: float, longitude: float) -> JsonDict:
+    async def _fetch_openmeteo_weather_insight(
+        self, *, latitude: float, longitude: float
+    ) -> JsonDict:
         try:
             await self._apply_rate_limit("openmeteo_weather")
             return await self.openmeteo_service.get_weather_forecast(
@@ -427,7 +479,9 @@ class GeospatialCatalogService:
             return {"error": "Weather forecast unavailable"}
 
     # -------------------------------------------------------------------------
-    async def _fetch_openmeteo_air_quality_insight(self, *, latitude: float, longitude: float) -> JsonDict:
+    async def _fetch_openmeteo_air_quality_insight(
+        self, *, latitude: float, longitude: float
+    ) -> JsonDict:
         try:
             await self._apply_rate_limit("openmeteo_air_quality")
             return await self.openmeteo_service.get_air_quality_forecast(
@@ -439,7 +493,9 @@ class GeospatialCatalogService:
             return {"error": "Air-quality forecast unavailable"}
 
     # -------------------------------------------------------------------------
-    async def _fetch_overpass_poi_insight(self, *, latitude: float, longitude: float, radius_m: float) -> JsonDict:
+    async def _fetch_overpass_poi_insight(
+        self, *, latitude: float, longitude: float, radius_m: float
+    ) -> JsonDict:
         try:
             await self._apply_rate_limit("overpass")
             return await self.overpass_service.get_nearby_poi(
@@ -514,13 +570,19 @@ class GeospatialCatalogService:
                 base_payload["tile_url_template"] = radar.get("tile_url_template")
                 base_payload["latest_time"] = radar.get("latest_time")
             elif overlay_id == "openaq_air_quality":
-                await self.openaq_service.get_nearby_measurements(latitude, longitude, radius_m)
+                await self.openaq_service.get_nearby_measurements(
+                    latitude, longitude, radius_m
+                )
             elif overlay_id == "pvgis_solar":
                 await self.pvgis_service.get_point_estimate(latitude, longitude)
             else:
                 base_payload["data_freshness"] = "static"
             return base_payload
-        except (OpenMeteoRequestError, OverpassRequestError, RainViewerRequestError) as exc:
+        except (
+            OpenMeteoRequestError,
+            OverpassRequestError,
+            RainViewerRequestError,
+        ) as exc:
             return {
                 **base_payload,
                 "availability": "error",

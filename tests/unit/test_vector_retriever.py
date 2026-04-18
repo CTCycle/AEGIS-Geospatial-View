@@ -30,7 +30,9 @@ class _ManifestLoaderStub:
                         "human_summary": "Default city basemap.",
                         "primary_use_cases": ["city context"],
                         "search_examples": ["show roads in Zurich"],
-                        "disambiguation_notes": ["Use satellite for imagery-first tasks."],
+                        "disambiguation_notes": [
+                            "Use satellite for imagery-first tasks."
+                        ],
                         "location_dependency": "Location-specific context.",
                         "integration_requirements": ["No API key required"],
                     },
@@ -55,7 +57,9 @@ class _ManifestLoaderStub:
                         "human_summary": "Station-based air-quality layer.",
                         "primary_use_cases": ["air quality awareness"],
                         "search_examples": ["show air quality in Zurich"],
-                        "disambiguation_notes": ["Use aerosol imagery for broad atmospheric patterns."],
+                        "disambiguation_notes": [
+                            "Use aerosol imagery for broad atmospheric patterns."
+                        ],
                         "location_dependency": "Location-specific and data-dependent.",
                         "integration_requirements": ["No API key required"],
                     },
@@ -78,11 +82,13 @@ class _ManifestLoaderStub:
                         "human_summary": "Traffic flow overlay for congestion context.",
                         "primary_use_cases": ["traffic checks"],
                         "search_examples": ["show traffic in Zurich"],
-                        "disambiguation_notes": ["Requires live traffic-capable provider."],
+                        "disambiguation_notes": [
+                            "Requires live traffic-capable provider."
+                        ],
                         "location_dependency": "Location-specific and near real-time.",
                         "integration_requirements": ["Provider integration required"],
                     },
-                }
+                },
             ],
         }
 
@@ -96,7 +102,9 @@ class _EmbeddingFactoryStub:
         _ = provider
         return "stub-embedding"
 
-    def get_embedding(self, *, provider: str, input_text: str, model: str | None = None):  # noqa: ANN001
+    def get_embedding(
+        self, *, provider: str, input_text: str, model: str | None = None
+    ):  # noqa: ANN001
         _ = provider
         return [float(len(input_text)), 0.0, 1.0], model or "stub-embedding"
 
@@ -122,7 +130,9 @@ def test_vector_retriever_returns_overlay_matches(tmp_path) -> None:
     overlay_ids = [str(item["id"]) for item in matches["overlays"]]
     assert "openaq_air_quality" in overlay_ids
     assert all("score" in item for item in matches["overlays"])
-    assert "tomtom_traffic_flow" not in [str(item["id"]) for item in matches["basemaps"]]
+    assert "tomtom_traffic_flow" not in [
+        str(item["id"]) for item in matches["basemaps"]
+    ]
     assert matches["providers"] == []
 
 
@@ -155,7 +165,9 @@ def test_vector_retriever_raw_prompt_finds_thematic_overlay(tmp_path) -> None:
     assert "tomtom_traffic_flow" in [str(item["id"]) for item in matches["overlays"]]
 
 
-def test_vector_retriever_rebuilds_after_dimension_mismatch(tmp_path, monkeypatch) -> None:
+def test_vector_retriever_rebuilds_after_dimension_mismatch(
+    tmp_path, monkeypatch
+) -> None:
     store = _build_memory_store(tmp_path)
     indexer = VectorIndexer(
         store=store,
@@ -171,7 +183,9 @@ def test_vector_retriever_rebuilds_after_dimension_mismatch(tmp_path, monkeypatc
     def flaky_similarity_search(query_text, *, top_k=5):  # noqa: ANN001
         call_count["count"] += 1
         if call_count["count"] == 1:
-            raise RuntimeError("Collection expecting embedding with dimension of 768, got 384")
+            raise RuntimeError(
+                "Collection expecting embedding with dimension of 768, got 384"
+            )
         return original_similarity_search(query_text, top_k=top_k)
 
     rebuild_calls = {"count": 0}
@@ -191,7 +205,9 @@ def test_vector_retriever_rebuilds_after_dimension_mismatch(tmp_path, monkeypatc
     assert "openaq_air_quality" in [str(item["id"]) for item in matches["overlays"]]
 
 
-def test_vector_retriever_returns_empty_candidates_when_search_fails(tmp_path, monkeypatch) -> None:
+def test_vector_retriever_returns_empty_candidates_when_search_fails(
+    tmp_path, monkeypatch
+) -> None:
     store = _build_memory_store(tmp_path)
     indexer = VectorIndexer(
         store=store,
@@ -201,7 +217,13 @@ def test_vector_retriever_returns_empty_candidates_when_search_fails(tmp_path, m
     indexer.rebuild()
     retriever = VectorRetriever(store=store, indexer=indexer)
 
-    monkeypatch.setattr(store, "similarity_search", lambda query_text, *, top_k=5: (_ for _ in ()).throw(RuntimeError("store offline")))
+    monkeypatch.setattr(
+        store,
+        "similarity_search",
+        lambda query_text, *, top_k=5: (_ for _ in ()).throw(
+            RuntimeError("store offline")
+        ),
+    )
 
     matches = retriever.retrieve_candidates("air quality overlay")
 

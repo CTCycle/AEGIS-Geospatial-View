@@ -7,8 +7,15 @@ from fastapi import APIRouter, status
 from fastapi.responses import Response
 
 from AEGIS.server.configurations import get_server_settings
-from AEGIS.server.domain.geographics import GeospatialCatalogResponse, SearchByLocationResponse
-from AEGIS.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from AEGIS.server.domain.geographics import (
+    GeospatialCatalogResponse,
+    SearchByLocationResponse,
+)
+from AEGIS.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
 from AEGIS.server.services.geospatial.elevation import OpenElevationService
 from AEGIS.server.services.geospatial.gibs import GIBSService
@@ -20,7 +27,10 @@ from AEGIS.server.services.geospatial.openmeteo import OpenMeteoService
 from AEGIS.server.services.geospatial.overpass import OverpassService
 from AEGIS.server.services.geospatial.pvgis import PVGISService
 from AEGIS.server.services.geospatial.rainviewer import RainViewerService
-from AEGIS.server.services.geospatial.rendering import MapRenderingService, MapSearchToolkit
+from AEGIS.server.services.geospatial.rendering import (
+    MapRenderingService,
+    MapSearchToolkit,
+)
 from AEGIS.server.services.jobs import job_manager
 from AEGIS.server.services.sanitization import LocationSanitizationService
 from AEGIS.server.services.search.execution import MapSearchExecutionService
@@ -86,6 +96,7 @@ router.add_api_route(
     status_code=status.HTTP_200_OK,
 )
 
+
 ###############################################################################
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
 def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
@@ -103,7 +114,9 @@ def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
     try:
         with urlopen(request, timeout=10) as upstream:
             media_type = upstream.headers.get_content_type() or "image/png"
-            cache_control = upstream.headers.get("Cache-Control", "public, max-age=3600")
+            cache_control = upstream.headers.get(
+                "Cache-Control", "public, max-age=3600"
+            )
             return Response(
                 content=upstream.read(),
                 media_type=media_type,
@@ -111,13 +124,18 @@ def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
             )
     except HTTPError as exc:
         detail = f"OSM basemap tile request failed with status {exc.code}."
-        return Response(content=detail, status_code=status.HTTP_502_BAD_GATEWAY, media_type="text/plain")
+        return Response(
+            content=detail,
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            media_type="text/plain",
+        )
     except URLError:
         return Response(
             content="OSM basemap tile provider is unavailable.",
             status_code=status.HTTP_502_BAD_GATEWAY,
             media_type="text/plain",
         )
+
 
 router.add_api_route(
     MAPS_SEARCH_ROUTE,

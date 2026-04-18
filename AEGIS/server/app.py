@@ -82,6 +82,7 @@ def bootstrap_vector_index_on_first_startup() -> None:
         return
     VectorIndexer().bootstrap_if_missing()
 
+
 routers = [search_router, chat_router, access_keys_router]
 
 for router in routers:

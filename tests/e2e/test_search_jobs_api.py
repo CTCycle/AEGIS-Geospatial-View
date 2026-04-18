@@ -45,7 +45,9 @@ def test_unknown_job_id_behavior(api_context: APIRequestContext) -> None:
     assert cancel_missing.status == 404
 
 
-def test_memory_backed_non_durable_semantics_shape(api_context: APIRequestContext) -> None:
+def test_memory_backed_non_durable_semantics_shape(
+    api_context: APIRequestContext,
+) -> None:
     start = api_context.post("/api/maps/jobs", data=_payload())
     assert start.status in {202, 502, 503, 504}
     if start.status != 202:

@@ -69,7 +69,9 @@ def test_startup_loads_environment_before_settings(monkeypatch, tmp_path: Path) 
     _write_json(config_file, {})
 
     monkeypatch.delenv("FASTAPI_PORT", raising=False)
-    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file))
+    monkeypatch.setattr(
+        "AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file)
+    )
     reset_environment_bootstrap_for_tests()
 
     app_settings = get_configuration_manager(config_path=config_file).configuration
@@ -87,19 +89,30 @@ def test_environment_loader_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     _write_json(config_file, {})
     monkeypatch.delenv("UI_PORT", raising=False)
     reset_environment_bootstrap_for_tests()
-    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file))
+    monkeypatch.setattr(
+        "AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file)
+    )
 
     ensure_environment_loaded()
     ensure_environment_loaded()
 
-    assert get_configuration_manager(config_path=config_file, force=True).configuration.ui_port == 4555
+    assert (
+        get_configuration_manager(
+            config_path=config_file, force=True
+        ).configuration.ui_port
+        == 4555
+    )
     reload_settings_for_tests()
 
 
-def test_get_server_settings_returns_runtime_settings(monkeypatch, tmp_path: Path) -> None:
+def test_get_server_settings_returns_runtime_settings(
+    monkeypatch, tmp_path: Path
+) -> None:
     config_file = tmp_path / "configurations.json"
     _write_json(config_file, {"jobs": {"polling_interval": 4.0}})
     reset_environment_bootstrap_for_tests()
-    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(tmp_path / ".env"))
+    monkeypatch.setattr(
+        "AEGIS.server.configurations.environment.ENV_FILE_PATH", str(tmp_path / ".env")
+    )
 
     assert get_server_settings(config_file).jobs.polling_interval == 4.0
