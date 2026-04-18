@@ -15,16 +15,41 @@ def map_structured_intent_to_location_request(
     fallback_datetime: str,
 ) -> dict[str, Any]:
     normalized_message = user_message.lower()
-    location = extracted_state.get("location") if isinstance(extracted_state.get("location"), dict) else {}
-    coordinates = (
-        extracted_state.get("coordinates") if isinstance(extracted_state.get("coordinates"), dict) else {}
+    location = (
+        extracted_state.get("location")
+        if isinstance(extracted_state.get("location"), dict)
+        else {}
     )
-    location_type = str(extracted_state.get("location_type") or location.get("location_type") or "").strip().lower() or None
-    semantic_filters = extracted_state.get("filters") if isinstance(extracted_state.get("filters"), list) else []
-    selected_overlay_filters = [str(value) for value in selected_overlay_ids if isinstance(value, str)]
-    layer_filters = [value for value in selected_overlay_filters if value.lower().startswith("gibs_")]
-    has_coordinates = coordinates.get("latitude") is not None and coordinates.get("longitude") is not None
-    nearby_requested = any(token in normalized_message for token in ("nearby", "around", "area nearby", "around it"))
+    coordinates = (
+        extracted_state.get("coordinates")
+        if isinstance(extracted_state.get("coordinates"), dict)
+        else {}
+    )
+    location_type = (
+        str(extracted_state.get("location_type") or location.get("location_type") or "")
+        .strip()
+        .lower()
+        or None
+    )
+    semantic_filters = (
+        extracted_state.get("filters")
+        if isinstance(extracted_state.get("filters"), list)
+        else []
+    )
+    selected_overlay_filters = [
+        str(value) for value in selected_overlay_ids if isinstance(value, str)
+    ]
+    layer_filters = [
+        value for value in selected_overlay_filters if value.lower().startswith("gibs_")
+    ]
+    has_coordinates = (
+        coordinates.get("latitude") is not None
+        and coordinates.get("longitude") is not None
+    )
+    nearby_requested = any(
+        token in normalized_message
+        for token in ("nearby", "around", "area nearby", "around it")
+    )
     default_size = float(get_server_settings().map.default_size_m)
     map_size_m = default_size
     radius_m = 2500.0

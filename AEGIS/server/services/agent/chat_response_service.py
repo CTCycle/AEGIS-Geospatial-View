@@ -18,8 +18,14 @@ class ChatResponseService:
         self.provider = provider
         self.model = model
 
-    def _sanitize_retrieval_for_chat(self, retrieval: dict[str, list[dict[str, object]]]) -> dict[str, list[dict[str, object]]]:
-        sanitized: dict[str, list[dict[str, object]]] = {"basemaps": [], "overlays": [], "providers": []}
+    def _sanitize_retrieval_for_chat(
+        self, retrieval: dict[str, list[dict[str, object]]]
+    ) -> dict[str, list[dict[str, object]]]:
+        sanitized: dict[str, list[dict[str, object]]] = {
+            "basemaps": [],
+            "overlays": [],
+            "providers": [],
+        }
         for kind in ("basemaps", "overlays"):
             for item in retrieval.get(kind, []):
                 if not isinstance(item, dict):
@@ -36,7 +42,9 @@ class ChatResponseService:
                 )
         return sanitized
 
-    def _sanitize_search_result_for_chat(self, search_result: dict[str, Any] | None) -> dict[str, Any] | None:
+    def _sanitize_search_result_for_chat(
+        self, search_result: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         if not isinstance(search_result, dict):
             return None
         geocode = search_result.get("geocode_result")
@@ -84,10 +92,19 @@ class ChatResponseService:
             return ""
         return value
 
-    def _fallback_response(self, decision: AgentDecision, search_result: dict[str, Any] | None) -> str:
+    def _fallback_response(
+        self, decision: AgentDecision, search_result: dict[str, Any] | None
+    ) -> str:
         if not decision.feasibility.is_supported:
-            return decision.feasibility.blocking_reason or "I can only help with location-based geospatial requests."
-        geocode_result = search_result.get("geocode_result") if isinstance(search_result, dict) else None
+            return (
+                decision.feasibility.blocking_reason
+                or "I can only help with location-based geospatial requests."
+            )
+        geocode_result = (
+            search_result.get("geocode_result")
+            if isinstance(search_result, dict)
+            else None
+        )
         if decision.execution_mode == "geocode":
             if isinstance(geocode_result, dict):
                 latitude = geocode_result.get("lat")
@@ -96,7 +113,9 @@ class ChatResponseService:
                     return f"The coordinates are latitude {latitude} and longitude {longitude}."
             return "I could not resolve coordinates for that location. Please share a more specific place name."
         if decision.execution_mode == "search" and search_result is not None:
-            if isinstance(search_result, dict) and isinstance(search_result.get("tool_result"), dict):
+            if isinstance(search_result, dict) and isinstance(
+                search_result.get("tool_result"), dict
+            ):
                 tool_result = search_result["tool_result"]
                 if tool_result.get("kind") == "weather_forecast":
                     return "I retrieved the weather forecast for that location."
@@ -107,18 +126,33 @@ class ChatResponseService:
                     if isinstance(total, int):
                         return f"I found {total} nearby points of interest for that location."
                     return "I retrieved nearby points of interest for that location."
-            map_session = search_result.get("map_session") if isinstance(search_result, dict) else None
-            payload = search_result.get("payload") if isinstance(search_result, dict) else None
+            map_session = (
+                search_result.get("map_session")
+                if isinstance(search_result, dict)
+                else None
+            )
+            payload = (
+                search_result.get("payload")
+                if isinstance(search_result, dict)
+                else None
+            )
             overlay_count = 0
             if isinstance(map_session, dict):
                 overlays = map_session.get("overlays")
                 if isinstance(overlays, list):
                     overlay_count = len(overlays)
             unmet_filters: list[str] = []
-            if isinstance(payload, dict) and isinstance(payload.get("unmet_filters"), list):
-                unmet_filters = [str(value) for value in payload["unmet_filters"] if str(value).strip()]
+            if isinstance(payload, dict) and isinstance(
+                payload.get("unmet_filters"), list
+            ):
+                unmet_filters = [
+                    str(value)
+                    for value in payload["unmet_filters"]
+                    if str(value).strip()
+                ]
             requested_overlay_intent = bool(
-                isinstance(decision.selected_overlay_ids, list) and decision.selected_overlay_ids
+                isinstance(decision.selected_overlay_ids, list)
+                and decision.selected_overlay_ids
             )
             if requested_overlay_intent and overlay_count == 0:
                 if unmet_filters:
@@ -127,7 +161,9 @@ class ChatResponseService:
                         f"Unmet filters: {', '.join(unmet_filters)}. Try a narrower overlay request."
                     )
                 return "I completed the map search, but no matching overlays were available for this request."
-            return "I completed the map search and prepared the requested geospatial view."
+            return (
+                "I completed the map search and prepared the requested geospatial view."
+            )
         if decision.clarification_question:
             return decision.clarification_question
         if "integration" in (decision.reasoning_summary or "").lower():
@@ -147,7 +183,11 @@ class ChatResponseService:
         if decision.clarification_kind == "integration_blocked":
             return decision.clarification_question
         if decision.execution_mode == "geocode":
-            geocode_result = search_result.get("geocode_result") if isinstance(search_result, dict) else None
+            geocode_result = (
+                search_result.get("geocode_result")
+                if isinstance(search_result, dict)
+                else None
+            )
             if geocode_result is None:
                 return "I couldn't resolve that place yet. Can you share a more specific location?"
         return None
@@ -179,17 +219,23 @@ class ChatResponseService:
                 "decision": decision.model_dump(mode="json"),
                 "retrieval": sanitized_retrieval,
                 "search_result": sanitized_search_result,
-                "execution_feedback": execution_feedback or {"status": "unknown", "errors": [], "ambiguities": []},
+                "execution_feedback": execution_feedback
+                or {"status": "unknown", "errors": [], "ambiguities": []},
             }
             result = provider.chat(
                 ChatCompletionRequest(
                     model=self.model,
                     messages=[
-                    {"role": "system", "content": get_agent_response_prompt(provider=self.provider, model=self.model)},
-                    {"role": "user", "content": conversation_context},
-                    {"role": "user", "content": json.dumps(payload, default=str)},
-                ],
-            )
+                        {
+                            "role": "system",
+                            "content": get_agent_response_prompt(
+                                provider=self.provider, model=self.model
+                            ),
+                        },
+                        {"role": "user", "content": conversation_context},
+                        {"role": "user", "content": json.dumps(payload, default=str)},
+                    ],
+                )
             )
             text = self._normalize_plain_text_response((result.content or "").strip())
             if text:

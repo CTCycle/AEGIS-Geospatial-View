@@ -35,15 +35,29 @@ class _MapServiceStub:
 
 ###############################################################################
 class _SanitizationStub:
-    def sanitize_location_inputs(self, address: str, city: str | None, country: str | None) -> dict[str, str | None]:
-        return {"address": address, "city": city, "country": country, "country_code": "it"}
+    def sanitize_location_inputs(
+        self, address: str, city: str | None, country: str | None
+    ) -> dict[str, str | None]:
+        return {
+            "address": address,
+            "city": city,
+            "country": country,
+            "country_code": "it",
+        }
 
 
 ###############################################################################
 class _NominatimCitySuccessStub:
-    async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
+    async def extract_coordinates(
+        self, address, city, country_name, country_code, limit=1
+    ):  # noqa: ANN001
         if city == "Rome":
-            return {"lat": 41.9, "lon": 12.5, "bbox": [12.4, 41.8, 12.6, 42.0], "confidence": 0.9}
+            return {
+                "lat": 41.9,
+                "lon": 12.5,
+                "bbox": [12.4, 41.8, 12.6, 42.0],
+                "confidence": 0.9,
+            }
         return None
 
     async def extract_bbox_from_coordinates(self, latitude, longitude):  # noqa: ANN001
@@ -52,7 +66,15 @@ class _NominatimCitySuccessStub:
 
 ###############################################################################
 class _NominatimPoiOversizedBBoxStub:
-    async def extract_coordinates(self, address, city, country_name, country_code, limit=1, expected_location_type=None):  # noqa: ANN001
+    async def extract_coordinates(
+        self,
+        address,
+        city,
+        country_name,
+        country_code,
+        limit=1,
+        expected_location_type=None,
+    ):  # noqa: ANN001
         _ = city, country_name, country_code, limit, expected_location_type
         if address and "Coliseum" in address:
             return {
@@ -70,7 +92,9 @@ class _NominatimPoiOversizedBBoxStub:
 
 ###############################################################################
 class _NominatimFailStub:
-    async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
+    async def extract_coordinates(
+        self, address, city, country_name, country_code, limit=1
+    ):  # noqa: ANN001
         return None
 
     async def extract_bbox_from_coordinates(self, latitude, longitude):  # noqa: ANN001
@@ -96,7 +120,9 @@ class _CatalogStub:
 
     async def fetch_overlay_runtime(self, latitude, longitude, overlay_ids, radius_m):  # noqa: ANN001
         _ = latitude, longitude, radius_m
-        return {str(overlay_id): {"availability": "available"} for overlay_id in overlay_ids}
+        return {
+            str(overlay_id): {"availability": "available"} for overlay_id in overlay_ids
+        }
 
     def resolve_compliance_warnings(self, basemap, overlays):  # noqa: ANN001
         return []
@@ -163,7 +189,9 @@ def test_unresolved_location_fails_with_actionable_error() -> None:
         asyncio.run(orchestrator.execute(payload))
     assert exc_info.value.status_code == 400
     assert "Unable to resolve a usable location" in str(exc_info.value.detail)
-    assert "Unable to resolve map extent for the requested imagery." not in str(exc_info.value.detail)
+    assert "Unable to resolve map extent for the requested imagery." not in str(
+        exc_info.value.detail
+    )
 
 
 ###############################################################################

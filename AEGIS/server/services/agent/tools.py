@@ -6,6 +6,7 @@ from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
 from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 
+
 ###############################################################################
 class AgentTools:
     def __init__(
@@ -60,11 +61,19 @@ class AgentTools:
             expected_location_type=expected_location_type,
         )
 
-    async def get_weather_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:
-        return await self.catalog_service.get_weather_forecast(latitude=latitude, longitude=longitude)
+    async def get_weather_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, Any]:
+        return await self.catalog_service.get_weather_forecast(
+            latitude=latitude, longitude=longitude
+        )
 
-    async def get_air_quality_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:
-        return await self.catalog_service.get_air_quality_forecast(latitude=latitude, longitude=longitude)
+    async def get_air_quality_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, Any]:
+        return await self.catalog_service.get_air_quality_forecast(
+            latitude=latitude, longitude=longitude
+        )
 
     async def get_nearby_poi(
         self,

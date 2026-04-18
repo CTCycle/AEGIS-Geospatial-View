@@ -29,7 +29,9 @@ ROME_MAP_SESSION = {
 }
 
 
-def chat_turn_map_response(session_id: int, assistant_message: str, basemap_id: str = "osm_default") -> dict[str, Any]:
+def chat_turn_map_response(
+    session_id: int, assistant_message: str, basemap_id: str = "osm_default"
+) -> dict[str, Any]:
     payload = dict(ROME_MAP_SESSION)
     payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
     return {
@@ -38,7 +40,10 @@ def chat_turn_map_response(session_id: int, assistant_message: str, basemap_id: 
         "structured_intent": {"request_text": assistant_message},
         "extracted_state": {"location": {"city": "Rome", "country": "Italy"}},
         "map_session": payload,
-        "tool_payload": {"execution": "map_search", "selected_overlay_ids": ["openaq_air_quality"]},
+        "tool_payload": {
+            "execution": "map_search",
+            "selected_overlay_ids": ["openaq_air_quality"],
+        },
         "follow_up_required": False,
         "fallback_mode": "none",
     }
@@ -51,7 +56,10 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
         "structured_intent": {"request_text": message},
         "extracted_state": {"location": {}},
         "map_session": None,
-        "tool_payload": {"execution": "follow_up", "fallback_mode": "needs_clarification"},
+        "tool_payload": {
+            "execution": "follow_up",
+            "fallback_mode": "needs_clarification",
+        },
         "follow_up_required": True,
         "fallback_mode": "needs_clarification",
     }
@@ -151,8 +159,12 @@ def split_role_settings_payload() -> dict[str, Any]:
     }
 
 
-def chat_stream_events(session_id: int, assistant_message: str, include_tool_status: bool = True) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = [{"event": "status", "data": {"message": "received"}}]
+def chat_stream_events(
+    session_id: int, assistant_message: str, include_tool_status: bool = True
+) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = [
+        {"event": "status", "data": {"message": "received"}}
+    ]
     for token in assistant_message.split():
         events.append({"event": "assistant_delta", "data": {"delta": f"{token} "}})
     if include_tool_status:

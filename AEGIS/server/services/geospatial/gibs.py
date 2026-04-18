@@ -193,7 +193,7 @@ class GIBSService:
         for value in entries:
             try:
                 parsed = float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if parsed > 0:
                 resolutions.append(parsed)
@@ -705,10 +705,14 @@ class GIBSService:
     # -------------------------------------------------------------------------
     def resolve_request_dates(self, *, layer: str, imagery_date: date) -> list[date]:
         fallback_days = self.layer_date_fallback_days.get(layer, 0)
-        return [imagery_date - timedelta(days=offset) for offset in range(fallback_days + 1)]
+        return [
+            imagery_date - timedelta(days=offset) for offset in range(fallback_days + 1)
+        ]
 
     # -------------------------------------------------------------------------
-    def should_retry_previous_date(self, *, layer: str, error: GIBSRequestError) -> bool:
+    def should_retry_previous_date(
+        self, *, layer: str, error: GIBSRequestError
+    ) -> bool:
         if self.layer_date_fallback_days.get(layer, 0) <= 0:
             return False
         message = str(error).lower()
@@ -855,7 +859,7 @@ class GIBSService:
             return None
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     # -------------------------------------------------------------------------

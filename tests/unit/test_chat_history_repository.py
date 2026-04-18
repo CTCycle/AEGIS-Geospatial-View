@@ -51,4 +51,3 @@ def test_get_latest_extracted_state_reads_nested_payload(monkeypatch) -> None:  
     assert latest.location.city == "Rome"
     assert latest.filters == ["traffic"]
     assert latest.location_type == "city"
-

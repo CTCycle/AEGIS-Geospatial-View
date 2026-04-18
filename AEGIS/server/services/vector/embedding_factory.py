@@ -27,7 +27,7 @@ class EmbeddingFactory:
             request = Request(f"{ollama_url}/api/tags", method="GET")
             with urlopen(request, timeout=1):
                 self._ollama_reachable = True
-        except (OSError, URLError, TimeoutError):
+        except OSError, URLError, TimeoutError:
             self._ollama_reachable = False
         return self._ollama_reachable
 
@@ -45,10 +45,18 @@ class EmbeddingFactory:
             return get_server_settings().vectors.default_google_embedding_model
         return get_server_settings().vectors.default_ollama_embedding_model
 
-    def get_embedding(self, *, provider: str, input_text: str, model: str | None = None) -> tuple[list[float], str]:
+    def get_embedding(
+        self, *, provider: str, input_text: str, model: str | None = None
+    ) -> tuple[list[float], str]:
         normalized = self.normalize_provider(provider)
         if normalized == "ollama" and not self._is_ollama_reachable():
             raise RuntimeError("Ollama is not reachable for embedding generation.")
-        selected_model = model.strip() if isinstance(model, str) and model.strip() else self.resolve_default_model(normalized)
+        selected_model = (
+            model.strip()
+            if isinstance(model, str) and model.strip()
+            else self.resolve_default_model(normalized)
+        )
         provider_client = self.llm_factory.get_provider(normalized)
-        return provider_client.embeddings(model=selected_model, input_text=input_text), selected_model
+        return provider_client.embeddings(
+            model=selected_model, input_text=input_text
+        ), selected_model

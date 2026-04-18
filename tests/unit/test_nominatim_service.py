@@ -25,7 +25,11 @@ def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
             "type": "attraction",
             "importance": 0.8,
             "boundingbox": ["41.8895", "41.8907", "12.4912", "12.4931"],
-            "address": {"road": "Piazza del Colosseo", "city": "Rome", "country": "Italy"},
+            "address": {
+                "road": "Piazza del Colosseo",
+                "city": "Rome",
+                "country": "Italy",
+            },
         },
     ]
     ranked = service.rank_candidates(

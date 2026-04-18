@@ -42,7 +42,14 @@ INTENT_SCHEMA: dict[str, Any] = {
                 "start_time": {"type": "array", "items": {"type": "string"}},
                 "end_time": {"type": "array", "items": {"type": "string"}},
             },
-            "required": ["year", "month", "day", "time_range", "start_time", "end_time"],
+            "required": [
+                "year",
+                "month",
+                "day",
+                "time_range",
+                "start_time",
+                "end_time",
+            ],
         },
         "user_goal": {"type": "string"},
         "filters": {"type": "array", "items": {"type": "string"}},
@@ -109,7 +116,13 @@ STAGE_B_SCHEMA: dict[str, Any] = {
         "base_map": {"type": ["string", "null"]},
         "required_overlays": {"type": ["array", "string", "null"]},
     },
-    "required": ["location", "coordinates", "time_reference", "base_map", "required_overlays"],
+    "required": [
+        "location",
+        "coordinates",
+        "time_reference",
+        "base_map",
+        "required_overlays",
+    ],
 }
 
 
@@ -191,11 +204,17 @@ def normalize_stage_a_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "location_type": str(normalized.get("location_type")).strip() or None
             if normalized.get("location_type") is not None
             else None,
-            "has_time_reference": _to_bool(normalized.get("has_time_reference"), default=False),
-            "requires_search": _to_bool(normalized.get("requires_search"), default=False),
+            "has_time_reference": _to_bool(
+                normalized.get("has_time_reference"), default=False
+            ),
+            "requires_search": _to_bool(
+                normalized.get("requires_search"), default=False
+            ),
             "requires_data": _to_bool(normalized.get("requires_data"), default=False),
             "required_tools": _to_str_list(normalized.get("required_tools")),
-            "certainty": max(0.0, min(1.0, _to_float(normalized.get("certainty"), default=0.0))),
+            "certainty": max(
+                0.0, min(1.0, _to_float(normalized.get("certainty"), default=0.0))
+            ),
         }
     )
     return model.model_dump(mode="json")
@@ -217,9 +236,15 @@ def normalize_stage_b_payload(payload: dict[str, Any]) -> dict[str, Any]:
     model = StageBSearchExtraction.model_validate(
         {
             "location": {
-                "address": str(location.get("address")).strip() or None if location.get("address") is not None else None,
-                "city": str(location.get("city")).strip() or None if location.get("city") is not None else None,
-                "country": str(location.get("country")).strip() or None if location.get("country") is not None else None,
+                "address": str(location.get("address")).strip() or None
+                if location.get("address") is not None
+                else None,
+                "city": str(location.get("city")).strip() or None
+                if location.get("city") is not None
+                else None,
+                "country": str(location.get("country")).strip() or None
+                if location.get("country") is not None
+                else None,
                 "location_type": (
                     str(location.get("location_type")).strip() or None
                     if location.get("location_type") is not None

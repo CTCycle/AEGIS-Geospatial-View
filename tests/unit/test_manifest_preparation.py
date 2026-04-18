@@ -52,9 +52,7 @@ def test_prepare_entry_rejects_embedding_incomplete_manifest() -> None:
         "description": "",
         "coverage": "global",
         "capabilities": ["overlay"],
-        "metadata": {
-            "keywords": ["overlay"]
-        },
+        "metadata": {"keywords": ["overlay"]},
     }
     with pytest.raises(ManifestEmbeddingValidationError):
         service.prepare_entry(entry=entry, kind="overlays")

@@ -8,7 +8,11 @@ from urllib.request import Request, urlopen
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
-from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult, ModelDescriptor
+from AEGIS.server.services.llm.types import (
+    ChatCompletionRequest,
+    ChatCompletionResult,
+    ModelDescriptor,
+)
 
 
 class GoogleProvider(LLMProvider):
@@ -40,7 +44,9 @@ class GoogleProvider(LLMProvider):
             raise ValueError(f"Google request failed: {exc.reason}") from exc
 
     def list_models(self) -> list[ModelDescriptor]:
-        return [entry for entry in get_cloud_model_catalog() if entry.provider == "google"]
+        return [
+            entry for entry in get_cloud_model_catalog() if entry.provider == "google"
+        ]
 
     def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
         text = "\n".join(item.get("content", "") for item in request.messages)
@@ -59,7 +65,9 @@ class GoogleProvider(LLMProvider):
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
         yield self.chat(request).content
 
-    def structured_output(self, request: ChatCompletionRequest, schema: dict[str, Any]) -> dict[str, Any]:
+    def structured_output(
+        self, request: ChatCompletionRequest, schema: dict[str, Any]
+    ) -> dict[str, Any]:
         result = self.chat(request)
         try:
             parsed = json.loads(result.content)

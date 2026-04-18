@@ -50,13 +50,24 @@ class OverpassService:
         self.base_url = base_url or settings.base_url
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
-        self.cache_ttl_s = max(cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0)
+        self.cache_ttl_s = max(
+            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+        )
         self.min_call_interval_s = max(
-            min_call_interval_s if min_call_interval_s is not None else settings.min_call_interval_s,
+            min_call_interval_s
+            if min_call_interval_s is not None
+            else settings.min_call_interval_s,
             0.05,
         )
-        self.default_radius_m = max(default_radius_m if default_radius_m is not None else settings.default_radius_m, 100.0)
-        self.default_limit = max(1, default_limit if default_limit is not None else settings.default_limit)
+        self.default_radius_m = max(
+            default_radius_m
+            if default_radius_m is not None
+            else settings.default_radius_m,
+            100.0,
+        )
+        self.default_limit = max(
+            1, default_limit if default_limit is not None else settings.default_limit
+        )
         self._lock = threading.Lock()
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._last_request_at = 0.0
@@ -72,7 +83,11 @@ class OverpassService:
     ) -> dict[str, Any]:
         resolved_radius_m = max(radius_m or self.default_radius_m, 100.0)
         resolved_limit = max(1, limit or self.default_limit)
-        tags = [tag.strip() for tag in (amenity_tags or list(self.DEFAULT_AMENITIES)) if tag and tag.strip()]
+        tags = [
+            tag.strip()
+            for tag in (amenity_tags or list(self.DEFAULT_AMENITIES))
+            if tag and tag.strip()
+        ]
         if not tags:
             tags = list(self.DEFAULT_AMENITIES)
         payload = await asyncio.to_thread(
@@ -83,7 +98,9 @@ class OverpassService:
             tags=tags,
             limit=resolved_limit,
         )
-        elements = payload.get("elements") if isinstance(payload.get("elements"), list) else []
+        elements = (
+            payload.get("elements") if isinstance(payload.get("elements"), list) else []
+        )
         points: list[dict[str, Any]] = []
         for raw in elements:
             if not isinstance(raw, dict):
@@ -95,15 +112,19 @@ class OverpassService:
             lat = raw.get("lat")
             lon = raw.get("lon")
             if lat is None or lon is None:
-                center = raw.get("center") if isinstance(raw.get("center"), dict) else {}
+                center = (
+                    raw.get("center") if isinstance(raw.get("center"), dict) else {}
+                )
                 lat = center.get("lat")
                 lon = center.get("lon")
             try:
                 lat_value = float(lat)
                 lon_value = float(lon)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
-            distance_m = self._haversine_distance_m(latitude, longitude, lat_value, lon_value)
+            distance_m = self._haversine_distance_m(
+                latitude, longitude, lat_value, lon_value
+            )
             points.append(
                 {
                     "id": str(raw.get("id")),
@@ -150,13 +171,7 @@ class OverpassService:
                 for tag in tags
             ]
         )
-        query = (
-            "[out:json][timeout:25];\n"
-            "(\n"
-            f"{filters}\n"
-            ");\n"
-            f"out center {limit};"
-        )
+        query = f"[out:json][timeout:25];\n(\n{filters}\n);\nout center {limit};"
         payload = urlencode({"data": query}).encode("utf-8")
         request = Request(
             self.base_url,
@@ -204,12 +219,17 @@ class OverpassService:
         with self._lock:
             self._last_request_at = time.time()
 
-    def _haversine_distance_m(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    def _haversine_distance_m(
+        self, lat1: float, lon1: float, lat2: float, lon2: float
+    ) -> float:
         radius = 6371000.0
         phi1 = math.radians(lat1)
         phi2 = math.radians(lat2)
         d_phi = math.radians(lat2 - lat1)
         d_lambda = math.radians(lon2 - lon1)
-        a = math.sin(d_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2.0) ** 2
+        a = (
+            math.sin(d_phi / 2.0) ** 2
+            + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2.0) ** 2
+        )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return radius * c

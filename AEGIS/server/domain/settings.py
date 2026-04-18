@@ -178,7 +178,9 @@ class JsonDatabaseSettings(BaseModel):
     connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
     insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
 
-    @field_validator("host", "database_name", "username", "password", "ssl_ca", mode="before")
+    @field_validator(
+        "host", "database_name", "username", "password", "ssl_ca", mode="before"
+    )
     @classmethod
     def normalize_optional_strings(cls, value: Any) -> str | None:
         if value is None:
@@ -277,7 +279,9 @@ class JsonGIBSSettings(BaseModel):
     capabilities_ttl_s: float = Field(default=6 * 60 * 60, ge=60.0)
     max_cache_entries: int = Field(default=24, ge=1)
     bbox_precision: int = Field(default=6, ge=0)
-    wms_base_endpoints: dict[str, str] = Field(default_factory=lambda: dict(GIBS_WMS_BASE_ENDPOINTS))
+    wms_base_endpoints: dict[str, str] = Field(
+        default_factory=lambda: dict(GIBS_WMS_BASE_ENDPOINTS)
+    )
     retry_backoff_s: float = Field(default=2.0, ge=0.1)
     min_visual_radius_m: float = Field(default=20000.0, ge=1000.0)
     image_width: int = Field(
@@ -291,12 +295,18 @@ class JsonGIBSSettings(BaseModel):
         le=GIBS_MAX_IMAGE_DIMENSION,
     )
     default_layer: str = DEFAULT_GIBS_DEFAULT_LAYER
-    capabilities_endpoints: dict[str, str] = Field(default_factory=lambda: dict(GIBS_CAPABILITIES_ENDPOINTS))
-    ows_namespaces: dict[str, str] = Field(default_factory=lambda: dict(GIBS_OWS_NAMESPACES))
+    capabilities_endpoints: dict[str, str] = Field(
+        default_factory=lambda: dict(GIBS_CAPABILITIES_ENDPOINTS)
+    )
+    ows_namespaces: dict[str, str] = Field(
+        default_factory=lambda: dict(GIBS_OWS_NAMESPACES)
+    )
     layer_sync_user_agent: str = DEFAULT_GIBS_LAYER_SYNC_USER_AGENT
     layer_sync_timeout: float = Field(default=30.0, ge=1.0)
 
-    @field_validator("wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before")
+    @field_validator(
+        "wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before"
+    )
     @classmethod
     def normalize_string_mapping(cls, value: Any) -> dict[str, str]:
         if not isinstance(value, dict):
@@ -334,7 +344,9 @@ class AppSettings(BaseSettings):
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
     jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
     chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
-    vectors: JsonVectorRuntimeSettings = Field(default_factory=JsonVectorRuntimeSettings)
+    vectors: JsonVectorRuntimeSettings = Field(
+        default_factory=JsonVectorRuntimeSettings
+    )
     openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
     overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
     rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)

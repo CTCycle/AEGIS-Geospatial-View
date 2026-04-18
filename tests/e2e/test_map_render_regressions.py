@@ -62,21 +62,35 @@ def _turn_payload() -> dict[str, Any]:
 
 
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
-    page.route(re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload()))
-    page.route(re.compile(r".*/api/chat/settings$"), lambda route: _json_ok(route, model_settings_payload()))
-    page.route(re.compile(r".*/api/chat/models$"), lambda route: _json_ok(route, _models_payload()))
+    page.route(
+        re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
+    )
+    page.route(
+        re.compile(r".*/api/chat/settings$"),
+        lambda route: _json_ok(route, model_settings_payload()),
+    )
+    page.route(
+        re.compile(r".*/api/chat/models$"),
+        lambda route: _json_ok(route, _models_payload()),
+    )
     page.route(
         re.compile(r".*/api/maps/catalog$"),
-        lambda route: _json_ok(route, {"providers": [], "basemaps": [], "overlays": []}),
+        lambda route: _json_ok(
+            route, {"providers": [], "basemaps": [], "overlays": []}
+        ),
     )
 
     def handle_osm_proxy(route: Route) -> None:
-        match = re.search(r"/api/maps/basemaps/osm/(\d+)/\d+/\d+\.png$", route.request.url)
+        match = re.search(
+            r"/api/maps/basemaps/osm/(\d+)/\d+/\d+\.png$", route.request.url
+        )
         if match:
             record_tile_zoom(int(match.group(1)))
         route.fulfill(status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT)
 
-    page.route(re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"), handle_osm_proxy)
+    page.route(
+        re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"), handle_osm_proxy
+    )
 
 
 def _collect_console_errors(page: Page) -> list[str]:
@@ -96,13 +110,22 @@ def _assert_no_render_blockers(errors: list[str]) -> None:
         for line in errors
         if any(
             token in line.lower()
-            for token in ("maplibre", "cors", "tile", "webgl", "render", "failed to load")
+            for token in (
+                "maplibre",
+                "cors",
+                "tile",
+                "webgl",
+                "render",
+                "failed to load",
+            )
         )
     ]
     assert not blockers, f"Render-blocking console errors detected: {blockers}"
 
 
-def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(page: Page, base_url: str) -> None:
+def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
+    page: Page, base_url: str
+) -> None:
     requested_zooms: list[int] = []
     _setup_stubs(page, requested_zooms.append)
     errors = _collect_console_errors(page)
@@ -118,7 +141,9 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(page: Page, ba
     _assert_no_render_blockers(errors)
 
 
-def test_refresh_restores_rendered_map_without_console_errors(page: Page, base_url: str) -> None:
+def test_refresh_restores_rendered_map_without_console_errors(
+    page: Page, base_url: str
+) -> None:
     requested_zooms: list[int] = []
     _setup_stubs(page, requested_zooms.append)
     errors = _collect_console_errors(page)
@@ -133,5 +158,7 @@ def test_refresh_restores_rendered_map_without_console_errors(page: Page, base_u
     expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
     expect(page.get_by_text("Search executed successfully.")).to_be_visible()
     expect(page.locator(".maplibregl-canvas")).to_be_visible()
-    assert requested_zooms, "Expected raster tile requests for initial or restored map render"
+    assert requested_zooms, (
+        "Expected raster tile requests for initial or restored map render"
+    )
     _assert_no_render_blockers(errors)

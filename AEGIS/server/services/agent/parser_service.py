@@ -10,7 +10,10 @@ from AEGIS.server.domain.extraction.models import (
     StageBSearchExtraction,
 )
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.prompts import get_agent_enrichment_prompt, get_agent_extraction_prompt
+from AEGIS.server.services.llm.prompts import (
+    get_agent_enrichment_prompt,
+    get_agent_extraction_prompt,
+)
 from AEGIS.server.services.llm.structured import (
     INTENT_SCHEMA,
     STAGE_A_SCHEMA,
@@ -60,7 +63,12 @@ class ParserService:
             request = ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": get_agent_extraction_prompt(provider=self.provider, model=self.model)},
+                    {
+                        "role": "system",
+                        "content": get_agent_extraction_prompt(
+                            provider=self.provider, model=self.model
+                        ),
+                    },
                     {
                         "role": "user",
                         "content": conversation_context,
@@ -94,19 +102,30 @@ class ParserService:
                 lines.append(f"- {name}: {description}")
         return "\n".join(lines) if lines else "No tools available."
 
-    def _stage_a_fallback(self, user_message: str, available_tools: list[dict[str, str]]) -> StageAParserIntent:
+    def _stage_a_fallback(
+        self, user_message: str, available_tools: list[dict[str, str]]
+    ) -> StageAParserIntent:
         has_coordinates = bool(COORDINATE_PAIR_RE.search(user_message))
         has_location = has_coordinates or bool(
-            re.search(r"\b(?:near|around|in|at)\s+[a-z0-9][a-z0-9\s,'\-]{2,}", user_message, re.IGNORECASE)
+            re.search(
+                r"\b(?:near|around|in|at)\s+[a-z0-9][a-z0-9\s,'\-]{2,}",
+                user_message,
+                re.IGNORECASE,
+            )
         )
-        if not has_location and re.search(r"\b(?:find|show|check|locate)\s+(?:me\s+)?[A-Z][a-z]{2,}\b", user_message):
+        if not has_location and re.search(
+            r"\b(?:find|show|check|locate)\s+(?:me\s+)?[A-Z][a-z]{2,}\b", user_message
+        ):
             has_location = True
         if not has_location:
             tokens = re.findall(r"\b[A-Za-z]{3,}\b", user_message)
             if any(token[0].isupper() for token in tokens[1:]):
                 has_location = True
         lowered = user_message.lower()
-        requires_search = any(token in lowered for token in ("map", "overlay", "layer", "satellite", "traffic"))
+        requires_search = any(
+            token in lowered
+            for token in ("map", "overlay", "layer", "satellite", "traffic")
+        )
         required_tools: list[str] = []
         for tool in available_tools:
             name = str(tool.get("name") or "")
@@ -117,9 +136,12 @@ class ParserService:
                 required_tools.append(name)
             if "poi" in lowered and "points of interest" in description:
                 required_tools.append(name)
-            if (
-                any(token in lowered for token in ("coordinate", "where is", "geocode", "locate"))
-                and any(token in description for token in ("geocode", "geocoding", "latitude and longitude"))
+            if any(
+                token in lowered
+                for token in ("coordinate", "where is", "geocode", "locate")
+            ) and any(
+                token in description
+                for token in ("geocode", "geocoding", "latitude and longitude")
             ):
                 required_tools.append(name)
         if has_coordinates:
@@ -131,7 +153,9 @@ class ParserService:
         return StageAParserIntent(
             has_location=has_location,
             location_type=location_type,
-            has_time_reference=bool(re.search(r"\b(today|tomorrow|yesterday|\d{4})\b", lowered)),
+            has_time_reference=bool(
+                re.search(r"\b(today|tomorrow|yesterday|\d{4})\b", lowered)
+            ),
             requires_search=requires_search,
             requires_data=requires_search,
             required_tools=list(dict.fromkeys(required_tools)),
@@ -154,19 +178,36 @@ class ParserService:
                 request = ChatCompletionRequest(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": get_agent_extraction_prompt(provider=self.provider, model=self.model)},
+                        {
+                            "role": "system",
+                            "content": get_agent_extraction_prompt(
+                                provider=self.provider, model=self.model
+                            ),
+                        },
                         {"role": "user", "content": conversation_context},
-                        {"role": "user", "content": f"latest_user_message={user_message}\navailable_tools:\n{self._tools_summary(available_tools)}"},
+                        {
+                            "role": "user",
+                            "content": f"latest_user_message={user_message}\navailable_tools:\n{self._tools_summary(available_tools)}",
+                        },
                     ],
                 )
                 raw_payload = provider.structured_output(request, schema=STAGE_A_SCHEMA)
-                normalized = normalize_stage_a_payload(raw_payload if isinstance(raw_payload, dict) else {})
+                normalized = normalize_stage_a_payload(
+                    raw_payload if isinstance(raw_payload, dict) else {}
+                )
                 stage_a = StageAParserIntent.model_validate(normalized)
                 fallback_stage = self._stage_a_fallback(user_message, available_tools)
                 if fallback_stage.has_location and not stage_a.has_location:
-                    stage_a = stage_a.model_copy(update={"has_location": True, "location_type": fallback_stage.location_type})
+                    stage_a = stage_a.model_copy(
+                        update={
+                            "has_location": True,
+                            "location_type": fallback_stage.location_type,
+                        }
+                    )
                 if fallback_stage.required_tools and not stage_a.required_tools:
-                    stage_a = stage_a.model_copy(update={"required_tools": fallback_stage.required_tools})
+                    stage_a = stage_a.model_copy(
+                        update={"required_tools": fallback_stage.required_tools}
+                    )
                 if stage_a.certainty >= certainty_threshold:
                     return stage_a
             except Exception:
@@ -186,26 +227,44 @@ class ParserService:
             request = ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": get_agent_enrichment_prompt(provider=self.provider, model=self.model)},
+                    {
+                        "role": "system",
+                        "content": get_agent_enrichment_prompt(
+                            provider=self.provider, model=self.model
+                        ),
+                    },
                     {"role": "user", "content": conversation_context},
-                    {"role": "user", "content": f"user_message={user_message}\nretrieval={retrieval}"},
+                    {
+                        "role": "user",
+                        "content": f"user_message={user_message}\nretrieval={retrieval}",
+                    },
                 ],
             )
             raw_payload = provider.structured_output(request, schema=STAGE_B_SCHEMA)
-            normalized = normalize_stage_b_payload(raw_payload if isinstance(raw_payload, dict) else {})
+            normalized = normalize_stage_b_payload(
+                raw_payload if isinstance(raw_payload, dict) else {}
+            )
             stage_b = StageBSearchExtraction.model_validate(normalized)
         except Exception:
             stage_b = StageBSearchExtraction()
-        if stage_b.coordinates.latitude is None or stage_b.coordinates.longitude is None:
+        if (
+            stage_b.coordinates.latitude is None
+            or stage_b.coordinates.longitude is None
+        ):
             match = COORDINATE_PAIR_RE.search(user_message)
             if match:
                 latitude = float(match.group("latitude"))
                 longitude = float(match.group("longitude"))
                 if -90 <= latitude <= 90 and -180 <= longitude <= 180:
                     payload = stage_b.model_dump(mode="json")
-                    payload["coordinates"] = {"latitude": latitude, "longitude": longitude}
+                    payload["coordinates"] = {
+                        "latitude": latitude,
+                        "longitude": longitude,
+                    }
                     stage_b = StageBSearchExtraction.model_validate(payload)
-        if not any([stage_b.location.address, stage_b.location.city, stage_b.location.country]):
+        if not any(
+            [stage_b.location.address, stage_b.location.city, stage_b.location.country]
+        ):
             city_match = re.search(
                 r"\b(?:in|at|near|around|find|show|locate)\s+(?:me\s+)?([A-Z][a-z]{2,})\b",
                 user_message,
@@ -219,10 +278,22 @@ class ParserService:
                     "location_type": "city",
                 }
                 stage_b = StageBSearchExtraction.model_validate(payload)
-        if not any([stage_b.location.address, stage_b.location.city, stage_b.location.country]):
+        if not any(
+            [stage_b.location.address, stage_b.location.city, stage_b.location.country]
+        ):
             city_tokens = re.findall(r"\b[A-Z][a-z]{2,}\b", user_message)
             for token in city_tokens:
-                if token.lower() in {"find", "show", "check", "locate", "map", "give", "what", "where", "please"}:
+                if token.lower() in {
+                    "find",
+                    "show",
+                    "check",
+                    "locate",
+                    "map",
+                    "give",
+                    "what",
+                    "where",
+                    "please",
+                }:
                     continue
                 payload = stage_b.model_dump(mode="json")
                 payload["location"] = {
@@ -235,6 +306,8 @@ class ParserService:
                 break
         if not stage_b.time_reference:
             stage_b = stage_b.model_copy(
-                update={"time_reference": fallback_datetime or datetime.now(UTC).isoformat()}
+                update={
+                    "time_reference": fallback_datetime or datetime.now(UTC).isoformat()
+                }
             )
         return stage_b

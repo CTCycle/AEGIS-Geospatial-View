@@ -41,7 +41,9 @@ class VectorIndexer:
     def _metadata_path(self) -> str:
         return os.path.join(self.store.persist_path, self.METADATA_FILENAME)
 
-    def _manifest_summary(self, catalog: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    def _manifest_summary(
+        self, catalog: dict[str, list[dict[str, Any]]]
+    ) -> list[dict[str, Any]]:
         summary: list[dict[str, Any]] = []
         for kind in self.SEARCHABLE_KINDS:
             for entry in catalog.get(kind, []):
@@ -56,15 +58,23 @@ class VectorIndexer:
         summary.sort(key=lambda item: (item["kind"], item["id"]))
         return summary
 
-    def _resolve_index_embedding_settings(self, catalog: dict[str, list[dict[str, Any]]]) -> tuple[str, str]:
+    def _resolve_index_embedding_settings(
+        self, catalog: dict[str, list[dict[str, Any]]]
+    ) -> tuple[str, str]:
         providers: set[str] = set()
         for kind in self.SEARCHABLE_KINDS:
             for entry in catalog.get(kind, []):
                 metadata = dict(entry.get("metadata") or {})
-                providers.add(self.embedding_factory.normalize_provider(metadata.get("embedding_provider")))
+                providers.add(
+                    self.embedding_factory.normalize_provider(
+                        metadata.get("embedding_provider")
+                    )
+                )
         if len(providers) > 1:
             detected = ", ".join(sorted(providers))
-            raise ValueError(f"Mixed embedding providers are not supported in one vector index: {detected}")
+            raise ValueError(
+                f"Mixed embedding providers are not supported in one vector index: {detected}"
+            )
         provider = next(iter(providers), "ollama")
         return provider, self.embedding_factory.resolve_default_model(provider)
 
@@ -104,8 +114,12 @@ class VectorIndexer:
             "manifest_summary": summary,
             "manifest_versions_summary": versions_summary,
             "source_directories": {
-                "basemaps": os.path.abspath(os.path.join(self.manifest_loader.root_path, "basemaps")),
-                "overlays": os.path.abspath(os.path.join(self.manifest_loader.root_path, "overlays")),
+                "basemaps": os.path.abspath(
+                    os.path.join(self.manifest_loader.root_path, "basemaps")
+                ),
+                "overlays": os.path.abspath(
+                    os.path.join(self.manifest_loader.root_path, "overlays")
+                ),
             },
         }
         if isinstance(build_duration_ms, int) and build_duration_ms >= 0:
@@ -142,7 +156,7 @@ class VectorIndexer:
         try:
             with open(metadata_path, "r", encoding="utf-8") as handle:
                 payload = json.load(handle)
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return None
         return payload if isinstance(payload, dict) else None
 
@@ -171,12 +185,18 @@ class VectorIndexer:
         summary = payload.get("manifest_summary")
         if not isinstance(summary, list):
             return False
-        if not isinstance(payload.get("manifest_count"), int) or payload["manifest_count"] != len(summary):
+        if not isinstance(payload.get("manifest_count"), int) or payload[
+            "manifest_count"
+        ] != len(summary):
             return False
-        return isinstance(payload.get("manifest_fingerprint"), str) and bool(str(payload["manifest_fingerprint"]).strip())
+        return isinstance(payload.get("manifest_fingerprint"), str) and bool(
+            str(payload["manifest_fingerprint"]).strip()
+        )
 
     def _bootstrap_artifacts_present(self) -> bool:
-        return bool(self.store.exists() and self._metadata_is_valid(self._read_metadata()))
+        return bool(
+            self.store.exists() and self._metadata_is_valid(self._read_metadata())
+        )
 
     def _entry_to_document(
         self,
@@ -250,7 +270,9 @@ class VectorIndexer:
     def rebuild(self) -> dict[str, Any]:
         started = perf_counter()
         catalog = self.manifest_loader.load_all()
-        embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
+        embedding_provider, embedding_model = self._resolve_index_embedding_settings(
+            catalog
+        )
         self.store.clear()
         documents = self._index_documents(
             catalog,
@@ -287,7 +309,9 @@ class VectorIndexer:
     def sync(self) -> dict[str, Any]:
         catalog = self.manifest_loader.load_all()
         updated = 0
-        embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
+        embedding_provider, embedding_model = self._resolve_index_embedding_settings(
+            catalog
+        )
         for kind in self.SEARCHABLE_KINDS:
             manifest_kind = kind[:-1]
             for entry in catalog.get(kind, []):
@@ -307,7 +331,9 @@ class VectorIndexer:
                 updated += 1
         if updated > 0 or not self._metadata_is_valid(self._read_metadata()):
             return self.rebuild()
-        document_count = sum(len(catalog.get(kind, [])) for kind in self.SEARCHABLE_KINDS)
+        document_count = sum(
+            len(catalog.get(kind, [])) for kind in self.SEARCHABLE_KINDS
+        )
         self._write_metadata(
             catalog=catalog,
             chunk_count=document_count,

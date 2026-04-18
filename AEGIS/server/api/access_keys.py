@@ -33,7 +33,9 @@ def list_access_keys(
         rows = serializer.list_keys(provider)
         return [_to_response(row) for row in rows]
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @router.post("", response_model=AccessKeyResponse, status_code=status.HTTP_201_CREATED)
@@ -42,12 +44,20 @@ def create_access_key(payload: AccessKeyCreateRequest) -> AccessKeyResponse:
         row = serializer.create_key(payload.provider, payload.access_key)
         return _to_response(row)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
 
 
-@router.put("/{key_id}/activate", response_model=AccessKeyResponse, status_code=status.HTTP_200_OK)
+@router.put(
+    "/{key_id}/activate",
+    response_model=AccessKeyResponse,
+    status_code=status.HTTP_200_OK,
+)
 def activate_access_key(
     key_id: int,
     provider: str = Query(..., min_length=1),
@@ -56,12 +66,18 @@ def activate_access_key(
         row = serializer.activate_key(key_id, provider)
         return _to_response(row)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/{key_id}", response_model=AccessKeyDeleteResponse, status_code=status.HTTP_200_OK)
+@router.delete(
+    "/{key_id}", response_model=AccessKeyDeleteResponse, status_code=status.HTTP_200_OK
+)
 def delete_access_key(
     key_id: int,
     provider: str = Query(..., min_length=1),
@@ -70,6 +86,10 @@ def delete_access_key(
         serializer.delete_key(key_id, provider)
         return AccessKeyDeleteResponse(success=True)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

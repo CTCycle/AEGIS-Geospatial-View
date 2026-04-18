@@ -14,7 +14,11 @@ from AEGIS.server.domain.geographics import (
     LocationSearchRequest,
     SearchByLocationResponse,
 )
-from AEGIS.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from AEGIS.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 from AEGIS.server.repositories.serialization import DataSerializer
 from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
 from AEGIS.server.services.geospatial.elevation import OpenElevationService
@@ -134,7 +138,7 @@ class MapSearchExecutionService:
         try:
             lon_value = float(lon_candidate)
             lat_value = float(lat_candidate)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return lon_value, lat_value
 
@@ -215,7 +219,9 @@ class MapSearchExecutionService:
     ) -> dict[str, Any]:
         response_payload: dict[str, Any] | None = None
         try:
-            self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_COORDINATES)
+            self.job_manager.update_progress(
+                job_id, MAP_SEARCH_JOB_PROGRESS_COORDINATES
+            )
             search_payload = await self.get_location_coordinates(payload)
             if self.job_manager.should_stop(job_id):
                 await self.record_search_session(
@@ -252,7 +258,9 @@ class MapSearchExecutionService:
             search_payload["compliance_warnings"] = map_session.get(
                 "compliance_warnings", []
             )
-            self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_POSTPROCESS)
+            self.job_manager.update_progress(
+                job_id, MAP_SEARCH_JOB_PROGRESS_POSTPROCESS
+            )
 
             lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
             lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))

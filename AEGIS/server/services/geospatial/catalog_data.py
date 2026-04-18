@@ -41,9 +41,17 @@ def build_catalog_basemaps(
         provider = str(entry.get("provider") or "")
         if not tile_url and isinstance(tile_url_template, str):
             if provider == "tomtom":
-                tile_url = tile_url_template.replace("{api_key}", tomtom_key) if tomtom_key else None
+                tile_url = (
+                    tile_url_template.replace("{api_key}", tomtom_key)
+                    if tomtom_key
+                    else None
+                )
             elif provider == "geoapify":
-                tile_url = tile_url_template.replace("{api_key}", geoapify_key) if geoapify_key else None
+                tile_url = (
+                    tile_url_template.replace("{api_key}", geoapify_key)
+                    if geoapify_key
+                    else None
+                )
         mapped.append(
             {
                 "id": entry["id"],
@@ -84,6 +92,8 @@ def build_catalog_overlays(*, tomtom_key: str | None) -> list[JsonDict]:
         }
         url_template = metadata.get("url_template")
         if isinstance(url_template, str) and entry.get("provider") == "tomtom":
-            overlay["url"] = url_template.replace("{api_key}", tomtom_key) if tomtom_key else None
+            overlay["url"] = (
+                url_template.replace("{api_key}", tomtom_key) if tomtom_key else None
+            )
         mapped.append(overlay)
     return mapped

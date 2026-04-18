@@ -57,7 +57,11 @@ def build_location_search_payload_data(
     image_crs: str | None,
     image_format: str | None,
 ) -> dict[str, Any]:
-    resolved_tiles = _resolve_tiles_from_basemap(basemap_id) or map_tiles or get_server_settings().map.tiles
+    resolved_tiles = (
+        _resolve_tiles_from_basemap(basemap_id)
+        or map_tiles
+        or get_server_settings().map.tiles
+    )
     payload_data: dict[str, Any] = {
         "datetime": datetime_value,
         "time_of_day": time_of_day,
@@ -76,7 +80,9 @@ def build_location_search_payload_data(
         "bbox": bbox,
         "image_width": get_server_settings().gibs.image_width,
         "image_height": get_server_settings().gibs.image_height,
-        "map_size_m": map_size_m if map_size_m is not None else get_server_settings().map.default_size_m,
+        "map_size_m": map_size_m
+        if map_size_m is not None
+        else get_server_settings().map.default_size_m,
         "map_tiles": resolved_tiles,
     }
     if radius_m is not None:
@@ -99,7 +105,9 @@ def _resolve_tiles_from_basemap(basemap_id: str | None) -> str | None:
     for entry in basemaps:
         if str(entry.get("id")) != selected:
             continue
-        metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+        metadata = (
+            entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+        )
         tile_url = metadata.get("tile_url")
         if isinstance(tile_url, str) and tile_url.strip():
             if selected == "osm_default":

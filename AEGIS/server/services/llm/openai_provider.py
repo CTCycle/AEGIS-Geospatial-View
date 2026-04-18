@@ -8,7 +8,11 @@ from urllib.request import Request, urlopen
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
-from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult, ModelDescriptor
+from AEGIS.server.services.llm.types import (
+    ChatCompletionRequest,
+    ChatCompletionResult,
+    ModelDescriptor,
+)
 
 
 class OpenAIProvider(LLMProvider):
@@ -41,7 +45,9 @@ class OpenAIProvider(LLMProvider):
             raise ValueError(f"OpenAI request failed: {exc.reason}") from exc
 
     def list_models(self) -> list[ModelDescriptor]:
-        return [entry for entry in get_cloud_model_catalog() if entry.provider == "openai"]
+        return [
+            entry for entry in get_cloud_model_catalog() if entry.provider == "openai"
+        ]
 
     def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
         payload = self._post_json(
@@ -63,7 +69,9 @@ class OpenAIProvider(LLMProvider):
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
         yield self.chat(request).content
 
-    def structured_output(self, request: ChatCompletionRequest, schema: dict[str, Any]) -> dict[str, Any]:
+    def structured_output(
+        self, request: ChatCompletionRequest, schema: dict[str, Any]
+    ) -> dict[str, Any]:
         result = self.chat(request)
         try:
             parsed = json.loads(result.content)

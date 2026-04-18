@@ -14,17 +14,28 @@ from AEGIS.server.services.llm.types import ChatCompletionRequest
 ###############################################################################
 class DecisionService:
     GEOCODE_PATTERNS = (
-        re.compile(r"\b(coordinates?|latitude|longitude|lat\s*/\s*lon|lat[- ]?lon)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(coordinates?|latitude|longitude|lat\s*/\s*lon|lat[- ]?lon)\b",
+            re.IGNORECASE,
+        ),
         re.compile(r"\b(where is\b|\bgeocode\b|\blocat(?:e|ion of)\b)", re.IGNORECASE),
     )
     DIRECT_WEATHER_PATTERNS = (
-        re.compile(r"\b(weather forecast|forecast weather|weather outlook)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(weather forecast|forecast weather|weather outlook)\b", re.IGNORECASE
+        ),
     )
     DIRECT_AIR_QUALITY_PATTERNS = (
-        re.compile(r"\b(air quality forecast|forecast air quality|pollution forecast)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(air quality forecast|forecast air quality|pollution forecast)\b",
+            re.IGNORECASE,
+        ),
     )
     DIRECT_POI_PATTERNS = (
-        re.compile(r"\b(nearby poi|nearby amenities|points of interest|nearby places)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(nearby poi|nearby amenities|points of interest|nearby places)\b",
+            re.IGNORECASE,
+        ),
     )
     AMBIGUOUS_REQUEST_PATTERNS = (
         re.compile(r"\b(best|ideal|optimum|optimize|most suitable)\b", re.IGNORECASE),
@@ -77,10 +88,18 @@ class DecisionService:
         "inspect",
     }
     LOCATION_CUE_PATTERNS = (
-        re.compile(r"\b(?:near|nearby|around|at|in)\s+[a-z0-9][a-z0-9\s,'\-]{2,}", re.IGNORECASE),
+        re.compile(
+            r"\b(?:near|nearby|around|at|in)\s+[a-z0-9][a-z0-9\s,'\-]{2,}",
+            re.IGNORECASE,
+        ),
         re.compile(r"\b\d{1,5}\s+[a-z0-9][a-z0-9\s.'\-]{2,}", re.IGNORECASE),
-        re.compile(r"\b(?:street|st|road|rd|avenue|ave|via|boulevard|blvd|lane|ln|square|piazza)\b", re.IGNORECASE),
-        re.compile(r"[+-]?\d{1,2}(?:\.\d+)?\s*[, ]\s*[+-]?\d{1,3}(?:\.\d+)?", re.IGNORECASE),
+        re.compile(
+            r"\b(?:street|st|road|rd|avenue|ave|via|boulevard|blvd|lane|ln|square|piazza)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"[+-]?\d{1,2}(?:\.\d+)?\s*[, ]\s*[+-]?\d{1,3}(?:\.\d+)?", re.IGNORECASE
+        ),
     )
     MAP_SEARCH_PATTERNS = (
         re.compile(r"\b(show|see|search|open|view|display|map)\b", re.IGNORECASE),
@@ -95,7 +114,9 @@ class DecisionService:
         normalized = user_message.strip()
         return any(pattern.search(normalized) for pattern in self.GEOCODE_PATTERNS)
 
-    def _looks_like_geospatial_request(self, user_message: str, extracted_state: ExtractedIntent) -> bool:
+    def _looks_like_geospatial_request(
+        self, user_message: str, extracted_state: ExtractedIntent
+    ) -> bool:
         haystack = " ".join(
             [
                 user_message,
@@ -115,7 +136,10 @@ class DecisionService:
         normalized = user_message.strip().lower()
         if any(pattern.search(normalized) for pattern in self.LOCATION_CUE_PATTERNS):
             return True
-        if "," in normalized and any(token in normalized for token in ("switzerland", "italy", "france", "usa", "uk")):
+        if "," in normalized and any(
+            token in normalized
+            for token in ("switzerland", "italy", "france", "usa", "uk")
+        ):
             return True
         return False
 
@@ -173,7 +197,9 @@ class DecisionService:
             reasoning_summary="Low-confidence parse with likely location intent; attempt geocode once",
         )
 
-    def _build_missing_integration_decision(self, integration_name: str) -> AgentDecision:
+    def _build_missing_integration_decision(
+        self, integration_name: str
+    ) -> AgentDecision:
         return AgentDecision(
             decision="clarify",
             execution_mode="clarify",
@@ -190,7 +216,9 @@ class DecisionService:
             reasoning_summary="Missing required integration",
         )
 
-    def _build_geocode_decision(self, has_text_location: bool, has_coordinates: bool) -> AgentDecision:
+    def _build_geocode_decision(
+        self, has_text_location: bool, has_coordinates: bool
+    ) -> AgentDecision:
         return AgentDecision(
             decision="search_and_complete",
             execution_mode="geocode",
@@ -217,7 +245,9 @@ class DecisionService:
             execution_mode="search",
             tool_target=tool_target,
             should_trigger_search=False,
-            location_status="valid" if (has_text_location or has_coordinates) else "missing",
+            location_status="valid"
+            if (has_text_location or has_coordinates)
+            else "missing",
             requires_geocoding=has_text_location and not has_coordinates,
             clarification_question=None,
             missing_fields=[],
@@ -240,7 +270,9 @@ class DecisionService:
             clarification = str(decision.clarification_question or "").lower()
             if "search the map or run a specific tool" in clarification:
                 return self._build_missing_location_decision()
-            if (has_text_location or has_coordinates) and self._is_map_search_request(user_message):
+            if (has_text_location or has_coordinates) and self._is_map_search_request(
+                user_message
+            ):
                 return AgentDecision(
                     decision="search_and_complete",
                     execution_mode="search",
@@ -257,7 +289,9 @@ class DecisionService:
                 )
         return decision
 
-    def _select_available_candidate_ids(self, retrieval: dict[str, list[dict[str, object]]], kind: str) -> list[str]:
+    def _select_available_candidate_ids(
+        self, retrieval: dict[str, list[dict[str, object]]], kind: str
+    ) -> list[str]:
         selected: list[str] = []
         for item in retrieval.get(kind, []):
             if not isinstance(item, dict):
@@ -276,7 +310,9 @@ class DecisionService:
                 return keyword, label
         return None
 
-    def _integration_blocked(self, *, retrieval: dict[str, list[dict[str, object]]], keyword: str) -> bool:
+    def _integration_blocked(
+        self, *, retrieval: dict[str, list[dict[str, object]]], keyword: str
+    ) -> bool:
         matching: list[dict[str, object]] = []
         for kind in ("basemaps", "overlays"):
             for item in retrieval.get(kind, []):
@@ -295,13 +331,17 @@ class DecisionService:
             return False
         return all(not bool(item.get("is_available", True)) for item in matching)
 
-    def _default_search_payload(self, has_coordinates: bool, has_text_location: bool) -> dict[str, Any]:
+    def _default_search_payload(
+        self, has_coordinates: bool, has_text_location: bool
+    ) -> dict[str, Any]:
         return {
             "decision": "search_and_complete",
             "execution_mode": "search",
             "tool_target": "map_search",
             "should_trigger_search": True,
-            "location_status": "valid" if (has_coordinates or has_text_location) else "missing",
+            "location_status": "valid"
+            if (has_coordinates or has_text_location)
+            else "missing",
             "requires_geocoding": bool(has_text_location and not has_coordinates),
             "selected_basemap_id": None,
             "selected_overlay_ids": [],
@@ -337,20 +377,32 @@ class DecisionService:
             ]
         )
         is_geocode_request = self._is_geocode_request(user_message)
-        is_geospatial_request = self._looks_like_geospatial_request(user_message, extracted_state)
+        is_geospatial_request = self._looks_like_geospatial_request(
+            user_message, extracted_state
+        )
         if not is_geocode_request and not is_geospatial_request:
             return self._unsupported_request_decision()
-        if any(pattern.search(user_message) for pattern in self.AMBIGUOUS_REQUEST_PATTERNS):
+        if any(
+            pattern.search(user_message) for pattern in self.AMBIGUOUS_REQUEST_PATTERNS
+        ):
             return self._ambiguous_request_decision()
         if is_geocode_request:
             return self._build_geocode_decision(has_text_location, has_coordinates)
         requested_integration = self._requested_integration(user_message)
         if requested_integration is not None:
             keyword, label = requested_integration
-            any_available = bool(self._select_available_candidate_ids(retrieval, "basemaps") or self._select_available_candidate_ids(retrieval, "overlays"))
-            if self._integration_blocked(retrieval=retrieval, keyword=keyword) and not any_available:
+            any_available = bool(
+                self._select_available_candidate_ids(retrieval, "basemaps")
+                or self._select_available_candidate_ids(retrieval, "overlays")
+            )
+            if (
+                self._integration_blocked(retrieval=retrieval, keyword=keyword)
+                and not any_available
+            ):
                 return self._build_missing_integration_decision(label)
-        if self._is_map_search_request(user_message) and (has_coordinates or has_text_location):
+        if self._is_map_search_request(user_message) and (
+            has_coordinates or has_text_location
+        ):
             return AgentDecision(
                 decision="search_and_complete",
                 execution_mode="search",
@@ -377,17 +429,24 @@ class DecisionService:
                 reasoning_summary="Coordinates available for deterministic map search",
             )
         if not has_coordinates and not has_text_location:
-            if self._looks_like_location_phrase(user_message) and extracted_state.certainty < 0.55:
+            if (
+                self._looks_like_location_phrase(user_message)
+                and extracted_state.certainty < 0.55
+            ):
                 return self._build_low_confidence_geocode_attempt_decision()
             return self._build_missing_location_decision()
-        if any(pattern.search(user_message) for pattern in self.DIRECT_WEATHER_PATTERNS):
+        if any(
+            pattern.search(user_message) for pattern in self.DIRECT_WEATHER_PATTERNS
+        ):
             return self._build_direct_tool_decision(
                 tool_target="get_weather_forecast",
                 has_text_location=has_text_location,
                 has_coordinates=has_coordinates,
                 summary="Direct weather forecast request",
             )
-        if any(pattern.search(user_message) for pattern in self.DIRECT_AIR_QUALITY_PATTERNS):
+        if any(
+            pattern.search(user_message) for pattern in self.DIRECT_AIR_QUALITY_PATTERNS
+        ):
             return self._build_direct_tool_decision(
                 tool_target="get_air_quality_forecast",
                 has_text_location=has_text_location,
@@ -407,7 +466,12 @@ class DecisionService:
             request = ChatCompletionRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": get_agent_decision_system_prompt(provider=self.provider, model=self.model)},
+                    {
+                        "role": "system",
+                        "content": get_agent_decision_system_prompt(
+                            provider=self.provider, model=self.model
+                        ),
+                    },
                     {"role": "user", "content": conversation_context},
                     {
                         "role": "user",
@@ -415,7 +479,9 @@ class DecisionService:
                             {
                                 "user_message": user_message,
                                 "available_tools": available_tools or [],
-                                "extracted_state": extracted_state.model_dump(mode="json"),
+                                "extracted_state": extracted_state.model_dump(
+                                    mode="json"
+                                ),
                                 "retrieval": retrieval,
                             }
                         ),
@@ -433,8 +499,14 @@ class DecisionService:
             payload = {}
         if "decision" not in payload:
             payload = self._default_search_payload(has_coordinates, has_text_location)
-        payload.setdefault("execution_mode", "search" if payload.get("should_trigger_search") else "clarify")
-        payload.setdefault("tool_target", "map_search" if payload.get("execution_mode") == "search" else None)
+        payload.setdefault(
+            "execution_mode",
+            "search" if payload.get("should_trigger_search") else "clarify",
+        )
+        payload.setdefault(
+            "tool_target",
+            "map_search" if payload.get("execution_mode") == "search" else None,
+        )
         if has_coordinates and payload.get("execution_mode") == "clarify":
             payload.update(
                 {
@@ -448,14 +520,26 @@ class DecisionService:
                     "reasoning_summary": "Coordinates provided; force map-search execution",
                 }
             )
-        allowed_basemaps = set(self._select_available_candidate_ids(retrieval, "basemaps"))
-        allowed_overlays = set(self._select_available_candidate_ids(retrieval, "overlays"))
+        allowed_basemaps = set(
+            self._select_available_candidate_ids(retrieval, "basemaps")
+        )
+        allowed_overlays = set(
+            self._select_available_candidate_ids(retrieval, "overlays")
+        )
         selected_basemap_id = payload.get("selected_basemap_id")
-        if isinstance(selected_basemap_id, str) and selected_basemap_id and selected_basemap_id not in allowed_basemaps:
+        if (
+            isinstance(selected_basemap_id, str)
+            and selected_basemap_id
+            and selected_basemap_id not in allowed_basemaps
+        ):
             payload["selected_basemap_id"] = None
         selected_overlays = payload.get("selected_overlay_ids")
         if isinstance(selected_overlays, list):
-            payload["selected_overlay_ids"] = [item for item in selected_overlays if isinstance(item, str) and item in allowed_overlays]
+            payload["selected_overlay_ids"] = [
+                item
+                for item in selected_overlays
+                if isinstance(item, str) and item in allowed_overlays
+            ]
         decision = AgentDecision.model_validate(payload)
         return self._post_validate_decision(
             decision=decision,

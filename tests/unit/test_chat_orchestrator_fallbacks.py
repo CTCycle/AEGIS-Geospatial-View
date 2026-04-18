@@ -19,7 +19,10 @@ class _SearchOrchestratorStub:
         return {
             "payload": {"ok": True},
             "map_session": {
-                "center": {"latitude": payload.latitude, "longitude": payload.longitude},
+                "center": {
+                    "latitude": payload.latitude,
+                    "longitude": payload.longitude,
+                },
                 "bounds": [12.4, 41.8, 12.6, 42.0],
             },
         }
@@ -36,8 +39,14 @@ class _FailingFactory:
         raise RuntimeError("chat unavailable")
 
 
-def test_chat_orchestrator_falls_back_when_llm_unavailable_for_coordinate_prompt(monkeypatch) -> None:  # noqa: ANN001
-    monkeypatch.setattr(AgentOrchestrator, "_check_ollama_availability", lambda self, settings: (True, None))
+def test_chat_orchestrator_falls_back_when_llm_unavailable_for_coordinate_prompt(
+    monkeypatch,
+) -> None:  # noqa: ANN001
+    monkeypatch.setattr(
+        AgentOrchestrator,
+        "_check_ollama_availability",
+        lambda self, settings: (True, None),
+    )
     orchestrator = AgentOrchestrator(
         search_orchestrator=_SearchOrchestratorStub(),
         llm_factory=_FailingFactory(),

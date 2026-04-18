@@ -36,7 +36,9 @@ class _ChatProviderStub:
 
 ###############################################################################
 class _FactoryStub:
-    def __init__(self, *, parser: Any = None, agent: Any = None, chat: Any = None) -> None:
+    def __init__(
+        self, *, parser: Any = None, agent: Any = None, chat: Any = None
+    ) -> None:
         self._parser = parser
         self._agent = agent
         self._chat = chat
@@ -59,10 +61,14 @@ def test_parser_service_includes_context_then_machine_readable_inputs() -> None:
         provider="ollama",
         model="llama3.2",
     )
-    state = ExtractedIntent.model_validate({"location": {"city": "Rome", "country": "Italy"}})
+    state = ExtractedIntent.model_validate(
+        {"location": {"city": "Rome", "country": "Italy"}}
+    )
     context = "user: Find Rome\n\n# current extracted state\n{}"
 
-    service.extract_patch(conversation_context=context, latest_state=state, user_message="same place")
+    service.extract_patch(
+        conversation_context=context, latest_state=state, user_message="same place"
+    )
 
     request = parser_provider.last_request
     assert request is not None
@@ -99,7 +105,11 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
         model="llama3.2",
     )
     context = "user: Find Rome\n\n# current extracted state\n{}"
-    retrieval = {"basemaps": [{"id": "osm_default"}], "overlays": [{"id": "fires"}], "providers": []}
+    retrieval = {
+        "basemaps": [{"id": "osm_default"}],
+        "overlays": [{"id": "fires"}],
+        "providers": [],
+    }
     state = ExtractedIntent.model_validate({"location": {"city": "Rome"}})
 
     service.decide(
@@ -116,7 +126,9 @@ def test_decision_service_includes_context_and_retrieval_payload() -> None:
     payload = json.loads(request.messages[2]["content"])
     assert payload["user_message"] == "compare air quality and weather in Rome"
     assert payload["retrieval"] == retrieval
-    assert payload["available_tools"] == [{"name": "map_search", "description": "Map search tool"}]
+    assert payload["available_tools"] == [
+        {"name": "map_search", "description": "Map search tool"}
+    ]
 
 
 ###############################################################################
@@ -139,11 +151,25 @@ def test_chat_response_service_includes_context_and_decision_payload() -> None:
     )
     state = ExtractedIntent.model_validate({"location": {"city": "Rome"}})
     retrieval = {
-        "basemaps": [{"id": "osm_default", "label": "OpenStreetMap", "provider": "fallback", "is_available": True}],
-        "overlays": [{"id": "fires", "label": "Fires", "provider": "gibs", "is_available": True}],
+        "basemaps": [
+            {
+                "id": "osm_default",
+                "label": "OpenStreetMap",
+                "provider": "fallback",
+                "is_available": True,
+            }
+        ],
+        "overlays": [
+            {"id": "fires", "label": "Fires", "provider": "gibs", "is_available": True}
+        ],
         "providers": [],
     }
-    search_result = {"map_session": {"center": {"latitude": 41.9, "longitude": 12.5}, "overlays": ["fires"]}}
+    search_result = {
+        "map_session": {
+            "center": {"latitude": 41.9, "longitude": 12.5},
+            "overlays": ["fires"],
+        }
+    }
 
     service.generate(
         conversation_context=context,

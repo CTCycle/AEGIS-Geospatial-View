@@ -641,19 +641,42 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, dict[str, object]] = {
     },
     "MODIS_Terra_Aerosol": {
         "provider": "gibs",
-        "aliases": ("aerosol", "aerosol optical depth", "modis aerosol", "aod", "air pollution"),
+        "aliases": (
+            "aerosol",
+            "aerosol optical depth",
+            "modis aerosol",
+            "aod",
+            "air pollution",
+        ),
     },
     "MODIS_Terra_Land_Surface_Temp_Day": {
         "provider": "gibs",
-        "aliases": ("surface temperature day", "land surface temperature", "lst day", "modis lst", "temperature day"),
+        "aliases": (
+            "surface temperature day",
+            "land surface temperature",
+            "lst day",
+            "modis lst",
+            "temperature day",
+        ),
     },
     "MODIS_Terra_Land_Surface_Temp_Night": {
         "provider": "gibs",
-        "aliases": ("surface temperature night", "lst night", "temperature night", "night temperature"),
+        "aliases": (
+            "surface temperature night",
+            "lst night",
+            "temperature night",
+            "night temperature",
+        ),
     },
     "MODIS_Terra_NDVI_8Day": {
         "provider": "gibs",
-        "aliases": ("ndvi", "vegetation index", "modis ndvi", "vegetation", "greenness"),
+        "aliases": (
+            "ndvi",
+            "vegetation index",
+            "modis ndvi",
+            "vegetation",
+            "greenness",
+        ),
     },
     "MODIS_Terra_L3_Land_Water_Mask": {
         "provider": "gibs",
@@ -661,11 +684,23 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, dict[str, object]] = {
     },
     "IMERG_Precipitation_Rate": {
         "provider": "gibs",
-        "aliases": ("precipitation rate", "imerg precipitation", "imerg", "rain", "rainfall"),
+        "aliases": (
+            "precipitation rate",
+            "imerg precipitation",
+            "imerg",
+            "rain",
+            "rainfall",
+        ),
     },
     "VIIRS_SNPP_DayNightBand_ENCC": {
         "provider": "gibs",
-        "aliases": ("nighttime lights", "city lights", "viirs lights", "light pollution", "night lights"),
+        "aliases": (
+            "nighttime lights",
+            "city lights",
+            "viirs lights",
+            "light pollution",
+            "night lights",
+        ),
     },
     "MODIS_Combined_Thermal_Anomalies_Fire": {
         "provider": "gibs",
@@ -674,14 +709,32 @@ DEFAULT_LAYER_DEFINITIONS: dict[str, dict[str, object]] = {
     },
     "OMPS_Ozone_Total_Column": {
         "provider": "gibs",
-        "aliases": ("ozone", "ozone column", "total ozone", "omps ozone", "atmospheric ozone"),
+        "aliases": (
+            "ozone",
+            "ozone column",
+            "total ozone",
+            "omps ozone",
+            "atmospheric ozone",
+        ),
     },
     "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": {
         "provider": "gibs",
-        "aliases": ("land cover", "land cover type", "modis igbp land cover", "igbp land cover", "land use"),
+        "aliases": (
+            "land cover",
+            "land cover type",
+            "modis igbp land cover",
+            "igbp land cover",
+            "land use",
+        ),
     },
     "SRTM_Color_Index": {
         "provider": "gibs",
-        "aliases": ("elevation", "dem", "digital elevation model", "terrain", "topography"),
+        "aliases": (
+            "elevation",
+            "dem",
+            "digital elevation model",
+            "terrain",
+            "topography",
+        ),
     },
 }

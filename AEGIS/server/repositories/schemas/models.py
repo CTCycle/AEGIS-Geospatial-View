@@ -99,7 +99,9 @@ class ModelProviderSettingsRecord(Base):
     parser_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
     agent_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
     agent_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
-    ollama_url: Mapped[str] = mapped_column(String(400), default="http://localhost:11434")
+    ollama_url: Mapped[str] = mapped_column(
+        String(400), default="http://localhost:11434"
+    )
     openai_base_url: Mapped[str | None] = mapped_column(String(400))
     google_base_url: Mapped[str | None] = mapped_column(String(400))
     created_at: Mapped[datetime] = mapped_column(
@@ -149,7 +151,9 @@ class AccessKeyRecord(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     __table_args__ = (
-        CheckConstraint("provider IN ('openai', 'gemini')", name="ck_access_keys_provider"),
+        CheckConstraint(
+            "provider IN ('openai', 'gemini')", name="ck_access_keys_provider"
+        ),
         Index("ix_access_keys_provider", "provider"),
         Index(
             "ux_access_keys_provider_active",
@@ -226,7 +230,9 @@ class SessionCatalogRecord(Base):
         unique=True,
     )
     models_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
-    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
     duration_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     num_messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -245,9 +251,13 @@ class SessionDetailsRecord(Base):
     user_message: Mapped[str] = mapped_column(Text, nullable=False)
     chat_response: Mapped[str] = mapped_column(Text, nullable=False)
     extracted_info_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
     response_time: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    has_triggered_search: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_triggered_search: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
 
 ###############################################################################
@@ -261,10 +271,14 @@ class ManifestEmbeddingRecord(Base):
     content_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     embedding_provider: Mapped[str] = mapped_column(String(64), nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(200), nullable=False)
-    last_embedded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    last_embedded_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
     vector_collection: Mapped[str] = mapped_column(String(120), nullable=False)
     vector_document_id: Mapped[str] = mapped_column(String(255), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("manifest_id", "manifest_kind", name="ux_manifest_embeddings_manifest"),
+        UniqueConstraint(
+            "manifest_id", "manifest_kind", name="ux_manifest_embeddings_manifest"
+        ),
     )

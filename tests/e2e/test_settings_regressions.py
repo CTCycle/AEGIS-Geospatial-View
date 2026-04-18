@@ -57,36 +57,53 @@ def _setup_stub_harness(
                 active_settings.update(payload)
             _json_ok(route, active_settings)
             return
-        route.fulfill(status=405, content_type="application/json", body=json.dumps({"detail": "Method not allowed"}))
+        route.fulfill(
+            status=405,
+            content_type="application/json",
+            body=json.dumps({"detail": "Method not allowed"}),
+        )
 
     def handle_turn(route: Route) -> None:
         if turn_payload_factory is None:
-            _json_ok(route, chat_turn_map_response(9001, "Search executed successfully."))
+            _json_ok(
+                route, chat_turn_map_response(9001, "Search executed successfully.")
+            )
             return
         _json_ok(route, turn_payload_factory(route))
 
     page.route(re.compile(r".*/api/chat/settings.*"), handle_settings)
-    page.route(re.compile(r".*/api/chat/models.*"), lambda route: _json_ok(route, active_models))
+    page.route(
+        re.compile(r".*/api/chat/models.*"),
+        lambda route: _json_ok(route, active_models),
+    )
     page.route(
         re.compile(r".*/api/maps/catalog.*"),
-        lambda route: _json_ok(route, {"providers": [], "basemaps": [], "overlays": []}),
+        lambda route: _json_ok(
+            route, {"providers": [], "basemaps": [], "overlays": []}
+        ),
     )
     page.route(re.compile(r".*/api/chat/turn.*"), handle_turn)
     page.route(
         re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"),
-        lambda route: route.fulfill(status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT),
+        lambda route: route.fulfill(
+            status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
+        ),
     )
     return captured_put_payloads
 
 
-def test_settings_mobile_layout_has_no_overlap_at_320px(page: Page, base_url: str) -> None:
+def test_settings_mobile_layout_has_no_overlap_at_320px(
+    page: Page, base_url: str
+) -> None:
     _setup_stub_harness(page)
     page.set_viewport_size({"width": 320, "height": 700})
 
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
 
     expect(page.locator(".model-card").first).to_be_visible(timeout=15000)
-    expect(page.locator(".settings-page__stats-mobile-card").first).to_be_visible(timeout=15000)
+    expect(page.locator(".settings-page__stats-mobile-card").first).to_be_visible(
+        timeout=15000
+    )
 
     layout_metrics = page.evaluate(
         """
@@ -124,21 +141,31 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(page: Page, base_url: st
     assert layout_metrics["overlaps"] == []
     assert layout_metrics["leftRect"] is not None
     assert layout_metrics["rightRect"] is not None
-    assert layout_metrics["rightRect"]["top"] >= layout_metrics["leftRect"]["bottom"] - 1
+    assert (
+        layout_metrics["rightRect"]["top"] >= layout_metrics["leftRect"]["bottom"] - 1
+    )
 
 
 def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) -> None:
     put_payloads: list[dict[str, Any]] = []
     expected_initial = split_role_settings_payload()
-    _setup_stub_harness(page, settings_payload=expected_initial, put_payloads=put_payloads)
+    _setup_stub_harness(
+        page, settings_payload=expected_initial, put_payloads=put_payloads
+    )
 
     page.goto(f"{base_url.rstrip('/')}/settings")
 
-    model_card = page.locator("article.model-card").filter(has=page.get_by_role("heading", name="gpt-5-mini")).first
+    model_card = (
+        page.locator("article.model-card")
+        .filter(has=page.get_by_role("heading", name="gpt-5-mini"))
+        .first
+    )
     expect(model_card).to_be_visible(timeout=15000)
     model_card.get_by_role("button", name="Use for parser").click()
 
-    expect(page.get_by_text("Selected gpt-5-mini for parser")).to_be_visible(timeout=15000)
+    expect(page.get_by_text("Selected gpt-5-mini for parser")).to_be_visible(
+        timeout=15000
+    )
     assert put_payloads, "Expected PUT /api/chat/settings payload to be captured."
     payload = put_payloads[-1]
 
@@ -155,7 +182,9 @@ def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) 
     assert payload["active_provider_mode"] == "cloud"
 
 
-def test_settings_query_params_do_not_leak_back_to_chat(page: Page, base_url: str) -> None:
+def test_settings_query_params_do_not_leak_back_to_chat(
+    page: Page, base_url: str
+) -> None:
     _setup_stub_harness(page)
 
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
@@ -170,13 +199,19 @@ def test_settings_query_params_do_not_leak_back_to_chat(page: Page, base_url: st
     assert query == ""
 
 
-def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(page: Page, base_url: str) -> None:
+def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
+    page: Page, base_url: str
+) -> None:
     def turn_payload(route: Route) -> dict[str, Any]:
         request_body = route.request.post_data_json or {}
         message = str(request_body.get("message", "")).lower()
         if "coordinate" in message:
-            return chat_turn_text_only_response(11001, "Coordinates identified without map session.")
-        return chat_turn_map_response(11001, "Place search rendered with an interactive map.")
+            return chat_turn_text_only_response(
+                11001, "Coordinates identified without map session."
+            )
+        return chat_turn_map_response(
+            11001, "Place search rendered with an interactive map."
+        )
 
     _setup_stub_harness(page, turn_payload_factory=turn_payload)
 
@@ -185,11 +220,15 @@ def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(page: Page,
 
     composer.fill("coordinate lookup for Eiffel Tower")
     page.get_by_role("button", name="Send").click()
-    expect(page.get_by_text("Coordinates identified without map session.")).to_be_visible(timeout=15000)
+    expect(
+        page.get_by_text("Coordinates identified without map session.")
+    ).to_be_visible(timeout=15000)
     expect(page.locator(".maplibregl-canvas")).to_have_count(0)
     expect(page.locator(".overlay-controls")).to_have_count(0)
 
     composer.fill("place search for Rome city center")
     page.get_by_role("button", name="Send").click()
-    expect(page.get_by_text("Place search rendered with an interactive map.")).to_be_visible(timeout=15000)
+    expect(
+        page.get_by_text("Place search rendered with an interactive map.")
+    ).to_be_visible(timeout=15000)
     expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)

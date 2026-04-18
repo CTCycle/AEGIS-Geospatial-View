@@ -8,7 +8,11 @@ from sqlalchemy import desc, func, select
 
 from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.repositories.database.backend import get_database
-from AEGIS.server.repositories.schemas.models import Base, ChatMessageRecord, ChatSessionRecord
+from AEGIS.server.repositories.schemas.models import (
+    Base,
+    ChatMessageRecord,
+    ChatSessionRecord,
+)
 
 
 ###############################################################################
@@ -57,14 +61,20 @@ class ChatHistoryRepository:
 
     def get_session(self, session_id: int) -> ChatSessionRecord | None:
         with self._session_factory() as session:
-            statement = select(ChatSessionRecord).where(ChatSessionRecord.id == session_id)
+            statement = select(ChatSessionRecord).where(
+                ChatSessionRecord.id == session_id
+            )
             return session.execute(statement).scalars().first()
 
-    def upsert_session(self, session_id: int | None, *, title: str | None = None) -> ChatSessionRecord:
+    def upsert_session(
+        self, session_id: int | None, *, title: str | None = None
+    ) -> ChatSessionRecord:
         if session_id is None:
             return self.create_session(title=title)
         with self._session_factory() as session:
-            statement = select(ChatSessionRecord).where(ChatSessionRecord.id == session_id)
+            statement = select(ChatSessionRecord).where(
+                ChatSessionRecord.id == session_id
+            )
             record = session.execute(statement).scalars().first()
             if record is None:
                 record = ChatSessionRecord(id=session_id, title=title, status="active")
@@ -90,8 +100,10 @@ class ChatHistoryRepository:
         map_session: Any = None,
     ) -> ChatMessageRecord:
         with self._session_factory() as session:
-            count_statement = select(func.count()).select_from(ChatMessageRecord).where(
-                ChatMessageRecord.session_id == session_id
+            count_statement = (
+                select(func.count())
+                .select_from(ChatMessageRecord)
+                .where(ChatMessageRecord.session_id == session_id)
             )
             turn_index = int(session.scalar(count_statement) or 0)
             message = ChatMessageRecord(

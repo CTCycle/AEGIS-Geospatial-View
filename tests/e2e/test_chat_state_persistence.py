@@ -122,7 +122,9 @@ def _base_state(saved_at: int | None = None) -> dict[str, Any]:
     }
 
 
-def test_refresh_same_tab_restores_chat_and_map_state(page: Page, base_url: str) -> None:
+def test_refresh_same_tab_restores_chat_and_map_state(
+    page: Page, base_url: str
+) -> None:
     _stub_settings_api(page)
     _seed_persisted_state(page, _base_state(), "persist-tab-1")
     page.goto(base_url)
@@ -130,11 +132,15 @@ def test_refresh_same_tab_restores_chat_and_map_state(page: Page, base_url: str)
     expect(page.get_by_text("show map at 41.9028, 12.4964")).to_be_visible()
     expect(page.locator(".overlay-controls")).to_be_visible()
     expect(page.locator(".maplibregl-canvas")).to_be_visible()
-    slider_value = page.locator(".overlay-control-row input[type='range']").first.input_value()
+    slider_value = page.locator(
+        ".overlay-control-row input[type='range']"
+    ).first.input_value()
     assert int(slider_value) == 33
 
 
-def test_back_forward_between_routes_restores_both_states(page: Page, base_url: str) -> None:
+def test_back_forward_between_routes_restores_both_states(
+    page: Page, base_url: str
+) -> None:
     _stub_settings_api(page)
     _seed_persisted_state(page, _base_state(), "persist-tab-2")
     page.goto(base_url)
@@ -155,7 +161,9 @@ def test_unknown_path_redirects_to_root(page: Page, base_url: str) -> None:
     expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
 
 
-def test_duplicate_tab_isolation_rotates_owner_and_resets_state(page: Page, base_url: str) -> None:
+def test_duplicate_tab_isolation_rotates_owner_and_resets_state(
+    page: Page, base_url: str
+) -> None:
     _stub_settings_api(page)
     state = _base_state()
     _seed_persisted_state(page, state, "dup-tab")
@@ -173,7 +181,9 @@ def test_duplicate_tab_isolation_rotates_owner_and_resets_state(page: Page, base
     expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
 
 
-def test_corrupted_session_storage_resets_to_defaults(page: Page, base_url: str) -> None:
+def test_corrupted_session_storage_resets_to_defaults(
+    page: Page, base_url: str
+) -> None:
     page.add_init_script(
         """
         (storageKey, tabKey) => {
@@ -197,11 +207,15 @@ def test_expired_state_resets_to_defaults(page: Page, base_url: str) -> None:
     expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
 
 
-def test_stale_overlay_ids_are_ignored_and_notice_shown(page: Page, base_url: str) -> None:
+def test_stale_overlay_ids_are_ignored_and_notice_shown(
+    page: Page, base_url: str
+) -> None:
     stale_state = _base_state()
     stale_state["chatPage"]["mapState"]["overlayVisibility"]["removed_overlay"] = True
     stale_state["chatPage"]["mapState"]["overlayOpacity"]["removed_overlay"] = 0.75
     _seed_persisted_state(page, stale_state, "overlay-tab")
     page.goto(base_url)
-    expect(page.get_by_text("Some saved overlay preferences could not be restored")).to_be_visible()
+    expect(
+        page.get_by_text("Some saved overlay preferences could not be restored")
+    ).to_be_visible()
     expect(page.locator(".overlay-control-row")).to_have_count(1)

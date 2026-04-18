@@ -8,7 +8,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from AEGIS.server.services.llm.base import LLMProvider
-from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult, ModelDescriptor
+from AEGIS.server.services.llm.types import (
+    ChatCompletionRequest,
+    ChatCompletionResult,
+    ModelDescriptor,
+)
 
 
 class _OllamaLibraryParser(HTMLParser):
@@ -44,8 +48,10 @@ class _OllamaLibraryParser(HTMLParser):
         merged = " ".join(self._chunks).strip()
         normalized = " ".join(merged.split())
         if normalized.lower().startswith(self._active_model.lower()):
-            normalized = normalized[len(self._active_model):].strip(" -:•")
-        self.entries[self._active_model] = normalized or f"Ollama library model {self._active_model}"
+            normalized = normalized[len(self._active_model) :].strip(" -:•")
+        self.entries[self._active_model] = (
+            normalized or f"Ollama library model {self._active_model}"
+        )
         self._active_model = None
         self._chunks = []
 
@@ -88,11 +94,15 @@ class OllamaProvider(LLMProvider):
             model_name = str(item.get("name") or "")
             if not model_name:
                 continue
-            details = item.get("details") if isinstance(item.get("details"), dict) else {}
+            details = (
+                item.get("details") if isinstance(item.get("details"), dict) else {}
+            )
             family = str(details.get("family") or "").strip()
             parameter_size = str(details.get("parameter_size") or "").strip()
             quantization_level = str(details.get("quantization_level") or "").strip()
-            details_chunks = [chunk for chunk in [family, parameter_size, quantization_level] if chunk]
+            details_chunks = [
+                chunk for chunk in [family, parameter_size, quantization_level] if chunk
+            ]
             description = (
                 " | ".join(details_chunks)
                 if details_chunks
@@ -149,7 +159,9 @@ class OllamaProvider(LLMProvider):
         if payload.content:
             yield payload.content
 
-    def structured_output(self, request: ChatCompletionRequest, schema: dict[str, Any]) -> dict[str, Any]:
+    def structured_output(
+        self, request: ChatCompletionRequest, schema: dict[str, Any]
+    ) -> dict[str, Any]:
         result = self.chat(request)
         try:
             parsed = json.loads(result.content)
@@ -160,7 +172,9 @@ class OllamaProvider(LLMProvider):
         return parsed
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        payload = self._post_json("/api/embeddings", {"model": model, "prompt": input_text})
+        payload = self._post_json(
+            "/api/embeddings", {"model": model, "prompt": input_text}
+        )
         vector = payload.get("embedding", [])
         if not isinstance(vector, list):
             return []
@@ -169,6 +183,10 @@ class OllamaProvider(LLMProvider):
     def health_check(self) -> dict[str, Any]:
         try:
             payload = self._get_json("/api/tags")
-            return {"ok": True, "detail": "reachable", "models": len(payload.get("models", []))}
+            return {
+                "ok": True,
+                "detail": "reachable",
+                "models": len(payload.get("models", [])),
+            }
         except (HTTPError, URLError, TimeoutError) as exc:
             return {"ok": False, "detail": str(exc)}

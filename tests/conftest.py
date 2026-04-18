@@ -123,7 +123,9 @@ def read_backend_log_tail(backend_log_path: Path):
     def _read(lines: int = 200) -> str:
         if not backend_log_path.exists():
             return ""
-        content = backend_log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        content = backend_log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
         return "\n".join(content[-max(1, lines) :])
 
     return _read

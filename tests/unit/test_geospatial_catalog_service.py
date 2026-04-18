@@ -29,11 +29,23 @@ class _PVGISStub:
 
 
 class _OpenMeteoStub:
-    async def get_weather_forecast(self, *, latitude: float, longitude: float) -> dict[str, object]:
-        return {"kind": "weather_forecast", "latitude": latitude, "longitude": longitude}
+    async def get_weather_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, object]:
+        return {
+            "kind": "weather_forecast",
+            "latitude": latitude,
+            "longitude": longitude,
+        }
 
-    async def get_air_quality_forecast(self, *, latitude: float, longitude: float) -> dict[str, object]:
-        return {"kind": "air_quality_forecast", "latitude": latitude, "longitude": longitude}
+    async def get_air_quality_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, object]:
+        return {
+            "kind": "air_quality_forecast",
+            "latitude": latitude,
+            "longitude": longitude,
+        }
 
 
 class _OverpassStub:

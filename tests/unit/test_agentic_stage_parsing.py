@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from AEGIS.server.domain.extraction.models import StageAParserIntent
 from AEGIS.server.services.agent.parser_service import ParserService
-from AEGIS.server.services.llm.structured import normalize_stage_a_payload, normalize_stage_b_payload
+from AEGIS.server.services.llm.structured import (
+    normalize_stage_a_payload,
+    normalize_stage_b_payload,
+)
 
 
 def test_stage_a_normalization_coerces_aliases_and_types() -> None:
@@ -37,7 +40,10 @@ def test_stage_b_normalization_accepts_basemap_overlay_aliases() -> None:
     assert normalized["location"]["city"] == "Rome"
     assert normalized["coordinates"]["latitude"] == 41.9
     assert normalized["base_map"] == "osm_default"
-    assert normalized["required_overlays"] == ["openmeteo_weather_forecast", "overpass_poi_amenities"]
+    assert normalized["required_overlays"] == [
+        "openmeteo_weather_forecast",
+        "overpass_poi_amenities",
+    ]
 
 
 def test_parser_stage_a_fallback_applies_when_provider_unavailable() -> None:
@@ -45,7 +51,9 @@ def test_parser_stage_a_fallback_applies_when_provider_unavailable() -> None:
         def get_parser_provider(self, provider: str):  # noqa: ARG002
             raise RuntimeError("parser unavailable")
 
-    service = ParserService(llm_factory=_FailingFactory(), provider="ollama", model="llama3.2")
+    service = ParserService(
+        llm_factory=_FailingFactory(), provider="ollama", model="llama3.2"
+    )
     stage_a = service.parse_stage_a_intent(
         conversation_context="# message 1\nshow map in Rome",
         user_message="show map in Rome",

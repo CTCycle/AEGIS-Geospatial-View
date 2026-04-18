@@ -3,7 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Protocol
 
-from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult, ModelDescriptor
+from AEGIS.server.services.llm.types import (
+    ChatCompletionRequest,
+    ChatCompletionResult,
+    ModelDescriptor,
+)
 
 
 class LLMProvider(Protocol):
@@ -15,7 +19,9 @@ class LLMProvider(Protocol):
 
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]: ...
 
-    def structured_output(self, request: ChatCompletionRequest, schema: dict[str, Any]) -> dict[str, Any]: ...
+    def structured_output(
+        self, request: ChatCompletionRequest, schema: dict[str, Any]
+    ) -> dict[str, Any]: ...
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]: ...
 

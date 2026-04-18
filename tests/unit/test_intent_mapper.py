@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from AEGIS.server.services.search.intent_mapper import map_structured_intent_to_location_request
+from AEGIS.server.services.search.intent_mapper import (
+    map_structured_intent_to_location_request,
+)
 
 
 ###############################################################################

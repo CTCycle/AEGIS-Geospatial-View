@@ -113,7 +113,7 @@ class MapSearchToolkit:
             try:
                 for value in candidate:
                     parsed.append(float(value))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
             return parsed
         return None
@@ -461,7 +461,9 @@ class MapRenderingService:
             return harmonized
         if coordinates is not None:
             lon, lat = coordinates
-            map_size_value = payload.map_size_m or get_server_settings().map.default_size_m
+            map_size_value = (
+                payload.map_size_m or get_server_settings().map.default_size_m
+            )
             return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
         return None
 

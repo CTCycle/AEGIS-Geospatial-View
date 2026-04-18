@@ -102,7 +102,7 @@ class NominatimService:
             north = float(bounding_box[1])
             west = float(bounding_box[2])
             east = float(bounding_box[3])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return [west, south, east, north]
 
@@ -173,7 +173,9 @@ class NominatimService:
         try:
             data = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            logger.warning("Nominatim %s response parsing failed: %s", request_kind, exc)
+            logger.warning(
+                "Nominatim %s response parsing failed: %s", request_kind, exc
+            )
             return None
         self._cache_set(cache, cache_key, data)
         return data
@@ -182,7 +184,9 @@ class NominatimService:
     def _wait_for_rate_limit_slot(self) -> None:
         with self._request_lock:
             now = time.monotonic()
-            remaining = self._min_request_interval_s - (now - self._last_request_started_at)
+            remaining = self._min_request_interval_s - (
+                now - self._last_request_started_at
+            )
             if remaining > 0:
                 time.sleep(remaining)
             self._last_request_started_at = time.monotonic()
@@ -217,7 +221,7 @@ class NominatimService:
         try:
             latitude = float(data["lat"])
             longitude = float(data["lon"])
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return None
         result: dict[str, Any] = {
             "lat": latitude,
@@ -236,7 +240,7 @@ class NominatimService:
                 east = float(bounding_box[3])
                 result["bbox"] = [west, south, east, north]
                 result["bbox_source"] = "nominatim"
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
         confidence = self.compute_confidence(
             data=data,
@@ -251,7 +255,9 @@ class NominatimService:
         return result
 
     # -----------------------------------------------------------------------------
-    def _location_type_matches(self, *, expected_location_type: str | None, data: dict[str, Any]) -> float:
+    def _location_type_matches(
+        self, *, expected_location_type: str | None, data: dict[str, Any]
+    ) -> float:
         expected = str(expected_location_type or "").strip().lower()
         if not expected:
             return 0.0
@@ -262,9 +268,19 @@ class NominatimService:
         if expected in {"poi", "address"}:
             if class_name in {"amenity", "tourism", "building", "shop", "highway"}:
                 return 0.22
-            if class_name in {"boundary", "administrative"} or type_name in {"city", "state", "region", "county"}:
+            if class_name in {"boundary", "administrative"} or type_name in {
+                "city",
+                "state",
+                "region",
+                "county",
+            }:
                 return -0.2
-        if expected == "city" and type_name in {"city", "town", "village", "municipality"}:
+        if expected == "city" and type_name in {
+            "city",
+            "town",
+            "village",
+            "municipality",
+        }:
             return 0.2
         if expected == "region" and type_name in {"state", "region", "county"}:
             return 0.2
@@ -295,10 +311,16 @@ class NominatimService:
             )
             if not isinstance(formatted, dict):
                 continue
-            display_name = self.normalize_component(str(candidate.get("display_name") or ""))
-            text_bonus = 0.1 if normalized_query and normalized_query in display_name else 0.0
+            display_name = self.normalize_component(
+                str(candidate.get("display_name") or "")
+            )
+            text_bonus = (
+                0.1 if normalized_query and normalized_query in display_name else 0.0
+            )
             confidence = float(formatted.get("confidence") or 0.0)
-            location_type_bonus = self._location_type_matches(expected_location_type=expected_location_type, data=candidate)
+            location_type_bonus = self._location_type_matches(
+                expected_location_type=expected_location_type, data=candidate
+            )
             score = confidence + text_bonus + location_type_bonus
             scored.append((score, formatted))
         scored.sort(key=lambda item: item[0], reverse=True)
@@ -356,7 +378,7 @@ class NominatimService:
     def derive_importance_score(self, importance: Any) -> float:
         try:
             value = float(importance)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0.55
         if value <= 0.0:
             return 0.05
@@ -468,7 +490,7 @@ class NominatimService:
             north = float(bounding_box[1])
             west = float(bounding_box[2])
             east = float(bounding_box[3])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0.5
         lat_span = abs(north - south)
         lon_span = abs(east - west)
@@ -582,7 +604,9 @@ class NominatimService:
         return self.compute_token_overlap(address_tokens, structured_tokens)
 
     # -----------------------------------------------------------------------------
-    def derive_house_number_score(self, address: str | None, data: dict[str, Any]) -> float:
+    def derive_house_number_score(
+        self, address: str | None, data: dict[str, Any]
+    ) -> float:
         address_tokens = self.tokenize(address)
         number_tokens = [token for token in address_tokens if token.isdigit()]
         if not number_tokens:
@@ -749,4 +773,3 @@ class NominatimService:
             base = normalized[: -len(NOMINATIM_SEARCH_PATH)]
             return f"{base}{NOMINATIM_REVERSE_PATH}"
         return f"{normalized}{NOMINATIM_REVERSE_PATH}"
-

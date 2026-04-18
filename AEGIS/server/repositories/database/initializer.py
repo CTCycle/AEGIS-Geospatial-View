@@ -107,7 +107,7 @@ def build_postgres_database_exists_statement() -> TextClause:
 def build_postgres_create_database_statement(database_name: str) -> TextClause:
     safe_database = database_name.replace('"', '""')
     return sqlalchemy.text(
-        f'CREATE DATABASE "{safe_database}" WITH ENCODING \'UTF8\' TEMPLATE template0'
+        f"CREATE DATABASE \"{safe_database}\" WITH ENCODING 'UTF8' TEMPLATE template0"
     )
 
 
@@ -137,6 +137,7 @@ def validate_postgres_schema(settings: DatabaseSettings) -> None:
             "PostgreSQL schema is missing required tables. "
             f"Run the external initialization script first. Missing: {', '.join(missing)}"
         )
+
 
 # -----------------------------------------------------------------------------
 def run_database_initialization() -> None:

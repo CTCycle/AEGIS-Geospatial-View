@@ -2,7 +2,11 @@ from __future__ import annotations
 import asyncio
 
 from AEGIS.server.api import search
-from AEGIS.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
+from AEGIS.server.domain.jobs import (
+    JobCancelResponse,
+    JobStartResponse,
+    JobStatusResponse,
+)
 
 
 def test_jobs_router_wiring_and_response_models() -> None:
@@ -15,8 +19,13 @@ def test_jobs_router_wiring_and_response_models() -> None:
     assert ("/maps/jobs/{job_id}", ("DELETE",)) in route_map
 
     assert route_map[("/maps/jobs", ("POST",))].response_model is JobStartResponse
-    assert route_map[("/maps/jobs/{job_id}", ("GET",))].response_model is JobStatusResponse
-    assert route_map[("/maps/jobs/{job_id}", ("DELETE",))].response_model is JobCancelResponse
+    assert (
+        route_map[("/maps/jobs/{job_id}", ("GET",))].response_model is JobStatusResponse
+    )
+    assert (
+        route_map[("/maps/jobs/{job_id}", ("DELETE",))].response_model
+        is JobCancelResponse
+    )
 
 
 def test_search_job_start_status_cancel_shapes(monkeypatch) -> None:

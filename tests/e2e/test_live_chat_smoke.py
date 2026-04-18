@@ -68,7 +68,9 @@ def test_live_chat_happy_path(
     tail = read_backend_log_tail(200)
     write_log_tail(dirs["logs"], test_id, tail)
     _assert_clean_backend_tail(tail)
-    write_http_capture(dirs["http"], "turn-01", {"message": "Show me Rome"}, {"session_id": session_id})
+    write_http_capture(
+        dirs["http"], "turn-01", {"message": "Show me Rome"}, {"session_id": session_id}
+    )
     write_report(
         dirs["reports"],
         test_id,
@@ -140,7 +142,9 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
     expect(page.locator(".overlay-controls")).not_to_be_visible()
 
 
-def test_live_degraded_path_shows_user_failure_without_crash(page: Page, base_url: str) -> None:
+def test_live_degraded_path_shows_user_failure_without_crash(
+    page: Page, base_url: str
+) -> None:
     page.route(
         "**/api/chat/turn",
         lambda route: route.fulfill(

@@ -7,7 +7,10 @@ from typing import Any
 from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.queries.session_catalog import select_by_session_id
 from AEGIS.server.repositories.schemas import Base
-from AEGIS.server.repositories.schemas.models import ChatMessageRecord, SessionCatalogRecord
+from AEGIS.server.repositories.schemas.models import (
+    ChatMessageRecord,
+    SessionCatalogRecord,
+)
 from sqlalchemy import func, select
 
 
@@ -21,7 +24,9 @@ class SessionCatalogRepository:
         with self._session_factory() as session:
             record = session.execute(select_by_session_id(session_id)).scalars().first()
             message_count = session.scalar(
-                select(func.count()).select_from(ChatMessageRecord).where(ChatMessageRecord.session_id == session_id)
+                select(func.count())
+                .select_from(ChatMessageRecord)
+                .where(ChatMessageRecord.session_id == session_id)
             )
             if record is None:
                 record = SessionCatalogRecord(
