@@ -85,6 +85,8 @@ router.add_api_route(
     response_model=GeospatialCatalogResponse,
     status_code=status.HTTP_200_OK,
 )
+
+###############################################################################
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
 def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
     if z < 0 or x < 0 or y < 0:
