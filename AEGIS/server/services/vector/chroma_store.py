@@ -4,6 +4,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+import chromadb
+from chromadb.config import Settings
+
 from AEGIS.server.utils.constants import PROJECT_DIR
 
 
@@ -24,9 +27,6 @@ class ChromaVectorStore:
         self._client = None
         self._collection = None
         try:
-            import chromadb
-            from chromadb.config import Settings
-
             self._client = chromadb.PersistentClient(
                 path=self.persist_path,
                 settings=Settings(anonymized_telemetry=False),

@@ -1,0 +1,11 @@
+<button
+  class="settings-icon-button"
+  type="button"
+  [attr.aria-label]="ariaLabel"
+  [attr.title]="title"
+  (click)="onClick()"
+>
+  <span class="settings-icon-button__glyph" aria-hidden="true">
+    <ng-content></ng-content>
+  </span>
+</button>

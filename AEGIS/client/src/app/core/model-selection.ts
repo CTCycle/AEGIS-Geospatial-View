@@ -16,6 +16,16 @@ const ROLE_FIELD_MAP: Record<ModelRole, { provider: keyof ModelSettingsResponse;
 const normalizeSettingField = (value: ModelSettingsResponse[keyof ModelSettingsResponse]): string =>
   typeof value === 'string' ? value.trim() : '';
 
+const toSelectionUpdateCredentials = (
+  credentials: ModelSettingsResponse['credentials'],
+): ModelSettingsUpdateRequest['credentials'] => {
+  const updateCredentials: ModelSettingsUpdateRequest['credentials'] = {};
+  Object.keys(credentials).forEach((provider) => {
+    updateCredentials[provider] = {};
+  });
+  return updateCredentials;
+};
+
 export const isModelSelectedForRole = (
   settings: ModelSettingsResponse,
   role: ModelRole,
@@ -39,7 +49,7 @@ export const buildModelSelectionPayload = (
     active_provider_mode: nextProviderMode,
     [roleFields.provider]: model.provider,
     [roleFields.name]: model.name,
-    credentials: settings.credentials as unknown as ModelSettingsUpdateRequest['credentials'],
+    credentials: toSelectionUpdateCredentials(settings.credentials),
   };
 };
 

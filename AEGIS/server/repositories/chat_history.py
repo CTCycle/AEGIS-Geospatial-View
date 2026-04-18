@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import desc, func, select
 
+from AEGIS.server.domain.extraction.models import ExtractedIntent
 from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import Base, ChatMessageRecord, ChatSessionRecord
 
@@ -140,7 +141,6 @@ class ChatHistoryRepository:
         payload = _from_json_payload(row.structured_payload_json)
         if not isinstance(payload, dict):
             return None
-        from AEGIS.server.domain.extraction.models import ExtractedIntent
 
         extracted_state_payload = payload.get("extracted_state")
         if not isinstance(extracted_state_payload, dict):

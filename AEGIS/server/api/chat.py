@@ -7,7 +7,19 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from AEGIS.server.domain.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResponse, ModelSettingsResponse, VectorizationResponse
+from AEGIS.server.domain.chat import (
+    ChatStreamEvent,
+    ChatTurnRequest,
+    ChatTurnResponse,
+    ModelLibraryResponse,
+    ModelSettingsResponse,
+    ModelSettingsUpdateRequest,
+    OllamaHealthResponse,
+    OllamaPullRequest,
+    OllamaPullResponse,
+    OllamaRefreshResponse,
+    VectorizationResponse,
+)
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
 from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
 from AEGIS.server.services.chat.model_library import ChatModelLibraryService
@@ -127,10 +139,11 @@ async def chat_stream(payload: ChatTurnRequest):
     return StreamingResponse(_chat_event_stream(payload), media_type="application/x-ndjson")
 
 
-@router.get(CHAT_MODELS_ROUTE, status_code=status.HTTP_200_OK)
-def get_models() -> dict[str, list[dict[str, object]]]:
+@router.get(CHAT_MODELS_ROUTE, response_model=ModelLibraryResponse, status_code=status.HTTP_200_OK)
+def get_models() -> ModelLibraryResponse:
     settings = settings_repo.get_or_create()
-    return model_library_service.list_models(ollama_url=settings.ollama_url)
+    response = model_library_service.list_models(ollama_url=settings.ollama_url)
+    return ModelLibraryResponse.model_validate(response)
 
 
 @router.get(CHAT_SETTINGS_ROUTE, response_model=ModelSettingsResponse, status_code=status.HTTP_200_OK)
@@ -139,32 +152,36 @@ def get_settings() -> ModelSettingsResponse:
 
 
 @router.put(CHAT_SETTINGS_ROUTE, response_model=ModelSettingsResponse, status_code=status.HTTP_200_OK)
-def update_settings(payload: dict[str, Any] = Body(default_factory=dict)) -> ModelSettingsResponse:
-    return settings_service.update_settings(payload)
+def update_settings(
+    payload: ModelSettingsUpdateRequest = Body(default_factory=ModelSettingsUpdateRequest),
+) -> ModelSettingsResponse:
+    return settings_service.update_settings(payload.model_dump(mode="python", exclude_none=True))
 
 
-@router.post(CHAT_OLLAMA_REFRESH_ROUTE, status_code=status.HTTP_200_OK)
-def refresh_ollama_models() -> dict[str, Any]:
+@router.post(CHAT_OLLAMA_REFRESH_ROUTE, response_model=OllamaRefreshResponse, status_code=status.HTTP_200_OK)
+def refresh_ollama_models() -> OllamaRefreshResponse:
     settings = settings_repo.get_or_create()
     provider = OllamaProvider(base_url=settings.ollama_url)
     library_models = provider.list_library_models()
     local_models = provider.list_models()
-    return {
-        "status": "ok",
-        "library_models": [model.name for model in library_models],
-        "local_models": [model.name for model in local_models],
-    }
+    return OllamaRefreshResponse(
+        status="ok",
+        library_models=[model.name for model in library_models],
+        local_models=[model.name for model in local_models],
+    )
 
 
-@router.post(CHAT_OLLAMA_PULL_ROUTE, status_code=status.HTTP_200_OK)
-def pull_ollama_model(payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
-    model_name = payload.get("model")
-    if not isinstance(model_name, str) or not model_name.strip():
+@router.post(CHAT_OLLAMA_PULL_ROUTE, response_model=OllamaPullResponse, status_code=status.HTTP_200_OK)
+def pull_ollama_model(
+    payload: OllamaPullRequest | None = Body(default=None),
+) -> OllamaPullResponse:
+    model_name = payload.model.strip() if payload is not None else ""
+    if not model_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="model is required")
     settings = settings_repo.get_or_create()
     provider = OllamaProvider(base_url=settings.ollama_url)
     try:
-        return provider.pull_model(model=model_name.strip())
+        return OllamaPullResponse.model_validate(provider.pull_model(model=model_name))
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc) or "Ollama pull failed") from exc
 
@@ -181,8 +198,8 @@ def sync_vectors() -> VectorizationResponse:
     return VectorizationResponse.model_validate(result)
 
 
-@router.get(CHAT_OLLAMA_HEALTH_ROUTE, status_code=status.HTTP_200_OK)
-def check_ollama_health() -> dict[str, Any]:
+@router.get(CHAT_OLLAMA_HEALTH_ROUTE, response_model=OllamaHealthResponse, status_code=status.HTTP_200_OK)
+def check_ollama_health() -> OllamaHealthResponse:
     settings = settings_repo.get_or_create()
     provider = OllamaProvider(base_url=settings.ollama_url)
-    return provider.health_check()
+    return OllamaHealthResponse.model_validate(provider.health_check())

@@ -8,6 +8,7 @@ import { PersistedChatPageState } from '../core/app-state';
 import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse } from '../core/types';
 import { sendChatTurn } from '../core/api';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
+import { ViewStateSyncService } from '../core/view-state-sync.service';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -48,6 +49,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     private readonly router: Router,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
+    private readonly viewStateSync: ViewStateSyncService,
   ) {
     this.chatPageState = this.appStateStore.getChatPage();
     this.payload = this.chatPageState.payload;
@@ -65,10 +67,8 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    window.scrollTo({ top: this.chatPageState.scrollY, behavior: 'auto' });
-    if (this.transcriptRef?.nativeElement) {
-      this.transcriptRef.nativeElement.scrollTop = this.transcriptScrollTop;
-    }
+    this.viewStateSync.restoreWindowScroll(this.chatPageState.scrollY);
+    this.viewStateSync.restoreElementScroll(this.transcriptRef?.nativeElement, this.transcriptScrollTop);
   }
 
   ngOnDestroy(): void {
@@ -276,10 +276,13 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         status: this.status,
         assistantDraft: this.assistantDraft,
         composerDraft: this.composerDraft,
-        transcriptScrollTop: this.transcriptRef?.nativeElement.scrollTop ?? this.transcriptScrollTop,
+        transcriptScrollTop: this.viewStateSync.captureElementScroll(
+          this.transcriptRef?.nativeElement,
+          this.transcriptScrollTop,
+        ),
       },
       mapState: this.mapState,
-      scrollY: window.scrollY,
+      scrollY: this.viewStateSync.captureWindowScroll(),
     };
     this.appStateStore.updateChatPage(next);
   }
