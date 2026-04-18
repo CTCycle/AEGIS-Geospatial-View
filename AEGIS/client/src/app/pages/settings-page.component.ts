@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
+import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
@@ -27,11 +28,18 @@ import {
   updateChatSettings,
 } from '../core/api';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
+import { ViewStateSyncService } from '../core/view-state-sync.service';
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModelRoleActionsComponent, SettingsModalShellComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ModelRoleActionsComponent,
+    SettingsIconActionComponent,
+    SettingsModalShellComponent,
+  ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
@@ -78,6 +86,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly router: Router,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
+    private readonly viewStateSync: ViewStateSyncService,
   ) {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
@@ -93,10 +102,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    window.scrollTo({ top: this.state.scrollY, behavior: 'auto' });
-    if (this.modelGridRef?.nativeElement) {
-      this.modelGridRef.nativeElement.scrollTop = this.state.modelGridScrollTop;
-    }
+    this.viewStateSync.restoreWindowScroll(this.state.scrollY);
+    this.viewStateSync.restoreElementScroll(this.modelGridRef?.nativeElement, this.state.modelGridScrollTop);
   }
 
   ngOnDestroy(): void {
@@ -419,8 +426,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       searchText: this.searchText,
       providerMode: this.providerMode,
       statusText: this.statusText,
-      scrollY: window.scrollY,
-      modelGridScrollTop: this.modelGridRef?.nativeElement.scrollTop ?? this.state.modelGridScrollTop,
+      scrollY: this.viewStateSync.captureWindowScroll(),
+      modelGridScrollTop: this.viewStateSync.captureElementScroll(
+        this.modelGridRef?.nativeElement,
+        this.state.modelGridScrollTop,
+      ),
     };
     this.appStateStore.updateSettingsPage(next);
   }

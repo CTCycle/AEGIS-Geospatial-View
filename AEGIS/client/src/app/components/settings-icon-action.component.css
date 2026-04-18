@@ -1,0 +1,20 @@
+:host {
+  display: contents;
+}
+
+.settings-icon-button {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: var(--shadow-1);
+}
+
+.settings-icon-button__glyph {
+  font-size: 0;
+  line-height: 1;
+  color: #405b80;
+}

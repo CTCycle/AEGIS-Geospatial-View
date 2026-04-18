@@ -78,6 +78,46 @@ class ModelSettingsResponse(BaseModel):
     credentials: dict[str, dict[str, bool]]
 
 
+class ModelSettingsUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    active_provider_mode: ModelProviderMode | None = None
+    chat_model_provider: str | None = None
+    chat_model_name: str | None = None
+    parser_model_provider: str | None = None
+    parser_model_name: str | None = None
+    agent_model_provider: str | None = None
+    agent_model_name: str | None = None
+    ollama_url: str | None = None
+    openai_base_url: str | None = None
+    google_base_url: str | None = None
+    credentials: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class ModelLibraryResponse(BaseModel):
+    cloud: list[ModelCardDescriptor] = Field(default_factory=list)
+    local: list[ModelCardDescriptor] = Field(default_factory=list)
+
+
+class OllamaRefreshResponse(BaseModel):
+    status: str
+    library_models: list[str] = Field(default_factory=list)
+    local_models: list[str] = Field(default_factory=list)
+
+
+class OllamaPullRequest(BaseModel):
+    model: str
+
+
+class OllamaPullResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class OllamaHealthResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    ok: bool | None = None
+    detail: str | None = None
+
+
 class VectorizationResponse(BaseModel):
     status: str
     indexed_documents: int
