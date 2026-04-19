@@ -16,8 +16,8 @@ from AEGIS.server.services.geospatial.layers import LayerProviderError
 from AEGIS.server.services.geospatial.maps import MapRequestError, MapValidationError
 from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.sanitization import LocationSanitizationService
-from AEGIS.server.utils.constants import MAP_SEARCH_STATUS_MESSAGE
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.constants import MAP_SEARCH_STATUS_MESSAGE
+from AEGIS.server.common.logger import logger
 
 type CoordinatePair = tuple[float, float]
 

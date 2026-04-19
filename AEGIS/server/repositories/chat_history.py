@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -84,7 +84,7 @@ class ChatHistoryRepository:
                 return record
             if title:
                 record.title = title
-            record.updated_at = datetime.utcnow()
+            record.updated_at = datetime.now(UTC)
             session.commit()
             session.refresh(record)
             return record
@@ -118,7 +118,7 @@ class ChatHistoryRepository:
             session.add(message)
             session_record = session.get(ChatSessionRecord, session_id)
             if session_record is not None:
-                session_record.updated_at = datetime.utcnow()
+                session_record.updated_at = datetime.now(UTC)
                 if map_session is not None:
                     session_record.last_map_session_json = _to_json_payload(map_session)
             session.commit()

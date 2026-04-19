@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     DEFAULT_DB_CONNECT_TIMEOUT,
     DEFAULT_DB_INSERT_BATCH_SIZE,
     DEFAULT_GIBS_DEFAULT_LAYER,

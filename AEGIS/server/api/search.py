@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime, time
+from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Body, Depends, Request, status
 from fastapi.responses import Response
 
-from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import (
     GeospatialCatalogResponse,
     SearchByLocationResponse,
@@ -16,25 +17,8 @@ from AEGIS.server.domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
-from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
-from AEGIS.server.services.geospatial.elevation import OpenElevationService
-from AEGIS.server.services.geospatial.gibs import GIBSService
-from AEGIS.server.services.geospatial.layers import LayerProviderService
-from AEGIS.server.services.geospatial.maps import MapService
-from AEGIS.server.services.geospatial.nominatim import NominatimService
-from AEGIS.server.services.geospatial.openaq import OpenAQService
-from AEGIS.server.services.geospatial.openmeteo import OpenMeteoService
-from AEGIS.server.services.geospatial.overpass import OverpassService
-from AEGIS.server.services.geospatial.pvgis import PVGISService
-from AEGIS.server.services.geospatial.rainviewer import RainViewerService
-from AEGIS.server.services.geospatial.rendering import (
-    MapRenderingService,
-    MapSearchToolkit,
-)
-from AEGIS.server.services.jobs import job_manager
-from AEGIS.server.services.sanitization import LocationSanitizationService
 from AEGIS.server.services.search.execution import MapSearchExecutionService
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     MAPS_CATALOG_ROUTE,
     MAPS_JOB_ROUTE,
     MAPS_JOBS_ROUTE,
@@ -45,66 +29,25 @@ from AEGIS.server.utils.constants import (
 
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 
-sanitization_service = LocationSanitizationService()
-nominatim_service = NominatimService()
-gibs_service = GIBSService()
-map_service = MapService()
-layer_service = LayerProviderService(
-    metadata_provider=gibs_service.resolve_layer_meters_per_pixel
-)
-elevation_service = OpenElevationService()
-openaq_service = OpenAQService()
-pvgis_service = PVGISService()
-openmeteo_service = OpenMeteoService()
-overpass_service = OverpassService()
-rainviewer_service = RainViewerService()
-catalog_service = GeospatialCatalogService(
-    openaq_service=openaq_service,
-    pvgis_service=pvgis_service,
-    openmeteo_service=openmeteo_service,
-    overpass_service=overpass_service,
-    rainviewer_service=rainviewer_service,
-)
 
-toolkit = MapSearchToolkit(
-    gibs_service=gibs_service,
-    default_layer=get_server_settings().gibs.default_layer,
-)
-rendering_service = MapRenderingService(
-    toolkit=toolkit,
-    map_service=map_service,
-    gibs_service=gibs_service,
-    layer_service=layer_service,
-)
-search_execution = MapSearchExecutionService(
-    router=router,
-    sanitization_service=sanitization_service,
-    nominatim_service=nominatim_service,
-    toolkit=toolkit,
-    rendering_service=rendering_service,
-    job_manager=job_manager,
-    catalog_service=catalog_service,
-    elevation_service=elevation_service,
-)
-search_endpoint = search_execution
-
-router.add_api_route(
-    MAPS_CATALOG_ROUTE,
-    search_execution.get_catalog,
-    methods=["GET"],
-    response_model=GeospatialCatalogResponse,
-    status_code=status.HTTP_200_OK,
-)
+def get_search_execution(request: Request) -> MapSearchExecutionService:
+    return request.app.state.search_runtime.search_execution
 
 
-###############################################################################
+@router.get(MAPS_CATALOG_ROUTE, response_model=GeospatialCatalogResponse, status_code=status.HTTP_200_OK)
+async def get_catalog(
+    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+) -> GeospatialCatalogResponse:
+    return await search_execution.get_catalog()
+
+
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
 def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
     if z < 0 or x < 0 or y < 0:
         return Response(status_code=status.HTTP_400_BAD_REQUEST)
 
     tile_url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-    request = Request(
+    request = UrlRequest(
         tile_url,
         headers={
             "User-Agent": "AEGIS Geospatial View/2.0 (+https://github.com/CTCycle/AEGIS-geographics)",
@@ -137,31 +80,121 @@ def proxy_osm_basemap_tile(z: int, x: int, y: int) -> Response:
         )
 
 
-router.add_api_route(
-    MAPS_SEARCH_ROUTE,
-    search_execution.search_by_location,
-    methods=["POST"],
-    response_model=SearchByLocationResponse,
-    status_code=status.HTTP_200_OK,
-)
-router.add_api_route(
-    MAPS_JOBS_ROUTE,
-    search_execution.start_search_job,
-    methods=["POST"],
-    response_model=JobStartResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-router.add_api_route(
-    MAPS_JOB_ROUTE,
-    search_execution.get_search_job_status,
-    methods=["GET"],
-    response_model=JobStatusResponse,
-    status_code=status.HTTP_200_OK,
-)
-router.add_api_route(
-    MAPS_JOB_ROUTE,
-    search_execution.cancel_search_job,
-    methods=["DELETE"],
-    response_model=JobCancelResponse,
-    status_code=status.HTTP_200_OK,
-)
+@router.post(MAPS_SEARCH_ROUTE, response_model=SearchByLocationResponse, status_code=status.HTTP_200_OK)
+async def search_by_location(
+    datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
+    time_of_day: time | str | None = Body(default=None),
+    timeline_year: int | None = Body(default=None),
+    country: str | None = Body(default=None),
+    city: str | None = Body(default=None),
+    address: str | None = Body(default=None),
+    use_coordinates: bool = Body(default=False),
+    latitude: float | None = Body(default=None),
+    longitude: float | None = Body(default=None),
+    geospatial_layers: list[str] = Body(default_factory=list),
+    basemap_id: str | None = Body(default=None),
+    overlay_ids: list[str] = Body(default_factory=list),
+    aoi: dict[str, Any] | None = Body(default=None),
+    commute: dict[str, Any] | None = Body(default=None),
+    bbox: list[float] | None = Body(default=None),
+    radius_m: float | None = Body(default=None),
+    map_size_m: float | None = Body(default=None),
+    map_tiles: str | None = Body(default=None),
+    image_width: int | None = Body(default=None),
+    image_height: int | None = Body(default=None),
+    image_crs: str | None = Body(default=None),
+    image_format: str | None = Body(default=None),
+    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+) -> SearchByLocationResponse:
+    return await search_execution.search_by_location(
+        datetime_value=datetime_value,
+        time_of_day=time_of_day,
+        timeline_year=timeline_year,
+        country=country,
+        city=city,
+        address=address,
+        use_coordinates=use_coordinates,
+        latitude=latitude,
+        longitude=longitude,
+        geospatial_layers=geospatial_layers,
+        basemap_id=basemap_id,
+        overlay_ids=overlay_ids,
+        aoi=aoi,
+        commute=commute,
+        bbox=bbox,
+        radius_m=radius_m,
+        map_size_m=map_size_m,
+        map_tiles=map_tiles,
+        image_width=image_width,
+        image_height=image_height,
+        image_crs=image_crs,
+        image_format=image_format,
+    )
+
+
+@router.post(MAPS_JOBS_ROUTE, response_model=JobStartResponse, status_code=status.HTTP_202_ACCEPTED)
+async def start_search_job(
+    datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
+    time_of_day: time | str | None = Body(default=None),
+    timeline_year: int | None = Body(default=None),
+    country: str | None = Body(default=None),
+    city: str | None = Body(default=None),
+    address: str | None = Body(default=None),
+    use_coordinates: bool = Body(default=False),
+    latitude: float | None = Body(default=None),
+    longitude: float | None = Body(default=None),
+    geospatial_layers: list[str] = Body(default_factory=list),
+    basemap_id: str | None = Body(default=None),
+    overlay_ids: list[str] = Body(default_factory=list),
+    aoi: dict[str, Any] | None = Body(default=None),
+    commute: dict[str, Any] | None = Body(default=None),
+    bbox: list[float] | None = Body(default=None),
+    radius_m: float | None = Body(default=None),
+    map_size_m: float | None = Body(default=None),
+    map_tiles: str | None = Body(default=None),
+    image_width: int | None = Body(default=None),
+    image_height: int | None = Body(default=None),
+    image_crs: str | None = Body(default=None),
+    image_format: str | None = Body(default=None),
+    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+) -> JobStartResponse:
+    return await search_execution.start_search_job(
+        datetime_value=datetime_value,
+        time_of_day=time_of_day,
+        timeline_year=timeline_year,
+        country=country,
+        city=city,
+        address=address,
+        use_coordinates=use_coordinates,
+        latitude=latitude,
+        longitude=longitude,
+        geospatial_layers=geospatial_layers,
+        basemap_id=basemap_id,
+        overlay_ids=overlay_ids,
+        aoi=aoi,
+        commute=commute,
+        bbox=bbox,
+        radius_m=radius_m,
+        map_size_m=map_size_m,
+        map_tiles=map_tiles,
+        image_width=image_width,
+        image_height=image_height,
+        image_crs=image_crs,
+        image_format=image_format,
+    )
+
+
+@router.get(MAPS_JOB_ROUTE, response_model=JobStatusResponse, status_code=status.HTTP_200_OK)
+async def get_search_job_status(
+    job_id: str,
+    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+) -> JobStatusResponse:
+    return await search_execution.get_search_job_status(job_id)
+
+
+@router.delete(MAPS_JOB_ROUTE, response_model=JobCancelResponse, status_code=status.HTTP_200_OK)
+async def cancel_search_job(
+    job_id: str,
+    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+) -> JobCancelResponse:
+    return await search_execution.cancel_search_job(job_id)

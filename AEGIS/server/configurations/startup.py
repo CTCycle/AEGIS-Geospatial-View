@@ -9,7 +9,7 @@ from AEGIS.server.configurations.environment import (
 )
 from AEGIS.server.configurations.management import ConfigurationManager
 from AEGIS.server.domain.settings import ServerSettings
-from AEGIS.server.utils.constants import CONFIGURATIONS_FILE
+from AEGIS.server.common.constants import CONFIGURATIONS_FILE
 
 
 def _resolve_config_path(config_path: str | Path | None = None) -> str:

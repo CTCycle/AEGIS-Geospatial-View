@@ -1,18 +1,20 @@
 from __future__ import annotations
+
 import asyncio
 
-from AEGIS.server.api import search
+from AEGIS.server.api.search import router
 from AEGIS.server.domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
     JobStatusResponse,
 )
+from AEGIS.server.services.search.composition import build_search_runtime
 
 
 def test_jobs_router_wiring_and_response_models() -> None:
     route_map = {
         (route.path, tuple(sorted(route.methods or []))): route
-        for route in search.router.routes
+        for route in router.routes
     }
     assert ("/maps/jobs", ("POST",)) in route_map
     assert ("/maps/jobs/{job_id}", ("GET",)) in route_map
@@ -29,9 +31,10 @@ def test_jobs_router_wiring_and_response_models() -> None:
 
 
 def test_search_job_start_status_cancel_shapes(monkeypatch) -> None:
-    monkeypatch.setattr(search.job_manager, "start_job", lambda **kwargs: "job-1")
+    runtime = build_search_runtime()
+    monkeypatch.setattr(runtime.job_manager, "start_job", lambda **kwargs: "job-1")
     monkeypatch.setattr(
-        search.job_manager,
+        runtime.job_manager,
         "get_job_status",
         lambda job_id: {
             "job_id": job_id,
@@ -42,10 +45,10 @@ def test_search_job_start_status_cancel_shapes(monkeypatch) -> None:
             "error": None,
         },
     )
-    monkeypatch.setattr(search.job_manager, "cancel_job", lambda job_id: True)
+    monkeypatch.setattr(runtime.job_manager, "cancel_job", lambda job_id: True)
 
     started = asyncio.run(
-        search.search_execution.start_search_job(
+        runtime.search_execution.start_search_job(
             datetime_value="2024-06-15T12:00:00",
             time_of_day=None,
             timeline_year=None,
@@ -73,18 +76,19 @@ def test_search_job_start_status_cancel_shapes(monkeypatch) -> None:
     assert isinstance(started, JobStartResponse)
     assert started.job_id == "job-1"
 
-    status = asyncio.run(search.search_execution.get_search_job_status("job-1"))
+    status = asyncio.run(runtime.search_execution.get_search_job_status("job-1"))
     assert isinstance(status, JobStatusResponse)
     assert status.job_id == "job-1"
 
-    cancel = asyncio.run(search.search_execution.cancel_search_job("job-1"))
+    cancel = asyncio.run(runtime.search_execution.cancel_search_job("job-1"))
     assert isinstance(cancel, JobCancelResponse)
     assert cancel.success is True
 
 
 def test_cancellation_path_consistency(monkeypatch) -> None:
+    runtime = build_search_runtime()
     monkeypatch.setattr(
-        search.job_manager,
+        runtime.job_manager,
         "get_job_status",
         lambda job_id: {
             "job_id": job_id,
@@ -95,7 +99,7 @@ def test_cancellation_path_consistency(monkeypatch) -> None:
             "error": None,
         },
     )
-    monkeypatch.setattr(search.job_manager, "cancel_job", lambda job_id: False)
-    cancel = asyncio.run(search.search_execution.cancel_search_job("job-2"))
+    monkeypatch.setattr(runtime.job_manager, "cancel_job", lambda job_id: False)
+    cancel = asyncio.run(runtime.search_execution.cancel_search_job("job-2"))
     assert cancel.job_id == "job-2"
     assert cancel.success is False

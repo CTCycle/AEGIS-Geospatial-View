@@ -4,7 +4,7 @@ import json
 import os
 from typing import Any
 
-from AEGIS.server.utils.constants import PROJECT_DIR
+from AEGIS.server.common.constants import PROJECT_DIR
 
 type JsonDict = dict[str, Any]
 

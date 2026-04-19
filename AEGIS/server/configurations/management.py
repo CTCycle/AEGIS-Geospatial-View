@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from AEGIS.server.domain.settings import AppSettings, ServerSettings
-from AEGIS.server.utils.constants import CONFIGURATIONS_FILE
+from AEGIS.server.common.constants import CONFIGURATIONS_FILE
 
 
 def _ensure_mapping(value: Any) -> dict[str, Any]:

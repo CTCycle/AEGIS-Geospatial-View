@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from AEGIS.server.api.search import MapRenderingService
+from AEGIS.server.services.geospatial.rendering import MapRenderingService
 from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 

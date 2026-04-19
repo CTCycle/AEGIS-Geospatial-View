@@ -11,8 +11,8 @@ from sqlalchemy.orm import sessionmaker
 
 from AEGIS.server.configurations import DatabaseSettings
 from AEGIS.server.repositories.schemas import Base
-from AEGIS.server.utils.constants import DATABASE_FILENAME, RESOURCES_PATH
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
+from AEGIS.server.common.logger import logger
 
 
 # [SQLITE DATABASE]

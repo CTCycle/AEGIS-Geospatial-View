@@ -20,7 +20,7 @@ from AEGIS.server.services.geospatial.rainviewer import (
     RainViewerRequestError,
     RainViewerService,
 )
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 type JsonDict = dict[str, Any]
 

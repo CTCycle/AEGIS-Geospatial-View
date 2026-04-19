@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 PVGIS_BASE_URL = "https://re.jrc.ec.europa.eu/api/v5_3"
 

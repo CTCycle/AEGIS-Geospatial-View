@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from AEGIS.server.domain.chat import (
@@ -20,13 +21,9 @@ from AEGIS.server.domain.chat import (
     OllamaRefreshResponse,
     VectorizationResponse,
 )
-from AEGIS.server.repositories.model_settings import ModelSettingsRepository
-from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
-from AEGIS.server.services.chat.model_library import ChatModelLibraryService
-from AEGIS.server.services.chat.settings_service import ChatSettingsService
+from AEGIS.server.services.chat.composition import ChatRuntime
 from AEGIS.server.services.llm.ollama import OllamaProvider
-from AEGIS.server.services.vector.indexer import VectorIndexer
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     CHAT_MODELS_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
     CHAT_OLLAMA_PULL_ROUTE,
@@ -39,16 +36,12 @@ from AEGIS.server.utils.constants import (
     CHAT_VECTORS_SYNC_ROUTE,
 )
 
-from AEGIS.server.api.search import search_endpoint
-
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 logger = logging.getLogger(__name__)
 
-settings_repo = ModelSettingsRepository()
-settings_service = ChatSettingsService(settings_repo=settings_repo)
-model_library_service = ChatModelLibraryService()
-vector_indexer = VectorIndexer()
-agent_orchestrator = AgentOrchestrator(search_orchestrator=search_endpoint.orchestrator)
+
+def get_chat_runtime(request: Request) -> ChatRuntime:
+    return request.app.state.chat_runtime
 
 
 ###############################################################################
@@ -77,10 +70,13 @@ def _stream_event(event: ChatStreamEvent) -> str:
 
 
 ###############################################################################
-async def _chat_event_stream(payload: ChatTurnRequest):
+async def _chat_event_stream(
+    payload: ChatTurnRequest,
+    runtime: ChatRuntime,
+) -> AsyncIterator[str]:
     yield _stream_event(ChatStreamEvent(event="status", data={"message": "received"}))
     try:
-        result = await agent_orchestrator.run_turn(payload)
+        result = await runtime.agent_orchestrator.run_turn(payload)
         for token in result.assistant_message.split():
             yield _stream_event(
                 ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "})
@@ -132,80 +128,87 @@ async def _chat_event_stream(payload: ChatTurnRequest):
                 data={
                     "message": str(exc)
                     or "Unexpected server error while streaming response.",
-                    "status": 500,
+                    "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 },
             )
         )
 
 
-###############################################################################
 @router.post(
-    CHAT_TURN_ROUTE, response_model=ChatTurnResponse, status_code=status.HTTP_200_OK
+    CHAT_TURN_ROUTE,
+    response_model=ChatTurnResponse,
+    status_code=status.HTTP_200_OK,
 )
-async def chat_turn(payload: ChatTurnRequest) -> ChatTurnResponse:
+async def chat_turn(
+    payload: ChatTurnRequest,
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> ChatTurnResponse:
     try:
-        return await agent_orchestrator.run_turn(payload)
+        return await runtime.agent_orchestrator.run_turn(payload)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
 
 
-###############################################################################
-@router.post(CHAT_STREAM_ROUTE, status_code=status.HTTP_200_OK)
-async def chat_stream(payload: ChatTurnRequest):
+@router.post(
+    CHAT_STREAM_ROUTE,
+    status_code=status.HTTP_200_OK,
+)
+async def chat_stream(
+    payload: ChatTurnRequest,
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> StreamingResponse:
     return StreamingResponse(
-        _chat_event_stream(payload), media_type="application/x-ndjson"
+        _chat_event_stream(payload, runtime),
+        media_type="application/x-ndjson",
     )
 
 
-###############################################################################
 @router.get(
     CHAT_MODELS_ROUTE,
     response_model=ModelLibraryResponse,
     status_code=status.HTTP_200_OK,
 )
-def get_models() -> ModelLibraryResponse:
-    settings = settings_repo.get_or_create()
-    response = model_library_service.list_models(ollama_url=settings.ollama_url)
+def get_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelLibraryResponse:
+    response = runtime.model_library_service.list_models(
+        ollama_url=runtime.settings_service.get_ollama_url()
+    )
     return ModelLibraryResponse.model_validate(response)
 
 
-###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
     status_code=status.HTTP_200_OK,
 )
-def get_settings() -> ModelSettingsResponse:
-    return settings_service.get_settings()
+def get_settings(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelSettingsResponse:
+    return runtime.settings_service.get_settings()
 
 
-###############################################################################
 @router.put(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
     status_code=status.HTTP_200_OK,
 )
 def update_settings(
-    payload: ModelSettingsUpdateRequest = Body(
-        default_factory=ModelSettingsUpdateRequest
-    ),
+    payload: Annotated[
+        ModelSettingsUpdateRequest, Body(default_factory=ModelSettingsUpdateRequest)
+    ],
+    runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
-    return settings_service.update_settings(
+    return runtime.settings_service.update_settings(
         payload.model_dump(mode="python", exclude_none=True)
     )
 
 
-###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
     response_model=OllamaRefreshResponse,
     status_code=status.HTTP_200_OK,
 )
-def refresh_ollama_models() -> OllamaRefreshResponse:
-    settings = settings_repo.get_or_create()
-    provider = OllamaProvider(base_url=settings.ollama_url)
+def refresh_ollama_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> OllamaRefreshResponse:
+    provider = OllamaProvider(base_url=runtime.settings_service.get_ollama_url())
     library_models = provider.list_library_models()
     local_models = provider.list_models()
     return OllamaRefreshResponse(
@@ -215,22 +218,21 @@ def refresh_ollama_models() -> OllamaRefreshResponse:
     )
 
 
-###############################################################################
 @router.post(
     CHAT_OLLAMA_PULL_ROUTE,
     response_model=OllamaPullResponse,
     status_code=status.HTTP_200_OK,
 )
 def pull_ollama_model(
-    payload: OllamaPullRequest | None = Body(default=None),
+    payload: Annotated[OllamaPullRequest | None, Body()] = None,
+    runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> OllamaPullResponse:
     model_name = payload.model.strip() if payload is not None else ""
     if not model_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="model is required"
         )
-    settings = settings_repo.get_or_create()
-    provider = OllamaProvider(base_url=settings.ollama_url)
+    provider = OllamaProvider(base_url=runtime.settings_service.get_ollama_url())
     try:
         return OllamaPullResponse.model_validate(provider.pull_model(model=model_name))
     except Exception as exc:
@@ -240,35 +242,31 @@ def pull_ollama_model(
         ) from exc
 
 
-###############################################################################
 @router.post(
     CHAT_VECTORS_REBUILD_ROUTE,
     response_model=VectorizationResponse,
     status_code=status.HTTP_200_OK,
 )
-def rebuild_vectors() -> VectorizationResponse:
-    result = vector_indexer.rebuild()
+def rebuild_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> VectorizationResponse:
+    result = runtime.vector_indexer.rebuild()
     return VectorizationResponse.model_validate(result)
 
 
-###############################################################################
 @router.post(
     CHAT_VECTORS_SYNC_ROUTE,
     response_model=VectorizationResponse,
     status_code=status.HTTP_200_OK,
 )
-def sync_vectors() -> VectorizationResponse:
-    result = vector_indexer.sync()
+def sync_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> VectorizationResponse:
+    result = runtime.vector_indexer.sync()
     return VectorizationResponse.model_validate(result)
 
 
-###############################################################################
 @router.get(
     CHAT_OLLAMA_HEALTH_ROUTE,
     response_model=OllamaHealthResponse,
     status_code=status.HTTP_200_OK,
 )
-def check_ollama_health() -> OllamaHealthResponse:
-    settings = settings_repo.get_or_create()
-    provider = OllamaProvider(base_url=settings.ollama_url)
+def check_ollama_health(runtime: ChatRuntime = Depends(get_chat_runtime)) -> OllamaHealthResponse:
+    provider = OllamaProvider(base_url=runtime.settings_service.get_ollama_url())
     return OllamaHealthResponse.model_validate(provider.health_check())

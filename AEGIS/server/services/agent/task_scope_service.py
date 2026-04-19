@@ -39,9 +39,11 @@ class TaskScopeService:
         re.IGNORECASE,
     )
 
+    # -------------------------------------------------------------------------
     def _is_referential(self, text: str) -> bool:
         return any(pattern.search(text) for pattern in self.REFERENTIAL_PATTERNS)
 
+    # -------------------------------------------------------------------------
     def _has_new_location_cue(self, text: str) -> bool:
         return bool(
             self.COORDINATE_RE.search(text)
@@ -49,9 +51,11 @@ class TaskScopeService:
             or self.CITY_OR_COUNTRY_RE.search(text)
         )
 
+    # -------------------------------------------------------------------------
     def _is_new_task_signal(self, text: str) -> bool:
         return any(pattern.search(text) for pattern in self.NEW_TASK_PATTERNS)
 
+    # -------------------------------------------------------------------------
     def _latest_task_start_index(
         self, history: list[dict[str, Any]], *, current_user_index: int
     ) -> int:
@@ -69,6 +73,7 @@ class TaskScopeService:
                 start_index = index
         return start_index
 
+    # -------------------------------------------------------------------------
     def decide_scope(
         self,
         *,

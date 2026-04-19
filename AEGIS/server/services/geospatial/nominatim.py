@@ -14,12 +14,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     NOMINATIM_REVERSE_PATH,
     NOMINATIM_SEARCH_PATH,
 )
 from AEGIS.server.configurations import get_server_settings
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 
 ###############################################################################

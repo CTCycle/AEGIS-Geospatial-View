@@ -7,7 +7,7 @@ from typing import Any
 import chromadb
 from chromadb.config import Settings
 
-from AEGIS.server.utils.constants import PROJECT_DIR
+from AEGIS.server.common.constants import PROJECT_DIR
 
 
 @dataclass(frozen=True)

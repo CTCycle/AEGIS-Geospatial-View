@@ -8,7 +8,7 @@ from typing import Any
 import folium
 
 from AEGIS.server.configurations import get_server_settings
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
     MAX_GEO_LAT,

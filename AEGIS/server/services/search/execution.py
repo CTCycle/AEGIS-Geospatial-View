@@ -5,7 +5,7 @@ import json
 from datetime import datetime, time
 from typing import Any, Mapping, Sequence
 
-from fastapi import APIRouter, Body, HTTPException, status
+from fastapi import Body, HTTPException, status
 from pydantic import ValidationError
 
 from AEGIS.server.configurations import get_server_settings
@@ -39,7 +39,7 @@ from AEGIS.server.services.search.factory import (
     build_search_response,
 )
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     JOB_STATUS_CANCELLED,
     MAP_SEARCH_CANCELLATION_NOT_ALLOWED,
     MAP_SEARCH_CANCELLATION_REQUESTED,
@@ -50,7 +50,7 @@ from AEGIS.server.utils.constants import (
     MAP_SEARCH_JOB_PROGRESS_POSTPROCESS,
     MAP_SEARCH_JOB_START_MESSAGE,
 )
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 
 def sanitize_validation_errors(
@@ -84,7 +84,6 @@ def run_map_search_job(
 class MapSearchExecutionService:
     def __init__(
         self,
-        router: APIRouter,
         sanitization_service: LocationSanitizationService,
         nominatim_service: NominatimService,
         toolkit: MapSearchToolkit,
@@ -93,7 +92,6 @@ class MapSearchExecutionService:
         catalog_service: GeospatialCatalogService,
         elevation_service: OpenElevationService,
     ) -> None:
-        self.router = router
         self.sanitization_service = sanitization_service
         self.nominatim_service = nominatim_service
         self.toolkit = toolkit
