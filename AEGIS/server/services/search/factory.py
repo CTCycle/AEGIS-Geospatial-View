@@ -5,7 +5,7 @@ from typing import Any
 
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
-from AEGIS.server.utils.constants import MAP_SEARCH_STATUS_MESSAGE
+from AEGIS.server.common.constants import MAP_SEARCH_STATUS_MESSAGE
 
 
 def build_request_context(

@@ -8,13 +8,14 @@ from AEGIS.server.configurations import DatabaseSettings, get_server_settings
 from AEGIS.server.repositories.database.initializer import validate_postgres_schema
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
     engine: Any
+    session: Callable[[], Any]
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...

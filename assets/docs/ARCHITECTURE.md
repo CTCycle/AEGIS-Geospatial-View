@@ -1,6 +1,6 @@
 # AEGIS Geospatial View Architecture
 
-Last updated: 2026-04-10
+Last updated: 2026-04-20
 Scope: `AEGIS/` and `tests/`
 
 ## 1. System Overview
@@ -33,6 +33,7 @@ Typical local defaults from env examples:
 - `AEGIS/server/services`: orchestration, geospatial, jobs, llm/vector services
 - `AEGIS/server/repositories`: persistence and serializers
 - `AEGIS/server/domain`: request/response models
+- `AEGIS/server/common`: shared constants, logger, and type coercion helpers
 - `AEGIS/settings`: runtime env and JSON settings
 - `AEGIS/resources`: local resources (manifests, runtime artifacts)
 - `tests/e2e`: Playwright + pytest end-to-end tests
@@ -82,9 +83,10 @@ Map search flow:
 
 Chat flow:
 1. `chat_turn`/`chat_stream` receives a user turn.
-2. Startup lifecycle bootstraps SQLite (first run) and vector index bootstrap (`VectorIndexer.bootstrap_if_missing`) when enabled by `vectors.auto_sync_on_start`.
-3. `AgentOrchestrator` processes parsing, raw-prompt retrieval, retrieval-availability annotation, decisioning, tool invocation, and assistant response.
-4. Structured/tool/map payloads are returned and persisted through repository-backed services.
+2. App startup wiring builds app-scoped service dependencies (`app.state`) consumed by API handlers.
+3. Startup lifecycle bootstraps SQLite (first run) and vector index bootstrap (`VectorIndexer.bootstrap_if_missing`) when enabled by `vectors.auto_sync_on_start`.
+4. `AgentOrchestrator` processes parsing, raw-prompt retrieval, retrieval-availability annotation, decisioning, tool invocation, and assistant response.
+5. Structured/tool/map payloads are returned and persisted through repository-backed services.
 
 Vector subsystem responsibilities:
 - `ManifestPreparationService` composes one embedding chunk per basemap/overlay manifest entry.

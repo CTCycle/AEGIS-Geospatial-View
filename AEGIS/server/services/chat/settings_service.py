@@ -41,6 +41,10 @@ class ChatSettingsService:
             credentials=credential_presence,
         )
 
+    def get_ollama_url(self) -> str:
+        record = self.settings_repo.get_or_create()
+        return record.ollama_url
+
     def update_settings(self, payload: dict[str, Any]) -> ModelSettingsResponse:
         credentials = (
             payload.get("credentials")

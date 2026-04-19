@@ -14,7 +14,7 @@ from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
 from AEGIS.server.repositories.schemas import Base, SystemSecretRecord
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 ACCESS_KEY_ENCRYPTION_SECRET_NAME = "access_key_encryption_key"
 

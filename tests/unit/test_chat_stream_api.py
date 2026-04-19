@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 import asyncio
+import json
+from types import SimpleNamespace
 
 from fastapi import status
 
@@ -16,7 +17,7 @@ def _collect_lines(stream) -> list[str]:  # noqa: ANN001
     return asyncio.run(_collect())
 
 
-def test_chat_stream_success_ndjson_event_sequence(monkeypatch) -> None:
+def test_chat_stream_success_ndjson_event_sequence() -> None:
     async def _run_turn(_: ChatTurnRequest) -> ChatTurnResponse:
         return ChatTurnResponse(
             session_id=1,
@@ -28,8 +29,8 @@ def test_chat_stream_success_ndjson_event_sequence(monkeypatch) -> None:
             fallback_mode="none",
         )
 
-    monkeypatch.setattr(chat.agent_orchestrator, "run_turn", _run_turn)
-    stream = chat._chat_event_stream(ChatTurnRequest(message="hello"))
+    runtime = SimpleNamespace(agent_orchestrator=SimpleNamespace(run_turn=_run_turn))
+    stream = chat._chat_event_stream(ChatTurnRequest(message="hello"), runtime)
     lines = _collect_lines(stream)
     events = [json.loads(entry.strip())["event"] for entry in lines]
     assert events[0] == "status"
@@ -37,12 +38,12 @@ def test_chat_stream_success_ndjson_event_sequence(monkeypatch) -> None:
     assert events[-1] == "final"
 
 
-def test_chat_stream_value_error_converted_to_503_error_event(monkeypatch) -> None:
+def test_chat_stream_value_error_converted_to_503_error_event() -> None:
     async def _run_turn(_: ChatTurnRequest) -> ChatTurnResponse:
         raise ValueError("provider unavailable")
 
-    monkeypatch.setattr(chat.agent_orchestrator, "run_turn", _run_turn)
-    stream = chat._chat_event_stream(ChatTurnRequest(message="hello"))
+    runtime = SimpleNamespace(agent_orchestrator=SimpleNamespace(run_turn=_run_turn))
+    stream = chat._chat_event_stream(ChatTurnRequest(message="hello"), runtime)
     lines = _collect_lines(stream)
     final = json.loads(lines[-1].strip())
     assert final["event"] == "error"
@@ -59,9 +60,9 @@ def test_chat_stream_unexpected_exception_converted_and_logged(monkeypatch) -> N
         logged["called"] = True
         assert "Chat stream failed" in message
 
-    monkeypatch.setattr(chat.agent_orchestrator, "run_turn", _run_turn)
+    runtime = SimpleNamespace(agent_orchestrator=SimpleNamespace(run_turn=_run_turn))
     monkeypatch.setattr(chat.logger, "exception", _log_exception)
-    stream = chat._chat_event_stream(ChatTurnRequest(message="hello"))
+    stream = chat._chat_event_stream(ChatTurnRequest(message="hello"), runtime)
     lines = _collect_lines(stream)
     final = json.loads(lines[-1].strip())
     assert final["event"] == "error"

@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from AEGIS.server.domain.layers import LayerProviderEntry
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     COMMON_GEOSPATIAL_LAYERS,
     DEFAULT_LAYER_DEFINITIONS,
 )

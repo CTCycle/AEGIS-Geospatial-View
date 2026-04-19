@@ -13,8 +13,11 @@ from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
+from AEGIS.server.services.access_keys import AccessKeysService
+from AEGIS.server.services.chat.composition import build_chat_runtime
+from AEGIS.server.services.search.composition import build_search_runtime
 from AEGIS.server.services.vector.indexer import VectorIndexer
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     FASTAPI_DESCRIPTION,
     FASTAPI_TITLE,
     FASTAPI_VERSION,
@@ -52,6 +55,22 @@ def packaged_client_available() -> bool:
     return tauri_mode_enabled() and os.path.isdir(get_client_dist_path())
 
 
+def serve_spa_root() -> FileResponse:
+    return FileResponse(os.path.join(get_client_dist_path(), "index.html"))
+
+
+def serve_spa_entrypoint(full_path: str) -> FileResponse:
+    client_dist_path = get_client_dist_path()
+    requested_path = os.path.join(client_dist_path, full_path)
+    if os.path.isfile(requested_path):
+        return FileResponse(requested_path)
+    return FileResponse(os.path.join(client_dist_path, "index.html"))
+
+
+def redirect_to_docs() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
+
 ###############################################################################
 app = FastAPI(
     title=FASTAPI_TITLE,
@@ -66,6 +85,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+search_runtime = build_search_runtime()
+chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
+access_keys_service = AccessKeysService()
+
+app.state.search_runtime = search_runtime
+app.state.chat_runtime = chat_runtime
+app.state.access_keys_service = access_keys_service
+
+app.include_router(search_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+app.include_router(access_keys_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -83,32 +114,19 @@ def bootstrap_vector_index_on_first_startup() -> None:
     VectorIndexer().bootstrap_if_missing()
 
 
-routers = [search_router, chat_router, access_keys_router]
-
-for router in routers:
-    app.include_router(router, prefix="/api")
-
-
 if packaged_client_available():
     client_dist_path = get_client_dist_path()
     assets_path = os.path.join(client_dist_path, "assets")
 
     if os.path.isdir(assets_path):
         app.mount("/assets", StaticFiles(directory=assets_path), name="spa-assets")
-
-    @app.get("/", include_in_schema=False)
-    def serve_spa_root() -> FileResponse:
-        return FileResponse(os.path.join(client_dist_path, "index.html"))
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def serve_spa_entrypoint(full_path: str) -> FileResponse:
-        requested_path = os.path.join(client_dist_path, full_path)
-        if os.path.isfile(requested_path):
-            return FileResponse(requested_path)
-        return FileResponse(os.path.join(client_dist_path, "index.html"))
+    app.add_api_route("/", serve_spa_root, methods=["GET"], include_in_schema=False)
+    app.add_api_route(
+        "/{full_path:path}",
+        serve_spa_entrypoint,
+        methods=["GET"],
+        include_in_schema=False,
+    )
 
 else:
-
-    @app.get("/")
-    def redirect_to_docs() -> RedirectResponse:
-        return RedirectResponse(url="/docs")
+    app.add_api_route("/", redirect_to_docs, methods=["GET"])

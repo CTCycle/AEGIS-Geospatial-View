@@ -9,14 +9,14 @@ from typing import Any
 from collections.abc import Callable
 
 from AEGIS.server.domain.job_state import JobState
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     JOB_STATUS_CANCELLED,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
     JOB_STATUS_RUNNING,
 )
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 
 ###############################################################################
@@ -182,5 +182,3 @@ class JobManager:
         return "job_id" in signature.parameters
 
 
-###############################################################################
-job_manager = JobManager()

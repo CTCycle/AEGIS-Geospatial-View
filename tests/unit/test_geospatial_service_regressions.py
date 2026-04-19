@@ -5,8 +5,8 @@ from datetime import date
 from AEGIS.server.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
-    LayerMetadata,
 )
+from AEGIS.server.domain.gibs import LayerMetadata
 from AEGIS.server.services.geospatial.layers import LayerProviderService
 from AEGIS.server.services.geospatial.maps import MapService, MapValidationError
 
