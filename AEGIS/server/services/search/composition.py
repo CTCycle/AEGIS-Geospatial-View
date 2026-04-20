@@ -10,6 +10,7 @@ from AEGIS.server.services.geospatial.layers import LayerProviderService
 from AEGIS.server.services.geospatial.maps import MapService
 from AEGIS.server.services.geospatial.nominatim import NominatimService
 from AEGIS.server.services.geospatial.openaq import OpenAQService
+from AEGIS.server.services.geospatial.osm_tiles import OsmTileProxyService
 from AEGIS.server.services.geospatial.openmeteo import OpenMeteoService
 from AEGIS.server.services.geospatial.overpass import OverpassService
 from AEGIS.server.services.geospatial.pvgis import PVGISService
@@ -29,6 +30,7 @@ class SearchRuntime:
     search_execution: MapSearchExecutionService
     search_orchestrator: LocationSearchOrchestrator
     job_manager: JobManager
+    osm_tile_proxy_service: OsmTileProxyService
 
 
 def build_search_runtime(job_manager: JobManager | None = None) -> SearchRuntime:
@@ -78,4 +80,5 @@ def build_search_runtime(job_manager: JobManager | None = None) -> SearchRuntime
         search_execution=search_execution,
         search_orchestrator=search_execution.orchestrator,
         job_manager=resolved_job_manager,
+        osm_tile_proxy_service=OsmTileProxyService(),
     )

@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import os
 import warnings
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from AEGIS.server.api.access_keys import router as access_keys_router
 from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
-from AEGIS.server.services.access_keys import AccessKeysService
 from AEGIS.server.services.chat.composition import build_chat_runtime
 from AEGIS.server.services.search.composition import build_search_runtime
 from AEGIS.server.services.vector.indexer import VectorIndexer
@@ -71,62 +70,60 @@ def redirect_to_docs() -> RedirectResponse:
     return RedirectResponse(url="/docs")
 
 
-###############################################################################
-app = FastAPI(
-    title=FASTAPI_TITLE,
-    version=FASTAPI_VERSION,
-    description=FASTAPI_DESCRIPTION,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=build_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-search_runtime = build_search_runtime()
-chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
-access_keys_service = AccessKeysService()
-
-app.state.search_runtime = search_runtime
-app.state.chat_runtime = chat_runtime
-app.state.access_keys_service = access_keys_service
-
-app.include_router(search_router, prefix="/api")
-app.include_router(chat_router, prefix="/api")
-app.include_router(access_keys_router, prefix="/api")
-
-
-@app.on_event("startup")
-def initialize_embedded_database_on_first_startup() -> None:
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
     settings = get_server_settings().database
-    if not settings.embedded_database:
-        return
-    initialize_sqlite_database(settings)
+    if settings.embedded_database:
+        initialize_sqlite_database(settings)
+
+    search_runtime = build_search_runtime()
+    chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
+    app.state.search_runtime = search_runtime
+    app.state.chat_runtime = chat_runtime
+
+    if get_server_settings().vectors.auto_sync_on_start:
+        VectorIndexer().bootstrap_if_missing()
+
+    yield
 
 
-@app.on_event("startup")
-def bootstrap_vector_index_on_first_startup() -> None:
-    if not get_server_settings().vectors.auto_sync_on_start:
-        return
-    VectorIndexer().bootstrap_if_missing()
-
-
-if packaged_client_available():
-    client_dist_path = get_client_dist_path()
-    assets_path = os.path.join(client_dist_path, "assets")
-
-    if os.path.isdir(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="spa-assets")
-    app.add_api_route("/", serve_spa_root, methods=["GET"], include_in_schema=False)
-    app.add_api_route(
-        "/{full_path:path}",
-        serve_spa_entrypoint,
-        methods=["GET"],
-        include_in_schema=False,
+###############################################################################
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=FASTAPI_TITLE,
+        version=FASTAPI_VERSION,
+        description=FASTAPI_DESCRIPTION,
+        lifespan=app_lifespan,
     )
 
-else:
-    app.add_api_route("/", redirect_to_docs, methods=["GET"])
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=build_cors_origins(),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(search_router, prefix="/api")
+    app.include_router(chat_router, prefix="/api")
+
+    if packaged_client_available():
+        client_dist_path = get_client_dist_path()
+        assets_path = os.path.join(client_dist_path, "assets")
+
+        if os.path.isdir(assets_path):
+            app.mount("/assets", StaticFiles(directory=assets_path), name="spa-assets")
+        app.add_api_route("/", serve_spa_root, methods=["GET"], include_in_schema=False)
+        app.add_api_route(
+            "/{full_path:path}",
+            serve_spa_entrypoint,
+            methods=["GET"],
+            include_in_schema=False,
+        )
+    else:
+        app.add_api_route("/", redirect_to_docs, methods=["GET"])
+
+    return app
+
+
+app = create_app()

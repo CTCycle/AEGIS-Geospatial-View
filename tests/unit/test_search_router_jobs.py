@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from AEGIS.server.api.search import router
+from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.domain.jobs import (
     JobCancelResponse,
     JobStartResponse,
@@ -49,28 +50,12 @@ def test_search_job_start_status_cancel_shapes(monkeypatch) -> None:
 
     started = asyncio.run(
         runtime.search_execution.start_search_job(
-            datetime_value="2024-06-15T12:00:00",
-            time_of_day=None,
-            timeline_year=None,
-            country=None,
-            city=None,
-            address=None,
-            use_coordinates=True,
-            latitude=41.9,
-            longitude=12.5,
-            geospatial_layers=[],
-            basemap_id=None,
-            overlay_ids=[],
-            aoi=None,
-            commute=None,
-            bbox=None,
-            radius_m=None,
-            map_size_m=None,
-            map_tiles=None,
-            image_width=None,
-            image_height=None,
-            image_crs=None,
-            image_format=None,
+            LocationSearchRequest(
+                datetime="2024-06-15T12:00:00",
+                use_coordinates=True,
+                latitude=41.9,
+                longitude=12.5,
+            )
         )
     )
     assert isinstance(started, JobStartResponse)

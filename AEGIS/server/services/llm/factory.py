@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import os
-
 from AEGIS.server.repositories.credentials import CredentialRepository
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
-from AEGIS.server.repositories.serialization.access_keys import AccessKeySerializer
 from AEGIS.server.services.cryptography import CredentialEncryptionService
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.google_provider import GoogleProvider
@@ -23,7 +20,19 @@ class LLMFactory:
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.credentials_repo = credentials_repo or CredentialRepository()
         self.crypto_service = crypto_service or CredentialEncryptionService()
-        self.access_keys = AccessKeySerializer()
+
+    def _resolve_provider_api_key(self, provider: str) -> str:
+        credential = self.credentials_repo.get_active(provider=provider, label="api_key")
+        if credential is None:
+            if provider == "openai":
+                raise ValueError(
+                    "OpenAI credentials are not configured. Add an OpenAI API key in Settings."
+                )
+            raise ValueError(
+                "Google credentials are not configured. Add a Google/Gemini API key in Settings."
+            )
+        self.credentials_repo.mark_used(provider=provider, label="api_key")
+        return self.crypto_service.decrypt(credential.encrypted_value)
 
     def get_provider(self, provider: str) -> LLMProvider:
         normalized = provider.strip().lower()
@@ -31,37 +40,10 @@ class LLMFactory:
         if normalized == "ollama":
             return OllamaProvider(base_url=settings.ollama_url)
         if normalized == "openai":
-            api_key = self.access_keys.decrypt_for_runtime("openai", mark_used=True)
-            if not api_key:
-                credential = self.credentials_repo.get_active(
-                    provider="openai", label="api_key"
-                )
-                if credential is not None:
-                    api_key = self.crypto_service.decrypt(credential.encrypted_value)
-            if not api_key:
-                api_key = os.getenv("OPENAI_API_KEY", "").strip()
-            if not api_key:
-                raise ValueError(
-                    "OpenAI credentials are not configured. Add an OpenAI API key in Settings."
-                )
+            api_key = self._resolve_provider_api_key("openai")
             return OpenAIProvider(api_key=api_key, base_url=settings.openai_base_url)
         if normalized == "google":
-            api_key = self.access_keys.decrypt_for_runtime("gemini", mark_used=True)
-            if not api_key:
-                credential = self.credentials_repo.get_active(
-                    provider="google", label="api_key"
-                )
-                if credential is not None:
-                    api_key = self.crypto_service.decrypt(credential.encrypted_value)
-            if not api_key:
-                api_key = (
-                    os.getenv("GOOGLE_API_KEY", "").strip()
-                    or os.getenv("GEMINI_API_KEY", "").strip()
-                )
-            if not api_key:
-                raise ValueError(
-                    "Google credentials are not configured. Add a Google/Gemini API key in Settings."
-                )
+            api_key = self._resolve_provider_api_key("google")
             return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
         raise ValueError(f"Unsupported model provider '{provider}'.")
 

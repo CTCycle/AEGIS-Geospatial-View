@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, time
 from typing import Any, Mapping, Sequence
 
-from fastapi import Body, HTTPException, status
+from fastapi import HTTPException, status
 from pydantic import ValidationError
 
 from AEGIS.server.configurations import get_server_settings
@@ -109,6 +108,19 @@ class MapSearchExecutionService:
             toolkit=toolkit,
         )
 
+    async def _prepare_request(
+        self, payload: LocationSearchRequest
+    ) -> tuple[LocationSearchRequest, dict[str, Any], dict[str, Any]]:
+        normalized_payload = await asyncio.to_thread(
+            LocationSearchRequest.model_validate, payload.model_dump(mode="python")
+        )
+        request_context = build_request_context(normalized_payload)
+        payload_data = build_location_search_payload_data(normalized_payload)
+        typed_payload = await asyncio.to_thread(
+            LocationSearchRequest.model_validate, payload_data
+        )
+        return typed_payload, request_context, payload_data
+
     def resolve_coordinate_pair(
         self,
         payload: LocationSearchRequest | None,
@@ -172,7 +184,7 @@ class MapSearchExecutionService:
         payload: LocationSearchRequest,
         search_payload: dict[str, Any],
         satellite_payload: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
         return await self.orchestrator.assemble_map_session(
             payload=payload,
             search_payload=search_payload,
@@ -247,7 +259,7 @@ class MapSearchExecutionService:
                 ) from exc
 
             search_payload["satellite_imagery"] = satellite_payload
-            map_session = await self.build_map_session(
+            map_session, selected_overlay_ids, applied_filters, unmet_filters = await self.build_map_session(
                 payload=payload,
                 search_payload=search_payload,
                 satellite_payload=satellite_payload,
@@ -256,6 +268,11 @@ class MapSearchExecutionService:
             search_payload["compliance_warnings"] = map_session.get(
                 "compliance_warnings", []
             )
+            search_payload["selected_overlay_ids"] = selected_overlay_ids
+            search_payload["applied_filters"] = applied_filters
+            search_payload["unmet_filters"] = unmet_filters
+            if applied_filters and not selected_overlay_ids:
+                search_payload["fallback_mode"] = "overlay_unavailable"
             self.job_manager.update_progress(
                 job_id, MAP_SEARCH_JOB_PROGRESS_POSTPROCESS
             )
@@ -312,75 +329,19 @@ class MapSearchExecutionService:
             raise
 
     async def search_by_location(
-        self,
-        datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
-        time_of_day: time | str | None = Body(default=None),
-        timeline_year: int | None = Body(default=None),
-        country: str | None = Body(default=None),
-        city: str | None = Body(default=None),
-        address: str | None = Body(default=None),
-        use_coordinates: bool = Body(default=False),
-        latitude: float | None = Body(default=None),
-        longitude: float | None = Body(default=None),
-        geospatial_layers: list[str] = Body(default_factory=list),
-        basemap_id: str | None = Body(default=None),
-        overlay_ids: list[str] = Body(default_factory=list),
-        aoi: dict[str, Any] | None = Body(default=None),
-        commute: dict[str, Any] | None = Body(default=None),
-        bbox: list[float] | None = Body(default=None),
-        radius_m: float | None = Body(default=None),
-        map_size_m: float | None = Body(default=None),
-        map_tiles: str | None = Body(default=None),
-        image_width: int | None = Body(default=None),
-        image_height: int | None = Body(default=None),
-        image_crs: str | None = Body(default=None),
-        image_format: str | None = Body(default=None),
+        self, payload: LocationSearchRequest
     ) -> SearchByLocationResponse:
-        payload: LocationSearchRequest | None = None
+        typed_payload: LocationSearchRequest | None = None
         response_payload: dict[str, Any] | None = None
-        request_context = build_request_context(
-            country=country,
-            city=city,
-            address=address,
-            longitude=longitude,
-            latitude=latitude,
-            geospatial_layers=geospatial_layers,
-            overlay_ids=overlay_ids,
-            basemap_id=basemap_id,
-            map_tiles=map_tiles,
-        )
+        request_context: dict[str, Any] = {}
         try:
-            payload_data = build_location_search_payload_data(
-                datetime_value=datetime_value,
-                time_of_day=time_of_day,
-                timeline_year=timeline_year,
-                country=country,
-                city=city,
-                address=address,
-                use_coordinates=use_coordinates,
-                latitude=latitude,
-                longitude=longitude,
-                geospatial_layers=geospatial_layers,
-                basemap_id=basemap_id,
-                overlay_ids=overlay_ids,
-                aoi=aoi,
-                commute=commute,
-                bbox=bbox,
-                radius_m=radius_m,
-                map_size_m=map_size_m,
-                map_tiles=request_context["map_tiles"],
-                image_crs=image_crs,
-                image_format=image_format,
-            )
-            payload = await asyncio.to_thread(
-                LocationSearchRequest.model_validate, payload_data
-            )
-            response_payload = await self.process_location_search(payload)
+            typed_payload, request_context, _ = await self._prepare_request(payload)
+            response_payload = await self.process_location_search(typed_payload)
             typed_response = await asyncio.to_thread(
                 SearchByLocationResponse.model_validate, response_payload
             )
             await self.record_search_session(
-                payload=payload,
+                payload=typed_payload,
                 response_payload=response_payload,
                 fallback=request_context,
                 state="success",
@@ -388,7 +349,7 @@ class MapSearchExecutionService:
             return typed_response
         except ValidationError as exc:
             await self.record_search_session(
-                payload=payload,
+                payload=typed_payload,
                 response_payload=response_payload,
                 fallback=request_context,
                 state="failed",
@@ -399,7 +360,7 @@ class MapSearchExecutionService:
             ) from exc
         except Exception:
             await self.record_search_session(
-                payload=payload,
+                payload=typed_payload,
                 response_payload=response_payload,
                 fallback=request_context,
                 state="failed",
@@ -407,72 +368,16 @@ class MapSearchExecutionService:
             raise
 
     async def start_search_job(
-        self,
-        datetime_value: datetime | str | None = Body(default=None, alias="datetime"),
-        time_of_day: time | str | None = Body(default=None),
-        timeline_year: int | None = Body(default=None),
-        country: str | None = Body(default=None),
-        city: str | None = Body(default=None),
-        address: str | None = Body(default=None),
-        use_coordinates: bool = Body(default=False),
-        latitude: float | None = Body(default=None),
-        longitude: float | None = Body(default=None),
-        geospatial_layers: list[str] = Body(default_factory=list),
-        basemap_id: str | None = Body(default=None),
-        overlay_ids: list[str] = Body(default_factory=list),
-        aoi: dict[str, Any] | None = Body(default=None),
-        commute: dict[str, Any] | None = Body(default=None),
-        bbox: list[float] | None = Body(default=None),
-        radius_m: float | None = Body(default=None),
-        map_size_m: float | None = Body(default=None),
-        map_tiles: str | None = Body(default=None),
-        image_width: int | None = Body(default=None),
-        image_height: int | None = Body(default=None),
-        image_crs: str | None = Body(default=None),
-        image_format: str | None = Body(default=None),
+        self, payload: LocationSearchRequest
     ) -> JobStartResponse:
-        payload: LocationSearchRequest | None = None
+        typed_payload: LocationSearchRequest | None = None
         response_payload: dict[str, Any] | None = None
-        request_context = build_request_context(
-            country=country,
-            city=city,
-            address=address,
-            longitude=longitude,
-            latitude=latitude,
-            geospatial_layers=geospatial_layers,
-            overlay_ids=overlay_ids,
-            basemap_id=basemap_id,
-            map_tiles=map_tiles,
-        )
+        request_context: dict[str, Any] = {}
         try:
-            payload_data = build_location_search_payload_data(
-                datetime_value=datetime_value,
-                time_of_day=time_of_day,
-                timeline_year=timeline_year,
-                country=country,
-                city=city,
-                address=address,
-                use_coordinates=use_coordinates,
-                latitude=latitude,
-                longitude=longitude,
-                geospatial_layers=geospatial_layers,
-                basemap_id=basemap_id,
-                overlay_ids=overlay_ids,
-                aoi=aoi,
-                commute=commute,
-                bbox=bbox,
-                radius_m=radius_m,
-                map_size_m=map_size_m,
-                map_tiles=request_context["map_tiles"],
-                image_crs=image_crs,
-                image_format=image_format,
-            )
-            payload = await asyncio.to_thread(
-                LocationSearchRequest.model_validate, payload_data
-            )
+            typed_payload, request_context, _ = await self._prepare_request(payload)
         except ValidationError as exc:
             await self.record_search_session(
-                payload=payload,
+                payload=typed_payload,
                 response_payload=response_payload,
                 fallback=request_context,
                 state="failed",
@@ -482,12 +387,13 @@ class MapSearchExecutionService:
                 detail=sanitize_validation_errors(exc.errors()),
             ) from exc
 
+        assert typed_payload is not None
         job_id = self.job_manager.start_job(
             job_type="map_search",
             runner=run_map_search_job,
             kwargs={
                 "service": self,
-                "payload": payload,
+                "payload": typed_payload,
                 "request_context": request_context,
             },
         )
