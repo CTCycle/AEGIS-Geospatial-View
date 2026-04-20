@@ -507,6 +507,18 @@
 
     .settings-page__content { padding-top: 1.15rem; }
 
+    .settings-page__layout {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-3);
+    }
+
+    .settings-page__left-column,
+    .settings-page__right-column {
+        min-height: auto;
+    }
+
     .settings-page__controls,
     .settings-page__controls-left,
     .settings-page__controls-right {
@@ -534,14 +546,26 @@
     .model-grid { grid-template-columns: 1fr; }
 
     .model-grid-scroll {
-        min-height: 18rem;
-        max-height: 56vh;
+        min-height: 0;
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
     }
 
     .model-search-bar { width: 100%; }
 
+    .settings-page__right-column {
+        width: 100%;
+        min-width: 0;
+        padding-top: 0;
+        position: static;
+        z-index: auto;
+    }
+
     .settings-page__stats-table-wrap {
         display: none;
+        max-height: none;
+        overflow: visible;
     }
 
     .settings-page__stats-mobile-list {
@@ -621,8 +645,6 @@
     }
 
     .settings-page__right-column {
-        width: 100%;
-        min-width: 0;
         position: static;
     }
 }

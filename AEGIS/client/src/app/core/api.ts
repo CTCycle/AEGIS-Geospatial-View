@@ -182,7 +182,15 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
 };
 
 export const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
-  const response = await fetch(url, init);
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (error: unknown) {
+    const message = (error as { name?: string })?.name === 'AbortError'
+      ? 'Request interrupted before completion.'
+      : 'Network request failed.';
+    throw new ApiRequestError(message, { detail: error, raw: error });
+  }
   if (!response.ok) {
     throw await buildApiError(response);
   }

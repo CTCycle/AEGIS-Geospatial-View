@@ -123,7 +123,11 @@
               </tr>
             </thead>
             <tbody>
-              @if (selectedModelStats.length === 0) {
+              @if (isLoadingModels) {
+                <tr>
+                  <td colSpan="4">Loading model assignments...</td>
+                </tr>
+              } @else if (selectedModelStats.length === 0) {
                 <tr>
                   <td colSpan="4">No models selected yet.</td>
                 </tr>
@@ -141,7 +145,11 @@
         </div>
 
         <div class="settings-page__stats-mobile-list" aria-label="Model statistics mobile">
-          @if (selectedModelStats.length === 0) {
+          @if (isLoadingModels) {
+            <article class="settings-page__stats-mobile-card">
+              <p class="settings-page__stats-mobile-empty">Loading model assignments...</p>
+            </article>
+          } @else if (selectedModelStats.length === 0) {
             <article class="settings-page__stats-mobile-card">
               <p class="settings-page__stats-mobile-empty">No models selected yet.</p>
             </article>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -410,17 +411,32 @@ async def run_turn_impl(
             location_query = orchestrator._derive_location_query_from_message(
                 request.message
             )
-            geocode_address = extracted_state.location.address or location_query
-            geocode_result = (
-                await orchestrator.agent_tools.geocode_location(
+            geocode_address = location_query or extracted_state.location.address
+            geocode_city = extracted_state.location.city
+            geocode_country = extracted_state.location.country
+            geocode_result = None
+            if orchestrator.agent_tools is not None:
+                geocode_result = await orchestrator.agent_tools.geocode_location(
                     address=geocode_address,
-                    city=extracted_state.location.city,
-                    country_name=extracted_state.location.country,
+                    city=geocode_city,
+                    country_name=geocode_country,
                     expected_location_type=extracted_state.location_type,
                 )
-                if orchestrator.agent_tools is not None
-                else None
-            )
+                if geocode_result is None and isinstance(location_query, str):
+                    split_match = re.search(
+                        r"^(.+?)\s+in\s+([a-z0-9][a-z0-9\s,'\\-]{2,})$",
+                        location_query.strip(),
+                        re.IGNORECASE,
+                    )
+                    if split_match:
+                        retry_address = split_match.group(1).strip(" .")
+                        retry_city = split_match.group(2).strip(" .")
+                        geocode_result = await orchestrator.agent_tools.geocode_location(
+                            address=retry_address,
+                            city=retry_city,
+                            country_name=geocode_country,
+                            expected_location_type=extracted_state.location_type,
+                        )
         search_result = {"geocode_result": geocode_result}
         tool_payload = {
             "execution": "location_to_coordinates",

@@ -220,6 +220,26 @@ class AgentOrchestrator:
         normalized = user_message.strip()
         if not normalized:
             return None
+        coordinate_question_match = re.search(
+            r"\b(?:coordinates?|latitude|longitude)\s+(?:for|of)\s+(.+?)(?:\?|$)",
+            normalized,
+            re.IGNORECASE,
+        )
+        if coordinate_question_match:
+            candidate = coordinate_question_match.group(1).strip(" .")
+            candidate = re.sub(r"^(?:the|a|an)\s+", "", candidate, flags=re.IGNORECASE)
+            if candidate:
+                return candidate
+        where_match = re.search(
+            r"\bwhere\s+is\s+(.+?)(?:\?|$)",
+            normalized,
+            re.IGNORECASE,
+        )
+        if where_match:
+            candidate = where_match.group(1).strip(" .")
+            candidate = re.sub(r"^(?:the|a|an)\s+", "", candidate, flags=re.IGNORECASE)
+            if candidate:
+                return candidate
         around_match = re.search(
             r"\b(?:near|around|in|at)\s+([a-z0-9][a-z0-9\s,'\-]{2,})$",
             normalized,

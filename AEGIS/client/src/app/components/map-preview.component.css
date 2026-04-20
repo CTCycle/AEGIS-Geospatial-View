@@ -189,4 +189,13 @@
         min-height: 15rem;
         height: min(42vh, 22rem);
     }
+
+    .empty-state {
+        align-items: flex-start;
+        padding-top: 1rem;
+    }
+
+    .empty-state__card {
+        width: 100%;
+    }
 }
