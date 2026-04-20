@@ -409,6 +409,88 @@ def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(
 
 
 ###############################################################################
+def test_chat_orchestrator_geocode_retries_with_split_poi_and_city(
+    monkeypatch,
+) -> None:
+    _allow_provider_checks(monkeypatch)
+    calls: list[dict[str, str | None]] = []
+
+    class _AgentToolsStub:
+        def describe_tools(self):  # noqa: ANN201
+            return [{"name": "location_to_coordinates", "description": "geocode"}]
+
+        async def geocode_location(
+            self,
+            *,
+            address,
+            city,
+            country_name,
+            country_code=None,
+            expected_location_type=None,
+        ):  # noqa: ANN001
+            _ = country_code, expected_location_type
+            calls.append(
+                {
+                    "address": address,
+                    "city": city,
+                    "country_name": country_name,
+                }
+            )
+            if address == "Colosseum" and city == "Rome":
+                return {"lat": 41.8902, "lon": 12.4922}
+            return None
+
+    orchestrator = AgentOrchestrator(
+        search_orchestrator=_SearchOrchestratorStub(),
+        vector_retriever=_VectorRetrieverStub(),
+        agent_tools=_AgentToolsStub(),
+    )
+    monkeypatch.setattr(
+        ParserService,
+        "extract_patch",
+        lambda self, conversation_context, latest_state, user_message: (
+            ExtractedIntentPatch(user_goal="coordinates lookup")
+        ),
+    )
+    monkeypatch.setattr(
+        DecisionService,
+        "decide",
+        lambda self, conversation_context, user_message, extracted_state, retrieval, available_tools=None: (
+            AgentDecision(
+                decision="search_and_complete",
+                execution_mode="geocode",
+                tool_target="location_to_coordinates",
+                should_trigger_search=False,
+                location_status="valid",
+                requires_geocoding=True,
+                reasoning_summary="test",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        ChatResponseService,
+        "generate",
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+            "The coordinates are latitude 41.8902 and longitude 12.4922."
+        ),
+    )
+
+    result = asyncio.run(
+        orchestrator.run_turn(
+            ChatTurnRequest(message="What are the coordinates of the Colosseum in Rome?")
+        )
+    )
+
+    assert result.tool_payload is not None
+    assert result.tool_payload["execution"] == "location_to_coordinates"
+    assert result.tool_payload["result"]["lat"] == 41.8902
+    assert result.tool_payload["result"]["lon"] == 12.4922
+    assert calls[0]["address"] == "Colosseum in Rome"
+    assert calls[1]["address"] == "Colosseum"
+    assert calls[1]["city"] == "Rome"
+
+
+###############################################################################
 def test_chat_orchestrator_executes_direct_weather_tool(monkeypatch) -> None:
     _allow_provider_checks(monkeypatch)
 
@@ -819,3 +901,17 @@ def test_chat_orchestrator_new_task_clears_stale_filters_and_coordinates(
     assert second.extracted_state["coordinates"]["latitude"] is None
     assert second.extracted_state["coordinates"]["longitude"] is None
     assert second.extracted_state["filters"] == []
+
+
+###############################################################################
+def test_chat_orchestrator_derives_location_query_from_coordinate_question() -> None:
+    orchestrator = AgentOrchestrator(
+        search_orchestrator=_SearchOrchestratorStub(),
+        vector_retriever=_VectorRetrieverStub(),
+    )
+
+    query = orchestrator._derive_location_query_from_message(
+        "What are the coordinates of the Colosseum in Rome?"
+    )
+
+    assert query == "Colosseum in Rome"
