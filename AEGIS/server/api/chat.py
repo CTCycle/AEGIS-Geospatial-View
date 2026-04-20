@@ -22,7 +22,6 @@ from AEGIS.server.domain.chat import (
     VectorizationResponse,
 )
 from AEGIS.server.services.chat.composition import ChatRuntime
-from AEGIS.server.services.llm.ollama import OllamaProvider
 from AEGIS.server.common.constants import (
     CHAT_MODELS_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
@@ -39,7 +38,7 @@ from AEGIS.server.common.constants import (
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 logger = logging.getLogger(__name__)
 
-
+###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
 
@@ -133,7 +132,7 @@ async def _chat_event_stream(
             )
         )
 
-
+###############################################################################
 @router.post(
     CHAT_TURN_ROUTE,
     response_model=ChatTurnResponse,
@@ -150,7 +149,7 @@ async def chat_turn(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
 
-
+###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
     status_code=status.HTTP_200_OK,
@@ -164,7 +163,7 @@ async def chat_stream(
         media_type="application/x-ndjson",
     )
 
-
+###############################################################################
 @router.get(
     CHAT_MODELS_ROUTE,
     response_model=ModelLibraryResponse,
@@ -176,7 +175,7 @@ def get_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelLibrary
     )
     return ModelLibraryResponse.model_validate(response)
 
-
+###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
@@ -185,7 +184,7 @@ def get_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelLibrary
 def get_settings(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelSettingsResponse:
     return runtime.settings_service.get_settings()
 
-
+###############################################################################
 @router.put(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
@@ -201,23 +200,16 @@ def update_settings(
         payload.model_dump(mode="python", exclude_none=True)
     )
 
-
+###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
     response_model=OllamaRefreshResponse,
     status_code=status.HTTP_200_OK,
 )
 def refresh_ollama_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> OllamaRefreshResponse:
-    provider = OllamaProvider(base_url=runtime.settings_service.get_ollama_url())
-    library_models = provider.list_library_models()
-    local_models = provider.list_models()
-    return OllamaRefreshResponse(
-        status="ok",
-        library_models=[model.name for model in library_models],
-        local_models=[model.name for model in local_models],
-    )
+    return runtime.maintenance_service.refresh_ollama_models()
 
-
+###############################################################################
 @router.post(
     CHAT_OLLAMA_PULL_ROUTE,
     response_model=OllamaPullResponse,
@@ -227,46 +219,46 @@ def pull_ollama_model(
     payload: Annotated[OllamaPullRequest | None, Body()] = None,
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> OllamaPullResponse:
-    model_name = payload.model.strip() if payload is not None else ""
-    if not model_name:
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="model is required"
         )
-    provider = OllamaProvider(base_url=runtime.settings_service.get_ollama_url())
     try:
-        return OllamaPullResponse.model_validate(provider.pull_model(model=model_name))
+        return runtime.maintenance_service.pull_ollama_model(payload)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc) or "Ollama pull failed",
         ) from exc
 
-
+###############################################################################
 @router.post(
     CHAT_VECTORS_REBUILD_ROUTE,
     response_model=VectorizationResponse,
     status_code=status.HTTP_200_OK,
 )
 def rebuild_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> VectorizationResponse:
-    result = runtime.vector_indexer.rebuild()
-    return VectorizationResponse.model_validate(result)
+    return runtime.maintenance_service.rebuild_vectors()
 
-
+###############################################################################
 @router.post(
     CHAT_VECTORS_SYNC_ROUTE,
     response_model=VectorizationResponse,
     status_code=status.HTTP_200_OK,
 )
 def sync_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> VectorizationResponse:
-    result = runtime.vector_indexer.sync()
-    return VectorizationResponse.model_validate(result)
+    return runtime.maintenance_service.sync_vectors()
 
-
+###############################################################################
 @router.get(
     CHAT_OLLAMA_HEALTH_ROUTE,
     response_model=OllamaHealthResponse,
     status_code=status.HTTP_200_OK,
 )
 def check_ollama_health(runtime: ChatRuntime = Depends(get_chat_runtime)) -> OllamaHealthResponse:
-    provider = OllamaProvider(base_url=runtime.settings_service.get_ollama_url())
-    return OllamaHealthResponse.model_validate(provider.health_check())
+    return runtime.maintenance_service.get_ollama_health()

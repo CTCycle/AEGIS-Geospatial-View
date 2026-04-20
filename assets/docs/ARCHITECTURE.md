@@ -29,7 +29,7 @@ Typical local defaults from env examples:
 
 - `AEGIS/client`: frontend application
 - `AEGIS/server`: backend application
-- `AEGIS/server/api`: route modules (`search.py`, `chat.py`, `access_keys.py`)
+- `AEGIS/server/api`: route modules (`search.py`, `chat.py`)
 - `AEGIS/server/services`: orchestration, geospatial, jobs, llm/vector services
 - `AEGIS/server/repositories`: persistence and serializers
 - `AEGIS/server/domain`: request/response models
@@ -40,7 +40,7 @@ Typical local defaults from env examples:
 
 ## 4. API Surface
 
-Routers are mounted at both base and `/api` prefix in `AEGIS/server/app.py`.
+Routers are mounted under `/api` in `AEGIS/server/app.py`.
 
 Maps router (`/maps`):
 - `GET /api/maps/catalog`
@@ -61,12 +61,6 @@ Chat router (`/chat`):
 - `POST /api/chat/vectors/rebuild`
 - `POST /api/chat/vectors/sync`
 
-Access keys router (`/api/access-keys`):
-- `GET /api/access-keys?provider=...`
-- `POST /api/access-keys`
-- `PUT /api/access-keys/{key_id}/activate?provider=...`
-- `DELETE /api/access-keys/{key_id}?provider=...`
-
 Root behavior:
 - In Tauri packaged mode with built frontend assets, `/` serves SPA files.
 - Otherwise, `/` redirects to `/docs`.
@@ -74,19 +68,21 @@ Root behavior:
 ## 5. Core Execution Flows
 
 Map search flow:
-1. Request validation in API/domain models.
+1. Request validation in API/domain models (`LocationSearchRequest`).
 2. Location sanitization and geocoding.
 3. Search execution orchestration (`MapSearchExecutionService`).
 4. Layer/catalog composition and rendering (`MapRenderingService`).
 5. Optional external enrichment (OpenAQ, Open-Elevation, PVGIS).
 6. Persisted search session metadata and response payload return.
+7. OSM tile proxy networking is delegated to `OsmTileProxyService`; endpoint translates service failures to HTTP 502.
 
 Chat flow:
 1. `chat_turn`/`chat_stream` receives a user turn.
-2. App startup wiring builds app-scoped service dependencies (`app.state`) consumed by API handlers.
-3. Startup lifecycle bootstraps SQLite (first run) and vector index bootstrap (`VectorIndexer.bootstrap_if_missing`) when enabled by `vectors.auto_sync_on_start`.
+2. App startup lifecycle (`create_app()` lifespan) composes runtimes and stores them on `app.state`.
+3. Startup bootstraps SQLite (first run) and vector index bootstrap (`VectorIndexer.bootstrap_if_missing`) when enabled by `vectors.auto_sync_on_start`.
 4. `AgentOrchestrator` processes parsing, raw-prompt retrieval, retrieval-availability annotation, decisioning, tool invocation, and assistant response.
 5. Structured/tool/map payloads are returned and persisted through repository-backed services.
+6. Operational endpoints (`ollama refresh/pull/health`, `vectors sync/rebuild`) delegate to `ChatMaintenanceService`.
 
 Vector subsystem responsibilities:
 - `ManifestPreparationService` composes one embedding chunk per basemap/overlay manifest entry.
@@ -97,6 +93,10 @@ Vector subsystem responsibilities:
 Agent tool awareness:
 - `AgentTools.describe_tools()` exposes `location_to_coordinates` and `map_search` descriptions to decisioning.
 - Direct geocode execution path is first-class and can complete without map search execution.
+
+Credentials:
+- Cloud provider credentials are resolved only from the encrypted `model_credentials` store via `CredentialRepository` + `CredentialEncryptionService`.
+- Runtime provider selection supports `openai`, `google`, and `ollama`; no legacy access-key storage path is active.
 
 ## 6. Background Jobs
 
