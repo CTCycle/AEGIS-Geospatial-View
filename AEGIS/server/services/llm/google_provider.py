@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from langchain_google_genai import (
-    ChatGoogleGenerativeAI,
-    GoogleGenerativeAIEmbeddings,
-)
+try:
+    from langchain_google_genai import (
+        ChatGoogleGenerativeAI,
+        GoogleGenerativeAIEmbeddings,
+    )
+except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
+    ChatGoogleGenerativeAI = None  # type: ignore[assignment]
+    GoogleGenerativeAIEmbeddings = None  # type: ignore[assignment]
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
@@ -31,9 +35,16 @@ class GoogleProvider(LLMProvider):
             base_url or "https://generativelanguage.googleapis.com/v1beta"
         ).rstrip("/")
 
+    def _ensure_dependency(self) -> None:
+        if ChatGoogleGenerativeAI is None or GoogleGenerativeAIEmbeddings is None:
+            raise RuntimeError(
+                "langchain_google_genai is not installed. Install optional LLM dependencies to use Google provider."
+            )
+
     def _build_chat_model(
         self, *, model: str, temperature: float
     ) -> ChatGoogleGenerativeAI:
+        self._ensure_dependency()
         kwargs: dict[str, Any] = {
             "model": model,
             "temperature": temperature,
@@ -50,6 +61,7 @@ class GoogleProvider(LLMProvider):
     def _build_embedding_model(
         self, *, model: str
     ) -> GoogleGenerativeAIEmbeddings:
+        self._ensure_dependency()
         kwargs: dict[str, Any] = {
             "model": model,
             "google_api_key": self.api_key,

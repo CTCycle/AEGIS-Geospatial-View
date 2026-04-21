@@ -368,7 +368,32 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private syncSessionFromPayload(): void {
-    this.mapSession = this.payload?.map_session;
+    const next = this.payload?.map_session;
+    if (!next) {
+      this.mapSession = undefined;
+      return;
+    }
+    const overlays = Array.isArray(next.overlays)
+      ? next.overlays
+      : (next.overlay_ids ?? []).map((overlayId) => ({
+        id: overlayId,
+        label: overlayId,
+        provider: 'manifest',
+        type: 'tile',
+      }));
+    this.mapSession = {
+      ...next,
+      center: next.center ?? {
+        latitude: next.resolved_location?.latitude ?? null,
+        longitude: next.resolved_location?.longitude ?? null,
+      },
+      basemap: next.basemap ?? {
+        id: next.basemap_id,
+        label: next.basemap_id,
+        provider: 'manifest',
+      },
+      overlays,
+    };
   }
 
   private rebuildOverlayStateFromSession(): void {

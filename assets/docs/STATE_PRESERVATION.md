@@ -1,57 +1,62 @@
 # Web App State Preservation
 
-Last updated: 2026-04-09
+Last updated: 2026-04-21
 Scope: `AEGIS/client/src`
 
 ## Overview
 
-The web app preserves user working context across:
-- navigation between `/` (chat/map) and `/settings`
-- browser back/forward
-- page refreshes in the same tab
+The web app stores per-tab UI state in `sessionStorage` under key `aegis:webapp-state:v3` with a 6-hour TTL.
 
-State is stored in `sessionStorage` under `aegis:webapp-state:v2` with a 6-hour TTL.
+Persistence is strict-versioned. Older schema payloads are invalidated and discarded.
 
-## Preserved State Categories
+## Persisted Root Contract
 
-Chat/map workspace (`/`):
-- toolbar width and collapsed state
-- chat session context and transcript state
-- chat composer draft
-- transcript scroll position
-- latest rendered map payload
-- overlay visibility/opacity
-- page scroll position
+`PersistedAppState` contains:
+- `version` (`3`)
+- `savedAt`
+- `tabId`
+- `chatPage`
+- `settingsPage`
 
-Settings workspace (`/settings`):
-- model search text
-- provider mode tab (`local`/`cloud`)
-- status/footer text
-- page scroll position
-- model grid scroll position
+## Chat Page Persistence
 
-## Routing and Deep Links
+`chatPage.chatPanel` persists:
+- `sessionId`
+- `conversationNonce`
+- `messages`
+- `lastDecision`
+- `memorySnapshot`
+- `mapSession`
+- status and composer/transcript UI state
 
-- `/` -> chat/map workspace
-- `/settings` -> settings workspace
-- Back/forward is handled by Angular Router/browser history.
-- Unknown paths redirect to `/`.
-- Settings query-state deep links use:
-  - `q=<search text>`
-  - `mode=local|cloud`
+Map UI state also persists:
+- `overlayVisibility`
+- `overlayOpacity`
 
-## Restore and Clear Rules
+## Restore Rules
 
-Restore behavior:
-- state is restored only when schema/version checks pass
-- expired state is discarded
-- transient runtime-only loading flags are not restored
+State is restored only when all checks pass:
+- schema version is `3`
+- TTL has not expired
+- persisted `tabId` matches active tab ownership
+- payload shape is valid objects/arrays for required sections
 
-Clear behavior:
-- corrupted storage payloads are discarded automatically
+If checks fail, app falls back to `defaultAppState()`.
 
-## Guardrails
+## Tab Isolation
 
-- Duplicated tabs are isolated via tab id and ownership heartbeat.
-- Stale overlay ids are ignored.
-- App is client-rendered and restores state post-startup.
+Tab ownership uses:
+- session tab id (`aegis:webapp-tab-id:v1`)
+- localStorage heartbeat (`aegis:webapp-tab-heartbeat:v1:<tabId>`)
+
+If an active owner heartbeat is detected, a new tab id is generated and persisted state is reset for isolation.
+
+## Clear Behavior
+
+The app clears persisted state when:
+- payload is corrupted JSON
+- schema version is invalid
+- state is expired
+- tab ownership is invalid
+
+`clearPersistedAppState()` explicitly clears the persisted snapshot for the current tab.

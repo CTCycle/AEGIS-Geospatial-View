@@ -1,21 +1,17 @@
-from .models import (
-    ExtractedCoordinates,
-    ExtractedIntent,
-    ExtractedIntentPatch,
-    ExtractedLocation,
-    ExtractedTimeReferences,
-    StageAParserIntent,
-    StageBSearchExtraction,
+from AEGIS.server.domain.extraction.models import (
+    ConversationContextSnapshot,
+    DisallowedPattern,
+    LocationSignal,
+    NormalizedIntent,
+    TemporalSignal,
+    TurnParseResult,
 )
-from .patching import merge_extracted_intent
 
 __all__ = [
-    "ExtractedCoordinates",
-    "ExtractedIntent",
-    "ExtractedIntentPatch",
-    "ExtractedLocation",
-    "ExtractedTimeReferences",
-    "StageAParserIntent",
-    "StageBSearchExtraction",
-    "merge_extracted_intent",
+    "ConversationContextSnapshot",
+    "LocationSignal",
+    "TemporalSignal",
+    "NormalizedIntent",
+    "TurnParseResult",
+    "DisallowedPattern",
 ]

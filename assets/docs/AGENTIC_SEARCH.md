@@ -1,75 +1,117 @@
 # Agentic Search
 
-Last updated: 2026-04-10
+Last updated: 2026-04-21
 
 ## Summary
 
-AEGIS uses a chat-first flow where each user turn can either:
-- execute geospatial search and update map session, or
-- return a follow-up question when required input is materially ambiguous.
+The chat workflow is now contract-first and deterministic:
 
-## Key Behaviors
+1. Parser emits evidence-only `TurnParseResult`.
+2. Policy engine builds a strict `PolicyDecision` + `ExecutionPlan`.
+3. Orchestrator executes only the approved plan state (`clarify`, `direct_tool`, `map_search`, `reject`).
+4. Turn payloads and location memory snapshots are persisted as structured JSON.
 
-- Datetime default:
-  - when omitted, backend defaults to current UTC timestamp.
-  - if temporal specificity is materially ambiguous, assistant returns follow-up instead of executing.
-- Ollama runtime:
-  - external service only; no automatic startup.
-  - settings expose URL validation, health, refresh, and pull.
-- Catalog source of truth:
-  - provider/basemap/overlay metadata is loaded from JSON manifests in `AEGIS/resources/manifests`.
-- Vector retrieval:
-  - vector index bootstrap runs at backend startup when `vectors.auto_sync_on_start=true`.
-  - bootstrap runs once when artifacts are missing and is skipped when both collection and metadata are valid.
-  - similarity retrieval uses the raw user prompt text.
-  - manual rebuild is exposed at `POST /api/chat/vectors/rebuild`.
-  - incremental sync is exposed at `POST /api/chat/vectors/sync`.
-- Direct coordinates tool:
-  - explicit coordinate-lookup requests route to direct geocoding.
-  - geocoding responses return plain text coordinates and do not create `map_session`.
-- Direct runtime tools:
-  - location-scoped weather, air-quality forecast, and nearby POI requests can route to direct tools.
-  - direct tool responses remain plain text and never expose internal tool IDs.
-- Retrieval availability:
-  - retrieved basemap/overlay candidates are annotated with runtime availability before decisioning.
-  - keyed integrations trigger clarification only when required and no available alternative can satisfy the same intent.
-- Runtime provider overlays:
-  - `openmeteo_weather_forecast`, `openmeteo_air_quality_forecast`, `overpass_poi_amenities`, and `rainviewer_precipitation_radar` are normalized into `map_session.insights`.
-  - each overlay in `map_session.overlays` includes a `runtime` block with freshness/availability and provider-safe error envelopes.
-- Plain text response safety:
-  - chat response payloads are sanitized before model generation.
-  - assistant output is normalized to plain text and falls back to deterministic plain text when needed.
-- Persistence:
-  - provider/model settings persisted in database.
-  - cloud credentials persisted encrypted at rest.
-  - chat sessions/messages persisted in database (`chat_sessions`, `chat_messages`).
-- Conversation memory:
-  - parser/decision/response model calls receive bounded transcript context.
-  - transcript depth is controlled by `chat.max_history_messages` in `AEGIS/settings/configurations.json`.
-- Provider transport:
-  - parser and response model invocation is routed through LangChain-backed provider adapters.
-  - agent behavior, fallback logic, and map-search execution flow are unchanged.
-- Location resolution:
-  - structured location mapping no longer falls back to raw user text as `address`.
-  - geocoding supports city/country-only input.
-  - unresolved locations fail early with actionable 400 validation errors.
+No legacy routing compatibility is preserved.
 
-## Backend Flow
+## Turn Contract
 
-1. `POST /api/chat/turn` or `POST /api/chat/stream` receives user turn.
-2. Agent orchestration loads bounded transcript context and extracts intent.
-3. Vector retriever resolves candidates from the raw user message.
-4. Candidate availability and tool descriptions are passed into decisioning.
-5. Decision selects geocode/search/clarify without exposing internal IDs.
-6. Intent mapper converts agent output to `LocationSearchRequest` shape for search mode.
-7. Shared location-search orchestrator executes map pipeline reused by `/api/maps/search`.
-8. Assistant response + structured payload + map session are persisted.
+Parser output is `TurnParseResult` and contains only:
+- user text and bounded conversation context
+- task class (`map_search | direct_query | general_question | unclear`)
+- location signals
+- normalized intent
+- temporal signal
+- ambiguities
+- disallowed patterns
+- parser confidence
 
-## Streaming Events
+Parser output never contains tool IDs, overlay IDs, or execution directives.
 
-`/api/chat/stream` returns NDJSON events:
-- `status`
-- `assistant_delta`
-- `tool_status`
-- `final`
-- `error`
+## Policy Engine Order
+
+Decisioning order is fixed and must not be reordered:
+
+1. validate task class
+2. enforce location requirement
+3. resolve location
+4. validate ambiguity
+5. retrieve capabilities
+6. filter runtime availability
+7. filter coverage
+8. choose execution mode
+9. build execution plan
+
+The policy engine is the only authority that decides execution mode.
+
+## Execution Modes
+
+`ExecutionPlan.state` can be only:
+- `clarify`
+- `direct_tool`
+- `map_search`
+- `reject`
+
+### `direct_tool`
+
+- Tool is resolved from manifest-backed capability + runtime registries.
+- Tool execution is handled through `ToolRegistry` and handler bindings.
+
+### `map_search`
+
+- `RequestBuilder` converts plan + resolved location into `LocationSearchRequest`.
+- Search orchestrator executes only explicit `basemap_id` + `overlay_ids`.
+- No inferred overlay selection from legacy semantic filters.
+
+## Capability Retrieval
+
+Retrieval is two-stage:
+
+1. semantic retrieval against manifest embeddings
+2. deterministic reranking (`intent`, `temporal`, `runtime`, `coverage`)
+
+Searchable kinds include basemaps, overlays, and tools from the same manifest source.
+
+## Runtime and Coverage
+
+Runtime availability is driven by `runtime_profiles.json` + current credentials:
+- enabled/disabled
+- mode support (`supports_map`, `supports_direct_text`)
+- health and credential status
+
+Coverage filtering is explicit and supports:
+- `global`
+- `global-partial`
+- `eu-eea`
+- `global-except-poles`
+
+## Location Memory
+
+Location context is stored as slot-based memory snapshot in persisted structured payloads.
+
+Services:
+- `build_memory_snapshot`
+- `resolve_explicit_references`
+- `update_memory_snapshot`
+
+This memory is consumed by parser/policy and returned as `memory_snapshot` in `ChatTurnResponse`.
+
+## API Contracts
+
+`POST /api/chat/turn` returns `ChatTurnResponse` with:
+- `assistant_message`
+- `turn_contract`
+- `decision`
+- `tool_payload`
+- `map_session`
+- `memory_snapshot`
+
+`POST /api/maps/search` accepts strict `LocationSearchRequest` only.
+
+## Extensibility Rules
+
+To add capabilities, update manifests and runtime profiles first.
+
+- Basemap/overlay: add manifest + runtime profile entry.
+- Direct tool: add tool manifest + runtime profile entry + handler module.
+
+Core parser/policy/orchestrator code should not need edits for additive capabilities.

@@ -23,7 +23,6 @@ import {
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
   SearchResponse,
-  SearchResponsePayload,
   VectorizationResponse,
   JsonValue,
 } from './types';
@@ -77,18 +76,13 @@ export const parseSearchResponse = (value: unknown): SearchResponse => {
   if (typeof statusMessage !== 'string') {
     throw new Error('Search response is missing status_message');
   }
-
-  const payloadCandidate = value.payload;
-  const payload: SearchResponsePayload = isRecord(payloadCandidate) ? payloadCandidate : {};
+  if (!isRecord(value.map_session)) {
+    throw new Error('Search response is missing map_session');
+  }
 
   return {
     status_message: statusMessage,
-    payload,
-    map_session: isRecord(value.map_session) ? value.map_session : undefined,
-    compliance_warnings: Array.isArray(value.compliance_warnings)
-      ? value.compliance_warnings.filter((item): item is string => typeof item === 'string')
-      : undefined,
-    json: value.json,
+    map_session: value.map_session as SearchResponse['map_session'],
   };
 };
 
@@ -96,54 +90,31 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
   }
-  const providers = Array.isArray(value.providers) ? value.providers : [];
-  const basemaps = Array.isArray(value.basemaps) ? value.basemaps : [];
-  const overlays = Array.isArray(value.overlays) ? value.overlays : [];
+  const capabilities = Array.isArray(value.capabilities) ? value.capabilities : [];
+  const normalized = capabilities
+      .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
+      .map((item) => ({
+        id: String(item.id),
+        name: String(item.name ?? item.id),
+        kind: String(item.kind ?? 'overlay'),
+        provider: String(item.provider ?? 'unknown'),
+        requires_credentials: Boolean(item.requires_credentials),
+        is_available: Boolean(item.is_available),
+        supports_map: Boolean(item.supports_map),
+        supports_direct_text: Boolean(item.supports_direct_text),
+        coverage: String(item.coverage ?? 'global'),
+        intent_tags: Array.isArray(item.intent_tags)
+          ? item.intent_tags.filter((v): v is string => typeof v === 'string')
+          : [],
+        task_tags: Array.isArray(item.task_tags)
+          ? item.task_tags.filter((v): v is string => typeof v === 'string')
+          : [],
+        metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
+      }));
   return {
-    providers: providers
-      .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
-      .map((item) => ({
-        id: String(item.id),
-        name: typeof item.name === 'string' ? item.name : undefined,
-        docs_url: typeof item.docs_url === 'string' ? item.docs_url : '',
-        commercial_notes: typeof item.commercial_notes === 'string' ? item.commercial_notes : '',
-        warning_level: typeof item.warning_level === 'string' ? item.warning_level : 'low',
-      })),
-    basemaps: basemaps
-      .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
-      .map((item) => ({
-        id: String(item.id),
-        label: typeof item.label === 'string' ? item.label : String(item.id),
-        provider: typeof item.provider === 'string' ? item.provider : 'unknown',
-        type: typeof item.type === 'string' ? item.type : 'tile',
-        tile_url: typeof item.tile_url === 'string' ? item.tile_url : null,
-        attribution: typeof item.attribution === 'string' ? item.attribution : undefined,
-        requires_key: Boolean(item.requires_key),
-      })),
-    overlays: overlays
-      .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
-      .map((item) => ({
-        id: String(item.id),
-        label: typeof item.label === 'string' ? item.label : String(item.id),
-        provider: typeof item.provider === 'string' ? item.provider : 'unknown',
-        type: typeof item.type === 'string' ? item.type : 'tile',
-        default_opacity: typeof item.default_opacity === 'number' ? item.default_opacity : undefined,
-        coverage: typeof item.coverage === 'string' ? item.coverage : undefined,
-        requires_key: Boolean(item.requires_key),
-        url: typeof item.url === 'string' ? item.url : null,
-        layers: typeof item.layers === 'string' ? item.layers : undefined,
-        layer_id: typeof item.layer_id === 'string' ? item.layer_id : undefined,
-        tile_matrix_set: typeof item.tile_matrix_set === 'string' ? item.tile_matrix_set : undefined,
-        wmts_format: typeof item.wmts_format === 'string' ? item.wmts_format : undefined,
-        wmts_style: typeof item.wmts_style === 'string' ? item.wmts_style : undefined,
-        wms_version: typeof item.wms_version === 'string' ? item.wms_version : undefined,
-        wms_exceptions: typeof item.wms_exceptions === 'string' ? item.wms_exceptions : undefined,
-        bounds: Array.isArray(item.bounds) && item.bounds.length === 4
-          && item.bounds.every((entry) => typeof entry === 'number')
-          ? [item.bounds[0], item.bounds[1], item.bounds[2], item.bounds[3]]
-          : undefined,
-        attribution: typeof item.attribution === 'string' ? item.attribution : undefined,
-      })),
+    capabilities: normalized,
+    basemaps: normalized.filter((item) => item.kind === 'basemap'),
+    overlays: normalized.filter((item) => item.kind === 'overlay'),
   };
 };
 
@@ -173,9 +144,21 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   return {
     session_id: Number(value.session_id ?? 0),
     assistant_message: String(value.assistant_message ?? ''),
-    extracted_state: isRecord(value.extracted_state) ? value.extracted_state as Record<string, JsonValue> : undefined,
-    map_session: isRecord(value.map_session) ? value.map_session : undefined,
+    turn_contract: isRecord(value.turn_contract) ? value.turn_contract as ChatTurnResponse['turn_contract'] : {
+      user_text: '',
+      task_class: 'unclear',
+      location_signals: [],
+      normalized_intent: { intent_id: 'unknown', intent_label: 'Unknown', task_tags: [], intent_tags: [], requires_location: false },
+      temporal_signal: { mode: 'none' },
+      ambiguities: [],
+      parser_confidence: 0,
+    },
+    decision: isRecord(value.decision) ? value.decision as ChatTurnResponse['decision'] : {
+      plan: { state: 'clarify', intent_id: 'unknown', overlay_ids: [] },
+    },
     tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
+    map_session: isRecord(value.map_session) ? value.map_session as ChatTurnResponse['map_session'] : undefined,
+    memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
     follow_up_required: Boolean(value.follow_up_required),
     fallback_mode: typeof value.fallback_mode === 'string' ? value.fallback_mode : undefined,
   };
@@ -213,44 +196,12 @@ export const buildApiError = async (response: Response): Promise<ApiRequestError
 };
 
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
-  const normalizedPayload: Record<string, unknown> = {
-    use_coordinates: payload.use_coordinates,
-  };
-  if (payload.datetime !== undefined) normalizedPayload.datetime = payload.datetime;
-  if (payload.time_of_day !== undefined) normalizedPayload.time_of_day = payload.time_of_day;
-  if (payload.timeline_year !== undefined) normalizedPayload.timeline_year = payload.timeline_year;
-  if (payload.country !== undefined) normalizedPayload.country = payload.country;
-  if (payload.city !== undefined) normalizedPayload.city = payload.city;
-  if (payload.address !== undefined) normalizedPayload.address = payload.address;
-  if (payload.latitude !== undefined) normalizedPayload.latitude = payload.latitude;
-  if (payload.longitude !== undefined) normalizedPayload.longitude = payload.longitude;
-  if (payload.bbox !== undefined) normalizedPayload.bbox = payload.bbox;
-  if (payload.radius_m !== undefined) normalizedPayload.radius_m = payload.radius_m;
-  if (payload.map_size_m !== undefined) normalizedPayload.map_size_m = payload.map_size_m;
-  if (payload.image_width !== undefined) normalizedPayload.image_width = payload.image_width;
-  if (payload.image_height !== undefined) normalizedPayload.image_height = payload.image_height;
-  if (payload.image_crs !== undefined) normalizedPayload.image_crs = payload.image_crs;
-  if (payload.image_format !== undefined) normalizedPayload.image_format = payload.image_format;
-  if (payload.aoi !== undefined) normalizedPayload.aoi = payload.aoi;
-  if (payload.commute !== undefined) normalizedPayload.commute = payload.commute;
-
-  if (payload.basemap_id) {
-    normalizedPayload.basemap_id = payload.basemap_id;
-  }
-  const normalizedOverlayIds = payload.overlay_ids ?? payload.filters;
-  if (normalizedOverlayIds && normalizedOverlayIds.length > 0) {
-    normalizedPayload.overlay_ids = normalizedOverlayIds;
-  }
-  if (payload.semantic_filters && payload.semantic_filters.length > 0) {
-    normalizedPayload.semantic_filters = payload.semantic_filters;
-  }
-
   const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_SEARCH_PATH}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(normalizedPayload),
+    body: JSON.stringify(payload),
   });
   return parseSearchResponse(data);
 };

@@ -16,8 +16,8 @@ from AEGIS.server.services.vector.manifest_preparation import ManifestPreparatio
 
 class VectorIndexer:
     METADATA_FILENAME = "manifest_index_metadata.json"
-    INDEX_SCHEMA_VERSION = 3
-    SEARCHABLE_KINDS = ("basemaps", "overlays")
+    INDEX_SCHEMA_VERSION = 4
+    SEARCHABLE_KINDS = ("basemaps", "overlays", "tools")
 
     def __init__(
         self,
@@ -88,15 +88,6 @@ class VectorIndexer:
         build_duration_ms: int | None = None,
     ) -> dict[str, Any]:
         summary = self._manifest_summary(catalog)
-        versions_summary: dict[str, dict[str, int]] = {}
-        for kind in self.SEARCHABLE_KINDS:
-            entries = catalog.get(kind, [])
-            versions = [int(entry.get("version") or 1) for entry in entries]
-            versions_summary[kind[:-1]] = {
-                "count": len(entries),
-                "min_version": min(versions) if versions else 0,
-                "max_version": max(versions) if versions else 0,
-            }
         fingerprint = hashlib.sha256(
             json.dumps(summary, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
@@ -112,13 +103,15 @@ class VectorIndexer:
             "embedding_model": embedding_model,
             "manifest_fingerprint": fingerprint,
             "manifest_summary": summary,
-            "manifest_versions_summary": versions_summary,
             "source_directories": {
                 "basemaps": os.path.abspath(
                     os.path.join(self.manifest_loader.root_path, "basemaps")
                 ),
                 "overlays": os.path.abspath(
                     os.path.join(self.manifest_loader.root_path, "overlays")
+                ),
+                "tools": os.path.abspath(
+                    os.path.join(self.manifest_loader.root_path, "tools")
                 ),
             },
         }
@@ -156,47 +149,20 @@ class VectorIndexer:
         try:
             with open(metadata_path, "r", encoding="utf-8") as handle:
                 payload = json.load(handle)
-        except OSError, json.JSONDecodeError:
+        except OSError | json.JSONDecodeError:
             return None
         return payload if isinstance(payload, dict) else None
 
     def _metadata_is_valid(self, payload: dict[str, Any] | None) -> bool:
         if not isinstance(payload, dict):
             return False
-        required_fields = {
-            "index_schema_version",
-            "last_update_timestamp",
-            "manifest_count",
-            "chunk_count",
-            "chunking_strategy",
-            "document_id_strategy",
-            "searchable_kinds",
-            "embedding_provider",
-            "embedding_model",
-            "manifest_fingerprint",
-            "manifest_summary",
-            "manifest_versions_summary",
-            "source_directories",
-        }
-        if not required_fields.issubset(payload):
-            return False
         if int(payload.get("index_schema_version") or 0) != self.INDEX_SCHEMA_VERSION:
             return False
         summary = payload.get("manifest_summary")
-        if not isinstance(summary, list):
-            return False
-        if not isinstance(payload.get("manifest_count"), int) or payload[
-            "manifest_count"
-        ] != len(summary):
-            return False
-        return isinstance(payload.get("manifest_fingerprint"), str) and bool(
-            str(payload["manifest_fingerprint"]).strip()
-        )
+        return isinstance(summary, list) and bool(payload.get("manifest_fingerprint"))
 
     def _bootstrap_artifacts_present(self) -> bool:
-        return bool(
-            self.store.exists() and self._metadata_is_valid(self._read_metadata())
-        )
+        return bool(self.store.exists() and self._metadata_is_valid(self._read_metadata()))
 
     def _entry_to_document(
         self,
@@ -205,8 +171,13 @@ class VectorIndexer:
         kind: str,
         embedding_provider: str,
         embedding_model: str,
+        runtime_profiles: dict[str, dict[str, Any]],
     ) -> VectorDocument:
-        prepared = self.manifest_preparation.prepare_entry(entry=entry, kind=kind)
+        prepared = self.manifest_preparation.prepare_entry(
+            entry=entry,
+            kind=kind,
+            runtime_profile=runtime_profiles.get(str(entry.get("id")), {}),
+        )
         try:
             embedding_vector, _ = self.embedding_factory.get_embedding(
                 provider=embedding_provider,
@@ -233,6 +204,11 @@ class VectorIndexer:
         embedding_provider: str,
         embedding_model: str,
     ) -> list[VectorDocument]:
+        runtime_profiles = {
+            str(item.get("capability_id")): dict(item)
+            for item in catalog.get("runtime_profiles", [])
+            if isinstance(item, dict)
+        }
         documents: list[VectorDocument] = []
         for kind in self.SEARCHABLE_KINDS:
             for entry in catalog.get(kind, []):
@@ -242,6 +218,7 @@ class VectorIndexer:
                         kind=kind,
                         embedding_provider=embedding_provider,
                         embedding_model=embedding_model,
+                        runtime_profiles=runtime_profiles,
                     )
                 )
         return documents
@@ -270,9 +247,7 @@ class VectorIndexer:
     def rebuild(self) -> dict[str, Any]:
         started = perf_counter()
         catalog = self.manifest_loader.load_all()
-        embedding_provider, embedding_model = self._resolve_index_embedding_settings(
-            catalog
-        )
+        embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
         self.store.clear()
         documents = self._index_documents(
             catalog,
@@ -309,9 +284,7 @@ class VectorIndexer:
     def sync(self) -> dict[str, Any]:
         catalog = self.manifest_loader.load_all()
         updated = 0
-        embedding_provider, embedding_model = self._resolve_index_embedding_settings(
-            catalog
-        )
+        embedding_provider, embedding_model = self._resolve_index_embedding_settings(catalog)
         for kind in self.SEARCHABLE_KINDS:
             manifest_kind = kind[:-1]
             for entry in catalog.get(kind, []):
@@ -331,9 +304,7 @@ class VectorIndexer:
                 updated += 1
         if updated > 0 or not self._metadata_is_valid(self._read_metadata()):
             return self.rebuild()
-        document_count = sum(
-            len(catalog.get(kind, [])) for kind in self.SEARCHABLE_KINDS
-        )
+        document_count = sum(len(catalog.get(kind, [])) for kind in self.SEARCHABLE_KINDS)
         self._write_metadata(
             catalog=catalog,
             chunk_count=document_count,

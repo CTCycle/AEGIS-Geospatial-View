@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
 from AEGIS.server.configurations import get_server_settings
+from AEGIS.server.configurations.startup import run_startup_validations
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
 from AEGIS.server.services.chat.composition import build_chat_runtime
 from AEGIS.server.services.search.composition import build_search_runtime
@@ -80,6 +81,7 @@ async def app_lifespan(app: FastAPI):
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
     app.state.search_runtime = search_runtime
     app.state.chat_runtime = chat_runtime
+    run_startup_validations()
 
     if get_server_settings().vectors.auto_sync_on_start:
         VectorIndexer().bootstrap_if_missing()

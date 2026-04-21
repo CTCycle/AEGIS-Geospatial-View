@@ -5,7 +5,7 @@ import {
 } from './app-state';
 
 describe('core/app-state', () => {
-  const storageKey = 'aegis:webapp-state:v2';
+  const storageKey = 'aegis:webapp-state:v3';
   const tabKey = 'aegis:webapp-tab-id:v1';
   const heartbeatPrefix = 'aegis:webapp-tab-heartbeat:v1:';
 
@@ -16,7 +16,7 @@ describe('core/app-state', () => {
 
   it('creates default state', () => {
     const state = defaultAppState();
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(3);
     expect(state.chatPage.chatPanel.messages).toEqual([]);
     expect(state.settingsPage.providerMode).toBe('local');
   });
@@ -86,8 +86,29 @@ describe('core/app-state', () => {
     const raw = window.sessionStorage.getItem(storageKey);
     expect(raw).toBeTruthy();
     const persisted = JSON.parse(String(raw));
-    expect(persisted.version).toBe(2);
+    expect(persisted.version).toBe(3);
     expect(typeof persisted.savedAt).toBe('number');
+  });
+
+  it('invalidates persisted state from older schema versions', () => {
+    const now = Date.now();
+    window.sessionStorage.setItem(tabKey, 'tab-old-version');
+    window.sessionStorage.setItem(storageKey, JSON.stringify({
+      ...defaultAppState(),
+      version: 2,
+      tabId: 'tab-old-version',
+      savedAt: now,
+      chatPage: {
+        ...defaultAppState().chatPage,
+        chatPanel: {
+          ...defaultAppState().chatPage.chatPanel,
+          composerDraft: 'legacy-schema-draft',
+        },
+      },
+    }));
+    const loaded = loadPersistedAppState();
+    expect(loaded.version).toBe(3);
+    expect(loaded.chatPage.chatPanel.composerDraft).toBe('');
   });
 
   it('stale overlay ids are tolerated in persisted payload and remain serializable', () => {

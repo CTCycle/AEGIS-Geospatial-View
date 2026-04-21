@@ -93,11 +93,13 @@ async def _chat_event_stream(
                 data={
                     "session_id": result.session_id,
                     "assistant_message": result.assistant_message,
-                    "structured_intent": result.structured_intent,
-                    "extracted_state": result.extracted_state,
-                    "map_session": result.map_session,
-                    "follow_up_required": result.follow_up_required,
-                    "fallback_mode": result.fallback_mode,
+                    "turn_contract": result.turn_contract.model_dump(mode="json"),
+                    "decision": result.decision.model_dump(mode="json"),
+                    "map_session": result.map_session.model_dump(mode="json")
+                    if result.map_session is not None
+                    else None,
+                    "tool_payload": result.tool_payload,
+                    "memory_snapshot": result.memory_snapshot,
                 },
             )
         )
