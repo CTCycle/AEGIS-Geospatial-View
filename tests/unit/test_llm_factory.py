@@ -5,6 +5,10 @@ from types import SimpleNamespace
 import pytest
 
 from AEGIS.server.services.llm.factory import LLMFactory
+from AEGIS.server.services.llm.google_provider import GoogleProvider
+from AEGIS.server.services.llm.ollama import OllamaProvider
+from AEGIS.server.services.llm.openai_provider import OpenAIProvider
+from AEGIS.server.services.llm.types import ChatCompletionRequest
 
 
 class _SettingsRepo:
@@ -98,3 +102,49 @@ def test_missing_credentials_follow_current_failure_path() -> None:
 
     with pytest.raises(ValueError, match="OpenAI credentials are not configured"):
         factory.get_provider("openai")
+
+
+def test_get_provider_returns_ollama_provider_type() -> None:
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=_CredentialsRepo({}),
+        crypto_service=_Crypto(),
+    )
+
+    provider = factory.get_provider("ollama")
+    assert isinstance(provider, OllamaProvider)
+
+
+def test_get_provider_returns_openai_provider_type() -> None:
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=_CredentialsRepo({("openai", "api_key"): "enc-openai"}),
+        crypto_service=_Crypto(),
+    )
+
+    provider = factory.get_provider("openai")
+    assert isinstance(provider, OpenAIProvider)
+
+
+def test_get_provider_returns_google_provider_type() -> None:
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=_CredentialsRepo({("google", "api_key"): "enc-google"}),
+        crypto_service=_Crypto(),
+    )
+
+    provider = factory.get_provider("google")
+    assert isinstance(provider, GoogleProvider)
+
+
+def test_chat_only_provider_blocks_structured_output() -> None:
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=_CredentialsRepo({}),
+        crypto_service=_Crypto(),
+    )
+    provider = factory.get_chat_provider("ollama")
+    request = ChatCompletionRequest(model="test", messages=[{"role": "user", "content": "x"}])
+
+    with pytest.raises(RuntimeError, match="Structured extraction is forbidden"):
+        provider.structured_output(request, schema=dict)

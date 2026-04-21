@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
+from AEGIS.server.services.llm.langchain_runtime import (
+    invoke_chat_model,
+    invoke_structured_chat_model,
+    stream_chat_model,
+)
 from AEGIS.server.services.llm.types import (
     ChatCompletionRequest,
     ChatCompletionResult,
@@ -22,27 +26,20 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
 
-    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        request = Request(
-            f"{self.base_url}{path}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-            method="POST",
+    def _build_chat_model(self, *, model: str, temperature: float) -> ChatOpenAI:
+        return ChatOpenAI(
+            model=model,
+            temperature=temperature,
+            api_key=self.api_key,
+            base_url=self.base_url,
         )
-        try:
-            with urlopen(request, timeout=45) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace").strip()
-            message = f"OpenAI request failed with HTTP {exc.code}"
-            if detail:
-                message = f"{message}: {detail}"
-            raise ValueError(message) from exc
-        except URLError as exc:
-            raise ValueError(f"OpenAI request failed: {exc.reason}") from exc
+
+    def _build_embedding_model(self, *, model: str) -> OpenAIEmbeddings:
+        return OpenAIEmbeddings(
+            model=model,
+            api_key=self.api_key,
+            base_url=self.base_url,
+        )
 
     def list_models(self) -> list[ModelDescriptor]:
         return [
@@ -50,44 +47,38 @@ class OpenAIProvider(LLMProvider):
         ]
 
     def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
-        payload = self._post_json(
-            "/chat/completions",
-            {
-                "model": request.model,
-                "messages": request.messages,
-                "temperature": request.temperature,
-            },
+        return invoke_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
         )
-        choices = payload.get("choices", [])
-        content = ""
-        if isinstance(choices, list) and choices:
-            message = choices[0].get("message", {})
-            if isinstance(message, dict):
-                content = str(message.get("content") or "")
-        return ChatCompletionResult(content=content, raw=payload)
 
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
-        yield self.chat(request).content
+        return stream_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
+        )
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: dict[str, Any]
+        self, request: ChatCompletionRequest, schema: type[object]
     ) -> dict[str, Any]:
-        result = self.chat(request)
-        try:
-            parsed = json.loads(result.content)
-        except json.JSONDecodeError:
-            parsed = {}
-        return parsed if isinstance(parsed, dict) else {}
+        payload = invoke_structured_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
+            schema=schema,
+        )
+        return dict(payload)
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        payload = self._post_json("/embeddings", {"model": model, "input": input_text})
-        data = payload.get("data", [])
-        if not isinstance(data, list) or not data:
+        values = self._build_embedding_model(model=model).embed_query(input_text)
+        if not isinstance(values, list):
             return []
-        embedding = data[0].get("embedding", [])
-        if not isinstance(embedding, list):
-            return []
-        return [float(value) for value in embedding if isinstance(value, (int, float))]
+        return [float(value) for value in values if isinstance(value, (int, float))]
 
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}

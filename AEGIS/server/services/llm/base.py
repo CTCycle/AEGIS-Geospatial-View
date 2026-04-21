@@ -9,7 +9,7 @@ from AEGIS.server.services.llm.types import (
     ModelDescriptor,
 )
 
-
+###############################################################################
 class LLMProvider(Protocol):
     provider_name: str
 
@@ -20,7 +20,7 @@ class LLMProvider(Protocol):
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]: ...
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: dict[str, Any]
+        self, request: ChatCompletionRequest, schema: type[object]
     ) -> dict[str, Any]: ...
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]: ...

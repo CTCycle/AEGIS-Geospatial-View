@@ -15,9 +15,6 @@ from AEGIS.server.services.llm.prompts import (
     get_agent_extraction_prompt,
 )
 from AEGIS.server.services.llm.structured import (
-    INTENT_SCHEMA,
-    STAGE_A_SCHEMA,
-    STAGE_B_SCHEMA,
     normalize_stage_a_payload,
     normalize_stage_b_payload,
 )
@@ -44,13 +41,14 @@ def _extract_coordinate_patch(user_message: str) -> ExtractedIntentPatch:
         certainty=0.9,
     )
 
-
+###############################################################################
 class ParserService:
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
         self.provider = provider
         self.model = model
 
+    # -------------------------------------------------------------------------
     def extract_patch(
         self,
         *,
@@ -84,13 +82,14 @@ class ParserService:
                     },
                 ],
             )
-            payload = provider.structured_output(request, schema=INTENT_SCHEMA)
+            payload = provider.structured_output(request, schema=ExtractedIntentPatch)
         except Exception:
             return _extract_coordinate_patch(user_message)
         if not isinstance(payload, dict):
             payload = {}
         return ExtractedIntentPatch.model_validate(payload)
 
+    # -------------------------------------------------------------------------
     def _tools_summary(self, available_tools: list[dict[str, str]]) -> str:
         if not available_tools:
             return "No tools available."
@@ -102,6 +101,7 @@ class ParserService:
                 lines.append(f"- {name}: {description}")
         return "\n".join(lines) if lines else "No tools available."
 
+    # -------------------------------------------------------------------------
     def _stage_a_fallback(
         self, user_message: str, available_tools: list[dict[str, str]]
     ) -> StageAParserIntent:
@@ -162,6 +162,7 @@ class ParserService:
             certainty=0.35 if has_location else 0.15,
         )
 
+    # -------------------------------------------------------------------------
     def parse_stage_a_intent(
         self,
         *,
@@ -191,7 +192,9 @@ class ParserService:
                         },
                     ],
                 )
-                raw_payload = provider.structured_output(request, schema=STAGE_A_SCHEMA)
+                raw_payload = provider.structured_output(
+                    request, schema=StageAParserIntent
+                )
                 normalized = normalize_stage_a_payload(
                     raw_payload if isinstance(raw_payload, dict) else {}
                 )
@@ -214,6 +217,7 @@ class ParserService:
                 continue
         return self._stage_a_fallback(user_message, available_tools)
 
+    # -------------------------------------------------------------------------
     def parse_stage_b_enrichment(
         self,
         *,
@@ -240,7 +244,9 @@ class ParserService:
                     },
                 ],
             )
-            raw_payload = provider.structured_output(request, schema=STAGE_B_SCHEMA)
+            raw_payload = provider.structured_output(
+                request, schema=StageBSearchExtraction
+            )
             normalized = normalize_stage_b_payload(
                 raw_payload if isinstance(raw_payload, dict) else {}
             )

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from typing import Any
+
 from AEGIS.server.repositories.credentials import CredentialRepository
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
 from AEGIS.server.services.cryptography import CredentialEncryptionService
 from AEGIS.server.services.llm.base import LLMProvider
+from AEGIS.server.services.llm.types import ChatCompletionRequest
 from AEGIS.server.services.llm.google_provider import GoogleProvider
 from AEGIS.server.services.llm.ollama import OllamaProvider
 from AEGIS.server.services.llm.openai_provider import OpenAIProvider
 
-
+###############################################################################
 class LLMFactory:
     def __init__(
         self,
@@ -21,6 +24,7 @@ class LLMFactory:
         self.credentials_repo = credentials_repo or CredentialRepository()
         self.crypto_service = crypto_service or CredentialEncryptionService()
 
+    # -------------------------------------------------------------------------
     def _resolve_provider_api_key(self, provider: str) -> str:
         credential = self.credentials_repo.get_active(provider=provider, label="api_key")
         if credential is None:
@@ -34,6 +38,7 @@ class LLMFactory:
         self.credentials_repo.mark_used(provider=provider, label="api_key")
         return self.crypto_service.decrypt(credential.encrypted_value)
 
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> LLMProvider:
         normalized = provider.strip().lower()
         settings = self.settings_repo.get_or_create()
@@ -47,16 +52,20 @@ class LLMFactory:
             return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
         raise ValueError(f"Unsupported model provider '{provider}'.")
 
+    # -------------------------------------------------------------------------
     def get_agent_provider(self, provider: str) -> LLMProvider:
         return self.get_provider(provider)
 
+    # -------------------------------------------------------------------------
     def get_parser_provider(self, provider: str) -> LLMProvider:
         return self.get_provider(provider)
 
+    # -------------------------------------------------------------------------    # ------------------------------------------------------------------------
     def get_chat_provider(self, provider: str) -> LLMProvider:
         return _ChatOnlyProvider(self.get_provider(provider))
 
 
+###############################################################################
 class _ChatOnlyProvider:
     def __init__(self, delegate: LLMProvider) -> None:
         self._delegate = delegate
@@ -65,5 +74,7 @@ class _ChatOnlyProvider:
     def __getattr__(self, item: str):  # noqa: ANN001
         return getattr(self._delegate, item)
 
-    def structured_output(self, request, schema):  # noqa: ANN001
+    def structured_output(
+        self, request: ChatCompletionRequest, schema: type[object]
+    ) -> dict[str, Any]:
         raise RuntimeError("Structured extraction is forbidden on chat-model path.")
