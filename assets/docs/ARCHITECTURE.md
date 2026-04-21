@@ -46,7 +46,6 @@ Pipeline order:
 ### Parser Layer
 
 - `AEGIS/server/services/agent/parser_service.py`
-- `AEGIS/server/services/agent/parser_rules.py`
 
 Parser is evidence-only and returns `TurnParseResult`.
 
@@ -126,7 +125,7 @@ No database schema migration is required for this workflow.
 ## 9. Test Coverage Focus
 
 Primary coverage targets:
-- parser rules and parser service
+- parser service
 - location memory and resolver
 - policy engine and retrieval/reranking
 - capability/runtime/coverage registry behavior

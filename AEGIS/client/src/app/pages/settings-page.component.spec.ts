@@ -118,12 +118,12 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    component.openaiKey = 'sk-valid';
+    component.openaiKey = 'sk-valid-openai-key-12345';
     await component.saveKeys();
     expect(component.statusText).toContain('API keys saved');
 
     (Api.updateChatSettings as jasmine.Spy).and.rejectWith(new Error('fail'));
-    component.openaiKey = 'sk-valid';
+    component.openaiKey = 'sk-valid-openai-key-12345';
     await component.saveKeys();
     expect(component.statusText).toContain('Could not save API keys right now.');
   });

@@ -228,13 +228,13 @@ export const loadPersistedAppState = (): PersistedAppState => {
             : 1,
           messages: messages as PersistedChatPanelState['messages'],
           lastDecision: isRecord(parsed.chatPage.chatPanel.lastDecision)
-            ? parsed.chatPage.chatPanel.lastDecision as PolicyDecision
+            ? parsed.chatPage.chatPanel.lastDecision as unknown as PolicyDecision
             : undefined,
           memorySnapshot: isRecord(parsed.chatPage.chatPanel.memorySnapshot)
             ? parsed.chatPage.chatPanel.memorySnapshot as Record<string, unknown>
             : {},
           mapSession: isRecord(parsed.chatPage.chatPanel.mapSession)
-            ? parsed.chatPage.chatPanel.mapSession as MapSession
+            ? parsed.chatPage.chatPanel.mapSession as unknown as MapSession
             : undefined,
           status: typeof parsed.chatPage.chatPanel.status === 'string'
             ? parsed.chatPage.chatPanel.status

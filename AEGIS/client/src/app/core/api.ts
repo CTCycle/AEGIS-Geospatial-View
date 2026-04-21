@@ -82,7 +82,7 @@ export const parseSearchResponse = (value: unknown): SearchResponse => {
 
   return {
     status_message: statusMessage,
-    map_session: value.map_session as SearchResponse['map_session'],
+    map_session: value.map_session as unknown as SearchResponse['map_session'],
   };
 };
 
@@ -144,7 +144,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   return {
     session_id: Number(value.session_id ?? 0),
     assistant_message: String(value.assistant_message ?? ''),
-    turn_contract: isRecord(value.turn_contract) ? value.turn_contract as ChatTurnResponse['turn_contract'] : {
+    turn_contract: isRecord(value.turn_contract) ? value.turn_contract as unknown as ChatTurnResponse['turn_contract'] : {
       user_text: '',
       task_class: 'unclear',
       location_signals: [],
@@ -153,11 +153,11 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
       ambiguities: [],
       parser_confidence: 0,
     },
-    decision: isRecord(value.decision) ? value.decision as ChatTurnResponse['decision'] : {
+    decision: isRecord(value.decision) ? value.decision as unknown as ChatTurnResponse['decision'] : {
       plan: { state: 'clarify', intent_id: 'unknown', overlay_ids: [] },
     },
     tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
-    map_session: isRecord(value.map_session) ? value.map_session as ChatTurnResponse['map_session'] : undefined,
+    map_session: isRecord(value.map_session) ? value.map_session as unknown as ChatTurnResponse['map_session'] : undefined,
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
     follow_up_required: Boolean(value.follow_up_required),
     fallback_mode: typeof value.fallback_mode === 'string' ? value.fallback_mode : undefined,

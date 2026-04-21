@@ -337,13 +337,15 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const errors: { openai?: string; google?: string } = {};
     const openAiValue = this.openaiKey.trim();
     const googleValue = this.googleKey.trim();
+    const openAiPattern = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
+    const googlePattern = /^AIza[A-Za-z0-9_-]{20,}$/;
 
-    if (openAiValue && !openAiValue.startsWith('sk-')) {
-      errors.openai = 'OpenAI key must start with "sk-".';
+    if (openAiValue && !openAiPattern.test(openAiValue)) {
+      errors.openai = 'OpenAI key must start with "sk-" and include a valid key body.';
     }
 
-    if (googleValue && !googleValue.startsWith('AIza')) {
-      errors.google = 'Google key must start with "AIza".';
+    if (googleValue && !googlePattern.test(googleValue)) {
+      errors.google = 'Google key must start with "AIza" and include a valid key body.';
     }
 
     return errors;

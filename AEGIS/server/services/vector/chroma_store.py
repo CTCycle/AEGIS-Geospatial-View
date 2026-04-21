@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import math
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -68,7 +70,7 @@ class ChromaVectorStore:
         if self._collection is not None:
             ids = [item.id for item in documents]
             texts = [item.text for item in documents]
-            metadatas = [item.metadata for item in documents]
+            metadatas = [_sanitize_metadata(item.metadata) for item in documents]
             if any(item.embedding for item in documents):
                 embeddings = [item.embedding or [] for item in documents]
                 self._collection.add(
@@ -125,3 +127,31 @@ def _distance_to_score(distance: Any) -> float:
     except TypeError, ValueError:
         return 0.0
     return max(0.0, 1.0 - value)
+
+
+def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, str | int | float | bool]:
+    safe: dict[str, str | int | float | bool] = {}
+    for key, value in metadata.items():
+        safe[str(key)] = _sanitize_metadata_value(value)
+    return safe
+
+
+def _sanitize_metadata_value(value: Any) -> str | int | float | bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
+        return str(value)
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple, set, dict)):
+        try:
+            return json.dumps(value, ensure_ascii=True, default=str)
+        except (TypeError, ValueError):
+            return str(value)
+    return str(value)
