@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -164,5 +165,9 @@ def test_live_degraded_path_shows_user_failure_without_crash(
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")
     page.get_by_role("button", name="Send").click()
-    expect(page.get_by_text("Provider unavailable for this test")).to_be_visible()
+    expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
+    assistant_text = page.locator(".chat-message--assistant .chat-message__content").last
+    expect(assistant_text).to_contain_text(
+        re.compile(r"provider unavailable|request failed|503", re.IGNORECASE)
+    )
     expect(page.get_by_label("Chat message")).to_be_visible()

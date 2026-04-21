@@ -33,7 +33,6 @@ from AEGIS.server.services.geospatial.rendering import (
 from AEGIS.server.services.jobs import JobManager
 from AEGIS.server.services.sanitization import LocationSanitizationService
 from AEGIS.server.services.search.factory import (
-    build_location_search_payload_data,
     build_request_context,
     build_search_response,
 )
@@ -115,11 +114,8 @@ class MapSearchExecutionService:
             LocationSearchRequest.model_validate, payload.model_dump(mode="python")
         )
         request_context = build_request_context(normalized_payload)
-        payload_data = build_location_search_payload_data(normalized_payload)
-        typed_payload = await asyncio.to_thread(
-            LocationSearchRequest.model_validate, payload_data
-        )
-        return typed_payload, request_context, payload_data
+        payload_data = normalized_payload.model_dump(mode="python")
+        return normalized_payload, request_context, payload_data
 
     def resolve_coordinate_pair(
         self,
@@ -184,11 +180,13 @@ class MapSearchExecutionService:
         payload: LocationSearchRequest,
         search_payload: dict[str, Any],
         satellite_payload: dict[str, Any],
+        basemap: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
         return await self.orchestrator.assemble_map_session(
             payload=payload,
             search_payload=search_payload,
             satellite_payload=satellite_payload,
+            basemap=basemap,
         )
 
     async def record_search_session(
@@ -244,8 +242,11 @@ class MapSearchExecutionService:
             self.job_manager.update_progress(job_id, MAP_SEARCH_JOB_PROGRESS_IMAGERY)
 
             try:
+                resolved_basemap = self.catalog_service.resolve_basemap(
+                    payload.basemap_id
+                )
                 satellite_payload = await self.renderer.build_satellite_payload(
-                    payload, search_payload
+                    payload, search_payload, basemap=resolved_basemap
                 )
             except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
                 raise HTTPException(
@@ -263,6 +264,7 @@ class MapSearchExecutionService:
                 payload=payload,
                 search_payload=search_payload,
                 satellite_payload=satellite_payload,
+                basemap=resolved_basemap,
             )
             search_payload["map_session"] = map_session
             search_payload["compliance_warnings"] = map_session.get(

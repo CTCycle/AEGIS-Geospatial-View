@@ -69,13 +69,9 @@ class LocationSearchRequest(BaseModel):
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     filters: list[str] = Field(default_factory=list)
     semantic_filters: list[str] = Field(default_factory=list)
-    geospatial_filter: list[str] = Field(default_factory=list)
     bbox: BBox | None = Field(default=None)
     radius_m: float = Field(default=2500.0, gt=0)
     map_size_m: float = Field(default=get_server_settings().map.default_size_m, gt=0)
-    map_tiles: str | None = Field(
-        default=get_server_settings().map.tiles, max_length=200
-    )
     basemap_id: str | None = Field(default=None, max_length=120)
     overlay_ids: list[str] = Field(default_factory=list)
     aoi: dict[str, Any] | None = Field(default=None)
@@ -93,7 +89,6 @@ class LocationSearchRequest(BaseModel):
         "country",
         "city",
         "address",
-        "map_tiles",
         mode="before",
     )
     # -------------------------------------------------------------------------
@@ -148,14 +143,6 @@ class LocationSearchRequest(BaseModel):
         return cls.normalize_filters(value)
 
     # -------------------------------------------------------------------------
-    @field_validator("geospatial_filter", mode="before")
-    @classmethod
-    def normalize_geospatial_filter(
-        cls, value: list[str] | tuple[str, ...] | str | None
-    ) -> list[str]:
-        return cls.normalize_filters(value)
-
-    # -------------------------------------------------------------------------
     @field_validator("bbox", mode="before")
     @classmethod
     def normalize_bbox(
@@ -195,15 +182,6 @@ class LocationSearchRequest(BaseModel):
         if not value:
             return "image/png"
         return str(value).lower()
-
-    # -------------------------------------------------------------------------
-    @field_validator("map_tiles", mode="before")
-    @classmethod
-    def normalize_map_tiles(cls, value: str | None) -> str:
-        if value is None:
-            return get_server_settings().map.tiles
-        normalized = str(value).strip()
-        return normalized or get_server_settings().map.tiles
 
     # -------------------------------------------------------------------------
     @field_validator("basemap_id", mode="before")

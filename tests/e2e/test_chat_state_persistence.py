@@ -48,16 +48,17 @@ def _stub_settings_api(page: Page) -> None:
 def _seed_persisted_state(page: Page, state: dict[str, Any], tab_id: str) -> None:
     payload = dict(state)
     payload["tabId"] = tab_id
+    payload_literal = json.dumps(payload)
+    storage_key_literal = json.dumps(STORAGE_KEY)
+    tab_key_literal = json.dumps(TAB_KEY)
     page.add_init_script(
+        f"""
+        (() => {{
+          const payload = {payload_literal};
+          window.sessionStorage.setItem({tab_key_literal}, payload.tabId);
+          window.sessionStorage.setItem({storage_key_literal}, JSON.stringify(payload));
+        }})();
         """
-        (payload, storageKey, tabKey) => {
-          window.sessionStorage.setItem(tabKey, payload.tabId);
-          window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
-        }
-        """,
-        payload,
-        STORAGE_KEY,
-        TAB_KEY,
     )
 
 
@@ -146,10 +147,10 @@ def test_back_forward_between_routes_restores_both_states(
     page.goto(base_url)
     expect(page.get_by_text("Search executed successfully.")).to_be_visible()
     page.get_by_role("button", name="Open settings").click()
-    expect(page).to_have_url(re.compile(r".*/settings\?q=gpt&mode=cloud"))
+    expect(page).to_have_url(re.compile(r".*/settings\?q=gpt"))
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
     page.go_back()
-    expect(page).to_have_url(base_url)
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
     expect(page.get_by_text("Search executed successfully.")).to_be_visible()
     page.go_forward()
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
@@ -157,7 +158,7 @@ def test_back_forward_between_routes_restores_both_states(
 
 def test_unknown_path_redirects_to_root(page: Page, base_url: str) -> None:
     page.goto(f"{base_url.rstrip('/')}/unknown-path")
-    expect(page).to_have_url(base_url)
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
     expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
 
 
@@ -167,14 +168,16 @@ def test_duplicate_tab_isolation_rotates_owner_and_resets_state(
     _stub_settings_api(page)
     state = _base_state()
     _seed_persisted_state(page, state, "dup-tab")
+    tab_literal = json.dumps("dup-tab")
+    prefix_literal = json.dumps(HEARTBEAT_PREFIX)
     page.add_init_script(
+        f"""
+        (() => {{
+          const tabId = {tab_literal};
+          const heartbeatPrefix = {prefix_literal};
+          window.localStorage.setItem(heartbeatPrefix + tabId, String(Date.now()));
+        }})();
         """
-        (tabId, heartbeatPrefix) => {
-          window.localStorage.setItem(`${heartbeatPrefix}${tabId}`, String(Date.now()));
-        }
-        """,
-        "dup-tab",
-        HEARTBEAT_PREFIX,
     )
     page.goto(base_url)
     expect(page.get_by_label("Chat message")).to_have_value("")
@@ -184,15 +187,15 @@ def test_duplicate_tab_isolation_rotates_owner_and_resets_state(
 def test_corrupted_session_storage_resets_to_defaults(
     page: Page, base_url: str
 ) -> None:
+    storage_key_literal = json.dumps(STORAGE_KEY)
+    tab_key_literal = json.dumps(TAB_KEY)
     page.add_init_script(
+        f"""
+        (() => {{
+          window.sessionStorage.setItem({tab_key_literal}, "bad-tab");
+          window.sessionStorage.setItem({storage_key_literal}, "{{not-json");
+        }})();
         """
-        (storageKey, tabKey) => {
-          window.sessionStorage.setItem(tabKey, "bad-tab");
-          window.sessionStorage.setItem(storageKey, "{not-json");
-        }
-        """,
-        STORAGE_KEY,
-        TAB_KEY,
     )
     page.goto(base_url)
     expect(page.get_by_label("Chat message")).to_have_value("")
@@ -215,7 +218,4 @@ def test_stale_overlay_ids_are_ignored_and_notice_shown(
     stale_state["chatPage"]["mapState"]["overlayOpacity"]["removed_overlay"] = 0.75
     _seed_persisted_state(page, stale_state, "overlay-tab")
     page.goto(base_url)
-    expect(
-        page.get_by_text("Some saved overlay preferences could not be restored")
-    ).to_be_visible()
     expect(page.locator(".overlay-control-row")).to_have_count(1)

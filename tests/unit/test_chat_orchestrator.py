@@ -20,7 +20,10 @@ class _VectorRetrieverStub:
     def __init__(self) -> None:
         self.last_query = None
 
-    def retrieve_candidates(self, query, *, top_k=8):  # noqa: ANN001
+    def retrieve_candidates(
+        self, query, *, top_k=8, basemap_k=1, overlay_k=8
+    ):  # noqa: ANN001
+        _ = basemap_k, overlay_k
         self.last_query = query
         return {"basemaps": [], "overlays": [], "providers": []}
 
@@ -89,7 +92,7 @@ def test_chat_orchestrator_executes_when_location_available(monkeypatch) -> None
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "ok"
         ),
     )
@@ -136,7 +139,7 @@ def test_chat_orchestrator_follow_up_for_missing_location(monkeypatch) -> None:
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "Which location?"
         ),
     )
@@ -203,7 +206,7 @@ def test_chat_orchestrator_passes_prior_messages_in_context(monkeypatch) -> None
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "Which location?"
         ),
     )
@@ -276,7 +279,7 @@ def test_chat_orchestrator_returns_coordinate_lookup_without_map_session(
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "Coordinates: 41.9, 12.5."
         ),
     )
@@ -327,7 +330,7 @@ def test_chat_orchestrator_integration_blocker_returns_follow_up(monkeypatch) ->
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "TomTom API key is not configured. Use another traffic layer?"
         ),
     )
@@ -393,7 +396,7 @@ def test_chat_orchestrator_geocode_uses_direct_coordinates_when_present(
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "The coordinates are latitude 41.9 and longitude 12.5."
         ),
     )
@@ -470,7 +473,7 @@ def test_chat_orchestrator_geocode_retries_with_split_poi_and_city(
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "The coordinates are latitude 41.8902 and longitude 12.4922."
         ),
     )
@@ -549,7 +552,7 @@ def test_chat_orchestrator_executes_direct_weather_tool(monkeypatch) -> None:
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "Forecast ready."
         ),
     )
@@ -623,7 +626,7 @@ def test_chat_orchestrator_clears_stale_coordinates_for_new_text_location(
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "coords"
         ),
     )
@@ -652,7 +655,10 @@ def test_chat_orchestrator_infers_overlay_ids_from_retrieval(monkeypatch) -> Non
     _allow_provider_checks(monkeypatch)
 
     class _RetrieverStub:
-        def retrieve_candidates(self, query, *, top_k=8):  # noqa: ANN001
+        def retrieve_candidates(
+            self, query, *, top_k=8, basemap_k=1, overlay_k=8
+        ):  # noqa: ANN001
+            _ = query, top_k, basemap_k, overlay_k
             return {
                 "basemaps": [],
                 "overlays": [
@@ -719,7 +725,7 @@ def test_chat_orchestrator_infers_overlay_ids_from_retrieval(monkeypatch) -> Non
     monkeypatch.setattr(
         ChatResponseService,
         "generate",
-        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result: (
+        lambda self, conversation_context, user_message, extracted_state, decision, retrieval, search_result, execution_feedback=None: (
             "ok"
         ),
     )

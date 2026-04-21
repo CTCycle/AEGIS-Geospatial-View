@@ -77,8 +77,9 @@ class SearchSessionRecord(Base):
     city: Mapped[str | None] = mapped_column(String(200))
     address: Mapped[str | None] = mapped_column(String(400))
     coordinates: Mapped[str | None] = mapped_column(String(128))
-    base_map: Mapped[str | None] = mapped_column(String(200))
-    geospatial_layers: Mapped[str | None] = mapped_column(Text)
+    basemap_id: Mapped[str | None] = mapped_column(String(120))
+    overlay_ids_json: Mapped[str | None] = mapped_column(Text)
+    semantic_filters_json: Mapped[str | None] = mapped_column(Text)
     state: Mapped[str | None] = mapped_column(String(20))
 
     __table_args__ = (UniqueConstraint("id"),)

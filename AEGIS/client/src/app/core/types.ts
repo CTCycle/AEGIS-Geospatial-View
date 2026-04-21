@@ -17,6 +17,7 @@ export interface LocationSearchRequest {
   latitude?: number;
   longitude?: number;
   filters?: string[];
+  semantic_filters?: string[];
   basemap_id?: string;
   overlay_ids?: string[];
   aoi?: {
@@ -28,7 +29,6 @@ export interface LocationSearchRequest {
   bbox?: number[];
   radius_m?: number;
   map_size_m?: number;
-  map_tiles?: string;
   image_width?: number;
   image_height?: number;
   image_crs?: string;
