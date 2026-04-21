@@ -76,6 +76,7 @@ release\tauri\build_with_tauri.bat
 
 - Python dependencies are lockfile-backed with `runtimes/uv.lock`.
 - Frontend dependencies are lockfile-backed with `AEGIS/client/package-lock.json`.
+- Backend runtime dependencies include `langchain-core`, `langchain-openai`, `langchain-google-genai`, and `langchain-ollama`.
 - Do not commit environment secrets in `.env` files.
 
 ## 8. Ollama Runtime Contract

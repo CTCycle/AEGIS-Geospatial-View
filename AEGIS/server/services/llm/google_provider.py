@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI,
+    GoogleGenerativeAIEmbeddings,
+)
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
+from AEGIS.server.services.llm.langchain_runtime import (
+    invoke_chat_model,
+    invoke_structured_chat_model,
+    stream_chat_model,
+)
 from AEGIS.server.services.llm.types import (
     ChatCompletionRequest,
     ChatCompletionResult,
@@ -24,24 +31,36 @@ class GoogleProvider(LLMProvider):
             base_url or "https://generativelanguage.googleapis.com/v1beta"
         ).rstrip("/")
 
-    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        request = Request(
-            f"{self.base_url}{path}?key={self.api_key}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+    def _build_chat_model(
+        self, *, model: str, temperature: float
+    ) -> ChatGoogleGenerativeAI:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "temperature": temperature,
+            "google_api_key": self.api_key,
+        }
+        if self.base_url:
+            kwargs["api_endpoint"] = self.base_url
         try:
-            with urlopen(request, timeout=45) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace").strip()
-            message = f"Google request failed with HTTP {exc.code}"
-            if detail:
-                message = f"{message}: {detail}"
-            raise ValueError(message) from exc
-        except URLError as exc:
-            raise ValueError(f"Google request failed: {exc.reason}") from exc
+            return ChatGoogleGenerativeAI(**kwargs)
+        except TypeError:
+            kwargs.pop("api_endpoint", None)
+            return ChatGoogleGenerativeAI(**kwargs)
+
+    def _build_embedding_model(
+        self, *, model: str
+    ) -> GoogleGenerativeAIEmbeddings:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "google_api_key": self.api_key,
+        }
+        if self.base_url:
+            kwargs["api_endpoint"] = self.base_url
+        try:
+            return GoogleGenerativeAIEmbeddings(**kwargs)
+        except TypeError:
+            kwargs.pop("api_endpoint", None)
+            return GoogleGenerativeAIEmbeddings(**kwargs)
 
     def list_models(self) -> list[ModelDescriptor]:
         return [
@@ -49,38 +68,35 @@ class GoogleProvider(LLMProvider):
         ]
 
     def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
-        text = "\n".join(item.get("content", "") for item in request.messages)
-        payload = self._post_json(
-            f"/models/{request.model}:generateContent",
-            {"contents": [{"parts": [{"text": text}]}]},
+        return invoke_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
         )
-        candidates = payload.get("candidates", [])
-        content = ""
-        if isinstance(candidates, list) and candidates:
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if isinstance(parts, list) and parts:
-                content = str(parts[0].get("text") or "")
-        return ChatCompletionResult(content=content, raw=payload)
 
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
-        yield self.chat(request).content
+        return stream_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
+        )
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: dict[str, Any]
+        self, request: ChatCompletionRequest, schema: type[object]
     ) -> dict[str, Any]:
-        result = self.chat(request)
-        try:
-            parsed = json.loads(result.content)
-        except json.JSONDecodeError:
-            parsed = {}
-        return parsed if isinstance(parsed, dict) else {}
+        payload = invoke_structured_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
+            schema=schema,
+        )
+        return dict(payload)
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        payload = self._post_json(
-            f"/models/{model}:embedContent",
-            {"content": {"parts": [{"text": input_text}]}},
-        )
-        values = payload.get("embedding", {}).get("values", [])
+        values = self._build_embedding_model(model=model).embed_query(input_text)
         if not isinstance(values, list):
             return []
         return [float(value) for value in values if isinstance(value, (int, float))]

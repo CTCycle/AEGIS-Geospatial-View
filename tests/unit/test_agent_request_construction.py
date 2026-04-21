@@ -5,6 +5,11 @@ from typing import Any
 
 from AEGIS.server.domain.agent.decision import AgentDecision
 from AEGIS.server.domain.extraction.models import ExtractedIntent
+from AEGIS.server.domain.extraction.models import (
+    ExtractedIntentPatch,
+    StageAParserIntent,
+    StageBSearchExtraction,
+)
 from AEGIS.server.services.agent.chat_response_service import ChatResponseService
 from AEGIS.server.services.agent.decision_service import DecisionService
 from AEGIS.server.services.agent.parser_service import ParserService
@@ -77,6 +82,46 @@ def test_parser_service_includes_context_then_machine_readable_inputs() -> None:
     assert request.messages[1]["content"] == context
     assert "latest_state=" in request.messages[2]["content"]
     assert "latest_user_message=same place" in request.messages[2]["content"]
+    assert parser_provider.last_schema is ExtractedIntentPatch
+
+
+###############################################################################
+def test_parser_stage_a_uses_typed_model_schema() -> None:
+    parser_provider = _ParserProviderStub()
+    service = ParserService(
+        llm_factory=_FactoryStub(parser=parser_provider),  # type: ignore[arg-type]
+        provider="ollama",
+        model="llama3.2",
+    )
+
+    service.parse_stage_a_intent(
+        conversation_context="ctx",
+        user_message="Find Rome weather",
+        available_tools=[{"name": "weather", "description": "weather lookup"}],
+        certainty_threshold=0.8,
+        max_retries=0,
+    )
+
+    assert parser_provider.last_schema is StageAParserIntent
+
+
+###############################################################################
+def test_parser_stage_b_uses_typed_model_schema() -> None:
+    parser_provider = _ParserProviderStub()
+    service = ParserService(
+        llm_factory=_FactoryStub(parser=parser_provider),  # type: ignore[arg-type]
+        provider="ollama",
+        model="llama3.2",
+    )
+
+    service.parse_stage_b_enrichment(
+        conversation_context="ctx",
+        user_message="Find Rome",
+        retrieval={"basemaps": [], "overlays": [], "providers": []},
+        fallback_datetime=None,
+    )
+
+    assert parser_provider.last_schema is StageBSearchExtraction
 
 
 ###############################################################################

@@ -7,7 +7,14 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+
 from AEGIS.server.services.llm.base import LLMProvider
+from AEGIS.server.services.llm.langchain_runtime import (
+    invoke_chat_model,
+    invoke_structured_chat_model,
+    stream_chat_model,
+)
 from AEGIS.server.services.llm.types import (
     ChatCompletionRequest,
     ChatCompletionResult,
@@ -61,6 +68,16 @@ class OllamaProvider(LLMProvider):
 
     def __init__(self, *, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
+
+    def _build_chat_model(self, *, model: str, temperature: float) -> ChatOllama:
+        return ChatOllama(
+            model=model,
+            temperature=temperature,
+            base_url=self.base_url,
+        )
+
+    def _build_embedding_model(self, *, model: str) -> OllamaEmbeddings:
+        return OllamaEmbeddings(model=model, base_url=self.base_url)
 
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = Request(
@@ -146,36 +163,35 @@ class OllamaProvider(LLMProvider):
         return self._post_json("/api/pull", {"name": model, "stream": False})
 
     def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
-        payload = self._post_json(
-            "/api/chat",
-            {"model": request.model, "messages": request.messages, "stream": False},
+        return invoke_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
         )
-        message = payload.get("message", {}) if isinstance(payload, dict) else {}
-        content = str(message.get("content") or "")
-        return ChatCompletionResult(content=content, raw=payload)
 
     def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
-        payload = self.chat(request)
-        if payload.content:
-            yield payload.content
+        return stream_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
+        )
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: dict[str, Any]
+        self, request: ChatCompletionRequest, schema: type[object]
     ) -> dict[str, Any]:
-        result = self.chat(request)
-        try:
-            parsed = json.loads(result.content)
-        except json.JSONDecodeError:
-            parsed = {}
-        if not isinstance(parsed, dict):
-            return {}
-        return parsed
+        payload = invoke_structured_chat_model(
+            chat_model=self._build_chat_model(
+                model=request.model, temperature=request.temperature
+            ),
+            request=request,
+            schema=schema,
+        )
+        return dict(payload)
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        payload = self._post_json(
-            "/api/embeddings", {"model": model, "prompt": input_text}
-        )
-        vector = payload.get("embedding", [])
+        vector = self._build_embedding_model(model=model).embed_query(input_text)
         if not isinstance(vector, list):
             return []
         return [float(value) for value in vector if isinstance(value, (int, float))]

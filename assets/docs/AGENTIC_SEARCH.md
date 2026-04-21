@@ -46,6 +46,9 @@ AEGIS uses a chat-first flow where each user turn can either:
 - Conversation memory:
   - parser/decision/response model calls receive bounded transcript context.
   - transcript depth is controlled by `chat.max_history_messages` in `AEGIS/settings/configurations.json`.
+- Provider transport:
+  - parser and response model invocation is routed through LangChain-backed provider adapters.
+  - agent behavior, fallback logic, and map-search execution flow are unchanged.
 - Location resolution:
   - structured location mapping no longer falls back to raw user text as `address`.
   - geocoding supports city/country-only input.

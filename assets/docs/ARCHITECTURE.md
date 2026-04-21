@@ -81,14 +81,16 @@ Chat flow:
 2. App startup lifecycle (`create_app()` lifespan) composes runtimes and stores them on `app.state`.
 3. Startup bootstraps SQLite (first run) and vector index bootstrap (`VectorIndexer.bootstrap_if_missing`) when enabled by `vectors.auto_sync_on_start`.
 4. `AgentOrchestrator` processes parsing, raw-prompt retrieval, retrieval-availability annotation, decisioning, tool invocation, and assistant response.
-5. Structured/tool/map payloads are returned and persisted through repository-backed services.
-6. Operational endpoints (`ollama refresh/pull/health`, `vectors sync/rebuild`) delegate to `ChatMaintenanceService`.
+5. Provider chat, structured extraction, and embedding invocation are normalized through LangChain adapters in `AEGIS/server/services/llm`.
+6. Structured/tool/map payloads are returned and persisted through repository-backed services.
+7. Operational endpoints (`ollama refresh/pull/health`, `vectors sync/rebuild`) delegate to `ChatMaintenanceService`.
 
 Vector subsystem responsibilities:
 - `ManifestPreparationService` composes one embedding chunk per basemap/overlay manifest entry.
 - `VectorIndexer` owns bootstrap, rebuild, sync, and startup-oriented metadata (`manifest_index_metadata.json`).
 - `VectorRetriever` performs similarity search and uses bootstrap as defensive fallback only.
 - `EmbeddingFactory` enforces one provider/model selection per persisted index build.
+- Embedding provider transport is handled through LangChain provider adapters.
 
 Agent tool awareness:
 - `AgentTools.describe_tools()` exposes `location_to_coordinates` and `map_search` descriptions to decisioning.
@@ -97,6 +99,7 @@ Agent tool awareness:
 Credentials:
 - Cloud provider credentials are resolved only from the encrypted `model_credentials` store via `CredentialRepository` + `CredentialEncryptionService`.
 - Runtime provider selection supports `openai`, `google`, and `ollama`; no legacy access-key storage path is active.
+- Ollama administrative operations (health, model list, pull) remain direct operational HTTP calls and are not routed through LangChain.
 
 ## 6. Background Jobs
 
