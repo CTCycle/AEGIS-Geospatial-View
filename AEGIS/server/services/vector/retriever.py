@@ -19,6 +19,7 @@ class VectorRetriever:
         return {
             "basemaps": [],
             "overlays": [],
+            "tools": [],
             "providers": [],
         }
 
@@ -54,6 +55,7 @@ class VectorRetriever:
                 return self._empty_result()
         basemaps: list[dict[str, object]] = []
         overlays: list[dict[str, object]] = []
+        tools: list[dict[str, object]] = []
         seen: set[str] = set()
         for item in matches:
             metadata = item.get("metadata", {})
@@ -78,9 +80,12 @@ class VectorRetriever:
                 basemaps.append(candidate)
             elif document_kind == "overlay":
                 overlays.append(candidate)
+            elif document_kind == "tool":
+                tools.append(candidate)
         result = {
             "basemaps": self._limit_ranked(basemaps, basemap_k or top_k),
             "overlays": self._limit_ranked(overlays, overlay_k or top_k),
+            "tools": self._limit_ranked(tools, top_k),
             "providers": [],
         }
         return result

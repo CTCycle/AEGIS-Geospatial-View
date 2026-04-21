@@ -133,6 +133,26 @@ describe('components/map-preview.component', () => {
     expect(component.mapSession).toBeUndefined();
   });
 
+  it('maps overlay ids directly when overlay descriptors are absent', () => {
+    component.payload = {
+      map_session: {
+        center: { latitude: 45.4642, longitude: 9.19 },
+        basemap_id: 'osm_default',
+        overlay_ids: ['openmeteo_weather_forecast', 'rainviewer_precipitation_radar'],
+      } as never,
+    };
+    fixture.detectChanges();
+    expect(component.mapSession?.overlay_ids).toEqual([
+      'openmeteo_weather_forecast',
+      'rainviewer_precipitation_radar',
+    ]);
+    expect(component.overlays.map((overlay) => overlay.id)).toEqual([
+      'openmeteo_weather_forecast',
+      'rainviewer_precipitation_radar',
+    ]);
+    expect(component.mapSession?.basemap?.id).toBe('osm_default');
+  });
+
   it('cleans up map on destroy', () => {
     component.payload = {
       map_session: {

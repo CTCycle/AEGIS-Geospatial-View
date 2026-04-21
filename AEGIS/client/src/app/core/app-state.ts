@@ -1,6 +1,6 @@
-import { ModelProviderMode, SearchResponsePayload, ChatMessage } from './types';
+import { ModelProviderMode, SearchResponsePayload, ChatMessage, PolicyDecision, MapSession } from './types';
 
-const STORAGE_KEY = 'aegis:webapp-state:v2';
+const STORAGE_KEY = 'aegis:webapp-state:v3';
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
@@ -11,6 +11,9 @@ export interface PersistedChatPanelState {
   sessionId?: number;
   conversationNonce: number;
   messages: ChatMessage[];
+  lastDecision?: PolicyDecision;
+  memorySnapshot?: Record<string, unknown>;
+  mapSession?: MapSession;
   status: string;
   assistantDraft: string;
   composerDraft: string;
@@ -40,7 +43,7 @@ export interface PersistedSettingsPageState {
 }
 
 export interface PersistedAppState {
-  version: 2;
+  version: 3;
   savedAt: number;
   tabId: string;
   chatPage: PersistedChatPageState;
@@ -54,7 +57,7 @@ const isProviderMode = (value: unknown): value is ModelProviderMode =>
   value === 'local' || value === 'cloud';
 
 export const defaultAppState = (): PersistedAppState => ({
-  version: 2,
+  version: 3,
   savedAt: Date.now(),
   tabId: '',
   chatPage: {
@@ -71,6 +74,9 @@ export const defaultAppState = (): PersistedAppState => ({
       sessionId: undefined,
       conversationNonce: 1,
       messages: [],
+      lastDecision: undefined,
+      memorySnapshot: {},
+      mapSession: undefined,
       status: 'Idle',
       assistantDraft: '',
       composerDraft: '',
@@ -158,7 +164,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
   }
   try {
     const parsed = JSON.parse(raw);
-    if (!isRecord(parsed) || parsed.version !== 2) {
+    if (!isRecord(parsed) || parsed.version !== 3) {
       return {
         ...defaultAppState(),
         tabId: currentTabId,
@@ -221,6 +227,15 @@ export const loadPersistedAppState = (): PersistedAppState => {
             ? parsed.chatPage.chatPanel.conversationNonce
             : 1,
           messages: messages as PersistedChatPanelState['messages'],
+          lastDecision: isRecord(parsed.chatPage.chatPanel.lastDecision)
+            ? parsed.chatPage.chatPanel.lastDecision as PolicyDecision
+            : undefined,
+          memorySnapshot: isRecord(parsed.chatPage.chatPanel.memorySnapshot)
+            ? parsed.chatPage.chatPanel.memorySnapshot as Record<string, unknown>
+            : {},
+          mapSession: isRecord(parsed.chatPage.chatPanel.mapSession)
+            ? parsed.chatPage.chatPanel.mapSession as MapSession
+            : undefined,
           status: typeof parsed.chatPage.chatPanel.status === 'string'
             ? parsed.chatPage.chatPanel.status
             : defaults.chatPage.chatPanel.status,

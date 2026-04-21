@@ -3,7 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+try:
+    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
+    ChatOpenAI = None  # type: ignore[assignment]
+    OpenAIEmbeddings = None  # type: ignore[assignment]
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
@@ -26,7 +30,14 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
 
+    def _ensure_dependency(self) -> None:
+        if ChatOpenAI is None or OpenAIEmbeddings is None:
+            raise RuntimeError(
+                "langchain_openai is not installed. Install optional LLM dependencies to use OpenAI provider."
+            )
+
     def _build_chat_model(self, *, model: str, temperature: float) -> ChatOpenAI:
+        self._ensure_dependency()
         return ChatOpenAI(
             model=model,
             temperature=temperature,
@@ -35,6 +46,7 @@ class OpenAIProvider(LLMProvider):
         )
 
     def _build_embedding_model(self, *, model: str) -> OpenAIEmbeddings:
+        self._ensure_dependency()
         return OpenAIEmbeddings(
             model=model,
             api_key=self.api_key,

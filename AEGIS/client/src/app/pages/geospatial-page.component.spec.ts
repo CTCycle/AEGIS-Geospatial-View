@@ -62,6 +62,60 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('Search executed successfully.');
   });
 
+  it('clarification responses set Need more detail status', async () => {
+    spyOn(Api, 'sendChatTurn').and.resolveTo({
+      session_id: 42,
+      assistant_message: 'Which location should I use?',
+      decision: {
+        plan: {
+          state: 'clarify',
+          intent_id: 'weather',
+          overlay_ids: [],
+        },
+      },
+      map_session: null,
+      tool_payload: null,
+    } as never);
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show weather';
+    await component.sendMessage();
+    expect(component.status).toBe('Need more detail');
+    expect(component.messages.at(-1)?.content).toContain('Which location should I use?');
+  });
+
+  it('direct tool payload responses render as assistant message without map session', async () => {
+    spyOn(Api, 'sendChatTurn').and.resolveTo({
+      session_id: 42,
+      assistant_message: 'Coordinates: 41.8902, 12.4922',
+      decision: {
+        plan: {
+          state: 'direct_tool',
+          intent_id: 'location_lookup',
+          overlay_ids: [],
+          tool_id: 'location_to_coordinates',
+        },
+      },
+      tool_payload: {
+        tool_id: 'location_to_coordinates',
+        result: {
+          latitude: 41.8902,
+          longitude: 12.4922,
+        },
+      },
+      map_session: null,
+    } as never);
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'what are the coordinates of the colosseum';
+    await component.sendMessage();
+    expect(component.status).toBe('Complete');
+    expect(component.mapSession).toBeUndefined();
+    expect(component.messages.at(-1)?.content).toContain('Coordinates: 41.8902, 12.4922');
+  });
+
   it('request nonce blocks stale response overwrite', async () => {
     let resolveTurn: (value: unknown) => void;
     const pending = new Promise((resolve) => { resolveTurn = resolve as (value: unknown) => void; });

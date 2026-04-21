@@ -52,8 +52,7 @@ class GeospatialManifestLoader:
             )
         normalized = dict(entry)
         normalized["capabilities"] = list(entry.get("capabilities") or [])
-        metadata = dict(entry.get("metadata") or {})
-        normalized["metadata"] = metadata
+        normalized["metadata"] = dict(entry.get("metadata") or {})
         normalized["source_filename"] = source
         if source_path:
             normalized["source_path"] = os.path.abspath(source_path)
@@ -78,6 +77,24 @@ class GeospatialManifestLoader:
             )
         return entries
 
+    def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
+        path = os.path.join(self.root_path, filename)
+        payload = self._load_json(path)
+        if not isinstance(payload, dict):
+            raise ManifestValidationError("Runtime profiles must be an object.")
+        profiles = payload.get("profiles")
+        if not isinstance(profiles, list):
+            raise ManifestValidationError("Runtime profiles must contain a profiles list.")
+        normalized: list[JsonDict] = []
+        for item in profiles:
+            if not isinstance(item, dict):
+                raise ManifestValidationError("Runtime profile entries must be objects.")
+            capability_id = str(item.get("capability_id") or "").strip()
+            if not capability_id:
+                raise ManifestValidationError("Runtime profile entry missing capability_id.")
+            normalized.append(dict(item))
+        return normalized
+
     def load_all(self) -> JsonDict:
         index = self.load_index()
         providers = self._load_directory_entries(
@@ -89,8 +106,14 @@ class GeospatialManifestLoader:
         overlays = self._load_directory_entries(
             str(index.get("overlays_dir") or "overlays")
         )
+        tools = self._load_directory_entries(str(index.get("tools_dir") or "tools"))
+        runtime_profiles = self._load_runtime_profiles(
+            str(index.get("runtime_profiles_file") or "runtime_profiles.json")
+        )
         return {
             "providers": providers,
             "basemaps": basemaps,
             "overlays": overlays,
+            "tools": tools,
+            "runtime_profiles": runtime_profiles,
         }

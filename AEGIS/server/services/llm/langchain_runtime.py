@@ -3,7 +3,21 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+try:
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
+    class _FallbackMessage:
+        def __init__(self, *, content: str) -> None:
+            self.content = content
+
+    class AIMessage(_FallbackMessage):
+        pass
+
+    class HumanMessage(_FallbackMessage):
+        pass
+
+    class SystemMessage(_FallbackMessage):
+        pass
 
 from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult
 
