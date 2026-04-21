@@ -129,7 +129,7 @@ def test_search_graceful_behavior_when_provider_degrades(
     response = _post(
         api_context,
         "/api/maps/search",
-        _payload(geospatial_layers=["VIIRS_SNPP_CorrectedReflectance_TrueColor"]),
+        _payload(overlay_ids=["VIIRS_SNPP_CorrectedReflectance_TrueColor"]),
     )
     if response.ok:
         assert "status_message" in response.json()

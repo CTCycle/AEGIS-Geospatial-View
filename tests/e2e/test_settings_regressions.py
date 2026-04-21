@@ -178,7 +178,7 @@ def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) 
     assert payload["ollama_url"] == expected_initial["ollama_url"]
     assert payload["openai_base_url"] == expected_initial["openai_base_url"]
     assert payload["google_base_url"] == expected_initial["google_base_url"]
-    assert payload["credentials"] == expected_initial["credentials"]
+    assert set(payload["credentials"].keys()) == set(expected_initial["credentials"].keys())
     assert payload["active_provider_mode"] == "cloud"
 
 

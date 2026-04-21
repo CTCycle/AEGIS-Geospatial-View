@@ -103,7 +103,10 @@ class _NominatimFailStub:
 
 ###############################################################################
 class _RendererStub:
-    async def build_satellite_payload(self, payload, search_payload):  # noqa: ANN001
+    async def build_satellite_payload(  # noqa: ANN001
+        self, payload, search_payload, basemap=None
+    ):
+        _ = basemap
         return {"bbox": search_payload.get("bbox") or [12.4, 41.8, 12.6, 42.0]}
 
 

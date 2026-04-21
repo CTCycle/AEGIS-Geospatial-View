@@ -126,8 +126,9 @@ def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> N
                 "city": "Rome",
                 "address": "Via Roma",
                 "coordinates": '{"longitude": 12.5, "latitude": 41.9}',
-                "base_map": "OpenStreetMap",
-                "geospatial_layers": '["Layer"]',
+                "basemap_id": "osm_default",
+                "overlay_ids_json": '["Layer"]',
+                "semantic_filters_json": '["air_quality"]',
                 "state": "success",
             }
         ],
@@ -138,3 +139,6 @@ def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> N
     assert repository.count_rows(SEARCH_SESSIONS_TABLE) == 1
     assert len(rows) == 1
     assert isinstance(rows[0]["id"], int)
+    assert rows[0]["basemap_id"] == "osm_default"
+    assert rows[0]["overlay_ids_json"] == '["Layer"]'
+    assert rows[0]["semantic_filters_json"] == '["air_quality"]'

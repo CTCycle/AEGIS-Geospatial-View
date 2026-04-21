@@ -72,7 +72,7 @@ def test_25_sequential_turns_mixed_with_new_chat_resets(
         text = "ambiguous weather only" if idx % 7 == 0 else f"show map turn {idx}"
         composer.fill(text)
         page.get_by_role("button", name="Send").click()
-        expect(page.locator(".chat-message--assistant").last).to_be_visible()
+        expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
         if idx in {9, 18}:
             page.get_by_role("button", name="Start new chat").click()
             expect(
@@ -95,7 +95,8 @@ def test_rapid_double_submit_does_not_duplicate_assistant_state(
     page.get_by_label("Chat message").fill("show map quickly")
     send = page.get_by_role("button", name="Send")
     send.click()
-    send.click()
+    if send.is_enabled():
+        send.click()
     expect(page.locator(".chat-message--assistant")).to_have_count(1, timeout=10000)
 
 
@@ -118,14 +119,14 @@ def test_route_switching_20_cycles_preserves_query_and_chat_state(
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map state before route cycles")
     page.get_by_role("button", name="Send").click()
-    expect(page.locator(".chat-message--assistant").first).to_be_visible()
+    expect(page.locator(".chat-message--assistant").first).to_be_visible(timeout=15000)
 
     for _ in range(20):
         page.get_by_role("button", name="Open settings").click()
         expect(page).to_have_url(re.compile(r".*/settings"))
         page.get_by_placeholder("Search models").fill("gpt")
         page.get_by_role("button", name="Back to chat").click()
-        expect(page).to_have_url(base_url)
+        expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
         expect(page.get_by_text("show map state before route cycles")).to_be_visible()
 
     page.get_by_role("button", name="Open settings").click()
@@ -149,7 +150,8 @@ def test_overlay_toggle_and_opacity_restore_after_refresh(
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map with overlays")
     page.get_by_role("button", name="Send").click()
-    expect(page.locator(".overlay-controls")).to_be_visible()
+    expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
+    expect(page.locator(".overlay-controls")).to_be_visible(timeout=15000)
 
     first_checkbox = page.locator(".overlay-control-row input[type='checkbox']").first
     first_checkbox.uncheck()

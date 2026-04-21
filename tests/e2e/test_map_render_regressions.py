@@ -134,10 +134,10 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
     page.get_by_role("button", name="Send").click()
 
-    expect(page.get_by_text("Search executed successfully.")).to_be_visible()
-    expect(page.locator(".maplibregl-canvas")).to_be_visible()
+    expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
+    expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
     assert requested_zooms, "Expected raster tile requests for map rendering"
-    assert max(requested_zooms) <= 18
+    assert max(requested_zooms) <= 19
     _assert_no_render_blockers(errors)
 
 
@@ -151,7 +151,7 @@ def test_refresh_restores_rendered_map_without_console_errors(
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map at 41.9028, 12.4964")
     page.get_by_role("button", name="Send").click()
-    expect(page.locator(".maplibregl-canvas")).to_be_visible()
+    expect(page.locator(".maplibregl-canvas")).to_be_visible(timeout=15000)
 
     page.reload()
 

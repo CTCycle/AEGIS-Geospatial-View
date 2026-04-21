@@ -170,8 +170,9 @@ SEARCH_SESSION_COLUMNS = [
     "city",
     "address",
     "coordinates",
-    "base_map",
-    "geospatial_layers",
+    "basemap_id",
+    "overlay_ids_json",
+    "semantic_filters_json",
     "state",
 ]
 

@@ -213,15 +213,44 @@ export const buildApiError = async (response: Response): Promise<ApiRequestError
 };
 
 export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
+  const normalizedPayload: Record<string, unknown> = {
+    use_coordinates: payload.use_coordinates,
+  };
+  if (payload.datetime !== undefined) normalizedPayload.datetime = payload.datetime;
+  if (payload.time_of_day !== undefined) normalizedPayload.time_of_day = payload.time_of_day;
+  if (payload.timeline_year !== undefined) normalizedPayload.timeline_year = payload.timeline_year;
+  if (payload.country !== undefined) normalizedPayload.country = payload.country;
+  if (payload.city !== undefined) normalizedPayload.city = payload.city;
+  if (payload.address !== undefined) normalizedPayload.address = payload.address;
+  if (payload.latitude !== undefined) normalizedPayload.latitude = payload.latitude;
+  if (payload.longitude !== undefined) normalizedPayload.longitude = payload.longitude;
+  if (payload.bbox !== undefined) normalizedPayload.bbox = payload.bbox;
+  if (payload.radius_m !== undefined) normalizedPayload.radius_m = payload.radius_m;
+  if (payload.map_size_m !== undefined) normalizedPayload.map_size_m = payload.map_size_m;
+  if (payload.image_width !== undefined) normalizedPayload.image_width = payload.image_width;
+  if (payload.image_height !== undefined) normalizedPayload.image_height = payload.image_height;
+  if (payload.image_crs !== undefined) normalizedPayload.image_crs = payload.image_crs;
+  if (payload.image_format !== undefined) normalizedPayload.image_format = payload.image_format;
+  if (payload.aoi !== undefined) normalizedPayload.aoi = payload.aoi;
+  if (payload.commute !== undefined) normalizedPayload.commute = payload.commute;
+
+  if (payload.basemap_id) {
+    normalizedPayload.basemap_id = payload.basemap_id;
+  }
+  const normalizedOverlayIds = payload.overlay_ids ?? payload.filters;
+  if (normalizedOverlayIds && normalizedOverlayIds.length > 0) {
+    normalizedPayload.overlay_ids = normalizedOverlayIds;
+  }
+  if (payload.semantic_filters && payload.semantic_filters.length > 0) {
+    normalizedPayload.semantic_filters = payload.semantic_filters;
+  }
+
   const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_SEARCH_PATH}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      ...payload,
-      geospatial_layers: payload.filters,
-    }),
+    body: JSON.stringify(normalizedPayload),
   });
   return parseSearchResponse(data);
 };

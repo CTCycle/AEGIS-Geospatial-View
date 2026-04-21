@@ -112,7 +112,6 @@ class LocationSearchOrchestrator:
     ) -> dict[str, Any]:
         response_payload = payload.model_dump()
         normalized_filters = list(payload.filters or [])
-        response_payload["geospatial_filter"] = normalized_filters
         response_payload["filters"] = normalized_filters
         response_payload.pop("layers", None)
         if not payload.use_coordinates:
@@ -170,6 +169,7 @@ class LocationSearchOrchestrator:
         payload: LocationSearchRequest,
         search_payload: dict[str, Any],
         satellite_payload: dict[str, Any],
+        basemap: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
         selected_overlay_ids = self._resolve_overlay_ids(payload)
         unmet_filters: list[str] = []
@@ -182,7 +182,9 @@ class LocationSearchOrchestrator:
                 semantic_filters=payload.semantic_filters,
             )
         overlays = self.catalog_service.resolve_overlays(selected_overlay_ids)
-        basemap = self.catalog_service.resolve_basemap(payload.basemap_id)
+        resolved_basemap = basemap or self.catalog_service.resolve_basemap(
+            payload.basemap_id
+        )
         lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
         lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))
         insights = await self.catalog_service.fetch_insights(
@@ -213,13 +215,13 @@ class LocationSearchOrchestrator:
                 }
             enriched_overlays.append(enriched)
         compliance_warnings = self.catalog_service.resolve_compliance_warnings(
-            basemap=basemap,
+            basemap=resolved_basemap,
             overlays=enriched_overlays,
         )
         map_session = {
             "center": {"latitude": lat_value, "longitude": lon_value},
             "bounds": satellite_payload.get("bbox"),
-            "basemap": basemap,
+            "basemap": resolved_basemap,
             "overlays": enriched_overlays,
             "insights": insights,
             "compliance_warnings": compliance_warnings,
@@ -249,8 +251,9 @@ class LocationSearchOrchestrator:
                     ),
                 )
         try:
+            resolved_basemap = self.catalog_service.resolve_basemap(payload.basemap_id)
             satellite_payload = await self.renderer.build_satellite_payload(
-                payload, search_payload
+                payload, search_payload, basemap=resolved_basemap
             )
         except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
             raise HTTPException(
@@ -271,6 +274,7 @@ class LocationSearchOrchestrator:
             payload=payload,
             search_payload=search_payload,
             satellite_payload=satellite_payload,
+            basemap=resolved_basemap,
         )
         search_payload["map_session"] = map_session
         search_payload["compliance_warnings"] = map_session.get(
@@ -326,24 +330,28 @@ class LocationSearchOrchestrator:
             ):
                 coordinates = (float(lon_candidate), float(lat_candidate))
 
-        layers = (
-            list(payload.filters)
-            if payload
-            else self.toolkit.normalize_layers(fallback.get("geospatial_layers") or [])
-        )
-        overlay_ids = (
+        payload_overlay_ids = (
             list(payload.overlay_ids)
             if payload
             else self.toolkit.normalize_layers(fallback.get("overlay_ids") or [])
         )
-        if overlay_ids:
-            layers = list(dict.fromkeys([*layers, *overlay_ids]))
+        response_snapshot = (
+            response_payload.get("payload", {})
+            if isinstance(response_payload, dict)
+            else {}
+        )
+        selected_overlay_ids = response_snapshot.get("selected_overlay_ids")
+        overlay_ids = self.toolkit.normalize_layers(
+            selected_overlay_ids
+            if isinstance(selected_overlay_ids, list)
+            else payload_overlay_ids
+        )
+        semantic_filters = (
+            list(payload.semantic_filters)
+            if payload
+            else self.toolkit.normalize_layers(fallback.get("semantic_filters") or [])
+        )
         basemap_id = payload.basemap_id if payload else fallback.get("basemap_id")
-        persisted_selection = {
-            "filters": layers,
-            "overlay_ids": overlay_ids,
-            "basemap_id": basemap_id,
-        }
         return {
             "id": None,
             "created_at": datetime.utcnow(),
@@ -356,7 +364,8 @@ class LocationSearchOrchestrator:
             )
             if coordinates
             else None,
-            "base_map": payload.map_tiles if payload else fallback.get("map_tiles"),
-            "geospatial_layers": json.dumps(persisted_selection),
+            "basemap_id": basemap_id,
+            "overlay_ids_json": json.dumps(overlay_ids),
+            "semantic_filters_json": json.dumps(semantic_filters),
             "state": state,
         }

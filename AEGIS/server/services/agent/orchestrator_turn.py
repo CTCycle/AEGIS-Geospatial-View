@@ -197,18 +197,12 @@ async def run_turn_impl(
         "providers": [],
     }
     if stage_a.requires_data or stage_a.requires_search:
-        try:
-            retrieval = orchestrator.vector_retriever.retrieve_candidates(
-                request.message.strip(),
-                top_k=10,
-                basemap_k=1,
-                overlay_k=10,
-            )
-        except TypeError:
-            retrieval = orchestrator.vector_retriever.retrieve_candidates(
-                request.message.strip(),
-                top_k=10,
-            )
+        retrieval = orchestrator.vector_retriever.retrieve_candidates(
+            request.message.strip(),
+            top_k=10,
+            basemap_k=1,
+            overlay_k=10,
+        )
     annotated_retrieval = orchestrator._annotate_retrieval_candidates(retrieval)
     annotated_retrieval["overlays"] = orchestrator._overlay_candidates_by_provider(
         annotated_retrieval.get("overlays", [])
@@ -590,25 +584,15 @@ async def run_turn_impl(
             ],
         }
 
-    try:
-        assistant_message = chat_service.generate(
-            conversation_context=context,
-            user_message=request.message,
-            extracted_state=extracted_state,
-            decision=decision,
-            retrieval=annotated_retrieval,
-            search_result=search_result,
-            execution_feedback=execution_feedback,
-        )
-    except TypeError:
-        assistant_message = chat_service.generate(
-            conversation_context=context,
-            user_message=request.message,
-            extracted_state=extracted_state,
-            decision=decision,
-            retrieval=annotated_retrieval,
-            search_result=search_result,
-        )
+    assistant_message = chat_service.generate(
+        conversation_context=context,
+        user_message=request.message,
+        extracted_state=extracted_state,
+        decision=decision,
+        retrieval=annotated_retrieval,
+        search_result=search_result,
+        execution_feedback=execution_feedback,
+    )
     orchestrator._debug_log(
         "turn_outcome",
         {

@@ -7,7 +7,10 @@ from AEGIS.server.services.agent.orchestrator import AgentOrchestrator
 
 
 class _VectorRetrieverStub:
-    def retrieve_candidates(self, query, *, top_k=8):  # noqa: ANN001
+    def retrieve_candidates(
+        self, query, *, top_k=8, basemap_k=1, overlay_k=8
+    ):  # noqa: ANN001
+        _ = query, top_k, basemap_k, overlay_k
         return {"basemaps": [], "overlays": [], "providers": []}
 
 
