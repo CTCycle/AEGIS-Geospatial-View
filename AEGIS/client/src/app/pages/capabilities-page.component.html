@@ -1,0 +1,62 @@
+<div class="capabilities-page">
+  <header class="capabilities-page__header">
+    <div>
+      <p class="page-kicker">System Interaction</p>
+      <h1>Capability Overview</h1>
+      <p>Manifest-backed map types, layers, direct actions, and data providers exposed by AEGIS.</p>
+    </div>
+    <span class="capabilities-page__status" aria-live="polite">{{ statusText }}</span>
+  </header>
+
+  <main class="capabilities-page__content">
+    @if (isLoading) {
+      <section class="capabilities-empty" aria-live="polite">Loading catalog...</section>
+    } @else {
+      @for (group of groups; track group.id) {
+        <section class="capability-section" [attr.aria-label]="group.label">
+          <header class="capability-section__header">
+            <div>
+              <h2>{{ group.label }}</h2>
+              <p>{{ group.description }}</p>
+            </div>
+            <span>{{ itemsFor(group.id).length }}</span>
+          </header>
+
+          <div class="capability-table-wrap">
+            <table class="capability-table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Purpose</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Update</th>
+                  <th scope="col">Access</th>
+                  <th scope="col">Dependencies</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of itemsFor(group.id); track trackCapability($index, item)) {
+                  <tr>
+                    <td>
+                      <strong>{{ item.name }}</strong>
+                      <span>{{ item.provider }} · {{ item.type || item.kind }} · {{ item.coverage }}</span>
+                    </td>
+                    <td>{{ capabilityPurpose(item) }}</td>
+                    <td class="capability-table__source">{{ dataSource(item) }}</td>
+                    <td>{{ updateFrequency(item) }}</td>
+                    <td>
+                      <span class="access-pill" [class.access-pill--locked]="item.requires_credentials && !item.is_available">
+                        {{ accessConstraints(item) }}
+                      </span>
+                    </td>
+                    <td>{{ dependencies(item) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+    }
+  </main>
+</div>

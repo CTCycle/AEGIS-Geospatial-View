@@ -67,3 +67,7 @@ class GeospatialCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     capabilities: list[dict[str, object]] = Field(default_factory=list)
+    providers: list[dict[str, object]] = Field(default_factory=list)
+    basemaps: list[dict[str, object]] = Field(default_factory=list)
+    overlays: list[dict[str, object]] = Field(default_factory=list)
+    tools: list[dict[str, object]] = Field(default_factory=list)

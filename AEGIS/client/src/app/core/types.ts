@@ -44,6 +44,8 @@ export interface CapabilityDescriptor {
   id: string;
   name: string;
   kind: 'basemap' | 'overlay' | 'tool' | string;
+  type?: string;
+  description?: string;
   provider: string;
   requires_credentials: boolean;
   is_available: boolean;
@@ -57,8 +59,10 @@ export interface CapabilityDescriptor {
 
 export interface CatalogResponse {
   capabilities: CapabilityDescriptor[];
+  providers?: CapabilityDescriptor[];
   basemaps?: CapabilityDescriptor[];
   overlays?: CapabilityDescriptor[];
+  tools?: CapabilityDescriptor[];
 }
 
 export interface MapSession {

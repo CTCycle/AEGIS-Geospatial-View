@@ -7,12 +7,7 @@
     <aside class="toolbar-panel" aria-label="Chat toolbar">
       <header class="toolbar-brand" aria-label="Application identity">
         <div class="toolbar-brand__identity">
-          <span class="toolbar-brand__icon" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
-          <span class="toolbar-brand__logo">AEGIS</span>
+          <span>Workspace</span>
         </div>
         <button
           type="button"
@@ -25,6 +20,23 @@
       </header>
 
       <div class="toolbar-panel__content">
+        <section class="assistant-status-card" aria-label="Assistant status">
+          <header>
+            <span class="assistant-status-card__crest" aria-hidden="true">
+              <svg viewBox="0 0 32 32" focusable="false">
+                <path class="crest-outline" d="M16 2.8 27.2 6.9v7.8c0 7.3-4.5 12.4-11.2 14.6C9.3 27.1 4.8 22 4.8 14.7V6.9L16 2.8Z" />
+                <path class="crest-field" d="M8.8 9.3 16 6.6l7.2 2.7v4.9c0 5-2.9 8.7-7.2 10.6-4.3-1.9-7.2-5.6-7.2-10.6V9.3Z" />
+                <path class="crest-cut" d="M16 8.7 21.1 22h-2.5l-.9-2.6h-3.4l-.9 2.6h-2.5L16 8.7Zm-.9 8.5h1.8L16 13.7l-.9 3.5Z" />
+                <path class="crest-signal" d="M10.7 12.7h3.1M18.2 12.7h3.1M12.1 23.2l2.2-3.8M19.9 23.2l-2.2-3.8" />
+              </svg>
+            </span>
+            <div>
+              <h2>AEGIS Assistant</h2>
+              <p><span aria-hidden="true"></span> Online</p>
+            </div>
+          </header>
+        </section>
+
         <section class="agent-chat-panel" aria-label="Agent Chat">
           <div
             #transcript
@@ -69,6 +81,18 @@
             </button>
           </div>
         </section>
+
+        <section class="rail-capability-card" aria-label="Capability status">
+          <header>
+            <h2>Capability Status</h2>
+            <span>Open</span>
+          </header>
+          <ul>
+            <li><span class="state-dot state-dot--ok"></span> Satellite Imagery <strong>Active</strong></li>
+            <li><span class="state-dot state-dot--ok"></span> Weather Intel <strong>Active</strong></li>
+            <li><span class="state-dot state-dot--warn"></span> Optional Keys <strong>Disabled</strong></li>
+          </ul>
+        </section>
       </div>
     </aside>
 
@@ -94,19 +118,6 @@
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
               <path
                 d="M12 3.5a4.8 4.8 0 0 0-4.8 4.8v1.7c0 .8-.2 1.6-.6 2.3L5.1 15h13.8l-1.5-2.7a4.8 4.8 0 0 1-.6-2.3V8.3A4.8 4.8 0 0 0 12 3.5zm0 17a2.4 2.4 0 0 1-2.2-1.5h4.4A2.4 2.4 0 0 1 12 20.5z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="canvas-header__icon-button"
-            aria-label="Open settings"
-            (click)="navigateToSettings()"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-              <path
-                d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5l-.3-2.6h-4l-.3 2.6a8 8 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.3 2.6h4l.3-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5zM12 15.1a3.1 3.1 0 1 1 0-6.2 3.1 3.1 0 0 1 0 6.2z"
                 fill="currentColor"
               />
             </svg>

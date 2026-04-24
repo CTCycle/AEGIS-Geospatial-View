@@ -1,0 +1,64 @@
+<div class="access-page">
+  <header class="access-page__header">
+    <div>
+      <p class="page-kicker">Access Configurations</p>
+      <h1>Optional Geospatial Provider Keys</h1>
+      <p>AEGIS uses free and openly accessible sources by default. Add keys only for optional premium-style map providers.</p>
+    </div>
+    <span class="access-page__status" aria-live="polite">{{ statusText }}</span>
+  </header>
+
+  <main class="access-page__content">
+    <section class="access-page__default" aria-label="Default open data workflow">
+      <h2>Default workflow</h2>
+      <p>OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim remain available without user-supplied API keys, subject to provider attribution and usage limits.</p>
+    </section>
+
+    <section class="access-grid" aria-label="Optional providers">
+      @for (provider of providers; track provider.id) {
+        <article class="access-provider">
+          <header>
+            <div>
+              <h2>{{ provider.name }}</h2>
+              <p>{{ provider.purpose }}</p>
+            </div>
+            <span [class.access-provider__state--enabled]="configured(provider.id)" class="access-provider__state">
+              {{ configured(provider.id) ? 'Configured' : 'Disabled' }}
+            </span>
+          </header>
+
+          <dl>
+            <div>
+              <dt>Access</dt>
+              <dd>Optional API key</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{{ health(provider.id) }}</dd>
+            </div>
+            <div>
+              <dt>Provider docs</dt>
+              <dd><a [href]="provider.docsUrl" target="_blank" rel="noreferrer">{{ provider.docsUrl }}</a></dd>
+            </div>
+          </dl>
+
+          <label>
+            API key
+            <input
+              type="password"
+              autocomplete="off"
+              [placeholder]="provider.placeholder"
+              [(ngModel)]="drafts[provider.id]"
+              [name]="provider.id + '_api_key'"
+            />
+          </label>
+
+          <footer>
+            <button type="button" class="primary-button" [disabled]="isSaving" (click)="saveProvider(provider.id)">Save key</button>
+            <button type="button" [disabled]="isSaving || !configured(provider.id)" (click)="clearProvider(provider.id)">Clear saved key</button>
+          </footer>
+        </article>
+      }
+    </section>
+  </main>
+</div>

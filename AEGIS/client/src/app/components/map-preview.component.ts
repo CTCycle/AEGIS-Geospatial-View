@@ -379,6 +379,22 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     return Math.round((this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY) * 100);
   }
 
+  zoomIn(): boolean {
+    if (!this.mapRef) {
+      return false;
+    }
+    this.mapRef.zoomIn({ duration: 120 });
+    return true;
+  }
+
+  zoomOut(): boolean {
+    if (!this.mapRef) {
+      return false;
+    }
+    this.mapRef.zoomOut({ duration: 120 });
+    return true;
+  }
+
   private syncSessionFromPayload(): void {
     const next = this.payload?.map_session;
     if (!next) {
@@ -468,7 +484,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       zoom: 12,
     });
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
     map.on('load', () => {
       map.resize();
       addOverlayLayers(map, this.mapSession);

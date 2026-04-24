@@ -1,211 +1,59 @@
 from __future__ import annotations
 
-import asyncio
-
 from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
+from AEGIS.server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
-class _OpenAQStub:
-    async def get_nearby_measurements(
-        self, latitude: float, longitude: float, radius_m: float
-    ) -> dict[str, object]:
-        return {
-            "provider": "openaq",
-            "latitude": latitude,
-            "longitude": longitude,
-            "radius_m": radius_m,
-        }
+class _CredentialRepo:
+    def __init__(self, present: bool) -> None:
+        self.present = present
+
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN201
+        if self.present and provider in {"tomtom", "geoapify"} and label == "api_key":
+            return object()
+        return None
 
 
-class _PVGISStub:
-    async def get_point_estimate(
-        self, latitude: float, longitude: float
-    ) -> dict[str, object]:
-        return {
-            "provider": "pvgis",
-            "latitude": latitude,
-            "longitude": longitude,
-        }
-
-
-class _OpenMeteoStub:
-    async def get_weather_forecast(
-        self, *, latitude: float, longitude: float
-    ) -> dict[str, object]:
-        return {
-            "kind": "weather_forecast",
-            "latitude": latitude,
-            "longitude": longitude,
-        }
-
-    async def get_air_quality_forecast(
-        self, *, latitude: float, longitude: float
-    ) -> dict[str, object]:
-        return {
-            "kind": "air_quality_forecast",
-            "latitude": latitude,
-            "longitude": longitude,
-        }
-
-
-class _OverpassStub:
-    async def get_nearby_poi(
-        self,
-        *,
-        latitude: float,
-        longitude: float,
-        radius_m: float,
-    ) -> dict[str, object]:
-        return {
-            "kind": "poi_amenities",
-            "latitude": latitude,
-            "longitude": longitude,
-            "radius_m": radius_m,
-            "total_results": 1,
-            "items": [{"id": "1", "name": "Cafe", "amenity": "cafe"}],
-        }
-
-
-class _RainViewerStub:
-    async def get_latest_radar_metadata(self) -> dict[str, object]:
-        return {
-            "kind": "precipitation_radar",
-            "latest_time": 123456,
-            "tile_url_template": "https://tilecache.rainviewer.com/path/{z}/{x}/{y}.png",
-        }
-
-
-def test_catalog_contains_expected_core_sections() -> None:
-    service = GeospatialCatalogService(
-        openaq_service=_OpenAQStub(),  # type: ignore[arg-type]
-        pvgis_service=_PVGISStub(),  # type: ignore[arg-type]
-        openmeteo_service=_OpenMeteoStub(),  # type: ignore[arg-type]
-        overpass_service=_OverpassStub(),  # type: ignore[arg-type]
-        rainviewer_service=_RainViewerStub(),  # type: ignore[arg-type]
+def _service_with_credentials(present: bool) -> GeospatialCatalogService:
+    return GeospatialCatalogService(
+        runtime_registry=RuntimeRegistry(credentials_repo=_CredentialRepo(present)),  # type: ignore[arg-type]
     )
 
-    catalog = service.list_catalog()
+
+def test_catalog_contains_grouped_capability_sections() -> None:
+    catalog = _service_with_credentials(False).list_catalog()
 
     assert "providers" in catalog
     assert "basemaps" in catalog
     assert "overlays" in catalog
+    assert "tools" in catalog
+    assert any(item["id"] == "osm_default" for item in catalog["basemaps"])
     assert any(item["id"] == "openaq_air_quality" for item in catalog["overlays"])
-    assert any(item["id"] == "pvgis_solar" for item in catalog["overlays"])
+    assert any(item["id"] == "get_weather_forecast" for item in catalog["tools"])
 
 
-def test_resolve_overlays_ignores_unknown_entries() -> None:
-    service = GeospatialCatalogService(
-        openaq_service=_OpenAQStub(),  # type: ignore[arg-type]
-        pvgis_service=_PVGISStub(),  # type: ignore[arg-type]
-        openmeteo_service=_OpenMeteoStub(),  # type: ignore[arg-type]
-        overpass_service=_OverpassStub(),  # type: ignore[arg-type]
-        rainviewer_service=_RainViewerStub(),  # type: ignore[arg-type]
-    )
+def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(monkeypatch) -> None:
+    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
+    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
 
-    resolved = service.resolve_overlays(["openaq_air_quality", "unknown_overlay"])
+    catalog = _service_with_credentials(False).list_catalog()
+    lookup = {item["id"]: item for item in catalog["capabilities"]}
+    providers = {item["id"]: item for item in catalog["providers"]}
 
-    assert len(resolved) == 1
-    assert resolved[0]["id"] == "openaq_air_quality"
-
-
-def test_catalog_exposes_eea_esa_overlay_transport_metadata() -> None:
-    service = GeospatialCatalogService(
-        openaq_service=_OpenAQStub(),  # type: ignore[arg-type]
-        pvgis_service=_PVGISStub(),  # type: ignore[arg-type]
-        openmeteo_service=_OpenMeteoStub(),  # type: ignore[arg-type]
-        overpass_service=_OverpassStub(),  # type: ignore[arg-type]
-        rainviewer_service=_RainViewerStub(),  # type: ignore[arg-type]
-    )
-
-    overlays = service.list_catalog()["overlays"]
-    lookup = {item["id"]: item for item in overlays}
-
-    eea = lookup["eea_noise_2019"]
-    assert eea["type"] == "wms"
-    assert eea["layers"] == "0"
-    assert eea["wms_version"] == "1.1.1"
-    assert eea["wms_exceptions"] == "application/vnd.ogc.se_inimage"
-    assert isinstance(eea["bounds"], list)
-    assert len(eea["bounds"]) == 4
-
-    esa = lookup["esa_worldcover"]
-    assert esa["type"] == "wmts"
-    assert esa["layer_id"] == "WORLDCOVER_2021_MAP"
-    assert esa["tile_matrix_set"] == "EPSG:3857"
-    assert esa["wmts_format"] == "image/png"
-    assert esa["wmts_style"] == ""
+    assert lookup["tomtom_traffic_flow"]["requires_credentials"] is True
+    assert lookup["tomtom_traffic_flow"]["is_available"] is False
+    assert lookup["geoapify_osm"]["is_available"] is False
+    assert providers["tomtom"]["is_available"] is False
 
 
-def test_insights_are_cached_for_same_aoi() -> None:
-    service = GeospatialCatalogService(
-        openaq_service=_OpenAQStub(),  # type: ignore[arg-type]
-        pvgis_service=_PVGISStub(),  # type: ignore[arg-type]
-        openmeteo_service=_OpenMeteoStub(),  # type: ignore[arg-type]
-        overpass_service=_OverpassStub(),  # type: ignore[arg-type]
-        rainviewer_service=_RainViewerStub(),  # type: ignore[arg-type]
-    )
+def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(monkeypatch) -> None:
+    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
+    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
 
-    first = asyncio.run(
-        service.fetch_insights(
-            latitude=45.0,
-            longitude=9.0,
-            overlay_ids=["openaq_air_quality", "pvgis_solar"],
-            radius_m=2500.0,
-        )
-    )
-    second = asyncio.run(
-        service.fetch_insights(
-            latitude=45.0,
-            longitude=9.0,
-            overlay_ids=["pvgis_solar", "openaq_air_quality"],
-            radius_m=2500.0,
-        )
-    )
+    catalog = _service_with_credentials(True).list_catalog()
+    lookup = {item["id"]: item for item in catalog["capabilities"]}
+    providers = {item["id"]: item for item in catalog["providers"]}
 
-    assert first == second
-    assert "air_quality" in second
-    assert "solar_potential" in second
-
-
-def test_catalog_runtime_insights_include_new_provider_blocks() -> None:
-    service = GeospatialCatalogService(
-        openaq_service=_OpenAQStub(),  # type: ignore[arg-type]
-        pvgis_service=_PVGISStub(),  # type: ignore[arg-type]
-        openmeteo_service=_OpenMeteoStub(),  # type: ignore[arg-type]
-        overpass_service=_OverpassStub(),  # type: ignore[arg-type]
-        rainviewer_service=_RainViewerStub(),  # type: ignore[arg-type]
-    )
-
-    insights = asyncio.run(
-        service.fetch_insights(
-            latitude=45.0,
-            longitude=9.0,
-            overlay_ids=[
-                "openmeteo_weather_forecast",
-                "openmeteo_air_quality_forecast",
-                "overpass_poi_amenities",
-                "rainviewer_precipitation_radar",
-            ],
-            radius_m=2500.0,
-        )
-    )
-    runtime = asyncio.run(
-        service.fetch_overlay_runtime(
-            latitude=45.0,
-            longitude=9.0,
-            overlay_ids=[
-                "openmeteo_weather_forecast",
-                "openmeteo_air_quality_forecast",
-                "overpass_poi_amenities",
-                "rainviewer_precipitation_radar",
-            ],
-            radius_m=2500.0,
-        )
-    )
-
-    assert "weather_forecast" in insights
-    assert "air_quality_forecast" in insights
-    assert "poi_amenities" in insights
-    assert "rain_radar" in insights
-    assert runtime["openmeteo_weather_forecast"]["availability"] == "available"
-    assert runtime["rainviewer_precipitation_radar"]["availability"] == "available"
+    assert lookup["tomtom_traffic_flow"]["is_available"] is True
+    assert lookup["geoapify_osm"]["is_available"] is True
+    assert providers["tomtom"]["is_available"] is True
