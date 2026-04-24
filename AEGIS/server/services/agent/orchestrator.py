@@ -141,12 +141,50 @@ class AgentOrchestrator:
         map_payload: dict[str, Any] | None,
     ) -> str:
         if decision.plan.state == "direct_tool":
-            return f"Executed direct tool '{decision.plan.tool_id}'."
+            return self._compose_direct_tool_message(decision.plan.tool_id, tool_payload)
         if decision.plan.state == "map_search" and isinstance(map_payload, dict):
             return self._compose_map_session_message(map_payload)
         if isinstance(tool_payload, dict) and tool_payload.get("error"):
             return str(tool_payload["error"])
         return "Done."
+
+    @classmethod
+    def _compose_direct_tool_message(
+        cls,
+        tool_id: object,
+        tool_payload: dict[str, Any] | None,
+    ) -> str:
+        if isinstance(tool_payload, dict) and tool_payload.get("error"):
+            return str(tool_payload["error"])
+        result = tool_payload.get("result") if isinstance(tool_payload, dict) else None
+        if not isinstance(result, dict):
+            return f"Completed {cls._humanize_identifier(tool_id)}."
+
+        nested_result = result.get("result")
+        if tool_id == "location_to_coordinates":
+            coordinates = result.get("coordinates")
+            location = result.get("location") or cls._extract_label(tool_payload.get("location"))
+            if isinstance(coordinates, dict):
+                latitude = coordinates.get("latitude")
+                longitude = coordinates.get("longitude")
+                if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
+                    return f"Coordinates for {location}: {latitude:.6f}, {longitude:.6f}."
+        if tool_id == "get_weather_forecast" and isinstance(nested_result, dict):
+            current = nested_result.get("current")
+            location = result.get("location") or cls._extract_label(tool_payload.get("location"))
+            if isinstance(current, dict):
+                temperature = current.get("temperature_2m")
+                precipitation = current.get("precipitation")
+                weather_time = current.get("time")
+                details: list[str] = []
+                if isinstance(temperature, (int, float)):
+                    details.append(f"temperature {temperature:g} C")
+                if isinstance(precipitation, (int, float)):
+                    details.append(f"precipitation {precipitation:g} mm")
+                if details:
+                    suffix = f" at {weather_time}" if isinstance(weather_time, str) and weather_time else ""
+                    return f"Weather for {location}{suffix}: {', '.join(details)}."
+        return f"Completed {cls._humanize_identifier(tool_id)}."
 
     @classmethod
     def _compose_map_session_message(cls, map_payload: dict[str, Any]) -> str:

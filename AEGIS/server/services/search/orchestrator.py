@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import UTC, datetime
 from typing import Any
@@ -51,7 +52,7 @@ class LocationSearchOrchestrator:
                 "latitude": payload.viewport.center_latitude,
                 "longitude": payload.viewport.center_longitude,
             },
-            bounds=payload.viewport.bbox,
+            bounds=payload.viewport.bbox or self._bounds_from_viewport(payload.viewport),
             basemap=basemap,
             overlays=overlays,
             compliance_warnings=warnings,
@@ -90,20 +91,31 @@ class LocationSearchOrchestrator:
             return None
         metadata = self._metadata(capability)
         warnings: list[str] = []
-        resolved_url, url_warning = self._resolve_runtime_tile_url(
+        raw_url = (
             metadata.get("url_template")
             or metadata.get("tile_url_template")
             or metadata.get("tile_url")
-            or metadata.get("url"),
-            capability=capability,
+            or metadata.get("url")
         )
+        capability_type = str(capability.get("type") or "")
+        is_point_insight = raw_url is None and (
+            bool(capability.get("supports_direct_text"))
+            or capability_type.endswith("insight")
+        )
+        if is_point_insight:
+            resolved_url, url_warning = None, None
+        else:
+            resolved_url, url_warning = self._resolve_runtime_tile_url(
+                raw_url,
+                capability=capability,
+            )
         if url_warning is not None:
             warnings.append(f"{overlay_id}: {url_warning}")
         descriptor: dict[str, object] = {
             "id": str(capability.get("id") or overlay_id),
             "label": str(metadata.get("label") or capability.get("name") or overlay_id),
             "provider": str(capability.get("provider") or "unknown"),
-            "type": str(capability.get("type") or "tile"),
+            "type": "point-insight" if is_point_insight else str(capability.get("type") or "tile"),
         }
         optional_fields = {
             "url": resolved_url,
@@ -139,6 +151,25 @@ class LocationSearchOrchestrator:
             return None
         stripped = value.strip()
         return stripped or None
+
+    @staticmethod
+    def _bounds_from_viewport(viewport: Any) -> list[float] | None:
+        latitude = getattr(viewport, "center_latitude", None)
+        longitude = getattr(viewport, "center_longitude", None)
+        radius_m = getattr(viewport, "radius_m", None)
+        if not isinstance(latitude, (int, float)) or not isinstance(longitude, (int, float)):
+            return None
+        if not isinstance(radius_m, (int, float)) or radius_m <= 0:
+            return None
+        lat_delta = radius_m / 111_320.0
+        cos_latitude = math.cos(math.radians(float(latitude)))
+        lon_delta = radius_m / (111_320.0 * max(abs(cos_latitude), 0.01))
+        return [
+            max(-180.0, float(longitude) - lon_delta),
+            max(-90.0, float(latitude) - lat_delta),
+            min(180.0, float(longitude) + lon_delta),
+            min(90.0, float(latitude) + lat_delta),
+        ]
 
     @classmethod
     def _resolve_runtime_tile_url(
