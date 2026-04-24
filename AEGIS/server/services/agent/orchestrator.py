@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
+from uuid import uuid4
 
 from AEGIS.server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from AEGIS.server.repositories.chat_history import ChatHistoryRepository
@@ -10,6 +12,8 @@ from AEGIS.server.services.agent.policy_engine import PolicyEngine
 from AEGIS.server.services.agent.tool_registry import ToolRegistry
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.services.search.request_builder import RequestBuilder
+
+LOGGER = logging.getLogger(__name__)
 
 
 class AgentOrchestrator:
@@ -33,6 +37,13 @@ class AgentOrchestrator:
         self.history_repo = history_repo or ChatHistoryRepository()
 
     async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+        request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
+        LOGGER.info(
+            "chat_turn_start request_id=%s session_id=%s message_length=%s",
+            request_id,
+            payload.session_id,
+            len(payload.message),
+        )
         session = self.history_repo.upsert_session(payload.session_id, title=payload.title)
         self.history_repo.append_message(session_id=session.id, role="user", content=payload.message)
 
@@ -73,6 +84,13 @@ class AgentOrchestrator:
                 decision.resolved_location,
             )
             map_session = await self.search_orchestrator.execute(request)
+            LOGGER.info(
+                "chat_turn_map_session request_id=%s basemap_id=%s overlay_ids=%s warnings=%s",
+                request_id,
+                map_session.basemap_id,
+                map_session.overlay_ids,
+                map_session.compliance_warnings,
+            )
             assistant_message = self._compose_assistant_message(decision, None, map_session.model_dump(mode="json"))
             memory_snapshot = self.location_memory_service.update_memory_snapshot(
                 latest_memory,
@@ -93,12 +111,20 @@ class AgentOrchestrator:
                 "decision": decision.model_dump(mode="json"),
                 "memory_snapshot": memory_snapshot,
                 "previous_turn_contract": latest_contract,
+                "request_id": request_id,
             },
             tool_payload=tool_payload,
             map_session=map_session.model_dump(mode="json") if map_session is not None else None,
         )
 
+        LOGGER.info(
+            "chat_turn_complete request_id=%s session_id=%s state=%s",
+            request_id,
+            session.id,
+            decision.plan.state,
+        )
         return ChatTurnResponse(
+            request_id=request_id,
             session_id=session.id,
             assistant_message=assistant_message,
             turn_contract=turn_contract,

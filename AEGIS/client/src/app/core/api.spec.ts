@@ -21,34 +21,40 @@ describe('core/api', () => {
   it('parseSearchResponse happy path and missing-field failure', () => {
     const parsed = parseSearchResponse({
       status_message: 'ok',
-      payload: { latitude: 1 },
+      map_session: { session_id: 'map-1' },
     });
     expect(parsed.status_message).toBe('ok');
-    expect(parsed.payload.latitude).toBe(1);
+    expect(parsed.map_session.session_id).toBe('map-1');
     expect(() => parseSearchResponse({ payload: {} })).toThrowError('Search response is missing status_message');
   });
 
   it('parseCatalogResponse normalizes entries', () => {
     const parsed = parseCatalogResponse({
-      providers: [{ id: 'p1' }],
-      basemaps: [{ id: 'b1' }],
-      overlays: [{ id: 'o1' }],
+      capabilities: [
+        { id: 'b1', kind: 'basemap' },
+        { id: 'o1', kind: 'overlay' },
+      ],
     });
-    expect(parsed.providers[0].id).toBe('p1');
-    expect(parsed.basemaps[0].label).toBe('b1');
-    expect(parsed.overlays[0].label).toBe('o1');
+    expect(parsed.basemaps?.[0].id).toBe('b1');
+    expect(parsed.basemaps?.[0].name).toBe('b1');
+    expect(parsed.overlays?.[0].id).toBe('o1');
+    expect(parsed.overlays?.[0].name).toBe('o1');
   });
 
   it('parseModelSettingsResponse defaults correctly', () => {
-    const parsed = parseModelSettingsResponse({});
+    const parsed = parseModelSettingsResponse({
+      credential_health: { openai: { api_key: 'unreadable' } },
+    });
     expect(parsed.active_provider_mode).toBe('local');
     expect(parsed.chat_model_provider).toBe('ollama');
     expect(parsed.ollama_url).toBe('http://localhost:11434');
     expect(parsed.credentials).toEqual({});
+    expect(parsed.credential_health?.openai.api_key).toBe('unreadable');
   });
 
   it('parseChatTurnResponse defaults correctly', () => {
-    const parsed = parseChatTurnResponse({});
+    const parsed = parseChatTurnResponse({ request_id: 'chat-abc' });
+    expect(parsed.request_id).toBe('chat-abc');
     expect(parsed.session_id).toBe(0);
     expect(parsed.assistant_message).toBe('');
     expect(parsed.follow_up_required).toBeFalse();

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from AEGIS.server.services.agent.parser_service import ParserService
+from AEGIS.server.services.llm.errors import LLMConfigurationError
 
 
 class _ProviderStub:
@@ -47,6 +50,11 @@ class _FactoryStub:
         return _ProviderStub()
 
 
+class _ConfigErrorFactoryStub:
+    def get_parser_provider(self, provider: str):  # noqa: ARG002
+        raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
+
+
 def test_parser_service_classifies_direct_query() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
@@ -80,3 +88,18 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     assert recent[0]["session_id"] == "217"
     assert recent[0]["turn_index"] == "0"
     assert recent[0]["content"] == ""
+
+
+def test_parser_service_does_not_hide_configuration_errors() -> None:
+    parser = ParserService(
+        llm_factory=_ConfigErrorFactoryStub(),
+        provider="openai",
+        model="gpt-4.1-mini",
+    )
+
+    with pytest.raises(LLMConfigurationError):
+        parser.parse_turn(
+            user_message="Show Rome",
+            memory_snapshot={},
+            conversation_messages=[],
+        )

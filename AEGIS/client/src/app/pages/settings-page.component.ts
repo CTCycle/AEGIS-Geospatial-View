@@ -59,6 +59,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     openai_base_url: null,
     google_base_url: null,
     credentials: {},
+    credential_health: {},
   };
 
   cloudModels: ModelCardDescriptor[] = [];
@@ -331,6 +332,22 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   googleConfigured(): boolean {
     return Boolean(this.settings.credentials['google']?.['api_key']);
+  }
+
+  openAiCredentialHealth(): string | null {
+    return this.credentialHealth('openai');
+  }
+
+  googleCredentialHealth(): string | null {
+    return this.credentialHealth('google');
+  }
+
+  private credentialHealth(provider: 'openai' | 'google'): string | null {
+    const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
+    if (!configured) {
+      return null;
+    }
+    return this.settings.credential_health?.[provider]?.['api_key'] ?? 'unknown';
   }
 
   private validateKeyInputs(): { openai?: string; google?: string } {

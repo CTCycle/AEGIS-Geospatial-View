@@ -186,6 +186,11 @@
           <label>
             OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
             <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event; keyValidationErrors.openai = undefined" name="openai_api_key" placeholder="sk-..." [class.input-invalid]="!!keyValidationErrors.openai" />
+            @if (openAiCredentialHealth() === 'unreadable') {
+              <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+            } @else if (openAiCredentialHealth() === 'healthy') {
+              <span class="settings-modal__field-health">Saved key is readable.</span>
+            }
             @if (keyValidationErrors.openai) {
               <span class="settings-modal__field-error">{{ keyValidationErrors.openai }}</span>
             }
@@ -193,6 +198,11 @@
           <label>
             Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
             <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event; keyValidationErrors.google = undefined" name="google_api_key" placeholder="AIza..." [class.input-invalid]="!!keyValidationErrors.google" />
+            @if (googleCredentialHealth() === 'unreadable') {
+              <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+            } @else if (googleCredentialHealth() === 'healthy') {
+              <span class="settings-modal__field-health">Saved key is readable.</span>
+            }
             @if (keyValidationErrors.google) {
               <span class="settings-modal__field-error">{{ keyValidationErrors.google }}</span>
             }

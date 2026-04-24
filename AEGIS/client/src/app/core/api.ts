@@ -134,6 +134,9 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
     google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
     credentials: parseBooleanCredentialMap(value.credentials),
+    credential_health: isRecord(value.credential_health)
+      ? value.credential_health as ModelSettingsResponse['credential_health']
+      : {},
   };
 };
 
@@ -142,6 +145,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     throw new Error('Unexpected chat response format');
   }
   return {
+    request_id: typeof value.request_id === 'string' ? value.request_id : undefined,
     session_id: Number(value.session_id ?? 0),
     assistant_message: String(value.assistant_message ?? ''),
     turn_contract: isRecord(value.turn_contract) ? value.turn_contract as unknown as ChatTurnResponse['turn_contract'] : {

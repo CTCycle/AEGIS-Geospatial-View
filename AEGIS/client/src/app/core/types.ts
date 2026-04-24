@@ -94,6 +94,7 @@ export interface MapSession {
     wms_exceptions?: string;
     bounds?: [number, number, number, number];
     attribution?: string;
+    maxzoom?: number;
   }>;
   compliance_warnings?: string[];
 }
@@ -122,6 +123,7 @@ export interface ChatTurnRequest {
   title?: string;
   message: string;
   datetime?: string;
+  request_id?: string;
 }
 
 export interface NormalizedIntent {
@@ -191,6 +193,7 @@ export interface ToolPayload {
 }
 
 export interface ChatTurnResponse {
+  request_id?: string;
   session_id: number;
   assistant_message: string;
   turn_contract?: TurnParseResult;
@@ -232,6 +235,7 @@ export interface ModelSettingsResponse {
   openai_base_url?: string | null;
   google_base_url?: string | null;
   credentials: Record<string, Record<string, boolean>>;
+  credential_health?: Record<string, Record<string, 'healthy' | 'unreadable' | string>>;
 }
 
 export interface ModelSettingsUpdateRequest {

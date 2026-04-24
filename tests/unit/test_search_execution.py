@@ -4,7 +4,9 @@ import asyncio
 import inspect
 
 from AEGIS.server.domain.geographics import LocationSearchRequest, SearchByLocationResponse
+from AEGIS.server.domain.agent.decision import ResolvedLocation
 from AEGIS.server.domain.jobs import JobStartResponse
+from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.services.search.composition import build_search_runtime
 
 
@@ -92,3 +94,89 @@ def test_search_and_job_paths_share_normalized_payload(monkeypatch) -> None:
     assert isinstance(response, SearchByLocationResponse)
     assert isinstance(started, JobStartResponse)
     assert calls["count"] == 2
+
+
+def test_location_search_orchestrator_includes_render_descriptors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        LocationSearchOrchestrator,
+        "_resolve_rainviewer_tile_url",
+        staticmethod(
+            lambda: "https://tilecache.rainviewer.com/v2/radar/123/256/{z}/{x}/{y}/2/1_1.png"
+        ),
+    )
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Tokyo",
+            latitude=35.6768601,
+            longitude=139.7638947,
+        ),
+        intent_id="show_precipitation_radar",
+        time_mode="current",
+        basemap_id="osm_dark",
+        overlay_ids=["rainviewer_precipitation_radar"],
+        viewport={
+            "center_latitude": 35.6768601,
+            "center_longitude": 139.7638947,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": True,
+            "high_contrast": True,
+            "show_legend": True,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    assert session.center == {
+        "latitude": 35.6768601,
+        "longitude": 139.7638947,
+    }
+    assert session.basemap is not None
+    assert session.basemap["id"] == "osm_dark"
+    assert session.basemap["label"] == "Dark Basemap"
+    assert session.overlays[0]["id"] == "rainviewer_precipitation_radar"
+    assert "{time}" not in str(session.overlays[0]["url"])
+    assert str(session.overlays[0]["url"]).startswith(
+        "https://tilecache.rainviewer.com/v2/radar/"
+    )
+    assert session.overlays[0]["maxzoom"] == 10
+    assert session.compliance_warnings == []
+
+
+def test_location_search_orchestrator_warns_on_rainviewer_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        LocationSearchOrchestrator,
+        "_resolve_rainviewer_tile_url",
+        staticmethod(lambda: None),
+    )
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Tokyo",
+            latitude=35.6768601,
+            longitude=139.7638947,
+        ),
+        intent_id="show_precipitation_radar",
+        time_mode="current",
+        basemap_id="osm_dark",
+        overlay_ids=["rainviewer_precipitation_radar"],
+        viewport={
+            "center_latitude": 35.6768601,
+            "center_longitude": 139.7638947,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": True,
+            "high_contrast": True,
+            "show_legend": True,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    assert "{time}" not in str(session.overlays[0]["url"])
+    assert session.compliance_warnings == [
+        "rainviewer_precipitation_radar: RainViewer metadata could not be fetched; using a timestamp fallback."
+    ]

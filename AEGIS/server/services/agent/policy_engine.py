@@ -87,8 +87,8 @@ class PolicyEngine:
             state=mode_state,
             mode="direct_text" if mode_state == "direct_tool" else "map",
             intent_id=turn.normalized_intent.intent_id,
-            basemap_id=self._select_basemap(candidates),
-            overlay_ids=[item.capability_id for item in candidates if item.kind == "overlay"][:4],
+            basemap_id=self._select_basemap(turn, candidates),
+            overlay_ids=self._select_overlays(turn, candidates),
             tool_id=selected_tool.capability_id if selected_tool is not None else None,
         )
         if mode_state == "direct_tool" and not plan.tool_id:
@@ -184,9 +184,70 @@ class PolicyEngine:
             missing_fields=["location"],
         )
 
-    def _select_basemap(self, candidates: list[CapabilityCandidate]) -> str:
+    def _intent_text(self, turn: TurnParseResult) -> str:
+        intent = turn.normalized_intent
+        return " ".join(
+            [
+                turn.user_text,
+                intent.intent_id,
+                intent.intent_label,
+                *intent.task_tags,
+                *intent.intent_tags,
+            ]
+        ).lower()
+
+    def _select_basemap(
+        self, turn: TurnParseResult, candidates: list[CapabilityCandidate]
+    ) -> str:
+        intent_text = self._intent_text(turn)
+        if any(marker in intent_text for marker in ("satellite", "imagery", "truecolor")):
+            return "gibs_satellite"
+        if "dark" in intent_text:
+            return "osm_dark"
+        if any(marker in intent_text for marker in ("terrain", "topographic", "topography")):
+            return "osm_terrain"
         preferred = next((item.capability_id for item in candidates if item.kind == "basemap"), None)
         return preferred or "osm_default"
+
+    def _requested_overlay_markers(self, turn: TurnParseResult) -> set[str]:
+        intent_text = self._intent_text(turn)
+        markers: set[str] = set()
+        if any(marker in intent_text for marker in ("air quality", "air_quality", "pollution", "aerosol")):
+            markers.update({"air_quality", "openaq", "aerosol"})
+        if any(marker in intent_text for marker in ("radar", "rainviewer")):
+            return {"rainviewer"}
+        has_precipitation_intent = any(
+            marker in intent_text for marker in ("precipitation", "rain", "storm")
+        )
+        if has_precipitation_intent:
+            markers.update({"precipitation", "rainviewer", "imerg", "radar"})
+        elif any(marker in intent_text for marker in ("weather", "temperature", "forecast")):
+            markers.update({"weather", "temperature", "forecast"})
+        return markers
+
+    def _select_overlays(
+        self, turn: TurnParseResult, candidates: list[CapabilityCandidate]
+    ) -> list[str]:
+        overlays = [item for item in candidates if item.kind == "overlay"]
+        requested_markers = self._requested_overlay_markers(turn)
+        selected: list[str] = []
+        seen: set[str] = set()
+        for overlay in overlays:
+            capability_id = overlay.capability_id
+            normalized_id = capability_id.lower()
+            if requested_markers and not any(
+                marker in normalized_id for marker in requested_markers
+            ):
+                continue
+            if not requested_markers and overlay.score <= 0:
+                continue
+            if capability_id in seen:
+                continue
+            seen.add(capability_id)
+            selected.append(capability_id)
+            if len(selected) >= 4:
+                break
+        return selected
 
     def _default_tool_for_intent(self, intent_id: str) -> str:
         return {
