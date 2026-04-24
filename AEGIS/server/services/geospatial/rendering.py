@@ -9,7 +9,8 @@ from PIL import Image
 
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import LocationSearchRequest
-from AEGIS.server.services.geospatial.gibs import GIBSService, GIBSValidationError
+from AEGIS.server.services.geospatial.gibs import GIBSService
+from AEGIS.server.services.geospatial.gibs_errors import GIBSValidationError
 from AEGIS.server.services.geospatial.layers import (
     LayerProviderEntry,
     LayerProviderError,

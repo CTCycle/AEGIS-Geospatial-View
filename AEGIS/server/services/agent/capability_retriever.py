@@ -4,6 +4,7 @@ from typing import Any
 
 from AEGIS.server.domain.agent.decision import CapabilityCandidate
 from AEGIS.server.domain.extraction.models import TurnParseResult
+from AEGIS.server.services.vector.retriever import VectorRetriever
 
 
 class CapabilityRetriever:
@@ -20,8 +21,6 @@ class CapabilityRetriever:
         if self.vector_retriever is not None:
             return self.vector_retriever
         try:
-            from AEGIS.server.services.vector.retriever import VectorRetriever
-
             self.vector_retriever = VectorRetriever()
         except Exception:
             self.vector_retriever = False

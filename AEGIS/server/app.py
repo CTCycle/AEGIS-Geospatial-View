@@ -12,10 +12,10 @@ from fastapi.staticfiles import StaticFiles
 from AEGIS.server.api.chat import router as chat_router
 from AEGIS.server.api.search import router as search_router
 from AEGIS.server.configurations import get_server_settings
-from AEGIS.server.configurations.startup import run_startup_validations
 from AEGIS.server.repositories.database.initializer import initialize_sqlite_database
 from AEGIS.server.services.chat.composition import build_chat_runtime
 from AEGIS.server.services.search.composition import build_search_runtime
+from AEGIS.server.services.startup_validation import run_startup_validations
 from AEGIS.server.services.vector.indexer import VectorIndexer
 from AEGIS.server.common.constants import (
     FASTAPI_DESCRIPTION,

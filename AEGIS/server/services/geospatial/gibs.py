@@ -15,12 +15,7 @@ from AEGIS.server.common.constants import (
 )
 from AEGIS.server.common.logger import logger
 from AEGIS.server.repositories.database import database
-from AEGIS.server.services.geospatial.gibs_errors import (
-    GIBSPayloadIntegrityError,
-    GIBSRequestError,
-    GIBSServiceError,
-    GIBSValidationError,
-)
+from AEGIS.server.services.geospatial.gibs_errors import GIBSRequestError
 from AEGIS.server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
 
 type BBox = list[float]
