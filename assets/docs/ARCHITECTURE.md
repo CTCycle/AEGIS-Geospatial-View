@@ -1,134 +1,384 @@
-# AEGIS Geospatial View Architecture
+# Architecture
 
-Last updated: 2026-04-21
-Scope: `AEGIS/` and `tests/`
+Last updated: 2026-04-24
+Scope: `AEGIS/`, `tests/`, `release/`
 
-## 1. System Overview
+## System Overview
 
-AEGIS is a chat-first geospatial system with:
-- Angular frontend (`AEGIS/client`)
-- FastAPI backend (`AEGIS/server`)
-- Manifest-driven geospatial capabilities (`AEGIS/resources/manifests`)
+AEGIS Geospatial View is a two-tier application:
+- Frontend: Angular 19 standalone SPA in `AEGIS/client/src`
+- Backend: FastAPI application in `AEGIS/server`
 
-The backend executes a deterministic parser -> policy -> execution pipeline.
+The backend provides chat orchestration and geospatial search APIs. The frontend consumes `/api` endpoints and renders chat + map workflows.
 
-## 2. Capability Source of Truth
+## Directory and File Structure
 
-Capabilities are loaded from manifests through `GeospatialManifestLoader` and `CapabilityRegistry`.
+This structure documents source and operational files (generated caches like `node_modules`, `dist`, `.angular`, and `__pycache__` are intentionally excluded).
 
-Manifest kinds:
-- providers
-- basemaps
-- overlays
-- tools
-- runtime profiles
+### Repository root
 
-Files:
-- `AEGIS/resources/manifests/index.json`
-- `AEGIS/resources/manifests/runtime_profiles.json`
-- `AEGIS/resources/manifests/basemaps/*.json`
-- `AEGIS/resources/manifests/overlays/*.json`
-- `AEGIS/resources/manifests/tools/*.json`
+```text
+AEGIS Geospatial View/
+  AEGIS/
+    client/
+      src/
+      src-tauri/
+      package.json
+      proxy.conf.cjs
+    resources/
+      manifests/
+      database.db
+    scripts/
+    server/
+      api/
+      common/
+      configurations/
+      domain/
+      repositories/
+      services/
+      app.py
+    settings/
+      .env
+      .env.local.example
+      .env.local.tauri.example
+      configurations.json
+    start_on_windows.bat
+    setup_and_maintenance.bat
+  tests/
+    e2e/
+    unit/
+    run_tests.bat
+  release/
+    tauri/
+    windows/
+  pyproject.toml
+  README.md
+```
 
-## 3. Backend Pipeline
+### Backend files (`AEGIS/server`)
 
-Main orchestration entry:
-- `AEGIS/server/services/agent/orchestrator.py`
+```text
+api/
+  chat.py
+  search.py
+common/
+  constants.py
+  logger.py
+  types.py
+configurations/
+  environment.py
+  management.py
+  startup.py
+domain/
+  chat.py
+  geographics.py
+  gibs.py
+  job_state.py
+  jobs.py
+  layers.py
+  settings.py
+  updater.py
+  agent/decision.py
+  agent/task_scope.py
+  extraction/models.py
+  llm/model_settings.py
+repositories/
+  chat_history.py
+  credentials.py
+  manifest_embeddings.py
+  model_settings.py
+  session_catalog.py
+  session_details.py
+  database/backend.py
+  database/initializer.py
+  database/postgres.py
+  database/sqlite.py
+  database/utils.py
+  queries/manifest_embeddings.py
+  queries/session_catalog.py
+  queries/session_details.py
+  schemas/models.py
+  serialization/serializer.py
+services/
+  cryptography.py
+  jobs.py
+  sanitization.py
+  agent/candidate_ranker.py
+  agent/capability_retriever.py
+  agent/executor.py
+  agent/location_memory.py
+  agent/location_resolver.py
+  agent/orchestrator.py
+  agent/parser_service.py
+  agent/policy_engine.py
+  agent/tool_registry.py
+  agent/tool_handlers/air_quality.py
+  agent/tool_handlers/coordinates.py
+  agent/tool_handlers/poi.py
+  agent/tool_handlers/weather.py
+  chat/composition.py
+  chat/history_buffer.py
+  chat/maintenance_service.py
+  chat/model_library.py
+  chat/plain_responder.py
+  chat/settings_service.py
+  geospatial/capability_registry.py
+  geospatial/catalog.py
+  geospatial/coverage.py
+  geospatial/elevation.py
+  geospatial/gibs_errors.py
+  geospatial/gibs_runtime.py
+  geospatial/gibs.py
+  geospatial/layers.py
+  geospatial/manifest_loader.py
+  geospatial/maps.py
+  geospatial/nominatim.py
+  geospatial/openaq.py
+  geospatial/openmeteo.py
+  geospatial/osm_tiles.py
+  geospatial/overpass.py
+  geospatial/pvgis.py
+  geospatial/rainviewer.py
+  geospatial/rendering.py
+  geospatial/runtime_registry.py
+  llm/base.py
+  llm/cloud_catalog.py
+  llm/context_builder.py
+  llm/factory.py
+  llm/google_provider.py
+  llm/langchain_runtime.py
+  llm/ollama.py
+  llm/openai_provider.py
+  llm/prompts.py
+  llm/structured.py
+  llm/types.py
+  search/composition.py
+  search/execution.py
+  search/orchestrator.py
+  search/request_builder.py
+  updater/gibs.py
+  vector/chroma_store.py
+  vector/embedding_factory.py
+  vector/indexer.py
+  vector/manifest_preparation.py
+  vector/retriever.py
+app.py
+```
 
-Pipeline order:
-1. load recent messages and memory snapshot
-2. parse turn (`ParserService`)
-3. run policy (`PolicyEngine`)
-4. execute direct tool or map search
-5. compose assistant response
-6. persist structured payloads
+### Frontend files (`AEGIS/client/src`)
 
-### Parser Layer
+```text
+main.ts
+styles.css
+app/
+  app.component.ts
+  app.config.ts
+  app.routes.ts
+  components/
+    map-preview.component.*
+    model-role-actions.component.*
+    settings-icon-action.component.*
+    settings-modal-shell.component.*
+  core/
+    api.ts
+    app-state.ts
+    app-state-store.service.ts
+    constants.ts
+    model-selection.ts
+    types.ts
+    user-facing-error.service.ts
+    view-state-sync.service.ts
+  pages/
+    geospatial-page.component.*
+    settings-page.component.*
+```
 
-- `AEGIS/server/services/agent/parser_service.py`
+### Manifest files (`AEGIS/resources/manifests`)
 
-Parser is evidence-only and returns `TurnParseResult`.
+- `index.json`
+- `runtime_profiles.json`
+- `providers/*.json`
+- `basemaps/*.json`
+- `overlays/*.json`
+- `tools/*.json`
 
-### Policy Layer
+### Tests
 
-- `AEGIS/server/services/agent/policy_engine.py`
-- `AEGIS/server/services/agent/location_resolver.py`
-- `AEGIS/server/services/agent/capability_retriever.py`
-- `AEGIS/server/services/agent/candidate_ranker.py`
+- E2E: `tests/e2e/*.py`
+- Unit: `tests/unit/**/*.py`
+- Runner: `tests/run_tests.bat`
 
-Policy emits `PolicyDecision` + strict `ExecutionPlan`.
+## Entry Points
 
-### Execution Layer
+### Backend
 
-Map execution:
-- `AEGIS/server/services/search/request_builder.py`
-- `AEGIS/server/services/search/orchestrator.py`
-- `AEGIS/server/services/search/execution.py`
+- Import/runtime entry: `AEGIS/server/app.py`
+- ASGI app object: `app = create_app()`
+- Standard startup invocation:
+  - PowerShell: `uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002`
+  - CMD: `uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002`
 
-Direct tools:
-- `AEGIS/server/services/agent/tool_registry.py`
-- `AEGIS/server/services/agent/tool_handlers/*.py`
+### Frontend web app
 
-## 4. Runtime Registry
+- Browser bootstrap: `AEGIS/client/src/main.ts`
+- Root component: `AEGIS/client/src/app/app.component.ts`
+- Routes: `AEGIS/client/src/app/app.routes.ts`
 
-`RuntimeRegistry` evaluates runtime readiness from `runtime_profiles.json` and credentials.
+### Desktop packaging
 
-Checks include:
-- enabled by default
-- credential presence
-- support mode (`map`, `direct_text`)
-- provider health status
-- tool handler name mapping
+- Tauri config: `AEGIS/client/src-tauri/tauri.conf.json`
+- Packaging script: `release/tauri/build_with_tauri.bat`
 
-No hardcoded provider-specific branches are used as routing authority.
+## API Endpoints
 
-## 5. Coverage and Catalog
+All routers are mounted with prefix `/api` in `AEGIS/server/app.py`.
 
-Coverage evaluation:
-- `AEGIS/server/services/geospatial/coverage.py`
+### Search endpoints (`AEGIS/server/api/search.py`)
 
-Catalog output:
-- `AEGIS/server/services/geospatial/catalog.py`
+- `GET /api/maps/catalog`  
+  Returns `GeospatialCatalogResponse`.
 
-Catalog exposes normalized descriptors for basemaps, overlays, and tools with availability, support modes, coverage, and tags.
+- `GET /api/maps/basemaps/osm/{z}/{x}/{y}.png`  
+  Proxies OSM basemap tiles.
 
-## 6. API Contracts
+- `POST /api/maps/search`  
+  Synchronous location search (`LocationSearchRequest` -> `SearchByLocationResponse`).
 
-Chat:
-- `POST /api/chat/turn`
-- `POST /api/chat/stream`
+- `POST /api/maps/jobs`  
+  Starts async search job (`LocationSearchRequest` -> `JobStartResponse`, HTTP 202).
 
-Maps:
-- `GET /api/maps/catalog`
-- `POST /api/maps/search`
+- `GET /api/maps/jobs/{job_id}`  
+  Polls async job status (`JobStatusResponse`).
 
-Request/response contracts are strict and versioned in backend and frontend domain types.
+- `DELETE /api/maps/jobs/{job_id}`  
+  Requests async job cancellation (`JobCancelResponse`).
 
-## 7. Frontend Integration
+### Chat/settings/model endpoints (`AEGIS/server/api/chat.py`)
 
-Primary page:
-- `AEGIS/client/src/app/pages/geospatial-page.component.ts`
+- `POST /api/chat/turn`  
+  Executes chat turn and returns structured turn response.
 
-Map renderer:
-- `AEGIS/client/src/app/components/map-preview.component.ts`
+- `POST /api/chat/stream`  
+  NDJSON event stream for progressive chat output.
 
-The frontend consumes explicit decision/tool/map payloads and explicit `basemap_id`/`overlay_ids` from backend responses.
+- `GET /api/chat/models`  
+  Returns cloud/local model library.
 
-## 8. Persistence
+- `GET /api/chat/settings`  
+  Reads model/provider settings.
 
-Structured chat turn payloads are stored in existing JSON persistence fields through `ChatHistoryRepository`.
+- `PUT /api/chat/settings`  
+  Updates model/provider settings and credentials.
 
-Location slot memory is persisted and restored from the same structured payloads.
+- `POST /api/chat/models/ollama/refresh`  
+  Refreshes local Ollama model list.
 
-No database schema migration is required for this workflow.
+- `POST /api/chat/models/ollama/pull`  
+  Pulls requested Ollama model.
 
-## 9. Test Coverage Focus
+- `GET /api/chat/models/ollama/health`  
+  Checks Ollama health.
 
-Primary coverage targets:
-- parser service
-- location memory and resolver
-- policy engine and retrieval/reranking
-- capability/runtime/coverage registry behavior
-- request builder and vector manifest preparation
-- frontend rendering for clarification/direct-tool/map-session states
-- persisted state invalidation on schema version changes
+- `POST /api/chat/vectors/rebuild`  
+  Rebuilds vector index.
+
+- `POST /api/chat/vectors/sync`  
+  Syncs vector index with manifests.
+
+## Layered Architecture and Responsibilities
+
+### Backend request flow
+
+- API layer: `AEGIS/server/api/*.py`
+- Service/orchestration layer: `AEGIS/server/services/**`
+- Persistence layer: `AEGIS/server/repositories/**`
+- Contracts/domain models: `AEGIS/server/domain/**`
+
+Representative path:
+- endpoint (`chat.py` / `search.py`) -> service composition (`services/*/composition.py`) -> orchestration/execution (`services/agent`, `services/search`, `services/geospatial`) -> repository/database operations (`repositories/*`)
+
+### Chat orchestration pipeline
+
+1. `AgentOrchestrator` receives chat turn.
+2. `ParserService` produces structured parse output.
+3. `PolicyEngine` resolves decision and execution plan.
+4. Execution branch:
+   - direct tool via `ToolRegistry` handlers, or
+   - map search via `RequestBuilder` + `LocationSearchOrchestrator`.
+5. Response payload persisted through repositories (chat history/session tables).
+
+### Geospatial capability pipeline
+
+- `manifest_loader.py` reads manifests.
+- `capability_registry.py` builds capability catalog.
+- `runtime_registry.py` applies runtime/credential availability.
+- `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
+
+## Data Persistence
+
+### Relational storage
+
+- Runtime selector: `AEGIS/server/repositories/database/backend.py`
+- Modes:
+  - SQLite (`database.embedded_database: true`) via `sqlite.py`
+  - PostgreSQL (`embedded_database: false`) via `postgres.py`
+- Settings source: `AEGIS/settings/configurations.json`
+
+Core tables (defined in constants/schema layer) include:
+- chat sessions/messages
+- model provider settings
+- encrypted model credentials
+- geospatial metadata/session data
+
+### Vector persistence
+
+- Vector services in `AEGIS/server/services/vector/*`
+- Index lifecycle managed by `VectorIndexer` and maintenance endpoints.
+
+### Frontend persistence
+
+- `sessionStorage` state snapshot key: `aegis:webapp-state:v3`
+- TTL: 6 hours
+- Tab ownership guard via heartbeat keys in `localStorage`
+- Implementation: `AEGIS/client/src/app/core/app-state.ts`
+
+## Async vs Sync Behavior
+
+### Async
+
+- FastAPI route handlers are predominantly `async`.
+- `POST /api/chat/stream` uses streaming NDJSON responses.
+- Search endpoints can run asynchronously through job APIs (`/api/maps/jobs`).
+
+### Sync/Threaded
+
+- Job runtime is in-process threaded (`JobManager` with `threading.Thread`).
+- `MapSearchExecutionService.start_search_job` uses synchronous runner bridge (`asyncio.run(...)`) inside job threads.
+- Cancellation is cooperative (`stop_requested` flag), not forceful thread termination.
+
+### Constraints
+
+- Job state is memory-backed and process-local (lost on restart).
+- High-concurrency/distributed workloads require external queue/worker replacement.
+- Async endpoints must avoid blocking CPU-bound work on the event loop.
+
+## Frontend Architecture
+
+- Route-level pages:
+  - `GeospatialPageComponent` (`/`) for chat + map workspace
+  - `SettingsPageComponent` (`/settings`) for model/provider and credential management
+- API client + response normalization: `core/api.ts`
+- Persisted view/application state: `core/app-state.ts` + store service
+- Map rendering surface: `components/map-preview.component.*`
+
+## External Integrations
+
+External providers are used through service modules and manifests:
+- OpenStreetMap/Nominatim
+- NASA GIBS
+- OpenAQ
+- Open-Meteo
+- Overpass
+- PVGIS
+- Rainviewer
+- LLM providers: Ollama, OpenAI-compatible, Google-compatible
