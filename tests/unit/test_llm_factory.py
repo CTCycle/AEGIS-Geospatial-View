@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from AEGIS.server.services.llm.factory import LLMFactory
+from AEGIS.server.services.llm.errors import LLMConfigurationError
 from AEGIS.server.services.llm.google_provider import GoogleProvider
 from AEGIS.server.services.llm.ollama import OllamaProvider
 from AEGIS.server.services.llm.openai_provider import OpenAIProvider
@@ -38,6 +39,11 @@ class _CredentialsRepo:
 class _Crypto:
     def decrypt(self, encrypted_value: str) -> str:
         return f"decrypted:{encrypted_value}"
+
+
+class _FailingCrypto:
+    def decrypt(self, encrypted_value: str) -> str:  # noqa: ARG002
+        raise ValueError("bad key")
 
 
 def test_openai_credential_is_read_from_repository(monkeypatch) -> None:
@@ -102,6 +108,22 @@ def test_missing_credentials_follow_current_failure_path() -> None:
 
     with pytest.raises(ValueError, match="OpenAI credentials are not configured"):
         factory.get_provider("openai")
+
+
+def test_unreadable_credentials_raise_configuration_error() -> None:
+    repo = _CredentialsRepo({("openai", "api_key"): "enc-openai"})
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=repo,
+        crypto_service=_FailingCrypto(),
+    )
+
+    with pytest.raises(
+        LLMConfigurationError,
+        match="OpenAI credentials are saved but cannot be decrypted",
+    ):
+        factory.get_provider("openai")
+    assert repo.mark_used_calls == []
 
 
 def test_get_provider_returns_ollama_provider_type() -> None:

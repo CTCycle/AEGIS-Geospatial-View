@@ -24,9 +24,17 @@ class ChatSettingsService:
         record = self.settings_repo.get_or_create()
         active_credentials = self.credentials_repo.list_active()
         credential_presence: dict[str, dict[str, bool]] = {}
+        credential_health: dict[str, dict[str, str]] = {}
         for item in active_credentials:
             provider_bucket = credential_presence.setdefault(item.provider, {})
             provider_bucket[item.label] = True
+            health_bucket = credential_health.setdefault(item.provider, {})
+            try:
+                self.crypto_service.decrypt(item.encrypted_value)
+            except ValueError:
+                health_bucket[item.label] = "unreadable"
+            else:
+                health_bucket[item.label] = "healthy"
         return ModelSettingsResponse(
             active_provider_mode=record.active_provider_mode,  # type: ignore[arg-type]
             chat_model_provider=record.chat_model_provider,
@@ -39,6 +47,7 @@ class ChatSettingsService:
             openai_base_url=record.openai_base_url,
             google_base_url=record.google_base_url,
             credentials=credential_presence,
+            credential_health=credential_health,
         )
 
     def get_ollama_url(self) -> str:

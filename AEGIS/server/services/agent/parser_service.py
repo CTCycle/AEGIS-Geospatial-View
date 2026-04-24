@@ -13,6 +13,7 @@ from AEGIS.server.domain.extraction.models import (
     TurnParseResult,
 )
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
+from AEGIS.server.services.llm.errors import LLMConfigurationError
 from AEGIS.server.services.llm.factory import LLMFactory
 from AEGIS.server.services.llm.types import LLMRequest
 from pydantic import BaseModel, ConfigDict, Field
@@ -189,6 +190,8 @@ class ParserService:
                 memory_snapshot=memory_snapshot,
                 recent_messages=normalized_recent,
             )
+        except LLMConfigurationError:
+            raise
         except Exception as exc:
             LOGGER.exception("Parser LLM extraction failed: %s", exc)
             extracted = _LLMParserExtraction(

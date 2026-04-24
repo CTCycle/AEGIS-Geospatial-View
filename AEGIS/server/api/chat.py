@@ -4,6 +4,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -21,6 +22,7 @@ from AEGIS.server.domain.chat import (
     OllamaRefreshResponse,
     VectorizationResponse,
 )
+from AEGIS.server.services.llm.errors import LLMConfigurationError
 from AEGIS.server.services.chat.composition import ChatRuntime
 from AEGIS.server.common.constants import (
     CHAT_MODELS_ROUTE,
@@ -68,14 +70,28 @@ def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
 
 
+def _ensure_request_id(payload: ChatTurnRequest) -> ChatTurnRequest:
+    if payload.request_id:
+        return payload
+    return payload.model_copy(update={"request_id": f"chat-{uuid4().hex[:12]}"})
+
+
 ###############################################################################
 async def _chat_event_stream(
     payload: ChatTurnRequest,
     runtime: ChatRuntime,
 ) -> AsyncIterator[str]:
-    yield _stream_event(ChatStreamEvent(event="status", data={"message": "received"}))
+    payload = _ensure_request_id(payload)
+    request_id = payload.request_id
+    yield _stream_event(
+        ChatStreamEvent(
+            event="status",
+            data={"message": "received", "request_id": request_id or ""},
+        )
+    )
     try:
         result = await runtime.agent_orchestrator.run_turn(payload)
+        request_id = result.request_id
         for token in result.assistant_message.split():
             yield _stream_event(
                 ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "})
@@ -92,6 +108,7 @@ async def _chat_event_stream(
                 event="final",
                 data={
                     "session_id": result.session_id,
+                    "request_id": result.request_id,
                     "assistant_message": result.assistant_message,
                     "turn_contract": result.turn_contract.model_dump(mode="json"),
                     "decision": result.decision.model_dump(mode="json"),
@@ -108,16 +125,17 @@ async def _chat_event_stream(
         yield _stream_event(
             ChatStreamEvent(
                 event="error",
-                data={"message": detail, "status": exc.status_code},
+                data={"message": detail, "status": exc.status_code, "request_id": request_id or ""},
             )
         )
-    except ValueError as exc:
+    except LLMConfigurationError as exc:
         yield _stream_event(
             ChatStreamEvent(
                 event="error",
                 data={
                     "message": str(exc),
                     "status": status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "request_id": request_id or "",
                 },
             )
         )
@@ -130,6 +148,7 @@ async def _chat_event_stream(
                     "message": str(exc)
                     or "Unexpected server error while streaming response.",
                     "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "request_id": request_id or "",
                 },
             )
         )
@@ -144,9 +163,10 @@ async def chat_turn(
     payload: ChatTurnRequest,
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatTurnResponse:
+    payload = _ensure_request_id(payload)
     try:
         return await runtime.agent_orchestrator.run_turn(payload)
-    except ValueError as exc:
+    except LLMConfigurationError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc

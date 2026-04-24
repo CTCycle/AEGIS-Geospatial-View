@@ -37,6 +37,7 @@ describe('pages/settings-page.component', () => {
       agent_model_name: 'llama3.2',
       ollama_url: 'http://localhost:11434',
       credentials: {},
+      credential_health: {},
     });
     spyOn(Api, 'fetchChatModels').and.resolveTo({
       cloud: [{ id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', description: 'cloud', provider: 'openai', capabilities: [], metadata: {} }],
@@ -126,6 +127,26 @@ describe('pages/settings-page.component', () => {
     component.openaiKey = 'sk-valid-openai-key-12345';
     await component.saveKeys();
     expect(component.statusText).toContain('Could not save API keys right now.');
+  });
+
+  it('reports unreadable credential health in API key modal state', async () => {
+    (Api.fetchChatSettings as jasmine.Spy).and.resolveTo({
+      active_provider_mode: 'cloud',
+      chat_model_provider: 'openai',
+      chat_model_name: 'gpt-4.1-mini',
+      parser_model_provider: 'openai',
+      parser_model_name: 'gpt-4.1-mini',
+      agent_model_provider: 'openai',
+      agent_model_name: 'gpt-4.1-mini',
+      ollama_url: 'http://localhost:11434',
+      credentials: { openai: { api_key: true } },
+      credential_health: { openai: { api_key: 'unreadable' } },
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.openAiCredentialHealth()).toBe('unreadable');
   });
 
   it('Ollama health success and degraded failure message formatting', async () => {

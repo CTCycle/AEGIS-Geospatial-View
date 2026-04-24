@@ -24,9 +24,11 @@ class ChatTurnRequest(BaseModel):
     title: str | None = None
     message: str
     datetime: str | None = None
+    request_id: str | None = None
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
+    request_id: str
     session_id: int
     assistant_message: str
     turn_contract: TurnParseResult
@@ -62,6 +64,7 @@ class ModelSettingsResponse(BaseModel):
     openai_base_url: str | None = None
     google_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
+    credential_health: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):

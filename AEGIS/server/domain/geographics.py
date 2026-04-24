@@ -49,6 +49,11 @@ class MapSession(BaseModel):
     viewport: ViewportPolicy
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     payload: dict[str, object] = Field(default_factory=dict)
+    center: dict[str, float | None] | None = None
+    bounds: list[float] | None = None
+    basemap: dict[str, object] | None = None
+    overlays: list[dict[str, object]] = Field(default_factory=list)
+    compliance_warnings: list[str] = Field(default_factory=list)
 
 
 class SearchByLocationResponse(BaseModel):
