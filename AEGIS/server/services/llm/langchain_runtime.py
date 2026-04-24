@@ -19,7 +19,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/d
     class SystemMessage(_FallbackMessage):
         pass
 
-from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult
+from AEGIS.server.services.llm.types import LLMRequest, LLMResult
 
 
 def to_langchain_messages(messages: list[dict[str, str]]) -> list[object]:
@@ -64,11 +64,9 @@ def read_ai_message_text(value: object) -> str:
     return _text_from_content(content)
 
 
-def invoke_chat_model(
-    *, chat_model: object, request: ChatCompletionRequest
-) -> ChatCompletionResult:
+def invoke_chat_model(*, chat_model: object, request: LLMRequest) -> LLMResult:
     response = chat_model.invoke(to_langchain_messages(request.messages))
-    return ChatCompletionResult(
+    return LLMResult(
         content=read_ai_message_text(response),
         raw={
             "response_metadata": dict(getattr(response, "response_metadata", {}) or {}),
@@ -79,7 +77,7 @@ def invoke_chat_model(
 
 
 def stream_chat_model(
-    *, chat_model: object, request: ChatCompletionRequest
+    *, chat_model: object, request: LLMRequest
 ) -> Iterable[str]:
     for chunk in chat_model.stream(to_langchain_messages(request.messages)):
         text = read_ai_message_text(chunk)
@@ -90,7 +88,7 @@ def stream_chat_model(
 def invoke_structured_chat_model(
     *,
     chat_model: object,
-    request: ChatCompletionRequest,
+    request: LLMRequest,
     schema: type[object],
 ) -> dict[str, object]:
     structured_model = chat_model.with_structured_output(schema)

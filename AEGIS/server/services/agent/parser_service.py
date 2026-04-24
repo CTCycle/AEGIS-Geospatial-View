@@ -14,7 +14,7 @@ from AEGIS.server.domain.extraction.models import (
 )
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
 from AEGIS.server.services.llm.factory import LLMFactory
-from AEGIS.server.services.llm.types import ChatCompletionRequest
+from AEGIS.server.services.llm.types import LLMRequest
 from pydantic import BaseModel, ConfigDict, Field
 
 LOGGER = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ class ParserService:
             "memory_snapshot": memory_snapshot,
             "recent_messages": recent_messages[-6:],
         }
-        request = ChatCompletionRequest(
+        request = LLMRequest(
             model=model_name,
             temperature=0.0,
             messages=[

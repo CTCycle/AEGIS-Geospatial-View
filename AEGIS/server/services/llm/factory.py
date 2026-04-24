@@ -6,7 +6,7 @@ from AEGIS.server.repositories.credentials import CredentialRepository
 from AEGIS.server.repositories.model_settings import ModelSettingsRepository
 from AEGIS.server.services.cryptography import CredentialEncryptionService
 from AEGIS.server.services.llm.base import LLMProvider
-from AEGIS.server.services.llm.types import ChatCompletionRequest
+from AEGIS.server.services.llm.types import LLMRequest
 from AEGIS.server.services.llm.google_provider import GoogleProvider
 from AEGIS.server.services.llm.ollama import OllamaProvider
 from AEGIS.server.services.llm.openai_provider import OpenAIProvider
@@ -75,6 +75,6 @@ class _ChatOnlyProvider:
         return getattr(self._delegate, item)
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
         raise RuntimeError("Structured extraction is forbidden on chat-model path.")
