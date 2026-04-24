@@ -103,6 +103,7 @@ services/
   cryptography.py
   jobs.py
   sanitization.py
+  startup_validation.py
   agent/candidate_ranker.py
   agent/capability_retriever.py
   agent/executor.py

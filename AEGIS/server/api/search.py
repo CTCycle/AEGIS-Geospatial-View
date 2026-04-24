@@ -38,13 +38,16 @@ async def get_catalog(
 
 
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
-def proxy_osm_basemap_tile(request: Request, z: int, x: int, y: int) -> Response:
+def proxy_osm_basemap_tile(
+    z: int,
+    x: int,
+    y: int,
+    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+) -> Response:
     if z < 0 or x < 0 or y < 0:
         return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
-        tile, media_type, cache_control = (
-            request.app.state.search_runtime.osm_tile_proxy_service.fetch_tile(z, x, y)
-        )
+        tile, media_type, cache_control = search_execution.fetch_osm_basemap_tile(z, x, y)
         return Response(
             content=tile,
             media_type=media_type,

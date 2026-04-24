@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import HTTPException, status
 
 from AEGIS.server.configurations import get_server_settings
@@ -10,6 +12,7 @@ from AEGIS.server.domain.geographics import (
 )
 from AEGIS.server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
+from AEGIS.server.services.geospatial.osm_tiles import OsmTileProxyService
 from AEGIS.server.services.jobs import JobManager
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.common.constants import (
@@ -27,10 +30,12 @@ class MapSearchExecutionService:
         *,
         orchestrator: LocationSearchOrchestrator,
         catalog_service: GeospatialCatalogService,
+        osm_tile_proxy_service: OsmTileProxyService,
         job_manager: JobManager,
     ) -> None:
         self.orchestrator = orchestrator
         self.catalog_service = catalog_service
+        self.osm_tile_proxy_service = osm_tile_proxy_service
         self.job_manager = job_manager
 
     async def search_by_location(self, payload: LocationSearchRequest) -> SearchByLocationResponse:
@@ -41,18 +46,9 @@ class MapSearchExecutionService:
         )
 
     async def start_search_job(self, payload: LocationSearchRequest) -> JobStartResponse:
-        async def _runner() -> dict[str, object]:
-            response = await self.search_by_location(payload)
-            return response.model_dump(mode="json")
-
-        def _sync_runner(service: "MapSearchExecutionService", job_payload: LocationSearchRequest) -> dict[str, object]:
-            import asyncio
-
-            return asyncio.run(service.search_by_location(job_payload)).model_dump(mode="json")
-
         job_id = self.job_manager.start_job(
             job_type="map_search",
-            runner=_sync_runner,
+            runner=run_search_job,
             kwargs={"service": self, "job_payload": payload},
         )
         job_status = self.job_manager.get_job_status(job_id)
@@ -99,3 +95,14 @@ class MapSearchExecutionService:
     async def get_catalog(self) -> GeospatialCatalogResponse:
         catalog = self.catalog_service.list_catalog()
         return GeospatialCatalogResponse.model_validate(catalog)
+
+    def fetch_osm_basemap_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:
+        return self.osm_tile_proxy_service.fetch_tile(z, x, y)
+
+
+def run_search_job(
+    service: MapSearchExecutionService,
+    job_payload: LocationSearchRequest,
+) -> dict[str, object]:
+    response = asyncio.run(service.search_by_location(job_payload))
+    return response.model_dump(mode="json")
