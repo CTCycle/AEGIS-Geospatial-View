@@ -1,26 +1,17 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from typing import Any
 
 try:
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+    from openai import OpenAI
 except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
-    ChatOpenAI = None  # type: ignore[assignment]
-    OpenAIEmbeddings = None  # type: ignore[assignment]
+    OpenAI = None  # type: ignore[assignment]
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
-from AEGIS.server.services.llm.langchain_runtime import (
-    invoke_chat_model,
-    invoke_structured_chat_model,
-    stream_chat_model,
-)
-from AEGIS.server.services.llm.types import (
-    ChatCompletionRequest,
-    ChatCompletionResult,
-    ModelDescriptor,
-)
+from AEGIS.server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
 
 
 class OpenAIProvider(LLMProvider):
@@ -31,66 +22,86 @@ class OpenAIProvider(LLMProvider):
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
 
     def _ensure_dependency(self) -> None:
-        if ChatOpenAI is None or OpenAIEmbeddings is None:
+        if OpenAI is None:
             raise RuntimeError(
-                "langchain_openai is not installed. Install optional LLM dependencies to use OpenAI provider."
+                "openai is not installed. Install LLM dependencies to use OpenAI provider."
             )
 
-    def _build_chat_model(self, *, model: str, temperature: float) -> ChatOpenAI:
+    def _client(self) -> Any:
         self._ensure_dependency()
-        return ChatOpenAI(
-            model=model,
-            temperature=temperature,
-            api_key=self.api_key,
-            base_url=self.base_url,
-        )
-
-    def _build_embedding_model(self, *, model: str) -> OpenAIEmbeddings:
-        self._ensure_dependency()
-        return OpenAIEmbeddings(
-            model=model,
-            api_key=self.api_key,
-            base_url=self.base_url,
-        )
+        return OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def list_models(self) -> list[ModelDescriptor]:
         return [
             entry for entry in get_cloud_model_catalog() if entry.provider == "openai"
         ]
 
-    def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
-        return invoke_chat_model(
-            chat_model=self._build_chat_model(
-                model=request.model, temperature=request.temperature
-            ),
-            request=request,
+    def chat(self, request: LLMRequest) -> LLMResult:
+        response = self._client().responses.create(
+            model=request.model,
+            input=request.messages,
+            temperature=request.temperature,
+        )
+        return LLMResult(
+            content=str(getattr(response, "output_text", "") or ""),
+            raw=self._dump_response(response),
         )
 
-    def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
-        return stream_chat_model(
-            chat_model=self._build_chat_model(
-                model=request.model, temperature=request.temperature
-            ),
-            request=request,
+    def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        stream = self._client().responses.create(
+            model=request.model,
+            input=request.messages,
+            temperature=request.temperature,
+            stream=True,
         )
+        for event in stream:
+            if getattr(event, "type", None) != "response.output_text.delta":
+                continue
+            delta = getattr(event, "delta", "")
+            if delta:
+                yield str(delta)
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
-        payload = invoke_structured_chat_model(
-            chat_model=self._build_chat_model(
-                model=request.model, temperature=request.temperature
-            ),
-            request=request,
-            schema=schema,
+        response = self._client().responses.parse(
+            model=request.model,
+            input=request.messages,
+            temperature=request.temperature,
+            text_format=schema,
         )
-        return dict(payload)
+        parsed = getattr(response, "output_parsed", None)
+        if isinstance(parsed, dict):
+            return parsed
+        model_dump = getattr(parsed, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump(mode="json")
+            return dumped if isinstance(dumped, dict) else {}
+        output_text = str(getattr(response, "output_text", "") or "")
+        if output_text:
+            loaded = json.loads(output_text)
+            return loaded if isinstance(loaded, dict) else {}
+        return {}
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        values = self._build_embedding_model(model=model).embed_query(input_text)
-        if not isinstance(values, list):
+        response = self._client().embeddings.create(model=model, input=input_text)
+        data = getattr(response, "data", None)
+        if not data:
             return []
-        return [float(value) for value in values if isinstance(value, (int, float))]
+        embedding = getattr(data[0], "embedding", None)
+        if not isinstance(embedding, list):
+            return []
+        return [float(value) for value in embedding if isinstance(value, (int, float))]
 
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
+
+    @staticmethod
+    def _dump_response(response: object) -> dict[str, Any]:
+        model_dump = getattr(response, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump(mode="json")
+            return dumped if isinstance(dumped, dict) else {}
+        if isinstance(response, dict):
+            return response
+        return {}

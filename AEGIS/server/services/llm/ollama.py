@@ -20,8 +20,8 @@ from AEGIS.server.services.llm.langchain_runtime import (
     stream_chat_model,
 )
 from AEGIS.server.services.llm.types import (
-    ChatCompletionRequest,
-    ChatCompletionResult,
+    LLMRequest,
+    LLMResult,
     ModelDescriptor,
 )
 
@@ -174,7 +174,7 @@ class OllamaProvider(LLMProvider):
     def pull_model(self, *, model: str) -> dict[str, Any]:
         return self._post_json("/api/pull", {"name": model, "stream": False})
 
-    def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
+    def chat(self, request: LLMRequest) -> LLMResult:
         return invoke_chat_model(
             chat_model=self._build_chat_model(
                 model=request.model, temperature=request.temperature
@@ -182,7 +182,7 @@ class OllamaProvider(LLMProvider):
             request=request,
         )
 
-    def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
+    def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         return stream_chat_model(
             chat_model=self._build_chat_model(
                 model=request.model, temperature=request.temperature
@@ -191,7 +191,7 @@ class OllamaProvider(LLMProvider):
         )
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
         payload = invoke_structured_chat_model(
             chat_model=self._build_chat_model(

@@ -8,7 +8,7 @@ from AEGIS.server.services.llm.factory import LLMFactory
 from AEGIS.server.services.llm.google_provider import GoogleProvider
 from AEGIS.server.services.llm.ollama import OllamaProvider
 from AEGIS.server.services.llm.openai_provider import OpenAIProvider
-from AEGIS.server.services.llm.types import ChatCompletionRequest
+from AEGIS.server.services.llm.types import LLMRequest
 
 
 class _SettingsRepo:
@@ -144,7 +144,7 @@ def test_chat_only_provider_blocks_structured_output() -> None:
         crypto_service=_Crypto(),
     )
     provider = factory.get_chat_provider("ollama")
-    request = ChatCompletionRequest(model="test", messages=[{"role": "user", "content": "x"}])
+    request = LLMRequest(model="test", messages=[{"role": "user", "content": "x"}])
 
     with pytest.raises(RuntimeError, match="Structured extraction is forbidden"):
         provider.structured_output(request, schema=dict)

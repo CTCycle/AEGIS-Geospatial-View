@@ -4,8 +4,8 @@ from collections.abc import Iterable
 from typing import Any, Protocol
 
 from AEGIS.server.services.llm.types import (
-    ChatCompletionRequest,
-    ChatCompletionResult,
+    LLMRequest,
+    LLMResult,
     ModelDescriptor,
 )
 
@@ -15,12 +15,12 @@ class LLMProvider(Protocol):
 
     def list_models(self) -> list[ModelDescriptor]: ...
 
-    def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult: ...
+    def chat(self, request: LLMRequest) -> LLMResult: ...
 
-    def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]: ...
+    def stream_chat(self, request: LLMRequest) -> Iterable[str]: ...
 
     def structured_output(
-        self, request: ChatCompletionRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]: ...
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]: ...
