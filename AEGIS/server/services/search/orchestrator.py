@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from typing import Any
 from urllib.request import urlopen
@@ -18,6 +19,20 @@ class LocationSearchOrchestrator:
         basemap = self._build_basemap_descriptor(payload.basemap_id)
         overlays: list[dict[str, object]] = []
         warnings: list[str] = []
+        if (
+            isinstance(basemap, dict)
+            and basemap.get("tile_url") is None
+            and basemap.get("provider") in {"tomtom", "geoapify"}
+        ):
+            warnings.append(
+                f"{payload.basemap_id}: provider API key is required; falling back to osm_default."
+            )
+            basemap = self._build_basemap_descriptor("osm_default")
+        effective_basemap_id = (
+            str(basemap.get("id"))
+            if isinstance(basemap, dict) and basemap.get("id")
+            else payload.basemap_id
+        )
         for overlay_id in payload.overlay_ids:
             overlay_result = self._build_overlay_descriptor(overlay_id)
             if overlay_result is None:
@@ -29,7 +44,7 @@ class LocationSearchOrchestrator:
         return MapSession(
             session_id=f"map-{int(datetime.now(UTC).timestamp())}",
             resolved_location=payload.resolved_location,
-            basemap_id=payload.basemap_id,
+            basemap_id=effective_basemap_id,
             overlay_ids=list(payload.overlay_ids),
             viewport=payload.viewport,
             center={
@@ -52,11 +67,18 @@ class LocationSearchOrchestrator:
         if capability is None:
             return None
         metadata = self._metadata(capability)
+        tile_url, _ = self._resolve_runtime_tile_url(
+            metadata.get("tile_url")
+            or metadata.get("tile_url_template")
+            or metadata.get("url_template")
+            or metadata.get("url"),
+            capability=capability,
+        )
         return {
             "id": str(capability.get("id") or basemap_id),
             "label": str(metadata.get("label") or capability.get("name") or basemap_id),
             "provider": str(capability.get("provider") or "unknown"),
-            "tile_url": self._optional_string(metadata.get("tile_url")),
+            "tile_url": tile_url,
             "attribution": str(metadata.get("attribution") or ""),
         }
 
@@ -70,8 +92,10 @@ class LocationSearchOrchestrator:
         warnings: list[str] = []
         resolved_url, url_warning = self._resolve_runtime_tile_url(
             metadata.get("url_template")
+            or metadata.get("tile_url_template")
             or metadata.get("tile_url")
-            or metadata.get("url")
+            or metadata.get("url"),
+            capability=capability,
         )
         if url_warning is not None:
             warnings.append(f"{overlay_id}: {url_warning}")
@@ -117,10 +141,20 @@ class LocationSearchOrchestrator:
         return stripped or None
 
     @classmethod
-    def _resolve_runtime_tile_url(cls, value: object) -> tuple[str | None, str | None]:
+    def _resolve_runtime_tile_url(
+        cls,
+        value: object,
+        *,
+        capability: dict[str, Any] | None = None,
+    ) -> tuple[str | None, str | None]:
         template = cls._optional_string(value)
         if template is None:
             return None, "Tile URL is missing from provider metadata."
+        template, credential_warning = cls._resolve_credential_placeholders(
+            template, capability
+        )
+        if credential_warning is not None:
+            return None, credential_warning
         if "{time}" not in template:
             return template, None
         rainviewer_url = cls._resolve_rainviewer_tile_url()
@@ -132,6 +166,27 @@ class LocationSearchOrchestrator:
             template.replace("{time}", str(rounded_timestamp)),
             "RainViewer metadata could not be fetched; using a timestamp fallback.",
         )
+
+    @classmethod
+    def _resolve_credential_placeholders(
+        cls,
+        template: str,
+        capability: dict[str, Any] | None,
+    ) -> tuple[str, str | None]:
+        if "{api_key}" not in template:
+            return template, None
+        provider = str((capability or {}).get("provider") or "").strip().lower()
+        env_by_provider = {
+            "tomtom": "TOMTOM_API_KEY",
+            "geoapify": "GEOAPIFY_API_KEY",
+        }
+        env_name = env_by_provider.get(provider)
+        if env_name is None:
+            return template, f"No credential mapping is configured for provider '{provider}'."
+        api_key = os.getenv(env_name, "").strip()
+        if not api_key:
+            return template, f"{env_name} is required to render this provider tile layer."
+        return template.replace("{api_key}", api_key), None
 
     @staticmethod
     def _resolve_rainviewer_tile_url() -> str | None:

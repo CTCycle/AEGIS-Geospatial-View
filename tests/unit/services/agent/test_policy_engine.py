@@ -130,6 +130,35 @@ def test_policy_engine_filters_unrelated_zero_score_overlays() -> None:
     assert engine._select_overlays(turn, candidates) == ["rainviewer_precipitation_radar"]
 
 
+def test_policy_engine_selects_traffic_overlay_for_traffic_intent() -> None:
+    engine = PolicyEngine(
+        location_resolver=LocationResolver(),
+        capability_retriever=CapabilityRetriever(),
+    )
+    turn = _turn(
+        user_text="Show current traffic flow around Times Square",
+        intent_id="show_current_traffic_flow",
+        task_tags=["traffic", "map"],
+        intent_tags=["traffic", "flow"],
+    )
+    candidates = [
+        CapabilityCandidate(
+            capability_id="tomtom_traffic_flow",
+            kind="overlay",
+            provider="tomtom",
+            score=0.0,
+        ),
+        CapabilityCandidate(
+            capability_id="openmeteo_air_quality_forecast",
+            kind="overlay",
+            provider="openmeteo",
+            score=0.2,
+        ),
+    ]
+
+    assert engine._select_overlays(turn, candidates) == ["tomtom_traffic_flow"]
+
+
 def test_policy_engine_does_not_treat_satellite_basemap_as_overlay_topic() -> None:
     engine = PolicyEngine(
         location_resolver=LocationResolver(),
