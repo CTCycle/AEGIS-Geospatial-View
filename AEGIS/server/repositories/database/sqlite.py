@@ -11,8 +11,8 @@ from sqlalchemy.orm import sessionmaker
 
 from AEGIS.server.configurations import DatabaseSettings
 from AEGIS.server.repositories.schemas import Base
-from AEGIS.server.utils.constants import DATABASE_FILENAME, RESOURCES_PATH
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.constants import DATABASE_FILENAME, RESOURCES_PATH
+from AEGIS.server.common.logger import logger
 
 
 # [SQLITE DATABASE]
@@ -51,7 +51,9 @@ class SQLiteRepository:
         raise ValueError(f"No unique constraint found for {table_cls.__name__}")
 
     # -------------------------------------------------------------------------
-    def normalize_record(self, table_cls: Any, record: dict[str, Any]) -> dict[str, Any]:
+    def normalize_record(
+        self, table_cls: Any, record: dict[str, Any]
+    ) -> dict[str, Any]:
         column_payload: dict[str, Any] = {}
         for column in table_cls.__table__.columns:
             if column.name not in record:

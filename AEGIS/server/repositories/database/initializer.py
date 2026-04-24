@@ -4,37 +4,15 @@ import os
 import urllib.parse
 
 import sqlalchemy
-from cryptography.fernet import Fernet
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.elements import TextClause
 
 from AEGIS.server.configurations import DatabaseSettings, get_server_settings
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
-from AEGIS.server.repositories.schemas import Base, SystemSecretRecord
+from AEGIS.server.repositories.schemas import Base
 from AEGIS.server.repositories.database.utils import normalize_postgres_engine
-from AEGIS.server.utils.logger import logger
-
-ACCESS_KEY_ENCRYPTION_SECRET_NAME = "access_key_encryption_key"
-
-
-def seed_access_key_encryption_key(engine) -> None:  # noqa: ANN001
-    session_factory = sessionmaker(bind=engine, future=True)
-    with session_factory() as session:
-        statement = sqlalchemy.select(SystemSecretRecord).where(
-            SystemSecretRecord.name == ACCESS_KEY_ENCRYPTION_SECRET_NAME
-        )
-        existing = session.execute(statement).scalars().first()
-        if existing is not None:
-            return
-        seeded = SystemSecretRecord(
-            name=ACCESS_KEY_ENCRYPTION_SECRET_NAME,
-            value=Fernet.generate_key().decode("utf-8"),
-        )
-        session.add(seeded)
-        session.commit()
-    logger.info("Seeded database-backed access key encryption secret.")
+from AEGIS.server.common.logger import logger
 
 
 ###############################################################################
@@ -85,7 +63,6 @@ def clone_settings_with_database(
 def initialize_sqlite_database(settings: DatabaseSettings) -> None:
     repository = SQLiteRepository(settings)
     Base.metadata.create_all(repository.engine)
-    seed_access_key_encryption_key(repository.engine)
     logger.info("Initialized SQLite database at %s", repository.db_path)
 
 
@@ -107,7 +84,7 @@ def build_postgres_database_exists_statement() -> TextClause:
 def build_postgres_create_database_statement(database_name: str) -> TextClause:
     safe_database = database_name.replace('"', '""')
     return sqlalchemy.text(
-        f'CREATE DATABASE "{safe_database}" WITH ENCODING \'UTF8\' TEMPLATE template0'
+        f"CREATE DATABASE \"{safe_database}\" WITH ENCODING 'UTF8' TEMPLATE template0"
     )
 
 
@@ -122,7 +99,6 @@ def ensure_postgres_database(settings: DatabaseSettings) -> str:
 
     repository = PostgresRepository(settings)
     Base.metadata.create_all(repository.engine)
-    seed_access_key_encryption_key(repository.engine)
     logger.info("Ensured PostgreSQL tables exist in %s", settings.database_name)
     return str(settings.database_name)
 
@@ -138,17 +114,17 @@ def validate_postgres_schema(settings: DatabaseSettings) -> None:
             f"Run the external initialization script first. Missing: {', '.join(missing)}"
         )
 
+
 # -----------------------------------------------------------------------------
 def run_database_initialization() -> None:
     settings = get_server_settings().database
     if settings.embedded_database:
         repository = SQLiteRepository(settings)
         Base.metadata.create_all(repository.engine)
-        seed_access_key_encryption_key(repository.engine)
         if should_initialize_sqlite_database(settings):
             logger.info("Initialized SQLite database at %s", repository.db_path)
         else:
-            logger.info("SQLite database already exists; schema and secrets ensured.")
+            logger.info("SQLite database already exists; schema ensured.")
         return
 
     engine_name = normalize_postgres_engine(settings.engine).lower()

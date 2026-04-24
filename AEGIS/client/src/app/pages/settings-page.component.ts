@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
+import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
@@ -16,6 +17,7 @@ import {
   ModelCardDescriptor,
   ModelProviderMode,
   ModelSettingsResponse,
+  ModelSettingsUpdateRequest,
 } from '../core/types';
 import {
   checkOllamaHealth,
@@ -26,11 +28,18 @@ import {
   updateChatSettings,
 } from '../core/api';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
+import { ViewStateSyncService } from '../core/view-state-sync.service';
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModelRoleActionsComponent, SettingsModalShellComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ModelRoleActionsComponent,
+    SettingsIconActionComponent,
+    SettingsModalShellComponent,
+  ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
@@ -50,6 +59,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     openai_base_url: null,
     google_base_url: null,
     credentials: {},
+    credential_health: {},
   };
 
   cloudModels: ModelCardDescriptor[] = [];
@@ -67,14 +77,17 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ollamaUrlDraft = 'http://localhost:11434';
   keysModalStatusText = '';
   ollamaModalStatusText = '';
+  keyValidationErrors: { openai?: string; google?: string } = {};
 
   providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
   showLocalOnly = false;
+  private isDestroyed = false;
 
   constructor(
     private readonly router: Router,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
+    private readonly viewStateSync: ViewStateSyncService,
   ) {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
@@ -90,13 +103,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    window.scrollTo({ top: this.state.scrollY, behavior: 'auto' });
-    if (this.modelGridRef?.nativeElement) {
-      this.modelGridRef.nativeElement.scrollTop = this.state.modelGridScrollTop;
-    }
+    this.viewStateSync.restoreWindowScroll(this.state.scrollY);
+    this.viewStateSync.restoreElementScroll(this.modelGridRef?.nativeElement, this.state.modelGridScrollTop);
   }
 
   ngOnDestroy(): void {
+    this.isDestroyed = true;
     this.syncState();
   }
 
@@ -191,20 +203,30 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
     const payload = buildModelSelectionPayload(this.settings, role, model);
     try {
-      const updated = await updateChatSettings(payload);
+      const updated = await this.saveModelSettings(payload);
+      if (this.isDestroyed) {
+        return;
+      }
       this.settings = updated;
       this.providerMode = updated.active_provider_mode;
-      this.statusText = model.provider === 'ollama'
-        ? `Selected ${model.name} for ${role}`
-        : `Selected ${model.name} for parser, chat, and agent`;
+      this.statusText = `Selected ${model.name} for ${this.roleLabel(role)}`;
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} for ${role}.`);
     }
   }
 
   async saveKeys(): Promise<void> {
+    this.keyValidationErrors = this.validateKeyInputs();
+    if (this.keyValidationErrors.openai || this.keyValidationErrors.google) {
+      this.keysModalStatusText = 'Fix the highlighted API key fields before saving.';
+      return;
+    }
+
     try {
       const updated = await updateChatSettings({
         ...this.settings,
@@ -296,6 +318,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isOllamaModalOpen = false;
     this.keysModalStatusText = '';
     this.ollamaModalStatusText = '';
+    this.keyValidationErrors = {};
   }
 
   onModelGridScroll(event: Event): void {
@@ -311,6 +334,40 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return Boolean(this.settings.credentials['google']?.['api_key']);
   }
 
+  openAiCredentialHealth(): string | null {
+    return this.credentialHealth('openai');
+  }
+
+  googleCredentialHealth(): string | null {
+    return this.credentialHealth('google');
+  }
+
+  private credentialHealth(provider: 'openai' | 'google'): string | null {
+    const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
+    if (!configured) {
+      return null;
+    }
+    return this.settings.credential_health?.[provider]?.['api_key'] ?? 'unknown';
+  }
+
+  private validateKeyInputs(): { openai?: string; google?: string } {
+    const errors: { openai?: string; google?: string } = {};
+    const openAiValue = this.openaiKey.trim();
+    const googleValue = this.googleKey.trim();
+    const openAiPattern = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
+    const googlePattern = /^AIza[A-Za-z0-9_-]{20,}$/;
+
+    if (openAiValue && !openAiPattern.test(openAiValue)) {
+      errors.openai = 'OpenAI key must start with "sk-" and include a valid key body.';
+    }
+
+    if (googleValue && !googlePattern.test(googleValue)) {
+      errors.google = 'Google key must start with "AIza" and include a valid key body.';
+    }
+
+    return errors;
+  }
+
   private async loadData(): Promise<void> {
     this.isLoadingModels = true;
     try {
@@ -318,6 +375,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         fetchChatSettings(),
         fetchChatModels(),
       ]);
+      if (this.isDestroyed) {
+        return;
+      }
       this.settings = nextSettings;
       this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
@@ -326,15 +386,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
       this.statusText = this.userFacingErrorService.toUserFacingError(error, 'Could not load model settings right now.');
       this.syncState();
     } finally {
+      if (this.isDestroyed) {
+        return;
+      }
       this.isLoadingModels = false;
     }
   }
 
   private syncQueryState(): void {
-    const params = new URLSearchParams(window.location.search);
+    const currentPath = this.router.url.split('?')[0];
+    if (currentPath !== '/settings') {
+      return;
+    }
+
+    const params = new URLSearchParams();
     if (this.searchText.trim()) {
       params.set('q', this.searchText);
     } else {
@@ -347,9 +418,26 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       params.delete('mode');
     }
 
-    const nextQuery = params.toString();
-    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
+    const queryParams: Record<string, string> = {};
+    params.forEach((value, key) => {
+      queryParams[key] = value;
+    });
+    const nextUrl = this.router.serializeUrl(this.router.createUrlTree(['/settings'], { queryParams }));
     window.history.replaceState(window.history.state, '', nextUrl);
+  }
+
+  private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
+    return updateChatSettings(payload);
+  }
+
+  private roleLabel(role: ModelRole): string {
+    if (role === 'parser') {
+      return 'parser';
+    }
+    if (role === 'chat') {
+      return 'chat';
+    }
+    return 'agent';
   }
 
   private syncState(): void {
@@ -357,8 +445,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       searchText: this.searchText,
       providerMode: this.providerMode,
       statusText: this.statusText,
-      scrollY: window.scrollY,
-      modelGridScrollTop: this.modelGridRef?.nativeElement.scrollTop ?? this.state.modelGridScrollTop,
+      scrollY: this.viewStateSync.captureWindowScroll(),
+      modelGridScrollTop: this.viewStateSync.captureElementScroll(
+        this.modelGridRef?.nativeElement,
+        this.state.modelGridScrollTop,
+      ),
     };
     this.appStateStore.updateSettingsPage(next);
   }

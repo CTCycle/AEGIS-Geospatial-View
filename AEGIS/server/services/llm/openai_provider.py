@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+try:
+    from openai import OpenAI
+except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
+    OpenAI = None  # type: ignore[assignment]
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
-from AEGIS.server.services.llm.types import ChatCompletionRequest, ChatCompletionResult, ModelDescriptor
+from AEGIS.server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
 
 
 class OpenAIProvider(LLMProvider):
@@ -18,68 +21,87 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
 
-    def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        request = Request(
-            f"{self.base_url}{path}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=45) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace").strip()
-            message = f"OpenAI request failed with HTTP {exc.code}"
-            if detail:
-                message = f"{message}: {detail}"
-            raise ValueError(message) from exc
-        except URLError as exc:
-            raise ValueError(f"OpenAI request failed: {exc.reason}") from exc
+    def _ensure_dependency(self) -> None:
+        if OpenAI is None:
+            raise RuntimeError(
+                "openai is not installed. Install LLM dependencies to use OpenAI provider."
+            )
+
+    def _client(self) -> Any:
+        self._ensure_dependency()
+        return OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def list_models(self) -> list[ModelDescriptor]:
-        return [entry for entry in get_cloud_model_catalog() if entry.provider == "openai"]
+        return [
+            entry for entry in get_cloud_model_catalog() if entry.provider == "openai"
+        ]
 
-    def chat(self, request: ChatCompletionRequest) -> ChatCompletionResult:
-        payload = self._post_json(
-            "/chat/completions",
-            {
-                "model": request.model,
-                "messages": request.messages,
-                "temperature": request.temperature,
-            },
+    def chat(self, request: LLMRequest) -> LLMResult:
+        response = self._client().responses.create(
+            model=request.model,
+            input=request.messages,
+            temperature=request.temperature,
         )
-        choices = payload.get("choices", [])
-        content = ""
-        if isinstance(choices, list) and choices:
-            message = choices[0].get("message", {})
-            if isinstance(message, dict):
-                content = str(message.get("content") or "")
-        return ChatCompletionResult(content=content, raw=payload)
+        return LLMResult(
+            content=str(getattr(response, "output_text", "") or ""),
+            raw=self._dump_response(response),
+        )
 
-    def stream_chat(self, request: ChatCompletionRequest) -> Iterable[str]:
-        yield self.chat(request).content
+    def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        stream = self._client().responses.create(
+            model=request.model,
+            input=request.messages,
+            temperature=request.temperature,
+            stream=True,
+        )
+        for event in stream:
+            if getattr(event, "type", None) != "response.output_text.delta":
+                continue
+            delta = getattr(event, "delta", "")
+            if delta:
+                yield str(delta)
 
-    def structured_output(self, request: ChatCompletionRequest, schema: dict[str, Any]) -> dict[str, Any]:
-        result = self.chat(request)
-        try:
-            parsed = json.loads(result.content)
-        except json.JSONDecodeError:
-            parsed = {}
-        return parsed if isinstance(parsed, dict) else {}
+    def structured_output(
+        self, request: LLMRequest, schema: type[object]
+    ) -> dict[str, Any]:
+        response = self._client().responses.parse(
+            model=request.model,
+            input=request.messages,
+            temperature=request.temperature,
+            text_format=schema,
+        )
+        parsed = getattr(response, "output_parsed", None)
+        if isinstance(parsed, dict):
+            return parsed
+        model_dump = getattr(parsed, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump(mode="json")
+            return dumped if isinstance(dumped, dict) else {}
+        output_text = str(getattr(response, "output_text", "") or "")
+        if output_text:
+            loaded = json.loads(output_text)
+            return loaded if isinstance(loaded, dict) else {}
+        return {}
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        payload = self._post_json("/embeddings", {"model": model, "input": input_text})
-        data = payload.get("data", [])
-        if not isinstance(data, list) or not data:
+        response = self._client().embeddings.create(model=model, input=input_text)
+        data = getattr(response, "data", None)
+        if not data:
             return []
-        embedding = data[0].get("embedding", [])
+        embedding = getattr(data[0], "embedding", None)
         if not isinstance(embedding, list):
             return []
         return [float(value) for value in embedding if isinstance(value, (int, float))]
 
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
+
+    @staticmethod
+    def _dump_response(response: object) -> dict[str, Any]:
+        model_dump = getattr(response, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump(mode="json")
+            return dumped if isinstance(dumped, dict) else {}
+        if isinstance(response, dict):
+            return response
+        return {}

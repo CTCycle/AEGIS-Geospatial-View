@@ -37,13 +37,23 @@ class RainViewerService:
         self.metadata_url = metadata_url or settings.metadata_url
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
-        self.cache_ttl_s = max(cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0)
+        self.cache_ttl_s = max(
+            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+        )
         self.min_call_interval_s = max(
-            min_call_interval_s if min_call_interval_s is not None else settings.min_call_interval_s,
+            min_call_interval_s
+            if min_call_interval_s is not None
+            else settings.min_call_interval_s,
             0.05,
         )
-        self.tile_color_scheme = tile_color_scheme if tile_color_scheme is not None else settings.tile_color_scheme
-        self.tile_smooth = tile_smooth if tile_smooth is not None else settings.tile_smooth
+        self.tile_color_scheme = (
+            tile_color_scheme
+            if tile_color_scheme is not None
+            else settings.tile_color_scheme
+        )
+        self.tile_smooth = (
+            tile_smooth if tile_smooth is not None else settings.tile_smooth
+        )
         self.tile_snow = tile_snow if tile_snow is not None else settings.tile_snow
         self._lock = threading.Lock()
         self._last_call = 0.0
@@ -91,7 +101,9 @@ class RainViewerService:
         try:
             data = json.loads(payload)
         except json.JSONDecodeError as exc:
-            raise RainViewerRequestError("RainViewer response was not valid JSON.") from exc
+            raise RainViewerRequestError(
+                "RainViewer response was not valid JSON."
+            ) from exc
         if not isinstance(data, dict):
             raise RainViewerRequestError("RainViewer response payload is malformed.")
         self._cache_set(data)

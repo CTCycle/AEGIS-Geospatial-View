@@ -34,19 +34,27 @@ class OpenMeteoService:
     ) -> None:
         settings = get_server_settings().openmeteo
         self.weather_base_url = weather_base_url or settings.weather_base_url
-        self.air_quality_base_url = air_quality_base_url or settings.air_quality_base_url
+        self.air_quality_base_url = (
+            air_quality_base_url or settings.air_quality_base_url
+        )
         self.user_agent = user_agent or settings.user_agent
         self.timeout_s = timeout_s if timeout_s is not None else settings.timeout
-        self.cache_ttl_s = max(cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0)
+        self.cache_ttl_s = max(
+            cache_ttl_s if cache_ttl_s is not None else settings.cache_ttl_s, 30.0
+        )
         self.min_call_interval_s = max(
-            min_call_interval_s if min_call_interval_s is not None else settings.min_call_interval_s,
+            min_call_interval_s
+            if min_call_interval_s is not None
+            else settings.min_call_interval_s,
             0.05,
         )
         self._lock = threading.Lock()
         self._last_call_by_key: dict[str, float] = {}
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
-    async def get_weather_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:
+    async def get_weather_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, Any]:
         params = {
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
@@ -61,7 +69,9 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_weather",
         )
-        hourly = payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
+        hourly = (
+            payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
+        )
         timeline = list(hourly.get("time") or [])
         temperature = list(hourly.get("temperature_2m") or [])
         precipitation = list(hourly.get("precipitation") or [])
@@ -71,9 +81,15 @@ class OpenMeteoService:
             preview.append(
                 {
                     "time": timeline[index],
-                    "temperature_2m": temperature[index] if index < len(temperature) else None,
-                    "precipitation": precipitation[index] if index < len(precipitation) else None,
-                    "weather_code": weather_code[index] if index < len(weather_code) else None,
+                    "temperature_2m": temperature[index]
+                    if index < len(temperature)
+                    else None,
+                    "precipitation": precipitation[index]
+                    if index < len(precipitation)
+                    else None,
+                    "weather_code": weather_code[index]
+                    if index < len(weather_code)
+                    else None,
                 }
             )
         return {
@@ -82,13 +98,17 @@ class OpenMeteoService:
             "latitude": latitude,
             "longitude": longitude,
             "timezone": payload.get("timezone"),
-            "current": payload.get("current") if isinstance(payload.get("current"), dict) else {},
+            "current": payload.get("current")
+            if isinstance(payload.get("current"), dict)
+            else {},
             "hourly_preview": preview,
             "resolved_at": datetime.now(UTC).isoformat(),
             "attribution": "Data from Open-Meteo",
         }
 
-    async def get_air_quality_forecast(self, *, latitude: float, longitude: float) -> dict[str, Any]:
+    async def get_air_quality_forecast(
+        self, *, latitude: float, longitude: float
+    ) -> dict[str, Any]:
         params = {
             "latitude": f"{latitude:.6f}",
             "longitude": f"{longitude:.6f}",
@@ -102,7 +122,9 @@ class OpenMeteoService:
             params=params,
             provider_key="openmeteo_air_quality",
         )
-        hourly = payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
+        hourly = (
+            payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
+        )
         timeline = list(hourly.get("time") or [])
         pollutants = {
             "pm2_5": list(hourly.get("pm2_5") or []),
@@ -129,7 +151,9 @@ class OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
-    def _get_json(self, *, endpoint: str, params: dict[str, str], provider_key: str) -> dict[str, Any]:
+    def _get_json(
+        self, *, endpoint: str, params: dict[str, str], provider_key: str
+    ) -> dict[str, Any]:
         cache_key = f"{provider_key}:{urlencode(sorted(params.items()))}"
         cached = self._cache_get(cache_key)
         if cached is not None:
@@ -145,7 +169,9 @@ class OpenMeteoService:
         try:
             data = json.loads(payload)
         except json.JSONDecodeError as exc:
-            raise OpenMeteoRequestError("Open-Meteo response was not valid JSON.") from exc
+            raise OpenMeteoRequestError(
+                "Open-Meteo response was not valid JSON."
+            ) from exc
         if not isinstance(data, dict):
             raise OpenMeteoRequestError("Open-Meteo response payload is malformed.")
         self._cache_set(cache_key, data)

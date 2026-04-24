@@ -4,6 +4,7 @@ Provides fixtures for Playwright page objects and API client.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -76,3 +77,55 @@ def api_context(playwright):
     context = playwright.request.new_context(base_url=API_BASE_URL)
     yield context
     context.dispose()
+
+
+@pytest.fixture(scope="session")
+def artifact_root() -> Path:
+    root = Path(__file__).parent / "artifacts"
+    root.mkdir(parents=True, exist_ok=True)
+    for child in ("screenshots", "http", "logs", "reports"):
+        (root / child).mkdir(parents=True, exist_ok=True)
+    return root
+
+
+@pytest.fixture(scope="session")
+def backend_log_path(artifact_root: Path) -> Path:
+    return artifact_root / "logs" / "backend.log"
+
+
+@pytest.fixture(scope="session")
+def frontend_log_path(artifact_root: Path) -> Path:
+    return artifact_root / "logs" / "frontend.log"
+
+
+@pytest.fixture
+def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
+    test_file = request.node.nodeid.split("::", 1)[0].replace("\\", "/").split("/")[-1]
+    name = request.node.name.replace("/", "_").replace(" ", "_")
+    target = artifact_root / "screenshots" / f"{test_file}__{name}"
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+@pytest.fixture
+def save_snapshot(snapshot_dir: Path):
+    def _save(page, name: str) -> Path:  # noqa: ANN001
+        filename = name if name.lower().endswith(".png") else f"{name}.png"
+        target = snapshot_dir / filename
+        page.screenshot(path=str(target), full_page=True)
+        return target
+
+    return _save
+
+
+@pytest.fixture
+def read_backend_log_tail(backend_log_path: Path):
+    def _read(lines: int = 200) -> str:
+        if not backend_log_path.exists():
+            return ""
+        content = backend_log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
+        return "\n".join(content[-max(1, lines) :])
+
+    return _read

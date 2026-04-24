@@ -5,21 +5,25 @@
       <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
     </div>
     <div class="settings-page__header-actions">
-      <button class="settings-icon-button" type="button" aria-label="Open Ollama settings" title="Ollama settings" (click)="ollamaModalStatusText = ''; isOllamaModalOpen = true">
-        <span class="settings-icon-button__glyph" aria-hidden="true">
+      <app-settings-icon-action
+        ariaLabel="Open Ollama settings"
+        title="Ollama settings"
+        (buttonClick)="ollamaModalStatusText = ''; isOllamaModalOpen = true"
+      >
           <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
             <path d="M5 4h14a1 1 0 0 1 1 1v11a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V5a1 1 0 0 1 1-1zm1 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6H6zm4 2h4a1 1 0 1 1 0 2h-4a1 1 0 1 1 0-2z" fill="currentColor" />
           </svg>
-        </span>
-      </button>
+      </app-settings-icon-action>
 
-      <button class="settings-icon-button" type="button" aria-label="Manage API keys" title="API key settings" (click)="keysModalStatusText = ''; isKeysModalOpen = true">
-        <span class="settings-icon-button__glyph" aria-hidden="true">
+      <app-settings-icon-action
+        ariaLabel="Manage API keys"
+        title="API key settings"
+        (buttonClick)="keysModalStatusText = ''; keyValidationErrors = {}; isKeysModalOpen = true"
+      >
           <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
             <path d="M14 3a7 7 0 1 0 5.5 11.3L23 17.8V21h-3v-2h-2v-2h-2.2A7 7 0 0 0 14 3zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" fill="currentColor" />
           </svg>
-        </span>
-      </button>
+      </app-settings-icon-action>
 
       <button type="button" class="settings-page__back" (click)="navigateBack()" aria-label="Back to chat" title="Back to chat">
         <span class="settings-page__back-icon" aria-hidden="true">←</span>
@@ -119,7 +123,11 @@
               </tr>
             </thead>
             <tbody>
-              @if (selectedModelStats.length === 0) {
+              @if (isLoadingModels) {
+                <tr>
+                  <td colSpan="4">Loading model assignments...</td>
+                </tr>
+              } @else if (selectedModelStats.length === 0) {
                 <tr>
                   <td colSpan="4">No models selected yet.</td>
                 </tr>
@@ -135,6 +143,37 @@
             </tbody>
           </table>
         </div>
+
+        <div class="settings-page__stats-mobile-list" aria-label="Model statistics mobile">
+          @if (isLoadingModels) {
+            <article class="settings-page__stats-mobile-card">
+              <p class="settings-page__stats-mobile-empty">Loading model assignments...</p>
+            </article>
+          } @else if (selectedModelStats.length === 0) {
+            <article class="settings-page__stats-mobile-card">
+              <p class="settings-page__stats-mobile-empty">No models selected yet.</p>
+            </article>
+          }
+          @for (row of selectedModelStats; track row.provider + ':' + row.model) {
+            <article class="settings-page__stats-mobile-card">
+              <h3>{{ row.model }}</h3>
+              <dl>
+                <div>
+                  <dt>Provider</dt>
+                  <dd>{{ row.provider }}</dd>
+                </div>
+                <div>
+                  <dt>Local</dt>
+                  <dd>{{ row.local ? 'Yes' : 'No' }}</dd>
+                </div>
+                <div>
+                  <dt>Assigned</dt>
+                  <dd>{{ row.assignedRoles.join(', ') }}</dd>
+                </div>
+              </dl>
+            </article>
+          }
+        </div>
       </aside>
     </div>
     <footer class="settings-page__status">{{ visibleStatusText }}</footer>
@@ -146,11 +185,27 @@
         <div class="settings-modal__body">
           <label>
             OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
-            <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event" name="openai_api_key" placeholder="sk-..." />
+            <input type="password" autocomplete="off" [ngModel]="openaiKey" (ngModelChange)="openaiKey = $event; keyValidationErrors.openai = undefined" name="openai_api_key" placeholder="sk-..." [class.input-invalid]="!!keyValidationErrors.openai" />
+            @if (openAiCredentialHealth() === 'unreadable') {
+              <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+            } @else if (openAiCredentialHealth() === 'healthy') {
+              <span class="settings-modal__field-health">Saved key is readable.</span>
+            }
+            @if (keyValidationErrors.openai) {
+              <span class="settings-modal__field-error">{{ keyValidationErrors.openai }}</span>
+            }
           </label>
           <label>
             Google API key {{ googleConfigured() ? '(Configured)' : '(Not configured)' }}
-            <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event" name="google_api_key" placeholder="AIza..." />
+            <input type="password" autocomplete="off" [ngModel]="googleKey" (ngModelChange)="googleKey = $event; keyValidationErrors.google = undefined" name="google_api_key" placeholder="AIza..." [class.input-invalid]="!!keyValidationErrors.google" />
+            @if (googleCredentialHealth() === 'unreadable') {
+              <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+            } @else if (googleCredentialHealth() === 'healthy') {
+              <span class="settings-modal__field-health">Saved key is readable.</span>
+            }
+            @if (keyValidationErrors.google) {
+              <span class="settings-modal__field-error">{{ keyValidationErrors.google }}</span>
+            }
           </label>
           @if (keysModalStatusText) {
             <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
 
+
 ###############################################################################
 @dataclass
 class JobState:

@@ -11,8 +11,8 @@
   "coverage": "global",
   "metadata": {
     "label": "Satellite Imagery",
-    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    "attribution": "\u00a9 NASA GIBS / OpenStreetMap contributors",
+    "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "attribution": "Tiles \u00a9 Esri, Maxar, Earthstar Geographics, and the GIS User Community",
     "requires_key": false,
     "keywords": [
       "satellite",
@@ -33,7 +33,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "daily imagery snapshots",
-    "constraints": "preview tiles may fallback to OSM while imagery overlays provide realism",
+    "constraints": "imagery tile availability and attribution are governed by the upstream basemap provider",
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",

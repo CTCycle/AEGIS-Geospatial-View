@@ -14,13 +14,13 @@ class ModelDescriptor:
 
 
 @dataclass(frozen=True)
-class ChatCompletionRequest:
+class LLMRequest:
     model: str
     messages: list[dict[str, str]]
     temperature: float = 0.2
 
 
 @dataclass(frozen=True)
-class ChatCompletionResult:
+class LLMResult:
     content: str
     raw: dict[str, Any] = field(default_factory=dict)

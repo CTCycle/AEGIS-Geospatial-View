@@ -36,7 +36,9 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
         monkeypatch.delenv(key, raising=False)
 
     reset_environment_bootstrap_for_tests()
-    monkeypatch.setattr("AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file))
+    monkeypatch.setattr(
+        "AEGIS.server.configurations.environment.ENV_FILE_PATH", str(env_file)
+    )
     ensure_environment_loaded()
 
     assert os.getenv("FASTAPI_HOST") == "127.0.0.1"

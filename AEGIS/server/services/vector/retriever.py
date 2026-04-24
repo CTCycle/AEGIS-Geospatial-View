@@ -19,12 +19,16 @@ class VectorRetriever:
         return {
             "basemaps": [],
             "overlays": [],
+            "tools": [],
             "providers": [],
         }
 
     def _should_rebuild_after_error(self, error: Exception) -> bool:
         message = str(error).lower()
-        return "expecting embedding with dimension" in message or "embedding dimension" in message
+        return (
+            "expecting embedding with dimension" in message
+            or "embedding dimension" in message
+        )
 
     def retrieve_candidates(
         self,
@@ -51,6 +55,7 @@ class VectorRetriever:
                 return self._empty_result()
         basemaps: list[dict[str, object]] = []
         overlays: list[dict[str, object]] = []
+        tools: list[dict[str, object]] = []
         seen: set[str] = set()
         for item in matches:
             metadata = item.get("metadata", {})
@@ -64,15 +69,23 @@ class VectorRetriever:
             seen.add(entry_id)
             distance = float(item.get("distance", 0.0) or 0.0)
             score = float(item.get("score", 0.0) or 0.0)
-            candidate = {"id": entry_id, "score": score, "distance": distance, "metadata": metadata}
+            candidate = {
+                "id": entry_id,
+                "score": score,
+                "distance": distance,
+                "metadata": metadata,
+            }
             document_kind = str(metadata.get("document_kind") or "")
             if document_kind == "basemap":
                 basemaps.append(candidate)
             elif document_kind == "overlay":
                 overlays.append(candidate)
+            elif document_kind == "tool":
+                tools.append(candidate)
         result = {
             "basemaps": self._limit_ranked(basemaps, basemap_k or top_k),
             "overlays": self._limit_ranked(overlays, overlay_k or top_k),
+            "tools": self._limit_ranked(tools, top_k),
             "providers": [],
         }
         return result
@@ -84,5 +97,9 @@ class VectorRetriever:
             "overlay_ids": [str(item["id"]) for item in candidates["overlays"]],
         }
 
-    def _limit_ranked(self, items: list[dict[str, object]], budget: int) -> list[dict[str, object]]:
-        return sorted(items, key=lambda item: float(item.get("score", 0.0) or 0.0), reverse=True)[: max(1, budget)]
+    def _limit_ranked(
+        self, items: list[dict[str, object]], budget: int
+    ) -> list[dict[str, object]]:
+        return sorted(
+            items, key=lambda item: float(item.get("score", 0.0) or 0.0), reverse=True
+        )[: max(1, budget)]

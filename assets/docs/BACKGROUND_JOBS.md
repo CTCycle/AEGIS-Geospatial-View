@@ -1,15 +1,15 @@
 # Background Job Management
 
-Last updated: 2026-04-08
-Scope: `AEGIS/server/services/jobs.py`, `AEGIS/server/api/search.py`
+Last updated: 2026-04-20
+Scope: `AEGIS/server/services/jobs.py`, `AEGIS/server/services/search/composition.py`, `AEGIS/server/api/search.py`
 
 AEGIS uses an in-process, thread-based job manager for asynchronous map-search execution.
 
 ## 1. Components
 
 - `JobState` dataclass: per-job status container.
-- `JobManager`: singleton coordinator for job lifecycle.
-- Shared instance: `job_manager`.
+- `JobManager`: runtime-scoped coordinator for job lifecycle.
+- `SearchRuntime.job_manager`: owner injected during app startup composition.
 
 ## 2. Job Lifecycle
 
@@ -30,11 +30,11 @@ State fields include:
 ## 3. API Endpoints
 
 Exposed by map routes:
-- `POST /maps/jobs`: start async map search
-- `GET /maps/jobs/{job_id}`: fetch state snapshot
-- `DELETE /maps/jobs/{job_id}`: request cancellation
+- `POST /api/maps/jobs`: start async map search
+- `GET /api/maps/jobs/{job_id}`: fetch state snapshot
+- `DELETE /api/maps/jobs/{job_id}`: request cancellation
 
-Routes are also available under `/api`.
+Routes are mounted under `/api`.
 
 ## 4. Execution Model
 

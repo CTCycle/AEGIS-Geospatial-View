@@ -8,8 +8,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import json
 
-from AEGIS.server.utils.constants import OPEN_ELEVATION_API_BASE_URL
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.constants import OPEN_ELEVATION_API_BASE_URL
+from AEGIS.server.common.logger import logger
 
 
 __all__ = [

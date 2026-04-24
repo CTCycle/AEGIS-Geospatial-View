@@ -8,7 +8,7 @@ from typing import Any
 import folium
 
 from AEGIS.server.configurations import get_server_settings
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
     MAX_GEO_LAT,
@@ -284,7 +284,7 @@ class MapService:
             try:
                 lat = float(coordinate[0])
                 lon = float(coordinate[1])
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
             normalized.append([lat, lon])
         return normalized

@@ -6,11 +6,12 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from AEGIS.server.api.search import MapRenderingService
+from AEGIS.server.services.geospatial.rendering import MapRenderingService
 from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 
 
+###############################################################################
 class _ToolkitStub:
     def harmonize_bbox_crs(self, bbox, *, source_crs, target_crs):  # noqa: ANN001
         return bbox
@@ -26,39 +27,90 @@ class _ToolkitStub:
         return None
 
 
+###############################################################################
 class _MapServiceStub:
     def compute_bbox_from_center(self, lon: float, lat: float, size: float):  # noqa: ANN001
         return [lon - 0.1, lat - 0.1, lon + 0.1, lat + 0.1]
 
 
+###############################################################################
 class _SanitizationStub:
-    def sanitize_location_inputs(self, address: str, city: str | None, country: str | None) -> dict[str, str | None]:
-        return {"address": address, "city": city, "country": country, "country_code": "it"}
+    def sanitize_location_inputs(
+        self, address: str, city: str | None, country: str | None
+    ) -> dict[str, str | None]:
+        return {
+            "address": address,
+            "city": city,
+            "country": country,
+            "country_code": "it",
+        }
 
 
+###############################################################################
 class _NominatimCitySuccessStub:
-    async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
+    async def extract_coordinates(
+        self, address, city, country_name, country_code, limit=1
+    ):  # noqa: ANN001
         if city == "Rome":
-            return {"lat": 41.9, "lon": 12.5, "bbox": [12.4, 41.8, 12.6, 42.0], "confidence": 0.9}
+            return {
+                "lat": 41.9,
+                "lon": 12.5,
+                "bbox": [12.4, 41.8, 12.6, 42.0],
+                "confidence": 0.9,
+            }
         return None
 
     async def extract_bbox_from_coordinates(self, latitude, longitude):  # noqa: ANN001
         return [longitude - 0.1, latitude - 0.1, longitude + 0.1, latitude + 0.1]
 
 
+###############################################################################
+class _NominatimPoiOversizedBBoxStub:
+    async def extract_coordinates(
+        self,
+        address,
+        city,
+        country_name,
+        country_code,
+        limit=1,
+        expected_location_type=None,
+    ):  # noqa: ANN001
+        _ = city, country_name, country_code, limit, expected_location_type
+        if address and "Coliseum" in address:
+            return {
+                "lat": 41.8902,
+                "lon": 12.4922,
+                "bbox": [12.2, 41.7, 12.8, 42.0],
+                "selected_result_type": "attraction",
+                "confidence": 0.88,
+            }
+        return None
+
+    async def extract_bbox_from_coordinates(self, latitude, longitude):  # noqa: ANN001
+        return [longitude - 0.1, latitude - 0.1, longitude + 0.1, latitude + 0.1]
+
+
+###############################################################################
 class _NominatimFailStub:
-    async def extract_coordinates(self, address, city, country_name, country_code, limit=1):  # noqa: ANN001
+    async def extract_coordinates(
+        self, address, city, country_name, country_code, limit=1
+    ):  # noqa: ANN001
         return None
 
     async def extract_bbox_from_coordinates(self, latitude, longitude):  # noqa: ANN001
         return None
 
 
+###############################################################################
 class _RendererStub:
-    async def build_satellite_payload(self, payload, search_payload):  # noqa: ANN001
+    async def build_satellite_payload(  # noqa: ANN001
+        self, payload, search_payload, basemap=None
+    ):
+        _ = basemap
         return {"bbox": search_payload.get("bbox") or [12.4, 41.8, 12.6, 42.0]}
 
 
+###############################################################################
 class _CatalogStub:
     def resolve_overlays(self, overlay_ids):  # noqa: ANN001
         return []
@@ -71,17 +123,21 @@ class _CatalogStub:
 
     async def fetch_overlay_runtime(self, latitude, longitude, overlay_ids, radius_m):  # noqa: ANN001
         _ = latitude, longitude, radius_m
-        return {str(overlay_id): {"availability": "available"} for overlay_id in overlay_ids}
+        return {
+            str(overlay_id): {"availability": "available"} for overlay_id in overlay_ids
+        }
 
     def resolve_compliance_warnings(self, basemap, overlays):  # noqa: ANN001
         return []
 
 
+###############################################################################
 class _ElevationStub:
     async def get_elevation(self, lat, lon):  # noqa: ANN001
         return None
 
 
+###############################################################################
 def _build_renderer_service() -> MapRenderingService:
     service = MapRenderingService.__new__(MapRenderingService)
     service.toolkit = _ToolkitStub()
@@ -89,6 +145,7 @@ def _build_renderer_service() -> MapRenderingService:
     return service
 
 
+###############################################################################
 def _build_orchestrator(nominatim_service) -> LocationSearchOrchestrator:  # noqa: ANN001
     return LocationSearchOrchestrator(
         sanitization_service=_SanitizationStub(),
@@ -100,6 +157,7 @@ def _build_orchestrator(nominatim_service) -> LocationSearchOrchestrator:  # noq
     )
 
 
+###############################################################################
 def test_derive_map_bbox_prefers_explicit_bbox() -> None:
     service = _build_renderer_service()
     payload = SimpleNamespace(
@@ -117,6 +175,7 @@ def test_derive_map_bbox_prefers_explicit_bbox() -> None:
     assert result == [1.0, 2.0, 3.0, 4.0]
 
 
+###############################################################################
 def test_city_only_location_resolves_without_generic_extent_error() -> None:
     orchestrator = _build_orchestrator(_NominatimCitySuccessStub())
     payload = LocationSearchRequest(city="Rome")
@@ -125,6 +184,7 @@ def test_city_only_location_resolves_without_generic_extent_error() -> None:
     assert result["payload"].get("longitude") is not None
 
 
+###############################################################################
 def test_unresolved_location_fails_with_actionable_error() -> None:
     orchestrator = _build_orchestrator(_NominatimFailStub())
     payload = LocationSearchRequest(city="Unknown Place", country="Nowhere Land")
@@ -132,4 +192,18 @@ def test_unresolved_location_fails_with_actionable_error() -> None:
         asyncio.run(orchestrator.execute(payload))
     assert exc_info.value.status_code == 400
     assert "Unable to resolve a usable location" in str(exc_info.value.detail)
-    assert "Unable to resolve map extent for the requested imagery." not in str(exc_info.value.detail)
+    assert "Unable to resolve map extent for the requested imagery." not in str(
+        exc_info.value.detail
+    )
+
+
+###############################################################################
+def test_point_like_query_uses_local_bbox_instead_of_oversized_city_bbox() -> None:
+    orchestrator = _build_orchestrator(_NominatimPoiOversizedBBoxStub())
+    payload = LocationSearchRequest(address="Coliseum, Rome")
+    result = asyncio.run(orchestrator.execute(payload))
+    bbox = result["payload"].get("bbox")
+    assert isinstance(bbox, list)
+    assert len(bbox) == 4
+    assert (bbox[2] - bbox[0]) < 0.2
+    assert (bbox[3] - bbox[1]) < 0.2

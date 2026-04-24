@@ -4,7 +4,7 @@ from math import isnan
 from typing import Any
 
 from AEGIS.server.repositories.database.backend import get_database
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     GEONAMES_COLUMNS,
     GEONAMES_TABLE,
     GIBS_LAYER_COLUMNS,

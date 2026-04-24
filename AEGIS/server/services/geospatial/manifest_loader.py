@@ -4,7 +4,7 @@ import json
 import os
 from typing import Any
 
-from AEGIS.server.utils.constants import PROJECT_DIR
+from AEGIS.server.common.constants import PROJECT_DIR
 
 type JsonDict = dict[str, Any]
 
@@ -42,7 +42,9 @@ class GeospatialManifestLoader:
             raise ManifestValidationError("Manifest index must be an object.")
         return payload
 
-    def _validate_entry(self, entry: JsonDict, *, source: str, source_path: str | None = None) -> JsonDict:
+    def _validate_entry(
+        self, entry: JsonDict, *, source: str, source_path: str | None = None
+    ) -> JsonDict:
         missing = [field for field in self.REQUIRED_FIELDS if field not in entry]
         if missing:
             raise ManifestValidationError(
@@ -50,8 +52,7 @@ class GeospatialManifestLoader:
             )
         normalized = dict(entry)
         normalized["capabilities"] = list(entry.get("capabilities") or [])
-        metadata = dict(entry.get("metadata") or {})
-        normalized["metadata"] = metadata
+        normalized["metadata"] = dict(entry.get("metadata") or {})
         normalized["source_filename"] = source
         if source_path:
             normalized["source_path"] = os.path.abspath(source_path)
@@ -68,32 +69,51 @@ class GeospatialManifestLoader:
             path = os.path.join(folder, filename)
             payload = self._load_json(path)
             if not isinstance(payload, dict):
-                raise ManifestValidationError(f"Manifest document '{path}' must be an object.")
-            entries.append(self._validate_entry(payload, source=filename, source_path=path))
+                raise ManifestValidationError(
+                    f"Manifest document '{path}' must be an object."
+                )
+            entries.append(
+                self._validate_entry(payload, source=filename, source_path=path)
+            )
         return entries
 
-    def _load_legacy_manifest(self, filename: str) -> list[JsonDict]:
+    def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
         path = os.path.join(self.root_path, filename)
         payload = self._load_json(path)
-        if not isinstance(payload, list):
-            raise ManifestValidationError(f"Manifest '{filename}' must contain an array.")
-        return [self._validate_entry(item, source=filename, source_path=path) for item in payload if isinstance(item, dict)]
+        if not isinstance(payload, dict):
+            raise ManifestValidationError("Runtime profiles must be an object.")
+        profiles = payload.get("profiles")
+        if not isinstance(profiles, list):
+            raise ManifestValidationError("Runtime profiles must contain a profiles list.")
+        normalized: list[JsonDict] = []
+        for item in profiles:
+            if not isinstance(item, dict):
+                raise ManifestValidationError("Runtime profile entries must be objects.")
+            capability_id = str(item.get("capability_id") or "").strip()
+            if not capability_id:
+                raise ManifestValidationError("Runtime profile entry missing capability_id.")
+            normalized.append(dict(item))
+        return normalized
 
     def load_all(self) -> JsonDict:
         index = self.load_index()
-        version = int(index.get("version") or 1)
-        if version >= 2:
-            providers = self._load_directory_entries(str(index.get("providers_dir") or "providers"))
-            basemaps = self._load_directory_entries(str(index.get("basemaps_dir") or "basemaps"))
-            overlays = self._load_directory_entries(str(index.get("overlays_dir") or "overlays"))
-            return {"providers": providers, "basemaps": basemaps, "overlays": overlays}
-
-        # compatibility for old index format
-        providers_file = str(index.get("providers") or "providers.json")
-        basemaps_file = str(index.get("basemaps") or "basemaps.json")
-        overlays_file = str(index.get("overlays") or "overlays.json")
+        providers = self._load_directory_entries(
+            str(index.get("providers_dir") or "providers")
+        )
+        basemaps = self._load_directory_entries(
+            str(index.get("basemaps_dir") or "basemaps")
+        )
+        overlays = self._load_directory_entries(
+            str(index.get("overlays_dir") or "overlays")
+        )
+        tools = self._load_directory_entries(str(index.get("tools_dir") or "tools"))
+        runtime_profiles = self._load_runtime_profiles(
+            str(index.get("runtime_profiles_file") or "runtime_profiles.json")
+        )
         return {
-            "providers": self._load_legacy_manifest(providers_file),
-            "basemaps": self._load_legacy_manifest(basemaps_file),
-            "overlays": self._load_legacy_manifest(overlays_file),
+            "providers": providers,
+            "basemaps": basemaps,
+            "overlays": overlays,
+            "tools": tools,
+            "runtime_profiles": runtime_profiles,
         }

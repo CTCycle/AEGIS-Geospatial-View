@@ -12,9 +12,17 @@ def infer_datetime(intent: dict[str, Any]) -> str:
 
 
 def requires_follow_up(intent: dict[str, Any]) -> bool:
-    planning = intent.get("planning") if isinstance(intent.get("planning"), dict) else intent
-    location = intent.get("location") if isinstance(intent.get("location"), dict) else {}
-    display_area = intent.get("display_area") if isinstance(intent.get("display_area"), dict) else {}
+    planning = (
+        intent.get("planning") if isinstance(intent.get("planning"), dict) else intent
+    )
+    location = (
+        intent.get("location") if isinstance(intent.get("location"), dict) else {}
+    )
+    display_area = (
+        intent.get("display_area")
+        if isinstance(intent.get("display_area"), dict)
+        else {}
+    )
     follow_up = planning.get("follow_up_question")
     if isinstance(follow_up, str) and follow_up.strip():
         return True
@@ -22,7 +30,14 @@ def requires_follow_up(intent: dict[str, Any]) -> bool:
     if isinstance(missing, list):
         normalized = {str(item).lower() for item in missing}
         if normalized.intersection(
-            {"datetime", "location", "display_area", "unsupported_overlay", "conflicting_map_type", "low_confidence"}
+            {
+                "datetime",
+                "location",
+                "display_area",
+                "unsupported_overlay",
+                "conflicting_map_type",
+                "low_confidence",
+            }
         ):
             return True
     confidence = planning.get("confidence")
