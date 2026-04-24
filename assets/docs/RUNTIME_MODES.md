@@ -24,6 +24,12 @@ Last updated: 2026-04-24
 - Test orchestrator: `tests/run_tests.bat`
 - Starts backend + frontend and runs pytest (including Playwright-based E2E)
 
+### 4. Browser validation tooling
+
+- The Codex Browser Use Node REPL runtime requires Node.js `>=22.22.0`.
+- If the active `node` resolves below that version (for example `v20.19.5`), Browser Use will fail before opening the in-app browser.
+- In that case, use the available Playwright MCP browser tools for local UI validation, or point `NODE_REPL_NODE_PATH` at a compatible Node.js runtime before retrying Browser Use.
+
 ### Not currently implemented
 
 - No first-class Docker/container deployment files are present.

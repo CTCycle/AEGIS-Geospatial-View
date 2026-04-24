@@ -180,3 +180,74 @@ def test_location_search_orchestrator_warns_on_rainviewer_fallback(monkeypatch) 
     assert session.compliance_warnings == [
         "rainviewer_precipitation_radar: RainViewer metadata could not be fetched; using a timestamp fallback."
     ]
+
+
+def test_location_search_orchestrator_resolves_provider_tile_templates(monkeypatch) -> None:
+    monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-test-key")
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Times Square",
+            latitude=40.7570095,
+            longitude=-73.9859724,
+        ),
+        intent_id="show_current_traffic_flow",
+        time_mode="current",
+        basemap_id="tomtom_basic",
+        overlay_ids=["tomtom_traffic_flow"],
+        viewport={
+            "center_latitude": 40.7570095,
+            "center_longitude": -73.9859724,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": True,
+            "high_contrast": True,
+            "show_legend": True,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    assert session.basemap is not None
+    assert session.basemap_id == "tomtom_basic"
+    assert session.basemap["id"] == "tomtom_basic"
+    assert "tomtom-test-key" in str(session.basemap["tile_url"])
+    assert session.overlays[0]["id"] == "tomtom_traffic_flow"
+    assert "tomtom-test-key" in str(session.overlays[0]["url"])
+    assert session.compliance_warnings == []
+
+
+def test_location_search_orchestrator_warns_and_falls_back_for_missing_basemap_key(monkeypatch) -> None:
+    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Times Square",
+            latitude=40.7570095,
+            longitude=-73.9859724,
+        ),
+        intent_id="show_current_traffic_flow",
+        time_mode="current",
+        basemap_id="tomtom_basic",
+        overlay_ids=[],
+        viewport={
+            "center_latitude": 40.7570095,
+            "center_longitude": -73.9859724,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": False,
+            "high_contrast": False,
+            "show_legend": False,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    assert session.basemap is not None
+    assert session.basemap_id == "osm_default"
+    assert session.basemap["id"] == "osm_default"
+    assert session.compliance_warnings == [
+        "tomtom_basic: provider API key is required; falling back to osm_default."
+    ]

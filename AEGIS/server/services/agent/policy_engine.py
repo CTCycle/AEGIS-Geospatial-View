@@ -214,6 +214,8 @@ class PolicyEngine:
         markers: set[str] = set()
         if any(marker in intent_text for marker in ("air quality", "air_quality", "pollution", "aerosol")):
             markers.update({"air_quality", "openaq", "aerosol"})
+        if any(marker in intent_text for marker in ("traffic", "congestion", "road flow", "traffic flow")):
+            markers.update({"traffic", "tomtom_traffic"})
         if any(marker in intent_text for marker in ("radar", "rainviewer")):
             return {"rainviewer"}
         has_precipitation_intent = any(
