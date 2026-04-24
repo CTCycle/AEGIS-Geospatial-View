@@ -111,6 +111,21 @@ class PolicyEngine:
         )
 
     def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
+        if "deictic_without_memory" in turn.ambiguities:
+            return ClarificationRequest(
+                question="Which location should I use?",
+                reason="The request refers to a previous location, but no active location is available.",
+                missing_fields=["location"],
+            )
+        if (
+            any(signal.signal_type == "deictic" for signal in turn.location_signals)
+            and not turn.conversation_context.memory_snapshot.get("active_location")
+        ):
+            return ClarificationRequest(
+                question="Which location should I use?",
+                reason="The request refers to a previous location, but no active location is available.",
+                missing_fields=["location"],
+            )
         if turn.normalized_intent.requires_location and not turn.location_signals and not turn.conversation_context.memory_snapshot.get("active_location"):
             return ClarificationRequest(
                 question="Which location should I use?",
@@ -171,11 +186,33 @@ class PolicyEngine:
         candidates: list[CapabilityCandidate],
     ) -> tuple[str, CapabilityCandidate | None]:
         if turn.task_class == "direct_query":
+            if self._should_render_direct_query_as_map(turn, candidates):
+                return "map_search", None
             tool = next((item for item in candidates if item.kind == "tool" and item.supports_direct_text), None)
             return "direct_tool", tool
         if turn.disallowed_patterns:
             return "reject", None
         return "map_search", None
+
+    def _should_render_direct_query_as_map(
+        self,
+        turn: TurnParseResult,
+        candidates: list[CapabilityCandidate],
+    ) -> bool:
+        intent_text = self._intent_text(turn)
+        display_markers = (
+            "show",
+            "display",
+            "map",
+            "overlay",
+            "layer",
+            "radar",
+            "satellite",
+            "view",
+        )
+        if not any(marker in intent_text for marker in display_markers):
+            return False
+        return bool(self._select_overlays(turn, candidates))
 
     def _build_clarification(self, ambiguities: list[str]) -> ClarificationRequest:
         return ClarificationRequest(
@@ -217,28 +254,70 @@ class PolicyEngine:
         if any(marker in intent_text for marker in ("traffic", "congestion", "road flow", "traffic flow")):
             markers.update({"traffic", "tomtom_traffic"})
         if any(marker in intent_text for marker in ("radar", "rainviewer")):
-            return {"rainviewer"}
+            markers.add("rainviewer")
         has_precipitation_intent = any(
             marker in intent_text for marker in ("precipitation", "rain", "storm")
         )
         if has_precipitation_intent:
             markers.update({"precipitation", "rainviewer", "imerg", "radar"})
-        elif any(marker in intent_text for marker in ("weather", "temperature", "forecast")):
+        if any(marker in intent_text for marker in ("weather", "temperature", "forecast")):
             markers.update({"weather", "temperature", "forecast"})
+        if any(marker in intent_text for marker in ("active fire", "active fires", "wildfire", "wildfires", "thermal anomaly", "thermal anomalies")):
+            markers.update({"fire", "fires", "thermal_anomalies", "thermal_anomaly"})
+        if any(marker in intent_text for marker in ("land cover", "landcover", "worldcover", "igbp")):
+            markers.update({"land_cover", "landcover", "worldcover", "igbp"})
         return markers
+
+    def _overlay_marker_score(self, overlay: CapabilityCandidate, requested_markers: set[str]) -> int:
+        if not requested_markers:
+            return 1 if overlay.score > 0 else 0
+        normalized_id = overlay.capability_id.lower()
+        score = 0
+        marker_groups = (
+            ({"fire", "fires", "thermal_anomalies", "thermal_anomaly"}, ("fire", "thermal_anomal")),
+            ({"land_cover", "landcover", "worldcover", "igbp"}, ("land_cover", "landcover", "worldcover", "igbp")),
+            ({"traffic", "tomtom_traffic"}, ("traffic",)),
+            ({"air_quality", "openaq", "aerosol"}, ("air_quality", "openaq", "aerosol")),
+            ({"rainviewer"}, ("rainviewer",)),
+            ({"precipitation", "imerg", "radar"}, ("precipitation", "imerg", "radar", "rainviewer")),
+            ({"weather", "temperature", "forecast"}, ("weather", "temperature", "forecast")),
+        )
+        for requested_group, id_markers in marker_groups:
+            if requested_group.intersection(requested_markers) and any(marker in normalized_id for marker in id_markers):
+                score += 10
+        if any(marker in normalized_id for marker in requested_markers):
+            score += 5
+        if score > 0 and overlay.score > 0:
+            score += 1
+        return score
 
     def _select_overlays(
         self, turn: TurnParseResult, candidates: list[CapabilityCandidate]
     ) -> list[str]:
         overlays = [item for item in candidates if item.kind == "overlay"]
         requested_markers = self._requested_overlay_markers(turn)
+        ranked_overlays = sorted(
+            overlays,
+            key=lambda item: (self._overlay_marker_score(item, requested_markers), item.score),
+            reverse=True,
+        )
         selected: list[str] = []
         seen: set[str] = set()
-        for overlay in overlays:
+        for overlay in ranked_overlays:
             capability_id = overlay.capability_id
             normalized_id = capability_id.lower()
-            if requested_markers and not any(
-                marker in normalized_id for marker in requested_markers
+            marker_score = self._overlay_marker_score(overlay, requested_markers)
+            if requested_markers and marker_score <= 0:
+                continue
+            if (
+                "rainviewer" in requested_markers
+                and "rainviewer" not in normalized_id
+                and overlay.score <= 0
+            ):
+                continue
+            if (
+                "air_quality" in normalized_id
+                and not {"air_quality", "openaq", "aerosol"}.intersection(requested_markers)
             ):
                 continue
             if not requested_markers and overlay.score <= 0:

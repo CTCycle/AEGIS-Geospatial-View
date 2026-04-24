@@ -27,49 +27,62 @@ def test_location_search_request_is_the_only_input_contract() -> None:
     }
 
 
-def test_image_dimensions_survive_normalization() -> None:
-    runtime = build_search_runtime()
-    payload = LocationSearchRequest(
-        datetime="2024-06-15T12:00:00",
-        use_coordinates=True,
-        latitude=41.9,
-        longitude=12.5,
-        image_width=1536,
-        image_height=1024,
+def _location_request() -> LocationSearchRequest:
+    return LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Rome",
+            latitude=41.9,
+            longitude=12.5,
+        ),
+        intent_id="show_map",
+        time_mode="current",
+        basemap_id="osm_default",
+        overlay_ids=[],
+        viewport={
+            "center_latitude": 41.9,
+            "center_longitude": 12.5,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": False,
+            "high_contrast": False,
+            "show_legend": False,
+        },
     )
-    typed_payload, _, payload_data = asyncio.run(
-        runtime.search_execution._prepare_request(payload)
-    )
-    assert typed_payload.image_width == 1536
-    assert typed_payload.image_height == 1024
-    assert payload_data["image_width"] == 1536
-    assert payload_data["image_height"] == 1024
 
 
 def test_search_and_job_paths_share_normalized_payload(monkeypatch) -> None:
     runtime = build_search_runtime()
     service = runtime.search_execution
-    calls = {"count": 0}
+    calls: list[LocationSearchRequest] = []
+    job_kwargs: dict[str, object] = {}
 
-    async def _prepare(payload: LocationSearchRequest):  # noqa: ANN202
-        calls["count"] += 1
-        return payload, {"country": payload.country}, payload.model_dump(mode="python")
-
-    async def _process(_: LocationSearchRequest) -> dict[str, object]:
+    async def _execute(payload: LocationSearchRequest):
+        calls.append(payload)
         return {
-            "status_message": "Map search request submitted.",
+            "session_id": "map-test",
+            "resolved_location": payload.resolved_location.model_dump(mode="json"),
+            "basemap_id": payload.basemap_id,
+            "overlay_ids": payload.overlay_ids,
+            "viewport": payload.viewport.model_dump(mode="json"),
+            "generated_at": "2026-04-24T00:00:00Z",
             "payload": {},
-            "map_session": {},
+            "center": {
+                "latitude": payload.viewport.center_latitude,
+                "longitude": payload.viewport.center_longitude,
+            },
+            "bounds": None,
+            "basemap": None,
+            "overlays": [],
             "compliance_warnings": [],
         }
 
-    async def _record(**kwargs) -> None:  # noqa: ANN003, ARG001
-        return None
+    def _start_job(**kwargs) -> str:  # noqa: ANN003
+        job_kwargs.update(kwargs)
+        return "job-123"
 
-    monkeypatch.setattr(service, "_prepare_request", _prepare)
-    monkeypatch.setattr(service, "process_location_search", _process)
-    monkeypatch.setattr(service, "record_search_session", _record)
-    monkeypatch.setattr(service.job_manager, "start_job", lambda **kwargs: "job-123")
+    monkeypatch.setattr(service.orchestrator, "execute", _execute)
+    monkeypatch.setattr(service.job_manager, "start_job", _start_job)
     monkeypatch.setattr(
         service.job_manager,
         "get_job_status",
@@ -83,17 +96,13 @@ def test_search_and_job_paths_share_normalized_payload(monkeypatch) -> None:
         },
     )
 
-    payload = LocationSearchRequest(
-        datetime="2024-06-15T12:00:00",
-        use_coordinates=True,
-        latitude=41.9,
-        longitude=12.5,
-    )
+    payload = _location_request()
     response = asyncio.run(service.search_by_location(payload))
     started = asyncio.run(service.start_search_job(payload))
     assert isinstance(response, SearchByLocationResponse)
     assert isinstance(started, JobStartResponse)
-    assert calls["count"] == 2
+    assert calls == [payload]
+    assert job_kwargs["kwargs"] == {"service": service, "job_payload": payload}
 
 
 def test_location_search_orchestrator_includes_render_descriptors(monkeypatch) -> None:
@@ -142,6 +151,80 @@ def test_location_search_orchestrator_includes_render_descriptors(monkeypatch) -
         "https://tilecache.rainviewer.com/v2/radar/"
     )
     assert session.overlays[0]["maxzoom"] == 10
+    assert session.compliance_warnings == []
+    assert session.bounds is not None
+    assert len(session.bounds) == 4
+
+
+def test_location_search_orchestrator_derives_bounds_from_viewport_radius() -> None:
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Berlin",
+            latitude=52.5173885,
+            longitude=13.3951309,
+        ),
+        intent_id="show_city_map_berlin",
+        time_mode="current",
+        basemap_id="osm_default",
+        overlay_ids=[],
+        viewport={
+            "center_latitude": 52.5173885,
+            "center_longitude": 13.3951309,
+            "radius_m": 25000.0,
+        },
+        presentation={
+            "emphasize_overlays": False,
+            "high_contrast": False,
+            "show_legend": False,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    assert session.bounds is not None
+    min_lon, min_lat, max_lon, max_lat = session.bounds
+    assert min_lon < 13.3951309 < max_lon
+    assert min_lat < 52.5173885 < max_lat
+    assert max_lat - min_lat > 0.4
+
+
+def test_location_search_orchestrator_uses_point_insight_for_direct_text_overlay_without_tiles() -> None:
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Naples",
+            latitude=40.8358846,
+            longitude=14.2487679,
+        ),
+        intent_id="weather_forecast_rain_radar",
+        time_mode="current",
+        basemap_id="osm_default",
+        overlay_ids=["openmeteo_weather_forecast"],
+        viewport={
+            "center_latitude": 40.8358846,
+            "center_longitude": 14.2487679,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": True,
+            "high_contrast": True,
+            "show_legend": True,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    assert session.overlays == [
+        {
+            "id": "openmeteo_weather_forecast",
+            "label": "Open-Meteo Weather Forecast",
+            "provider": "openmeteo",
+            "type": "point-insight",
+            "attribution": "© Open-Meteo",
+            "default_opacity": 0.72,
+        }
+    ]
     assert session.compliance_warnings == []
 
 

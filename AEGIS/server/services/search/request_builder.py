@@ -49,7 +49,21 @@ class RequestBuilder:
         intent: NormalizedIntent,
     ) -> ViewportPolicy:
         radius_m = 2500.0
-        if intent.intent_id in {"traffic", "air_quality"}:
+        intent_text = " ".join(
+            [
+                intent.intent_id,
+                intent.intent_label,
+                *intent.task_tags,
+                *intent.intent_tags,
+            ]
+        ).lower()
+        if any(marker in intent_text for marker in ("exact_address", "exact address", "address")):
+            radius_m = 1000.0
+        elif any(marker in intent_text for marker in ("wide", "city", "city_level", "entire city")):
+            radius_m = 25000.0
+        elif any(marker in intent_text for marker in ("region", "regional", "country", "island", "province")):
+            radius_m = 100000.0
+        elif intent.intent_id in {"traffic", "air_quality"}:
             radius_m = 4500.0
         return ViewportPolicy(
             center_latitude=location.latitude,
