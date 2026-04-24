@@ -90,13 +90,16 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
   }
-  const capabilities = Array.isArray(value.capabilities) ? value.capabilities : [];
-  const normalized = capabilities
+  const normalizeCapabilities = (input: unknown): CatalogResponse['capabilities'] => (
+    Array.isArray(input) ? input : []
+  )
       .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
       .map((item) => ({
         id: String(item.id),
         name: String(item.name ?? item.id),
         kind: String(item.kind ?? 'overlay'),
+        type: typeof item.type === 'string' ? item.type : undefined,
+        description: typeof item.description === 'string' ? item.description : undefined,
         provider: String(item.provider ?? 'unknown'),
         requires_credentials: Boolean(item.requires_credentials),
         is_available: Boolean(item.is_available),
@@ -111,10 +114,17 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
           : [],
         metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
       }));
+  const normalized = normalizeCapabilities(value.capabilities);
+  const providers = normalizeCapabilities(value.providers);
+  const basemaps = normalizeCapabilities(value.basemaps);
+  const overlays = normalizeCapabilities(value.overlays);
+  const tools = normalizeCapabilities(value.tools);
   return {
     capabilities: normalized,
-    basemaps: normalized.filter((item) => item.kind === 'basemap'),
-    overlays: normalized.filter((item) => item.kind === 'overlay'),
+    providers: providers.length ? providers : normalized.filter((item) => item.kind === 'provider'),
+    basemaps: basemaps.length ? basemaps : normalized.filter((item) => item.kind === 'basemap'),
+    overlays: overlays.length ? overlays : normalized.filter((item) => item.kind === 'overlay'),
+    tools: tools.length ? tools : normalized.filter((item) => item.kind === 'tool'),
   };
 };
 

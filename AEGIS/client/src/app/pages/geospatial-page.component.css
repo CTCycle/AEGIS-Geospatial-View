@@ -1,17 +1,18 @@
 .geospatial-page {
     width: 100%;
     height: 100%;
-    min-height: 100dvh;
-    background: #dbe1eb;
+    min-height: 0;
+    background: #0d171d;
+    color: #d9e6eb;
 }
 
 .geospatial-workspace {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(17rem, var(--toolbar-width, 30vw)) 0.42rem minmax(0, 1fr);
+    grid-template-columns: minmax(20rem, var(--toolbar-width, 30vw)) 0.42rem minmax(0, 1fr);
     width: 100%;
     height: 100%;
-    background: #dbe1eb;
+    background: #0d171d;
 }
 
 .geospatial-workspace--toolbar-collapsed {
@@ -27,8 +28,8 @@
 }
 
 .toolbar-panel {
-    background: linear-gradient(180deg, #d7e6f4 0%, #dbe3f0 35%, #d2dce9 100%);
-    border-right: 1px solid #bdc7d8;
+    background: #101c23;
+    border-right: 1px solid #253640;
     overflow: hidden;
 }
 
@@ -43,10 +44,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 3.7rem;
-    padding: 0 1.25rem;
-    border-bottom: 1px solid #c3cfde;
-    background: #eef2f8;
+    height: 3.2rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid #263640;
+    background: #101c23;
 }
 
 .toolbar-brand__identity {
@@ -55,90 +56,202 @@
     gap: 0.72rem;
 }
 
-.toolbar-brand__icon {
-    width: 1.55rem;
-    height: 1.55rem;
-    border-radius: 0.45rem;
-    background: linear-gradient(145deg, #2e5dcf 0%, #1f448f 100%);
-    display: inline-grid;
-    grid-template-columns: repeat(3, 0.3rem);
-    align-content: center;
-    justify-content: center;
-    gap: 0.11rem;
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 32%), 0 4px 10px rgb(26 55 111 / 28%);
+.assistant-status-card__crest .crest-outline,
+.assistant-status-card__crest .crest-signal {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.toolbar-brand__icon span {
-    display: block;
-    width: 0.3rem;
-    border-radius: 0.1rem;
-    background: rgb(231 239 255 / 95%);
+.assistant-status-card__crest .crest-outline {
+    stroke-width: 2;
 }
 
-.toolbar-brand__icon span:nth-child(1) { height: 0.88rem; }
-.toolbar-brand__icon span:nth-child(2) { height: 0.58rem; }
-.toolbar-brand__icon span:nth-child(3) { height: 0.73rem; }
+.assistant-status-card__crest .crest-signal {
+    stroke-width: 1.15;
+    opacity: 0.8;
+}
 
-.toolbar-brand__logo {
+.assistant-status-card__crest .crest-field {
+    fill: currentColor;
+    opacity: 0.92;
+}
+
+.assistant-status-card__crest .crest-cut {
+    fill: #13212a;
+}
+
+.toolbar-brand__identity span {
     display: block;
-    font-size: 1.35rem;
+    font-size: 0.78rem;
     line-height: 1;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #2954d1;
+    color: #dce8ed;
 }
 
 .toolbar-brand__new-chat {
-    border: 1px solid #aebede;
-    background: #f8fbff;
-    color: #35527a;
-    border-radius: 999px;
+    border: 1px solid #344953;
+    background: #172831;
+    color: #e4eef2;
+    border-radius: 0.45rem;
     padding: 0.35rem 0.7rem;
     font-size: 0.74rem;
     font-weight: 700;
 }
 
 .toolbar-brand__new-chat:hover {
-    border-color: #7fa0d3;
-    background: #eef5ff;
-    color: #244778;
+    border-color: #3a89b8;
+    background: #1b3340;
+    color: #f8fcff;
 }
 
 .toolbar-panel__content {
     padding: 0.8rem;
     flex: 1;
     min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 0.65rem;
+}
+
+.assistant-status-card,
+.rail-capability-card {
+    border: 1px solid #263a45;
+    border-radius: 0.35rem;
+    background: #122029;
+    color: #dce8ed;
+}
+
+.assistant-status-card {
+    padding: 0.65rem;
+}
+
+.assistant-status-card header {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.assistant-status-card__crest {
+    width: 1.35rem;
+    height: 1.35rem;
+    color: #dfecef;
+}
+
+.assistant-status-card__crest svg {
+    width: 100%;
+    height: 100%;
+}
+
+.assistant-status-card h2,
+.assistant-status-card p,
+.rail-capability-card h2,
+.rail-capability-card ul {
+    margin: 0;
+}
+
+.assistant-status-card h2 {
+    font-size: 0.78rem;
+    color: #eff8fb;
+}
+
+.assistant-status-card p {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #7cd995;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.assistant-status-card p span,
+.state-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #56c878;
+}
+
+.rail-capability-card {
+    padding: 0.7rem;
+}
+
+.rail-capability-card header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.55rem;
+}
+
+.rail-capability-card h2 {
+    color: #e5f0f4;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rail-capability-card header span {
+    color: #56c878;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.rail-capability-card ul {
+    display: grid;
+    gap: 0.45rem;
+    list-style: none;
+}
+
+.rail-capability-card li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.45rem;
+    align-items: center;
+    color: #c5d3d8;
+    font-size: 0.72rem;
+}
+
+.rail-capability-card strong {
+    color: #56c878;
+    font-size: 0.68rem;
+}
+
+.state-dot--warn {
+    background: #e6a620;
+}
+
+.state-dot--warn + * + strong {
+    color: #e6a620;
 }
 
 .toolbar-resize-handle {
     width: 0.42rem;
     cursor: col-resize;
-    background: linear-gradient(180deg, #d7dee9 0%, #bcc7d8 50%, #d7dee9 100%);
+    background: #22333d;
     transition: background 120ms ease;
 }
 
 .toolbar-resize-handle:hover,
 .toolbar-resize-handle.is-active {
-    background: linear-gradient(180deg, #9cb5de 0%, #6f95d0 50%, #9cb5de 100%);
+    background: #2f9bd7;
 }
 
 .toolbar-resize-handle.is-collapsed {
     cursor: e-resize;
-    background: linear-gradient(180deg, #85a6d9 0%, #4c79c2 50%, #85a6d9 100%);
+    background: #2f9bd7;
 }
 
-.canvas-panel { background: #d3dae5; }
+.canvas-panel { background: #0d171d; }
 
 .canvas-header {
-    height: 3.7rem;
-    padding: 0 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 1rem;
-    background: #e6ecf4;
-    border-bottom: 1px solid #c2ccdc;
+    display: none;
+    height: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
 }
 
 .canvas-header__actions {
@@ -150,28 +263,29 @@
 .canvas-header__icon-button {
     width: 2.25rem;
     height: 2.25rem;
-    border-radius: 0.65rem;
+    border-radius: 0.35rem;
     border: 1px solid transparent;
     display: grid;
     place-items: center;
-    color: #3f4f67;
+    color: #d6e3e8;
 }
 
 .canvas-header__icon-button:hover {
-    border-color: #bdc8d9;
-    background: #f4f8fd;
+    border-color: #344953;
+    background: #172831;
 }
 
 .canvas-header__icon-button--active {
-    border-color: #7c99c9;
-    background: #edf4ff;
-    color: #214c9d;
+    border-color: #2f9bd7;
+    background: #172f3a;
+    color: #e8f7ff;
 }
 
 .canvas-panel__body {
     flex: 1;
     min-height: 0;
     position: relative;
+    border-left: 1px solid #16252d;
 }
 
 .agent-chat-panel {
@@ -179,9 +293,9 @@
     flex-direction: column;
     min-height: 0;
     height: 100%;
-    background: rgb(229 236 246 / 92%);
-    border: 1px solid #b9c8dc;
-    border-radius: 0.9rem;
+    background: #0f1a21;
+    border: 1px solid #263a45;
+    border-radius: 0.35rem;
     overflow: hidden;
 }
 
@@ -203,24 +317,24 @@
     padding: 0.1rem 0.1rem 0.4rem;
     font-size: 0.82rem;
     line-height: 1.35;
-    color: #5b6f8b;
+    color: #9dadb5;
 }
 
 .chat-message {
     width: fit-content;
     max-width: 90%;
-    border-radius: 0.8rem;
-    border: 1px solid #c4cedd;
-    background: #f7f9fd;
+    border-radius: 0.35rem;
+    border: 1px solid #263a45;
+    background: #17252e;
     padding: 0.82rem 0.95rem;
-    color: #1f2f46;
+    color: #dce8ed;
 }
 
 .chat-message--user {
     margin-left: auto;
-    border-color: #2752cb;
-    background: linear-gradient(160deg, #2959db 0%, #1c4bc5 100%);
-    color: #f8fbff;
+    border-color: #244c6f;
+    background: #18344b;
+    color: #eff8ff;
 }
 
 .chat-message__role {
@@ -228,7 +342,7 @@
     font-size: 0.64rem;
     letter-spacing: 0.13em;
     text-transform: uppercase;
-    color: #54637a;
+    color: #91a5ae;
     font-weight: 700;
 }
 
@@ -248,8 +362,8 @@
     gap: 0.42rem;
     margin-top: auto;
     padding: 0.62rem 0.72rem 0.72rem;
-    border-top: 1px solid #bfccde;
-    background: rgb(233 240 248 / 90%);
+    border-top: 1px solid #263a45;
+    background: #101c23;
 }
 
 .chat-composer textarea {
@@ -258,11 +372,11 @@
     min-height: 3.35rem;
     max-height: 12rem;
     resize: vertical;
-    border: 1px solid #b5c5dc;
-    border-radius: 0.92rem;
-    background: #f7faff;
+    border: 1px solid #344953;
+    border-radius: 0.45rem;
+    background: #0f1a21;
     padding: 0.72rem 0.86rem;
-    color: #30435f;
+    color: #dce8ed;
     font-size: 0.84rem;
     line-height: 1.42;
 }
@@ -272,9 +386,9 @@
     height: 2.35rem;
     flex: 0 0 auto;
     border-radius: 999px;
-    border: 1px solid #2b58cd;
-    background: linear-gradient(180deg, #3767df 0%, #2553c7 100%);
-    box-shadow: 0 5px 12px rgb(31 66 145 / 28%);
+    border: 1px solid #3b5966;
+    background: #162833;
+    box-shadow: none;
     color: #eff5ff;
     display: grid;
     place-items: center;
@@ -283,16 +397,16 @@
 
 .chat-composer .primary-button:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 7px 14px rgb(31 66 145 / 34%);
-    border-color: #1f46ad;
+    box-shadow: none;
+    border-color: #2f9bd7;
 }
 
 .chat-composer .primary-button:disabled {
     opacity: 0.52;
     cursor: not-allowed;
     box-shadow: none;
-    border-color: #aab9d6;
-    background: linear-gradient(180deg, #d0dbef 0%, #c0cde7 100%);
+    border-color: #314650;
+    background: #17242c;
 }
 
 .chat-composer .sr-only {
@@ -316,9 +430,9 @@
     align-items: center;
     gap: 0.35rem;
     border-radius: 999px;
-    border: 1px solid #aab8cd;
-    background: rgb(234 241 250 / 92%);
-    color: #3c4f6c;
+    border: 1px solid #344953;
+    background: rgb(15 26 33 / 92%);
+    color: #dce8ed;
     padding: 0.35rem 0.58rem;
     font-size: 0.75rem;
     font-weight: 700;
@@ -333,10 +447,10 @@
     display: grid;
     gap: 0.65rem;
     padding: 0.8rem 0.9rem;
-    border: 1px solid #b7c8df;
-    border-radius: 0.85rem;
-    background: rgb(245 249 255 / 97%);
-    box-shadow: 0 18px 34px rgb(29 49 88 / 16%);
+    border: 1px solid #344953;
+    border-radius: 0.35rem;
+    background: rgb(15 26 33 / 97%);
+    box-shadow: 0 18px 34px rgb(0 0 0 / 28%);
 }
 
 .workspace-alerts__header {
@@ -355,18 +469,18 @@
 
 .workspace-alerts__header h2 {
     font-size: 0.92rem;
-    color: #24385a;
+    color: #e7f2f5;
 }
 
 .workspace-alerts__header p {
     font-size: 0.74rem;
-    color: #5b7292;
+    color: #98abb3;
     font-weight: 700;
 }
 
 .workspace-alerts__empty,
 .workspace-alerts__list {
-    color: #3d5575;
+    color: #cbd9de;
     font-size: 0.82rem;
     line-height: 1.45;
 }
@@ -379,14 +493,14 @@
     width: 0.72rem;
     height: 0.72rem;
     border-radius: 999px;
-    border: 2px solid #b8c8de;
-    border-top-color: #4a74ba;
+    border: 2px solid #425a65;
+    border-top-color: #2f9bd7;
     animation: spin 0.9s linear infinite;
 }
 
 @media (max-width: 1100px) {
     .geospatial-workspace {
-        grid-template-columns: minmax(16.5rem, var(--toolbar-width, 19rem)) 0.42rem minmax(0, 1fr);
+        grid-template-columns: minmax(19rem, var(--toolbar-width, 21rem)) 0.42rem minmax(0, 1fr);
     }
 }
 
@@ -414,6 +528,15 @@
 
     .toolbar-panel__content {
         min-height: 0;
+        grid-template-rows: auto minmax(15rem, auto) auto;
+    }
+
+    .agent-chat-panel {
+        min-height: 15rem;
+    }
+
+    .chat-transcript {
+        min-height: 7.5rem;
     }
 
     .canvas-header {
@@ -453,10 +576,16 @@
 
     .toolbar-panel__content {
         padding: 0.6rem;
+        grid-template-rows: auto minmax(16rem, auto) auto;
+    }
+
+    .agent-chat-panel {
+        min-height: 16rem;
     }
 
     .chat-transcript {
         padding: 0.72rem;
+        min-height: 8.5rem;
     }
 
     .chat-composer {

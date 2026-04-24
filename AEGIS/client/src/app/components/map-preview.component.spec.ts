@@ -16,6 +16,8 @@ describe('components/map-preview.component', () => {
     getLayer: jasmine.Spy;
     setLayoutProperty: jasmine.Spy;
     setPaintProperty: jasmine.Spy;
+    zoomIn: jasmine.Spy;
+    zoomOut: jasmine.Spy;
     resize: jasmine.Spy;
     remove: jasmine.Spy;
   };
@@ -30,6 +32,8 @@ describe('components/map-preview.component', () => {
       getLayer: jasmine.createSpy('getLayer').and.returnValue({}),
       setLayoutProperty: jasmine.createSpy('setLayoutProperty'),
       setPaintProperty: jasmine.createSpy('setPaintProperty'),
+      zoomIn: jasmine.createSpy('zoomIn'),
+      zoomOut: jasmine.createSpy('zoomOut'),
       resize: jasmine.createSpy('resize'),
       remove: jasmine.createSpy('remove'),
     };
@@ -104,6 +108,20 @@ describe('components/map-preview.component', () => {
     component.setOverlayOpacity('ov1', '25');
     expect(emitted.at(-1)?.overlayVisibility['ov1']).toBeFalse();
     expect(emitted.at(-1)?.overlayOpacity['ov1']).toBeCloseTo(0.25, 2);
+  });
+
+  it('exposes lightweight zoom controls', () => {
+    component.payload = {
+      map_session: {
+        center: { latitude: 41.9, longitude: 12.5 },
+        overlays: [],
+      },
+    };
+    fixture.detectChanges();
+    expect(component.zoomIn()).toBeTrue();
+    expect(component.zoomOut()).toBeTrue();
+    expect(fakeMap.zoomIn).toHaveBeenCalledWith({ duration: 120 });
+    expect(fakeMap.zoomOut).toHaveBeenCalledWith({ duration: 120 });
   });
 
   it('builds raster, WMS, and WMTS source URLs', () => {

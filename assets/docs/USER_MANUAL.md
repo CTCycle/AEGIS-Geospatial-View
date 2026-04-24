@@ -10,7 +10,9 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 ## 2. Primary Screens
 
 - Workspace (`/`): chat panel + map canvas.
-- Settings (`/settings`): model selection, provider configuration, API key and Ollama management.
+- Capabilities (`/capabilities`): manifest-backed overview of map types, layers, direct tools, data providers, access constraints, and dependencies.
+- Access configurations (`/access-configurations`): optional geospatial provider keys for Geoapify and TomTom.
+- Model Settings (`/settings`): model selection, cloud/local LLM keys, and Ollama management.
 
 ## 3. Quick Start Journey
 
@@ -18,7 +20,7 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 2. In chat, ask for a place or coordinates and what you want to see.
 3. Wait for the assistant to return a response and map session.
 4. Review map output and overlay controls.
-5. Open Settings (gear icon) to tune providers/models if needed.
+5. Use the top Operations Bar to open capabilities, optional access configuration, or model settings.
 
 ## 4. User Journeys
 
@@ -38,7 +40,12 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 2. Ask follow-up refinements in chat (scope, focus, timeframe).
 3. Compare updated map session results after each turn.
 
-### Journey C: Model/provider setup
+### Journey C: Optional geospatial access setup
+1. Open Access configurations from the Operations Bar.
+2. Add Geoapify or TomTom keys only if you want optional key-backed layers.
+3. Leave this page empty for the default free/open workflow.
+
+### Journey D: Model setup
 1. Open Settings.
 2. Choose `Cloud` or `Local` mode.
 3. Search/filter models and assign parser/api/chat/agent roles.
@@ -54,8 +61,15 @@ Chat composer:
 Toolbar and layout:
 - Collapse/expand left panel with the toolbar toggle button.
 - Resize toolbar width by dragging the vertical resize handle.
+- Use the map `+` and `-` controls or type `zoom in` / `zoom out` to adjust the active interactive map.
 
-Settings controls:
+Navigation:
+- Workspace: chat and map canvas.
+- Capabilities: available map types, layers, tools, providers, and access status.
+- Access: optional geospatial provider keys.
+- Model Settings: LLM provider/model configuration.
+
+Model Settings controls:
 - Provider mode toggle (`Cloud`/`Local`).
 - Model search bar and provider filters.
 - API key modal for supported cloud providers.
@@ -73,12 +87,18 @@ Examples:
 - "Analyze this coordinate area: 41.9028, 12.4964 and include relevant overlays."
 - "Refine the previous result to focus on environmental overlays."
 - "Give me the coordinates of Rome, Italy."
+- "What can you do?"
+- "Show available layers."
+- "Zoom in."
 
 ## 7. Key Features
 
 - Chat-first geospatial orchestration.
 - Interactive map payload preview with overlay controls.
+- Lightweight map zoom controls and chat zoom commands.
+- Manifest-backed capability overview.
 - Persisted session state across page refreshes within the same tab.
+- Default free/open data workflow with optional geospatial provider keys.
 - Configurable model roles (parser, chat, agent).
 - Local and cloud provider workflows.
 
@@ -89,7 +109,7 @@ Examples:
 - Missing expected model: refresh model list or pull model in Ollama settings.
 - Unexpected state after auth failures: app clears persisted state on 401/403 for safety.
 - If asked for location: provide a city, address, region, or coordinate pair.
-- If asked for missing integration: add the requested API key in Settings or ask for an available alternative layer.
+- If asked for missing geospatial integration: add the requested key in Access configurations or ask for an available open-data alternative.
 
 ## 9. Operational Notes
 

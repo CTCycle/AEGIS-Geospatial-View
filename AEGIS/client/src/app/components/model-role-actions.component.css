@@ -6,15 +6,16 @@
 }
 
 .model-card__actions button {
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid #344953;
   border-radius: 999px;
   padding: 0.24rem 0.55rem;
-  background: rgb(248 250 252 / 94%);
+  background: #162833;
+  color: #dce8ed;
   font-size: 0.76rem;
 }
 
 .model-card__actions button.active {
-  border-color: var(--color-brand);
-  background: rgb(37 99 235 / 12%);
-  color: #1e40af;
+  border-color: #2f9bd7;
+  background: #17384a;
+  color: #e6f7ff;
 }

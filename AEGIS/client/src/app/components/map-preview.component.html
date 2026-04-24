@@ -6,7 +6,7 @@
         <p class="loading-text">Rendering map...</p>
       </div>
     } @else if (!payload || (!payload.satellite_imagery && !payload.map_session)) {
-      <div class="empty-state">
+      <div class="empty-state empty-state--operations">
         <div class="empty-state__card">
           <p class="empty-state__eyebrow">Map Workspace</p>
           <p class="empty-state__message">{{ emptyMessage }}</p>
@@ -30,6 +30,11 @@
     } @else {
       <div class="maplibre-wrap">
         <div #mapContainer class="maplibre-container"></div>
+
+        <div class="map-zoom-controls" aria-label="Map zoom controls">
+          <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>
+          <button type="button" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">&minus;</button>
+        </div>
 
         @if (overlays.length) {
           <div class="overlay-controls">

@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from AEGIS.server.repositories.credentials import CredentialRepository
 from AEGIS.server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 
@@ -20,9 +21,21 @@ class RuntimeRegistry:
         "google": "GOOGLE_API_KEY",
     }
 
-    def __init__(self, *, manifest_loader: GeospatialManifestLoader | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        manifest_loader: GeospatialManifestLoader | None = None,
+        credentials_repo: CredentialRepository | None = None,
+    ) -> None:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
+        self._credentials_repo = credentials_repo
         self._snapshot: RuntimeRegistrySnapshot | None = None
+
+    @property
+    def credentials_repo(self) -> CredentialRepository:
+        if self._credentials_repo is None:
+            self._credentials_repo = CredentialRepository()
+        return self._credentials_repo
 
     def build_snapshot(self) -> RuntimeRegistrySnapshot:
         manifest = self.manifest_loader.load_all()
@@ -56,7 +69,12 @@ class RuntimeRegistry:
         env_name = self.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
         if not env_name:
             return True
-        return bool(os.getenv(env_name, "").strip())
+        if os.getenv(env_name, "").strip():
+            return True
+        try:
+            return self.credentials_repo.get_active(provider=provider, label="api_key") is not None
+        except Exception:
+            return False
 
     def supports_mode(self, capability_id: str, mode: str) -> bool:
         profile = self._profile(capability_id)

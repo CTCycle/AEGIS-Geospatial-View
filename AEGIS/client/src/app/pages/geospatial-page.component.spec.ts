@@ -175,6 +175,39 @@ describe('pages/geospatial-page.component', () => {
     expect(store.updateChatPage).toHaveBeenCalled();
   });
 
+  it('handles zoom commands locally without chat API request', async () => {
+    const sendSpy = spyOn(Api, 'sendChatTurn').and.resolveTo({} as never);
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.mapPreview = { zoomIn: jasmine.createSpy('zoomIn').and.returnValue(true) } as never;
+    component.composerDraft = 'zoom in';
+
+    await component.sendMessage();
+
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(component.messages.at(-1)?.content).toBe('Map zoomed in.');
+  });
+
+  it('answers capability questions from the catalog locally', async () => {
+    const sendSpy = spyOn(Api, 'sendChatTurn').and.resolveTo({} as never);
+    spyOn(Api, 'fetchCatalog').and.resolveTo({
+      capabilities: [],
+      basemaps: [{ id: 'osm_default', name: 'OpenStreetMap', kind: 'basemap', provider: 'fallback', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
+      overlays: [{ id: 'rainviewer_precipitation_radar', name: 'RainViewer Precipitation Radar', kind: 'overlay', provider: 'rainviewer', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global-partial', intent_tags: [], task_tags: [], metadata: {} }],
+      tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'what can you do?';
+
+    await component.sendMessage();
+
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(component.messages.at(-1)?.content).toContain('Current catalog: 1 map types, 1 layers, and 1 direct tools.');
+  });
+
   it('navigateToSettings syncs state and routes to settings', () => {
     const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     const fixture = TestBed.createComponent(GeospatialPageComponent);
