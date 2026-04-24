@@ -198,55 +198,12 @@
     background: transparent;
 }
 
-.chat-welcome-card {
-    display: grid;
-    gap: 0.65rem;
-    padding: 1rem;
-    border: 1px solid #bfd0e2;
-    border-radius: 0.9rem;
-    background: linear-gradient(180deg, rgb(245 249 255 / 96%), rgb(236 243 251 / 96%));
-    color: #20324d;
-}
-
-.chat-welcome-card__eyebrow {
+.chat-welcome-message {
     margin: 0;
-    font-size: 0.72rem;
-    line-height: 1;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #5d7395;
-    font-weight: 700;
-}
-
-.chat-welcome-card__prompt {
-    margin: 0;
-    font-size: 0.92rem;
-    line-height: 1.45;
-    color: #35506f;
-}
-
-.chat-welcome-card__examples-label {
-    margin: 0;
-    font-size: 0.68rem;
-    line-height: 1;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #7b8ea9;
-    font-weight: 700;
-}
-
-.chat-welcome-card__examples {
-    margin: 0;
-    padding-left: 1rem;
-    display: grid;
-    gap: 0.45rem;
-    color: #687d99;
-    font-size: 0.84rem;
-    line-height: 1.45;
-}
-
-.chat-welcome-card__examples li {
-    opacity: 0.9;
+    padding: 0.1rem 0.1rem 0.4rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: #5b6f8b;
 }
 
 .chat-message {
@@ -440,7 +397,7 @@
 
     .geospatial-workspace {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(22rem, auto) minmax(24rem, 1fr);
+        grid-template-rows: auto minmax(18rem, 1fr);
         height: auto;
         min-height: 100dvh;
     }
@@ -448,7 +405,7 @@
     .toolbar-panel {
         border-right: none;
         border-bottom: 1px solid #bcc7d8;
-        min-height: 22rem;
+        min-height: 0;
         max-height: none;
     }
 
@@ -471,11 +428,11 @@
     }
 
     .canvas-panel {
-        min-height: 24rem;
+        min-height: 18rem;
     }
 
     .canvas-panel__body {
-        min-height: 24rem;
+        min-height: 18rem;
     }
 
     .workspace-alerts {
@@ -487,11 +444,11 @@
 
 @media (max-width: 700px) {
     .geospatial-workspace {
-        grid-template-rows: minmax(19rem, auto) minmax(20rem, 1fr);
+        grid-template-rows: auto minmax(16rem, 1fr);
     }
 
     .toolbar-panel {
-        min-height: 19rem;
+        min-height: 0;
     }
 
     .toolbar-panel__content {
@@ -507,6 +464,6 @@
     }
 
     .canvas-panel__body {
-        min-height: 20rem;
+        min-height: 16rem;
     }
 }

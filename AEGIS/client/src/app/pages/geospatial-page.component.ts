@@ -8,6 +8,7 @@ import { PersistedChatPageState } from '../core/app-state';
 import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse } from '../core/types';
 import { sendChatTurn } from '../core/api';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
+import { ViewStateSyncService } from '../core/view-state-sync.service';
 
 @Component({
   selector: 'app-geospatial-page',
@@ -27,6 +28,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   sessionId?: number;
   conversationNonce = 1;
   messages: ChatMessage[] = [];
+  lastDecision?: ChatTurnResponse['decision'];
+  memorySnapshot: Record<string, unknown> = {};
+  mapSession?: MapSession;
   status = 'Idle';
   assistantDraft = '';
   composerDraft = '';
@@ -48,6 +52,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     private readonly router: Router,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
+    private readonly viewStateSync: ViewStateSyncService,
   ) {
     this.chatPageState = this.appStateStore.getChatPage();
     this.payload = this.chatPageState.payload;
@@ -58,6 +63,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.sessionId = this.chatPageState.chatPanel.sessionId;
     this.conversationNonce = this.chatPageState.chatPanel.conversationNonce;
     this.messages = this.chatPageState.chatPanel.messages;
+    this.lastDecision = this.chatPageState.chatPanel.lastDecision;
+    this.memorySnapshot = this.chatPageState.chatPanel.memorySnapshot ?? {};
+    this.mapSession = this.chatPageState.chatPanel.mapSession;
     this.status = this.chatPageState.chatPanel.status;
     this.assistantDraft = this.chatPageState.chatPanel.assistantDraft;
     this.composerDraft = this.chatPageState.chatPanel.composerDraft;
@@ -65,10 +73,8 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    window.scrollTo({ top: this.chatPageState.scrollY, behavior: 'auto' });
-    if (this.transcriptRef?.nativeElement) {
-      this.transcriptRef.nativeElement.scrollTop = this.transcriptScrollTop;
-    }
+    this.viewStateSync.restoreWindowScroll(this.chatPageState.scrollY);
+    this.viewStateSync.restoreElementScroll(this.transcriptRef?.nativeElement, this.transcriptScrollTop);
   }
 
   ngOnDestroy(): void {
@@ -93,8 +99,12 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   get activeAlertItems(): string[] {
     const alerts: string[] = [];
+    const latestAssistantMessage = [...this.messages].reverse().find((entry) => entry.role === 'assistant')?.content?.trim() ?? '';
     if (this.status === 'Failed') {
       alerts.push('The last request failed before the map session updated.');
+    }
+    if (latestAssistantMessage && this.looksLikeRuntimeFailure(latestAssistantMessage)) {
+      alerts.push(latestAssistantMessage);
     }
     if (!this.payload?.map_session) {
       alerts.push('No active map session is loaded yet.');
@@ -125,6 +135,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.sessionId = undefined;
     this.conversationNonce += 1;
     this.messages = [];
+    this.lastDecision = undefined;
+    this.memorySnapshot = {};
+    this.mapSession = undefined;
     this.payload = undefined;
     this.status = 'Idle';
     this.assistantDraft = '';
@@ -242,8 +255,11 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     if (typeof mapSession === 'object' && mapSession !== null) {
       this.handleMapSession(mapSession as MapSession);
     }
+    this.lastDecision = result.decision;
+    this.memorySnapshot = result.memory_snapshot ?? {};
     this.assistantDraft = '';
-    this.status = result.follow_up_required ? 'Need more detail' : 'Complete';
+    const planState = result.decision?.plan?.state;
+    this.status = planState === 'clarify' ? 'Need more detail' : 'Complete';
     this.progressPercent = 100;
     this.syncState();
     queueMicrotask(() => this.scrollTranscriptToBottom());
@@ -253,6 +269,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     if (!mapSession) {
       return;
     }
+    this.mapSession = mapSession;
     this.payload = {
       satellite_imagery: this.payload?.satellite_imagery,
       map_session: mapSession,
@@ -269,13 +286,19 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         sessionId: this.sessionId,
         conversationNonce: this.conversationNonce,
         messages: this.messages,
+        lastDecision: this.lastDecision,
+        memorySnapshot: this.memorySnapshot,
+        mapSession: this.mapSession,
         status: this.status,
         assistantDraft: this.assistantDraft,
         composerDraft: this.composerDraft,
-        transcriptScrollTop: this.transcriptRef?.nativeElement.scrollTop ?? this.transcriptScrollTop,
+        transcriptScrollTop: this.viewStateSync.captureElementScroll(
+          this.transcriptRef?.nativeElement,
+          this.transcriptScrollTop,
+        ),
       },
       mapState: this.mapState,
-      scrollY: window.scrollY,
+      scrollY: this.viewStateSync.captureWindowScroll(),
     };
     this.appStateStore.updateChatPage(next);
   }
@@ -303,5 +326,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     container.scrollTop = container.scrollHeight;
     this.transcriptScrollTop = container.scrollTop;
+  }
+
+  private looksLikeRuntimeFailure(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return normalized.includes('cannot reach')
+      || normalized.includes('could not reach')
+      || normalized.includes('cannot process this request')
+      || normalized.includes('failed')
+      || normalized.includes('error');
   }
 }

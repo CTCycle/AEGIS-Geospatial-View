@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from AEGIS.server.repositories.schemas.models import (
-    AccessKeyRecord,
     Base,
     ChatMessageRecord,
     ChatSessionRecord,
@@ -11,13 +10,11 @@ from AEGIS.server.repositories.schemas.models import (
     ModelCredentialRecord,
     ModelProviderSettingsRecord,
     SearchSessionRecord,
-    SystemSecretRecord,
     SessionCatalogRecord,
     SessionDetailsRecord,
 )
 
 __all__ = [
-    "AccessKeyRecord",
     "Base",
     "ChatMessageRecord",
     "ChatSessionRecord",
@@ -27,7 +24,6 @@ __all__ = [
     "ModelCredentialRecord",
     "ModelProviderSettingsRecord",
     "SearchSessionRecord",
-    "SystemSecretRecord",
     "SessionCatalogRecord",
     "SessionDetailsRecord",
 ]

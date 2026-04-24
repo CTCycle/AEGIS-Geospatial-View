@@ -24,9 +24,17 @@ class ChatSettingsService:
         record = self.settings_repo.get_or_create()
         active_credentials = self.credentials_repo.list_active()
         credential_presence: dict[str, dict[str, bool]] = {}
+        credential_health: dict[str, dict[str, str]] = {}
         for item in active_credentials:
             provider_bucket = credential_presence.setdefault(item.provider, {})
             provider_bucket[item.label] = True
+            health_bucket = credential_health.setdefault(item.provider, {})
+            try:
+                self.crypto_service.decrypt(item.encrypted_value)
+            except ValueError:
+                health_bucket[item.label] = "unreadable"
+            else:
+                health_bucket[item.label] = "healthy"
         return ModelSettingsResponse(
             active_provider_mode=record.active_provider_mode,  # type: ignore[arg-type]
             chat_model_provider=record.chat_model_provider,
@@ -39,10 +47,19 @@ class ChatSettingsService:
             openai_base_url=record.openai_base_url,
             google_base_url=record.google_base_url,
             credentials=credential_presence,
+            credential_health=credential_health,
         )
 
+    def get_ollama_url(self) -> str:
+        record = self.settings_repo.get_or_create()
+        return record.ollama_url
+
     def update_settings(self, payload: dict[str, Any]) -> ModelSettingsResponse:
-        credentials = payload.get("credentials") if isinstance(payload.get("credentials"), dict) else {}
+        credentials = (
+            payload.get("credentials")
+            if isinstance(payload.get("credentials"), dict)
+            else {}
+        )
         for provider, labels in credentials.items():
             if not isinstance(labels, dict):
                 continue
@@ -50,7 +67,9 @@ class ChatSettingsService:
                 if not isinstance(raw_value, str):
                     continue
                 if not raw_value.strip():
-                    self.credentials_repo.deactivate(provider=str(provider), label=str(label))
+                    self.credentials_repo.deactivate(
+                        provider=str(provider), label=str(label)
+                    )
                     continue
                 encrypted = self.crypto_service.encrypt(raw_value.strip())
                 self.credentials_repo.upsert(
@@ -69,10 +88,14 @@ class ChatSettingsService:
             agent_model_name=str(payload.get("agent_model_name") or "llama3.2"),
             ollama_url=str(payload.get("ollama_url") or "http://localhost:11434"),
             openai_base_url=(
-                str(payload.get("openai_base_url")) if payload.get("openai_base_url") else None
+                str(payload.get("openai_base_url"))
+                if payload.get("openai_base_url")
+                else None
             ),
             google_base_url=(
-                str(payload.get("google_base_url")) if payload.get("google_base_url") else None
+                str(payload.get("google_base_url"))
+                if payload.get("google_base_url")
+                else None
             ),
         )
         return self.get_settings()

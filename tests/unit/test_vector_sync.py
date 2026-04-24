@@ -31,7 +31,9 @@ class _ManifestLoaderStub:
                         "human_summary": "Default city basemap.",
                         "primary_use_cases": ["city context"],
                         "search_examples": ["show roads in Rome"],
-                        "disambiguation_notes": ["Use satellite for imagery-heavy tasks."],
+                        "disambiguation_notes": [
+                            "Use satellite for imagery-heavy tasks."
+                        ],
                         "location_dependency": "Location-specific context.",
                         "integration_requirements": ["No API key required"],
                     },
@@ -56,7 +58,9 @@ class _ManifestLoaderStub:
                         "human_summary": "Air-quality overlay for pollution context.",
                         "primary_use_cases": ["air quality awareness"],
                         "search_examples": ["show air quality in Rome"],
-                        "disambiguation_notes": ["Use forecast overlays for future outlooks."],
+                        "disambiguation_notes": [
+                            "Use forecast overlays for future outlooks."
+                        ],
                         "location_dependency": "Location-specific and data-dependent.",
                         "integration_requirements": ["No API key required"],
                     },
@@ -74,7 +78,9 @@ class _EmbeddingFactoryStub:
         _ = provider
         return "stub-embedding"
 
-    def get_embedding(self, *, provider: str, input_text: str, model: str | None = None):  # noqa: ANN001
+    def get_embedding(
+        self, *, provider: str, input_text: str, model: str | None = None
+    ):  # noqa: ANN001
         _ = provider
         return [float(len(input_text)), 0.0, 1.0], model or "stub-embedding"
 
@@ -100,5 +106,9 @@ def test_vector_sync_is_idempotent(tmp_path) -> None:
     assert second["status"] == "ok"
     assert second["indexed_documents"] >= 0
     assert third is None
-    metadata = json.loads((tmp_path / "vectors" / "manifest_index_metadata.json").read_text(encoding="utf-8"))
+    metadata = json.loads(
+        (tmp_path / "vectors" / "manifest_index_metadata.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert metadata["manifest_fingerprint"]

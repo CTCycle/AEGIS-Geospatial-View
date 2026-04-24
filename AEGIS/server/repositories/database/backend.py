@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import cache
 from typing import Any, Protocol
 
 from AEGIS.server.configurations import DatabaseSettings, get_server_settings
 from AEGIS.server.repositories.database.initializer import validate_postgres_schema
 from AEGIS.server.repositories.database.postgres import PostgresRepository
 from AEGIS.server.repositories.database.sqlite import SQLiteRepository
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.logger import logger
 
 
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
     engine: Any
+    session: Callable[[], Any]
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...
@@ -93,14 +95,9 @@ class AEGISDatabase:
         return self.backend.list_columns(table_name)
 
 
-_database_instance: AEGISDatabase | None = None
-
-
+@cache
 def get_database() -> AEGISDatabase:
-    global _database_instance
-    if _database_instance is None:
-        _database_instance = AEGISDatabase()
-    return _database_instance
+    return AEGISDatabase()
 
 
 class _DatabaseProxy:

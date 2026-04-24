@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, func, select
 
 from AEGIS.server.repositories.database.backend import get_database
-from AEGIS.server.repositories.schemas.models import Base, ChatMessageRecord, ChatSessionRecord
+from AEGIS.server.repositories.schemas.models import (
+    Base,
+    ChatMessageRecord,
+    ChatSessionRecord,
+)
 
 
 def _to_json_payload(value: Any) -> str | None:
@@ -24,7 +28,7 @@ def _from_json_payload(value: str | None) -> Any:
     except json.JSONDecodeError:
         return None
 
-
+###############################################################################
 class ChatHistoryRepository:
     def __init__(self) -> None:
         backend = get_database().backend
@@ -54,14 +58,20 @@ class ChatHistoryRepository:
 
     def get_session(self, session_id: int) -> ChatSessionRecord | None:
         with self._session_factory() as session:
-            statement = select(ChatSessionRecord).where(ChatSessionRecord.id == session_id)
+            statement = select(ChatSessionRecord).where(
+                ChatSessionRecord.id == session_id
+            )
             return session.execute(statement).scalars().first()
 
-    def upsert_session(self, session_id: int | None, *, title: str | None = None) -> ChatSessionRecord:
+    def upsert_session(
+        self, session_id: int | None, *, title: str | None = None
+    ) -> ChatSessionRecord:
         if session_id is None:
             return self.create_session(title=title)
         with self._session_factory() as session:
-            statement = select(ChatSessionRecord).where(ChatSessionRecord.id == session_id)
+            statement = select(ChatSessionRecord).where(
+                ChatSessionRecord.id == session_id
+            )
             record = session.execute(statement).scalars().first()
             if record is None:
                 record = ChatSessionRecord(id=session_id, title=title, status="active")
@@ -71,7 +81,7 @@ class ChatHistoryRepository:
                 return record
             if title:
                 record.title = title
-            record.updated_at = datetime.utcnow()
+            record.updated_at = datetime.now(UTC)
             session.commit()
             session.refresh(record)
             return record
@@ -87,8 +97,10 @@ class ChatHistoryRepository:
         map_session: Any = None,
     ) -> ChatMessageRecord:
         with self._session_factory() as session:
-            count_statement = select(func.count()).select_from(ChatMessageRecord).where(
-                ChatMessageRecord.session_id == session_id
+            count_statement = (
+                select(func.count())
+                .select_from(ChatMessageRecord)
+                .where(ChatMessageRecord.session_id == session_id)
             )
             turn_index = int(session.scalar(count_statement) or 0)
             message = ChatMessageRecord(
@@ -103,7 +115,7 @@ class ChatHistoryRepository:
             session.add(message)
             session_record = session.get(ChatSessionRecord, session_id)
             if session_record is not None:
-                session_record.updated_at = datetime.utcnow()
+                session_record.updated_at = datetime.now(UTC)
                 if map_session is not None:
                     session_record.last_map_session_json = _to_json_payload(map_session)
             session.commit()
@@ -121,7 +133,7 @@ class ChatHistoryRepository:
             rows = list(reversed(session.execute(statement).scalars().all()))
         return [self._to_message_dict(row) for row in rows]
 
-    def get_latest_extracted_state(self, session_id: int) -> Any | None:
+    def _last_assistant_payload(self, session_id: int) -> dict[str, Any] | None:
         with self._session_factory() as session:
             statement = (
                 select(ChatMessageRecord)
@@ -136,14 +148,23 @@ class ChatHistoryRepository:
         if row is None:
             return None
         payload = _from_json_payload(row.structured_payload_json)
-        if payload is None:
-            return None
-        from AEGIS.server.domain.extraction.models import ExtractedIntent
+        return payload if isinstance(payload, dict) else None
 
-        try:
-            return ExtractedIntent.model_validate(payload)
-        except Exception:
+    def get_latest_turn_contract(self, session_id: int) -> dict[str, Any] | None:
+        payload = self._last_assistant_payload(session_id)
+        if not isinstance(payload, dict):
             return None
+        contract = payload.get("turn_contract")
+        return contract if isinstance(contract, dict) else None
+
+    def get_latest_memory_snapshot(self, session_id: int) -> dict[str, Any]:
+        payload = self._last_assistant_payload(session_id)
+        if not isinstance(payload, dict):
+            return {"location_slots": [], "active_location": None}
+        snapshot = payload.get("memory_snapshot")
+        if not isinstance(snapshot, dict):
+            return {"location_slots": [], "active_location": None}
+        return snapshot
 
     def get_last_assistant_message(self, session_id: int) -> dict[str, Any] | None:
         with self._session_factory() as session:

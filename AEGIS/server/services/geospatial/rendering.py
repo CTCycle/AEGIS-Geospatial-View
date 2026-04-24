@@ -9,7 +9,8 @@ from PIL import Image
 
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import LocationSearchRequest
-from AEGIS.server.services.geospatial.gibs import GIBSService, GIBSValidationError
+from AEGIS.server.services.geospatial.gibs import GIBSService
+from AEGIS.server.services.geospatial.gibs_errors import GIBSValidationError
 from AEGIS.server.services.geospatial.layers import (
     LayerProviderEntry,
     LayerProviderError,
@@ -113,7 +114,7 @@ class MapSearchToolkit:
             try:
                 for value in candidate:
                     parsed.append(float(value))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
             return parsed
         return None
@@ -198,6 +199,7 @@ class MapRenderingService:
         self,
         payload: LocationSearchRequest,
         response_payload: dict[str, Any],
+        basemap: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         coordinate_pair = self.toolkit.extract_coordinate_pair(
             payload, response_payload
@@ -252,6 +254,7 @@ class MapRenderingService:
             coordinate_pair=coordinate_pair,
             bbox=view_bbox,
             overlays=overlays,
+            basemap=basemap,
         )
         if overlays:
             map_response["overlays"] = [
@@ -279,6 +282,7 @@ class MapRenderingService:
         coordinate_pair: CoordinatePair | None,
         bbox: list[float] | None,
         overlays: list[dict[str, Any]] | None,
+        basemap: dict[str, Any] | None,
     ) -> dict[str, Any]:
         if not bbox and not coordinate_pair:
             raise MapValidationError(
@@ -294,7 +298,7 @@ class MapRenderingService:
             "map_size_m": map_size_value,
             "width": payload.image_width,
             "height": payload.image_height,
-            "tiles": payload.map_tiles,
+            "tiles": self._resolve_tiles_from_basemap(basemap),
             "overlays": overlays,
         }
         map_response = await asyncio.to_thread(
@@ -304,6 +308,19 @@ class MapRenderingService:
         map_response["image_base64"] = self.toolkit.encode_image(image_bytes)
         map_response["mime"] = map_response.get("mime", payload.image_format)
         return map_response
+
+    def _resolve_tiles_from_basemap(self, basemap: dict[str, Any] | None) -> str | None:
+        if not isinstance(basemap, dict):
+            return None
+        basemap_id = str(basemap.get("id") or "").strip()
+        if basemap_id == "osm_default":
+            return "OpenStreetMap"
+        metadata = basemap.get("metadata")
+        if isinstance(metadata, dict):
+            tile_url = metadata.get("tile_url")
+            if isinstance(tile_url, str) and tile_url.strip():
+                return tile_url
+        return None
 
     def _expand_map_bbox_for_layers(
         self,
@@ -461,7 +478,9 @@ class MapRenderingService:
             return harmonized
         if coordinates is not None:
             lon, lat = coordinates
-            map_size_value = payload.map_size_m or get_server_settings().map.default_size_m
+            map_size_value = (
+                payload.map_size_m or get_server_settings().map.default_size_m
+            )
             return self.map_service.compute_bbox_from_center(lon, lat, map_size_value)
         return None
 

@@ -1,285 +1,165 @@
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import UTC, datetime
 from typing import Any
+from urllib.request import urlopen
 
-from fastapi import HTTPException, status
-
-from AEGIS.server.domain.geographics import LocationSearchRequest
-from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
-from AEGIS.server.services.geospatial.elevation import OpenElevationService
-from AEGIS.server.services.geospatial.gibs import GIBSRequestError, GIBSValidationError
-from AEGIS.server.services.geospatial.layers import LayerProviderError
-from AEGIS.server.services.geospatial.maps import MapRequestError, MapValidationError
-from AEGIS.server.services.geospatial.nominatim import NominatimService
-from AEGIS.server.services.sanitization import LocationSanitizationService
-from AEGIS.server.utils.constants import MAP_SEARCH_STATUS_MESSAGE
-from AEGIS.server.utils.logger import logger
-
-type CoordinatePair = tuple[float, float]
+from AEGIS.server.domain.geographics import LocationSearchRequest, MapSession
+from AEGIS.server.services.geospatial.capability_registry import CapabilityRegistry
 
 
 class LocationSearchOrchestrator:
-    def __init__(
-        self,
-        *,
-        sanitization_service: LocationSanitizationService,
-        nominatim_service: NominatimService,
-        catalog_service: GeospatialCatalogService,
-        elevation_service: OpenElevationService,
-        renderer: Any,
-        toolkit: Any,
-    ) -> None:
-        self.sanitization_service = sanitization_service
-        self.nominatim_service = nominatim_service
-        self.catalog_service = catalog_service
-        self.elevation_service = elevation_service
-        self.renderer = renderer
-        self.toolkit = toolkit
+    def __init__(self, *, capability_registry: CapabilityRegistry | None = None) -> None:
+        self.capability_registry = capability_registry or CapabilityRegistry()
 
-    def _coerce_coordinate_scalar(self, value: Any) -> float | None:
-        if isinstance(value, (int, float)):
-            return float(value)
-        return None
-
-    def _resolve_overlay_ids(self, payload: LocationSearchRequest) -> list[str]:
-        explicit_overlays = self.toolkit.normalize_layers(payload.overlay_ids)
-        if explicit_overlays:
-            return list(explicit_overlays)
-        suggest_overlay_ids = getattr(self.catalog_service, "suggest_overlay_ids_from_filters", None)
-        if callable(suggest_overlay_ids):
-            return self.toolkit.normalize_layers(suggest_overlay_ids(payload.semantic_filters))
-        return self.toolkit.normalize_layers(payload.semantic_filters)
-
-    async def resolve_coordinates(self, payload: LocationSearchRequest) -> dict[str, Any]:
-        response_payload = payload.model_dump()
-        normalized_filters = list(payload.filters or [])
-        response_payload["geospatial_filter"] = normalized_filters
-        response_payload["filters"] = normalized_filters
-        response_payload.pop("layers", None)
-        if not payload.use_coordinates:
-            sanitized_location = await asyncio.to_thread(
-                self.sanitization_service.sanitize_location_inputs,
-                payload.address or "",
-                payload.city,
-                payload.country,
-            )
-            response_payload["sanitized_location"] = sanitized_location
-            nominatim_candidate = await self.nominatim_service.extract_coordinates(
-                address=sanitized_location["address"] or "",
-                city=sanitized_location["city"],
-                country_name=sanitized_location["country"],
-                country_code=sanitized_location["country_code"],
-            )
-            if nominatim_candidate:
-                latitude = nominatim_candidate.get("lat")
-                longitude = nominatim_candidate.get("lon")
-                if latitude is not None and longitude is not None:
-                    try:
-                        response_payload["latitude"] = float(latitude)
-                        response_payload["longitude"] = float(longitude)
-                    except (TypeError, ValueError):
-                        pass
-                if nominatim_candidate.get("bbox"):
-                    response_payload["bbox"] = nominatim_candidate["bbox"]
-                if nominatim_candidate.get("confidence") is not None:
-                    response_payload["confidence"] = nominatim_candidate["confidence"]
-        elif payload.latitude is not None and payload.longitude is not None:
-            response_payload["latitude"] = payload.latitude
-            response_payload["longitude"] = payload.longitude
-            bbox = await self.nominatim_service.extract_bbox_from_coordinates(
-                latitude=payload.latitude,
-                longitude=payload.longitude,
-            )
-            if bbox:
-                response_payload["bbox"] = bbox
-        return response_payload
-
-    async def assemble_map_session(
-        self,
-        *,
-        payload: LocationSearchRequest,
-        search_payload: dict[str, Any],
-        satellite_payload: dict[str, Any],
-    ) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
-        selected_overlay_ids = self._resolve_overlay_ids(payload)
-        unmet_filters: list[str] = []
-        filter_overlay_ids = getattr(self.catalog_service, "filter_overlay_ids_by_semantics", None)
-        if callable(filter_overlay_ids):
-            selected_overlay_ids, unmet_filters = filter_overlay_ids(
-                overlay_ids=selected_overlay_ids,
-                semantic_filters=payload.semantic_filters,
-            )
-        overlays = self.catalog_service.resolve_overlays(selected_overlay_ids)
-        if not overlays:
-            legacy_overlays = satellite_payload.get("overlays", [])
-            if isinstance(legacy_overlays, list):
-                for entry in legacy_overlays:
-                    if not isinstance(entry, dict):
-                        continue
-                    overlays.append(
-                        {
-                            "id": str(entry.get("name") or "legacy_overlay"),
-                            "label": str(entry.get("label") or "Legacy Overlay"),
-                            "provider": str(entry.get("provider") or "gibs"),
-                            "type": "legacy-image",
-                            "default_opacity": float(entry.get("opacity", 0.68)),
-                            "coverage": "dynamic",
-                            "requires_key": False,
-                            "attribution": entry.get("attribution"),
-                        }
-                    )
-        basemap = self.catalog_service.resolve_basemap(payload.basemap_id)
-        lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
-        lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))
-        insights = await self.catalog_service.fetch_insights(
-            latitude=lat_value,
-            longitude=lon_value,
-            overlay_ids=[item["id"] for item in overlays],
-            radius_m=float(payload.radius_m or 2500.0),
-        )
-        overlay_runtime = await self.catalog_service.fetch_overlay_runtime(
-            latitude=lat_value,
-            longitude=lon_value,
-            overlay_ids=[item["id"] for item in overlays],
-            radius_m=float(payload.radius_m or 2500.0),
-        )
-        enriched_overlays: list[dict[str, Any]] = []
-        for overlay in overlays:
-            enriched = dict(overlay)
-            runtime_payload = overlay_runtime.get(str(overlay.get("id")))
-            if isinstance(runtime_payload, dict):
-                enriched["runtime"] = runtime_payload
-            else:
-                enriched["runtime"] = {
-                    "provider": overlay.get("provider"),
-                    "resolved_timestamp": datetime.now(UTC).isoformat(),
-                    "data_freshness": "unknown",
-                    "availability": "unknown",
-                    "error": None,
-                }
-            enriched_overlays.append(enriched)
-        compliance_warnings = self.catalog_service.resolve_compliance_warnings(
+    async def execute(self, payload: LocationSearchRequest) -> MapSession:
+        self.capability_registry.load_capabilities()
+        basemap = self._build_basemap_descriptor(payload.basemap_id)
+        overlays: list[dict[str, object]] = []
+        warnings: list[str] = []
+        for overlay_id in payload.overlay_ids:
+            overlay_result = self._build_overlay_descriptor(overlay_id)
+            if overlay_result is None:
+                warnings.append(f"Overlay '{overlay_id}' is not available in the capability catalog.")
+                continue
+            descriptor, overlay_warnings = overlay_result
+            overlays.append(descriptor)
+            warnings.extend(overlay_warnings)
+        return MapSession(
+            session_id=f"map-{int(datetime.now(UTC).timestamp())}",
+            resolved_location=payload.resolved_location,
+            basemap_id=payload.basemap_id,
+            overlay_ids=list(payload.overlay_ids),
+            viewport=payload.viewport,
+            center={
+                "latitude": payload.viewport.center_latitude,
+                "longitude": payload.viewport.center_longitude,
+            },
+            bounds=payload.viewport.bbox,
             basemap=basemap,
-            overlays=enriched_overlays,
+            overlays=overlays,
+            compliance_warnings=warnings,
+            payload={
+                "intent_id": payload.intent_id,
+                "time_mode": payload.time_mode,
+                "presentation": payload.presentation.model_dump(mode="json"),
+            },
         )
-        map_session = {
-            "center": {"latitude": lat_value, "longitude": lon_value},
-            "bounds": satellite_payload.get("bbox"),
-            "basemap": basemap,
-            "overlays": enriched_overlays,
-            "insights": insights,
-            "compliance_warnings": compliance_warnings,
-        }
-        return map_session, selected_overlay_ids, payload.semantic_filters, unmet_filters
 
-    async def execute(self, payload: LocationSearchRequest) -> dict[str, Any]:
-        if payload.datetime is None:
-            payload = payload.model_copy(update={"datetime": datetime.now(UTC)})
-        search_payload = await self.resolve_coordinates(payload)
-        lat_value = self._coerce_coordinate_scalar(search_payload.get("latitude"))
-        lon_value = self._coerce_coordinate_scalar(search_payload.get("longitude"))
-        bbox_value = search_payload.get("bbox")
-        has_bbox = isinstance(bbox_value, list) and len(bbox_value) == 4
-        if lat_value is None or lon_value is None:
-            if not has_bbox:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        "Unable to resolve a usable location from the current request. "
-                        "Please provide a more specific place or coordinates."
-                    ),
-                )
+    def _build_basemap_descriptor(self, basemap_id: str) -> dict[str, object] | None:
+        capability = self.capability_registry.get_capability(basemap_id)
+        if capability is None:
+            return None
+        metadata = self._metadata(capability)
+        return {
+            "id": str(capability.get("id") or basemap_id),
+            "label": str(metadata.get("label") or capability.get("name") or basemap_id),
+            "provider": str(capability.get("provider") or "unknown"),
+            "tile_url": self._optional_string(metadata.get("tile_url")),
+            "attribution": str(metadata.get("attribution") or ""),
+        }
+
+    def _build_overlay_descriptor(
+        self, overlay_id: str
+    ) -> tuple[dict[str, object], list[str]] | None:
+        capability = self.capability_registry.get_capability(overlay_id)
+        if capability is None:
+            return None
+        metadata = self._metadata(capability)
+        warnings: list[str] = []
+        resolved_url, url_warning = self._resolve_runtime_tile_url(
+            metadata.get("url_template")
+            or metadata.get("tile_url")
+            or metadata.get("url")
+        )
+        if url_warning is not None:
+            warnings.append(f"{overlay_id}: {url_warning}")
+        descriptor: dict[str, object] = {
+            "id": str(capability.get("id") or overlay_id),
+            "label": str(metadata.get("label") or capability.get("name") or overlay_id),
+            "provider": str(capability.get("provider") or "unknown"),
+            "type": str(capability.get("type") or "tile"),
+        }
+        optional_fields = {
+            "url": resolved_url,
+            "layers": metadata.get("layers"),
+            "layer_id": metadata.get("layer_id"),
+            "tile_matrix_set": metadata.get("tile_matrix_set"),
+            "wmts_format": metadata.get("wmts_format"),
+            "wmts_style": metadata.get("wmts_style"),
+            "wms_version": metadata.get("wms_version"),
+            "wms_exceptions": metadata.get("wms_exceptions"),
+            "attribution": metadata.get("attribution"),
+        }
+        for key, value in optional_fields.items():
+            normalized = self._optional_string(value)
+            if normalized is not None:
+                descriptor[key] = normalized
+        if isinstance(metadata.get("default_opacity"), int | float):
+            descriptor["default_opacity"] = float(metadata["default_opacity"])
+        if descriptor["provider"] == "rainviewer":
+            descriptor["maxzoom"] = 10
+        if self._is_bounds(metadata.get("bounds")):
+            descriptor["bounds"] = list(metadata["bounds"])
+        return descriptor, warnings
+
+    @staticmethod
+    def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
+        metadata = capability.get("metadata")
+        return dict(metadata) if isinstance(metadata, dict) else {}
+
+    @staticmethod
+    def _optional_string(value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @classmethod
+    def _resolve_runtime_tile_url(cls, value: object) -> tuple[str | None, str | None]:
+        template = cls._optional_string(value)
+        if template is None:
+            return None, "Tile URL is missing from provider metadata."
+        if "{time}" not in template:
+            return template, None
+        rainviewer_url = cls._resolve_rainviewer_tile_url()
+        if rainviewer_url is not None:
+            return rainviewer_url, None
+        timestamp = int(datetime.now(UTC).timestamp())
+        rounded_timestamp = timestamp - (timestamp % 600)
+        return (
+            template.replace("{time}", str(rounded_timestamp)),
+            "RainViewer metadata could not be fetched; using a timestamp fallback.",
+        )
+
+    @staticmethod
+    def _resolve_rainviewer_tile_url() -> str | None:
         try:
-            satellite_payload = await self.renderer.build_satellite_payload(payload, search_payload)
-        except (GIBSValidationError, MapValidationError, LayerProviderError) as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        except (GIBSRequestError, MapRequestError) as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+            with urlopen(  # noqa: S310
+                "https://api.rainviewer.com/public/weather-maps.json",
+                timeout=2,
+            ) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            return None
+        radar = payload.get("radar") if isinstance(payload, dict) else None
+        past = radar.get("past") if isinstance(radar, dict) else None
+        if not isinstance(past, list) or not past:
+            return None
+        latest = past[-1]
+        if not isinstance(latest, dict):
+            return None
+        path = latest.get("path")
+        host = payload.get("host")
+        if not isinstance(path, str) or not isinstance(host, str):
+            return None
+        return f"{host.rstrip('/')}{path}/256/{{z}}/{{x}}/{{y}}/2/1_1.png"
 
-        search_payload["satellite_imagery"] = satellite_payload
-        map_session, selected_overlay_ids, applied_filters, unmet_filters = await self.assemble_map_session(
-            payload=payload,
-            search_payload=search_payload,
-            satellite_payload=satellite_payload,
+    @staticmethod
+    def _is_bounds(value: object) -> bool:
+        return (
+            isinstance(value, list)
+            and len(value) == 4
+            and all(isinstance(item, int | float) for item in value)
         )
-        search_payload["map_session"] = map_session
-        search_payload["compliance_warnings"] = map_session.get("compliance_warnings", [])
-        search_payload["selected_overlay_ids"] = selected_overlay_ids
-        search_payload["applied_filters"] = applied_filters
-        search_payload["unmet_filters"] = unmet_filters
-        if applied_filters and not selected_overlay_ids:
-            search_payload["fallback_mode"] = "overlay_unavailable"
-
-        if lat_value is not None and lon_value is not None:
-            try:
-                search_payload["elevation"] = await self.elevation_service.get_elevation(
-                    lat_value, lon_value
-                )
-            except Exception as exc:
-                logger.warning("Failed to fetch elevation: %s", exc)
-                search_payload["elevation"] = None
-
-        return {
-            "status_message": MAP_SEARCH_STATUS_MESSAGE,
-            "payload": search_payload,
-            "map_session": map_session,
-            "compliance_warnings": map_session.get("compliance_warnings", []),
-        }
-
-    def build_search_session_record(
-        self,
-        *,
-        payload: LocationSearchRequest | None,
-        response_payload: dict[str, Any] | None,
-        fallback: dict[str, Any],
-        state: str,
-    ) -> dict[str, Any]:
-        payload_snapshot = response_payload.get("payload", {}) if response_payload else {}
-        coordinates: CoordinatePair | None = None
-        if payload:
-            coordinates = self.toolkit.extract_coordinate_pair(payload, payload_snapshot)
-            if not coordinates:
-                coordinates = self.toolkit.extract_coordinate_pair(payload, payload.model_dump())
-        if coordinates is None:
-            lon_candidate = fallback.get("longitude")
-            lat_candidate = fallback.get("latitude")
-            if isinstance(lon_candidate, (int, float)) and isinstance(lat_candidate, (int, float)):
-                coordinates = (float(lon_candidate), float(lat_candidate))
-
-        layers = (
-            list(payload.filters)
-            if payload
-            else self.toolkit.normalize_layers(fallback.get("geospatial_layers") or [])
-        )
-        overlay_ids = (
-            list(payload.overlay_ids)
-            if payload
-            else self.toolkit.normalize_layers(fallback.get("overlay_ids") or [])
-        )
-        if overlay_ids:
-            layers = list(dict.fromkeys([*layers, *overlay_ids]))
-        basemap_id = payload.basemap_id if payload else fallback.get("basemap_id")
-        persisted_selection = {
-            "legacy_layers": layers,
-            "overlay_ids": overlay_ids,
-            "basemap_id": basemap_id,
-        }
-        return {
-            "id": None,
-            "created_at": datetime.utcnow(),
-            "user": fallback.get("user"),
-            "country": payload.country if payload else fallback.get("country"),
-            "city": payload.city if payload else fallback.get("city"),
-            "address": payload.address if payload else fallback.get("address"),
-            "coordinates": json.dumps(
-                {"longitude": coordinates[0], "latitude": coordinates[1]}
-            )
-            if coordinates
-            else None,
-            "base_map": payload.map_tiles if payload else fallback.get("map_tiles"),
-            "geospatial_layers": json.dumps(persisted_selection),
-            "state": state,
-        }

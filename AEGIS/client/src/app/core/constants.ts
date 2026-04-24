@@ -57,4 +57,7 @@ export const DEFAULT_WMS_EXCEPTIONS = 'application/vnd.ogc.se_inimage';
 export const DEFAULT_WMTS_MATRIX_SET = 'EPSG:3857';
 export const DEFAULT_WMTS_FORMAT = 'image/png';
 export const DEFAULT_BASE_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const DEFAULT_BASE_TILE_PROXY_URL = `${API_BASE_URL}/maps/basemaps/osm/{z}/{x}/{y}.png`;
 export const DEFAULT_BASE_ATTRIBUTION = '© OpenStreetMap contributors';
+export const DEFAULT_BASE_TILE_MAX_ZOOM = 19;
+export const DEFAULT_MAP_FIT_MAX_ZOOM = 18;

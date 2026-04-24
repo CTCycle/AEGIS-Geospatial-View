@@ -11,8 +11,8 @@ from tqdm import tqdm
 
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.updater import LayerAggregate
-from AEGIS.server.utils.constants import GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M
-from AEGIS.server.utils.logger import logger
+from AEGIS.server.common.constants import GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M
+from AEGIS.server.common.logger import logger
 from AEGIS.server.repositories.serialization import DataSerializer
 
 

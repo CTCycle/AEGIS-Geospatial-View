@@ -1,6 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "providers_dir": "providers",
   "basemaps_dir": "basemaps",
-  "overlays_dir": "overlays"
+  "overlays_dir": "overlays",
+  "tools_dir": "tools",
+  "runtime_profiles_file": "runtime_profiles.json"
 }

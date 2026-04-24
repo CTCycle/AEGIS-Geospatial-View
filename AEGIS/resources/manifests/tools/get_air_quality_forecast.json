@@ -1,0 +1,20 @@
+{
+  "id": "get_air_quality_forecast",
+  "name": "Air Quality Forecast",
+  "provider": "openmeteo",
+  "type": "direct-tool",
+  "description": "Fetch air-quality forecast for a resolved location.",
+  "capabilities": ["air-quality", "forecast"],
+  "coverage": "global",
+  "metadata": {
+    "intent_tags": ["air quality", "pm25", "pollution"],
+    "task_tags": ["direct_query", "environment"],
+    "search_examples": ["air quality around Milan"],
+    "handler_name": "air_quality",
+    "requires_location": true,
+    "supports_direct_text": true,
+    "supports_map": true
+  },
+  "version": 1,
+  "last_modified": "2026-04-21T00:00:00+00:00"
+}

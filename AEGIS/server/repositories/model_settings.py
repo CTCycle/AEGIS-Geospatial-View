@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from AEGIS.server.repositories.database.backend import get_database
 from AEGIS.server.repositories.schemas.models import ModelProviderSettingsRecord
-from AEGIS.server.utils.constants import OLLAMA_DEFAULT_HOST
+from AEGIS.server.common.constants import OLLAMA_DEFAULT_HOST
 
 
 class ModelSettingsRepository:

@@ -83,8 +83,8 @@ Outputs:
 3. Review the rendered map and layer controls.
 4. Open Settings to change model assignment, manage credentials, or configure Ollama.
 5. Optional vector maintenance endpoints:
-   - `POST /chat/vectors/rebuild`
-   - `POST /chat/vectors/sync`
+   - `POST /api/chat/vectors/rebuild`
+   - `POST /api/chat/vectors/sync`
 
 For full user-oriented guidance, see `assets/docs/USER_MANUAL.md`.
 

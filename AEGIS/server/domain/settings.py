@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from AEGIS.server.utils.constants import (
+from AEGIS.server.common.constants import (
     DEFAULT_DB_CONNECT_TIMEOUT,
     DEFAULT_DB_INSERT_BATCH_SIZE,
     DEFAULT_GIBS_DEFAULT_LAYER,
@@ -76,6 +76,8 @@ class JobsSettings:
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
+    parser_certainty_threshold: float
+    parser_max_retries: int
 
 
 ###############################################################################
@@ -176,7 +178,9 @@ class JsonDatabaseSettings(BaseModel):
     connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
     insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
 
-    @field_validator("host", "database_name", "username", "password", "ssl_ca", mode="before")
+    @field_validator(
+        "host", "database_name", "username", "password", "ssl_ca", mode="before"
+    )
     @classmethod
     def normalize_optional_strings(cls, value: Any) -> str | None:
         if value is None:
@@ -223,6 +227,8 @@ class JsonJobsSettings(BaseModel):
 ###############################################################################
 class JsonChatRuntimeSettings(BaseModel):
     max_history_messages: int = Field(default=12, ge=1, le=100)
+    parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    parser_max_retries: int = Field(default=2, ge=0, le=5)
 
 
 ###############################################################################
@@ -273,7 +279,9 @@ class JsonGIBSSettings(BaseModel):
     capabilities_ttl_s: float = Field(default=6 * 60 * 60, ge=60.0)
     max_cache_entries: int = Field(default=24, ge=1)
     bbox_precision: int = Field(default=6, ge=0)
-    wms_base_endpoints: dict[str, str] = Field(default_factory=lambda: dict(GIBS_WMS_BASE_ENDPOINTS))
+    wms_base_endpoints: dict[str, str] = Field(
+        default_factory=lambda: dict(GIBS_WMS_BASE_ENDPOINTS)
+    )
     retry_backoff_s: float = Field(default=2.0, ge=0.1)
     min_visual_radius_m: float = Field(default=20000.0, ge=1000.0)
     image_width: int = Field(
@@ -287,12 +295,18 @@ class JsonGIBSSettings(BaseModel):
         le=GIBS_MAX_IMAGE_DIMENSION,
     )
     default_layer: str = DEFAULT_GIBS_DEFAULT_LAYER
-    capabilities_endpoints: dict[str, str] = Field(default_factory=lambda: dict(GIBS_CAPABILITIES_ENDPOINTS))
-    ows_namespaces: dict[str, str] = Field(default_factory=lambda: dict(GIBS_OWS_NAMESPACES))
+    capabilities_endpoints: dict[str, str] = Field(
+        default_factory=lambda: dict(GIBS_CAPABILITIES_ENDPOINTS)
+    )
+    ows_namespaces: dict[str, str] = Field(
+        default_factory=lambda: dict(GIBS_OWS_NAMESPACES)
+    )
     layer_sync_user_agent: str = DEFAULT_GIBS_LAYER_SYNC_USER_AGENT
     layer_sync_timeout: float = Field(default=30.0, ge=1.0)
 
-    @field_validator("wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before")
+    @field_validator(
+        "wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before"
+    )
     @classmethod
     def normalize_string_mapping(cls, value: Any) -> dict[str, str]:
         if not isinstance(value, dict):
@@ -330,7 +344,9 @@ class AppSettings(BaseSettings):
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
     jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
     chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
-    vectors: JsonVectorRuntimeSettings = Field(default_factory=JsonVectorRuntimeSettings)
+    vectors: JsonVectorRuntimeSettings = Field(
+        default_factory=JsonVectorRuntimeSettings
+    )
     openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
     overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
     rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)
@@ -392,7 +408,11 @@ class AppSettings(BaseSettings):
                 tiles=self.map.tiles,
             ),
             jobs=JobsSettings(polling_interval=self.jobs.polling_interval),
-            chat=ChatRuntimeSettings(max_history_messages=self.chat.max_history_messages),
+            chat=ChatRuntimeSettings(
+                max_history_messages=self.chat.max_history_messages,
+                parser_certainty_threshold=self.chat.parser_certainty_threshold,
+                parser_max_retries=self.chat.parser_max_retries,
+            ),
             vectors=VectorRuntimeSettings(
                 auto_sync_on_start=self.vectors.auto_sync_on_start,
                 default_ollama_embedding_model=self.vectors.default_ollama_embedding_model,

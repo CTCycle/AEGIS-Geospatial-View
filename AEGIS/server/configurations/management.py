@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from AEGIS.server.domain.settings import AppSettings, ServerSettings
-from AEGIS.server.utils.constants import CONFIGURATIONS_FILE
+from AEGIS.server.common.constants import CONFIGURATIONS_FILE
 
 
 def _ensure_mapping(value: Any) -> dict[str, Any]:
@@ -66,7 +66,9 @@ class ConfigurationManager:
     def reload(self) -> "ConfigurationManager":
         return self.load()
 
-    def update(self, payload: dict[str, Any], *, persist: bool = True) -> "ConfigurationManager":
+    def update(
+        self, payload: dict[str, Any], *, persist: bool = True
+    ) -> "ConfigurationManager":
         if not isinstance(payload, dict):
             raise RuntimeError("Configuration must be a JSON object.")
 
@@ -99,7 +101,9 @@ class ConfigurationManager:
         try:
             payload = json.loads(self.config_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"Unable to load configuration from {self.config_path}") from exc
+            raise RuntimeError(
+                f"Unable to load configuration from {self.config_path}"
+            ) from exc
 
         if not isinstance(payload, dict):
             raise RuntimeError("Configuration must be a JSON object.")

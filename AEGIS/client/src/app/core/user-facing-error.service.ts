@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class UserFacingErrorService {
-  private static readonly LOW_LEVEL_CONNECTION_PATTERN = /winerror\s*10061|connection refused|econnrefused|urlopen error|failed to establish a new connection/i;
+  private static readonly LOW_LEVEL_CONNECTION_PATTERN =
+    /winerror\s*10061|connection refused|econnrefused|urlopen error|failed to establish a new connection|failed to fetch|network request failed|networkerror|err_aborted|request interrupted|aborterror/i;
 
   toUserFacingError(error: unknown, fallback: string): string {
     const message = this.toErrorText(error);

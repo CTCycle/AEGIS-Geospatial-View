@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from AEGIS.server.services.llm.factory import LLMFactory
 from AEGIS.server.services.llm.prompts import get_agent_response_prompt
-from AEGIS.server.services.llm.types import ChatCompletionRequest
+from AEGIS.server.services.llm.types import LLMRequest
 
 
 class PlainResponder:
@@ -14,10 +14,15 @@ class PlainResponder:
     def respond(self, user_text: str) -> str:
         provider = self.llm_factory.get_chat_provider(self.provider)
         result = provider.chat(
-            ChatCompletionRequest(
+            LLMRequest(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": get_agent_response_prompt(provider=self.provider, model=self.model)},
+                    {
+                        "role": "system",
+                        "content": get_agent_response_prompt(
+                            provider=self.provider, model=self.model
+                        ),
+                    },
                     {"role": "user", "content": user_text},
                 ],
             )

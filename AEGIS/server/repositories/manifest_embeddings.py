@@ -14,9 +14,15 @@ class ManifestEmbeddingsRepository:
         self._session_factory = backend.session
         Base.metadata.create_all(backend.engine)
 
-    def get(self, *, manifest_id: str, manifest_kind: str) -> ManifestEmbeddingRecord | None:
+    def get(
+        self, *, manifest_id: str, manifest_kind: str
+    ) -> ManifestEmbeddingRecord | None:
         with self._session_factory() as session:
-            return session.execute(select_by_manifest(manifest_id, manifest_kind)).scalars().first()
+            return (
+                session.execute(select_by_manifest(manifest_id, manifest_kind))
+                .scalars()
+                .first()
+            )
 
     def upsert(
         self,
@@ -31,7 +37,11 @@ class ManifestEmbeddingsRepository:
         vector_document_id: str,
     ) -> None:
         with self._session_factory() as session:
-            record = session.execute(select_by_manifest(manifest_id, manifest_kind)).scalars().first()
+            record = (
+                session.execute(select_by_manifest(manifest_id, manifest_kind))
+                .scalars()
+                .first()
+            )
             if record is None:
                 record = ManifestEmbeddingRecord(
                     manifest_id=manifest_id,

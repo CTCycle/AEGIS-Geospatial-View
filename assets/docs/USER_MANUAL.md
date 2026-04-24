@@ -41,7 +41,7 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 ### Journey C: Model/provider setup
 1. Open Settings.
 2. Choose `Cloud` or `Local` mode.
-3. Search/filter models and assign parser/chat/agent roles.
+3. Search/filter models and assign parser/api/chat/agent roles.
 4. For local mode, manage Ollama URL, check connection, refresh models, or pull a model.
 5. Save and return to chat.
 
