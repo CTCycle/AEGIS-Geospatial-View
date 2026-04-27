@@ -11,7 +11,7 @@
   "metadata": {
     "label": "Terrain Context",
     "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    "attribution": "\u00a9 OpenStreetMap contributors",
+    "attribution": "© OpenStreetMap contributors",
     "requires_key": false,
     "keywords": [
       "terrain",
@@ -53,7 +53,19 @@
     "location_dependency": "Location-specific; useful from local to continental extents.",
     "integration_requirements": [
       "No API key required"
-    ]
+    ],
+    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Tile_servers",
+    "source_protocol": "raster-tile",
+    "data_format": "image tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "terrain semantics mapped to OSM fallback tiles",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

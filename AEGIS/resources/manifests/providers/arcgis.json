@@ -4,20 +4,57 @@
   "provider": "arcgis",
   "type": "catalog-provider",
   "description": "ArcGIS REST and portal services for public and credentialed geospatial layers.",
-  "capabilities": ["catalog-discovery", "feature-services", "map-services"],
+  "capabilities": [
+    "catalog-discovery",
+    "feature-services",
+    "map-services"
+  ],
   "coverage": "global",
   "metadata": {
     "label": "ArcGIS REST Services",
     "requires_key": false,
     "attribution": "ArcGIS service publishers",
-    "keywords": ["arcgis", "esri", "feature service", "map service", "geoportal"],
-    "intent_tags": ["catalog-discovery", "feature-services", "map-services"],
-    "task_tags": ["geospatial-discovery", "metadata"],
+    "keywords": [
+      "arcgis",
+      "esri",
+      "feature service",
+      "map service",
+      "geoportal"
+    ],
+    "intent_tags": [
+      "catalog-discovery",
+      "feature-services",
+      "map-services"
+    ],
+    "task_tags": [
+      "geospatial-discovery",
+      "metadata"
+    ],
     "temporal_behavior": "dataset-dependent",
     "dataset_time_reference": "Provided by individual service metadata or timeInfo",
     "source_freshness": "Service-specific modified timestamp where available",
     "query_mode": "catalog-discovery",
-    "integration_requirements": ["Public services work without a key; private portals require configured credentials"]
+    "integration_requirements": [
+      "Public services work without a key; private portals require configured credentials"
+    ],
+    "official_docs_url": "https://developers.arcgis.com/rest/services-reference/enterprise/output-formats/",
+    "source_protocol": "catalog-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show ArcGIS REST Services",
+      "find ArcGIS REST Services near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
   "last_modified": "2026-04-27T00:00:00+00:00"

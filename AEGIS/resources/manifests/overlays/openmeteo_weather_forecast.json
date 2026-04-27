@@ -58,7 +58,19 @@
     "location_dependency": "Location-specific and time-dependent forecast data.",
     "integration_requirements": [
       "No API key required in the free Open-Meteo flow"
-    ]
+    ],
+    "official_docs_url": "https://open-meteo.com/en/docs",
+    "source_protocol": "JSON time series",
+    "data_format": "JSON",
+    "geometry_type": "regional/time-series",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Useful for forecast context. Validate non-commercial limits and attribution requirements.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-10T16:45:00+00:00"

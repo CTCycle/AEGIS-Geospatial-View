@@ -37,7 +37,25 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "openmeteo-provider-v1"
+    "content_hash": "openmeteo-provider-v1",
+    "requires_key": false,
+    "official_docs_url": "https://open-meteo.com/en/docs",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Check non-commercial limits and attribution obligations before high-scale use.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show Open-Meteo",
+      "find Open-Meteo near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
   },
   "version": 1,
   "last_modified": "2026-04-10T16:45:00+00:00"

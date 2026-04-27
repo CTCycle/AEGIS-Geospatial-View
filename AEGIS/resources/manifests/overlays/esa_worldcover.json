@@ -18,7 +18,7 @@
     "tile_matrix_set": "EPSG:3857",
     "wmts_format": "image/png",
     "wmts_style": "",
-    "attribution": "\u00a9 ESA WorldCover / Terrascope",
+    "attribution": "© ESA WorldCover / Terrascope",
     "keywords": [
       "wmts",
       "land-cover",
@@ -59,7 +59,19 @@
     "location_dependency": "Location-dependent with periodic dataset updates.",
     "integration_requirements": [
       "No API key required"
-    ]
+    ],
+    "official_docs_url": "https://esa-worldcover.org/en/data-access",
+    "source_protocol": "WMTS",
+    "data_format": "image/png via WMTS",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

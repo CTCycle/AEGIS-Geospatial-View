@@ -7,6 +7,9 @@ Last updated: 2026-04-24
 - AGENTIC_SEARCH.md  
   Contract-first chat orchestration architecture (parser -> policy -> execution), decision states, and capability/runtime enforcement.
 
+- API_ACCESS_AND_ACCOUNT_SETUP.md  
+  Account setup, credential configuration, API key handling, quotas, restrictions, and official links for all external geospatial data providers.
+
 - ARCHITECTURE.md  
   End-to-end technical architecture for frontend and backend, including module responsibilities, API surfaces, data persistence, and execution model.
 

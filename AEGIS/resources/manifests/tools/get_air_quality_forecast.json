@@ -4,16 +4,48 @@
   "provider": "openmeteo",
   "type": "direct-tool",
   "description": "Fetch air-quality forecast for a resolved location.",
-  "capabilities": ["air-quality", "forecast"],
+  "capabilities": [
+    "air-quality",
+    "forecast"
+  ],
   "coverage": "global",
   "metadata": {
-    "intent_tags": ["air quality", "pm25", "pollution"],
-    "task_tags": ["direct_query", "environment"],
-    "search_examples": ["air quality around Milan"],
+    "intent_tags": [
+      "air quality",
+      "pm25",
+      "pollution"
+    ],
+    "task_tags": [
+      "direct_query",
+      "environment"
+    ],
+    "search_examples": [
+      "air quality around Milan"
+    ],
     "handler_name": "air_quality",
     "requires_location": true,
     "supports_direct_text": true,
-    "supports_map": true
+    "supports_map": true,
+    "requires_key": false,
+    "official_docs_url": "https://open-meteo.com/en/docs",
+    "source_protocol": "direct-tool",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "keywords": [
+      "openmeteo",
+      "direct-tool",
+      "Air Quality Forecast"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
   "last_modified": "2026-04-21T00:00:00+00:00"

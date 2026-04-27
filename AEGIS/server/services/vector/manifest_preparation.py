@@ -64,6 +64,12 @@ class ManifestPreparationService:
             f"Search examples: {', '.join(self._normalize_list(metadata.get('search_examples')))}",
             f"Location dependency: {metadata.get('location_dependency') or 'location-specific'}",
             f"Constraints: {metadata.get('constraints') or 'none'}",
+            f"Source protocol: {metadata.get('source_protocol') or 'unspecified'}",
+            f"Data format: {metadata.get('data_format') or 'unspecified'}",
+            f"Geometry type: {metadata.get('geometry_type') or 'unspecified'}",
+            f"Queryable: {bool(metadata.get('queryable', False))}",
+            f"Vectorizable: {bool(metadata.get('vectorizable', False))}",
+            f"Authentication mode: {metadata.get('auth_mode') or 'none'}",
         ]
         if isinstance(runtime_profile, dict):
             lines.extend(
@@ -96,6 +102,11 @@ class ManifestPreparationService:
             "runtime_supports_map": bool((runtime_profile or {}).get("supports_map", False)),
             "runtime_supports_direct_text": bool((runtime_profile or {}).get("supports_direct_text", False)),
             "runtime_credential_provider": (runtime_profile or {}).get("credential_provider"),
+            "source_protocol": metadata.get("source_protocol"),
+            "data_format": metadata.get("data_format"),
+            "geometry_type": metadata.get("geometry_type"),
+            "queryable": bool(metadata.get("queryable", False)),
+            "vectorizable": bool(metadata.get("vectorizable", False)),
             "source_path": entry.get("source_path"),
             "source_filename": entry.get("source_filename"),
         }

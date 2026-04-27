@@ -13,7 +13,7 @@
     "label": "PVGIS Solar Potential",
     "default_opacity": 1.0,
     "requires_key": false,
-    "attribution": "\u00a9 European Commission JRC PVGIS",
+    "attribution": "© European Commission JRC PVGIS",
     "keywords": [
       "solar",
       "point-insight",
@@ -54,7 +54,19 @@
     "location_dependency": "Location-specific and query-driven.",
     "integration_requirements": [
       "No API key required"
-    ]
+    ],
+    "official_docs_url": "https://re.jrc.ec.europa.eu/pvg_tools/en/",
+    "source_protocol": "JSON point insight",
+    "data_format": "JSON",
+    "geometry_type": "point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

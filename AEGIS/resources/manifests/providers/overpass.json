@@ -37,7 +37,25 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "overpass-provider-v1"
+    "content_hash": "overpass-provider-v1",
+    "requires_key": false,
+    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Overpass_API",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "point",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect instance rate and volume guidance and include attribution.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show Overpass API",
+      "find Overpass API near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
   },
   "version": 1,
   "last_modified": "2026-04-10T16:45:00+00:00"

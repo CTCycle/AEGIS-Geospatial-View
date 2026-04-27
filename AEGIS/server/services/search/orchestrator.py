@@ -35,7 +35,7 @@ class LocationSearchOrchestrator:
             else payload.basemap_id
         )
         for overlay_id in payload.overlay_ids:
-            overlay_result = self._build_overlay_descriptor(overlay_id)
+            overlay_result = self._build_overlay_descriptor(overlay_id, payload=payload)
             if overlay_result is None:
                 warnings.append(f"Overlay '{overlay_id}' is not available in the capability catalog.")
                 continue
@@ -84,7 +84,7 @@ class LocationSearchOrchestrator:
         }
 
     def _build_overlay_descriptor(
-        self, overlay_id: str
+        self, overlay_id: str, *, payload: LocationSearchRequest
     ) -> tuple[dict[str, object], list[str]] | None:
         capability = self.capability_registry.get_capability(overlay_id)
         if capability is None:
@@ -97,6 +97,7 @@ class LocationSearchOrchestrator:
             or metadata.get("tile_url")
             or metadata.get("url")
         )
+        raw_url = self._apply_spatial_placeholders(raw_url, payload=payload)
         capability_type = str(capability.get("type") or "")
         is_point_insight = raw_url is None and (
             bool(capability.get("supports_direct_text"))
@@ -127,6 +128,9 @@ class LocationSearchOrchestrator:
             "wms_version": metadata.get("wms_version"),
             "wms_exceptions": metadata.get("wms_exceptions"),
             "attribution": metadata.get("attribution"),
+            "source_protocol": metadata.get("source_protocol"),
+            "data_format": metadata.get("data_format"),
+            "geometry_type": metadata.get("geometry_type"),
         }
         for key, value in optional_fields.items():
             normalized = self._optional_string(value)
@@ -139,6 +143,22 @@ class LocationSearchOrchestrator:
         if self._is_bounds(metadata.get("bounds")):
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings
+
+    def _apply_spatial_placeholders(
+        self, value: object, *, payload: LocationSearchRequest
+    ) -> object:
+        template = self._optional_string(value)
+        if template is None:
+            return value
+        bounds = payload.viewport.bbox or self._bounds_from_viewport(payload.viewport)
+        if "{bbox}" in template and bounds:
+            bbox = ",".join(str(round(float(item), 6)) for item in bounds)
+            template = template.replace("{bbox}", bbox)
+        if "{lat}" in template:
+            template = template.replace("{lat}", str(payload.viewport.center_latitude))
+        if "{lon}" in template:
+            template = template.replace("{lon}", str(payload.viewport.center_longitude))
+        return template
 
     @staticmethod
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
@@ -208,8 +228,13 @@ class LocationSearchOrchestrator:
             return template, None
         provider = str((capability or {}).get("provider") or "").strip().lower()
         env_by_provider = {
+            "arcgis": "ARCGIS_API_KEY",
+            "census": "CENSUS_API_KEY",
+            "fred": "FRED_API_KEY",
             "tomtom": "TOMTOM_API_KEY",
             "geoapify": "GEOAPIFY_API_KEY",
+            "google_maps": "GOOGLE_MAPS_API_KEY",
+            "openaq": "OPENAQ_API_KEY",
         }
         env_name = env_by_provider.get(provider)
         if env_name is None:

@@ -36,7 +36,25 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "27249c9ae04d624fa519f7a48ef760fef7f1ebd590ca05925c68a0c6b1d103f1"
+    "content_hash": "27249c9ae04d624fa519f7a48ef760fef7f1ebd590ca05925c68a0c6b1d103f1",
+    "requires_key": true,
+    "official_docs_url": "https://docs.openaq.org/using-the-api/api-key",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "api_key",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show OpenAQ",
+      "find OpenAQ near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

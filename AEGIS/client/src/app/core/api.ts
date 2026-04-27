@@ -106,6 +106,14 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
         supports_map: Boolean(item.supports_map),
         supports_direct_text: Boolean(item.supports_direct_text),
         coverage: String(item.coverage ?? 'global'),
+        source_protocol: typeof item.source_protocol === 'string' ? item.source_protocol : undefined,
+        data_format: typeof item.data_format === 'string' ? item.data_format : undefined,
+        geometry_type: typeof item.geometry_type === 'string' ? item.geometry_type : undefined,
+        queryable: typeof item.queryable === 'boolean' ? item.queryable : undefined,
+        vectorizable: typeof item.vectorizable === 'boolean' ? item.vectorizable : undefined,
+        endpoint_health: typeof item.endpoint_health === 'string' ? item.endpoint_health : undefined,
+        auth_mode: typeof item.auth_mode === 'string' ? item.auth_mode : undefined,
+        official_docs_url: typeof item.official_docs_url === 'string' ? item.official_docs_url : undefined,
         intent_tags: Array.isArray(item.intent_tags)
           ? item.intent_tags.filter((v): v is string => typeof v === 'string')
           : [],
