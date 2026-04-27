@@ -34,7 +34,9 @@ class ChatSettingsService:
             except ValueError:
                 health_bucket[item.label] = "unreadable"
             else:
-                health_bucket[item.label] = "healthy"
+                health_bucket[item.label] = (
+                    "healthy" if item.provider in {"openai", "google"} else "stored"
+                )
         return ModelSettingsResponse(
             active_provider_mode=record.active_provider_mode,  # type: ignore[arg-type]
             chat_model_provider=record.chat_model_provider,

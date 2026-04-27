@@ -19,7 +19,16 @@ class LocationResolver:
         if not location_signals:
             active = memory_snapshot.get("active_location") if isinstance(memory_snapshot, dict) else None
             if isinstance(active, dict):
-                return ResolvedLocation.model_validate(active)
+                return ResolvedLocation(
+                    label=str(active.get("label") or ""),
+                    latitude=float(active.get("latitude")),
+                    longitude=float(active.get("longitude")),
+                    country=active.get("country") if isinstance(active.get("country"), str) else None,
+                    city=active.get("city") if isinstance(active.get("city"), str) else None,
+                    address=active.get("address") if isinstance(active.get("address"), str) else None,
+                    source=str(active.get("source") or "memory"),
+                    confidence=float(active.get("confidence") or 0.85),
+                )
             return ClarificationRequest(
                 question="Which location should I use?",
                 reason="No resolvable location signal found.",
@@ -28,10 +37,14 @@ class LocationResolver:
 
         ranked = self.score_location_matches(location_signals)
         top = ranked[0]
-        if len(ranked) > 1 and abs(ranked[0].confidence - ranked[1].confidence) < 0.12:
+        if (
+            len(ranked) > 1
+            and abs(ranked[0].confidence - ranked[1].confidence) < 0.12
+            and not self._same_resolved_point(ranked[0], ranked[1])
+        ):
             return self.build_ambiguity_question(ranked[:2])
 
-        if top.signal_type == "coordinates" and top.latitude is not None and top.longitude is not None:
+        if top.latitude is not None and top.longitude is not None:
             return ResolvedLocation(
                 label=top.normalized_value or top.raw_value,
                 latitude=top.latitude,
@@ -63,6 +76,14 @@ class LocationResolver:
 
     def score_location_matches(self, location_signals: Sequence[LocationSignal]) -> list[LocationSignal]:
         return sorted(location_signals, key=lambda item: item.confidence, reverse=True)
+
+    def _same_resolved_point(self, left: LocationSignal, right: LocationSignal) -> bool:
+        if None in {left.latitude, left.longitude, right.latitude, right.longitude}:
+            return False
+        return (
+            abs(float(left.latitude) - float(right.latitude)) < 0.01
+            and abs(float(left.longitude) - float(right.longitude)) < 0.01
+        )
 
     def build_ambiguity_question(self, candidates: Sequence[LocationSignal]) -> ClarificationRequest:
         options = ", ".join((candidate.raw_value for candidate in candidates if candidate.raw_value))
