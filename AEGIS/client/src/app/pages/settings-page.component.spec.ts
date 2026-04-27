@@ -180,8 +180,18 @@ describe('pages/settings-page.component', () => {
     await fixture.whenStable();
     const component = fixture.componentInstance;
     component.setSearchText('gpt');
+    await fixture.whenStable();
     expect(window.location.search).toContain('q=gpt');
     expect(store.updateSettingsPage).toHaveBeenCalled();
+  });
+
+  it('exposes an accessible label on the model search input', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const input = fixture.nativeElement.querySelector('input.model-search-bar') as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+    expect(input?.getAttribute('aria-label')).toBe('Search models');
   });
 
   it('navigateBack preserves state before routing', async () => {

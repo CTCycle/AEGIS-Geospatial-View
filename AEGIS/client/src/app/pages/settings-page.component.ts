@@ -422,8 +422,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     params.forEach((value, key) => {
       queryParams[key] = value;
     });
-    const nextUrl = this.router.serializeUrl(this.router.createUrlTree(['/settings'], { queryParams }));
-    window.history.replaceState(window.history.state, '', nextUrl);
+    void this.router.navigate(['/settings'], {
+      queryParams,
+      replaceUrl: true,
+    });
   }
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {

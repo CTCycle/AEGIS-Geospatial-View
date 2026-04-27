@@ -40,7 +40,7 @@
 .capability-section {
     display: grid;
     gap: 0.7rem;
-    min-width: max-content;
+    min-width: 0;
 }
 
 .capability-section__header {
@@ -73,7 +73,10 @@
 }
 
 .capability-table-wrap {
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid #263a45;
     background: #101c23;
 }
