@@ -2,7 +2,10 @@
   <section class="settings-modal" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel">
     <header class="settings-modal__header">
       <h2>{{ title }}</h2>
-      <button type="button" class="settings-modal__close" (click)="requestClose.emit()">Close</button>
+      <button type="button" class="settings-modal__close" aria-label="Close" (click)="requestClose.emit()">
+        <span aria-hidden="true">&times;</span>
+        <span class="sr-only">Close</span>
+      </button>
     </header>
     <ng-content></ng-content>
   </section>

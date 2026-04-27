@@ -183,7 +183,7 @@
 
   @if (isKeysModalOpen) {
     <app-settings-modal-shell title="API keys" ariaLabel="API key management" (requestClose)="closeModal()">
-      <form class="settings-modal__form" (ngSubmit)="saveKeys()">
+      <form class="settings-modal__form settings-modal__form--keys" (ngSubmit)="saveKeys()">
         <div class="settings-modal__body">
           <label>
             OpenAI API key {{ openAiConfigured() ? '(Configured)' : '(Not configured)' }}
