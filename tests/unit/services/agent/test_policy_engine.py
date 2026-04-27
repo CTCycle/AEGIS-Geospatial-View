@@ -294,6 +294,49 @@ def test_policy_engine_keeps_coordinate_direct_query_as_tool() -> None:
     assert tool.capability_id == "location_to_coordinates"
 
 
+def test_policy_engine_keeps_coordinate_query_as_direct_tool_even_with_overlay_candidates() -> None:
+    engine = PolicyEngine(
+        location_resolver=LocationResolver(),
+        capability_retriever=CapabilityRetriever(),
+    )
+    turn = _turn(
+        user_text="Coordinates for Shibuya Crossing",
+        intent_id="shibuya_crossing_coordinates",
+        task_tags=["coordinates", "location_query"],
+        intent_tags=["coordinates", "landmark"],
+        task_class="direct_query",
+    )
+    candidates = [
+        CapabilityCandidate(
+            capability_id="location_to_coordinates",
+            kind="tool",
+            provider="nominatim",
+            score=0.3,
+            supports_direct_text=True,
+            supports_map=False,
+        ),
+        CapabilityCandidate(
+            capability_id="overpass_poi_amenities",
+            kind="overlay",
+            provider="overpass",
+            score=0.4,
+            supports_map=True,
+            supports_direct_text=False,
+        ),
+    ]
+
+    mode, tool = engine._select_execution_mode(
+        turn,
+        candidates,
+        overlay_ids=["overpass_poi_amenities"],
+        tool_id="location_to_coordinates",
+    )
+
+    assert mode == "direct_tool"
+    assert tool is not None
+    assert tool.capability_id == "location_to_coordinates"
+
+
 def test_policy_engine_clarifies_deictic_reference_without_memory_before_resolving() -> None:
     engine = PolicyEngine(
         location_resolver=LocationResolver(),

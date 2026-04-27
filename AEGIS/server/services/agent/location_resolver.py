@@ -36,43 +36,30 @@ class LocationResolver:
             )
 
         ranked = self.score_location_matches(location_signals)
-        top = ranked[0]
-        if (
-            len(ranked) > 1
-            and abs(ranked[0].confidence - ranked[1].confidence) < 0.12
-            and not self._same_resolved_point(ranked[0], ranked[1])
-        ):
-            return self.build_ambiguity_question(ranked[:2])
+        resolved_candidates: list[ResolvedLocation] = []
+        ranked_candidates: list[LocationSignal] = []
+        for signal in ranked[:3]:
+            resolved = await self._resolve_signal(signal)
+            if resolved is None:
+                continue
+            resolved_candidates.append(resolved)
+            ranked_candidates.append(signal)
 
-        if top.latitude is not None and top.longitude is not None:
-            return ResolvedLocation(
-                label=top.normalized_value or top.raw_value,
-                latitude=top.latitude,
-                longitude=top.longitude,
-                source=top.source,
-                confidence=top.confidence,
-            )
-
-        geocoded = await self.nominatim_service.extract_coordinates(
-            address=top.normalized_value or top.raw_value,
-            city=None,
-            country_name=None,
-            country_code=None,
-        )
-        if not isinstance(geocoded, dict):
+        if not resolved_candidates:
             return ClarificationRequest(
                 question="I could not resolve that location. Can you provide a city or coordinates?",
                 reason="Geocoder did not return a valid candidate.",
                 missing_fields=["location"],
             )
 
-        return ResolvedLocation(
-            label=str(geocoded.get("display_name") or top.raw_value),
-            latitude=float(geocoded["lat"]),
-            longitude=float(geocoded["lon"]),
-            source="geocoder",
-            confidence=float(geocoded.get("confidence") or top.confidence),
-        )
+        if (
+            len(resolved_candidates) > 1
+            and abs(resolved_candidates[0].confidence - resolved_candidates[1].confidence) < 0.12
+            and not self._same_resolved_location(resolved_candidates[0], resolved_candidates[1])
+        ):
+            return self.build_ambiguity_question(ranked_candidates[:2])
+
+        return resolved_candidates[0]
 
     def score_location_matches(self, location_signals: Sequence[LocationSignal]) -> list[LocationSignal]:
         return sorted(location_signals, key=lambda item: item.confidence, reverse=True)
@@ -83,6 +70,37 @@ class LocationResolver:
         return (
             abs(float(left.latitude) - float(right.latitude)) < 0.01
             and abs(float(left.longitude) - float(right.longitude)) < 0.01
+        )
+
+    def _same_resolved_location(self, left: ResolvedLocation, right: ResolvedLocation) -> bool:
+        return (
+            abs(float(left.latitude) - float(right.latitude)) < 0.01
+            and abs(float(left.longitude) - float(right.longitude)) < 0.01
+        )
+
+    async def _resolve_signal(self, signal: LocationSignal) -> ResolvedLocation | None:
+        if signal.latitude is not None and signal.longitude is not None:
+            return ResolvedLocation(
+                label=signal.normalized_value or signal.raw_value,
+                latitude=signal.latitude,
+                longitude=signal.longitude,
+                source=signal.source,
+                confidence=signal.confidence,
+            )
+        geocoded = await self.nominatim_service.extract_coordinates(
+            address=signal.normalized_value or signal.raw_value,
+            city=None,
+            country_name=None,
+            country_code=None,
+        )
+        if not isinstance(geocoded, dict):
+            return None
+        return ResolvedLocation(
+            label=str(geocoded.get("display_name") or signal.raw_value),
+            latitude=float(geocoded["lat"]),
+            longitude=float(geocoded["lon"]),
+            source="geocoder",
+            confidence=float(geocoded.get("confidence") or signal.confidence),
         )
 
     def build_ambiguity_question(self, candidates: Sequence[LocationSignal]) -> ClarificationRequest:

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from AEGIS.server.services.agent.parser_service import ParserService
+from AEGIS.server.services.agent.parser_service import PARSER_SYSTEM_PROMPT, ParserService
 from AEGIS.server.services.llm.errors import LLMConfigurationError
 
 
 class _ProviderStub:
     def structured_output(self, request, schema):  # noqa: ANN001
-        user_message = request.messages[-1]["content"]
+        payload = json.loads(request.messages[-1]["content"])
+        user_message = payload.get("user_message", "")
         if "Colosseum" in user_message:
             return {
                 "task_class": "direct_query",
@@ -27,6 +30,34 @@ class _ProviderStub:
                 ],
                 "temporal_signal": {"mode": "none"},
                 "ambiguities": [],
+                "disallowed_patterns": [],
+                "parser_confidence": 0.9,
+            }
+        if "القاهرة" in user_message:
+            return {
+                "task_class": "map_search",
+                "intent_id": "air_quality_map",
+                "intent_label": "Air quality map",
+                "task_tags": ["map"],
+                "intent_tags": ["air_quality"],
+                "requested_visualizations": ["air_quality"],
+                "requires_location": True,
+                "location_signals": [
+                    {
+                        "signal_type": "city",
+                        "raw_value": "القاهرة",
+                        "normalized_value": "Cairo",
+                        "confidence": 0.9,
+                    },
+                    {
+                        "signal_type": "city",
+                        "raw_value": "الخرطوم",
+                        "normalized_value": "Khartoum",
+                        "confidence": 0.85,
+                    },
+                ],
+                "temporal_signal": {"mode": "none"},
+                "ambiguities": ["'الخرطية' likely intended as 'الخرطوم' (Khartoum)"],
                 "disallowed_patterns": [],
                 "parser_confidence": 0.9,
             }
@@ -103,3 +134,20 @@ def test_parser_service_does_not_hide_configuration_errors() -> None:
             memory_snapshot={},
             conversation_messages=[],
         )
+
+
+def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> None:
+    assert "The user may write in any language" in PARSER_SYSTEM_PROMPT
+    assert "raw_value must be a verbatim span" in PARSER_SYSTEM_PROMPT
+    assert "requested_visualizations must use only canonical ids" in PARSER_SYSTEM_PROMPT
+
+
+def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
+    parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
+    result = parser.parse_turn(
+        user_message="اعرض جودة الهواء في القاهرة على الخريطة.",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+    assert [item.raw_value for item in result.location_signals] == ["القاهرة"]
+    assert result.ambiguities == []

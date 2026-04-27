@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Literal
 
 from AEGIS.server.domain.extraction.models import (
@@ -43,6 +44,12 @@ Rules:
 1. Always infer location entities from natural language when present.
 2. If a location is explicitly present in user text, do not mark missing_location.
 3. Keep extraction concise and deterministic; no prose.
+4. The user may write in any language; interpret multilingual input without assuming English.
+5. For each location_signals item, raw_value must be a verbatim span from the current user message.
+6. Do not invent extra locations that are not explicitly present in the current user message.
+7. requested_visualizations must use only canonical ids when relevant:
+   satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire, weather, aerosol, ozone, solar, noise
+8. When the request is for air quality, prefer air_quality in requested_visualizations and intent tags unless the user explicitly requests another theme.
 """.strip()
 
 
@@ -146,6 +153,31 @@ class ParserService:
             result.append(text)
         return result
 
+    @staticmethod
+    def _contains_verbatim_span(user_message: str, candidate: str) -> bool:
+        message = " ".join(str(user_message or "").casefold().split())
+        span = " ".join(str(candidate or "").casefold().split())
+        if not span:
+            return False
+        return span in message
+
+    def _ambiguity_has_text_evidence(self, user_message: str, ambiguity: str) -> bool:
+        normalized = str(ambiguity or "").strip()
+        if not normalized:
+            return False
+        if normalized in {
+            "missing_location",
+            "deictic_without_memory",
+            "potential_alternate_location",
+            "alternate_location",
+            "multiple_possible_locations",
+        }:
+            return True
+        quoted_terms = [item.strip() for item in re.findall(r"'([^']+)'", normalized)]
+        if not quoted_terms:
+            return True
+        return any(self._contains_verbatim_span(user_message, term) for term in quoted_terms)
+
     def _extract_turn(self, *, user_message: str, memory_snapshot: dict, recent_messages: list[dict[str, str]]) -> _LLMParserExtraction:
         settings = self.settings_repo.get_or_create()
         provider_name = self.provider or settings.parser_model_provider
@@ -212,6 +244,15 @@ class ParserService:
                 parser_confidence=0.0,
             )
 
+        extracted_location_signals = list(extracted.location_signals)
+        verbatim_signals = [
+            item
+            for item in extracted_location_signals
+            if self._contains_verbatim_span(user_message, item.raw_value)
+        ]
+        if verbatim_signals:
+            extracted_location_signals = verbatim_signals
+
         location_signals = [
             LocationSignal(
                 signal_type=item.signal_type,
@@ -222,7 +263,7 @@ class ParserService:
                 confidence=item.confidence,
                 source="model",
             )
-            for item in extracted.location_signals
+            for item in extracted_location_signals
             if item.raw_value.strip()
         ]
         normalized_intent = NormalizedIntent(
@@ -250,6 +291,11 @@ class ParserService:
         ]
 
         ambiguities = self._dedupe(list(extracted.ambiguities))
+        ambiguities = [
+            item
+            for item in ambiguities
+            if self._ambiguity_has_text_evidence(user_message, item)
+        ]
         has_deictic = any(item.signal_type == "deictic" for item in location_signals)
         if normalized_intent.requires_location and not location_signals:
             ambiguities = self._dedupe([*ambiguities, "missing_location"])
