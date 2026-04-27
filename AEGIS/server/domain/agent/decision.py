@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-PlanState = Literal["clarify", "direct_tool", "map_search", "reject"]
+PlanState = Literal["clarify", "direct_response", "direct_tool", "map_search", "reject"]
 ExecutionMode = Literal["direct_text", "map"]
 
 ###############################################################################
@@ -46,6 +46,8 @@ class ExecutionPlan(BaseModel):
     state: PlanState
     mode: ExecutionMode | None = None
     intent_id: str
+    temporal_mode: str | None = None
+    temporal_text: str | None = None
     basemap_id: str | None = None
     overlay_ids: list[str] = Field(default_factory=list)
     tool_id: str | None = None

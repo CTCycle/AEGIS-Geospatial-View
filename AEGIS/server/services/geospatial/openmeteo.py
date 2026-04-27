@@ -12,15 +12,15 @@ from urllib.request import Request, urlopen
 
 from AEGIS.server.configurations import get_server_settings
 
-
+###############################################################################
 class OpenMeteoServiceError(Exception):
     """Base exception for Open-Meteo failures."""
 
-
+###############################################################################
 class OpenMeteoRequestError(OpenMeteoServiceError):
     """Raised when Open-Meteo cannot fulfill a request."""
 
-
+###############################################################################
 class OpenMeteoService:
     def __init__(
         self,
@@ -77,20 +77,25 @@ class OpenMeteoService:
         precipitation = list(hourly.get("precipitation") or [])
         weather_code = list(hourly.get("weather_code") or [])
         preview: list[dict[str, Any]] = []
-        for index in range(min(6, len(timeline))):
+        hourly_forecast: list[dict[str, Any]] = []
+        for index in range(min(72, len(timeline))):
+            row = {
+                "time": timeline[index],
+                "temperature_2m": temperature[index]
+                if index < len(temperature)
+                else None,
+                "precipitation": precipitation[index]
+                if index < len(precipitation)
+                else None,
+                "weather_code": weather_code[index]
+                if index < len(weather_code)
+                else None,
+            }
+            hourly_forecast.append(row)
+            if len(preview) >= 6:
+                continue
             preview.append(
-                {
-                    "time": timeline[index],
-                    "temperature_2m": temperature[index]
-                    if index < len(temperature)
-                    else None,
-                    "precipitation": precipitation[index]
-                    if index < len(precipitation)
-                    else None,
-                    "weather_code": weather_code[index]
-                    if index < len(weather_code)
-                    else None,
-                }
+                row
             )
         return {
             "provider": "openmeteo",
@@ -102,6 +107,7 @@ class OpenMeteoService:
             if isinstance(payload.get("current"), dict)
             else {},
             "hourly_preview": preview,
+            "hourly_forecast": hourly_forecast,
             "resolved_at": datetime.now(UTC).isoformat(),
             "attribution": "Data from Open-Meteo",
         }

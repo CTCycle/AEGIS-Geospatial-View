@@ -15,7 +15,7 @@ from AEGIS.server.services.search.request_builder import RequestBuilder
 
 LOGGER = logging.getLogger(__name__)
 
-
+###############################################################################
 class AgentOrchestrator:
     def __init__(
         self,
@@ -57,6 +57,33 @@ class AgentOrchestrator:
             conversation_messages=recent_messages,
         )
         context_usage = self.parser_service.last_context_usage
+        if turn_contract.task_class == "general_question" or self._is_capability_question(turn_contract.user_text):
+            assistant_message = self._compose_general_question_message(turn_contract.user_text)
+            self.history_repo.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                structured_payload={
+                    "turn_contract": turn_contract.model_dump(mode="json"),
+                    "decision": None,
+                    "memory_snapshot": latest_memory,
+                    "previous_turn_contract": latest_contract,
+                    "request_id": request_id,
+                },
+                tool_payload=None,
+                map_session=None,
+            )
+            return ChatTurnResponse(
+                request_id=request_id,
+                session_id=session.id,
+                assistant_message=assistant_message,
+                turn_contract=turn_contract,
+                decision=self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id),
+                tool_payload=None,
+                map_session=None,
+                memory_snapshot=latest_memory,
+                context_usage=context_usage,
+            )
 
         decision = await self.policy_engine.decide(
             turn=turn_contract,
@@ -136,6 +163,31 @@ class AgentOrchestrator:
             context_usage=context_usage,
         )
 
+    @staticmethod
+    def _build_direct_reject_decision(intent_id: str):
+        from AEGIS.server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
+
+        return PolicyDecision(
+            plan=ExecutionPlan(state="direct_response", intent_id=intent_id),
+            trace=DecisionTrace(steps=["general_question.direct_response"]),
+        )
+
+    @staticmethod
+    def _compose_general_question_message(user_text: str) -> str:
+        text = user_text.lower()
+        if "capabil" in text or "model" in text:
+            return (
+                "I can parse geospatial requests, resolve locations, build map sessions with supported basemaps and overlays, "
+                "answer coordinate and weather queries through registered tools, remember the active location for follow-ups, "
+                "and reject requests that try to bypass policy or reveal secrets."
+            )
+        return "I can help with location-based maps, coordinates, weather, rainfall, traffic layers, and related geospatial questions."
+
+    @staticmethod
+    def _is_capability_question(user_text: str) -> bool:
+        text = user_text.lower()
+        return "capabil" in text and any(marker in text for marker in ("model", "you", "app", "aegis"))
+
     def _compose_assistant_message(
         self,
         decision,
@@ -172,7 +224,7 @@ class AgentOrchestrator:
                 if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
                     return f"Coordinates for {location}: {latitude:.6f}, {longitude:.6f}."
         if tool_id == "get_weather_forecast" and isinstance(nested_result, dict):
-            current = nested_result.get("current")
+            current = nested_result.get("selected_forecast") or nested_result.get("current")
             location = result.get("location") or cls._extract_label(tool_payload.get("location"))
             if isinstance(current, dict):
                 temperature = current.get("temperature_2m")

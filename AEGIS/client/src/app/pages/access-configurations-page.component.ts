@@ -70,7 +70,11 @@ export class AccessConfigurationsPageComponent implements OnInit {
   }
 
   health(provider: GeoProviderId): string {
-    return this.settings?.credential_health?.[provider]?.['api_key'] ?? (this.configured(provider) ? 'unknown' : 'not configured');
+    const status = this.settings?.credential_health?.[provider]?.['api_key'];
+    if (status === 'healthy' || status === 'stored') {
+      return 'stored (not validated)';
+    }
+    return status ?? (this.configured(provider) ? 'stored (not validated)' : 'not configured');
   }
 
   async saveProvider(provider: GeoProviderId): Promise<void> {
@@ -84,7 +88,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
     }
     if (await this.persistCredential(provider, value)) {
       this.drafts[provider] = '';
-      this.statusText = `${this.providerName(provider)} key saved. Optional capabilities will become available in the catalog.`;
+      this.statusText = `${this.providerName(provider)} key saved. Provider access has not been validated.`;
     }
   }
 

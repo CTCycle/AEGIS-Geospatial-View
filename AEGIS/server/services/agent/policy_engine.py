@@ -15,7 +15,7 @@ from AEGIS.server.services.agent.manifest_intent_resolver import ManifestIntentR
 from AEGIS.server.services.geospatial.capability_registry import CapabilityRegistry
 from AEGIS.server.services.geospatial.runtime_registry import RuntimeRegistrySnapshot
 
-
+###############################################################################
 class PolicyEngine:
     def __init__(
         self,
@@ -55,6 +55,15 @@ class PolicyEngine:
                 trace=trace,
             )
 
+        trace.steps.append("2a.enforce_safety_policy")
+        safety_policy = self._enforce_safety_policy(turn)
+        if safety_policy is not None:
+            return PolicyDecision(
+                plan=ExecutionPlan(state="reject", intent_id=turn.normalized_intent.intent_id),
+                clarification=safety_policy,
+                trace=trace,
+            )
+
         trace.steps.append("3.resolve_location")
         resolved = await self._resolve_location(turn, memory_snapshot)
         if isinstance(resolved, ClarificationRequest):
@@ -65,10 +74,11 @@ class PolicyEngine:
             )
 
         trace.steps.append("4.validate_ambiguity")
-        if turn.ambiguities:
+        blocking_ambiguities = self._blocking_ambiguities(turn, resolved)
+        if blocking_ambiguities:
             return PolicyDecision(
                 plan=ExecutionPlan(state="clarify", intent_id=turn.normalized_intent.intent_id),
-                clarification=self._build_clarification(turn.ambiguities),
+                clarification=self._build_clarification(blocking_ambiguities),
                 resolved_location=resolved,
                 trace=trace,
             )
@@ -93,6 +103,12 @@ class PolicyEngine:
             capability_registry=capability_registry,
             available_ids=available_ids,
         )
+        overlay_ids = list(manifest_resolution.overlay_ids)
+        tool_id = manifest_resolution.tool_id
+        if self._explicitly_suppresses_overlays(turn):
+            overlay_ids = []
+            if tool_id in {"get_nearby_poi"}:
+                tool_id = None
         trace.steps.append(
             "8a.resolve_manifest_concepts:"
             + ",".join(manifest_resolution.concepts or ["none"])
@@ -102,8 +118,10 @@ class PolicyEngine:
                 plan=ExecutionPlan(
                     state="clarify",
                     intent_id=turn.normalized_intent.intent_id,
+                    temporal_mode=turn.temporal_signal.mode,
+                    temporal_text=turn.temporal_signal.raw_text,
                     basemap_id=manifest_resolution.basemap_id,
-                    overlay_ids=manifest_resolution.overlay_ids,
+                    overlay_ids=overlay_ids,
                 ),
                 clarification=ClarificationRequest(
                     question="Which data layer should I use for this map request?",
@@ -118,8 +136,8 @@ class PolicyEngine:
         mode_state, selected_tool = self._select_execution_mode(
             turn,
             candidates,
-            overlay_ids=manifest_resolution.overlay_ids,
-            tool_id=manifest_resolution.tool_id,
+            overlay_ids=overlay_ids,
+            tool_id=tool_id,
         )
 
         trace.steps.append("9.build_execution_plan")
@@ -127,9 +145,11 @@ class PolicyEngine:
             state=mode_state,
             mode="direct_text" if mode_state == "direct_tool" else "map",
             intent_id=turn.normalized_intent.intent_id,
+            temporal_mode=turn.temporal_signal.mode,
+            temporal_text=turn.temporal_signal.raw_text,
             basemap_id=manifest_resolution.basemap_id,
-            overlay_ids=manifest_resolution.overlay_ids,
-            tool_id=manifest_resolution.tool_id
+            overlay_ids=overlay_ids,
+            tool_id=tool_id
             or (selected_tool.capability_id if selected_tool is not None else None),
         )
         if mode_state == "direct_tool" and not plan.tool_id:
@@ -174,6 +194,62 @@ class PolicyEngine:
                 missing_fields=["location"],
             )
         return None
+
+    def _enforce_safety_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
+        actionable_patterns = self._actionable_disallowed_patterns(turn)
+        if not actionable_patterns:
+            return None
+        return ClarificationRequest(
+            question="I cannot execute this request with the current policy constraints.",
+            reason="; ".join(item.reason for item in actionable_patterns if item.reason),
+            missing_fields=[],
+        )
+
+    def _actionable_disallowed_patterns(self, turn: TurnParseResult):
+        return [
+            item
+            for item in turn.disallowed_patterns
+            if item.pattern_id.strip().lower()
+            not in {
+                "overlay_exclusion",
+                "overlay_prohibition",
+                "overlay_restriction",
+                "no_overlay",
+                "no_overlays",
+            }
+        ]
+
+    def _explicitly_suppresses_overlays(self, turn: TurnParseResult) -> bool:
+        text = self._intent_text(turn)
+        suppress_markers = (
+            "do not add overlays",
+            "don't add overlays",
+            "no overlays",
+            "without overlays",
+            "map style only",
+            "basemap only",
+        )
+        return any(marker in text for marker in suppress_markers)
+
+    def _blocking_ambiguities(
+        self,
+        turn: TurnParseResult,
+        resolved_location: ResolvedLocation,
+    ) -> list[str]:
+        non_blocking_when_resolved = {
+            "potential_alternate_location",
+            "alternate_location",
+            "multiple_possible_locations",
+        }
+        blocking: list[str] = []
+        for ambiguity in turn.ambiguities:
+            normalized = ambiguity.strip().lower()
+            if not normalized:
+                continue
+            if normalized in non_blocking_when_resolved and resolved_location.confidence >= 0.6:
+                continue
+            blocking.append(ambiguity)
+        return blocking
 
     async def _resolve_location(self, turn: TurnParseResult, memory_snapshot: dict) -> ResolvedLocation | ClarificationRequest:
         return await self.location_resolver.resolve_location_signals(turn.location_signals, memory_snapshot)
@@ -242,7 +318,7 @@ class PolicyEngine:
                 None,
             )
             return "direct_tool", tool
-        if turn.disallowed_patterns:
+        if self._actionable_disallowed_patterns(turn):
             return "reject", None
         return "map_search", None
 
