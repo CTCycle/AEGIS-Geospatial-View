@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-04-24
+Last updated: 2026-04-27
 Scope: `AEGIS/`, `tests/`, `release/`
 
 ## System Overview
@@ -145,12 +145,14 @@ services/
   llm/base.py
   llm/cloud_catalog.py
   llm/context_builder.py
+  llm/errors.py
   llm/factory.py
   llm/google_provider.py
   llm/langchain_runtime.py
   llm/ollama.py
   llm/openai_provider.py
   llm/prompts.py
+  llm/response_serialization.py
   llm/structured.py
   llm/types.py
   search/composition.py

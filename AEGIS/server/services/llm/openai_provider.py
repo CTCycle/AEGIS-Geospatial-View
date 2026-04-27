@@ -4,13 +4,11 @@ import json
 from collections.abc import Iterable
 from typing import Any
 
-try:
-    from openai import OpenAI
-except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
-    OpenAI = None  # type: ignore[assignment]
+from openai import OpenAI
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
+from AEGIS.server.services.llm.response_serialization import dump_response_payload
 from AEGIS.server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
 
 
@@ -21,14 +19,7 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
 
-    def _ensure_dependency(self) -> None:
-        if OpenAI is None:
-            raise RuntimeError(
-                "openai is not installed. Install LLM dependencies to use OpenAI provider."
-            )
-
     def _client(self) -> Any:
-        self._ensure_dependency()
         return OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def list_models(self) -> list[ModelDescriptor]:
@@ -44,7 +35,7 @@ class OpenAIProvider(LLMProvider):
         )
         return LLMResult(
             content=str(getattr(response, "output_text", "") or ""),
-            raw=self._dump_response(response),
+            raw=dump_response_payload(response),
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
@@ -96,12 +87,3 @@ class OpenAIProvider(LLMProvider):
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
 
-    @staticmethod
-    def _dump_response(response: object) -> dict[str, Any]:
-        model_dump = getattr(response, "model_dump", None)
-        if callable(model_dump):
-            dumped = model_dump(mode="json")
-            return dumped if isinstance(dumped, dict) else {}
-        if isinstance(response, dict):
-            return response
-        return {}

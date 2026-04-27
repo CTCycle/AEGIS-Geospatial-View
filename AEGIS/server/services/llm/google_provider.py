@@ -4,15 +4,12 @@ import json
 from collections.abc import Iterable
 from typing import Any
 
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
-    genai = None  # type: ignore[assignment]
-    genai_types = None  # type: ignore[assignment]
+from google import genai
+from google.genai import types as genai_types
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
+from AEGIS.server.services.llm.response_serialization import dump_response_payload
 from AEGIS.server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
 
 DEFAULT_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -25,14 +22,7 @@ class GoogleProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/") if base_url else None
 
-    def _ensure_dependency(self) -> None:
-        if genai is None or genai_types is None:
-            raise RuntimeError(
-                "google-genai is not installed. Install LLM dependencies to use Google provider."
-            )
-
     def _client(self) -> Any:
-        self._ensure_dependency()
         if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
             return genai.Client(
                 api_key=self.api_key,
@@ -56,7 +46,7 @@ class GoogleProvider(LLMProvider):
         )
         return LLMResult(
             content=str(getattr(response, "text", "") or ""),
-            raw=self._dump_response(response),
+            raw=dump_response_payload(response),
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
@@ -133,12 +123,3 @@ class GoogleProvider(LLMProvider):
             config["system_instruction"] = system_instruction
         return config
 
-    @staticmethod
-    def _dump_response(response: object) -> dict[str, Any]:
-        model_dump = getattr(response, "model_dump", None)
-        if callable(model_dump):
-            dumped = model_dump(mode="json")
-            return dumped if isinstance(dumped, dict) else {}
-        if isinstance(response, dict):
-            return response
-        return {}

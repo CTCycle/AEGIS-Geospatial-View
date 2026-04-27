@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import json
-from html.parser import HTMLParser
 from collections.abc import Iterable
+from html.parser import HTMLParser
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-try:
-    from langchain_ollama import ChatOllama, OllamaEmbeddings
-except ModuleNotFoundError:  # pragma: no cover - optional dependency in local/dev shells
-    ChatOllama = None  # type: ignore[assignment]
-    OllamaEmbeddings = None  # type: ignore[assignment]
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.langchain_runtime import (
@@ -73,14 +69,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self, *, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
 
-    def _ensure_dependency(self) -> None:
-        if ChatOllama is None or OllamaEmbeddings is None:
-            raise RuntimeError(
-                "langchain_ollama is not installed. Install optional LLM dependencies to use Ollama provider."
-            )
-
     def _build_chat_model(self, *, model: str, temperature: float) -> ChatOllama:
-        self._ensure_dependency()
         return ChatOllama(
             model=model,
             temperature=temperature,
@@ -88,7 +77,6 @@ class OllamaProvider(LLMProvider):
         )
 
     def _build_embedding_model(self, *, model: str) -> OllamaEmbeddings:
-        self._ensure_dependency()
         return OllamaEmbeddings(model=model, base_url=self.base_url)
 
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
