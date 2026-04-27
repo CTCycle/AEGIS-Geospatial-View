@@ -468,6 +468,10 @@
     padding: 0.55rem 0.7rem;
 }
 
+.settings-modal__form--keys .settings-modal__body input {
+    width: 85%;
+}
+
 .settings-modal__body input.input-invalid {
     border-color: #d94f5f;
     box-shadow: 0 0 0 2px rgb(217 79 95 / 18%);

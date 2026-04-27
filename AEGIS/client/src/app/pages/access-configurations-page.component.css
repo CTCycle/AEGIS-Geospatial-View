@@ -9,7 +9,7 @@
 .access-page__header {
     display: flex;
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 1rem;
     padding: 1.2rem 1.35rem;
     border-bottom: 1px solid #263640;
@@ -46,17 +46,6 @@
     max-width: 50rem;
     color: #a9bac2;
     font-size: 0.92rem;
-}
-
-.access-page__status {
-    max-width: 28rem;
-    border: 1px solid #314650;
-    border-radius: 999px;
-    padding: 0.38rem 0.65rem;
-    background: #14242d;
-    color: #dbe8ed;
-    font-size: 0.76rem;
-    font-weight: 800;
 }
 
 .access-page__content {
@@ -96,7 +85,7 @@
     display: grid;
     grid-template-columns: minmax(12rem, 1.1fr) minmax(15rem, 1fr) minmax(17rem, 1.2fr) auto;
     gap: 0.9rem;
-    align-items: center;
+    align-items: start;
 }
 
 .access-provider header,
@@ -112,9 +101,11 @@
 }
 
 .access-provider footer {
-    align-self: center;
+    align-self: start;
     flex-wrap: wrap;
     justify-content: flex-end;
+    align-items: center;
+    padding-top: 1.9rem;
 }
 
 .access-provider__state {
@@ -167,13 +158,15 @@
 .access-provider label {
     display: grid;
     gap: 0.35rem;
-    align-self: center;
+    align-self: start;
     color: #c9d8de;
     font-size: 0.78rem;
     font-weight: 800;
 }
 
 .access-provider input {
+    width: 85%;
+    max-width: 22rem;
     border: 1px solid #344953;
     border-radius: 0.35rem;
     background: #0f1a21;
@@ -214,6 +207,7 @@
 
     .access-provider footer {
         justify-content: flex-start;
+        padding-top: 0;
     }
 }
 

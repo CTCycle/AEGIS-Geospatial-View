@@ -34,11 +34,13 @@
     display: grid;
     gap: 1rem;
     padding: 1rem 1.35rem 1.4rem;
+    overflow-x: auto;
 }
 
 .capability-section {
     display: grid;
     gap: 0.7rem;
+    min-width: max-content;
 }
 
 .capability-section__header {
@@ -71,13 +73,13 @@
 }
 
 .capability-table-wrap {
-    overflow: auto;
+    overflow: visible;
     border: 1px solid #263a45;
     background: #101c23;
 }
 
 .capability-table {
-    width: 100%;
+    width: max-content;
     border-collapse: collapse;
     min-width: 72rem;
 }

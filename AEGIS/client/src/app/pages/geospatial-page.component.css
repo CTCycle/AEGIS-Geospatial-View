@@ -41,10 +41,11 @@
     position: sticky;
     top: 0;
     z-index: 4;
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    height: 3.2rem;
+    column-gap: 0.7rem;
+    min-height: 3.2rem;
     padding: 0 1rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
@@ -53,54 +54,38 @@
 .toolbar-brand__identity {
     display: inline-flex;
     align-items: center;
-    gap: 0.72rem;
-}
-
-.assistant-status-card__crest .crest-outline,
-.assistant-status-card__crest .crest-signal {
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.assistant-status-card__crest .crest-outline {
-    stroke-width: 2;
-}
-
-.assistant-status-card__crest .crest-signal {
-    stroke-width: 1.15;
-    opacity: 0.8;
-}
-
-.assistant-status-card__crest .crest-field {
-    fill: currentColor;
-    opacity: 0.92;
-}
-
-.assistant-status-card__crest .crest-cut {
-    fill: #13212a;
+    gap: 0.38rem;
+    justify-self: start;
 }
 
 .toolbar-brand__identity span {
+    width: 0.44rem;
+    height: 0.44rem;
+    border-radius: 999px;
+    background: #56c878;
+}
+
+.toolbar-brand__identity strong {
     display: block;
-    font-size: 0.78rem;
-    line-height: 1;
+    font-size: 0.66rem;
+    line-height: 1.1;
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #dce8ed;
+    color: #7cd995;
 }
 
 .toolbar-brand__new-chat {
+    width: 2.35rem;
+    height: 2.2rem;
+    display: grid;
+    place-items: center;
     border: 1px solid #344953;
     background: #172831;
     color: #e4eef2;
     border-radius: 0.45rem;
-    padding: 0.35rem 0.7rem;
-    font-size: 0.74rem;
-    font-weight: 700;
-    white-space: nowrap;
+    padding: 0;
+    justify-self: end;
 }
 
 .toolbar-brand__new-chat:hover {
@@ -110,15 +95,15 @@
 }
 
 .context-window-tracker {
-    flex: 0 1 13rem;
+    width: min(100%, 12.75rem);
     display: grid;
     gap: 0.28rem;
     min-width: 0;
-    max-width: 13rem;
-    margin-left: auto;
-    padding: 0;
+    margin-left: 0;
+    padding: 0.1rem 0.35rem 0.15rem;
     border-bottom: 0;
     background: transparent;
+    justify-self: end;
 }
 
 .context-window-tracker__meta {
@@ -166,11 +151,10 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 0.65rem;
 }
 
-.assistant-status-card,
 .rail-capability-card {
     border: 1px solid #263a45;
     border-radius: 0.35rem;
@@ -178,49 +162,11 @@
     color: #dce8ed;
 }
 
-.assistant-status-card {
-    padding: 0.65rem;
-}
-
-.assistant-status-card header {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-}
-
-.assistant-status-card__crest {
-    width: 1.35rem;
-    height: 1.35rem;
-    color: #dfecef;
-}
-
-.assistant-status-card__crest svg {
-    width: 100%;
-    height: 100%;
-}
-
-.assistant-status-card h2,
-.assistant-status-card p,
 .rail-capability-card h2,
 .rail-capability-card ul {
     margin: 0;
 }
 
-.assistant-status-card h2 {
-    font-size: 0.78rem;
-    color: #eff8fb;
-}
-
-.assistant-status-card p {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    color: #7cd995;
-    font-size: 0.7rem;
-    font-weight: 800;
-}
-
-.assistant-status-card p span,
 .state-dot {
     width: 0.45rem;
     height: 0.45rem;
@@ -232,24 +178,11 @@
     padding: 0.7rem;
 }
 
-.rail-capability-card header {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.6rem;
-    margin-bottom: 0.35rem;
-}
-
 .rail-capability-card h2 {
     color: #e5f0f4;
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-}
-
-.rail-capability-card header span {
-    color: #56c878;
-    font-size: 0.68rem;
-    font-weight: 800;
 }
 
 .rail-capability-card ul {
@@ -409,60 +342,64 @@
 }
 
 .chat-composer {
-    display: flex;
-    align-items: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.75rem;
+    align-items: stretch;
     width: 100%;
-    gap: 0.42rem;
+    gap: 0;
     margin-top: auto;
     padding: 0.62rem 0.72rem 0.72rem;
     border-top: 1px solid #263a45;
-    background: #101c23;
+    background: #0f1a21;
 }
 
 .chat-composer textarea {
-    flex: 1 1 auto;
     width: 100%;
     min-height: 3.35rem;
     max-height: 12rem;
     resize: vertical;
-    border: 1px solid #344953;
-    border-radius: 0.45rem;
-    background: #0f1a21;
-    padding: 0.72rem 0.86rem;
+    border: 1px solid #324753;
+    border-right: none;
+    border-radius: 0.45rem 0 0 0.45rem;
+    background: #12222c;
+    padding: 0.72rem 0.84rem;
     color: #dce8ed;
     font-size: 0.84rem;
     line-height: 1.42;
 }
 
 .chat-composer .primary-button {
-    width: 2.35rem;
-    height: 2.35rem;
+    width: 100%;
+    height: 100%;
+    min-height: 3.35rem;
     flex: 0 0 auto;
-    border-radius: 999px;
-    border: 1px solid #3b5966;
-    background: #162833;
+    border-radius: 0 0.45rem 0.45rem 0;
+    border: 1px solid #324753;
+    border-left: none;
+    background: #12222c;
     box-shadow: none;
-    color: #eff5ff;
+    color: #a9bac3;
     display: grid;
     place-items: center;
-    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
 }
 
 .chat-composer .primary-button:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: none;
+    background: #152935;
     border-color: #2f9bd7;
+    color: #e5f5ff;
 }
 
 .chat-composer .primary-button:disabled {
-    opacity: 0.52;
+    opacity: 0.72;
     cursor: not-allowed;
     box-shadow: none;
-    border-color: #314650;
-    background: #17242c;
+    border-color: #2d414d;
+    background: #112029;
+    color: #7f919a;
 }
 
-.chat-composer .sr-only {
+.sr-only {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -581,7 +518,7 @@
 
     .toolbar-panel__content {
         min-height: 0;
-        grid-template-rows: auto minmax(15rem, auto) auto;
+        grid-template-rows: minmax(15rem, auto) auto;
     }
 
     .agent-chat-panel {
@@ -629,22 +566,41 @@
 
     .toolbar-panel__content {
         padding: 0.6rem;
-        grid-template-rows: auto minmax(16rem, auto) auto;
+        grid-template-rows: minmax(16rem, auto) auto;
     }
 
     .toolbar-brand {
-        flex-wrap: wrap;
         height: auto;
         min-height: 3.2rem;
         padding-top: 0.6rem;
         padding-bottom: 0.52rem;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        column-gap: 0.5rem;
+        row-gap: 0;
     }
 
     .context-window-tracker {
-        order: 3;
-        flex: 1 0 100%;
-        max-width: none;
-        margin-left: 0;
+        width: min(100%, 11.5rem);
+        max-width: 11.5rem;
+        justify-self: end;
+        padding: 0.05rem 0 0.1rem;
+    }
+
+    .context-window-tracker__meta {
+        font-size: 0.58rem;
+    }
+
+    .context-window-tracker__meta strong {
+        font-size: 0.62rem;
+    }
+
+    .toolbar-brand__identity strong {
+        font-size: 0.62rem;
+    }
+
+    .toolbar-brand__new-chat {
+        width: 2.1rem;
+        height: 2rem;
     }
 
     .agent-chat-panel {
