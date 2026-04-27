@@ -220,16 +220,43 @@ class PolicyEngine:
         ]
 
     def _explicitly_suppresses_overlays(self, turn: TurnParseResult) -> bool:
-        text = self._intent_text(turn)
-        suppress_markers = (
-            "do not add overlays",
-            "don't add overlays",
-            "no overlays",
-            "without overlays",
-            "map style only",
-            "basemap only",
+        disallowed_ids = {
+            str(item.pattern_id or "").strip().lower()
+            for item in turn.disallowed_patterns
+        }
+        if disallowed_ids.intersection(
+            {
+                "overlay_exclusion",
+                "overlay_prohibition",
+                "overlay_restriction",
+                "no_overlay",
+                "no_overlays",
+            }
+        ):
+            return True
+
+        intent_markers = {
+            str(item).strip().lower()
+            for item in (
+                *turn.normalized_intent.task_tags,
+                *turn.normalized_intent.intent_tags,
+                *turn.ambiguities,
+            )
+            if str(item).strip()
+        }
+        return bool(
+            intent_markers.intersection(
+                {
+                    "overlay_exclusion",
+                    "overlay_prohibition",
+                    "overlay_restriction",
+                    "no_overlay",
+                    "no_overlays",
+                    "without_overlays",
+                    "basemap_only",
+                }
+            )
         )
-        return any(marker in text for marker in suppress_markers)
 
     def _blocking_ambiguities(
         self,
@@ -305,6 +332,18 @@ class PolicyEngine:
         tool_id: str | None = None,
     ) -> tuple[str, CapabilityCandidate | None]:
         if turn.task_class == "direct_query":
+            if self._is_coordinate_lookup(turn, tool_id):
+                tool = next(
+                    (
+                        item
+                        for item in candidates
+                        if item.kind == "tool"
+                        and item.supports_direct_text
+                        and item.capability_id == "location_to_coordinates"
+                    ),
+                    None,
+                )
+                return "direct_tool", tool
             if self._should_render_direct_query_as_map(turn, candidates, overlay_ids=overlay_ids):
                 return "map_search", None
             tool = next(
@@ -322,26 +361,37 @@ class PolicyEngine:
             return "reject", None
         return "map_search", None
 
+    def _is_coordinate_lookup(self, turn: TurnParseResult, tool_id: str | None) -> bool:
+        if tool_id == "location_to_coordinates":
+            return True
+        intent = turn.normalized_intent
+        text = " ".join(
+            [
+                intent.intent_id,
+                intent.intent_label,
+                *intent.task_tags,
+                *intent.intent_tags,
+            ]
+        ).lower()
+        markers = ("coordinate", "coordinates", "geocode", "location_lookup")
+        return any(marker in text for marker in markers)
+
     def _should_render_direct_query_as_map(
         self,
         turn: TurnParseResult,
         candidates: list[CapabilityCandidate],
         overlay_ids: list[str] | None = None,
     ) -> bool:
-        intent_text = self._intent_text(turn)
-        display_markers = (
-            "show",
-            "display",
-            "map",
-            "overlay",
-            "layer",
-            "radar",
-            "satellite",
-            "view",
+        selected_overlays = (
+            list(overlay_ids)
+            if overlay_ids is not None
+            else self._select_overlays(turn, candidates)
         )
-        if not any(marker in intent_text for marker in display_markers):
-            return False
-        return bool(overlay_ids if overlay_ids is not None else self._select_overlays(turn, candidates))
+        if selected_overlays:
+            return True
+        return bool(turn.normalized_intent.requested_visualizations) and any(
+            item.kind in {"basemap", "overlay"} for item in candidates
+        )
 
     def _build_clarification(self, ambiguities: list[str]) -> ClarificationRequest:
         return ClarificationRequest(
@@ -354,11 +404,11 @@ class PolicyEngine:
         intent = turn.normalized_intent
         return " ".join(
             [
-                turn.user_text,
                 intent.intent_id,
                 intent.intent_label,
                 *intent.task_tags,
                 *intent.intent_tags,
+                *intent.requested_visualizations,
             ]
         ).lower()
 
@@ -438,6 +488,7 @@ class PolicyEngine:
         self, turn: TurnParseResult, candidates: list[CapabilityCandidate]
     ) -> list[str]:
         candidate_ids = {item.capability_id for item in candidates}
+        overlays = [item for item in candidates if item.kind == "overlay"]
         if candidate_ids:
             resolution = self.manifest_intent_resolver.resolve(
                 turn=turn,
@@ -445,8 +496,11 @@ class PolicyEngine:
                 available_ids=candidate_ids | {"osm_default", "osm_terrain", "gibs_satellite"},
             )
             if resolution.overlay_ids:
-                return resolution.overlay_ids
-        overlays = [item for item in candidates if item.kind == "overlay"]
+                overlays = [
+                    item
+                    for item in overlays
+                    if item.capability_id in set(resolution.overlay_ids)
+                ]
         requested_markers = self._requested_overlay_markers(turn)
         ranked_overlays = sorted(
             overlays,
@@ -454,11 +508,9 @@ class PolicyEngine:
             reverse=True,
         )
         selected: list[str] = []
-        seen: set[str] = set()
         for overlay in ranked_overlays:
-            capability_id = overlay.capability_id
-            normalized_id = capability_id.lower()
             marker_score = self._overlay_marker_score(overlay, requested_markers)
+            normalized_id = overlay.capability_id.lower()
             if requested_markers and marker_score <= 0:
                 continue
             if (
@@ -474,10 +526,11 @@ class PolicyEngine:
                 continue
             if not requested_markers and overlay.score <= 0:
                 continue
-            if capability_id in seen:
+            if requested_markers and overlay.score <= 0 and selected:
                 continue
-            seen.add(capability_id)
-            selected.append(capability_id)
+            if overlay.capability_id in selected:
+                continue
+            selected.append(overlay.capability_id)
             if len(selected) >= 4:
                 break
         return selected

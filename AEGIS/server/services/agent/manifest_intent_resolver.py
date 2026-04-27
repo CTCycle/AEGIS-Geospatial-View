@@ -1,16 +1,38 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
-from typing import Any
 
 from AEGIS.server.domain.extraction.models import TurnParseResult
 from AEGIS.server.services.geospatial.capability_registry import CapabilityRegistry
 
 
-def _norm(value: object) -> str:
-    text = str(value or "").lower()
-    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+def _tokenize(value: object) -> set[str]:
+    if value is None:
+        return set()
+    text = unicodedata.normalize("NFKC", str(value)).casefold()
+    base_parts = [part for part in re.split(r"[^\w]+", text, flags=re.UNICODE) if part]
+    tokens: set[str] = set(base_parts)
+    for part in base_parts:
+        tokens.update(chunk for chunk in part.split("_") if chunk)
+    return tokens
+
+
+def _collect_tokens(values: object) -> set[str]:
+    if values is None:
+        return set()
+    if isinstance(values, dict):
+        tokens: set[str] = set()
+        for item in values.values():
+            tokens.update(_collect_tokens(item))
+        return tokens
+    if isinstance(values, (list, tuple, set)):
+        tokens: set[str] = set()
+        for item in values:
+            tokens.update(_collect_tokens(item))
+        return tokens
+    return _tokenize(values)
 
 
 @dataclass(frozen=True)
@@ -23,47 +45,26 @@ class ManifestResolution:
 
 
 class ManifestIntentResolver:
-    CONCEPT_ALIASES: dict[str, tuple[str, ...]] = {
-        "satellite": ("satellite", "imagery", "truecolor", "true_color"),
-        "terrain": ("terrain", "topographic", "topography", "relief"),
-        "elevation": ("elevation", "dem", "srtm"),
-        "air_quality": ("air_quality", "air-quality", "pollution", "pollutant", "polluted"),
-        "aerosol": ("aerosol", "atmospheric_pollution"),
-        "traffic": ("traffic", "congestion", "road_flow", "traffic_flow"),
-        "precipitation": ("precipitation", "rain", "storm", "radar", "rainfall"),
-        "weather": ("weather", "forecast", "temperature"),
-        "poi": ("poi", "points_of_interest", "amenities", "commercial", "nearby"),
-        "active_fire": ("active_fire", "active_fires", "wildfire", "wildfires", "thermal_anomaly", "thermal_anomalies"),
-        "land_cover": ("land_cover", "landcover", "worldcover", "igbp"),
-        "solar": ("solar", "pvgis", "photovoltaic"),
-        "noise": ("noise", "environmental_noise"),
-        "ozone": ("ozone",),
-    }
-
-    BASEMAP_BY_CONCEPT = {
-        "satellite": "gibs_satellite",
-        "terrain": "osm_terrain",
-    }
-
-    OVERLAYS_BY_CONCEPT = {
-        "elevation": ("SRTM_Color_Index",),
-        "air_quality": ("openaq_air_quality",),
-        "aerosol": ("MODIS_Terra_Aerosol",),
-        "traffic": ("tomtom_traffic_flow",),
-        "precipitation": ("rainviewer_precipitation_radar", "IMERG_Precipitation_Rate"),
-        "weather": ("openmeteo_weather_forecast",),
-        "poi": ("overpass_poi_amenities",),
-        "land_cover": ("MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual", "esa_worldcover"),
-        "active_fire": ("MODIS_Combined_Thermal_Anomalies_Fire",),
-        "solar": ("pvgis_solar",),
-        "noise": ("eea_noise_2019",),
-        "ozone": ("OMPS_Ozone_Total_Column",),
-    }
-
-    TOOL_BY_CONCEPT = {
-        "air_quality": "get_air_quality_forecast",
-        "weather": "get_weather_forecast",
-        "poi": "get_nearby_poi",
+    OVERLAY_EXCLUDED_CONCEPTS = {
+        "map",
+        "maps",
+        "basemap",
+        "base",
+        "satellite",
+        "imagery",
+        "terrain",
+        "topographic",
+        "topography",
+        "dark",
+        "light",
+        "style",
+        "view",
+        "forecast",
+        "current",
+        "direct",
+        "query",
+        "search",
+        "location",
     }
 
     def resolve(
@@ -75,7 +76,7 @@ class ManifestIntentResolver:
     ) -> ManifestResolution:
         concepts = self._extract_concepts(turn)
         basemap_id = self._select_basemap(concepts, capability_registry, available_ids)
-        overlay_ids, ambiguous = self._select_overlays(
+        overlay_ids = self._select_overlays(
             concepts, capability_registry, available_ids
         )
         tool_id = self._select_tool(concepts, capability_registry, available_ids)
@@ -83,34 +84,86 @@ class ManifestIntentResolver:
             basemap_id=basemap_id,
             overlay_ids=overlay_ids,
             tool_id=tool_id,
-            ambiguous_concepts=ambiguous,
+            ambiguous_concepts=[],
             concepts=concepts,
         )
 
-    def _intent_text(self, turn: TurnParseResult) -> str:
+    def _extract_concepts(self, turn: TurnParseResult) -> list[str]:
         intent = turn.normalized_intent
-        parts = [
-            turn.user_text,
+        ordered_signals: list[object] = [
+            *intent.requested_visualizations,
+            *intent.intent_tags,
+            *intent.task_tags,
             intent.intent_id,
             intent.intent_label,
-            *intent.task_tags,
-            *intent.intent_tags,
-            *intent.requested_visualizations,
         ]
-        return " ".join(parts).lower()
-
-    def _extract_concepts(self, turn: TurnParseResult) -> list[str]:
-        normalized_text = _norm(self._intent_text(turn))
-        found: list[str] = []
-        for concept, aliases in self.CONCEPT_ALIASES.items():
-            if any(alias in normalized_text for alias in {_norm(item) for item in aliases}):
-                found.append(concept)
-        return found
+        seen: set[str] = set()
+        concepts: list[str] = []
+        for signal in ordered_signals:
+            for token in sorted(_collect_tokens(signal)):
+                if token in seen:
+                    continue
+                seen.add(token)
+                concepts.append(token)
+        return concepts
 
     def _capability_exists(
-        self, capability_registry: CapabilityRegistry, available_ids: set[str], capability_id: str
+        self,
+        capability_registry: CapabilityRegistry,
+        available_ids: set[str],
+        capability_id: str,
     ) -> bool:
-        return capability_id in available_ids and capability_registry.get_capability(capability_id) is not None
+        return (
+            capability_id in available_ids
+            and capability_registry.get_capability(capability_id) is not None
+        )
+
+    def _iter_kind(
+        self, capability_registry: CapabilityRegistry, kind: str
+    ) -> list[dict[str, object]]:
+        if kind == "basemap":
+            return capability_registry.list_basemaps()
+        if kind == "overlay":
+            return capability_registry.list_overlays()
+        if kind == "tool":
+            return capability_registry.list_tools()
+        return []
+
+    def _capability_tokens(self, capability: dict[str, object]) -> set[str]:
+        metadata = capability.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        sources: list[object] = [
+            capability.get("capabilities"),
+            metadata.get("intent_tags"),
+            metadata.get("task_tags"),
+            metadata.get("keywords"),
+            metadata.get("map_type_tags"),
+        ]
+        return _collect_tokens(sources)
+
+    def _rank_kind(
+        self,
+        *,
+        kind: str,
+        concepts: list[str],
+        capability_registry: CapabilityRegistry,
+        available_ids: set[str],
+    ) -> list[tuple[str, int]]:
+        ranked: list[tuple[str, int]] = []
+        concept_set = set(concepts)
+        for capability in self._iter_kind(capability_registry, kind):
+            capability_id = str(capability.get("id") or "").strip()
+            if not capability_id:
+                continue
+            if not self._capability_exists(
+                capability_registry, available_ids, capability_id
+            ):
+                continue
+            score = len(concept_set.intersection(self._capability_tokens(capability)))
+            ranked.append((capability_id, score))
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        return ranked
 
     def _select_basemap(
         self,
@@ -118,11 +171,14 @@ class ManifestIntentResolver:
         capability_registry: CapabilityRegistry,
         available_ids: set[str],
     ) -> str:
-        for concept in concepts:
-            capability_id = self.BASEMAP_BY_CONCEPT.get(concept)
-            if capability_id and self._capability_exists(
-                capability_registry, available_ids, capability_id
-            ):
+        ranked = self._rank_kind(
+            kind="basemap",
+            concepts=concepts,
+            capability_registry=capability_registry,
+            available_ids=available_ids,
+        )
+        for capability_id, score in ranked:
+            if score > 0:
                 return capability_id
         return "osm_default" if "osm_default" in available_ids else "osm_default"
 
@@ -131,19 +187,52 @@ class ManifestIntentResolver:
         concepts: list[str],
         capability_registry: CapabilityRegistry,
         available_ids: set[str],
-    ) -> tuple[list[str], list[str]]:
+    ) -> list[str]:
+        overlays = {
+            str(item.get("id")): self._capability_tokens(item)
+            for item in capability_registry.list_overlays()
+            if isinstance(item, dict)
+            and str(item.get("id") or "") in available_ids
+            and self._capability_exists(
+                capability_registry, available_ids, str(item.get("id") or "")
+            )
+        }
         selected: list[str] = []
-        ambiguous: list[str] = []
+        concept_set = set(concepts)
         for concept in concepts:
-            candidates = [
+            if concept in self.OVERLAY_EXCLUDED_CONCEPTS:
+                continue
+            concept_candidates = [
                 capability_id
-                for capability_id in self.OVERLAYS_BY_CONCEPT.get(concept, ())
-                if self._capability_exists(capability_registry, available_ids, capability_id)
+                for capability_id, tokens in overlays.items()
+                if concept in tokens and capability_id not in selected
             ]
-            for capability_id in candidates[:1]:
-                if capability_id not in selected:
-                    selected.append(capability_id)
-        return selected[:4], ambiguous
+            if not concept_candidates:
+                continue
+            concept_candidates.sort(
+                key=lambda capability_id: (
+                    len(overlays[capability_id].intersection(concept_set)),
+                    capability_id,
+                ),
+                reverse=True,
+            )
+            selected.append(concept_candidates[0])
+            if len(selected) >= 4:
+                return selected
+
+        ranked = self._rank_kind(
+            kind="overlay",
+            concepts=concepts,
+            capability_registry=capability_registry,
+            available_ids=available_ids,
+        )
+        for capability_id, score in ranked:
+            if score <= 0 or capability_id in selected:
+                continue
+            selected.append(capability_id)
+            if len(selected) >= 4:
+                break
+        return selected
 
     def _select_tool(
         self,
@@ -151,12 +240,17 @@ class ManifestIntentResolver:
         capability_registry: CapabilityRegistry,
         available_ids: set[str],
     ) -> str | None:
-        for concept in concepts:
-            capability_id = self.TOOL_BY_CONCEPT.get(concept)
-            if capability_id and self._capability_exists(
-                capability_registry, available_ids, capability_id
-            ):
+        ranked = self._rank_kind(
+            kind="tool",
+            concepts=concepts,
+            capability_registry=capability_registry,
+            available_ids=available_ids,
+        )
+        for capability_id, score in ranked:
+            if score > 0:
                 return capability_id
-        if self._capability_exists(capability_registry, available_ids, "location_to_coordinates"):
+        if self._capability_exists(
+            capability_registry, available_ids, "location_to_coordinates"
+        ):
             return "location_to_coordinates"
         return None
