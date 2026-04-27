@@ -117,6 +117,9 @@ async def _chat_event_stream(
                     else None,
                     "tool_payload": result.tool_payload,
                     "memory_snapshot": result.memory_snapshot,
+                    "context_usage": result.context_usage.model_dump(mode="json")
+                    if result.context_usage is not None
+                    else None,
                 },
             )
         )
@@ -134,6 +137,17 @@ async def _chat_event_stream(
                 event="error",
                 data={
                     "message": str(exc),
+                    "status": status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "request_id": request_id or "",
+                },
+            )
+        )
+    except ValueError as exc:
+        yield _stream_event(
+            ChatStreamEvent(
+                event="error",
+                data={
+                    "message": str(exc) or "Provider unavailable.",
                     "status": status.HTTP_503_SERVICE_UNAVAILABLE,
                     "request_id": request_id or "",
                 },

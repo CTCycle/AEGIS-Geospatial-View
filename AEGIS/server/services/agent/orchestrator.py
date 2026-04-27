@@ -56,6 +56,7 @@ class AgentOrchestrator:
             memory_snapshot=latest_memory,
             conversation_messages=recent_messages,
         )
+        context_usage = self.parser_service.last_context_usage
 
         decision = await self.policy_engine.decide(
             turn=turn_contract,
@@ -132,6 +133,7 @@ class AgentOrchestrator:
             tool_payload=tool_payload,
             map_session=map_session,
             memory_snapshot=memory_snapshot,
+            context_usage=context_usage,
         )
 
     def _compose_assistant_message(

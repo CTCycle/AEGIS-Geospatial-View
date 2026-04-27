@@ -75,7 +75,11 @@
     box-shadow: var(--shadow-1);
 }
 
-.settings-page__back-icon { font-size: 1rem; line-height: 1; }
+.settings-page__back:hover {
+    border-color: #2f9bd7;
+    background: #1b3340;
+    color: #f4fbff;
+}
 
 .settings-page__header-actions {
     display: inline-flex;

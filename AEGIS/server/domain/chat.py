@@ -27,6 +27,15 @@ class ChatTurnRequest(BaseModel):
     request_id: str | None = None
 
 ###############################################################################
+class ContextUsageResponse(BaseModel):
+    estimated_input_tokens: int
+    selected_context_window: int | None = None
+    model_context_limit: int | None = None
+    usage_percent: float
+    provider: str
+    model: str
+
+###############################################################################
 class ChatTurnResponse(BaseModel):
     request_id: str
     session_id: int
@@ -36,6 +45,7 @@ class ChatTurnResponse(BaseModel):
     tool_payload: dict[str, Any] | None = None
     map_session: MapSession | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
+    context_usage: ContextUsageResponse | None = None
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):

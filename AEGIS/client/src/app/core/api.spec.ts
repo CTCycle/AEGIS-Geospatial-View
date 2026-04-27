@@ -53,10 +53,21 @@ describe('core/api', () => {
   });
 
   it('parseChatTurnResponse defaults correctly', () => {
-    const parsed = parseChatTurnResponse({ request_id: 'chat-abc' });
+    const parsed = parseChatTurnResponse({
+      request_id: 'chat-abc',
+      context_usage: {
+        estimated_input_tokens: 100,
+        selected_context_window: 2048,
+        model_context_limit: 8192,
+        usage_percent: 4.9,
+        provider: 'ollama',
+        model: 'llama3.2',
+      },
+    });
     expect(parsed.request_id).toBe('chat-abc');
     expect(parsed.session_id).toBe(0);
     expect(parsed.assistant_message).toBe('');
+    expect(parsed.context_usage?.selected_context_window).toBe(2048);
     expect(parsed.follow_up_required).toBeFalse();
   });
 

@@ -14,3 +14,13 @@ def test_manifest_loader_reads_core_collections() -> None:
     basemap = next(item for item in payload["basemaps"] if item["id"] == "osm_default")
     assert basemap.get("source_filename")
     assert basemap.get("source_path")
+
+
+def test_priority_provider_manifests_include_temporal_metadata() -> None:
+    payload = GeospatialManifestLoader().load_all()
+    providers = {item["id"]: item for item in payload["providers"]}
+    for provider_id in ("inspire", "data_europa", "arcgis", "geoss", "google_maps"):
+        metadata = providers[provider_id]["metadata"]
+        assert metadata["dataset_time_reference"]
+        assert metadata["source_freshness"]
+        assert metadata["query_mode"]

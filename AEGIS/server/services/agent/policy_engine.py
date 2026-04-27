@@ -11,6 +11,7 @@ from AEGIS.server.domain.agent.decision import (
 from AEGIS.server.domain.extraction.models import TurnParseResult
 from AEGIS.server.services.agent.capability_retriever import CapabilityRetriever
 from AEGIS.server.services.agent.location_resolver import LocationResolver
+from AEGIS.server.services.agent.manifest_intent_resolver import ManifestIntentResolver
 from AEGIS.server.services.geospatial.capability_registry import CapabilityRegistry
 from AEGIS.server.services.geospatial.runtime_registry import RuntimeRegistrySnapshot
 
@@ -21,9 +22,11 @@ class PolicyEngine:
         *,
         location_resolver: LocationResolver,
         capability_retriever: CapabilityRetriever,
+        manifest_intent_resolver: ManifestIntentResolver | None = None,
     ) -> None:
         self.location_resolver = location_resolver
         self.capability_retriever = capability_retriever
+        self.manifest_intent_resolver = manifest_intent_resolver or ManifestIntentResolver()
 
     async def decide(
         self,
@@ -80,16 +83,54 @@ class PolicyEngine:
         candidates = self._filter_candidates_by_coverage(candidates, resolved)
 
         trace.steps.append("8.choose_execution_mode")
-        mode_state, selected_tool = self._select_execution_mode(turn, candidates)
+        available_ids = {
+            capability_id
+            for capability_id, profile in runtime_registry.profiles.items()
+            if isinstance(profile, dict) and bool(profile.get("enabled_by_default", False))
+        }
+        manifest_resolution = self.manifest_intent_resolver.resolve(
+            turn=turn,
+            capability_registry=capability_registry,
+            available_ids=available_ids,
+        )
+        trace.steps.append(
+            "8a.resolve_manifest_concepts:"
+            + ",".join(manifest_resolution.concepts or ["none"])
+        )
+        if manifest_resolution.ambiguous_concepts:
+            return PolicyDecision(
+                plan=ExecutionPlan(
+                    state="clarify",
+                    intent_id=turn.normalized_intent.intent_id,
+                    basemap_id=manifest_resolution.basemap_id,
+                    overlay_ids=manifest_resolution.overlay_ids,
+                ),
+                clarification=ClarificationRequest(
+                    question="Which data layer should I use for this map request?",
+                    reason="Multiple manifest layers match: "
+                    + ", ".join(manifest_resolution.ambiguous_concepts),
+                    missing_fields=["layer"],
+                ),
+                resolved_location=resolved,
+                candidates=candidates,
+                trace=trace,
+            )
+        mode_state, selected_tool = self._select_execution_mode(
+            turn,
+            candidates,
+            overlay_ids=manifest_resolution.overlay_ids,
+            tool_id=manifest_resolution.tool_id,
+        )
 
         trace.steps.append("9.build_execution_plan")
         plan = ExecutionPlan(
             state=mode_state,
             mode="direct_text" if mode_state == "direct_tool" else "map",
             intent_id=turn.normalized_intent.intent_id,
-            basemap_id=self._select_basemap(turn, candidates),
-            overlay_ids=self._select_overlays(turn, candidates),
-            tool_id=selected_tool.capability_id if selected_tool is not None else None,
+            basemap_id=manifest_resolution.basemap_id,
+            overlay_ids=manifest_resolution.overlay_ids,
+            tool_id=manifest_resolution.tool_id
+            or (selected_tool.capability_id if selected_tool is not None else None),
         )
         if mode_state == "direct_tool" and not plan.tool_id:
             plan = plan.model_copy(update={"tool_id": self._default_tool_for_intent(turn.normalized_intent.intent_id)})
@@ -184,11 +225,22 @@ class PolicyEngine:
         self,
         turn: TurnParseResult,
         candidates: list[CapabilityCandidate],
+        overlay_ids: list[str] | None = None,
+        tool_id: str | None = None,
     ) -> tuple[str, CapabilityCandidate | None]:
         if turn.task_class == "direct_query":
-            if self._should_render_direct_query_as_map(turn, candidates):
+            if self._should_render_direct_query_as_map(turn, candidates, overlay_ids=overlay_ids):
                 return "map_search", None
-            tool = next((item for item in candidates if item.kind == "tool" and item.supports_direct_text), None)
+            tool = next(
+                (
+                    item
+                    for item in candidates
+                    if item.kind == "tool"
+                    and item.supports_direct_text
+                    and (tool_id is None or item.capability_id == tool_id)
+                ),
+                None,
+            )
             return "direct_tool", tool
         if turn.disallowed_patterns:
             return "reject", None
@@ -198,6 +250,7 @@ class PolicyEngine:
         self,
         turn: TurnParseResult,
         candidates: list[CapabilityCandidate],
+        overlay_ids: list[str] | None = None,
     ) -> bool:
         intent_text = self._intent_text(turn)
         display_markers = (
@@ -212,7 +265,7 @@ class PolicyEngine:
         )
         if not any(marker in intent_text for marker in display_markers):
             return False
-        return bool(self._select_overlays(turn, candidates))
+        return bool(overlay_ids if overlay_ids is not None else self._select_overlays(turn, candidates))
 
     def _build_clarification(self, ambiguities: list[str]) -> ClarificationRequest:
         return ClarificationRequest(
@@ -236,6 +289,20 @@ class PolicyEngine:
     def _select_basemap(
         self, turn: TurnParseResult, candidates: list[CapabilityCandidate]
     ) -> str:
+        candidate_ids = {item.capability_id for item in candidates}
+        available_ids = candidate_ids | {
+            "osm_default",
+            "osm_dark",
+            "osm_terrain",
+            "gibs_satellite",
+        }
+        resolution = self.manifest_intent_resolver.resolve(
+            turn=turn,
+            capability_registry=CapabilityRegistry(),
+            available_ids=available_ids,
+        )
+        if resolution.basemap_id:
+            return resolution.basemap_id
         intent_text = self._intent_text(turn)
         if any(marker in intent_text for marker in ("satellite", "imagery", "truecolor")):
             return "gibs_satellite"
@@ -294,6 +361,15 @@ class PolicyEngine:
     def _select_overlays(
         self, turn: TurnParseResult, candidates: list[CapabilityCandidate]
     ) -> list[str]:
+        candidate_ids = {item.capability_id for item in candidates}
+        if candidate_ids:
+            resolution = self.manifest_intent_resolver.resolve(
+                turn=turn,
+                capability_registry=CapabilityRegistry(),
+                available_ids=candidate_ids | {"osm_default", "osm_terrain", "gibs_satellite"},
+            )
+            if resolution.overlay_ids:
+                return resolution.overlay_ids
         overlays = [item for item in candidates if item.kind == "overlay"]
         requested_markers = self._requested_overlay_markers(turn)
         ranked_overlays = sorted(

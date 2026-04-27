@@ -1,0 +1,24 @@
+{
+  "id": "data_europa",
+  "name": "data.europa.eu",
+  "provider": "data_europa",
+  "type": "catalog-provider",
+  "description": "European open data portal used for discovering public geospatial datasets and metadata.",
+  "capabilities": ["catalog-discovery", "open-data", "europe"],
+  "coverage": "eu-eea",
+  "metadata": {
+    "label": "data.europa.eu",
+    "requires_key": false,
+    "attribution": "data.europa.eu and source publishers",
+    "keywords": ["data.europa.eu", "open data", "europe", "metadata", "geoportal"],
+    "intent_tags": ["catalog-discovery", "open-data", "europe"],
+    "task_tags": ["geospatial-discovery", "metadata"],
+    "temporal_behavior": "dataset-dependent",
+    "dataset_time_reference": "Provided by individual dataset records",
+    "source_freshness": "Dataset-specific issued/modified metadata",
+    "query_mode": "catalog-discovery",
+    "integration_requirements": ["No default API key required for public discovery"]
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00"
+}

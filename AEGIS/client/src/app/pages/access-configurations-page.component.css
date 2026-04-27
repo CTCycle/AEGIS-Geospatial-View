@@ -61,7 +61,7 @@
 
 .access-page__content {
     display: grid;
-    gap: 1rem;
+    gap: 0.85rem;
     padding: 1rem 1.35rem 1.4rem;
 }
 
@@ -88,13 +88,15 @@
 
 .access-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
 }
 
 .access-provider {
     display: grid;
+    grid-template-columns: minmax(12rem, 1.1fr) minmax(15rem, 1fr) minmax(17rem, 1.2fr) auto;
     gap: 0.9rem;
+    align-items: center;
 }
 
 .access-provider header,
@@ -103,6 +105,16 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 0.8rem;
+}
+
+.access-provider header {
+    min-width: 0;
+}
+
+.access-provider footer {
+    align-self: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .access-provider__state {
@@ -124,7 +136,7 @@
 
 .access-provider dl {
     display: grid;
-    gap: 0.45rem;
+    gap: 0.38rem;
     margin: 0;
 }
 
@@ -155,6 +167,7 @@
 .access-provider label {
     display: grid;
     gap: 0.35rem;
+    align-self: center;
     color: #c9d8de;
     font-size: 0.78rem;
     font-weight: 800;
@@ -190,13 +203,17 @@
 }
 
 @media (max-width: 850px) {
-    .access-grid {
-        grid-template-columns: 1fr;
-    }
-
     .access-page__header {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .access-provider {
+        grid-template-columns: 1fr;
+    }
+
+    .access-provider footer {
+        justify-content: flex-start;
     }
 }
 

@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { fetchChatSettings, updateChatSettings } from '../core/api';
 import { ModelSettingsResponse } from '../core/types';
 
-type GeoProviderId = 'geoapify' | 'tomtom';
+type GeoProviderId = 'geoapify' | 'tomtom' | 'google_maps' | 'arcgis';
 
 interface GeoProviderAccess {
   id: GeoProviderId;
@@ -26,7 +26,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
   settings?: ModelSettingsResponse;
   statusText = 'Loading access configuration';
   isSaving = false;
-  drafts: Record<GeoProviderId, string> = { geoapify: '', tomtom: '' };
+  drafts: Record<GeoProviderId, string> = { geoapify: '', tomtom: '', google_maps: '', arcgis: '' };
 
   readonly providers: GeoProviderAccess[] = [
     {
@@ -42,6 +42,20 @@ export class AccessConfigurationsPageComponent implements OnInit {
       purpose: 'Optional traffic and TomTom basemap provider.',
       placeholder: 'TomTom API key',
       docsUrl: 'https://developer.tomtom.com/',
+    },
+    {
+      id: 'google_maps',
+      name: 'Google Maps Platform',
+      purpose: 'Optional Google Places, commercial POI, and geocoding metadata provider.',
+      placeholder: 'Google Maps API key',
+      docsUrl: 'https://developers.google.com/maps',
+    },
+    {
+      id: 'arcgis',
+      name: 'ArcGIS',
+      purpose: 'Optional access token/API key for credentialed ArcGIS portal and REST services.',
+      placeholder: 'ArcGIS API key',
+      docsUrl: 'https://developers.arcgis.com/',
     },
   ];
 

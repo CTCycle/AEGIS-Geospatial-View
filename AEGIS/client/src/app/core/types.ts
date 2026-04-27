@@ -130,11 +130,21 @@ export interface ChatTurnRequest {
   request_id?: string;
 }
 
+export interface ContextUsage {
+  estimated_input_tokens: number;
+  selected_context_window?: number | null;
+  model_context_limit?: number | null;
+  usage_percent: number;
+  provider: string;
+  model: string;
+}
+
 export interface NormalizedIntent {
   intent_id: string;
   intent_label: string;
   task_tags: string[];
   intent_tags: string[];
+  requested_visualizations?: string[];
   requires_location: boolean;
 }
 
@@ -205,6 +215,7 @@ export interface ChatTurnResponse {
   tool_payload?: ToolPayload | null;
   map_session?: MapSession | null;
   memory_snapshot?: Record<string, JsonValue>;
+  context_usage?: ContextUsage | null;
   follow_up_required?: boolean;
   fallback_mode?: string | null;
 }

@@ -19,6 +19,8 @@ class RuntimeRegistry:
         "geoapify": "GEOAPIFY_API_KEY",
         "openai": "OPENAI_API_KEY",
         "google": "GOOGLE_API_KEY",
+        "google_maps": "GOOGLE_MAPS_API_KEY",
+        "arcgis": "ARCGIS_API_KEY",
     }
 
     def __init__(

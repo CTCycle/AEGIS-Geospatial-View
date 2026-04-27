@@ -9,6 +9,15 @@
         <div class="toolbar-brand__identity">
           <span>Workspace</span>
         </div>
+        <section class="context-window-tracker" aria-label="Context window utilization">
+          <div class="context-window-tracker__meta">
+            <span>{{ contextTrackerText }}</span>
+            <strong>{{ contextUsageLabel }}</strong>
+          </div>
+          <div class="context-window-tracker__bar" aria-hidden="true">
+            <span [style.width.%]="contextUsagePercent"></span>
+          </div>
+        </section>
         <button
           type="button"
           class="toolbar-brand__new-chat"
@@ -84,7 +93,6 @@
 
         <section class="rail-capability-card" aria-label="Capability status">
           <header>
-            <h2>Capability Status</h2>
             <span>Open</span>
           </header>
           <ul>

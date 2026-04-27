@@ -35,8 +35,11 @@ class _StructuredModel:
 
 
 class _FakeChatModel:
+    instances: list["_FakeChatModel"] = []
+
     def __init__(self, **_kwargs) -> None:
-        pass
+        self.kwargs = _kwargs
+        self.instances.append(self)
 
     def invoke(self, _messages):  # noqa: ANN001, ANN202
         return _Message("chat-ok")
@@ -233,6 +236,7 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
 
 
 def test_ollama_provider_langchain_paths(monkeypatch) -> None:
+    _FakeChatModel.instances = []
     monkeypatch.setattr(
         "AEGIS.server.services.llm.ollama.ChatOllama",
         _FakeChatModel,
@@ -255,3 +259,6 @@ def test_ollama_provider_langchain_paths(monkeypatch) -> None:
         0.2,
         0.3,
     ]
+    assert _FakeChatModel.instances[0].kwargs["num_ctx"] >= 2048
+    assert provider.last_context_usage is not None
+    assert provider.last_context_usage["provider"] == "ollama"

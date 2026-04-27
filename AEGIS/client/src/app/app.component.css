@@ -100,56 +100,8 @@
     box-shadow: inset 0 -2px 0 #28a3e4;
 }
 
-.operations-bar__tools {
+.operations-bar__spacer {
     margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #d7e3e8;
-}
-
-.operations-bar__tools button {
-    width: 2rem;
-    height: 2rem;
-    display: grid;
-    place-items: center;
-    border-radius: 0.35rem;
-    color: #d7e3e8;
-}
-
-.operations-bar__tools button:hover {
-    background: #172730;
-}
-
-.operations-bar__user {
-    width: 1.8rem;
-    height: 1.8rem;
-    display: grid;
-    place-items: center;
-    border: 1px solid #324852;
-    border-radius: 999px;
-    background: #182730;
-    color: #dce8ed;
-    font-size: 0.7rem;
-    font-weight: 800;
-}
-
-.operations-bar__status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.42rem;
-    min-width: max-content;
-    color: #a6b5bd;
-    font-size: 0.76rem;
-    font-weight: 700;
-}
-
-.operations-bar__status span {
-    width: 0.52rem;
-    height: 0.52rem;
-    border-radius: 999px;
-    background: #1b9a75;
-    box-shadow: 0 0 0 3px rgb(27 154 117 / 14%);
 }
 
 .app-content {
@@ -164,10 +116,6 @@
     flex-wrap: wrap;
     gap: 0.55rem;
     padding: 0.65rem 0.75rem;
-  }
-
-  .operations-bar__status {
-    display: none;
   }
 
   .operations-bar__nav {
@@ -198,7 +146,5 @@
     margin-right: auto;
   }
 
-  .operations-bar__tools {
-    margin-left: 0;
-  }
+  .operations-bar__spacer { display: none; }
 }
