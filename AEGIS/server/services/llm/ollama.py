@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from AEGIS.server.services.llm.base import LLMProvider
+from AEGIS.server.services.llm.context_budget import compute_ollama_context_usage
 from AEGIS.server.services.llm.langchain_runtime import (
     invoke_chat_model,
     invoke_structured_chat_model,
@@ -68,12 +69,20 @@ class OllamaProvider(LLMProvider):
 
     def __init__(self, *, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
+        self.last_context_usage: dict[str, Any] | None = None
 
-    def _build_chat_model(self, *, model: str, temperature: float) -> ChatOllama:
+    def _build_chat_model(
+        self, *, model: str, temperature: float, num_ctx: int | None = None
+    ) -> ChatOllama:
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "temperature": temperature,
+            "base_url": self.base_url,
+        }
+        if num_ctx is not None:
+            kwargs["num_ctx"] = num_ctx
         return ChatOllama(
-            model=model,
-            temperature=temperature,
-            base_url=self.base_url,
+            **kwargs,
         )
 
     def _build_embedding_model(self, *, model: str) -> OllamaEmbeddings:
@@ -163,17 +172,25 @@ class OllamaProvider(LLMProvider):
         return self._post_json("/api/pull", {"name": model, "stream": False})
 
     def chat(self, request: LLMRequest) -> LLMResult:
+        usage = compute_ollama_context_usage(request)
+        self.last_context_usage = usage.to_dict()
         return invoke_chat_model(
             chat_model=self._build_chat_model(
-                model=request.model, temperature=request.temperature
+                model=request.model,
+                temperature=request.temperature,
+                num_ctx=usage.selected_context_window,
             ),
             request=request,
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        usage = compute_ollama_context_usage(request)
+        self.last_context_usage = usage.to_dict()
         return stream_chat_model(
             chat_model=self._build_chat_model(
-                model=request.model, temperature=request.temperature
+                model=request.model,
+                temperature=request.temperature,
+                num_ctx=usage.selected_context_window,
             ),
             request=request,
         )
@@ -181,9 +198,13 @@ class OllamaProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
+        usage = compute_ollama_context_usage(request)
+        self.last_context_usage = usage.to_dict()
         payload = invoke_structured_chat_model(
             chat_model=self._build_chat_model(
-                model=request.model, temperature=request.temperature
+                model=request.model,
+                temperature=request.temperature,
+                num_ctx=usage.selected_context_window,
             ),
             request=request,
             schema=schema,

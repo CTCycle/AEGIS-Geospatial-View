@@ -1,0 +1,24 @@
+{
+  "id": "geoss",
+  "name": "GEOSS Platform",
+  "provider": "geoss",
+  "type": "catalog-provider",
+  "description": "GEOSS discovery source for earth observation and institutional geospatial datasets.",
+  "capabilities": ["catalog-discovery", "earth-observation", "institutional-data"],
+  "coverage": "global",
+  "metadata": {
+    "label": "GEOSS Platform",
+    "requires_key": false,
+    "attribution": "GEOSS Platform and contributing providers",
+    "keywords": ["geoss", "earth observation", "geoportal", "metadata", "institutional"],
+    "intent_tags": ["catalog-discovery", "earth-observation", "institutional-data"],
+    "task_tags": ["geospatial-discovery", "metadata"],
+    "temporal_behavior": "dataset-dependent",
+    "dataset_time_reference": "Provided by individual discovery records",
+    "source_freshness": "Dataset-specific metadata modified timestamp",
+    "query_mode": "catalog-discovery",
+    "integration_requirements": ["No default API key required for public discovery"]
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00"
+}

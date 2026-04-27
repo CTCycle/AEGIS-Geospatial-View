@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { MapPreviewComponent } from '../components/map-preview.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedChatPageState } from '../core/app-state';
-import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse } from '../core/types';
+import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse, ContextUsage } from '../core/types';
 import { fetchCatalog, sendChatTurn } from '../core/api';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -31,6 +31,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   messages: ChatMessage[] = [];
   lastDecision?: ChatTurnResponse['decision'];
   memorySnapshot: Record<string, unknown> = {};
+  contextUsage?: ContextUsage;
   mapSession?: MapSession;
   status = 'Idle';
   assistantDraft = '';
@@ -66,6 +67,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.messages = this.chatPageState.chatPanel.messages;
     this.lastDecision = this.chatPageState.chatPanel.lastDecision;
     this.memorySnapshot = this.chatPageState.chatPanel.memorySnapshot ?? {};
+    this.contextUsage = this.chatPageState.chatPanel.contextUsage;
     this.mapSession = this.chatPageState.chatPanel.mapSession;
     this.status = this.chatPageState.chatPanel.status;
     this.assistantDraft = this.chatPageState.chatPanel.assistantDraft;
@@ -127,12 +129,41 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     return this.isLoading;
   }
 
+  get contextUsagePercent(): number {
+    return Math.max(0, Math.min(100, Math.round(this.contextUsage?.usage_percent ?? 0)));
+  }
+
+  get contextUsageLabel(): string {
+    if (!this.contextUsage) {
+      return '0%';
+    }
+    return `${this.contextUsagePercent}%`;
+  }
+
+  get contextUsageDetail(): string {
+    if (!this.contextUsage) {
+      return 'Context window awaiting first request';
+    }
+    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit ?? 0;
+    const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
+    return `${this.contextUsage.estimated_input_tokens} / ${selected} tokens${model ? ` - ${model}` : ''}`;
+  }
+
+  get contextTrackerText(): string {
+    if (!this.contextUsage) {
+      return 'Context window';
+    }
+    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit ?? 0;
+    return `${this.contextUsage.estimated_input_tokens} / ${selected}`;
+  }
+
   startNewChat(): void {
     this.sessionId = undefined;
     this.conversationNonce += 1;
     this.messages = [];
     this.lastDecision = undefined;
     this.memorySnapshot = {};
+    this.contextUsage = undefined;
     this.mapSession = undefined;
     this.payload = undefined;
     this.status = 'Idle';
@@ -261,6 +292,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     this.lastDecision = result.decision;
     this.memorySnapshot = result.memory_snapshot ?? {};
+    this.contextUsage = result.context_usage ?? undefined;
     this.assistantDraft = '';
     const planState = result.decision?.plan?.state;
     this.status = planState === 'clarify' ? 'Need more detail' : 'Complete';
@@ -357,6 +389,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         messages: this.messages,
         lastDecision: this.lastDecision,
         memorySnapshot: this.memorySnapshot,
+        contextUsage: this.contextUsage,
         mapSession: this.mapSession,
         status: this.status,
         assistantDraft: this.assistantDraft,

@@ -9,6 +9,7 @@ from google.genai import types as genai_types
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
+from AEGIS.server.services.llm.context_budget import compute_context_usage
 from AEGIS.server.services.llm.response_serialization import dump_response_payload
 from AEGIS.server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
 
@@ -21,6 +22,7 @@ class GoogleProvider(LLMProvider):
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/") if base_url else None
+        self.last_context_usage: dict[str, Any] | None = None
 
     def _client(self) -> Any:
         if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
@@ -39,6 +41,9 @@ class GoogleProvider(LLMProvider):
         ]
 
     def chat(self, request: LLMRequest) -> LLMResult:
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         response = self._client().models.generate_content(
             model=request.model,
             contents=self._contents_from_messages(request.messages),
@@ -50,6 +55,9 @@ class GoogleProvider(LLMProvider):
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         stream = self._client().models.generate_content_stream(
             model=request.model,
             contents=self._contents_from_messages(request.messages),
@@ -63,6 +71,9 @@ class GoogleProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         schema_dump = getattr(schema, "model_json_schema", None)
         json_schema = schema_dump() if callable(schema_dump) else {}
         response = self._client().models.generate_content(

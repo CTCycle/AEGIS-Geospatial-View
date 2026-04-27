@@ -1,4 +1,4 @@
-import { ModelProviderMode, SearchResponsePayload, ChatMessage, PolicyDecision, MapSession } from './types';
+import { ModelProviderMode, SearchResponsePayload, ChatMessage, PolicyDecision, MapSession, ContextUsage } from './types';
 
 const STORAGE_KEY = 'aegis:webapp-state:v3';
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -14,6 +14,7 @@ export interface PersistedChatPanelState {
   lastDecision?: PolicyDecision;
   memorySnapshot?: Record<string, unknown>;
   mapSession?: MapSession;
+  contextUsage?: ContextUsage;
   status: string;
   assistantDraft: string;
   composerDraft: string;
@@ -76,7 +77,8 @@ export const defaultAppState = (): PersistedAppState => ({
       messages: [],
       lastDecision: undefined,
       memorySnapshot: {},
-      mapSession: undefined,
+        mapSession: undefined,
+        contextUsage: undefined,
       status: 'Idle',
       assistantDraft: '',
       composerDraft: '',
@@ -235,6 +237,9 @@ export const loadPersistedAppState = (): PersistedAppState => {
             : {},
           mapSession: isRecord(parsed.chatPage.chatPanel.mapSession)
             ? parsed.chatPage.chatPanel.mapSession as unknown as MapSession
+            : undefined,
+          contextUsage: isRecord(parsed.chatPage.chatPanel.contextUsage)
+            ? parsed.chatPage.chatPanel.contextUsage as unknown as ContextUsage
             : undefined,
           status: typeof parsed.chatPage.chatPanel.status === 'string'
             ? parsed.chatPage.chatPanel.status

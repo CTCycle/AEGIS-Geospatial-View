@@ -31,6 +31,7 @@ Return JSON only with this schema:
 - intent_label: short human label
 - task_tags: array of tags
 - intent_tags: array of tags
+- requested_visualizations: array of explicit requested map concepts such as satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire
 - requires_location: boolean
 - location_signals: array of {signal_type,address/city/country/coordinates/deictic, raw_value, normalized_value, latitude, longitude, confidence}
 - temporal_signal: {mode: current|historical|forecast|none, raw_text, reference_time_iso}
@@ -84,6 +85,7 @@ class _LLMParserExtraction(BaseModel):
     intent_label: str = "General map request"
     task_tags: list[str] = Field(default_factory=list)
     intent_tags: list[str] = Field(default_factory=list)
+    requested_visualizations: list[str] = Field(default_factory=list)
     requires_location: bool = True
     location_signals: list[_LLMLocationSignal] = Field(default_factory=list)
     temporal_signal: _LLMTemporalSignal = Field(default_factory=_LLMTemporalSignal)
@@ -105,6 +107,7 @@ class ParserService:
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.provider = provider
         self.model = model
+        self.last_context_usage: dict[str, object] | None = None
 
     @staticmethod
     def _to_text(value: object) -> str:
@@ -148,6 +151,7 @@ class ParserService:
         provider_name = self.provider or settings.parser_model_provider
         model_name = self.model or settings.parser_model_name
         parser_provider = self.llm_factory.get_parser_provider(provider_name)
+        self.last_context_usage = None
         prompt_payload = {
             "user_message": user_message,
             "memory_snapshot": memory_snapshot,
@@ -156,6 +160,7 @@ class ParserService:
         request = LLMRequest(
             model=model_name,
             temperature=0.0,
+            provider=provider_name,
             messages=[
                 {"role": "system", "content": PARSER_SYSTEM_PROMPT},
                 {
@@ -167,6 +172,8 @@ class ParserService:
         payload = parser_provider.structured_output(
             request=request, schema=_LLMParserExtraction
         )
+        usage = getattr(parser_provider, "last_context_usage", None)
+        self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
         extracted = _LLMParserExtraction.model_validate(payload)
         LOGGER.debug(
             "Parser LLM extraction: provider=%s model=%s task=%s intent=%s",
@@ -223,6 +230,9 @@ class ParserService:
             intent_label=extracted.intent_label.strip() or "General map request",
             task_tags=[tag for tag in extracted.task_tags if str(tag).strip()],
             intent_tags=[tag for tag in extracted.intent_tags if str(tag).strip()],
+            requested_visualizations=[
+                tag for tag in extracted.requested_visualizations if str(tag).strip()
+            ],
             requires_location=extracted.requires_location,
         )
         temporal_signal = TemporalSignal(

@@ -8,6 +8,7 @@ from openai import OpenAI
 
 from AEGIS.server.services.llm.base import LLMProvider
 from AEGIS.server.services.llm.cloud_catalog import get_cloud_model_catalog
+from AEGIS.server.services.llm.context_budget import compute_context_usage
 from AEGIS.server.services.llm.response_serialization import dump_response_payload
 from AEGIS.server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
 
@@ -18,6 +19,7 @@ class OpenAIProvider(LLMProvider):
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+        self.last_context_usage: dict[str, Any] | None = None
 
     def _client(self) -> Any:
         return OpenAI(api_key=self.api_key, base_url=self.base_url)
@@ -28,6 +30,9 @@ class OpenAIProvider(LLMProvider):
         ]
 
     def chat(self, request: LLMRequest) -> LLMResult:
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         response = self._client().responses.create(
             model=request.model,
             input=request.messages,
@@ -39,6 +44,9 @@ class OpenAIProvider(LLMProvider):
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         stream = self._client().responses.create(
             model=request.model,
             input=request.messages,
@@ -55,6 +63,9 @@ class OpenAIProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
+        self.last_context_usage = compute_context_usage(
+            request, provider=self.provider_name
+        ).to_dict()
         response = self._client().responses.parse(
             model=request.model,
             input=request.messages,

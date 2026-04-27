@@ -44,6 +44,7 @@ class NormalizedIntent(BaseModel):
     intent_label: str
     task_tags: list[str] = Field(default_factory=list)
     intent_tags: list[str] = Field(default_factory=list)
+    requested_visualizations: list[str] = Field(default_factory=list)
     requires_location: bool = True
 
 ###############################################################################

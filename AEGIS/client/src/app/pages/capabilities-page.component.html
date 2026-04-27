@@ -1,11 +1,9 @@
 <div class="capabilities-page">
   <header class="capabilities-page__header">
     <div>
-      <p class="page-kicker">System Interaction</p>
       <h1>Capability Overview</h1>
       <p>Manifest-backed map types, layers, direct actions, and data providers exposed by AEGIS.</p>
     </div>
-    <span class="capabilities-page__status" aria-live="polite">{{ statusText }}</span>
   </header>
 
   <main class="capabilities-page__content">
@@ -45,7 +43,7 @@
                     <td class="capability-table__source">{{ dataSource(item) }}</td>
                     <td>{{ updateFrequency(item) }}</td>
                     <td>
-                      <span class="access-pill" [class.access-pill--locked]="item.requires_credentials && !item.is_available">
+                      <span class="access-status" [class.access-status--locked]="item.requires_credentials && !item.is_available">
                         {{ accessConstraints(item) }}
                       </span>
                     </td>

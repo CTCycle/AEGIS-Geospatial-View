@@ -100,12 +100,65 @@
     padding: 0.35rem 0.7rem;
     font-size: 0.74rem;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .toolbar-brand__new-chat:hover {
     border-color: #3a89b8;
     background: #1b3340;
     color: #f8fcff;
+}
+
+.context-window-tracker {
+    flex: 0 1 13rem;
+    display: grid;
+    gap: 0.28rem;
+    min-width: 0;
+    max-width: 13rem;
+    margin-left: auto;
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
+}
+
+.context-window-tracker__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    min-width: 0;
+    color: #8fa3ad;
+    font-size: 0.62rem;
+    line-height: 1.2;
+}
+
+.context-window-tracker__meta span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.context-window-tracker__meta strong {
+    flex: 0 0 auto;
+    color: #dce8ed;
+    font-size: 0.66rem;
+}
+
+.context-window-tracker__bar {
+    height: 0.2rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #1b2b34;
+}
+
+.context-window-tracker__bar span {
+    display: block;
+    height: 100%;
+    min-width: 0.2rem;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1b9a75, #2f9bd7);
+    transition: width 180ms ease;
 }
 
 .toolbar-panel__content {
@@ -181,9 +234,9 @@
 
 .rail-capability-card header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 0.6rem;
-    margin-bottom: 0.55rem;
+    margin-bottom: 0.35rem;
 }
 
 .rail-capability-card h2 {
@@ -577,6 +630,21 @@
     .toolbar-panel__content {
         padding: 0.6rem;
         grid-template-rows: auto minmax(16rem, auto) auto;
+    }
+
+    .toolbar-brand {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 3.2rem;
+        padding-top: 0.6rem;
+        padding-bottom: 0.52rem;
+    }
+
+    .context-window-tracker {
+        order: 3;
+        flex: 1 0 100%;
+        max-width: none;
+        margin-left: 0;
     }
 
     .agent-chat-panel {

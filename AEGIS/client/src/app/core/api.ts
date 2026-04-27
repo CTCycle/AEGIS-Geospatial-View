@@ -154,6 +154,20 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected chat response format');
   }
+  const parseContextUsage = (input: unknown): ChatTurnResponse['context_usage'] => {
+    if (!isRecord(input)) {
+      return undefined;
+    }
+    return {
+      estimated_input_tokens: Number(input.estimated_input_tokens ?? 0),
+      selected_context_window: typeof input.selected_context_window === 'number' ? input.selected_context_window : null,
+      model_context_limit: typeof input.model_context_limit === 'number' ? input.model_context_limit : null,
+      usage_percent: Number(input.usage_percent ?? 0),
+      provider: String(input.provider ?? ''),
+      model: String(input.model ?? ''),
+    };
+  };
+
   return {
     request_id: typeof value.request_id === 'string' ? value.request_id : undefined,
     session_id: Number(value.session_id ?? 0),
@@ -173,6 +187,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
     map_session: isRecord(value.map_session) ? value.map_session as unknown as ChatTurnResponse['map_session'] : undefined,
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
+    context_usage: parseContextUsage(value.context_usage),
     follow_up_required: Boolean(value.follow_up_required),
     fallback_mode: typeof value.fallback_mode === 'string' ? value.fallback_mode : undefined,
   };

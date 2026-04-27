@@ -51,6 +51,14 @@ describe('pages/geospatial-page.component', () => {
       session_id: 42,
       assistant_message: 'Search executed successfully.',
       map_session: null,
+      context_usage: {
+        estimated_input_tokens: 120,
+        selected_context_window: 2048,
+        model_context_limit: 8192,
+        usage_percent: 5.9,
+        provider: 'ollama',
+        model: 'llama3.2',
+      },
       follow_up_required: false,
     });
     const fixture = TestBed.createComponent(GeospatialPageComponent);
@@ -60,6 +68,29 @@ describe('pages/geospatial-page.component', () => {
     await component.sendMessage();
     expect(component.status).toBe('Complete');
     expect(component.messages.at(-1)?.content).toContain('Search executed successfully.');
+    expect(component.contextUsagePercent).toBe(6);
+  });
+
+  it('renders context tracker fallback and telemetry detail', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.contextUsageLabel).toBe('0%');
+    expect(component.contextUsageDetail).toContain('awaiting first request');
+
+    component.contextUsage = {
+      estimated_input_tokens: 321,
+      selected_context_window: 2048,
+      model_context_limit: 8192,
+      usage_percent: 15.7,
+      provider: 'ollama',
+      model: 'llama3.2',
+    };
+    fixture.detectChanges();
+
+    const element: HTMLElement = fixture.nativeElement;
+    expect(component.contextUsageLabel).toBe('16%');
+    expect(element.textContent).toContain('321 / 2048 tokens');
   });
 
   it('clarification responses set Need more detail status', async () => {
@@ -155,11 +186,20 @@ describe('pages/geospatial-page.component', () => {
     component.messages = [{ role: 'assistant', content: 'x' }];
     component.composerDraft = 'draft';
     component.payload = { map_session: { overlays: [] } };
+    component.contextUsage = {
+      estimated_input_tokens: 50,
+      selected_context_window: 2048,
+      model_context_limit: 8192,
+      usage_percent: 2.5,
+      provider: 'ollama',
+      model: 'llama3.2',
+    };
     component.startNewChat();
     expect(component.sessionId).toBeUndefined();
     expect(component.messages.length).toBe(0);
     expect(component.composerDraft).toBe('');
     expect(component.payload).toBeUndefined();
+    expect(component.contextUsage).toBeUndefined();
     expect(store.resetChatPage).toHaveBeenCalled();
   });
 

@@ -33,11 +33,20 @@ describe('core/app-state', () => {
         chatPanel: {
           ...defaultAppState().chatPage.chatPanel,
           composerDraft: 'persisted draft',
+          contextUsage: {
+            estimated_input_tokens: 200,
+            selected_context_window: 2048,
+            model_context_limit: 8192,
+            usage_percent: 9.8,
+            provider: 'ollama',
+            model: 'llama3.2',
+          },
         },
       },
     }));
     const state = loadPersistedAppState();
     expect(state.chatPage.chatPanel.composerDraft).toBe('persisted draft');
+    expect(state.chatPage.chatPanel.contextUsage?.usage_percent).toBe(9.8);
     expect(state.tabId).toBe('tab-1');
   });
 

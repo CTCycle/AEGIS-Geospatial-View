@@ -1,0 +1,24 @@
+{
+  "id": "arcgis",
+  "name": "ArcGIS REST Services",
+  "provider": "arcgis",
+  "type": "catalog-provider",
+  "description": "ArcGIS REST and portal services for public and credentialed geospatial layers.",
+  "capabilities": ["catalog-discovery", "feature-services", "map-services"],
+  "coverage": "global",
+  "metadata": {
+    "label": "ArcGIS REST Services",
+    "requires_key": false,
+    "attribution": "ArcGIS service publishers",
+    "keywords": ["arcgis", "esri", "feature service", "map service", "geoportal"],
+    "intent_tags": ["catalog-discovery", "feature-services", "map-services"],
+    "task_tags": ["geospatial-discovery", "metadata"],
+    "temporal_behavior": "dataset-dependent",
+    "dataset_time_reference": "Provided by individual service metadata or timeInfo",
+    "source_freshness": "Service-specific modified timestamp where available",
+    "query_mode": "catalog-discovery",
+    "integration_requirements": ["Public services work without a key; private portals require configured credentials"]
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00"
+}
