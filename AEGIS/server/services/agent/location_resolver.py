@@ -8,6 +8,14 @@ from AEGIS.server.services.geospatial.nominatim import NominatimService
 
 ###############################################################################
 class LocationResolver:
+    SPECIFICITY_BY_SIGNAL_TYPE = {
+        "coordinates": 4,
+        "address": 3,
+        "city": 2,
+        "deictic": 2,
+        "country": 1,
+    }
+
     def __init__(self, *, nominatim_service: NominatimService | None = None) -> None:
         self.nominatim_service = nominatim_service or NominatimService()
 
@@ -55,6 +63,7 @@ class LocationResolver:
         if (
             len(resolved_candidates) > 1
             and abs(resolved_candidates[0].confidence - resolved_candidates[1].confidence) < 0.12
+            and self._specificity_gap_is_small(ranked_candidates[0], ranked_candidates[1])
             and not self._same_resolved_location(resolved_candidates[0], resolved_candidates[1])
         ):
             return self.build_ambiguity_question(ranked_candidates[:2])
@@ -62,7 +71,19 @@ class LocationResolver:
         return resolved_candidates[0]
 
     def score_location_matches(self, location_signals: Sequence[LocationSignal]) -> list[LocationSignal]:
-        return sorted(location_signals, key=lambda item: item.confidence, reverse=True)
+        return sorted(
+            location_signals,
+            key=lambda item: (
+                item.confidence,
+                self.SPECIFICITY_BY_SIGNAL_TYPE.get(item.signal_type, 0),
+            ),
+            reverse=True,
+        )
+
+    def _specificity_gap_is_small(self, left: LocationSignal, right: LocationSignal) -> bool:
+        left_specificity = self.SPECIFICITY_BY_SIGNAL_TYPE.get(left.signal_type, 0)
+        right_specificity = self.SPECIFICITY_BY_SIGNAL_TYPE.get(right.signal_type, 0)
+        return left_specificity == right_specificity
 
     def _same_resolved_point(self, left: LocationSignal, right: LocationSignal) -> bool:
         if None in {left.latitude, left.longitude, right.latitude, right.longitude}:
