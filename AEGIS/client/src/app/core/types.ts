@@ -54,6 +54,14 @@ export interface CapabilityDescriptor {
   coverage: string;
   intent_tags: string[];
   task_tags: string[];
+  source_protocol?: string;
+  data_format?: string;
+  geometry_type?: string;
+  queryable?: boolean;
+  vectorizable?: boolean;
+  endpoint_health?: string;
+  auth_mode?: string;
+  official_docs_url?: string;
   metadata?: Record<string, JsonValue>;
 }
 
@@ -96,10 +104,13 @@ export interface MapSession {
     wmts_style?: string;
     wms_version?: string;
     wms_exceptions?: string;
-    bounds?: [number, number, number, number];
-    attribution?: string;
-    maxzoom?: number;
-  }>;
+      bounds?: [number, number, number, number];
+      attribution?: string;
+      maxzoom?: number;
+      source_protocol?: string;
+      data_format?: string;
+      geometry_type?: string;
+    }>;
   compliance_warnings?: string[];
 }
 

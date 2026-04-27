@@ -1,6 +1,6 @@
 # Capability Manifests
 
-Last updated: 2026-04-24
+Last updated: 2026-04-27
 
 ## Purpose
 
@@ -14,6 +14,9 @@ Default capability selection prioritizes free and openly accessible providers. G
 - Runtime availability is controlled by `runtime_profiles.json` plus credential presence.
 - Credential-backed geospatial providers use the encrypted credential repository with `api_key` labels; environment variables remain a runtime fallback.
 - Every capability entry must define purpose, data source, update frequency, access constraints, and dependencies.
+- Every metadata object must expose ingestion traits: `official_docs_url`, `source_protocol`, `data_format`, `geometry_type`, `queryable`, `vectorizable`, `endpoint_health`, `auth_mode`, and `rate_limit_notes`.
+- Queryable/vectorizable claims are reserved for GeoJSON, ArcGIS REST GeoJSON, point-insight, and time-series insight layers. Raster tile, WMS, and WMTS layers are OpenLayers-compatible but not advertised as machine-queryable vectors.
+- OpenLayers-compatible source protocols are the manifest standard. The active UI renderer remains MapLibre unless an OpenLayers adapter adds unique capability.
 
 ## Providers
 
@@ -23,12 +26,15 @@ Default capability selection prioritizes free and openly accessible providers. G
 | ESA (`esa`) | ESA WorldCover land-use and land-cover context. | ESA/Terrascope WMTS service. | Static release dataset. | Free/open with attribution requirements. | WMTS rendering, WorldCover layer identifiers, global coverage policy. |
 | Geoapify (`geoapify`) | Optional OSM-derived basemap and amenities provider. | Geoapify Maps and Places APIs. | Static tiles and request-driven places. | Requires user-supplied Geoapify API key; disabled in the default free workflow. | Encrypted provider credential, tile/GeoJSON handling, Geoapify service terms. |
 | NASA GIBS (`gibs`) | Satellite, environmental, terrain, atmosphere, and earth-observation layers. | NASA Global Imagery Browse Services WMS/WMTS endpoints. | Layer-dependent; daily, 8-day, monthly, annual, and static layers. | No API key; NASA attribution and service-aware usage required. | WMS/WMTS rendering, GIBS capabilities metadata, NASA service availability. |
-| OpenAQ (`openaq`) | Air-quality station observations and measurements. | OpenAQ API and upstream station networks. | Dynamic but coverage-dependent. | No configured API key required; source licenses and station coverage vary. | Point-insight rendering, location radius, OpenAQ service availability. |
+| OpenAQ (`openaq`) | Air-quality station observations and measurements. | OpenAQ API and upstream station networks. | Dynamic but coverage-dependent. | Requires OpenAQ API key for current API access; source licenses and station coverage vary. | Encrypted OpenAQ credential, point-insight rendering, location radius, OpenAQ service availability. |
 | Open-Meteo (`openmeteo`) | Weather and air-quality forecasts. | Open-Meteo forecast APIs. | Dynamic forecast data. | No API key in default workflow; validate non-commercial limits before production scale. | Direct tool handlers, time-series insight rendering, rate limits. |
 | Overpass API (`overpass`) | OpenStreetMap POI and feature queries. | Public Overpass API instances over OSM data. | Dynamic, based on OSM and Overpass instance freshness. | No API key; respect public instance capacity, query volume, and ODbL attribution. | OSM tags, location radius, POI direct-tool handler. |
 | PVGIS (`pvgis`) | Solar irradiation and photovoltaic potential estimates. | European Commission JRC PVGIS API. | Static/model-derived per-location estimates. | No API key; attribution recommended. | Point-insight rendering, location coordinates, PVGIS availability. |
 | RainViewer (`rainviewer`) | Precipitation radar tiles and metadata. | RainViewer weather map metadata and tile cache. | Dynamic near-real-time radar frames. | No API key for basic use; validate tile caching and commercial terms. | Tile metadata lookup, time-indexed radar tile URL, regional radar coverage. |
 | TomTom (`tomtom`) | Optional commercial road basemap and traffic flow. | TomTom Maps and Traffic APIs. | Near-real-time for traffic; provider-defined for basemap tiles. | Requires user-supplied TomTom API key; disabled in the default free workflow. | Encrypted provider credential, tile rendering, TomTom service terms. |
+| U.S. Census Bureau (`census`) | U.S. demographic, boundary, and hydrography layers. | Census Data API and TIGERweb ArcGIS REST services. | Dataset/vintage-dependent. | Public access; optional Census API key for higher-volume statistical API use. | TIGERweb GeoJSON queries, Census geography joins, U.S.-only coverage. |
+| Eurostat (`eurostat`) | EU/EEA demographic, housing, rent, and economic indicators. | Eurostat Statistics and JSON-stat APIs. | Dataset-dependent, provider-updated. | Free/public with attribution and dataset-specific terms. | JSON-stat parsing, regional code selection, EU/EEA coverage. |
+| FRED (`fred`) | U.S. market, housing, rent, and economic time-series indicators. | Federal Reserve Economic Data API. | Series/release-calendar dependent. | Requires FRED API key; third-party series restrictions may apply. | Encrypted FRED credential, time-series retrieval, U.S. coverage. |
 
 ## Map Types
 
@@ -57,7 +63,7 @@ Default capability selection prioritizes free and openly accessible providers. G
 | `MODIS_Terra_Land_Surface_Temp_Night` | Nighttime land surface temperature. | NASA GIBS MODIS Terra WMS layer. | Daily. | No API key; NASA attribution required. | WMS renderer, GIBS layer availability. |
 | `MODIS_Terra_NDVI_8Day` | Vegetation condition using NDVI. | NASA GIBS MODIS Terra WMS layer. | 8-day aggregation. | No API key; NASA attribution required. | WMS renderer, GIBS layer availability. |
 | `OMPS_Ozone_Total_Column` | Total-column atmospheric ozone. | NASA GIBS OMPS WMS layer. | Daily. | No API key; NASA attribution required. | WMS renderer, GIBS layer availability. |
-| `openaq_air_quality` | Nearby air-quality observation insight. | OpenAQ API. | Dynamic station/measurement updates. | No API key; station coverage and licenses vary. | Location radius, point-insight renderer, OpenAQ service. |
+| `openaq_air_quality` | Nearby air-quality observation insight. | OpenAQ API. | Dynamic station/measurement updates. | Requires OpenAQ API key; station coverage and licenses vary. | Location radius, point-insight renderer, OpenAQ service. |
 | `openmeteo_air_quality_forecast` | Forecast PM and gas concentration context. | Open-Meteo Air Quality API. | Dynamic forecast model updates. | No API key in default flow; observe Open-Meteo terms. | Time-series insight renderer, location coordinates. |
 | `openmeteo_weather_forecast` | Forecast temperature and precipitation context. | Open-Meteo Forecast API. | Dynamic forecast model updates. | No API key in default flow; observe Open-Meteo terms. | Time-series insight renderer, location coordinates. |
 | `overpass_poi_amenities` | Nearby amenities and POI discovery. | Overpass API over OpenStreetMap. | Dynamic request-time OSM query. | No API key; respect Overpass limits and ODbL attribution. | Location radius, OSM tags, point-insight renderer. |
@@ -67,6 +73,25 @@ Default capability selection prioritizes free and openly accessible providers. G
 | `tomtom_traffic_flow` | Optional live road congestion and flow. | TomTom Traffic tile API. | Dynamic near-real-time traffic. | Requires TomTom API key configured in Access. | Encrypted TomTom credential, MapLibre raster overlay. |
 | `VIIRS_SNPP_CorrectedReflectance_TrueColor` | Recent true-color visual earth conditions. | NASA GIBS VIIRS SNPP WMS layer. | Daily. | No API key; NASA attribution required. | WMS renderer, GIBS layer availability. |
 | `VIIRS_SNPP_DayNightBand_ENCC` | Nighttime lights and low-light observations. | NASA GIBS VIIRS Day/Night Band WMS layer. | Monthly/static product behavior. | No API key; NASA attribution required. | WMS renderer, GIBS layer availability. |
+| `census_tigerweb_hydrography` | U.S. rivers, lakes, and water features. | Census TIGERweb Hydro ArcGIS REST query with `f=geojson`. | Census/TIGERweb release-dependent. | No API key for public sampled queries; U.S. only. | Bounded GeoJSON query, MapLibre GeoJSON renderer, TIGERweb availability. |
+| `census_tigerweb_demographics` | U.S. Census tract geometry for demographic joins. | Census TIGERweb Tracts/Blocks ArcGIS REST query with `f=geojson`. | Census/TIGERweb release-dependent. | No API key for public sampled queries; U.S. only. | Bounded GeoJSON query, Census geography codes, demographic-data joins. |
+| `openmeteo_pressure_humidity_wind` | Pressure, humidity, wind, gust, and precipitation-probability forecast insight. | Open-Meteo Forecast API. | Dynamic forecast updates. | No API key in default flow; observe Open-Meteo terms. | Time-series insight handling, location coordinates. |
+| `fred_regional_market_indicators` | U.S. housing, rent, income, and economic market indicators. | FRED API. | Series/release-calendar dependent. | Requires FRED API key. | Encrypted FRED credential, time-series insight handling. |
+| `eurostat_regional_demographics` | EU/EEA population density and demographic context. | Eurostat Statistics API. | Dataset-dependent. | No API key; EU/EEA statistical coverage. | JSON-stat handling, region-code lookup. |
+| `eurostat_housing_market` | EU/EEA housing, rent, and market indicator context. | Eurostat Statistics API. | Dataset-dependent. | No API key; EU/EEA statistical coverage. | JSON-stat handling, region-code lookup. |
+
+## Source Trait Metadata
+
+| Field | Meaning |
+| --- | --- |
+| `source_protocol` | Integration protocol, for example `GeoJSON`, `ArcGIS REST GeoJSON`, `WMS`, `WMTS`, `raster-tile`, or JSON insight APIs. |
+| `data_format` | Runtime payload shape, for example `GeoJSON`, `JSON`, `image/png via WMS`, or image tiles. |
+| `geometry_type` | Expected geometry class for queryable/vector layers, or `raster-grid` for visualization-only layers. |
+| `queryable` | Indicates the layer returns structured data suitable for programmatic inspection. |
+| `vectorizable` | Indicates the layer can be indexed or rendered as machine-readable features. |
+| `endpoint_health` | Validation status for the manifest endpoint or representative sampled endpoint. |
+| `auth_mode` | Authentication style, usually `none` or `api_key`. |
+| `official_docs_url` | Maintainer-facing link to current provider documentation. |
 
 ## Direct Tools
 

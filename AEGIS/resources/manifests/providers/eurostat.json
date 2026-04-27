@@ -1,0 +1,69 @@
+{
+  "id": "eurostat",
+  "name": "Eurostat API",
+  "provider": "eurostat",
+  "type": "provider",
+  "description": "Eurostat statistics APIs for EU regional demographics, housing, rent, and economic indicators.",
+  "capabilities": [
+    "demographics",
+    "market-data",
+    "regional-statistics",
+    "time-series-insight"
+  ],
+  "coverage": "eu-eea",
+  "metadata": {
+    "label": "Eurostat API",
+    "requires_key": false,
+    "attribution": "Eurostat / European Commission",
+    "keywords": [
+      "eurostat",
+      "demographics",
+      "housing",
+      "rent",
+      "regional statistics"
+    ],
+    "intent_tags": [
+      "european demographics",
+      "housing market",
+      "regional indicators"
+    ],
+    "task_tags": [
+      "market context",
+      "population analysis",
+      "regional comparison"
+    ],
+    "temporal_behavior": "dynamic",
+    "dataset_time_reference": "Dataset-specific reference period",
+    "source_freshness": "Eurostat database updates when new data or structural changes are available",
+    "query_mode": "json-stat-api",
+    "human_summary": "EU statistical data suitable for regional demographic and market trend insights.",
+    "primary_use_cases": [
+      "EU demographic comparison",
+      "housing and rent trend context",
+      "regional economic screening"
+    ],
+    "integration_requirements": [
+      "No API key required"
+    ],
+    "official_docs_url": "https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-introduction",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "polygon",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show Eurostat API",
+      "find Eurostat API near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00"
+}

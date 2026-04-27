@@ -1,0 +1,63 @@
+{
+  "id": "eurostat_regional_demographics",
+  "name": "Eurostat Regional Demographics",
+  "provider": "eurostat",
+  "type": "time-series-insight",
+  "description": "EU regional demographic insight for population density and age structure using Eurostat JSON-stat APIs.",
+  "capabilities": [
+    "demographics",
+    "population-density",
+    "age-structure",
+    "time-series-insight"
+  ],
+  "coverage": "eu-eea",
+  "metadata": {
+    "label": "Eurostat Regional Demographics",
+    "default_opacity": 0.7,
+    "requires_key": false,
+    "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/DEMO_R_D3DENS?lang=EN",
+    "attribution": "Eurostat / European Commission",
+    "keywords": [
+      "eurostat",
+      "population density",
+      "age structure",
+      "demographics"
+    ],
+    "intent_tags": [
+      "demographics",
+      "population density",
+      "age structure"
+    ],
+    "task_tags": [
+      "EU regional demographics",
+      "population comparison",
+      "age analysis"
+    ],
+    "human_summary": "EU regional demographic indicators for population density and age-structure context.",
+    "primary_use_cases": [
+      "population density comparison",
+      "age-structure screening",
+      "regional demographic context"
+    ],
+    "search_examples": [
+      "show population density for Lombardy",
+      "compare regional demographics in Spain"
+    ],
+    "official_docs_url": "https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-introduction",
+    "source_protocol": "JSON time series",
+    "data_format": "JSON",
+    "geometry_type": "polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00"
+}

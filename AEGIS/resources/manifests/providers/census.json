@@ -1,0 +1,69 @@
+{
+  "id": "census",
+  "name": "U.S. Census Bureau APIs",
+  "provider": "census",
+  "type": "provider",
+  "description": "U.S. Census Data API and TIGERweb GeoServices for demographics, boundaries, hydrography, and regional indicators.",
+  "capabilities": [
+    "demographics",
+    "boundaries",
+    "hydrology",
+    "arcgis-geojson"
+  ],
+  "coverage": "us",
+  "metadata": {
+    "label": "U.S. Census Bureau APIs",
+    "requires_key": false,
+    "attribution": "U.S. Census Bureau",
+    "keywords": [
+      "census",
+      "tigerweb",
+      "demographics",
+      "hydrography",
+      "boundaries"
+    ],
+    "intent_tags": [
+      "demographics",
+      "census boundaries",
+      "hydrology"
+    ],
+    "task_tags": [
+      "demographic context",
+      "regional boundaries",
+      "water features"
+    ],
+    "temporal_behavior": "dataset-dependent",
+    "dataset_time_reference": "Census vintage or TIGERweb release metadata",
+    "source_freshness": "Dataset-specific Census release cadence",
+    "query_mode": "arcgis-rest-and-json-api",
+    "human_summary": "U.S. demographic and boundary data with queryable GeoJSON geometry through TIGERweb and tabular Census APIs.",
+    "primary_use_cases": [
+      "population density analysis",
+      "income and age structure context",
+      "hydrography and boundary overlays"
+    ],
+    "integration_requirements": [
+      "No key required for many calls; optional Census API key recommended for higher-volume use"
+    ],
+    "official_docs_url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "line/polygon",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show U.S. Census Bureau APIs",
+      "find U.S. Census Bureau APIs near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00"
+}

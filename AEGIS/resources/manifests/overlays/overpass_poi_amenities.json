@@ -57,7 +57,19 @@
     "location_dependency": "Strongly location-specific and dependent on selected query area.",
     "integration_requirements": [
       "No API key required for public Overpass instances"
-    ]
+    ],
+    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Overpass_API",
+    "source_protocol": "JSON point insight",
+    "data_format": "JSON",
+    "geometry_type": "point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Query volume must respect Overpass instance limits and ODbL attribution obligations.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-10T16:45:00+00:00"

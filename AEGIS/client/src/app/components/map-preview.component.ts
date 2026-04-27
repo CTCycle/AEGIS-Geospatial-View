@@ -173,6 +173,10 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
       return;
     }
 
+    if (addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
+      return;
+    }
+
     if (overlay.type === 'point-insight') {
       const center = mapSession?.center;
       if (typeof center?.longitude !== 'number' || typeof center?.latitude !== 'number') {
@@ -208,6 +212,62 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
       });
     }
   });
+};
+
+const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
+  const overlayType = overlay.type.toLowerCase();
+  const format = overlay.data_format?.toLowerCase() || '';
+  const protocol = overlay.source_protocol?.toLowerCase() || '';
+  return Boolean(
+    overlay.url
+    && (overlayType === 'geojson'
+      || overlayType === 'arcgis-geojson'
+      || format.includes('geojson')
+      || protocol.includes('geojson')),
+  );
+};
+
+const addGeoJsonOverlayLayer = (
+  map: Map,
+  overlay: OverlayEntry,
+  sourceId: string,
+  layerId: string,
+  opacity: number,
+): boolean => {
+  if (!isGeoJsonOverlay(overlay) || !overlay.url) {
+    return false;
+  }
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: overlay.url,
+  });
+  const geometryType = overlay.geometry_type?.toLowerCase() || '';
+  if (geometryType.includes('point')) {
+    map.addLayer({
+      id: layerId,
+      source: sourceId,
+      type: 'circle',
+      paint: {
+        'circle-radius': 5,
+        'circle-color': '#0ea5e9',
+        'circle-opacity': opacity,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#082f49',
+      },
+    });
+    return true;
+  }
+  map.addLayer({
+    id: layerId,
+    source: sourceId,
+    type: 'line',
+    paint: {
+      'line-color': '#38bdf8',
+      'line-width': 2,
+      'line-opacity': opacity,
+    },
+  });
+  return true;
 };
 
 const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
@@ -513,6 +573,9 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       const opacityValue = this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY;
       if (overlay.type === 'point-insight') {
         map.setPaintProperty(layerId, 'circle-opacity', opacityValue);
+      } else if (isGeoJsonOverlay(overlay)) {
+        const geometryType = overlay.geometry_type?.toLowerCase() || '';
+        map.setPaintProperty(layerId, geometryType.includes('point') ? 'circle-opacity' : 'line-opacity', opacityValue);
       } else {
         map.setPaintProperty(layerId, 'raster-opacity', opacityValue);
       }

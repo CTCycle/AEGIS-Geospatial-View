@@ -2,96 +2,6 @@
   "version": 1,
   "profiles": [
     {
-      "capability_id": "geoapify_osm",
-      "enabled_by_default": true,
-      "credential_provider": "geoapify",
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "gibs_satellite",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "osm_dark",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "osm_default",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "osm_terrain",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "tomtom_basic",
-      "enabled_by_default": true,
-      "credential_provider": "tomtom",
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "eea_noise_2019",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "eu-eea",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "esa_worldcover",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "geoapify_amenities",
-      "enabled_by_default": true,
-      "credential_provider": "geoapify",
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
       "capability_id": "IMERG_Precipitation_Rate",
       "enabled_by_default": true,
       "credential_provider": null,
@@ -182,79 +92,9 @@
       "handler_name": null
     },
     {
-      "capability_id": "openaq_air_quality",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": true,
-      "coverage_policy": "global-partial",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "openmeteo_air_quality_forecast",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": true,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "openmeteo_weather_forecast",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": true,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "overpass_poi_amenities",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": true,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "pvgis_solar",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": true,
-      "coverage_policy": "global-except-poles",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "rainviewer_precipitation_radar",
-      "enabled_by_default": true,
-      "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global-partial",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
       "capability_id": "SRTM_Color_Index",
       "enabled_by_default": true,
       "credential_provider": null,
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null
-    },
-    {
-      "capability_id": "tomtom_traffic_flow",
-      "enabled_by_default": true,
-      "credential_provider": "tomtom",
       "supports_map": true,
       "supports_direct_text": false,
       "coverage_policy": "global",
@@ -275,6 +115,96 @@
       "capability_id": "VIIRS_SNPP_DayNightBand_ENCC",
       "enabled_by_default": true,
       "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "census_tigerweb_demographics",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "us",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "census_tigerweb_hydrography",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "us",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "eea_noise_2019",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "eu-eea",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "esa_worldcover",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "eurostat_housing_market",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": false,
+      "supports_direct_text": true,
+      "coverage_policy": "eu-eea",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "eurostat_regional_demographics",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": false,
+      "supports_direct_text": true,
+      "coverage_policy": "eu-eea",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "fred_regional_market_indicators",
+      "enabled_by_default": true,
+      "credential_provider": "fred",
+      "supports_map": false,
+      "supports_direct_text": true,
+      "coverage_policy": "us",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "geoapify_amenities",
+      "enabled_by_default": true,
+      "credential_provider": "geoapify",
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "geoapify_osm",
+      "enabled_by_default": true,
+      "credential_provider": "geoapify",
       "supports_map": true,
       "supports_direct_text": false,
       "coverage_policy": "global",
@@ -312,6 +242,16 @@
       "handler_name": "weather"
     },
     {
+      "capability_id": "gibs_satellite",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
       "capability_id": "location_to_coordinates",
       "enabled_by_default": true,
       "credential_provider": null,
@@ -320,6 +260,126 @@
       "coverage_policy": "global",
       "health_policy": "best_effort",
       "handler_name": "coordinates"
+    },
+    {
+      "capability_id": "openaq_air_quality",
+      "enabled_by_default": true,
+      "credential_provider": "openaq",
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global-partial",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "openmeteo_air_quality_forecast",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "openmeteo_pressure_humidity_wind",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "openmeteo_weather_forecast",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "osm_dark",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "osm_default",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "osm_terrain",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "overpass_poi_amenities",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "pvgis_solar",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global-except-poles",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "rainviewer_precipitation_radar",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global-partial",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "tomtom_basic",
+      "enabled_by_default": true,
+      "credential_provider": "tomtom",
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
+    },
+    {
+      "capability_id": "tomtom_traffic_flow",
+      "enabled_by_default": true,
+      "credential_provider": "tomtom",
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null
     }
   ]
 }

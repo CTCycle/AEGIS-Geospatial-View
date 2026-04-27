@@ -23,7 +23,7 @@
       45.0,
       72.0
     ],
-    "attribution": "\u00a9 European Environment Agency (CC BY 4.0 where applicable)",
+    "attribution": "© European Environment Agency (CC BY 4.0 where applicable)",
     "keywords": [
       "noise",
       "wms",
@@ -64,7 +64,19 @@
     "location_dependency": "Strongly location-dependent and region-limited to European datasets.",
     "integration_requirements": [
       "No API key required"
-    ]
+    ],
+    "official_docs_url": "https://www.eea.europa.eu/en/datahub",
+    "source_protocol": "WMS",
+    "data_format": "image/png via WMS",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

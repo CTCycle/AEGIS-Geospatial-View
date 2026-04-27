@@ -36,7 +36,25 @@
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
-    "content_hash": "886881adeb0dceb3d63339a3e82a98c47d0c9f98a594128ccb0a27f1c393066e"
+    "content_hash": "886881adeb0dceb3d63339a3e82a98c47d0c9f98a594128ccb0a27f1c393066e",
+    "requires_key": false,
+    "official_docs_url": "https://esa-worldcover.org/en/data-access",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show ESA",
+      "find ESA near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

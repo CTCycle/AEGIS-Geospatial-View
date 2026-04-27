@@ -57,7 +57,19 @@
     "location_dependency": "Location-specific and strongly time-dependent.",
     "integration_requirements": [
       "No API key required for basic RainViewer usage"
-    ]
+    ],
+    "official_docs_url": "https://www.rainviewer.com/api.html",
+    "source_protocol": "raster-tile",
+    "data_format": "image tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Time-indexed radar tiles; coverage and licensing vary by region and usage scenario.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-10T16:45:00+00:00"

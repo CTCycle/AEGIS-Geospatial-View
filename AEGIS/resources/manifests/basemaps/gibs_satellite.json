@@ -12,7 +12,7 @@
   "metadata": {
     "label": "Satellite Imagery",
     "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "attribution": "Tiles \u00a9 Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    "attribution": "Tiles © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
     "requires_key": false,
     "keywords": [
       "satellite",
@@ -54,7 +54,19 @@
     "location_dependency": "Location-specific; supports local and regional map extents.",
     "integration_requirements": [
       "No API key required"
-    ]
+    ],
+    "official_docs_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+    "source_protocol": "raster-tile",
+    "data_format": "image tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "imagery tile availability and attribution are governed by the upstream basemap provider",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
   },
   "version": 1,
   "last_modified": "2026-04-06T15:08:00.882573+00:00"

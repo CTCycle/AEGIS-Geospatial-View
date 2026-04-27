@@ -145,6 +145,30 @@ describe('components/map-preview.component', () => {
     expect(sourceTiles.some((url) => url.includes('service=WMTS'))).toBeTrue();
   });
 
+  it('renders GeoJSON overlay sources as vector layers', () => {
+    component.payload = {
+      map_session: {
+        center: { latitude: 41.9, longitude: 12.5 },
+        overlays: [
+          {
+            id: 'census_hydro',
+            label: 'Hydro',
+            type: 'arcgis-geojson',
+            provider: 'census',
+            url: 'https://example.test/query?f=geojson',
+            data_format: 'GeoJSON',
+            geometry_type: 'line/polygon',
+          },
+        ],
+      },
+    };
+    fixture.detectChanges();
+    const source = fakeMap.addSource.calls.mostRecent().args[1] as { type: string; data?: string };
+    expect(source.type).toBe('geojson');
+    expect(source.data).toContain('f=geojson');
+    expect(fakeMap.addLayer.calls.mostRecent().args[0].type).toBe('line');
+  });
+
   it('does not crash when map session is absent', () => {
     component.payload = {};
     fixture.detectChanges();
