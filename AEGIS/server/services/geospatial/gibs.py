@@ -14,7 +14,7 @@ from AEGIS.server.common.constants import (
     GIBS_LAYERS_TABLE,
 )
 from AEGIS.server.common.logger import logger
-from AEGIS.server.repositories.database import database
+from AEGIS.server.repositories.database import get_database
 from AEGIS.server.services.geospatial.gibs_errors import GIBSRequestError
 from AEGIS.server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
 
@@ -116,7 +116,7 @@ class GIBSService(GIBSRuntimeMixin):
     # -------------------------------------------------------------------------
     def load_layer_catalog(self) -> dict[str, LayerCatalogEntry]:
         try:
-            rows = database.load_from_database(GIBS_LAYERS_TABLE)
+            rows = get_database().load_from_database(GIBS_LAYERS_TABLE)
         except Exception as exc:  # pragma: no cover - database access failures
             logger.warning("Unable to load GIBS layer metadata: %s", exc)
             return {}

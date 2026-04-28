@@ -68,7 +68,6 @@ describe('core/api', () => {
     expect(parsed.session_id).toBe(0);
     expect(parsed.assistant_message).toBe('');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
-    expect(parsed.follow_up_required).toBeFalse();
   });
 
   it('buildApiError builds ApiRequestError', async () => {

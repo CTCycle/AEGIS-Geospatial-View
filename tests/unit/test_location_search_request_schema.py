@@ -8,10 +8,20 @@ from AEGIS.server.domain.geographics import LocationSearchRequest
 
 def _base_payload() -> dict[str, object]:
     return {
-        "datetime": "2024-06-15T12:00:00",
-        "use_coordinates": True,
-        "latitude": 41.9,
-        "longitude": 12.5,
+        "resolved_location": {
+            "label": "Rome, Italy",
+            "latitude": 41.9,
+            "longitude": 12.5,
+            "city": "Rome",
+            "country": "Italy",
+        },
+        "intent_id": "air_quality",
+        "time_mode": "current",
+        "viewport": {
+            "center_latitude": 41.9,
+            "center_longitude": 12.5,
+            "radius_m": 2500.0,
+        },
     }
 
 
@@ -21,22 +31,26 @@ def test_accepts_canonical_request_fields() -> None:
             **_base_payload(),
             "basemap_id": "osm_default",
             "overlay_ids": ["openaq_air_quality"],
-            "semantic_filters": ["air_quality"],
+            "presentation": {
+                "emphasize_overlays": True,
+                "high_contrast": False,
+                "show_legend": True,
+            },
         }
     )
     assert request.basemap_id == "osm_default"
     assert request.overlay_ids == ["openaq_air_quality"]
-    assert request.semantic_filters == ["air_quality"]
+    assert request.resolved_location.city == "Rome"
 
 
 @pytest.mark.parametrize(
-    "legacy_field,value",
+    "removed_field,value",
     [
         ("map_tiles", "OpenStreetMap"),
         ("geospatial_filter", ["air_quality"]),
         ("geospatial_layers", ["air_quality"]),
     ],
 )
-def test_rejects_removed_legacy_fields(legacy_field: str, value: object) -> None:
+def test_rejects_removed_request_fields(removed_field: str, value: object) -> None:
     with pytest.raises(ValidationError):
-        LocationSearchRequest.model_validate({**_base_payload(), legacy_field: value})
+        LocationSearchRequest.model_validate({**_base_payload(), removed_field: value})

@@ -7,7 +7,6 @@ from AEGIS.server.repositories.database.backend import (
     DatabaseBackend,
     build_postgres_backend,
     build_sqlite_backend,
-    database,
     get_database,
 )
 
@@ -18,6 +17,5 @@ __all__ = [
     "DatabaseBackend",
     "build_postgres_backend",
     "build_sqlite_backend",
-    "database",
     "get_database",
 ]

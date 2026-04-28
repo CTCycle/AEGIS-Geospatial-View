@@ -111,7 +111,7 @@ describe('core/app-state', () => {
         ...defaultAppState().chatPage,
         chatPanel: {
           ...defaultAppState().chatPage.chatPanel,
-          composerDraft: 'legacy-schema-draft',
+          composerDraft: 'old-schema-draft',
         },
       },
     }));

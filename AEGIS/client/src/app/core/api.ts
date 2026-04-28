@@ -196,8 +196,6 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     map_session: isRecord(value.map_session) ? value.map_session as unknown as ChatTurnResponse['map_session'] : undefined,
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
     context_usage: parseContextUsage(value.context_usage),
-    follow_up_required: Boolean(value.follow_up_required),
-    fallback_mode: typeof value.fallback_mode === 'string' ? value.fallback_mode : undefined,
   };
 };
 

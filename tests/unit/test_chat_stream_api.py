@@ -7,7 +7,14 @@ from types import SimpleNamespace
 from fastapi import status
 
 from AEGIS.server.api import chat
+from AEGIS.server.domain.agent.decision import ExecutionPlan, PolicyDecision
 from AEGIS.server.domain.chat import ChatTurnRequest, ChatTurnResponse
+from AEGIS.server.domain.extraction.models import (
+    ConversationContextSnapshot,
+    NormalizedIntent,
+    TemporalSignal,
+    TurnParseResult,
+)
 
 
 def _collect_lines(stream) -> list[str]:  # noqa: ANN001
@@ -17,16 +24,36 @@ def _collect_lines(stream) -> list[str]:  # noqa: ANN001
     return asyncio.run(_collect())
 
 
+def _turn_contract() -> TurnParseResult:
+    return TurnParseResult(
+        user_text="hello",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="general_question",
+        normalized_intent=NormalizedIntent(
+            intent_id="general_question",
+            intent_label="General question",
+            requires_location=False,
+        ),
+        temporal_signal=TemporalSignal(),
+        parser_confidence=1.0,
+    )
+
+
+def _decision() -> PolicyDecision:
+    return PolicyDecision(
+        plan=ExecutionPlan(state="direct_response", intent_id="general_question")
+    )
+
+
 def test_chat_stream_success_ndjson_event_sequence() -> None:
     async def _run_turn(_: ChatTurnRequest) -> ChatTurnResponse:
         return ChatTurnResponse(
+            request_id="chat-test",
             session_id=1,
             assistant_message="hello world",
-            extracted_state={"ok": True},
-            map_session={"overlays": []},
+            turn_contract=_turn_contract(),
+            decision=_decision(),
             tool_payload={"execution": "map_search", "map_session": {"overlays": []}},
-            follow_up_required=False,
-            fallback_mode="none",
         )
 
     runtime = SimpleNamespace(agent_orchestrator=SimpleNamespace(run_turn=_run_turn))

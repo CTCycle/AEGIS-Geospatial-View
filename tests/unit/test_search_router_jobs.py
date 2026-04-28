@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from AEGIS.server.api.search import router
+from AEGIS.server.domain.agent.decision import ResolvedLocation
 from AEGIS.server.domain.geographics import LocationSearchRequest
 from AEGIS.server.domain.jobs import (
     JobCancelResponse,
@@ -10,6 +11,27 @@ from AEGIS.server.domain.jobs import (
     JobStatusResponse,
 )
 from AEGIS.server.services.search.composition import build_search_runtime
+
+
+def _location_search_request() -> LocationSearchRequest:
+    return LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Rome, Italy",
+            latitude=41.9,
+            longitude=12.5,
+            city="Rome",
+            country="Italy",
+        ),
+        intent_id="air_quality",
+        time_mode="current",
+        basemap_id="osm_default",
+        overlay_ids=["openaq_air_quality"],
+        viewport={
+            "center_latitude": 41.9,
+            "center_longitude": 12.5,
+            "radius_m": 2500.0,
+        },
+    )
 
 
 def test_jobs_router_wiring_and_response_models() -> None:
@@ -49,14 +71,7 @@ def test_search_job_start_status_cancel_shapes(monkeypatch) -> None:
     monkeypatch.setattr(runtime.job_manager, "cancel_job", lambda job_id: True)
 
     started = asyncio.run(
-        runtime.search_execution.start_search_job(
-            LocationSearchRequest(
-                datetime="2024-06-15T12:00:00",
-                use_coordinates=True,
-                latitude=41.9,
-                longitude=12.5,
-            )
-        )
+        runtime.search_execution.start_search_job(_location_search_request())
     )
     assert isinstance(started, JobStartResponse)
     assert started.job_id == "job-1"

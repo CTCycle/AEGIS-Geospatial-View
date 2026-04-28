@@ -12,19 +12,16 @@ def _turn(api_context: APIRequestContext, message: str, session_id: int | None =
     if response.status in {400, 502, 503}:
         pytest.skip(
             f"Provider unavailable for orchestration check ({response.status})."
-        )
+    )
     assert response.ok, f"Expected 200, got {response.status}"
-    body = response.json()
-    if body.get("fallback_mode") == "provider_unavailable":
-        pytest.skip("Provider unavailable for orchestration check (fallback mode).")
-    return body
+    return response.json()
 
 
 def test_ambiguous_temporal_request_produces_clarification(
     api_context: APIRequestContext,
 ) -> None:
     body = _turn(api_context, "Show me weather")
-    assert body.get("follow_up_required") is True
+    assert body.get("decision", {}).get("plan", {}).get("state") == "clarify"
     assert body.get("map_session") is None
 
 
@@ -32,7 +29,7 @@ def test_missing_location_produces_clarification_or_validation(
     api_context: APIRequestContext,
 ) -> None:
     body = _turn(api_context, "Show me air quality overlays")
-    if body.get("follow_up_required") is True:
+    if body.get("decision", {}).get("plan", {}).get("state") == "clarify":
         return
     assistant = str(body.get("assistant_message") or "").lower()
     assert "location" in assistant or "where" in assistant
@@ -61,7 +58,7 @@ def test_missing_key_request_clarifies_or_falls_back_consistently(
 ) -> None:
     body = _turn(api_context, "Use TomTom traffic in Rome")
     assistant = str(body.get("assistant_message") or "").lower()
-    if body.get("follow_up_required") is True:
+    if body.get("decision", {}).get("plan", {}).get("state") == "clarify":
         assert (
             "key" in assistant or "configure" in assistant or "alternative" in assistant
         )

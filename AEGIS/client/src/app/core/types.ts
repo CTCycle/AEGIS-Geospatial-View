@@ -227,8 +227,6 @@ export interface ChatTurnResponse {
   map_session?: MapSession | null;
   memory_snapshot?: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
-  follow_up_required?: boolean;
-  fallback_mode?: string | null;
 }
 
 export type ChatStreamEventType = 'status' | 'assistant_delta' | 'tool_status' | 'final' | 'error';

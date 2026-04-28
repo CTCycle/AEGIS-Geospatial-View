@@ -106,7 +106,8 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     turn_body = turn_response.json()
     assert "assistant_message" in turn_body
     assert "session_id" in turn_body
-    assert "extracted_state" in turn_body
+    assert "turn_contract" in turn_body
+    assert "decision" in turn_body
 
     prefixed_turn = _post(
         api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
@@ -174,11 +175,7 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(unsupported)
     assert unsupported.ok
     unsupported_body = unsupported.json()
-    if unsupported_body.get("fallback_mode") == "provider_unavailable":
-        assistant = str(unsupported_body.get("assistant_message") or "").lower()
-        assert "ollama" in assistant or "provider" in assistant
-        return
-    if unsupported_body.get("follow_up_required") is True:
+    if unsupported_body.get("decision", {}).get("plan", {}).get("state") == "clarify":
         return
     assistant = str(unsupported_body.get("assistant_message") or "").lower()
     assert "weather" in assistant or "forecast" in assistant
