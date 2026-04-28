@@ -39,8 +39,6 @@ def _turn_payload() -> dict[str, Any]:
     return {
         "session_id": 7001,
         "assistant_message": "Search executed successfully.",
-        "structured_intent": {"request_text": "show map at 41.9028, 12.4964"},
-        "extracted_state": {"location": {"city": "Rome", "country": "Italy"}},
         "map_session": {
             "center": {"latitude": 41.9028, "longitude": 12.4964},
             "bounds": [12.4963044, 41.902725, 12.4964044, 41.902825],
@@ -56,8 +54,6 @@ def _turn_payload() -> dict[str, Any]:
             "compliance_warnings": [],
         },
         "tool_payload": {"execution": "map_search", "selected_overlay_ids": []},
-        "follow_up_required": False,
-        "fallback_mode": "none",
     }
 
 

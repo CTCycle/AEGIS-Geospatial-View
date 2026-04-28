@@ -227,4 +227,4 @@ def test_vector_retriever_returns_empty_candidates_when_search_fails(
 
     matches = retriever.retrieve_candidates("air quality overlay")
 
-    assert matches == {"basemaps": [], "overlays": [], "providers": []}
+    assert matches == {"basemaps": [], "overlays": [], "providers": [], "tools": []}

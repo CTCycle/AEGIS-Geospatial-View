@@ -100,9 +100,3 @@ def get_database() -> AEGISDatabase:
     return AEGISDatabase()
 
 
-class _DatabaseProxy:
-    def __getattr__(self, name: str) -> Any:
-        return getattr(get_database(), name)
-
-
-database = _DatabaseProxy()

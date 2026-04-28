@@ -109,12 +109,12 @@ def test_bootstrap_if_missing_rebuilds_when_artifacts_missing(tmp_path) -> None:
     assert result["status"] == "ok"
     metadata_path = tmp_path / "vectors" / "manifest_index_metadata.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert metadata["index_schema_version"] == 3
+    assert metadata["index_schema_version"] == VectorIndexer.INDEX_SCHEMA_VERSION
     assert metadata["manifest_count"] == 2
     assert metadata["chunk_count"] == 2
     assert metadata["chunking_strategy"] == "one_manifest_per_chunk"
     assert metadata["document_id_strategy"] == "kind_prefixed_manifest_id"
-    assert "manifest_versions_summary" in metadata
+    assert "manifest_summary" in metadata
     assert metadata["last_update_timestamp"]
     assert metadata["embedding_model"] == "stub-embedding-model"
 

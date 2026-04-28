@@ -215,16 +215,22 @@ def test_location_search_orchestrator_uses_point_insight_for_direct_text_overlay
 
     session = asyncio.run(orchestrator.execute(payload))
 
-    assert session.overlays == [
-        {
-            "id": "openmeteo_weather_forecast",
-            "label": "Open-Meteo Weather Forecast",
-            "provider": "openmeteo",
-            "type": "point-insight",
-            "attribution": "© Open-Meteo",
-            "default_opacity": 0.72,
-        }
-    ]
+    assert {
+        "source_protocol": None,
+        "data_format": None,
+        "geometry_type": None,
+        **session.overlays[0],
+    } == {
+        "id": "openmeteo_weather_forecast",
+        "label": "Open-Meteo Weather Forecast",
+        "provider": "openmeteo",
+        "type": "point-insight",
+        "attribution": "© Open-Meteo",
+        "default_opacity": 0.72,
+        "source_protocol": "JSON time series",
+        "data_format": "JSON",
+        "geometry_type": "regional/time-series",
+    }
     assert session.compliance_warnings == []
 
 
