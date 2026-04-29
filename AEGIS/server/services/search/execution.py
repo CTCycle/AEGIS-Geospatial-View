@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import HTTPException, status
-
 from AEGIS.server.configurations import get_server_settings
 from AEGIS.server.domain.geographics import (
     GeospatialCatalogResponse,
@@ -14,6 +12,10 @@ from AEGIS.server.domain.jobs import JobCancelResponse, JobStartResponse, JobSta
 from AEGIS.server.services.geospatial.catalog import GeospatialCatalogService
 from AEGIS.server.services.geospatial.osm_tiles import OsmTileProxyService
 from AEGIS.server.services.jobs import JobManager
+from AEGIS.server.services.search.errors import (
+    MapSearchJobInitializationError,
+    MapSearchJobNotFoundError,
+)
 from AEGIS.server.services.search.orchestrator import LocationSearchOrchestrator
 from AEGIS.server.common.constants import (
     MAP_SEARCH_CANCELLATION_NOT_ALLOWED,
@@ -53,10 +55,7 @@ class MapSearchExecutionService:
         )
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=MAP_SEARCH_JOB_INIT_ERROR,
-            )
+            raise MapSearchJobInitializationError(MAP_SEARCH_JOB_INIT_ERROR)
         return JobStartResponse(
             job_id=job_id,
             job_type=job_status["job_type"],
@@ -68,19 +67,13 @@ class MapSearchExecutionService:
     async def get_search_job_status(self, job_id: str) -> JobStatusResponse:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
-            )
+            raise MapSearchJobNotFoundError(f"Job not found: {job_id}")
         return JobStatusResponse(**job_status)
 
     async def cancel_search_job(self, job_id: str) -> JobCancelResponse:
         job_status = self.job_manager.get_job_status(job_id)
         if job_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job not found: {job_id}",
-            )
+            raise MapSearchJobNotFoundError(f"Job not found: {job_id}")
         success = self.job_manager.cancel_job(job_id)
         return JobCancelResponse(
             job_id=job_id,

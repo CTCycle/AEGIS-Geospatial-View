@@ -26,7 +26,7 @@ jobs:
 
       - name: Run backend unit suites
         run: |
-          python -m pytest tests/unit/services/agent tests/unit/services/geospatial tests/unit/services/search tests/unit/services/vector tests/unit/test_runtime_env_loading.py
+          python -m pytest tests/unit/test_backend_python_compile.py tests/unit/services/agent tests/unit/services/geospatial tests/unit/services/search tests/unit/services/vector tests/unit/test_runtime_env_loading.py
 
   frontend-build-and-tests:
     runs-on: ubuntu-latest
@@ -77,3 +77,4 @@ jobs:
 
       - name: Validate tool binding completeness
         run: python -m pytest tests/unit/services/agent/test_tool_registry.py::test_tool_registry_has_binding_for_all_tool_manifests
+

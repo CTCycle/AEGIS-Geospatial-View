@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, status
+from typing import NoReturn
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 
 from AEGIS.server.domain.geographics import (
@@ -13,6 +15,11 @@ from AEGIS.server.domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
+from AEGIS.server.services.search.errors import (
+    MapSearchExecutionError,
+    MapSearchJobInitializationError,
+    MapSearchJobNotFoundError,
+)
 from AEGIS.server.services.search.execution import MapSearchExecutionService
 from AEGIS.server.common.constants import (
     MAPS_CATALOG_ROUTE,
@@ -24,6 +31,23 @@ from AEGIS.server.common.constants import (
 )
 
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
+
+
+def raise_map_search_http_error(error: MapSearchExecutionError) -> NoReturn:
+    if isinstance(error, MapSearchJobNotFoundError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+    if isinstance(error, MapSearchJobInitializationError):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(error),
+        ) from error
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=str(error),
+    ) from error
 
 
 def get_search_execution(request: Request) -> MapSearchExecutionService:
@@ -74,7 +98,10 @@ async def start_search_job(
     payload: LocationSearchRequest,
     search_execution: MapSearchExecutionService = Depends(get_search_execution),
 ) -> JobStartResponse:
-    return await search_execution.start_search_job(payload)
+    try:
+        return await search_execution.start_search_job(payload)
+    except MapSearchExecutionError as error:
+        raise_map_search_http_error(error)
 
 
 @router.get(MAPS_JOB_ROUTE, response_model=JobStatusResponse, status_code=status.HTTP_200_OK)
@@ -82,7 +109,10 @@ async def get_search_job_status(
     job_id: str,
     search_execution: MapSearchExecutionService = Depends(get_search_execution),
 ) -> JobStatusResponse:
-    return await search_execution.get_search_job_status(job_id)
+    try:
+        return await search_execution.get_search_job_status(job_id)
+    except MapSearchExecutionError as error:
+        raise_map_search_http_error(error)
 
 
 @router.delete(MAPS_JOB_ROUTE, response_model=JobCancelResponse, status_code=status.HTTP_200_OK)
@@ -90,4 +120,7 @@ async def cancel_search_job(
     job_id: str,
     search_execution: MapSearchExecutionService = Depends(get_search_execution),
 ) -> JobCancelResponse:
-    return await search_execution.cancel_search_job(job_id)
+    try:
+        return await search_execution.cancel_search_job(job_id)
+    except MapSearchExecutionError as error:
+        raise_map_search_http_error(error)
