@@ -120,7 +120,7 @@ class OverpassService:
             try:
                 lat_value = float(lat)
                 lon_value = float(lon)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             distance_m = self._haversine_distance_m(
                 latitude, longitude, lat_value, lon_value
@@ -233,3 +233,4 @@ class OverpassService:
         )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return radius * c
+

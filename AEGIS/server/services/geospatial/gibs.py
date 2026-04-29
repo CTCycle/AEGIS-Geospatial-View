@@ -153,7 +153,7 @@ class GIBSService(GIBSRuntimeMixin):
         for value in entries:
             try:
                 parsed = float(value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             if parsed > 0:
                 resolutions.append(parsed)
@@ -197,8 +197,8 @@ class GIBSService(GIBSRuntimeMixin):
         radius_m: float | None,
         date: str,
         layer: str,
-        width: int = get_server_settings().gibs.image_width,
-        height: int = get_server_settings().gibs.image_height,
+        width: int | None = None,
+        height: int | None = None,
         crs: str = "EPSG:3857",
         format: str = "image/png",
         style: str | None = None,
@@ -219,7 +219,10 @@ class GIBSService(GIBSRuntimeMixin):
             radius_m=effective_radius,
             target_crs=request_crs,
         )
-        self.validate_dimensions(width, height)
+        settings = get_server_settings().gibs
+        resolved_width = width if width is not None else settings.image_width
+        resolved_height = height if height is not None else settings.image_height
+        self.validate_dimensions(resolved_width, resolved_height)
         format_lower = format.lower()
         capabilities, _ = self.resolve_capabilities_for_layer(
             requested_crs=request_crs,
@@ -238,10 +241,14 @@ class GIBSService(GIBSRuntimeMixin):
         # the bbox to meet minimum resolution requirements for standalone usage.
         if not skip_bbox_expansion:
             bbox_for_request = self.ensure_bbox_resolution(
-                layer, bbox_for_request, actual_crs, width, height
+                layer,
+                bbox_for_request,
+                actual_crs,
+                resolved_width,
+                resolved_height,
             )
         meters_per_pixel = self.compute_meters_per_pixel(
-            bbox_for_request, actual_crs, width, height
+            bbox_for_request, actual_crs, resolved_width, resolved_height
         )
         self.validate_format(format_lower, layer_meta, capabilities)
         imagery_date_value = self.parse_imagery_date(date)
@@ -260,8 +267,8 @@ class GIBSService(GIBSRuntimeMixin):
                 imagery_date=imagery_date_token,
                 bbox=bbox_for_request,
                 crs=actual_crs,
-                width=width,
-                height=height,
+                width=resolved_width,
+                height=resolved_height,
                 format_value=format_lower,
                 style_value=style_value,
             )
@@ -272,8 +279,8 @@ class GIBSService(GIBSRuntimeMixin):
                 base_url=self.resolve_base_url(actual_crs),
                 bbox=bbox_for_request,
                 crs=actual_crs,
-                width=width,
-                height=height,
+                width=resolved_width,
+                height=resolved_height,
                 layer=layer,
                 imagery_date=imagery_date_token,
                 format_value=format_lower,
@@ -294,8 +301,8 @@ class GIBSService(GIBSRuntimeMixin):
                 "crs": actual_crs,
                 "date": imagery_date_token,
                 "layer": layer,
-                "width": width,
-                "height": height,
+                "width": resolved_width,
+                "height": resolved_height,
                 "wms_url": final_url,
                 "attribution": self.nasa_attribution,
                 "meters_per_pixel": meters_per_pixel,
@@ -307,3 +314,5 @@ class GIBSService(GIBSRuntimeMixin):
         raise GIBSRequestError("GIBS GetMap failed without a usable fallback date.")
 
     # -------------------------------------------------------------------------
+
+

@@ -70,7 +70,7 @@ class PVGISService:
             for entry in fixed:
                 try:
                     yearly_kwh += float(entry.get("E_m", 0.0) or 0.0)
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     continue
         return {
             "provider": "pvgis",
@@ -80,3 +80,4 @@ class PVGISService:
             "raw": outputs,
             "attribution": "PVGIS (European Commission JRC)",
         }
+

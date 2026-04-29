@@ -56,7 +56,10 @@ class GIBSRuntimeMixin:
                 raise GIBSValidationError(
                     "BBox must include four values [minx, miny, maxx, maxy]."
                 )
-            normalized = [float(value) for value in bbox]
+            try:
+                normalized = [float(value) for value in bbox]
+            except (TypeError, ValueError) as exc:
+                raise GIBSValidationError("BBox values must be numeric.") from exc
             self.validate_bbox_values(normalized, target_crs)
             return normalized
         if lon is None or lat is None:
@@ -554,7 +557,7 @@ class GIBSRuntimeMixin:
             return None
         try:
             return int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     # -------------------------------------------------------------------------
@@ -728,3 +731,4 @@ class GIBSRuntimeMixin:
             raise GIBSValidationError(
                 f"Height must be between {GIBS_MIN_IMAGE_DIMENSION} and {GIBS_MAX_IMAGE_DIMENSION} pixels."
             )
+

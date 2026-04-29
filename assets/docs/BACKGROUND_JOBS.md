@@ -39,7 +39,8 @@ Routes are mounted under `/api`.
 ## 4. Execution Model
 
 - Each job runs in a dedicated daemon `threading.Thread`.
-- Worker function for map jobs: `run_map_search_job(...)`.
+- Worker function for map jobs: `AEGIS/server/services/search/execution.py::run_search_job(...)`.
+- Missing-job and job-initialization failures are raised as service-layer exceptions in `AEGIS/server/services/search/errors.py` and translated to HTTP errors in `AEGIS/server/api/search.py`.
 - The runner updates progress and merges final result payloads.
 - Failures are captured and surfaced through status polling.
 
@@ -56,3 +57,4 @@ Cancellation is cooperative:
 - Job state is not persisted across server restarts.
 - Suitable for local and moderate concurrency scenarios.
 - For distributed/high-volume workloads, migrate to external queue + worker infrastructure.
+

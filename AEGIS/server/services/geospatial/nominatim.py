@@ -24,13 +24,13 @@ from AEGIS.server.common.logger import logger
 
 ###############################################################################
 class NominatimService:
-    base_url = get_server_settings().nominatim.base_url
-
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
-        self.user_agent = user_agent or get_server_settings().nominatim.user_agent
-        default_timeout = get_server_settings().nominatim.timeout
+        settings = get_server_settings().nominatim
+        self.base_url = settings.base_url
+        self.user_agent = user_agent or settings.user_agent
+        default_timeout = settings.timeout
         self.timeout = timeout if timeout is not None else default_timeout
         self._request_lock = threading.Lock()
         self._last_request_started_at = 0.0
@@ -102,7 +102,7 @@ class NominatimService:
             north = float(bounding_box[1])
             west = float(bounding_box[2])
             east = float(bounding_box[3])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
         return [west, south, east, north]
 
@@ -221,7 +221,7 @@ class NominatimService:
         try:
             latitude = float(data["lat"])
             longitude = float(data["lon"])
-        except KeyError, TypeError, ValueError:
+        except (KeyError, TypeError, ValueError):
             return None
         result: dict[str, Any] = {
             "lat": latitude,
@@ -240,7 +240,7 @@ class NominatimService:
                 east = float(bounding_box[3])
                 result["bbox"] = [west, south, east, north]
                 result["bbox_source"] = "nominatim"
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 pass
         confidence = self.compute_confidence(
             data=data,
@@ -378,7 +378,7 @@ class NominatimService:
     def derive_importance_score(self, importance: Any) -> float:
         try:
             value = float(importance)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0.55
         if value <= 0.0:
             return 0.05
@@ -490,7 +490,7 @@ class NominatimService:
             north = float(bounding_box[1])
             west = float(bounding_box[2])
             east = float(bounding_box[3])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return 0.5
         lat_span = abs(north - south)
         lon_span = abs(east - west)
@@ -773,3 +773,4 @@ class NominatimService:
             base = normalized[: -len(NOMINATIM_SEARCH_PATH)]
             return f"{base}{NOMINATIM_REVERSE_PATH}"
         return f"{normalized}{NOMINATIM_REVERSE_PATH}"
+

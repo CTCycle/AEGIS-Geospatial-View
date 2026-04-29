@@ -284,7 +284,8 @@ class MapService:
             try:
                 lat = float(coordinate[0])
                 lon = float(coordinate[1])
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return None
             normalized.append([lat, lon])
         return normalized
+

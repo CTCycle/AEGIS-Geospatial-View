@@ -144,6 +144,7 @@ services/
   geospatial/runtime_registry.py
   llm/base.py
   llm/cloud_catalog.py
+  llm/context_budget.py
   llm/context_builder.py
   llm/errors.py
   llm/factory.py
@@ -156,6 +157,7 @@ services/
   llm/structured.py
   llm/types.py
   search/composition.py
+  search/errors.py
   search/execution.py
   search/orchestrator.py
   search/request_builder.py
@@ -300,6 +302,11 @@ All routers are mounted with prefix `/api` in `AEGIS/server/app.py`.
 Representative path:
 - endpoint (`chat.py` / `search.py`) -> service composition (`services/*/composition.py`) -> orchestration/execution (`services/agent`, `services/search`, `services/geospatial`) -> repository/database operations (`repositories/*`)
 
+Layering constraints:
+- API routes translate service exceptions into HTTP responses.
+- Services do not import FastAPI.
+- Repositories remain the persistence boundary.
+
 ### Chat orchestration pipeline
 
 1. `AgentOrchestrator` receives chat turn.
@@ -385,3 +392,4 @@ External providers are used through service modules and manifests:
 - PVGIS
 - Rainviewer
 - LLM providers: Ollama, OpenAI-compatible, Google-compatible
+

@@ -114,7 +114,7 @@ class MapSearchToolkit:
             try:
                 for value in candidate:
                     parsed.append(float(value))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return None
             return parsed
         return None
@@ -690,3 +690,4 @@ class MapRenderingService:
     def _bbox_to_bounds(self, bbox: list[float]) -> list[list[float]]:
         minx, miny, maxx, maxy = bbox
         return [[miny, minx], [maxy, maxx]]
+

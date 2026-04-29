@@ -124,7 +124,7 @@ class ChromaVectorStore:
 def _distance_to_score(distance: Any) -> float:
     try:
         value = float(distance)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0.0
     return max(0.0, 1.0 - value)
 
@@ -155,3 +155,4 @@ def _sanitize_metadata_value(value: Any) -> str | int | float | bool:
         except (TypeError, ValueError):
             return str(value)
     return str(value)
+
