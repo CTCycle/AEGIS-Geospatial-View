@@ -4,6 +4,7 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from server.repositories.chat_history import ChatHistoryRepository
 from server.services.agent.location_memory import LocationMemoryService
@@ -165,8 +166,6 @@ class AgentOrchestrator:
 
     @staticmethod
     def _build_direct_reject_decision(intent_id: str):
-        from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
-
         return PolicyDecision(
             plan=ExecutionPlan(state="direct_response", intent_id=intent_id),
             trace=DecisionTrace(steps=["general_question.direct_response"]),

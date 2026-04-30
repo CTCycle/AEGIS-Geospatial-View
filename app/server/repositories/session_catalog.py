@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import Any
 
+from sqlalchemy import func, select
+
+from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.queries.session_catalog import select_by_session_id
 from server.repositories.schemas import Base
@@ -11,7 +13,6 @@ from server.repositories.schemas.models import (
     ChatMessageRecord,
     SessionCatalogRecord,
 )
-from sqlalchemy import func, select
 
 
 class SessionCatalogRepository:
@@ -33,7 +34,7 @@ class SessionCatalogRepository:
                     session_id=session_id,
                     user_id=None,
                     models_json=json.dumps(models),
-                    start_time=datetime.utcnow(),
+                    start_time=utc_now_naive(),
                     duration_seconds=0.0,
                     num_messages=int(message_count or 0),
                 )
@@ -43,6 +44,6 @@ class SessionCatalogRepository:
                 record.num_messages = int(message_count or record.num_messages)
                 record.duration_seconds = max(
                     0.0,
-                    (datetime.utcnow() - record.start_time).total_seconds(),
+                    (utc_now_naive() - record.start_time).total_seconds(),
                 )
             session.commit()

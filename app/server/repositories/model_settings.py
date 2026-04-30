@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import select
 
+from server.common.time import utc_now_naive
+from server.common.constants import OLLAMA_DEFAULT_HOST
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelProviderSettingsRecord
-from server.common.constants import OLLAMA_DEFAULT_HOST
 
 
 class ModelSettingsRepository:
@@ -71,7 +70,7 @@ class ModelSettingsRepository:
             record.ollama_url = ollama_url
             record.openai_base_url = openai_base_url
             record.google_base_url = google_base_url
-            record.updated_at = datetime.utcnow()
+            record.updated_at = utc_now_naive()
             session.commit()
             session.refresh(record)
             return record

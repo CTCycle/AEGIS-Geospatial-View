@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import select
 
+from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelCredentialRecord
 
@@ -40,7 +39,7 @@ class CredentialRepository:
                 record.encrypted_value = encrypted_value
                 record.key_version = key_version
                 record.is_active = True
-                record.updated_at = datetime.utcnow()
+                record.updated_at = utc_now_naive()
             session.commit()
             session.refresh(record)
             return record
@@ -67,7 +66,7 @@ class CredentialRepository:
             if record is None:
                 return
             record.is_active = False
-            record.updated_at = datetime.utcnow()
+            record.updated_at = utc_now_naive()
             session.commit()
 
     def get_active(self, *, provider: str, label: str) -> ModelCredentialRecord | None:
@@ -91,6 +90,7 @@ class CredentialRepository:
             record = session.execute(statement).scalars().first()
             if record is None:
                 return
-            record.last_used_at = datetime.utcnow()
-            record.updated_at = datetime.utcnow()
+            now = utc_now_naive()
+            record.last_used_at = now
+            record.updated_at = now
             session.commit()

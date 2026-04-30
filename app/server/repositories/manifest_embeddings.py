@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
-
+from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.queries.manifest_embeddings import select_by_manifest
 from server.repositories.schemas import Base
@@ -52,7 +51,7 @@ class ManifestEmbeddingsRepository:
                     embedding_model=embedding_model,
                     vector_collection=vector_collection,
                     vector_document_id=vector_document_id,
-                    last_embedded_at=datetime.utcnow(),
+                    last_embedded_at=utc_now_naive(),
                 )
                 session.add(record)
             else:
@@ -62,5 +61,5 @@ class ManifestEmbeddingsRepository:
                 record.embedding_model = embedding_model
                 record.vector_collection = vector_collection
                 record.vector_document_id = vector_document_id
-                record.last_embedded_at = datetime.utcnow()
+                record.last_embedded_at = utc_now_naive()
             session.commit()
