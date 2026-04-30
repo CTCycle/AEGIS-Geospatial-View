@@ -1,19 +1,19 @@
 # Project-specific generated/runtime artifacts
 runtimes/**
-AEGIS/resources/logs/**
-AEGIS/resources/vectors/**
-AEGIS/client/node_modules/
-AEGIS/client/dist/
-AEGIS/client/dist-ssr/
-AEGIS/client/logs/
-AEGIS/client/.angular/
-AEGIS/client/src-tauri/r/
-AEGIS/client/src-tauri/target/
+app/resources/logs/**
+app/resources/vectors/**
+app/client/node_modules/
+app/client/dist/
+app/client/dist-ssr/
+app/client/logs/
+app/client/.angular/
+app/client/src-tauri/r/
+app/client/src-tauri/target/
 release/windows/
 
 
 # Environment files (keep templates)
-AEGIS/client/*.local
+app/client/*.local
 
 # Python
 __pycache__/
