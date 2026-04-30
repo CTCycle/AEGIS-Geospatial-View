@@ -1,13 +1,13 @@
 # Architecture
 
-Last updated: 2026-04-27
-Scope: `AEGIS/`, `tests/`, `release/`
+Last updated: 2026-04-30
+Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
 
 AEGIS Geospatial View is a two-tier application:
-- Frontend: Angular 19 standalone SPA in `AEGIS/client/src`
-- Backend: FastAPI application in `AEGIS/server`
+- Frontend: Angular 19 standalone SPA in `app/client/src`
+- Backend: FastAPI application in `app/server`
 
 The backend provides chat orchestration and geospatial search APIs. The frontend consumes `/api` endpoints and renders chat + map workflows.
 
@@ -19,7 +19,7 @@ This structure documents source and operational files (generated caches like `no
 
 ```text
 AEGIS Geospatial View/
-  AEGIS/
+  app/
     client/
       src/
       src-tauri/
@@ -37,25 +37,24 @@ AEGIS Geospatial View/
       repositories/
       services/
       app.py
-    settings/
-      .env
-      .env.local.example
-      .env.local.tauri.example
-      configurations.json
-    start_on_windows.bat
-    setup_and_maintenance.bat
-  tests/
-    e2e/
-    unit/
-    run_tests.bat
+    shared/
+    tests/
+      e2e/
+      unit/
+      run_tests.bat
+  settings/
+    .env
+    .env.local.example
+    .env.local.tauri.example
+    configurations.json
+  start_on_windows.bat
+  setup_and_maintenance.bat
   release/
     tauri/
-    windows/
-  pyproject.toml
   README.md
 ```
 
-### Backend files (`AEGIS/server`)
+### Backend files (`app/server`)
 
 ```text
 api/
@@ -64,6 +63,7 @@ api/
 common/
   constants.py
   logger.py
+  time.py
   types.py
 configurations/
   environment.py
@@ -170,7 +170,7 @@ services/
 app.py
 ```
 
-### Frontend files (`AEGIS/client/src`)
+### Frontend files (`app/client/src`)
 
 ```text
 main.ts
@@ -198,7 +198,7 @@ app/
     settings-page.component.*
 ```
 
-### Manifest files (`AEGIS/resources/manifests`)
+### Manifest files (`app/resources/manifests`)
 
 - `index.json`
 - `runtime_profiles.json`
@@ -209,36 +209,36 @@ app/
 
 ### Tests
 
-- E2E: `tests/e2e/*.py`
-- Unit: `tests/unit/**/*.py`
-- Runner: `tests/run_tests.bat`
+- E2E: `app/tests/e2e/*.py`
+- Unit: `app/tests/unit/**/*.py`
+- Runner: `app/tests/run_tests.bat`
 
 ## Entry Points
 
 ### Backend
 
-- Import/runtime entry: `AEGIS/server/app.py`
+- Import/runtime entry: `app/server/app.py`
 - ASGI app object: `app = create_app()`
 - Standard startup invocation:
-  - PowerShell: `uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002`
-  - CMD: `uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002`
+  - PowerShell: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002`
+  - CMD: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002`
 
 ### Frontend web app
 
-- Browser bootstrap: `AEGIS/client/src/main.ts`
-- Root component: `AEGIS/client/src/app/app.component.ts`
-- Routes: `AEGIS/client/src/app/app.routes.ts`
+- Browser bootstrap: `app/client/src/main.ts`
+- Root component: `app/client/src/app/app.component.ts`
+- Routes: `app/client/src/app/app.routes.ts`
 
 ### Desktop packaging
 
-- Tauri config: `AEGIS/client/src-tauri/tauri.conf.json`
+- Tauri config: `app/client/src-tauri/tauri.conf.json`
 - Packaging script: `release/tauri/build_with_tauri.bat`
 
 ## API Endpoints
 
-All routers are mounted with prefix `/api` in `AEGIS/server/app.py`.
+All routers are mounted with prefix `/api` in `app/server/app.py`.
 
-### Search endpoints (`AEGIS/server/api/search.py`)
+### Search endpoints (`app/server/api/search.py`)
 
 - `GET /api/maps/catalog`  
   Returns `GeospatialCatalogResponse`.
@@ -258,7 +258,7 @@ All routers are mounted with prefix `/api` in `AEGIS/server/app.py`.
 - `DELETE /api/maps/jobs/{job_id}`  
   Requests async job cancellation (`JobCancelResponse`).
 
-### Chat/settings/model endpoints (`AEGIS/server/api/chat.py`)
+### Chat/settings/model endpoints (`app/server/api/chat.py`)
 
 - `POST /api/chat/turn`  
   Executes chat turn and returns structured turn response.
@@ -294,10 +294,10 @@ All routers are mounted with prefix `/api` in `AEGIS/server/app.py`.
 
 ### Backend request flow
 
-- API layer: `AEGIS/server/api/*.py`
-- Service/orchestration layer: `AEGIS/server/services/**`
-- Persistence layer: `AEGIS/server/repositories/**`
-- Contracts/domain models: `AEGIS/server/domain/**`
+- API layer: `app/server/api/*.py`
+- Service/orchestration layer: `app/server/services/**`
+- Persistence layer: `app/server/repositories/**`
+- Contracts/domain models: `app/server/domain/**`
 
 Representative path:
 - endpoint (`chat.py` / `search.py`) -> service composition (`services/*/composition.py`) -> orchestration/execution (`services/agent`, `services/search`, `services/geospatial`) -> repository/database operations (`repositories/*`)
@@ -328,11 +328,11 @@ Layering constraints:
 
 ### Relational storage
 
-- Runtime selector: `AEGIS/server/repositories/database/backend.py`
+- Runtime selector: `app/server/repositories/database/backend.py`
 - Modes:
   - SQLite (`database.embedded_database: true`) via `sqlite.py`
   - PostgreSQL (`embedded_database: false`) via `postgres.py`
-- Settings source: `AEGIS/settings/configurations.json`
+- Settings source: `settings/configurations.json`
 
 Core tables (defined in constants/schema layer) include:
 - chat sessions/messages
@@ -342,7 +342,7 @@ Core tables (defined in constants/schema layer) include:
 
 ### Vector persistence
 
-- Vector services in `AEGIS/server/services/vector/*`
+- Vector services in `app/server/services/vector/*`
 - Index lifecycle managed by `VectorIndexer` and maintenance endpoints.
 
 ### Frontend persistence
@@ -350,7 +350,7 @@ Core tables (defined in constants/schema layer) include:
 - `sessionStorage` state snapshot key: `aegis:webapp-state:v3`
 - TTL: 6 hours
 - Tab ownership guard via heartbeat keys in `localStorage`
-- Implementation: `AEGIS/client/src/app/core/app-state.ts`
+- Implementation: `app/client/src/app/core/app-state.ts`
 
 ## Async vs Sync Behavior
 

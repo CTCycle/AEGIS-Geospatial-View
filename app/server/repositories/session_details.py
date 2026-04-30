@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import Any
 
+from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.schemas import Base
 from server.repositories.schemas.models import SessionDetailsRecord
@@ -33,7 +33,7 @@ class SessionDetailsRepository:
                 user_message=user_message,
                 chat_response=chat_response,
                 extracted_info_json=json.dumps(extracted_info),
-                timestamp=datetime.utcnow(),
+                timestamp=utc_now_naive(),
                 response_time=response_time,
                 has_triggered_search=has_triggered_search,
             )
