@@ -1,270 +1,227 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal EnableDelayedExpansion
 
-REM ============================================================================
-REM == AEGIS E2E Test Runner
-REM == Automatically starts the application, runs tests, and cleans up.
-REM ============================================================================
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..\..") do set "PROJECT_ROOT=%%~fI"
+set "APP_DIR=%PROJECT_ROOT%\app"
+set "SERVER_DIR=%APP_DIR%\server"
+set "CLIENT_DIR=%APP_DIR%\client"
+set "TESTS_DIR=%APP_DIR%\tests"
+set "SETTINGS_ENV=%PROJECT_ROOT%\settings\.env"
+set "VENV_PYTHON=%SERVER_DIR%\.venv\Scripts\python.exe"
+set "RUNTIME_NPM=%PROJECT_ROOT%\runtimes\nodejs\npm.cmd"
 
-set "tests_folder=%~dp0"
-set "project_folder=%tests_folder%..\"
-set "root_folder=%tests_folder%..\..\"
-set "runtimes_dir=%root_folder%runtimes"
-set "settings_dir=%root_folder%settings"
-set "artifacts_dir=%tests_folder%artifacts"
-set "artifacts_logs_dir=%artifacts_dir%\logs"
-
-set "python_dir=%runtimes_dir%\python"
-set "python_exe=%python_dir%\python.exe"
-set "uv_dir=%runtimes_dir%\uv"
-set "uv_exe=%uv_dir%\uv.exe"
-set "nodejs_dir=%runtimes_dir%\nodejs"
-set "node_exe=%nodejs_dir%\node.exe"
-set "npm_cmd=%nodejs_dir%\npm.cmd"
-
-set "DOTENV=%settings_dir%\.env"
-set "FRONTEND_DIR=%project_folder%client"
-set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
-set "UVICORN_MODULE=server.app:app"
-set "BACKEND_LOG=%artifacts_logs_dir%\backend.log"
-set "FRONTEND_LOG=%artifacts_logs_dir%\frontend.log"
-
-title AEGIS Test Runner
-echo.
-echo ============================================================================
-echo    AEGIS E2E Test Runner
-echo ============================================================================
-echo.
-
-REM ============================================================================
-REM == Check prerequisites
-REM ============================================================================
-if not exist "%python_exe%" (
-    echo [ERROR] Python not found. Please run start_on_windows.bat first.
-    goto error
-)
-if not exist "%uv_exe%" (
-    echo [ERROR] uv not found. Please run start_on_windows.bat first.
-    goto error
-)
-if not exist "%node_exe%" (
-    echo [ERROR] Node.js not found. Please run start_on_windows.bat first.
-    goto error
-)
-
-echo [OK] All prerequisites found.
-
-if not exist "%artifacts_dir%" mkdir "%artifacts_dir%"
-if not exist "%artifacts_logs_dir%" mkdir "%artifacts_logs_dir%"
-break > "%BACKEND_LOG%"
-break > "%FRONTEND_LOG%"
-
-REM ============================================================================
-REM == Load environment variables
-REM ============================================================================
 set "FASTAPI_HOST=127.0.0.1"
 set "FASTAPI_PORT=8000"
 set "UI_HOST=127.0.0.1"
 set "UI_PORT=7861"
+set "TEST_RESULT=0"
+set "BACKEND_PHASE=SKIPPED"
+set "FRONTEND_BOOTSTRAP_PHASE=SKIPPED"
+set "FRONTEND_UNIT_PHASE=SKIPPED"
+set "FRONTEND_E2E_PHASE=SKIPPED"
+set "PYTEST_PHASE=SKIPPED"
+set "LIVE_SERVER_PHASE=SKIPPED"
+set "STARTED_BACKEND=0"
+set "STARTED_FRONTEND=0"
 
-if exist "%DOTENV%" (
-    for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
-        set "line=%%L"
-        if not "!line!"=="" if "!line:~0,1!" NEQ "#" if "!line:~0,1!" NEQ ";" (
-            for /f "tokens=1,* delims==" %%K in ("!line!") do (
-                set "k=%%K"
-                set "v=%%L"
-                if defined v (
-                    for /f "tokens=* delims= " %%Q in ("!v!") do set "v=%%Q"
-                    set "v=!v:"=!"
-                    if "!v:~0,1!"=="'" set "v=!v:~1,-1!"
-                )
-                set "!k!=!v!"
-            )
-        )
+if exist "%SETTINGS_ENV%" (
+  for /f "usebackq tokens=* delims=" %%L in ("%SETTINGS_ENV%") do (
+    set "line=%%L"
+    if not "!line!"=="" if "!line:~0,1!" NEQ "#" if "!line:~0,1!" NEQ ";" (
+      for /f "tokens=1,* delims==" %%A in ("!line!") do (
+        if /i "%%A"=="FASTAPI_HOST" set "FASTAPI_HOST=%%B"
+        if /i "%%A"=="FASTAPI_PORT" set "FASTAPI_PORT=%%B"
+        if /i "%%A"=="UI_HOST" set "UI_HOST=%%B"
+        if /i "%%A"=="UI_PORT" set "UI_PORT=%%B"
+      )
     )
+  )
 )
 
-set "FASTAPI_TEST_HOST=%FASTAPI_HOST%"
-if /i "%FASTAPI_TEST_HOST%"=="0.0.0.0" set "FASTAPI_TEST_HOST=127.0.0.1"
-set "UI_TEST_HOST=%UI_HOST%"
-if /i "%UI_TEST_HOST%"=="0.0.0.0" set "UI_TEST_HOST=127.0.0.1"
+set "TEST_FASTAPI_HOST=%FASTAPI_HOST%"
+set "TEST_UI_HOST=%UI_HOST%"
+if /i "%TEST_FASTAPI_HOST%"=="0.0.0.0" set "TEST_FASTAPI_HOST=127.0.0.1"
+if /i "%TEST_FASTAPI_HOST%"=="::" set "TEST_FASTAPI_HOST=127.0.0.1"
+if /i "%TEST_FASTAPI_HOST%"=="[::]" set "TEST_FASTAPI_HOST=127.0.0.1"
+if /i "%TEST_UI_HOST%"=="0.0.0.0" set "TEST_UI_HOST=127.0.0.1"
+if /i "%TEST_UI_HOST%"=="::" set "TEST_UI_HOST=127.0.0.1"
+if /i "%TEST_UI_HOST%"=="[::]" set "TEST_UI_HOST=127.0.0.1"
 
-if not defined APP_TEST_BACKEND_URL set "APP_TEST_BACKEND_URL=http://%FASTAPI_TEST_HOST%:%FASTAPI_PORT%"
-if not defined APP_TEST_FRONTEND_URL set "APP_TEST_FRONTEND_URL=http://%UI_TEST_HOST%:%UI_PORT%"
+set "APP_TEST_BACKEND_URL=http://%TEST_FASTAPI_HOST%:%FASTAPI_PORT%"
+set "APP_TEST_FRONTEND_URL=http://%TEST_UI_HOST%:%UI_PORT%"
 set "API_BASE_URL=%APP_TEST_BACKEND_URL%"
 set "UI_BASE_URL=%APP_TEST_FRONTEND_URL%"
+set "PYTHONPATH=%APP_DIR%"
 
-echo [INFO] APP_TEST_BACKEND_URL=%APP_TEST_BACKEND_URL%
-echo [INFO] APP_TEST_FRONTEND_URL=%APP_TEST_FRONTEND_URL%
+if "%STANDARD_TEST_SKIP_LIVE_SERVERS%"=="" set "STANDARD_TEST_SKIP_LIVE_SERVERS=false"
+if "%STANDARD_TEST_SKIP_FRONTEND%"=="" set "STANDARD_TEST_SKIP_FRONTEND=false"
 
-REM ============================================================================
-REM == Force portable runtimes (avoid global Python/npm)
-REM ============================================================================
-set "PATH=%python_dir%;%nodejs_dir%;%PATH%"
-set "PYTHONHOME=%python_dir%"
-set "PYTHONPATH=%root_folder%app"
-set "PYTHONNOUSERSITE=1"
-set "VIRTUAL_ENV="
-set "__PYVENV_LAUNCHER__="
-set "PYTHON=%python_exe%"
-set "npm_config_python=%python_exe%"
-
-REM ============================================================================
-REM == Configure pytest / Playwright options
-REM ============================================================================
-if not defined E2E_HEADLESS set "E2E_HEADLESS=true"
-if not defined E2E_BROWSER set "E2E_BROWSER=chromium"
-if not defined E2E_SLOWMO set "E2E_SLOWMO=0"
-if not defined E2E_PWDEBUG set "E2E_PWDEBUG=0"
-
-set "PYTEST_UNIT_ARGS=../tests/unit -v --tb=short"
-set "PYTEST_E2E_ARGS=../tests/e2e -v --tb=short"
-if defined E2E_BROWSER set "PYTEST_E2E_ARGS=!PYTEST_E2E_ARGS! --browser !E2E_BROWSER!"
-if /i "!E2E_HEADLESS!"=="false" set "PYTEST_E2E_ARGS=!PYTEST_E2E_ARGS! --headed"
-if /i "!E2E_HEADLESS!"=="0" set "PYTEST_E2E_ARGS=!PYTEST_E2E_ARGS! --headed"
-if not "!E2E_SLOWMO!"=="0" set "PYTEST_E2E_ARGS=!PYTEST_E2E_ARGS! --slowmo !E2E_SLOWMO!"
-if /i "!E2E_PWDEBUG!"=="1" set "PWDEBUG=1" & set "PYTEST_E2E_ARGS=!PYTEST_E2E_ARGS! --headed"
-if /i "!E2E_PWDEBUG!"=="true" set "PWDEBUG=1" & set "PYTEST_E2E_ARGS=!PYTEST_E2E_ARGS! --headed"
-
-REM ============================================================================
-REM == Install Playwright browsers if needed
-REM ============================================================================
-echo [STEP 1/4] Checking Playwright browsers...
-"%uv_exe%" run --project "%project_folder%server" --python "%python_exe%" python -m playwright install chromium >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo [INFO] Installing Playwright browsers...
-    "%uv_exe%" run --project "%project_folder%server" --extra test --python "%python_exe%" python -m playwright install
+if exist "%VENV_PYTHON%" (
+  set "PYTHON_CMD=%VENV_PYTHON%"
+) else (
+  echo [ERROR] Missing backend venv: "%VENV_PYTHON%"
+  echo [ERROR] Run start_on_windows.bat first.
+  exit /b 1
 )
-echo [OK] Playwright browsers ready.
 
-REM ============================================================================
-REM == Start backend
-REM ============================================================================
-echo [STEP 2/4] Starting backend server...
-call :kill_port %FASTAPI_PORT%
-pushd "%project_folder%server" >nul
-start "" /b "%uv_exe%" run --project "%project_folder%server" --python "%python_exe%" python -m uvicorn %UVICORN_MODULE% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
-popd >nul
-
-REM Wait for backend to be ready
-echo [INFO] Waiting for backend to start...
-for /L %%i in (1,1,120) do (
-  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $response = Invoke-WebRequest -Uri '%APP_TEST_BACKEND_URL%/docs' -UseBasicParsing -TimeoutSec 2; if ($response.StatusCode -ge 200) { exit 0 } ; exit 1 } catch { exit 1 }" >nul 2>&1
-  if !errorlevel! equ 0 goto :backend_ready_check
-  timeout /t 1 /nobreak >nul
+if exist "%RUNTIME_NPM%" (
+  set "NPM_CMD=%RUNTIME_NPM%"
+) else (
+  where npm >nul 2>&1
+  if errorlevel 1 (
+    echo [ERROR] npm runtime not found.
+    exit /b 1
+  )
+  set "NPM_CMD=npm"
 )
-echo [WARN] Timed out waiting for backend.
-:backend_ready_check
 
-REM ============================================================================
-REM == Start frontend
-REM ============================================================================
-echo [STEP 3/4] Starting frontend server...
+echo.
+echo ============================================================
+echo  Standard Test Runner
+echo ============================================================
+echo [INFO] Project root: %PROJECT_ROOT%
+echo [INFO] Backend URL : %APP_TEST_BACKEND_URL%
+echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
+echo.
 
-if not exist "%FRONTEND_DIR%\node_modules" (
-    echo [INFO] Installing frontend dependencies...
-    pushd "%FRONTEND_DIR%" >nul
-    if exist "%FRONTEND_DIR%\package-lock.json" (
-        echo [INFO] Detected package-lock.json. Using npm ci...
-        call "%npm_cmd%" ci
-        set "npm_ec=!ERRORLEVEL!"
-        if not "!npm_ec!"=="0" (
-            echo [WARN] npm ci failed with code !npm_ec!. Falling back to npm install.
-            call "%npm_cmd%" install
-            set "npm_ec=!ERRORLEVEL!"
+set "PYTEST_TARGET=%TESTS_DIR%"
+if not "%STANDARD_TEST_PYTEST_TARGET%"=="" set "PYTEST_TARGET=%STANDARD_TEST_PYTEST_TARGET%"
+set "HAS_E2E=0"
+if exist "%TESTS_DIR%\e2e" set "HAS_E2E=1"
+
+if /i "%STANDARD_TEST_SKIP_LIVE_SERVERS%"=="false" if "%HAS_E2E%"=="1" (
+  set "LIVE_SERVER_PHASE=PASS"
+
+  curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+  if errorlevel 1 (
+    echo [INFO] Starting backend server...
+    start "" /B /D "%SERVER_DIR%" "%PYTHON_CMD%" -m uvicorn server.app:app --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
+    set "STARTED_BACKEND=1"
+  )
+
+  if /i "%STANDARD_TEST_SKIP_FRONTEND%"=="false" if exist "%CLIENT_DIR%\package.json" (
+    curl -s --max-time 2 "%APP_TEST_FRONTEND_URL%" >nul 2>&1
+    if errorlevel 1 (
+      if not exist "%CLIENT_DIR%\node_modules" (
+        echo [INFO] Installing frontend dependencies...
+        if exist "%CLIENT_DIR%\package-lock.json" (
+          call "%NPM_CMD%" --prefix "%CLIENT_DIR%" ci
+          if errorlevel 1 call "%NPM_CMD%" --prefix "%CLIENT_DIR%" install
+        ) else (
+          call "%NPM_CMD%" --prefix "%CLIENT_DIR%" install
         )
-    ) else (
-        call "%npm_cmd%" install
-        set "npm_ec=!ERRORLEVEL!"
+        if errorlevel 1 (
+          set "LIVE_SERVER_PHASE=FAIL"
+          set "TEST_RESULT=1"
+          goto cleanup
+        )
+      )
+
+      if not exist "%CLIENT_DIR%\dist" (
+        echo [INFO] Building frontend...
+        call "%NPM_CMD%" --prefix "%CLIENT_DIR%" run build
+        if errorlevel 1 (
+          set "LIVE_SERVER_PHASE=FAIL"
+          set "TEST_RESULT=1"
+          goto cleanup
+        )
+      )
+
+      echo [INFO] Starting frontend preview server...
+      start "" /B /D "%CLIENT_DIR%" "%NPM_CMD%" run preview -- --host %UI_HOST% --port %UI_PORT% --strictPort
+      set "STARTED_FRONTEND=1"
     )
-    popd >nul
-    if not "!npm_ec!"=="0" (
-        echo [FATAL] Frontend dependency installation failed with code !npm_ec!.
-        goto error
-    )
-)
+  )
 
-if not exist "%FRONTEND_DIST%" (
-    echo [INFO] Building frontend...
-    pushd "%FRONTEND_DIR%" >nul
-    call "%npm_cmd%" run build
-    popd >nul
-)
-
-call :kill_port %UI_PORT%
-pushd "%FRONTEND_DIR%" >nul
-start "" /b "%npm_cmd%" run preview -- --host %UI_HOST% --port %UI_PORT%
-popd >nul
-
-REM Wait for frontend to be ready
-echo [INFO] Waiting for frontend to start...
-for /L %%i in (1,1,120) do (
-  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $response = Invoke-WebRequest -Uri '%APP_TEST_FRONTEND_URL%' -UseBasicParsing -TimeoutSec 2; if ($response.StatusCode -ge 200) { exit 0 } ; exit 1 } catch { exit 1 }" >nul 2>&1
-  if !errorlevel! equ 0 goto :frontend_ready_check
-  timeout /t 1 /nobreak >nul
-)
-echo [WARN] Timed out waiting for frontend.
-:frontend_ready_check
-
-REM ============================================================================
-REM == Run tests
-REM ============================================================================
-echo [STEP 4/5] Running unit tests...
-echo.
-echo ============================================================================
-
-pushd "%project_folder%server" >nul
-"%uv_exe%" run --project "%project_folder%server" --extra test --python "%python_exe%" python -m pytest %PYTEST_UNIT_ARGS%
-set "unit_result=%ERRORLEVEL%"
-popd >nul
-
-if not "%unit_result%"=="0" (
-    set "test_result=%unit_result%"
+  echo [INFO] Waiting for live services...
+  set "ATTEMPTS=0"
+  :wait_loop
+  if !ATTEMPTS! geq 30 (
+    set "LIVE_SERVER_PHASE=FAIL"
+    set "TEST_RESULT=1"
     goto cleanup
+  )
+
+  curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
+  if errorlevel 1 (
+    set /a ATTEMPTS+=1
+    timeout /t 1 /nobreak >nul
+    goto wait_loop
+  )
+
+  if "%STARTED_FRONTEND%"=="1" (
+    curl -s --max-time 2 "%APP_TEST_FRONTEND_URL%" >nul 2>&1
+    if errorlevel 1 (
+      set /a ATTEMPTS+=1
+      timeout /t 1 /nobreak >nul
+      goto wait_loop
+    )
+  )
 )
 
-echo [STEP 5/5] Running E2E tests...
-pushd "%project_folder%server" >nul
-"%uv_exe%" run --project "%project_folder%server" --extra test --python "%python_exe%" python -m pytest %PYTEST_E2E_ARGS%
-set "test_result=%ERRORLEVEL%"
-popd >nul
+echo [STEP] Running Python tests...
+"%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %*
+set "PYTEST_RC=%ERRORLEVEL%"
+if "%PYTEST_RC%"=="0" (
+  set "PYTEST_PHASE=PASS"
+) else (
+  set "PYTEST_PHASE=FAIL"
+  set "TEST_RESULT=1"
+)
 
+if /i "%STANDARD_TEST_SKIP_FRONTEND%"=="true" goto summary
+if not exist "%CLIENT_DIR%\package.json" goto summary
+
+set "HAS_FRONTEND_UNIT=0"
+set "HAS_FRONTEND_E2E=0"
+findstr /R /C:"\"test:unit\"[ ]*:" "%CLIENT_DIR%\package.json" >nul 2>&1
+if not errorlevel 1 set "HAS_FRONTEND_UNIT=1"
+findstr /R /C:"\"test:e2e\"[ ]*:" "%CLIENT_DIR%\package.json" >nul 2>&1
+if not errorlevel 1 set "HAS_FRONTEND_E2E=1"
+set "FRONTEND_BOOTSTRAP_PHASE=PASS"
+
+if "%HAS_FRONTEND_UNIT%"=="1" (
+  echo [STEP] Running frontend unit tests...
+  call "%NPM_CMD%" --prefix "%CLIENT_DIR%" run test:unit --if-present
+  if errorlevel 1 (
+    set "FRONTEND_UNIT_PHASE=FAIL"
+    set "TEST_RESULT=1"
+  ) else (
+    set "FRONTEND_UNIT_PHASE=PASS"
+  )
+)
+
+if "%HAS_FRONTEND_E2E%"=="1" (
+  echo [STEP] Running frontend E2E tests...
+  call "%NPM_CMD%" --prefix "%CLIENT_DIR%" run test:e2e --if-present
+  if errorlevel 1 (
+    set "FRONTEND_E2E_PHASE=FAIL"
+    set "TEST_RESULT=1"
+  ) else (
+    set "FRONTEND_E2E_PHASE=PASS"
+  )
+)
+
+:summary
 echo.
-echo ============================================================================
+echo ============================================================
+echo  Test Summary
+echo ============================================================
+echo  Live server phase   : %LIVE_SERVER_PHASE%
+echo  Python tests        : %PYTEST_PHASE%
+echo  Frontend bootstrap  : %FRONTEND_BOOTSTRAP_PHASE%
+echo  Frontend unit tests : %FRONTEND_UNIT_PHASE%
+echo  Frontend E2E tests  : %FRONTEND_E2E_PHASE%
+echo ============================================================
+echo.
 
 :cleanup
-REM ============================================================================
-REM == Cleanup: Stop servers
-REM ============================================================================
-echo [CLEANUP] Stopping servers...
-call :kill_port %FASTAPI_PORT%
-call :kill_port %UI_PORT%
-
-if %test_result% EQU 0 (
-    echo [SUCCESS] All tests passed!
-    endlocal & exit /b 0
-) else (
-    echo [FAILED] Some tests failed. Exit code: %test_result%
-    endlocal & exit /b %test_result%
+if "%STARTED_BACKEND%"=="1" (
+  for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R ":%FASTAPI_PORT% "') do taskkill /PID %%P /F >nul 2>&1
+)
+if "%STARTED_FRONTEND%"=="1" (
+  for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R ":%UI_PORT% "') do taskkill /PID %%P /F >nul 2>&1
 )
 
-REM ============================================================================
-REM == Error
-REM ============================================================================
-:error
-echo.
-echo !!! An error occurred. !!!
-pause
-endlocal & exit /b 1
-
-REM ============================================================================
-REM == Kill process on port
-REM ============================================================================
-:kill_port
-set "target_port=%~1"
-if not defined target_port goto :eof
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R ":%target_port%"') do (
-    taskkill /PID %%P /F >nul 2>&1
-)
-goto :eof
+exit /b %TEST_RESULT%
