@@ -73,10 +73,10 @@ if errorlevel 1 (
   set "PYTHONPATH=%APP_DIR%"
 )
 
-set "PYTEST_TARGET=%TESTS_DIR%\unit"
+set "PYTEST_TARGET=%TESTS_DIR%"
 if not "%STANDARD_TEST_PYTEST_TARGET%"=="" set "PYTEST_TARGET=%STANDARD_TEST_PYTEST_TARGET%"
 
-set "NEED_FRONTEND=0"
+set "NEED_FRONTEND=1"
 echo %PYTEST_TARGET% | findstr /I "\\e2e" >nul 2>&1
 if not errorlevel 1 set "NEED_FRONTEND=1"
 
@@ -162,3 +162,4 @@ echo ============================================================
 echo.
 
 exit /b %TEST_RESULT%
+
