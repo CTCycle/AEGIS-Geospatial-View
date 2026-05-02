@@ -1,7 +1,7 @@
 # UI Standards
 
-Last updated: 2026-04-24
-Scope: `AEGIS/client/src`
+Last updated: 2026-05-02
+Scope: `app/client/src`
 
 ## Typography
 
@@ -12,7 +12,7 @@ Scope: `AEGIS/client/src`
 
 ### Scale hierarchy
 
-Defined in `AEGIS/client/src/styles.css`:
+Defined in `app/client/src/styles.css`:
 - Caption: `--font-size-caption` (`0.8rem`)
 - Label: `--font-size-label` (`0.9rem`)
 - Body: `--font-size-body` (`1rem`)
@@ -78,6 +78,7 @@ Defined in `styles.css`:
 - `model-role-actions.component.*`: model role assignment actions
 - `settings-icon-action.component.*`: compact icon action controls
 - `settings-modal-shell.component.*`: modal shell pattern for settings dialogs
+- `model-stats-panel.component.*`: settings statistics table/card presentation across desktop and mobile
 
 ### Standard interaction states
 

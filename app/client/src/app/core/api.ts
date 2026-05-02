@@ -17,6 +17,7 @@ import {
   ChatTurnRequest,
   ChatTurnResponse,
   GenericObjectResponse,
+  JsonValue,
   LocationSearchRequest,
   ModelCardDescriptor,
   ModelSettingsResponse,
@@ -24,7 +25,6 @@ import {
   OllamaHealthResponse,
   SearchResponse,
   VectorizationResponse,
-  JsonValue,
 } from './types';
 
 export class ApiRequestError extends Error {
@@ -67,6 +67,103 @@ export const parseBooleanCredentialMap = (value: unknown): Record<string, Record
   return parsed;
 };
 
+export const requireRecord = (value: unknown, fieldName: string): Record<string, unknown> => {
+  if (!isRecord(value)) {
+    throw new Error(`Chat response field ${fieldName} must be an object`);
+  }
+  return value;
+};
+
+export const requireString = (value: unknown, fieldName: string): string => {
+  if (typeof value !== 'string') {
+    throw new Error(`Chat response field ${fieldName} must be a string`);
+  }
+  return value;
+};
+
+export const requireNumber = (value: unknown, fieldName: string): number => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new Error(`Chat response field ${fieldName} must be a number`);
+  }
+  return value;
+};
+
+export const normalizeCapabilities = (input: unknown): CatalogResponse['capabilities'] => (
+  Array.isArray(input) ? input : []
+)
+  .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
+  .map((item) => ({
+    id: String(item.id),
+    name: String(item.name ?? item.id),
+    kind: String(item.kind ?? 'overlay'),
+    type: typeof item.type === 'string' ? item.type : undefined,
+    description: typeof item.description === 'string' ? item.description : undefined,
+    provider: String(item.provider ?? 'unknown'),
+    requires_credentials: Boolean(item.requires_credentials),
+    is_available: Boolean(item.is_available),
+    supports_map: Boolean(item.supports_map),
+    supports_direct_text: Boolean(item.supports_direct_text),
+    coverage: String(item.coverage ?? 'global'),
+    source_protocol: typeof item.source_protocol === 'string' ? item.source_protocol : undefined,
+    data_format: typeof item.data_format === 'string' ? item.data_format : undefined,
+    geometry_type: typeof item.geometry_type === 'string' ? item.geometry_type : undefined,
+    queryable: typeof item.queryable === 'boolean' ? item.queryable : undefined,
+    vectorizable: typeof item.vectorizable === 'boolean' ? item.vectorizable : undefined,
+    endpoint_health: typeof item.endpoint_health === 'string' ? item.endpoint_health : undefined,
+    auth_mode: typeof item.auth_mode === 'string' ? item.auth_mode : undefined,
+    official_docs_url: typeof item.official_docs_url === 'string' ? item.official_docs_url : undefined,
+    intent_tags: Array.isArray(item.intent_tags)
+      ? item.intent_tags.filter((v): v is string => typeof v === 'string')
+      : [],
+    task_tags: Array.isArray(item.task_tags)
+      ? item.task_tags.filter((v): v is string => typeof v === 'string')
+      : [],
+    metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
+  }));
+
+export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usage'] => {
+  if (!isRecord(input)) {
+    return undefined;
+  }
+  return {
+    estimated_input_tokens: Number(input.estimated_input_tokens ?? 0),
+    selected_context_window: typeof input.selected_context_window === 'number' ? input.selected_context_window : null,
+    model_context_limit: typeof input.model_context_limit === 'number' ? input.model_context_limit : null,
+    usage_percent: Number(input.usage_percent ?? 0),
+    provider: String(input.provider ?? ''),
+    model: String(input.model ?? ''),
+  };
+};
+
+export const buildModelDescription = (item: Record<string, unknown>): string => {
+  const rawDescription = String(item.description ?? '').trim();
+  if (rawDescription && !rawDescription.toLowerCase().startsWith('local ollama model ')) {
+    return rawDescription;
+  }
+  const metadata = isRecord(item.metadata) ? item.metadata : {};
+  const family = typeof metadata.family === 'string' ? metadata.family : '';
+  const parameterSize = typeof metadata.parameter_size === 'string' ? metadata.parameter_size : '';
+  const quantization = typeof metadata.quantization_level === 'string' ? metadata.quantization_level : '';
+  const details = [family, parameterSize, quantization].filter(Boolean).join(' ');
+  return details ? `Optimized for ${details}.` : rawDescription || 'General purpose local model.';
+};
+
+export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  return input
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item) => ({
+      id: String(item.id ?? item.name ?? ''),
+      name: String(item.name ?? item.id ?? ''),
+      description: buildModelDescription(item),
+      provider: String(item.provider ?? ''),
+      capabilities: isStringArray(item.capabilities) ? item.capabilities : [],
+      metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
+    }));
+};
+
 export const parseSearchResponse = (value: unknown): SearchResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected search response format');
@@ -90,38 +187,6 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
   }
-  const normalizeCapabilities = (input: unknown): CatalogResponse['capabilities'] => (
-    Array.isArray(input) ? input : []
-  )
-      .filter((item): item is Record<string, unknown> => isRecord(item) && typeof item.id === 'string')
-      .map((item) => ({
-        id: String(item.id),
-        name: String(item.name ?? item.id),
-        kind: String(item.kind ?? 'overlay'),
-        type: typeof item.type === 'string' ? item.type : undefined,
-        description: typeof item.description === 'string' ? item.description : undefined,
-        provider: String(item.provider ?? 'unknown'),
-        requires_credentials: Boolean(item.requires_credentials),
-        is_available: Boolean(item.is_available),
-        supports_map: Boolean(item.supports_map),
-        supports_direct_text: Boolean(item.supports_direct_text),
-        coverage: String(item.coverage ?? 'global'),
-        source_protocol: typeof item.source_protocol === 'string' ? item.source_protocol : undefined,
-        data_format: typeof item.data_format === 'string' ? item.data_format : undefined,
-        geometry_type: typeof item.geometry_type === 'string' ? item.geometry_type : undefined,
-        queryable: typeof item.queryable === 'boolean' ? item.queryable : undefined,
-        vectorizable: typeof item.vectorizable === 'boolean' ? item.vectorizable : undefined,
-        endpoint_health: typeof item.endpoint_health === 'string' ? item.endpoint_health : undefined,
-        auth_mode: typeof item.auth_mode === 'string' ? item.auth_mode : undefined,
-        official_docs_url: typeof item.official_docs_url === 'string' ? item.official_docs_url : undefined,
-        intent_tags: Array.isArray(item.intent_tags)
-          ? item.intent_tags.filter((v): v is string => typeof v === 'string')
-          : [],
-        task_tags: Array.isArray(item.task_tags)
-          ? item.task_tags.filter((v): v is string => typeof v === 'string')
-          : [],
-        metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
-      }));
   const normalized = normalizeCapabilities(value.capabilities);
   const providers = normalizeCapabilities(value.providers);
   const basemaps = normalizeCapabilities(value.basemaps);
@@ -162,36 +227,13 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected chat response format');
   }
-  const parseContextUsage = (input: unknown): ChatTurnResponse['context_usage'] => {
-    if (!isRecord(input)) {
-      return undefined;
-    }
-    return {
-      estimated_input_tokens: Number(input.estimated_input_tokens ?? 0),
-      selected_context_window: typeof input.selected_context_window === 'number' ? input.selected_context_window : null,
-      model_context_limit: typeof input.model_context_limit === 'number' ? input.model_context_limit : null,
-      usage_percent: Number(input.usage_percent ?? 0),
-      provider: String(input.provider ?? ''),
-      model: String(input.model ?? ''),
-    };
-  };
 
   return {
-    request_id: typeof value.request_id === 'string' ? value.request_id : undefined,
-    session_id: Number(value.session_id ?? 0),
-    assistant_message: String(value.assistant_message ?? ''),
-    turn_contract: isRecord(value.turn_contract) ? value.turn_contract as unknown as ChatTurnResponse['turn_contract'] : {
-      user_text: '',
-      task_class: 'unclear',
-      location_signals: [],
-      normalized_intent: { intent_id: 'unknown', intent_label: 'Unknown', task_tags: [], intent_tags: [], requires_location: false },
-      temporal_signal: { mode: 'none' },
-      ambiguities: [],
-      parser_confidence: 0,
-    },
-    decision: isRecord(value.decision) ? value.decision as unknown as ChatTurnResponse['decision'] : {
-      plan: { state: 'clarify', intent_id: 'unknown', overlay_ids: [] },
-    },
+    request_id: requireString(value.request_id, 'request_id'),
+    session_id: requireNumber(value.session_id, 'session_id'),
+    assistant_message: requireString(value.assistant_message, 'assistant_message'),
+    turn_contract: requireRecord(value.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
+    decision: requireRecord(value.decision, 'decision') as unknown as ChatTurnResponse['decision'],
     tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
     map_session: isRecord(value.map_session) ? value.map_session as unknown as ChatTurnResponse['map_session'] : undefined,
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
@@ -335,38 +377,9 @@ export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[];
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}`, { method: 'GET' });
   const value = isRecord(data) ? data : {};
 
-  const buildDescription = (item: Record<string, unknown>): string => {
-    const rawDescription = String(item.description ?? '').trim();
-    if (rawDescription && !rawDescription.toLowerCase().startsWith('local ollama model ')) {
-      return rawDescription;
-    }
-    const metadata = isRecord(item.metadata) ? item.metadata : {};
-    const family = typeof metadata.family === 'string' ? metadata.family : '';
-    const parameterSize = typeof metadata.parameter_size === 'string' ? metadata.parameter_size : '';
-    const quantization = typeof metadata.quantization_level === 'string' ? metadata.quantization_level : '';
-    const details = [family, parameterSize, quantization].filter(Boolean).join(' ');
-    return details ? `Optimized for ${details}.` : rawDescription || 'General purpose local model.';
-  };
-
-  const normalize = (input: unknown): ModelCardDescriptor[] => {
-    if (!Array.isArray(input)) {
-      return [];
-    }
-    return input
-      .filter((item): item is Record<string, unknown> => isRecord(item))
-      .map((item) => ({
-        id: String(item.id ?? item.name ?? ''),
-        name: String(item.name ?? item.id ?? ''),
-        description: buildDescription(item),
-        provider: String(item.provider ?? ''),
-        capabilities: isStringArray(item.capabilities) ? item.capabilities : [],
-        metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
-      }));
-  };
-
   return {
-    cloud: normalize(value.cloud),
-    local: normalize(value.local),
+    cloud: normalizeModelCards(value.cloud),
+    local: normalizeModelCards(value.local),
   };
 };
 

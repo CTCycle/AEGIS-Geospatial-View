@@ -120,68 +120,7 @@
       </section>
 
       <aside class="settings-page__right-column" aria-label="Model statistics">
-        <div class="settings-page__stats-table-wrap">
-          <table class="settings-page__stats-table">
-            <thead>
-              <tr>
-                <th scope="col">Model</th>
-                <th scope="col">Provider</th>
-                <th scope="col">Local</th>
-                <th scope="col">Assigned</th>
-              </tr>
-            </thead>
-            <tbody>
-              @if (isLoadingModels) {
-                <tr>
-                  <td colSpan="4">Loading model assignments...</td>
-                </tr>
-              } @else if (selectedModelStats.length === 0) {
-                <tr>
-                  <td colSpan="4">No models selected yet.</td>
-                </tr>
-              }
-              @for (row of selectedModelStats; track row.provider + ':' + row.model) {
-                <tr>
-                  <td>{{ row.model }}</td>
-                  <td>{{ row.provider }}</td>
-                  <td>{{ row.local ? 'Yes' : 'No' }}</td>
-                  <td>{{ row.assignedRoles.join(', ') }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-
-        <div class="settings-page__stats-mobile-list" aria-label="Model statistics mobile">
-          @if (isLoadingModels) {
-            <article class="settings-page__stats-mobile-card">
-              <p class="settings-page__stats-mobile-empty">Loading model assignments...</p>
-            </article>
-          } @else if (selectedModelStats.length === 0) {
-            <article class="settings-page__stats-mobile-card">
-              <p class="settings-page__stats-mobile-empty">No models selected yet.</p>
-            </article>
-          }
-          @for (row of selectedModelStats; track row.provider + ':' + row.model) {
-            <article class="settings-page__stats-mobile-card">
-              <h3>{{ row.model }}</h3>
-              <dl>
-                <div>
-                  <dt>Provider</dt>
-                  <dd>{{ row.provider }}</dd>
-                </div>
-                <div>
-                  <dt>Local</dt>
-                  <dd>{{ row.local ? 'Yes' : 'No' }}</dd>
-                </div>
-                <div>
-                  <dt>Assigned</dt>
-                  <dd>{{ row.assignedRoles.join(', ') }}</dd>
-                </div>
-              </dl>
-            </article>
-          }
-        </div>
+        <app-model-stats-panel [rows]="selectedModelStats" [isLoading]="isLoadingModels"></app-model-stats-panel>
       </aside>
     </div>
     <footer class="settings-page__status">{{ visibleStatusText }}</footer>

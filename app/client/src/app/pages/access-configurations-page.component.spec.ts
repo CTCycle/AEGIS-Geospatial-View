@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import * as Api from '../core/api';
+import { ModelSettingsResponse } from '../core/types';
 import { AccessConfigurationsPageComponent } from './access-configurations-page.component';
 
 const settings = {
@@ -19,17 +20,23 @@ const settings = {
 };
 
 describe('pages/access-configurations-page.component', () => {
+  let fetchChatSettingsMock: jasmine.Spy;
+  let updateChatSettingsMock: jasmine.Spy;
+
   beforeEach(async () => {
-    spyOn(Api, 'fetchChatSettings').and.resolveTo(settings);
-    spyOn(Api, 'updateChatSettings').and.callFake(async (payload) => ({
+    fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo(settings);
+    updateChatSettingsMock = jasmine.createSpy('updateChatSettings').and.callFake(async (payload): Promise<ModelSettingsResponse> => ({
       ...settings,
       credentials: payload.credentials.geoapify?.api_key
-        ? { geoapify: { api_key: true } }
-        : {},
+        ? ({ geoapify: { api_key: true } } as Record<string, Record<string, boolean>>)
+        : ({} as Record<string, Record<string, boolean>>),
       credential_health: payload.credentials.geoapify?.api_key
         ? { geoapify: { api_key: 'healthy' } }
         : {},
     }));
+
+    spyOnProperty(Api, 'fetchChatSettings', 'get').and.returnValue(fetchChatSettingsMock);
+    spyOnProperty(Api, 'updateChatSettings', 'get').and.returnValue(updateChatSettingsMock);
 
     await TestBed.configureTestingModule({
       imports: [AccessConfigurationsPageComponent],
@@ -44,7 +51,7 @@ describe('pages/access-configurations-page.component', () => {
     const component = fixture.componentInstance;
     component.drafts.geoapify = 'geo-key';
     await component.saveProvider('geoapify');
-    expect(Api.updateChatSettings).toHaveBeenCalled();
+    expect(updateChatSettingsMock).toHaveBeenCalled();
     expect(component.configured('geoapify')).toBeTrue();
 
     await component.clearProvider('geoapify');

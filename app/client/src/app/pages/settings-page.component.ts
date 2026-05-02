@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
+import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
 import {
@@ -39,6 +40,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
     ModelRoleActionsComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
+    ModelStatsPanelComponent,
   ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
