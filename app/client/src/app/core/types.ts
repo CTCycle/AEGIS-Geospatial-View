@@ -218,14 +218,14 @@ export interface ToolPayload {
 }
 
 export interface ChatTurnResponse {
-  request_id?: string;
+  request_id: string;
   session_id: number;
   assistant_message: string;
-  turn_contract?: TurnParseResult;
-  decision?: PolicyDecision;
+  turn_contract: TurnParseResult;
+  decision: PolicyDecision;
   tool_payload?: ToolPayload | null;
   map_session?: MapSession | null;
-  memory_snapshot?: Record<string, JsonValue>;
+  memory_snapshot: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
 }
 

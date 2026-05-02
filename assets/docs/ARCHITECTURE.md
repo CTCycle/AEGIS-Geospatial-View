@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-04-30
+Last updated: 2026-05-02
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -123,6 +123,7 @@ services/
   chat/model_library.py
   chat/plain_responder.py
   chat/settings_service.py
+  chat/streaming.py
   geospatial/capability_registry.py
   geospatial/catalog.py
   geospatial/coverage.py
@@ -181,6 +182,7 @@ app/
   app.routes.ts
   components/
     map-preview.component.*
+    model-stats-panel.component.*
     model-role-actions.component.*
     settings-icon-action.component.*
     settings-modal-shell.component.*
@@ -189,11 +191,14 @@ app/
     app-state.ts
     app-state-store.service.ts
     constants.ts
+    local-command-response.ts
     model-selection.ts
     types.ts
     user-facing-error.service.ts
     view-state-sync.service.ts
   pages/
+    access-configurations-page.component.*
+    capabilities-page.component.*
     geospatial-page.component.*
     settings-page.component.*
 ```
@@ -392,4 +397,3 @@ External providers are used through service modules and manifests:
 - PVGIS
 - Rainviewer
 - LLM providers: Ollama, OpenAI-compatible, Google-compatible
-

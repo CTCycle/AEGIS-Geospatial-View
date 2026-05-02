@@ -1,7 +1,7 @@
 # Background Job Management
 
-Last updated: 2026-04-20
-Scope: `AEGIS/server/services/jobs.py`, `AEGIS/server/services/search/composition.py`, `AEGIS/server/api/search.py`
+Last updated: 2026-05-02
+Scope: `app/server/services/jobs.py`, `app/server/services/search/composition.py`, `app/server/api/search.py`
 
 AEGIS uses an in-process, thread-based job manager for asynchronous map-search execution.
 
@@ -39,8 +39,8 @@ Routes are mounted under `/api`.
 ## 4. Execution Model
 
 - Each job runs in a dedicated daemon `threading.Thread`.
-- Worker function for map jobs: `AEGIS/server/services/search/execution.py::run_search_job(...)`.
-- Missing-job and job-initialization failures are raised as service-layer exceptions in `AEGIS/server/services/search/errors.py` and translated to HTTP errors in `AEGIS/server/api/search.py`.
+- Worker function for map jobs: `app/server/services/search/execution.py::run_search_job(...)`.
+- Missing-job and job-initialization failures are raised as service-layer exceptions in `app/server/services/search/errors.py` and translated to HTTP errors in `app/server/api/search.py`.
 - The runner updates progress and merges final result payloads.
 - Failures are captured and surfaced through status polling.
 
@@ -57,4 +57,3 @@ Cancellation is cooperative:
 - Job state is not persisted across server restarts.
 - Suitable for local and moderate concurrency scenarios.
 - For distributed/high-volume workloads, migrate to external queue + worker infrastructure.
-

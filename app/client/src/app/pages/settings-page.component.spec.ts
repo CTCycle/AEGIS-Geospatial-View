@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 
 import * as Api from '../core/api';
-import { AppStateStoreService } from '../core/app-state-store.service';
 import { defaultAppState } from '../core/app-state';
+import { AppStateStoreService } from '../core/app-state-store.service';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { SettingsPageComponent } from './settings-page.component';
 
@@ -11,23 +11,22 @@ describe('pages/settings-page.component', () => {
   let router: Router;
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
+  let fetchChatSettingsMock: jasmine.Spy;
+  let fetchChatModelsMock: jasmine.Spy;
+  let updateChatSettingsMock: jasmine.Spy;
+  let checkOllamaHealthMock: jasmine.Spy;
+  let refreshOllamaModelsMock: jasmine.Spy;
+  let pullOllamaModelMock: jasmine.Spy;
 
   beforeEach(async () => {
-    store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', [
-      'getSettingsPage',
-      'updateSettingsPage',
-    ]);
+    store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', ['getSettingsPage', 'updateSettingsPage']);
     store.getSettingsPage.and.returnValue(defaultAppState().settingsPage);
-    errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', [
-      'toUserFacingError',
-      'normalizeDisplayText',
-      'isLowLevelConnectionError',
-    ]);
+    errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['toUserFacingError', 'normalizeDisplayText', 'isLowLevelConnectionError']);
     errors.toUserFacingError.and.callFake((_: unknown, fallback: string) => fallback);
     errors.normalizeDisplayText.and.callFake((value: string) => value);
     errors.isLowLevelConnectionError.and.returnValue(true);
 
-    spyOn(Api, 'fetchChatSettings').and.resolveTo({
+    fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'local',
       chat_model_provider: 'ollama',
       chat_model_name: 'llama3.2',
@@ -39,22 +38,25 @@ describe('pages/settings-page.component', () => {
       credentials: {},
       credential_health: {},
     });
-    spyOn(Api, 'fetchChatModels').and.resolveTo({
+    fetchChatModelsMock = jasmine.createSpy('fetchChatModels').and.resolveTo({
       cloud: [{ id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', description: 'cloud', provider: 'openai', capabilities: [], metadata: {} }],
       local: [{ id: 'llama3.2', name: 'llama3.2', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
     });
-    spyOn(Api, 'updateChatSettings').and.callFake(async (payload) => payload as never);
-    spyOn(Api, 'checkOllamaHealth').and.resolveTo({ ok: true, detail: 'ok' });
-    spyOn(Api, 'refreshOllamaModels').and.resolveTo({});
-    spyOn(Api, 'pullOllamaModel').and.resolveTo({});
+    updateChatSettingsMock = jasmine.createSpy('updateChatSettings').and.callFake(async (payload) => payload as never);
+    checkOllamaHealthMock = jasmine.createSpy('checkOllamaHealth').and.resolveTo({ ok: true, detail: 'ok' });
+    refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
+    pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
+
+    spyOnProperty(Api, 'fetchChatSettings', 'get').and.returnValue(fetchChatSettingsMock);
+    spyOnProperty(Api, 'fetchChatModels', 'get').and.returnValue(fetchChatModelsMock);
+    spyOnProperty(Api, 'updateChatSettings', 'get').and.returnValue(updateChatSettingsMock);
+    spyOnProperty(Api, 'checkOllamaHealth', 'get').and.returnValue(checkOllamaHealthMock);
+    spyOnProperty(Api, 'refreshOllamaModels', 'get').and.returnValue(refreshOllamaModelsMock);
+    spyOnProperty(Api, 'pullOllamaModel', 'get').and.returnValue(pullOllamaModelMock);
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AppStateStoreService, useValue: store },
-        { provide: UserFacingErrorService, useValue: errors },
-      ],
+      providers: [provideRouter([]), { provide: AppStateStoreService, useValue: store }, { provide: UserFacingErrorService, useValue: errors }],
     }).compileComponents();
     router = TestBed.inject(Router);
   });
@@ -72,10 +74,10 @@ describe('pages/settings-page.component', () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(Api.fetchChatSettings).toHaveBeenCalled();
-    expect(Api.fetchChatModels).toHaveBeenCalled();
+    expect(fetchChatSettingsMock).toHaveBeenCalled();
+    expect(fetchChatModelsMock).toHaveBeenCalled();
 
-    (Api.fetchChatSettings as jasmine.Spy).and.rejectWith(new Error('boom'));
+    fetchChatSettingsMock.and.rejectWith(new Error('boom'));
     const fixture2 = TestBed.createComponent(SettingsPageComponent);
     fixture2.detectChanges();
     await fixture2.whenStable();
@@ -98,7 +100,7 @@ describe('pages/settings-page.component', () => {
     await fixture.whenStable();
     const component = fixture.componentInstance;
     await component.applyModelSelection('chat', component.displayedModels[0]);
-    expect(Api.updateChatSettings).toHaveBeenCalled();
+    expect(updateChatSettingsMock).toHaveBeenCalled();
     expect(component.statusText).toContain('Selected');
   });
 
@@ -123,14 +125,14 @@ describe('pages/settings-page.component', () => {
     await component.saveKeys();
     expect(component.statusText).toContain('API keys saved');
 
-    (Api.updateChatSettings as jasmine.Spy).and.rejectWith(new Error('fail'));
+    updateChatSettingsMock.and.rejectWith(new Error('fail'));
     component.openaiKey = 'sk-valid-openai-key-12345';
     await component.saveKeys();
     expect(component.statusText).toContain('Could not save API keys right now.');
   });
 
   it('reports unreadable credential health in API key modal state', async () => {
-    (Api.fetchChatSettings as jasmine.Spy).and.resolveTo({
+    fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
       chat_model_provider: 'openai',
       chat_model_name: 'gpt-4.1-mini',
@@ -157,7 +159,7 @@ describe('pages/settings-page.component', () => {
     await component.checkOllamaConnection();
     expect(component.statusText).toContain('Ollama:');
 
-    (Api.checkOllamaHealth as jasmine.Spy).and.rejectWith(new Error('connection refused'));
+    checkOllamaHealthMock.and.rejectWith(new Error('connection refused'));
     await component.checkOllamaConnection();
     expect(component.statusText).toContain('Unable to reach Ollama');
   });

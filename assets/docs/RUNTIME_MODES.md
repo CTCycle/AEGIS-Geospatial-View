@@ -7,13 +7,13 @@ Last updated: 2026-04-24
 ### 1. Local development (web app + API)
 
 - Backend: FastAPI (`AEGIS.server.app:app`)
-- Frontend: Angular dev/preview server (`AEGIS/client`)
+- Frontend: Angular dev/preview server (`app/client`)
 - Primary launcher: `AEGIS/start_on_windows.bat`
 - Portable runtimes are expected under `runtimes/` (Python, uv, Node.js)
 
 ### 2. Desktop runtime and packaging (Tauri on Windows)
 
-- Tauri config: `AEGIS/client/src-tauri/tauri.conf.json`
+- Tauri config: `app/client/src-tauri/tauri.conf.json`
 - Build pipeline: `release/tauri/build_with_tauri.bat`
 - Output artifacts:
   - `release/windows/installers`
@@ -56,7 +56,7 @@ What it does:
 ```powershell
 uv sync
 uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002
-Set-Location AEGIS/client
+Set-Location app/client
 npm install
 npm run start -- --host 127.0.0.1 --port 5000
 ```
@@ -110,13 +110,13 @@ Defines:
 
 ### Database mode switch
 
-- `database.embedded_database=true` -> SQLite (`AEGIS/resources/database.db`)
+- `database.embedded_database=true` -> SQLite (`app/resources/database.db`)
 - `database.embedded_database=false` -> PostgreSQL backend using JSON credentials/settings
 
 ## Interoperability
 
 - Frontend talks to backend through `/api` routes.
-- In development, proxying is configured by `AEGIS/client/proxy.conf.cjs`.
+- In development, proxying is configured by `app/client/proxy.conf.cjs`.
 - Chat and map features share backend services and persistence layers.
 - Desktop runtime bundles frontend dist + backend/runtime resources into Tauri package resources.
 

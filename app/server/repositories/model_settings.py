@@ -3,7 +3,12 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from server.common.time import utc_now_naive
-from server.common.constants import OLLAMA_DEFAULT_HOST
+from server.common.constants import (
+    DEFAULT_MODEL_NAME,
+    DEFAULT_MODEL_PROVIDER,
+    DEFAULT_MODEL_PROVIDER_MODE,
+    OLLAMA_DEFAULT_HOST,
+)
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
@@ -23,13 +28,13 @@ class ModelSettingsRepository:
                 return record
 
             record = ModelProviderSettingsRecord(
-                active_provider_mode="local",
-                chat_model_provider="ollama",
-                chat_model_name="llama3.2",
-                parser_model_provider="ollama",
-                parser_model_name="llama3.2",
-                agent_model_provider="ollama",
-                agent_model_name="llama3.2",
+                active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
+                chat_model_provider=DEFAULT_MODEL_PROVIDER,
+                chat_model_name=DEFAULT_MODEL_NAME,
+                parser_model_provider=DEFAULT_MODEL_PROVIDER,
+                parser_model_name=DEFAULT_MODEL_NAME,
+                agent_model_provider=DEFAULT_MODEL_PROVIDER,
+                agent_model_name=DEFAULT_MODEL_NAME,
                 ollama_url=OLLAMA_DEFAULT_HOST,
             )
             session.add(record)

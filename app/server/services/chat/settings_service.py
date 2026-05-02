@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
-
-from server.domain.chat import ModelSettingsResponse
+from server.common.constants import (
+    DEFAULT_MODEL_NAME,
+    DEFAULT_MODEL_PROVIDER,
+    DEFAULT_MODEL_PROVIDER_MODE,
+    OLLAMA_DEFAULT_HOST,
+)
+from server.domain.chat import ModelSettingsResponse, ModelSettingsUpdateRequest
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
@@ -56,48 +60,29 @@ class ChatSettingsService:
         record = self.settings_repo.get_or_create()
         return record.ollama_url
 
-    def update_settings(self, payload: dict[str, Any]) -> ModelSettingsResponse:
-        credentials = (
-            payload.get("credentials")
-            if isinstance(payload.get("credentials"), dict)
-            else {}
-        )
-        for provider, labels in credentials.items():
-            if not isinstance(labels, dict):
-                continue
+    def update_settings(self, payload: ModelSettingsUpdateRequest) -> ModelSettingsResponse:
+        for provider, labels in payload.credentials.items():
             for label, raw_value in labels.items():
-                if not isinstance(raw_value, str):
-                    continue
                 if not raw_value.strip():
-                    self.credentials_repo.deactivate(
-                        provider=str(provider), label=str(label)
-                    )
+                    self.credentials_repo.deactivate(provider=provider, label=label)
                     continue
                 encrypted = self.crypto_service.encrypt(raw_value.strip())
                 self.credentials_repo.upsert(
-                    provider=str(provider),
-                    label=str(label),
+                    provider=provider,
+                    label=label,
                     encrypted_value=encrypted.value,
                     key_version=encrypted.key_version,
                 )
         self.settings_repo.update(
-            active_provider_mode=str(payload.get("active_provider_mode") or "local"),
-            chat_model_provider=str(payload.get("chat_model_provider") or "ollama"),
-            chat_model_name=str(payload.get("chat_model_name") or "llama3.2"),
-            parser_model_provider=str(payload.get("parser_model_provider") or "ollama"),
-            parser_model_name=str(payload.get("parser_model_name") or "llama3.2"),
-            agent_model_provider=str(payload.get("agent_model_provider") or "ollama"),
-            agent_model_name=str(payload.get("agent_model_name") or "llama3.2"),
-            ollama_url=str(payload.get("ollama_url") or "http://localhost:11434"),
-            openai_base_url=(
-                str(payload.get("openai_base_url"))
-                if payload.get("openai_base_url")
-                else None
-            ),
-            google_base_url=(
-                str(payload.get("google_base_url"))
-                if payload.get("google_base_url")
-                else None
-            ),
+            active_provider_mode=payload.active_provider_mode or DEFAULT_MODEL_PROVIDER_MODE,
+            chat_model_provider=payload.chat_model_provider or DEFAULT_MODEL_PROVIDER,
+            chat_model_name=payload.chat_model_name or DEFAULT_MODEL_NAME,
+            parser_model_provider=payload.parser_model_provider or DEFAULT_MODEL_PROVIDER,
+            parser_model_name=payload.parser_model_name or DEFAULT_MODEL_NAME,
+            agent_model_provider=payload.agent_model_provider or DEFAULT_MODEL_PROVIDER,
+            agent_model_name=payload.agent_model_name or DEFAULT_MODEL_NAME,
+            ollama_url=payload.ollama_url or OLLAMA_DEFAULT_HOST,
+            openai_base_url=payload.openai_base_url or None,
+            google_base_url=payload.google_base_url or None,
         )
         return self.get_settings()

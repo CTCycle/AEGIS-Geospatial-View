@@ -13,10 +13,14 @@ ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
 ###############################################################################
+def utc_chat_message_timestamp() -> datetime:
+    return datetime.now(UTC)
+
+###############################################################################
 class ChatMessage(BaseModel):
     role: ChatRole
     content: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=utc_chat_message_timestamp)
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -78,7 +82,7 @@ class ModelSettingsResponse(BaseModel):
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     active_provider_mode: ModelProviderMode | None = None
     chat_model_provider: str | None = None
@@ -90,7 +94,7 @@ class ModelSettingsUpdateRequest(BaseModel):
     ollama_url: str | None = None
     openai_base_url: str | None = None
     google_base_url: str | None = None
-    credentials: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    credentials: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 ###############################################################################
 class ModelLibraryResponse(BaseModel):

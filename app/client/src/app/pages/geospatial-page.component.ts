@@ -7,6 +7,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedChatPageState } from '../core/app-state';
 import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse, ContextUsage } from '../core/types';
 import { fetchCatalog, sendChatTurn } from '../core/api';
+import { formatCapabilitySummary } from '../core/local-command-response';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 
@@ -332,9 +333,6 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       this.syncState();
       try {
         const catalog = await fetchCatalog();
-        const basemapCount = catalog.basemaps?.length ?? 0;
-        const overlayCount = catalog.overlays?.length ?? 0;
-        const toolCount = catalog.tools?.length ?? 0;
         const optional = catalog.capabilities
           .filter((item) => item.requires_credentials)
           .map((item) => item.name);
@@ -345,7 +343,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
           : '';
         const reply = [
           `I can create location-focused map sessions, resolve coordinates, show basemaps, add thematic overlays, run weather, air-quality, POI, and coordinate tools, and adjust the active map with lightweight zoom commands.`,
-          `Current catalog: ${basemapCount} map types, ${overlayCount} layers, and ${toolCount} direct tools.`,
+          formatCapabilitySummary(catalog),
           sampleBasemaps ? `Map types include ${sampleBasemaps}.` : '',
           sampleOverlays ? `Layers include ${sampleOverlays}.` : '',
           `The default workflow uses free/open sources; ask for a place plus a goal, such as satellite context, precipitation, air quality, POIs, terrain, or solar potential.${optionalText}`,

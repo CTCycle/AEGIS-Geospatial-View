@@ -52,9 +52,29 @@ describe('core/api', () => {
     expect(parsed.credential_health?.openai.api_key).toBe('unreadable');
   });
 
-  it('parseChatTurnResponse defaults correctly', () => {
+  it('parseChatTurnResponse accepts valid backend response', () => {
     const parsed = parseChatTurnResponse({
       request_id: 'chat-abc',
+      session_id: 12,
+      assistant_message: 'done',
+      turn_contract: {
+        user_text: 'show weather',
+        task_class: 'direct_query',
+        location_signals: [],
+        normalized_intent: {
+          intent_id: 'weather',
+          intent_label: 'Weather',
+          task_tags: [],
+          intent_tags: [],
+          requires_location: false,
+        },
+        temporal_signal: { mode: 'none' },
+        ambiguities: [],
+        parser_confidence: 0.9,
+      },
+      decision: {
+        plan: { state: 'direct_tool', mode: 'direct_text', intent_id: 'weather', overlay_ids: [] },
+      },
       context_usage: {
         estimated_input_tokens: 100,
         selected_context_window: 2048,
@@ -65,9 +85,36 @@ describe('core/api', () => {
       },
     });
     expect(parsed.request_id).toBe('chat-abc');
-    expect(parsed.session_id).toBe(0);
-    expect(parsed.assistant_message).toBe('');
+    expect(parsed.session_id).toBe(12);
+    expect(parsed.assistant_message).toBe('done');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
+  });
+
+  it('parseChatTurnResponse rejects missing request_id', () => {
+    expect(() => parseChatTurnResponse({
+      session_id: 1,
+      assistant_message: 'ok',
+      turn_contract: {},
+      decision: {},
+    })).toThrow();
+  });
+
+  it('parseChatTurnResponse rejects missing turn_contract', () => {
+    expect(() => parseChatTurnResponse({
+      request_id: 'chat-1',
+      session_id: 1,
+      assistant_message: 'ok',
+      decision: {},
+    })).toThrow();
+  });
+
+  it('parseChatTurnResponse rejects missing decision', () => {
+    expect(() => parseChatTurnResponse({
+      request_id: 'chat-1',
+      session_id: 1,
+      assistant_message: 'ok',
+      turn_contract: {},
+    })).toThrow();
   });
 
   it('buildApiError builds ApiRequestError', async () => {
@@ -138,7 +185,14 @@ describe('core/api', () => {
 
   it('base URL route construction uses API_BASE_URL', async () => {
     const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(JSON.stringify({ session_id: 1, assistant_message: 'ok' }), {
+      new Response(JSON.stringify({
+        request_id: 'chat-1',
+        session_id: 1,
+        assistant_message: 'ok',
+        turn_contract: {},
+        decision: {},
+        memory_snapshot: {},
+      }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),

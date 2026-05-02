@@ -22,11 +22,11 @@ jobs:
       - name: Install backend test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          pip install -e "app/server[test]"
 
       - name: Run backend unit suites
         run: |
-          python -m pytest tests/unit/test_backend_python_compile.py tests/unit/services/agent tests/unit/services/geospatial tests/unit/services/search tests/unit/services/vector tests/unit/test_runtime_env_loading.py
+          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_backend_python_compile.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/services/vector app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
 
   frontend-build-and-tests:
     runs-on: ubuntu-latest
@@ -39,18 +39,18 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: AEGIS/client/package-lock.json
+          cache-dependency-path: app/client/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: AEGIS/client
+        working-directory: app/client
         run: npm ci
 
       - name: Frontend build
-        working-directory: AEGIS/client
+        working-directory: app/client
         run: npm run build
 
       - name: Frontend unit tests
-        working-directory: AEGIS/client
+        working-directory: app/client
         run: npm run test -- --watch=false --browsers=ChromeHeadless
 
   capability-contract-validation:
@@ -67,14 +67,14 @@ jobs:
       - name: Install backend test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          pip install -e "app/server[test]"
 
       - name: Validate manifest completeness
-        run: python -m pytest tests/unit/services/vector/test_capability_manifest_completeness.py
+        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/vector/test_capability_manifest_completeness.py
 
       - name: Validate runtime profile completeness
-        run: python -m pytest tests/unit/services/geospatial/test_runtime_registry.py::test_runtime_profiles_cover_all_capabilities
+        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/geospatial/test_runtime_registry.py::test_runtime_profiles_cover_all_capabilities
 
       - name: Validate tool binding completeness
-        run: python -m pytest tests/unit/services/agent/test_tool_registry.py::test_tool_registry_has_binding_for_all_tool_manifests
+        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/agent/test_tool_registry.py::test_tool_registry_has_binding_for_all_tool_manifests
 

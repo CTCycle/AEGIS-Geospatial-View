@@ -54,6 +54,9 @@ NOMINATIM_REVERSE_URL = f"{NOMINATIM_BASE_URL}{NOMINATIM_REVERSE_PATH}"
 OPENAQ_API_BASE_URL = "https://api.openaq.org/v3"
 OPEN_ELEVATION_API_BASE_URL = "https://api.open-elevation.com/api/v1"
 OLLAMA_DEFAULT_HOST = "http://localhost:11434"
+DEFAULT_MODEL_PROVIDER_MODE = "local"
+DEFAULT_MODEL_PROVIDER = "ollama"
+DEFAULT_MODEL_NAME = "llama3.2"
 
 # [GIBS SERVICE URLS]
 ###############################################################################

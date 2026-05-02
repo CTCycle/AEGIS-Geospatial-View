@@ -4,7 +4,7 @@ Last updated: 2026-04-27
 
 ## Purpose
 
-This document is the maintained technical inventory of geospatial capabilities exposed by AEGIS. The source of truth remains `AEGIS/resources/manifests`; this document mirrors the manifest catalog in a reviewable form for operators, maintainers, and UI authors.
+This document is the maintained technical inventory of geospatial capabilities exposed by AEGIS. The source of truth remains `app/resources/manifests`; this document mirrors the manifest catalog in a reviewable form for operators, maintainers, and UI authors.
 
 Default capability selection prioritizes free and openly accessible providers. Geoapify and TomTom capabilities are optional and remain unavailable until users configure their own provider keys in the Access configurations page.
 
