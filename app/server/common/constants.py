@@ -120,9 +120,7 @@ COMMON_FOLIUM_MAPS = {
 
 # [DATABASE TABLES]
 ###############################################################################
-GEONAMES_TABLE = "geonames"
 GIBS_LAYERS_TABLE = "gibs_layers"
-SEARCH_SESSIONS_TABLE = "search_sessions"
 MODEL_PROVIDER_SETTINGS_TABLE = "model_provider_settings"
 MODEL_CREDENTIALS_TABLE = "model_credentials"
 CHAT_SESSIONS_TABLE = "chat_sessions"
@@ -131,28 +129,6 @@ CHAT_MESSAGES_TABLE = "chat_messages"
 
 # [DATABASE COLUMNS]
 ###############################################################################
-GEONAMES_COLUMNS = [
-    "geonameid",
-    "name",
-    "asciiname",
-    "alternatenames",
-    "latitude",
-    "longitude",
-    "feature_class",
-    "feature_code",
-    "country_code",
-    "cc2",
-    "admin1_code",
-    "admin2_code",
-    "admin3_code",
-    "admin4_code",
-    "population",
-    "elevation",
-    "dem",
-    "timezone",
-    "modification_date",
-]
-
 GIBS_LAYER_COLUMNS = [
     "layer_id",
     "title",
@@ -161,20 +137,6 @@ GIBS_LAYER_COLUMNS = [
     "source_urls",
     "tile_matrix_sets",
     "meters_per_pixel",
-]
-
-SEARCH_SESSION_COLUMNS = [
-    "id",
-    "created_at",
-    "user",
-    "country",
-    "city",
-    "address",
-    "coordinates",
-    "basemap_id",
-    "overlay_ids_json",
-    "semantic_filters_json",
-    "state",
 ]
 
 MODEL_PROVIDER_SETTINGS_COLUMNS = [

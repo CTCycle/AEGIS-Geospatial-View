@@ -6,7 +6,7 @@ from server.configurations import build_database_settings
 def test_db_settings_use_json_payload_for_embedded_mode() -> None:
     payload = {
         "embedded_database": True,
-        "engine": "postgres",
+        "engine": "postgresql+psycopg",
         "host": "json-host",
         "port": 5432,
         "database_name": "json-db",

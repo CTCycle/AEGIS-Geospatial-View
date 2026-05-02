@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from server.configurations import DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
-from server.common.constants import GIBS_LAYERS_TABLE, SEARCH_SESSIONS_TABLE
+from server.common.constants import CHAT_SESSIONS_TABLE, GIBS_LAYERS_TABLE
 
 
 def build_test_settings(insert_batch_size: int = 2) -> DatabaseSettings:
@@ -120,25 +118,17 @@ def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> N
         [
             {
                 "id": None,
-                "created_at": datetime.now(UTC),
-                "user": "tester",
-                "country": "IT",
-                "city": "Rome",
-                "address": "Via Roma",
-                "coordinates": '{"longitude": 12.5, "latitude": 41.9}',
-                "basemap_id": "osm_default",
-                "overlay_ids_json": '["Layer"]',
-                "semantic_filters_json": '["air_quality"]',
-                "state": "success",
+                "title": "Current session",
+                "status": "active",
+                "last_map_session_json": "{}",
             }
         ],
-        SEARCH_SESSIONS_TABLE,
+        CHAT_SESSIONS_TABLE,
     )
 
-    rows = repository.load_from_database(SEARCH_SESSIONS_TABLE)
-    assert repository.count_rows(SEARCH_SESSIONS_TABLE) == 1
+    rows = repository.load_from_database(CHAT_SESSIONS_TABLE)
+    assert repository.count_rows(CHAT_SESSIONS_TABLE) == 1
     assert len(rows) == 1
     assert isinstance(rows[0]["id"], int)
-    assert rows[0]["basemap_id"] == "osm_default"
-    assert rows[0]["overlay_ids_json"] == '["Layer"]'
-    assert rows[0]["semantic_filters_json"] == '["air_quality"]'
+    assert rows[0]["title"] == "Current session"
+    assert rows[0]["status"] == "active"

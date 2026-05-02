@@ -7,7 +7,6 @@ from sqlalchemy import func, select
 
 from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
-from server.repositories.queries.session_catalog import select_by_session_id
 from server.repositories.schemas import Base
 from server.repositories.schemas.models import (
     ChatMessageRecord,
@@ -23,7 +22,15 @@ class SessionCatalogRepository:
 
     def upsert_for_session(self, *, session_id: int, models: dict[str, Any]) -> None:
         with self._session_factory() as session:
-            record = session.execute(select_by_session_id(session_id)).scalars().first()
+            record = (
+                session.execute(
+                    select(SessionCatalogRecord).where(
+                        SessionCatalogRecord.session_id == session_id
+                    )
+                )
+                .scalars()
+                .first()
+            )
             message_count = session.scalar(
                 select(func.count())
                 .select_from(ChatMessageRecord)

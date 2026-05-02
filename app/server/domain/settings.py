@@ -167,7 +167,7 @@ class ServerSettings:
 ###############################################################################
 class JsonDatabaseSettings(BaseModel):
     embedded_database: bool = True
-    engine: str = "postgres"
+    engine: str = "postgresql+psycopg"
     host: str | None = None
     port: int = Field(default=5432, ge=1, le=65535)
     database_name: str | None = None
@@ -192,7 +192,7 @@ class JsonDatabaseSettings(BaseModel):
     @classmethod
     def normalize_engine(cls, value: Any) -> str:
         text = str(value).strip() if value is not None else ""
-        return text or "postgres"
+        return text or "postgresql+psycopg"
 
 
 ###############################################################################

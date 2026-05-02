@@ -1,7 +1,7 @@
 {  
   "database": {
     "embedded_database": true,
-    "engine": "postgres",
+    "engine": "postgresql+psycopg",
     "host": "localhost",
     "port": 5432,
     "database_name": "AEGIS",
