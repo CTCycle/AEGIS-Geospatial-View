@@ -60,7 +60,8 @@ class ChatStreamingService:
                     "request_id": request_id,
                 },
             )
-
+    
+    # -------------------------------------------------------------------------
     def _build_tool_status_payload(self, response: ChatTurnResponse) -> dict[str, Any]:
         tool_payload = response.tool_payload
         if not isinstance(tool_payload, dict):
