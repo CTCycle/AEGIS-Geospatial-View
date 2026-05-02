@@ -5,12 +5,8 @@ from typing import Any
 
 from server.repositories.database.backend import get_database
 from server.common.constants import (
-    GEONAMES_COLUMNS,
-    GEONAMES_TABLE,
     GIBS_LAYER_COLUMNS,
     GIBS_LAYERS_TABLE,
-    SEARCH_SESSION_COLUMNS,
-    SEARCH_SESSIONS_TABLE,
 )
 
 
@@ -41,25 +37,11 @@ class DataSerializer:
         return normalized_records
 
     # -----------------------------------------------------------------------------
-    def upsert_geonames_records(self, records: list[dict[str, Any]]) -> None:
-        if not records:
-            return
-        normalized_records = self.normalize_records(records, GEONAMES_COLUMNS)
-        self.database.upsert_into_database(normalized_records, GEONAMES_TABLE)
-
-    # -----------------------------------------------------------------------------
     def upsert_gibs_layers(self, layers: list[dict[str, Any]]) -> None:
         if not layers:
             return
         normalized_records = self.normalize_records(layers, GIBS_LAYER_COLUMNS)
         self.database.upsert_into_database(normalized_records, GIBS_LAYERS_TABLE)
-
-    # -----------------------------------------------------------------------------
-    def insert_search_session(self, session: dict[str, Any]) -> None:
-        if not session:
-            return
-        normalized_records = self.normalize_records([session], SEARCH_SESSION_COLUMNS)
-        self.database.upsert_into_database(normalized_records, SEARCH_SESSIONS_TABLE)
 
     # -----------------------------------------------------------------------------
     def load_table(self, table_name: str) -> list[dict[str, Any]]:

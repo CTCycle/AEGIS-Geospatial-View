@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from sqlalchemy import select
+
 from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
-from server.repositories.queries.manifest_embeddings import select_by_manifest
 from server.repositories.schemas import Base
 from server.repositories.schemas.models import ManifestEmbeddingRecord
 
@@ -18,7 +19,12 @@ class ManifestEmbeddingsRepository:
     ) -> ManifestEmbeddingRecord | None:
         with self._session_factory() as session:
             return (
-                session.execute(select_by_manifest(manifest_id, manifest_kind))
+                session.execute(
+                    select(ManifestEmbeddingRecord).where(
+                        ManifestEmbeddingRecord.manifest_id == manifest_id,
+                        ManifestEmbeddingRecord.manifest_kind == manifest_kind,
+                    )
+                )
                 .scalars()
                 .first()
             )
@@ -37,7 +43,12 @@ class ManifestEmbeddingsRepository:
     ) -> None:
         with self._session_factory() as session:
             record = (
-                session.execute(select_by_manifest(manifest_id, manifest_kind))
+                session.execute(
+                    select(ManifestEmbeddingRecord).where(
+                        ManifestEmbeddingRecord.manifest_id == manifest_id,
+                        ManifestEmbeddingRecord.manifest_kind == manifest_kind,
+                    )
+                )
                 .scalars()
                 .first()
             )

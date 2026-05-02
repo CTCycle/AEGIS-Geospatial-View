@@ -10,7 +10,6 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from server.configurations import DatabaseSettings
-from server.repositories.database.utils import normalize_postgres_engine
 from server.repositories.schemas import Base
 
 
@@ -27,7 +26,9 @@ class PostgresRepository:
             )
 
         port = settings.port or 5432
-        engine_name = normalize_postgres_engine(settings.engine)
+        engine_name = settings.engine
+        if engine_name != "postgresql+psycopg":
+            raise ValueError(f"Unsupported database engine: {settings.engine}")
         password = settings.password or ""
         connect_args: dict[str, Any] = {"connect_timeout": settings.connect_timeout}
         if settings.ssl:

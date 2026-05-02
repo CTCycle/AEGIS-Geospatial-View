@@ -47,7 +47,7 @@ def build_postgres_backend(settings: DatabaseSettings) -> DatabaseBackend:
 
 BACKEND_FACTORIES: dict[str, BackendFactory] = {
     "sqlite": build_sqlite_backend,
-    "postgres": build_postgres_backend,
+    "postgresql+psycopg": build_postgres_backend,
 }
 
 
@@ -60,7 +60,7 @@ class AEGISDatabase:
 
     # -------------------------------------------------------------------------
     def _build_backend(self, is_embedded: bool) -> DatabaseBackend:
-        backend_name = "sqlite" if is_embedded else (self.settings.engine or "postgres")
+        backend_name = "sqlite" if is_embedded else (self.settings.engine or "")
         normalized_name = backend_name.lower()
         logger.info("Initializing %s database backend", backend_name)
         if normalized_name not in BACKEND_FACTORIES:

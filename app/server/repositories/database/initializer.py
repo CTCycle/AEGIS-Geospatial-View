@@ -1,62 +1,15 @@
 from __future__ import annotations
 
 import os
-import urllib.parse
 
 import sqlalchemy
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.sql.elements import TextClause
 
 from server.configurations import DatabaseSettings, get_server_settings
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
-from server.repositories.database.utils import normalize_postgres_engine
 from server.common.logger import logger
-
-
-###############################################################################
-def build_postgres_connect_args(settings: DatabaseSettings) -> dict[str, str | int]:
-    connect_args: dict[str, str | int] = {
-        "connect_timeout": settings.connect_timeout,
-        "client_encoding": "utf8",
-    }
-    if settings.ssl:
-        connect_args["sslmode"] = "require"
-        if settings.ssl_ca:
-            connect_args["sslrootcert"] = settings.ssl_ca
-    return connect_args
-
-
-# -----------------------------------------------------------------------------
-def build_postgres_url(settings: DatabaseSettings, database_name: str) -> str:
-    port = settings.port or 5432
-    engine_name = normalize_postgres_engine(settings.engine)
-    safe_username = urllib.parse.quote_plus(settings.username or "")
-    safe_password = urllib.parse.quote_plus(settings.password or "")
-    return (
-        f"{engine_name}://{safe_username}:{safe_password}"
-        f"@{settings.host}:{port}/{database_name}"
-    )
-
-
-# -----------------------------------------------------------------------------
-def clone_settings_with_database(
-    settings: DatabaseSettings, database_name: str
-) -> DatabaseSettings:
-    return DatabaseSettings(
-        embedded_database=False,
-        engine=settings.engine,
-        host=settings.host,
-        port=settings.port,
-        database_name=database_name,
-        username=settings.username,
-        password=settings.password,
-        ssl=settings.ssl,
-        ssl_ca=settings.ssl_ca,
-        connect_timeout=settings.connect_timeout,
-        insert_batch_size=settings.insert_batch_size,
-    )
 
 
 # -----------------------------------------------------------------------------
@@ -73,19 +26,6 @@ def should_initialize_sqlite_database(settings: DatabaseSettings) -> bool:
     if not db_path:
         return False
     return not os.path.exists(db_path)
-
-
-# -----------------------------------------------------------------------------
-def build_postgres_database_exists_statement() -> TextClause:
-    return sqlalchemy.text("SELECT 1 FROM pg_database WHERE datname=:name")
-
-
-# -----------------------------------------------------------------------------
-def build_postgres_create_database_statement(database_name: str) -> TextClause:
-    safe_database = database_name.replace('"', '""')
-    return sqlalchemy.text(
-        f"CREATE DATABASE \"{safe_database}\" WITH ENCODING 'UTF8' TEMPLATE template0"
-    )
 
 
 # -----------------------------------------------------------------------------
@@ -127,13 +67,8 @@ def run_database_initialization() -> None:
             logger.info("SQLite database already exists; schema ensured.")
         return
 
-    engine_name = normalize_postgres_engine(settings.engine).lower()
-    if engine_name not in {
-        "postgres",
-        "postgresql",
-        "postgresql+psycopg",
-        "postgresql+psycopg2",
-    }:
+    engine_name = (settings.engine or "").lower()
+    if engine_name != "postgresql+psycopg":
         raise ValueError(f"Unsupported database engine: {settings.engine}")
 
     ensure_postgres_database(settings)
