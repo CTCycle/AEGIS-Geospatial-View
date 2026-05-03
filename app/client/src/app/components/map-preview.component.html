@@ -37,27 +37,13 @@
         </div>
 
         @if (overlays.length) {
-          <div class="overlay-controls">
-            @for (overlay of overlays; track trackOverlay($index, overlay)) {
-              <div class="overlay-control-row">
-                <label>
-                  <input
-                    type="checkbox"
-                    [checked]="overlayVisibility[overlay.id]"
-                    (change)="onOverlayVisibilityChange(overlay.id, $event)"
-                  />
-                  {{ overlay.label }}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  [value]="getOpacityPercent(overlay)"
-                  (change)="onOverlayOpacityChange(overlay.id, $event)"
-                />
-              </div>
-            }
-          </div>
+          <app-overlay-controls
+            [overlays]="overlays"
+            [overlayVisibility]="overlayVisibility"
+            [overlayOpacity]="overlayOpacity"
+            (overlayVisibilityChange)="onOverlayVisibilityChange($event)"
+            (overlayOpacityChange)="onOverlayOpacityChange($event)"
+          ></app-overlay-controls>
         }
 
         @if (complianceWarnings.length) {

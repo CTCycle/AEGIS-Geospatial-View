@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 
-import { fetchCatalog } from '../core/api';
+import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
 
 type CapabilityGroup = 'providers' | 'basemaps' | 'overlays' | 'tools';
@@ -25,11 +25,14 @@ export class CapabilitiesPageComponent implements OnInit {
     { id: 'tools', label: 'Direct Tools', description: 'Fast non-map actions the assistant can execute.' },
   ];
 
-  constructor(private readonly changeDetector: ChangeDetectorRef) {}
+  constructor(
+    private readonly apiClient: ApiClientService,
+    private readonly changeDetector: ChangeDetectorRef,
+  ) {}
 
   async ngOnInit(): Promise<void> {
     try {
-      this.catalog = await fetchCatalog();
+      this.catalog = await this.apiClient.fetchCatalog();
       this.statusText = 'Capability catalog loaded';
     } catch {
       this.catalog = { capabilities: [], providers: [], basemaps: [], overlays: [], tools: [] };

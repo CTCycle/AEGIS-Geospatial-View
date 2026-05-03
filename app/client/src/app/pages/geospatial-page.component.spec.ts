@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 
-import * as Api from '../core/api';
+import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { ChatTurnResponse } from '../core/types';
@@ -12,6 +12,7 @@ describe('pages/geospatial-page.component', () => {
   let router: Router;
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
+  let apiClient: jasmine.SpyObj<ApiClientService>;
   let sendChatTurnMock: jasmine.Spy;
   let fetchCatalogMock: jasmine.Spy;
 
@@ -39,14 +40,20 @@ describe('pages/geospatial-page.component', () => {
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['toUserFacingError']);
     errors.toUserFacingError.and.returnValue('fallback error');
 
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn', 'fetchCatalog']);
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     fetchCatalogMock = jasmine.createSpy('fetchCatalog').and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
-    spyOnProperty(Api, 'sendChatTurn', 'get').and.returnValue(sendChatTurnMock);
-    spyOnProperty(Api, 'fetchCatalog', 'get').and.returnValue(fetchCatalogMock);
+    apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
+    apiClient.fetchCatalog.and.callFake(() => fetchCatalogMock());
 
     await TestBed.configureTestingModule({
       imports: [GeospatialPageComponent],
-      providers: [provideRouter([]), { provide: AppStateStoreService, useValue: store }, { provide: UserFacingErrorService, useValue: errors }],
+      providers: [
+        provideRouter([]),
+        { provide: ApiClientService, useValue: apiClient },
+        { provide: AppStateStoreService, useValue: store },
+        { provide: UserFacingErrorService, useValue: errors },
+      ],
     }).compileComponents();
     router = TestBed.inject(Router);
   });

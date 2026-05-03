@@ -1,5 +1,6 @@
 import {
   AfterViewInit,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -13,6 +14,7 @@ import {
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import maplibregl, { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
 
+import { OverlayControlsComponent } from './overlay-controls.component';
 import {
   DEFAULT_BASE_ATTRIBUTION,
   DEFAULT_BASE_TILE_MAX_ZOOM,
@@ -26,7 +28,13 @@ import {
   DEFAULT_WMTS_FORMAT,
   DEFAULT_WMTS_MATRIX_SET,
 } from '../core/constants';
-import { MapSession, SearchResponsePayload } from '../core/types';
+import {
+  MapSession,
+  OverlayOpacityChange,
+  OverlayStateChange,
+  OverlayVisibilityChange,
+  SearchResponsePayload,
+} from '../core/types';
 
 type OverlayEntry = NonNullable<MapSession['overlays']>[number];
 type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
@@ -335,6 +343,8 @@ const normalizeBounds = (bounds: unknown): LngLatBoundsLike | null => {
 
 @Component({
   selector: 'app-map-preview',
+  standalone: true,
+  imports: [OverlayControlsComponent],
   templateUrl: './map-preview.component.html',
   styleUrl: './map-preview.component.css',
 })
@@ -344,10 +354,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() emptyMessage = 'Run a search to display the map.';
   @Input() initialOverlayVisibility: Record<string, boolean> = {};
   @Input() initialOverlayOpacity: Record<string, number> = {};
-  @Output() overlayStateChange = new EventEmitter<{
-    overlayVisibility: Record<string, boolean>;
-    overlayOpacity: Record<string, number>;
-  }>();
+  @Output() overlayStateChange = new EventEmitter<OverlayStateChange>();
 
   @ViewChild('mapContainer', { static: false })
   private set mapContainer(value: ElementRef<HTMLDivElement> | undefined) {
@@ -366,7 +373,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private mapContainerRef?: ElementRef<HTMLDivElement>;
   private viewInitialized = false;
 
-  constructor(private readonly sanitizer: DomSanitizer) {}
+  constructor(
+    private readonly sanitizer: DomSanitizer,
+    private readonly changeDetector: ChangeDetectorRef,
+  ) {}
 
   get hasCenter(): boolean {
     return typeof this.mapSession?.center?.latitude === 'number'
@@ -390,7 +400,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   ngAfterViewInit(): void {
     this.viewInitialized = true;
-    this.syncSessionFromPayload();
+    if (!this.mapSession && this.payload) {
+      this.syncSessionFromPayload();
+      this.rebuildOverlayStateFromSession();
+      this.changeDetector.detectChanges();
+    }
     this.recreateMapIfPossible();
     this.applyOverlayStateToMap();
   }
@@ -408,10 +422,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.destroyMap();
   }
 
-  trackOverlay(_: number, overlay: OverlayEntry): string {
-    return overlay.id;
-  }
-
   setOverlayVisibility(overlayId: string, checked: boolean): void {
     this.overlayVisibility = { ...this.overlayVisibility, [overlayId]: checked };
     this.emitOverlayState();
@@ -425,18 +435,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.applyOverlayStateToMap();
   }
 
-  onOverlayVisibilityChange(overlayId: string, event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    this.setOverlayVisibility(overlayId, Boolean(target?.checked));
+  onOverlayVisibilityChange(change: OverlayVisibilityChange): void {
+    this.setOverlayVisibility(change.overlayId, change.checked);
   }
 
-  onOverlayOpacityChange(overlayId: string, event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    this.setOverlayOpacity(overlayId, target?.value ?? '0');
-  }
-
-  getOpacityPercent(overlay: OverlayEntry): number {
-    return Math.round((this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY) * 100);
+  onOverlayOpacityChange(change: OverlayOpacityChange): void {
+    this.setOverlayOpacity(change.overlayId, change.percentValue);
   }
 
   zoomIn(): boolean {
@@ -461,9 +465,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       this.mapSession = undefined;
       return;
     }
-    const overlays = Array.isArray(next.overlays)
+    const overlayIds = next.overlay_ids ?? [];
+    const overlays = Array.isArray(next.overlays) && next.overlays.length > 0
       ? next.overlays
-      : (next.overlay_ids ?? []).map((overlayId) => ({
+      : overlayIds.map((overlayId) => ({
         id: overlayId,
         label: overlayId,
         provider: 'manifest',

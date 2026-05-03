@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import * as Api from '../core/api';
+import { ApiClientService } from '../core/api-client.service';
 import { ModelSettingsResponse } from '../core/types';
 import { AccessConfigurationsPageComponent } from './access-configurations-page.component';
 
@@ -24,6 +24,7 @@ describe('pages/access-configurations-page.component', () => {
   let updateChatSettingsMock: jasmine.Spy;
 
   beforeEach(async () => {
+    const apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['fetchChatSettings', 'updateChatSettings']);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo(settings);
     updateChatSettingsMock = jasmine.createSpy('updateChatSettings').and.callFake(async (payload): Promise<ModelSettingsResponse> => ({
       ...settings,
@@ -35,11 +36,12 @@ describe('pages/access-configurations-page.component', () => {
         : {},
     }));
 
-    spyOnProperty(Api, 'fetchChatSettings', 'get').and.returnValue(fetchChatSettingsMock);
-    spyOnProperty(Api, 'updateChatSettings', 'get').and.returnValue(updateChatSettingsMock);
+    apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
+    apiClient.updateChatSettings.and.callFake((payload) => updateChatSettingsMock(payload));
 
     await TestBed.configureTestingModule({
       imports: [AccessConfigurationsPageComponent],
+      providers: [{ provide: ApiClientService, useValue: apiClient }],
     }).compileComponents();
   });
 
