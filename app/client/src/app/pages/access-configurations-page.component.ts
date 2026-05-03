@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { fetchChatSettings, updateChatSettings } from '../core/api';
+import { ApiClientService } from '../core/api-client.service';
 import { ModelSettingsResponse } from '../core/types';
 
 type GeoProviderId = 'geoapify' | 'tomtom' | 'google_maps' | 'arcgis';
@@ -59,7 +59,10 @@ export class AccessConfigurationsPageComponent implements OnInit {
     },
   ];
 
-  constructor(private readonly changeDetector: ChangeDetectorRef) {}
+  constructor(
+    private readonly apiClient: ApiClientService,
+    private readonly changeDetector: ChangeDetectorRef,
+  ) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadSettings();
@@ -104,7 +107,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
 
   private async loadSettings(): Promise<void> {
     try {
-      this.settings = await fetchChatSettings();
+      this.settings = await this.apiClient.fetchChatSettings();
       this.statusText = 'Default workflow uses free and open providers. Optional keys are only used when configured.';
     } catch {
       this.statusText = 'Could not load access configuration.';
@@ -119,7 +122,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
     }
     this.isSaving = true;
     try {
-      this.settings = await updateChatSettings({
+      this.settings = await this.apiClient.updateChatSettings({
         active_provider_mode: this.settings.active_provider_mode,
         chat_model_provider: this.settings.chat_model_provider,
         chat_model_name: this.settings.chat_model_name,

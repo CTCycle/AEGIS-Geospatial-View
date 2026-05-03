@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 
-import * as Api from '../core/api';
+import { ApiClientService } from '../core/api-client.service';
 import { CapabilitiesPageComponent } from './capabilities-page.component';
 
 describe('pages/capabilities-page.component', () => {
   beforeEach(async () => {
+    const apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['fetchCatalog']);
     const fetchCatalogMock = jasmine.createSpy('fetchCatalog').and.resolveTo({
       capabilities: [],
       providers: [{ id: 'gibs', name: 'NASA GIBS', kind: 'provider', provider: 'gibs', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: { docs_url: 'https://earthdata.nasa.gov/' } }],
@@ -12,10 +13,11 @@ describe('pages/capabilities-page.component', () => {
       overlays: [{ id: 'tomtom_traffic_flow', name: 'TomTom Traffic Flow', kind: 'overlay', type: 'tile', description: 'Traffic', provider: 'tomtom', requires_credentials: true, is_available: false, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
       tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', type: 'direct-tool', description: 'Forecast', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
     });
-    spyOnProperty(Api, 'fetchCatalog', 'get').and.returnValue(fetchCatalogMock);
+    apiClient.fetchCatalog.and.callFake(() => fetchCatalogMock());
 
     await TestBed.configureTestingModule({
       imports: [CapabilitiesPageComponent],
+      providers: [{ provide: ApiClientService, useValue: apiClient }],
     }).compileComponents();
   });
 

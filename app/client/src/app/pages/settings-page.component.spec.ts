@@ -1,16 +1,21 @@
 import { TestBed } from '@angular/core/testing';
+import { Component } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 
-import * as Api from '../core/api';
+import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { SettingsPageComponent } from './settings-page.component';
 
+@Component({ template: '' })
+class TestRouteComponent {}
+
 describe('pages/settings-page.component', () => {
   let router: Router;
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
+  let apiClient: jasmine.SpyObj<ApiClientService>;
   let fetchChatSettingsMock: jasmine.Spy;
   let fetchChatModelsMock: jasmine.Spy;
   let updateChatSettingsMock: jasmine.Spy;
@@ -26,6 +31,14 @@ describe('pages/settings-page.component', () => {
     errors.normalizeDisplayText.and.callFake((value: string) => value);
     errors.isLowLevelConnectionError.and.returnValue(true);
 
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', [
+      'fetchChatSettings',
+      'fetchChatModels',
+      'updateChatSettings',
+      'checkOllamaHealth',
+      'refreshOllamaModels',
+      'pullOllamaModel',
+    ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'local',
       chat_model_provider: 'ollama',
@@ -47,16 +60,21 @@ describe('pages/settings-page.component', () => {
     refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
     pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
 
-    spyOnProperty(Api, 'fetchChatSettings', 'get').and.returnValue(fetchChatSettingsMock);
-    spyOnProperty(Api, 'fetchChatModels', 'get').and.returnValue(fetchChatModelsMock);
-    spyOnProperty(Api, 'updateChatSettings', 'get').and.returnValue(updateChatSettingsMock);
-    spyOnProperty(Api, 'checkOllamaHealth', 'get').and.returnValue(checkOllamaHealthMock);
-    spyOnProperty(Api, 'refreshOllamaModels', 'get').and.returnValue(refreshOllamaModelsMock);
-    spyOnProperty(Api, 'pullOllamaModel', 'get').and.returnValue(pullOllamaModelMock);
+    apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
+    apiClient.fetchChatModels.and.callFake(() => fetchChatModelsMock());
+    apiClient.updateChatSettings.and.callFake((payload) => updateChatSettingsMock(payload));
+    apiClient.checkOllamaHealth.and.callFake(() => checkOllamaHealthMock());
+    apiClient.refreshOllamaModels.and.callFake(() => refreshOllamaModelsMock());
+    apiClient.pullOllamaModel.and.callFake((model) => pullOllamaModelMock(model));
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
-      providers: [provideRouter([]), { provide: AppStateStoreService, useValue: store }, { provide: UserFacingErrorService, useValue: errors }],
+      providers: [
+        provideRouter([{ path: 'settings', component: TestRouteComponent }]),
+        { provide: ApiClientService, useValue: apiClient },
+        { provide: AppStateStoreService, useValue: store },
+        { provide: UserFacingErrorService, useValue: errors },
+      ],
     }).compileComponents();
     router = TestBed.inject(Router);
   });
@@ -177,13 +195,17 @@ describe('pages/settings-page.component', () => {
 
   it('syncQueryState and persistence update URL and store', async () => {
     window.history.replaceState({}, '', '/settings');
+    const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
     component.setSearchText('gpt');
     await fixture.whenStable();
-    expect(window.location.search).toContain('q=gpt');
+    expect(navigateSpy).toHaveBeenCalledWith(['/settings'], {
+      queryParams: { q: 'gpt' },
+      replaceUrl: true,
+    });
     expect(store.updateSettingsPage).toHaveBeenCalled();
   });
 

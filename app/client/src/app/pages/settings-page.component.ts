@@ -7,6 +7,7 @@ import { ModelRoleActionsComponent } from '../components/model-role-actions.comp
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
+import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
 import {
@@ -20,14 +21,6 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
 } from '../core/types';
-import {
-  checkOllamaHealth,
-  fetchChatModels,
-  fetchChatSettings,
-  pullOllamaModel,
-  refreshOllamaModels,
-  updateChatSettings,
-} from '../core/api';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 
@@ -87,6 +80,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   constructor(
     private readonly router: Router,
+    private readonly apiClient: ApiClientService,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
@@ -230,7 +224,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     try {
-      const updated = await updateChatSettings({
+      const updated = await this.apiClient.updateChatSettings({
         ...this.settings,
         credentials: {
           openai: this.openaiKey.trim() ? { api_key: this.openaiKey.trim() } : {},
@@ -253,7 +247,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async checkOllamaConnection(): Promise<void> {
     try {
-      const health = await checkOllamaHealth();
+      const health = await this.apiClient.checkOllamaHealth();
       const summary = this.formatOllamaHealthSummary(health);
       this.ollamaModalStatusText = summary;
       this.statusText = `Ollama: ${summary}`;
@@ -267,7 +261,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async refreshOllamaLibrary(): Promise<void> {
     try {
-      await refreshOllamaModels();
+      await this.apiClient.refreshOllamaModels();
       await this.loadData();
       this.statusText = 'Ollama library refreshed';
       this.ollamaModalStatusText = 'Model library refreshed.';
@@ -281,7 +275,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async saveOllamaSettings(): Promise<void> {
     try {
-      const updated = await updateChatSettings({
+      const updated = await this.apiClient.updateChatSettings({
         ...this.settings,
         ollama_url: this.ollamaUrlDraft.trim() || 'http://localhost:11434',
       });
@@ -300,8 +294,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async pullLocalModel(model: ModelCardDescriptor): Promise<void> {
     try {
-      await pullOllamaModel(model.name);
-      await refreshOllamaModels();
+      await this.apiClient.pullOllamaModel(model.name);
+      await this.apiClient.refreshOllamaModels();
       await this.loadData();
       this.statusText = `Pulled ${model.name}`;
       this.syncState();
@@ -374,8 +368,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isLoadingModels = true;
     try {
       const [nextSettings, modelLibrary] = await Promise.all([
-        fetchChatSettings(),
-        fetchChatModels(),
+        this.apiClient.fetchChatSettings(),
+        this.apiClient.fetchChatModels(),
       ]);
       if (this.isDestroyed) {
         return;
@@ -403,7 +397,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private syncQueryState(): void {
     const currentPath = this.router.url.split('?')[0];
-    if (currentPath !== '/settings') {
+    if (currentPath !== '/settings' && window.location.pathname !== '/settings') {
       return;
     }
 
@@ -431,7 +425,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
-    return updateChatSettings(payload);
+    return this.apiClient.updateChatSettings(payload);
   }
 
   private roleLabel(role: ModelRole): string {

@@ -1,4 +1,13 @@
-import { ModelProviderMode, SearchResponsePayload, ChatMessage, PolicyDecision, MapSession, ContextUsage } from './types';
+import {
+  ChatMessage,
+  ChatRole,
+  ContextUsage,
+  MapSession,
+  ModelProviderMode,
+  OverlayStateChange,
+  PolicyDecision,
+  SearchResponsePayload,
+} from './types';
 
 const STORAGE_KEY = 'aegis:webapp-state:v3';
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -21,10 +30,7 @@ export interface PersistedChatPanelState {
   transcriptScrollTop: number;
 }
 
-export interface PersistedMapState {
-  overlayVisibility: Record<string, boolean>;
-  overlayOpacity: Record<string, number>;
-}
+export interface PersistedMapState extends OverlayStateChange {}
 
 export interface PersistedChatPageState {
   toolbarWidth: number;
@@ -56,6 +62,53 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isProviderMode = (value: unknown): value is ModelProviderMode =>
   value === 'local' || value === 'cloud';
+
+const isChatRole = (value: unknown): value is ChatRole =>
+  value === 'user' || value === 'assistant' || value === 'system' || value === 'tool';
+
+const isPersistedChatMessage = (value: unknown): value is ChatMessage => (
+  isRecord(value)
+  && isChatRole(value.role)
+  && typeof value.content === 'string'
+  && (value.created_at === undefined || typeof value.created_at === 'string')
+);
+
+const parseBooleanRecord = (value: unknown): Record<string, boolean> => {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.entries(value).reduce<Record<string, boolean>>((acc, [key, entry]) => {
+    if (typeof entry === 'boolean') {
+      acc[key] = entry;
+    }
+    return acc;
+  }, {});
+};
+
+const parseNumberRecord = (value: unknown): Record<string, number> => {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.entries(value).reduce<Record<string, number>>((acc, [key, entry]) => {
+    if (typeof entry === 'number' && Number.isFinite(entry)) {
+      acc[key] = entry;
+    }
+    return acc;
+  }, {});
+};
+
+const parsePersistedMessages = (value: unknown): ChatMessage[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter(isPersistedChatMessage)
+    .map((entry) => ({
+      role: entry.role,
+      content: entry.content,
+      created_at: typeof entry.created_at === 'string' ? entry.created_at : undefined,
+    }));
+};
 
 export const defaultAppState = (): PersistedAppState => ({
   version: 3,
@@ -207,20 +260,11 @@ export const loadPersistedAppState = (): PersistedAppState => {
       next.chatPage.scrollY = typeof parsed.chatPage.scrollY === 'number' ? parsed.chatPage.scrollY : 0;
       if (isRecord(parsed.chatPage.mapState)) {
         next.chatPage.mapState = {
-          overlayVisibility: isRecord(parsed.chatPage.mapState.overlayVisibility)
-            ? parsed.chatPage.mapState.overlayVisibility as Record<string, boolean>
-            : {},
-          overlayOpacity: isRecord(parsed.chatPage.mapState.overlayOpacity)
-            ? parsed.chatPage.mapState.overlayOpacity as Record<string, number>
-            : {},
+          overlayVisibility: parseBooleanRecord(parsed.chatPage.mapState.overlayVisibility),
+          overlayOpacity: parseNumberRecord(parsed.chatPage.mapState.overlayOpacity),
         };
       }
       if (isRecord(parsed.chatPage.chatPanel)) {
-        const messages = Array.isArray(parsed.chatPage.chatPanel.messages)
-          ? parsed.chatPage.chatPanel.messages.filter((entry) => (
-            isRecord(entry) && typeof entry.role === 'string' && typeof entry.content === 'string'
-          ))
-          : [];
         next.chatPage.chatPanel = {
           sessionId: typeof parsed.chatPage.chatPanel.sessionId === 'number'
             ? parsed.chatPage.chatPanel.sessionId
@@ -228,7 +272,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
           conversationNonce: typeof parsed.chatPage.chatPanel.conversationNonce === 'number'
             ? parsed.chatPage.chatPanel.conversationNonce
             : 1,
-          messages: messages as PersistedChatPanelState['messages'],
+          messages: parsePersistedMessages(parsed.chatPage.chatPanel.messages),
           lastDecision: isRecord(parsed.chatPage.chatPanel.lastDecision)
             ? parsed.chatPage.chatPanel.lastDecision as unknown as PolicyDecision
             : undefined,

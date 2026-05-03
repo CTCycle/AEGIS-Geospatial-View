@@ -125,6 +125,21 @@ export interface SearchResponsePayload {
   compliance_warnings?: string[];
 }
 
+export interface OverlayStateChange {
+  overlayVisibility: Record<string, boolean>;
+  overlayOpacity: Record<string, number>;
+}
+
+export interface OverlayVisibilityChange {
+  overlayId: string;
+  checked: boolean;
+}
+
+export interface OverlayOpacityChange {
+  overlayId: string;
+  percentValue: string;
+}
+
 export type ChatRole = 'user' | 'assistant' | 'system' | 'tool';
 
 export interface ChatMessage {

@@ -3,10 +3,18 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@ang
 import { Router } from '@angular/router';
 
 import { MapPreviewComponent } from '../components/map-preview.component';
+import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedChatPageState } from '../core/app-state';
-import { MapSession, SearchResponsePayload, ChatMessage, ChatRole, ChatTurnResponse, ContextUsage } from '../core/types';
-import { fetchCatalog, sendChatTurn } from '../core/api';
+import {
+  MapSession,
+  OverlayStateChange,
+  SearchResponsePayload,
+  ChatMessage,
+  ChatRole,
+  ChatTurnResponse,
+  ContextUsage,
+} from '../core/types';
 import { formatCapabilitySummary } from '../core/local-command-response';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -53,6 +61,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   constructor(
     private readonly router: Router,
+    private readonly apiClient: ApiClientService,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
@@ -232,7 +241,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  onOverlayStateChange(state: { overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }): void {
+  onOverlayStateChange(state: OverlayStateChange): void {
     this.mapState = state;
     this.syncState();
   }
@@ -244,10 +253,10 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
 
     const message = trimmed;
+    const requestNonce = this.conversationNonce;
     if (await this.tryHandleLocalCommand(message)) {
       return;
     }
-    const requestNonce = this.conversationNonce;
     this.composerDraft = '';
     this.isLoading = true;
     this.status = 'Searching map data';
@@ -257,7 +266,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.syncState();
 
     try {
-      const result = await sendChatTurn({
+      const result = await this.apiClient.sendChatTurn({
         session_id: this.sessionId,
         message,
       });
@@ -332,7 +341,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       this.status = 'Loading capabilities';
       this.syncState();
       try {
-        const catalog = await fetchCatalog();
+        const catalog = await this.apiClient.fetchCatalog();
         const optional = catalog.capabilities
           .filter((item) => item.requires_credentials)
           .map((item) => item.name);
