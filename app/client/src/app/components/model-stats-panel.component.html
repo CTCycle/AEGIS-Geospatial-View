@@ -11,10 +11,8 @@
     <tbody>
       @if (isLoading) {
         <tr><td colSpan="4">Loading model assignments...</td></tr>
-      } @else if (rows.length === 0) {
-        <tr><td colSpan="4">No models selected yet.</td></tr>
       }
-      @for (row of rows; track row.provider + ':' + row.model) {
+      @for (row of rows; track row.assignedRoles[0] + ':' + row.provider + ':' + row.model) {
         <tr>
           <td>{{ row.model }}</td>
           <td>{{ row.provider }}</td>
@@ -31,12 +29,8 @@
     <article class="settings-page__stats-mobile-card">
       <p class="settings-page__stats-mobile-empty">Loading model assignments...</p>
     </article>
-  } @else if (rows.length === 0) {
-    <article class="settings-page__stats-mobile-card">
-      <p class="settings-page__stats-mobile-empty">No models selected yet.</p>
-    </article>
   }
-  @for (row of rows; track row.provider + ':' + row.model) {
+  @for (row of rows; track row.assignedRoles[0] + ':' + row.provider + ':' + row.model) {
     <article class="settings-page__stats-mobile-card">
       <h3>{{ row.model }}</h3>
       <dl>

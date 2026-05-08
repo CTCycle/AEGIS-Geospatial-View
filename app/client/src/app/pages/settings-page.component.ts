@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
@@ -79,7 +78,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private isDestroyed = false;
 
   constructor(
-    private readonly router: Router,
     private readonly apiClient: ApiClientService,
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
@@ -304,11 +302,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  navigateBack(): void {
-    this.syncState();
-    this.router.navigateByUrl('/');
-  }
-
   closeModal(): void {
     this.isKeysModalOpen = false;
     this.isOllamaModalOpen = false;
@@ -396,7 +389,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private syncQueryState(): void {
-    const currentPath = this.router.url.split('?')[0];
+    const currentPath = window.location.pathname;
     if (currentPath !== '/settings' && window.location.pathname !== '/settings') {
       return;
     }
@@ -418,10 +411,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     params.forEach((value, key) => {
       queryParams[key] = value;
     });
-    void this.router.navigate(['/settings'], {
-      queryParams,
-      replaceUrl: true,
-    });
+    const query = new URLSearchParams(queryParams).toString();
+    const nextUrl = query ? `/settings?${query}` : '/settings';
+    window.history.replaceState(window.history.state, '', nextUrl);
   }
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {

@@ -66,10 +66,25 @@
     font-size: 0.8rem;
 }
 
-.capability-section__header span {
+.capability-section__count {
+    align-self: flex-start;
+    border: 1px solid #263a45;
+    border-radius: 0.35rem;
+    background: #101c23;
+    padding: 0.2rem 0.45rem;
     color: #8fb2c3;
     font-size: 0.78rem;
     font-weight: 800;
+    white-space: nowrap;
+}
+
+.capability-section__empty {
+    margin: 0;
+    border: 1px solid #263a45;
+    background: #101c23;
+    padding: 0.8rem;
+    color: #9fb1ba;
+    font-size: 0.82rem;
 }
 
 .capability-table-wrap {

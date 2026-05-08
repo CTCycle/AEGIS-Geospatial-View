@@ -22,10 +22,11 @@ describe('ModelStatsPanelComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('ollama');
   });
 
-  it('renders empty state', () => {
+  it('renders table headers even without rows', () => {
     component.rows = [];
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No models selected yet.');
+    expect(fixture.nativeElement.textContent).toContain('Model');
+    expect(fixture.nativeElement.textContent).toContain('Assigned');
   });
 
   it('renders provider and assigned metadata', () => {
