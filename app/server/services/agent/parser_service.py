@@ -16,41 +16,11 @@ from server.domain.extraction.models import (
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.factory import LLMFactory
+from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
 from pydantic import BaseModel, ConfigDict, Field
 
 LOGGER = logging.getLogger(__name__)
-
-PARSER_SYSTEM_PROMPT = """
-Role:
-You are the AEGIS parser. Extract turn-routing intent from the current user message.
-
-Output:
-Return JSON only with this schema:
-- task_class: map_search|direct_query|general_question|unclear
-- intent_id: short snake_case id
-- intent_label: short human label
-- task_tags: array of tags
-- intent_tags: array of tags
-- requested_visualizations: array of explicit requested map concepts such as satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire
-- requires_location: boolean
-- location_signals: array of {signal_type,address/city/country/coordinates/deictic, raw_value, normalized_value, latitude, longitude, confidence}
-- temporal_signal: {mode: current|historical|forecast|none, raw_text, reference_time_iso}
-- ambiguities: array of strings
-- disallowed_patterns: array of {pattern_id, reason, matched_text}
-- parser_confidence: 0..1
-
-Rules:
-1. Always infer location entities from natural language when present.
-2. If a location is explicitly present in user text, do not mark missing_location.
-3. Keep extraction concise and deterministic; no prose.
-4. The user may write in any language; interpret multilingual input without assuming English.
-5. For each location_signals item, raw_value must be a verbatim span from the current user message.
-6. Do not invent extra locations that are not explicitly present in the current user message.
-7. requested_visualizations must use only canonical ids when relevant:
-   satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire, weather, aerosol, ozone, solar, noise
-8. When the request is for air quality, prefer air_quality in requested_visualizations and intent tags unless the user explicitly requests another theme.
-""".strip()
 
 
 class _LLMTemporalSignal(BaseModel):
@@ -194,7 +164,10 @@ class ParserService:
             temperature=0.0,
             provider=provider_name,
             messages=[
-                {"role": "system", "content": PARSER_SYSTEM_PROMPT},
+                {
+                    "role": "system",
+                    "content": get_parser_system_prompt(provider_name, model_name),
+                },
                 {
                     "role": "user",
                     "content": json.dumps(prompt_payload, ensure_ascii=True),

@@ -122,6 +122,33 @@ describe('pages/settings-page.component', () => {
     expect(component.statusText).toContain('Selected');
   });
 
+  it('applyModelSelection does not send read-only credential health fields', async () => {
+    fetchChatSettingsMock.and.resolveTo({
+      active_provider_mode: 'local',
+      chat_model_provider: 'ollama',
+      chat_model_name: 'llama3.2',
+      parser_model_provider: 'ollama',
+      parser_model_name: 'llama3.2',
+      agent_model_provider: 'ollama',
+      agent_model_name: 'llama3.2',
+      ollama_url: 'http://localhost:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      credentials: { openai: { api_key: true }, google: { api_key: true } },
+      credential_health: { openai: { api_key: 'unreadable' }, google: { api_key: 'healthy' } },
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    await fixture.componentInstance.applyModelSelection('chat', fixture.componentInstance.displayedModels[0]);
+
+    const payload = updateChatSettingsMock.calls.mostRecent().args[0];
+    expect(payload.credential_health).toBeUndefined();
+    expect(payload.credentials.openai.api_key).toBeUndefined();
+    expect(payload.credentials.google.api_key).toBeUndefined();
+  });
+
   it('API key validation rules enforce OpenAI and Google prefixes', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -147,6 +174,34 @@ describe('pages/settings-page.component', () => {
     component.openaiKey = 'sk-valid-openai-key-12345';
     await component.saveKeys();
     expect(component.statusText).toContain('Could not save API keys right now.');
+  });
+
+  it('saveOllamaSettings sends a sanitized update payload', async () => {
+    fetchChatSettingsMock.and.resolveTo({
+      active_provider_mode: 'local',
+      chat_model_provider: 'ollama',
+      chat_model_name: 'llama3.2',
+      parser_model_provider: 'ollama',
+      parser_model_name: 'llama3.2',
+      agent_model_provider: 'ollama',
+      agent_model_name: 'llama3.2',
+      ollama_url: 'http://localhost:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      credentials: { openai: { api_key: true }, google: { api_key: true } },
+      credential_health: { openai: { api_key: 'unreadable' }, google: { api_key: 'healthy' } },
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    fixture.componentInstance.ollamaUrlDraft = 'http://localhost:11435';
+    await fixture.componentInstance.saveOllamaSettings();
+
+    const payload = updateChatSettingsMock.calls.mostRecent().args[0];
+    expect(payload.ollama_url).toBe('http://localhost:11435');
+    expect(payload.credentials).toEqual({});
+    expect(payload.credential_health).toBeUndefined();
   });
 
   it('reports unreadable credential health in API key modal state', async () => {

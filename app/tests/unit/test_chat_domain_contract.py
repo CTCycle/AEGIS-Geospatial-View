@@ -33,3 +33,12 @@ def test_model_settings_update_request_accepts_valid_payload() -> None:
 
     assert payload.active_provider_mode == "cloud"
     assert payload.credentials["openai"]["api_key"] == "secret"
+
+
+def test_model_settings_update_request_rejects_invalid_base_urls() -> None:
+    try:
+        ModelSettingsUpdateRequest(ollama_url="not-a-url")
+    except ValidationError as exc:
+        assert "Base URL must start with http:// or https://" in str(exc)
+    else:
+        raise AssertionError("Expected ValidationError for invalid Ollama URL")

@@ -105,3 +105,10 @@ def test_direct_weather_message_summarizes_current_conditions() -> None:
 
     assert message == "Weather for Naples at 2026-04-24T18:45: temperature 18.6 C, precipitation 0 mm."
     assert "Executed direct tool" not in message
+
+
+def test_parser_runtime_failure_message_is_actionable() -> None:
+    class _TurnContract:
+        ambiguities = ["parser_unavailable"]
+
+    assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())

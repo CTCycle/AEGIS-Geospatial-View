@@ -180,6 +180,76 @@ def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) 
     assert payload["google_base_url"] == expected_initial["google_base_url"]
     assert set(payload["credentials"].keys()) == set(expected_initial["credentials"].keys())
     assert payload["active_provider_mode"] == "cloud"
+    assert "credential_health" not in payload
+    assert all("api_key" not in values for values in payload["credentials"].values())
+
+
+def test_capabilities_tables_do_not_clip_desktop_columns(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(page)
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{base_url.rstrip('/')}/capabilities")
+
+    expect(page.get_by_role("heading", name="Capability Overview")).to_be_visible(
+        timeout=15000
+    )
+
+    metrics = page.evaluate(
+        """
+        () => {
+          const page = document.querySelector('.capabilities-page');
+          const tableWraps = Array.from(document.querySelectorAll('.capability-table-wrap'));
+          const pageRect = page.getBoundingClientRect();
+          return {
+            bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            wrappedTables: tableWraps.map((wrap) => {
+              const rect = wrap.getBoundingClientRect();
+              return { left: rect.left, right: rect.right, pageRight: pageRect.right };
+            }),
+          };
+        }
+        """
+    )
+
+    assert metrics["bodyOverflow"] <= 1
+    assert metrics["wrappedTables"]
+    assert all(item["right"] <= item["pageRight"] + 1 for item in metrics["wrappedTables"])
+
+
+def test_chat_composer_does_not_cover_latest_assistant_message(
+    page: Page, base_url: str
+) -> None:
+    _setup_stub_harness(
+        page,
+        turn_payload_factory=lambda route: chat_turn_text_only_response(
+            12001,
+            "This is the latest assistant response and it must remain visible above the composer.",
+        ),
+    )
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(base_url)
+
+    page.get_by_label("Chat message").fill("show status")
+    page.get_by_role("button", name="Send").click()
+    latest = page.get_by_text(
+        "This is the latest assistant response and it must remain visible above the composer."
+    )
+    expect(latest).to_be_visible(timeout=15000)
+
+    metrics = page.evaluate(
+        """
+        () => {
+          const assistant = Array.from(document.querySelectorAll('.chat-message--assistant')).at(-1);
+          const composer = document.querySelector('.chat-composer');
+          const a = assistant.getBoundingClientRect();
+          const c = composer.getBoundingClientRect();
+          return { assistantBottom: a.bottom, composerTop: c.top };
+        }
+        """
+    )
+
+    assert metrics["assistantBottom"] <= metrics["composerTop"] + 1
 
 
 def test_settings_query_params_do_not_leak_back_to_chat(

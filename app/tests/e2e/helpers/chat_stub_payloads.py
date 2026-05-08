@@ -29,14 +29,48 @@ ROME_MAP_SESSION = {
 }
 
 
+def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
+    return {
+        "user_text": message,
+        "conversation_context": {"recent_messages": [], "memory_snapshot": {}},
+        "task_class": "direct_query",
+        "location_signals": [],
+        "normalized_intent": {
+            "intent_id": "stub",
+            "intent_label": "Stub",
+            "task_tags": [],
+            "intent_tags": [],
+            "requires_location": False,
+        },
+        "temporal_signal": {"mode": "none"},
+        "ambiguities": [],
+        "disallowed_patterns": [],
+        "parser_confidence": 1.0,
+    }
+
+
+def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
+    return {
+        "plan": {
+            "state": state,
+            "intent_id": "stub",
+            "overlay_ids": [],
+        },
+        "trace": {"steps": ["stub"]},
+    }
+
+
 def chat_turn_map_response(
     session_id: int, assistant_message: str, basemap_id: str = "osm_default"
 ) -> dict[str, Any]:
     payload = dict(ROME_MAP_SESSION)
     payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
     return {
+        "request_id": f"chat-stub-{session_id}",
         "session_id": session_id,
         "assistant_message": assistant_message,
+        "turn_contract": _chat_turn_contract(),
+        "decision": _chat_decision("map_search"),
         "map_session": payload,
         "tool_payload": {
             "execution": "map_search",
@@ -47,8 +81,11 @@ def chat_turn_map_response(
 
 def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
     return {
+        "request_id": f"chat-stub-{session_id}",
         "session_id": session_id,
         "assistant_message": message,
+        "turn_contract": _chat_turn_contract(),
+        "decision": _chat_decision("clarify"),
         "map_session": None,
         "tool_payload": {
             "execution": "follow_up",
@@ -58,8 +95,11 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
 
 def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
     return {
+        "request_id": f"chat-stub-{session_id}",
         "session_id": session_id,
         "assistant_message": message,
+        "turn_contract": _chat_turn_contract(),
+        "decision": _chat_decision("direct_tool"),
         "map_session": None,
         "tool_payload": {"execution": "location_to_coordinates"},
     }

@@ -34,7 +34,7 @@
     display: grid;
     gap: 1rem;
     padding: 1rem 1.35rem 1.4rem;
-    overflow-x: auto;
+    overflow-x: hidden;
 }
 
 .capability-section {
@@ -82,9 +82,39 @@
 }
 
 .capability-table {
-    width: max-content;
+    width: 100%;
     border-collapse: collapse;
-    min-width: 72rem;
+    table-layout: fixed;
+}
+
+.capability-table th:nth-child(1),
+.capability-table td:nth-child(1) {
+    width: 17%;
+}
+
+.capability-table th:nth-child(2),
+.capability-table td:nth-child(2) {
+    width: 35%;
+}
+
+.capability-table th:nth-child(3),
+.capability-table td:nth-child(3) {
+    width: 18%;
+}
+
+.capability-table th:nth-child(4),
+.capability-table td:nth-child(4) {
+    width: 9%;
+}
+
+.capability-table th:nth-child(5),
+.capability-table td:nth-child(5) {
+    width: 12%;
+}
+
+.capability-table th:nth-child(6),
+.capability-table td:nth-child(6) {
+    width: 9%;
 }
 
 .capability-table th,
@@ -95,6 +125,7 @@
     vertical-align: top;
     font-size: 0.78rem;
     line-height: 1.38;
+    overflow-wrap: anywhere;
 }
 
 .capability-table th {
@@ -154,5 +185,9 @@
     .capabilities-page__header {
         padding-left: 0.85rem;
         padding-right: 0.85rem;
+    }
+
+    .capability-table {
+        min-width: 56rem;
     }
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.domain.agent.decision import PolicyDecision
 from server.domain.extraction.models import TurnParseResult
@@ -95,6 +95,18 @@ class ModelSettingsUpdateRequest(BaseModel):
     openai_base_url: str | None = None
     google_base_url: str | None = None
     credentials: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+    @field_validator("ollama_url", "openai_base_url", "google_base_url")
+    @classmethod
+    def validate_base_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        normalized = value.strip()
+        if not normalized:
+            return normalized
+        if not (normalized.startswith("http://") or normalized.startswith("https://")):
+            raise ValueError("Base URL must start with http:// or https://")
+        return normalized
 
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
