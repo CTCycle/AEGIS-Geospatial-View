@@ -4,15 +4,14 @@
       <p class="page-kicker">Access Configurations</p>
       <h1>Optional Geospatial Provider Keys</h1>
       <p>AEGIS uses free and openly accessible sources by default. Add keys only for optional premium-style map providers.</p>
+      <p class="access-page__default-inline">
+        <strong>Default workflow:</strong>
+        OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim remain available without user-supplied API keys, subject to provider attribution and usage limits.
+      </p>
     </div>
   </header>
 
   <main class="access-page__content">
-    <section class="access-page__default" aria-label="Default open data workflow">
-      <h2>Default workflow</h2>
-      <p>OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim remain available without user-supplied API keys, subject to provider attribution and usage limits.</p>
-    </section>
-
     <section class="access-grid" aria-label="Optional providers">
       @for (provider of providers; track provider.id) {
         <article class="access-provider">
@@ -21,9 +20,6 @@
               <h2>{{ provider.name }}</h2>
               <p>{{ provider.purpose }}</p>
             </div>
-            <span [class.access-provider__state--enabled]="configured(provider.id)" class="access-provider__state">
-              {{ configured(provider.id) ? 'Configured' : 'Disabled' }}
-            </span>
           </header>
 
           <dl>
@@ -33,7 +29,13 @@
             </div>
             <div>
               <dt>Status</dt>
-              <dd>{{ health(provider.id) }}</dd>
+              <dd
+                class="access-provider__status"
+                [class.access-provider__status--enabled]="configured(provider.id)"
+              >
+                <span aria-hidden="true"></span>
+                {{ health(provider.id) }}
+              </dd>
             </div>
             <div>
               <dt>Provider docs</dt>
@@ -41,20 +43,45 @@
             </div>
           </dl>
 
-          <label>
-            API key
-            <input
-              type="password"
-              autocomplete="off"
-              [placeholder]="provider.placeholder"
-              [(ngModel)]="drafts[provider.id]"
-              [name]="provider.id + '_api_key'"
-            />
-          </label>
-
           <footer>
-            <button type="button" class="primary-button" [disabled]="isSaving" (click)="saveProvider(provider.id)">Save key</button>
-            <button type="button" [disabled]="isSaving || !configured(provider.id)" (click)="clearProvider(provider.id)">Clear saved key</button>
+            <label class="access-provider__key-field">
+              API key
+              <div class="access-provider__key-input-row">
+                <input
+                  type="password"
+                  autocomplete="off"
+                  [placeholder]="provider.placeholder"
+                  [(ngModel)]="drafts[provider.id]"
+                  [name]="provider.id + '_api_key'"
+                />
+                <div class="access-provider__key-actions" role="group" [attr.aria-label]="'API key actions for ' + provider.name">
+                  <button
+                    type="button"
+                    class="access-provider__icon-button access-provider__icon-button--primary"
+                    [disabled]="isSaving"
+                    (click)="saveProvider(provider.id)"
+                    [attr.aria-label]="'Save key for ' + provider.name"
+                    title="Save key"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+                      <path d="M5 3h11.2L21 7.8V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v14h14V8.7L15.3 5H15v4.8a1.2 1.2 0 0 1-1.2 1.2H8.2A1.2 1.2 0 0 1 7 9.8V5H5Zm4 0v4h4V5H9Zm-1 9h8a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Z" fill="currentColor" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="access-provider__icon-button"
+                    [disabled]="isSaving || !configured(provider.id)"
+                    (click)="clearProvider(provider.id)"
+                    [attr.aria-label]="'Clear key for ' + provider.name"
+                    title="Clear saved key"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-1.4 6h8.8l-.7 10.2A2 2 0 0 1 13.7 21H10.3a2 2 0 0 1-2-1.8L7.6 9Zm2.2 1.8.3 7.2h1.5l-.3-7.2H9.8Zm3.9 0-.3 7.2h1.5l.3-7.2h-1.5Z" fill="currentColor" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </label>
           </footer>
         </article>
       }

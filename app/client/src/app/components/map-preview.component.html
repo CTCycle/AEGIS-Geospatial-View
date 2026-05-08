@@ -9,7 +9,9 @@
       <div class="empty-state empty-state--operations">
         <div class="empty-state__card">
           <p class="empty-state__eyebrow">Map Workspace</p>
+          @if (emptyMessage) {
           <p class="empty-state__message">{{ emptyMessage }}</p>
+          }
         </div>
       </div>
     } @else if (embeddedMapHtml) {

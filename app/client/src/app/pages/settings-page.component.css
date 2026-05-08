@@ -61,30 +61,17 @@
     font-size: var(--font-size-label);
 }
 
-.settings-page__back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #344953;
-    border-radius: 0.35rem;
-    background: #162833;
-    color: #dce8ed;
-    width: 2rem;
-    height: 2rem;
-    font-weight: var(--font-weight-semibold);
-    box-shadow: var(--shadow-1);
-}
-
-.settings-page__back:hover {
-    border-color: #2f9bd7;
-    background: #1b3340;
-    color: #f4fbff;
-}
-
 .settings-page__header-actions {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
+}
+
+.settings-page__ollama-logo {
+    width: 0.8rem;
+    height: 1.15rem;
+    display: block;
+    filter: invert(1);
 }
 
 .settings-page__controls {
@@ -134,15 +121,17 @@
 
 .provider-toggle {
     display: inline-flex;
-    border: 1px solid #344953;
-    border-radius: 0.35rem;
-    overflow: hidden;
-    background: #101c23;
+    gap: 0.2rem;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
     box-shadow: none;
 }
 
 .provider-toggle button {
-    border: none;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
     background: transparent;
     color: #b7c8d0;
     height: 2.15rem;

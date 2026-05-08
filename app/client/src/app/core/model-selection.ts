@@ -72,7 +72,7 @@ export const buildSelectedModelStats = (
   settings: ModelSettingsResponse,
   localModelIds: ReadonlySet<string>,
 ): SelectedModelStat[] => {
-  const rows = new Map<string, SelectedModelStat>();
+  const rows: SelectedModelStat[] = [];
   const assignments: Array<{ role: string; provider: string; name: string }> = [
     { role: 'Parser', provider: settings.parser_model_provider, name: settings.parser_model_name },
     { role: 'Chat', provider: settings.chat_model_provider, name: settings.chat_model_name },
@@ -82,26 +82,15 @@ export const buildSelectedModelStats = (
   assignments.forEach(({ role, provider, name }) => {
     const normalizedProvider = provider.trim();
     const normalizedName = name.trim();
-    if (!normalizedProvider || !normalizedName) {
-      return;
-    }
-    const key = `${normalizedProvider}:${normalizedName}`;
-    const existing = rows.get(key);
-    const local = localModelIds.has(normalizedName);
-    if (existing) {
-      existing.local = existing.local || local;
-      if (!existing.assignedRoles.includes(role)) {
-        existing.assignedRoles.push(role);
-      }
-      return;
-    }
-    rows.set(key, {
-      model: normalizedName,
-      provider: normalizedProvider,
+    const hasSelection = Boolean(normalizedProvider) && Boolean(normalizedName);
+    const local = hasSelection && localModelIds.has(normalizedName);
+    rows.push({
+      model: hasSelection ? normalizedName : 'Not selected',
+      provider: hasSelection ? normalizedProvider : '-',
       local,
       assignedRoles: [role],
     });
   });
 
-  return Array.from(rows.values());
+  return rows;
 };

@@ -140,7 +140,7 @@
 .context-window-tracker__bar span {
     display: block;
     height: 100%;
-    min-width: 0.2rem;
+    width: 0;
     border-radius: inherit;
     background: linear-gradient(90deg, #1b9a75, #2f9bd7);
     transition: width 180ms ease;

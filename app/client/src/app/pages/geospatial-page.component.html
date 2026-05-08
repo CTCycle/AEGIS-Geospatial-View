@@ -41,9 +41,6 @@
             aria-live="polite"
             (scroll)="onTranscriptScroll($event)"
           >
-            @if (!hasMessages) {
-              <p class="chat-welcome-message">Enter a location-based request to begin.</p>
-            }
             @for (message of renderedMessages; track $index) {
               <article class="chat-message" [class]="'chat-message chat-message--' + message.role">
                 <header class="chat-message__role">{{ message.role }}</header>
@@ -138,7 +135,7 @@
         <app-map-preview
           [payload]="payload"
           [isLoading]="isLoading"
-          [emptyMessage]="'Ask the assistant for location-based map data or coordinates.'"
+          [emptyMessage]="''"
           [initialOverlayVisibility]="mapState.overlayVisibility"
           [initialOverlayOpacity]="mapState.overlayOpacity"
           (overlayStateChange)="onOverlayStateChange($event)"

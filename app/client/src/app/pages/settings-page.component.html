@@ -10,9 +10,7 @@
         title="Ollama settings"
         (buttonClick)="ollamaModalStatusText = ''; isOllamaModalOpen = true"
       >
-          <svg viewBox="0 0 24 24" width="15" height="15" focusable="false">
-            <path d="M6.5 4.5h11A2.5 2.5 0 0 1 20 7v7.7a4.8 4.8 0 0 1-4.8 4.8H8.8A4.8 4.8 0 0 1 4 14.7V7a2.5 2.5 0 0 1 2.5-2.5Zm0 1.8a.7.7 0 0 0-.7.7v7.7a3 3 0 0 0 3 3h6.4a3 3 0 0 0 3-3V7a.7.7 0 0 0-.7-.7h-11Zm2.8 3h5.4a.9.9 0 1 1 0 1.8H9.3a.9.9 0 0 1 0-1.8Zm0 3.4h3.2a.9.9 0 1 1 0 1.8H9.3a.9.9 0 1 1 0-1.8Z" fill="currentColor" />
-          </svg>
+          <img class="settings-page__ollama-logo" src="ollama-logo.svg" alt="" aria-hidden="true" />
       </app-settings-icon-action>
 
       <app-settings-icon-action
@@ -25,11 +23,6 @@
           </svg>
       </app-settings-icon-action>
 
-      <button type="button" class="settings-page__back" (click)="navigateBack()" aria-label="Back to chat" title="Back to chat">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-          <path d="M10.7 5.3a1 1 0 0 1 0 1.4L6.4 11H20a1 1 0 1 1 0 2H6.4l4.3 4.3a1 1 0 1 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0Z" fill="currentColor" />
-        </svg>
-      </button>
     </div>
   </header>
 

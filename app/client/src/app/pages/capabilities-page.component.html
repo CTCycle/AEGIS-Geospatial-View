@@ -17,9 +17,12 @@
               <h2>{{ group.label }}</h2>
               <p>{{ group.description }}</p>
             </div>
-            <span>{{ itemsFor(group.id).length }}</span>
+            <span class="capability-section__count">{{ itemsFor(group.id).length }} items</span>
           </header>
 
+          @if (itemsFor(group.id).length === 0) {
+            <p class="capability-section__empty">No entries returned by the catalog API.</p>
+          } @else {
           <div class="capability-table-wrap">
             <table class="capability-table">
               <thead>
@@ -53,6 +56,7 @@
               </tbody>
             </table>
           </div>
+          }
         </section>
       }
     }
