@@ -35,7 +35,7 @@ def _assert_clean_backend_tail(tail: str) -> None:
 
 
 def _read_session_id(page: Page) -> int | None:
-    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-state:v2')")
+    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-state:v3')")
     if not raw:
         return None
     data = json.loads(raw)
@@ -147,14 +147,6 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
 def test_live_degraded_path_shows_user_failure_without_crash(
     page: Page, base_url: str
 ) -> None:
-    page.route(
-        "**/api/chat/turn",
-        lambda route: route.fulfill(
-            status=503,
-            content_type="application/json",
-            body=json.dumps({"detail": "Provider unavailable for this test"}),
-        ),
-    )
     page.route(
         "**/api/chat/turn",
         lambda route: route.fulfill(
