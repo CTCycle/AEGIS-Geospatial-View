@@ -32,7 +32,6 @@ MAPS_CATALOG_ROUTE = "/catalog"
 MAPS_OSM_BASEMAP_TILE_ROUTE = "/basemaps/osm/{z}/{x}/{y}.png"
 MAPS_JOBS_ROUTE = "/jobs"
 MAPS_JOB_ROUTE = "/jobs/{job_id}"
-GEO_SEARCH_URL = f"{MAPS_ROUTER_PREFIX}{MAPS_SEARCH_ROUTE}"
 CHAT_ROUTER_PREFIX = "/chat"
 CHAT_TURN_ROUTE = "/turn"
 CHAT_STREAM_ROUTE = "/stream"
@@ -106,11 +105,6 @@ COMMON_GEOSPATIAL_LAYERS = {
     **GIBS_ANNUAL_LAYERS,
 }
 
-GEOSPATIAL_LAYER_CHOICES = [
-    "None",
-    *COMMON_GEOSPATIAL_LAYERS.values(),
-]
-
 COMMON_FOLIUM_MAPS = {
     "OpenStreetMap": "Street Map",
     "CartoDB Positron": "Cartographic Light",
@@ -124,10 +118,7 @@ COMMON_FOLIUM_MAPS = {
 # [DATABASE TABLES]
 ###############################################################################
 GIBS_LAYERS_TABLE = "gibs_layers"
-MODEL_PROVIDER_SETTINGS_TABLE = "model_provider_settings"
-MODEL_CREDENTIALS_TABLE = "model_credentials"
 CHAT_SESSIONS_TABLE = "chat_sessions"
-CHAT_MESSAGES_TABLE = "chat_messages"
 
 
 # [DATABASE COLUMNS]
@@ -141,56 +132,6 @@ GIBS_LAYER_COLUMNS = [
     "tile_matrix_sets",
     "meters_per_pixel",
 ]
-
-MODEL_PROVIDER_SETTINGS_COLUMNS = [
-    "id",
-    "active_provider_mode",
-    "chat_model_provider",
-    "chat_model_name",
-    "parser_model_provider",
-    "parser_model_name",
-    "agent_model_provider",
-    "agent_model_name",
-    "ollama_url",
-    "openai_base_url",
-    "google_base_url",
-    "created_at",
-    "updated_at",
-]
-
-MODEL_CREDENTIALS_COLUMNS = [
-    "id",
-    "provider",
-    "label",
-    "encrypted_value",
-    "key_version",
-    "is_active",
-    "created_at",
-    "updated_at",
-    "last_used_at",
-]
-
-CHAT_SESSION_COLUMNS = [
-    "id",
-    "title",
-    "status",
-    "created_at",
-    "updated_at",
-    "last_map_session_json",
-]
-
-CHAT_MESSAGE_COLUMNS = [
-    "id",
-    "session_id",
-    "turn_index",
-    "role",
-    "content",
-    "structured_payload_json",
-    "tool_payload_json",
-    "map_session_json",
-    "created_at",
-]
-
 
 # [COUNTRY DATA]
 ###############################################################################

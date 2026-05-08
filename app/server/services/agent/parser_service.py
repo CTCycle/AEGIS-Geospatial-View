@@ -189,40 +189,6 @@ class ParserService:
         )
         return extracted
 
-    def _fallback_location_signals(self, user_message: str) -> list[LocationSignal]:
-        pattern = re.compile(
-            r"\b(?:around|near|over|above|in|for)\s+"
-            r"([A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'-]*(?:\s+[A-Z][A-Za-zÀ-ÖØ-öø-ÿ.'-]*){0,3})"
-        )
-        stop_words = {
-            "I",
-            "Show",
-            "Map",
-            "Just",
-            "The",
-            "A",
-            "An",
-            "Where",
-            "Right",
-            "Now",
-        }
-        signals: list[LocationSignal] = []
-        for match in pattern.finditer(user_message):
-            raw_value = match.group(1).strip(" .,!?")
-            if not raw_value or raw_value in stop_words:
-                continue
-            signals.append(
-                LocationSignal(
-                    signal_type="address",
-                    raw_value=raw_value,
-                    normalized_value=raw_value,
-                    confidence=0.55,
-                    source="text",
-                )
-            )
-            break
-        return signals
-
     def parse_turn(
         self,
         user_message: str,
@@ -273,8 +239,6 @@ class ParserService:
             for item in extracted_location_signals
             if item.raw_value.strip()
         ]
-        if not location_signals:
-            location_signals = self._fallback_location_signals(user_message)
         normalized_intent = NormalizedIntent(
             intent_id=extracted.intent_id.strip() or "general_map",
             intent_label=extracted.intent_label.strip() or "General map request",

@@ -62,6 +62,20 @@ class _ProviderStub:
                 "disallowed_patterns": [],
                 "parser_confidence": 0.9,
             }
+        if "No model location" in user_message:
+            return {
+                "task_class": "map_search",
+                "intent_id": "general_map",
+                "intent_label": "General map request",
+                "task_tags": ["map"],
+                "intent_tags": ["map"],
+                "requires_location": True,
+                "location_signals": [],
+                "temporal_signal": {"mode": "none"},
+                "ambiguities": [],
+                "disallowed_patterns": [],
+                "parser_confidence": 0.7,
+            }
         return {
             "task_class": "general_question",
             "intent_id": "general_map",
@@ -152,3 +166,14 @@ def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
     )
     assert [item.raw_value for item in result.location_signals] == ["القاهرة"]
     assert result.ambiguities == []
+
+
+def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
+    parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
+    result = parser.parse_turn(
+        user_message="No model location around Rome",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+    assert result.location_signals == []
+    assert result.ambiguities == ["missing_location"]
