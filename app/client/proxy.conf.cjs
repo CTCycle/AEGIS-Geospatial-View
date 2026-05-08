@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const settingsEnvPath = path.resolve(__dirname, '../settings/.env');
+const settingsEnvPath = path.resolve(__dirname, '../../settings/.env');
 
 const parseEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {

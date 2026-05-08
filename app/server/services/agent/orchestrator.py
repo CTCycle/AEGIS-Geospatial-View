@@ -58,6 +58,43 @@ class AgentOrchestrator:
             conversation_messages=recent_messages,
         )
         context_usage = self.parser_service.last_context_usage
+        if self._has_parser_runtime_failure(turn_contract):
+            assistant_message = (
+                "I could not process this request because the configured parser model is unavailable. "
+                "Open Model Settings, choose an installed model, or refresh/pull the configured Ollama model."
+            )
+            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            self.history_repo.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                structured_payload={
+                    "turn_contract": turn_contract.model_dump(mode="json"),
+                    "decision": decision.model_dump(mode="json"),
+                    "memory_snapshot": latest_memory,
+                    "previous_turn_contract": latest_contract,
+                    "request_id": request_id,
+                },
+                tool_payload=None,
+                map_session=None,
+            )
+            LOGGER.info(
+                "chat_turn_parser_unavailable request_id=%s session_id=%s",
+                request_id,
+                session.id,
+            )
+            return ChatTurnResponse(
+                request_id=request_id,
+                session_id=session.id,
+                assistant_message=assistant_message,
+                turn_contract=turn_contract,
+                decision=decision,
+                tool_payload=None,
+                map_session=None,
+                memory_snapshot=latest_memory,
+                context_usage=context_usage,
+            )
+
         if turn_contract.task_class == "general_question" or self._is_capability_question(turn_contract.user_text):
             assistant_message = self._compose_general_question_message(turn_contract.user_text)
             self.history_repo.append_message(
@@ -186,6 +223,10 @@ class AgentOrchestrator:
     def _is_capability_question(user_text: str) -> bool:
         text = user_text.lower()
         return "capabil" in text and any(marker in text for marker in ("model", "you", "app", "aegis"))
+
+    @staticmethod
+    def _has_parser_runtime_failure(turn_contract) -> bool:
+        return "parser_unavailable" in set(turn_contract.ambiguities or [])
 
     def _compose_assistant_message(
         self,

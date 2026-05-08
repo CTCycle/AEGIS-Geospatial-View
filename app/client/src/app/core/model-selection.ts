@@ -45,8 +45,16 @@ export const buildModelSelectionPayload = (
   const roleFields = ROLE_FIELD_MAP[role];
   const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
   return {
-    ...settings,
     active_provider_mode: nextProviderMode,
+    chat_model_provider: settings.chat_model_provider,
+    chat_model_name: settings.chat_model_name,
+    parser_model_provider: settings.parser_model_provider,
+    parser_model_name: settings.parser_model_name,
+    agent_model_provider: settings.agent_model_provider,
+    agent_model_name: settings.agent_model_name,
+    ollama_url: settings.ollama_url,
+    openai_base_url: settings.openai_base_url,
+    google_base_url: settings.google_base_url,
     [roleFields.provider]: model.provider,
     [roleFields.name]: model.name,
     credentials: toSelectionUpdateCredentials(settings.credentials),

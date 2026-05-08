@@ -225,7 +225,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     try {
       const updated = await this.apiClient.updateChatSettings({
-        ...this.settings,
+        ...this.settingsUpdateBase(),
         credentials: {
           openai: this.openaiKey.trim() ? { api_key: this.openaiKey.trim() } : {},
           google: this.googleKey.trim() ? { api_key: this.googleKey.trim() } : {},
@@ -276,7 +276,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   async saveOllamaSettings(): Promise<void> {
     try {
       const updated = await this.apiClient.updateChatSettings({
-        ...this.settings,
+        ...this.settingsUpdateBase(),
         ollama_url: this.ollamaUrlDraft.trim() || 'http://localhost:11434',
       });
       this.settings = updated;
@@ -426,6 +426,22 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
     return this.apiClient.updateChatSettings(payload);
+  }
+
+  private settingsUpdateBase(): ModelSettingsUpdateRequest {
+    return {
+      active_provider_mode: this.settings.active_provider_mode,
+      chat_model_provider: this.settings.chat_model_provider,
+      chat_model_name: this.settings.chat_model_name,
+      parser_model_provider: this.settings.parser_model_provider,
+      parser_model_name: this.settings.parser_model_name,
+      agent_model_provider: this.settings.agent_model_provider,
+      agent_model_name: this.settings.agent_model_name,
+      ollama_url: this.settings.ollama_url,
+      openai_base_url: this.settings.openai_base_url,
+      google_base_url: this.settings.google_base_url,
+      credentials: {},
+    };
   }
 
   private roleLabel(role: ModelRole): string {

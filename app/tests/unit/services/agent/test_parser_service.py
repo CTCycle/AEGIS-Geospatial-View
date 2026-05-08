@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from server.services.agent.parser_service import PARSER_SYSTEM_PROMPT, ParserService
+from server.services.agent.parser_service import ParserService
+from server.services.llm.prompts import PARSER_SYSTEM_PROMPT
 from server.services.llm.errors import LLMConfigurationError
 
 
