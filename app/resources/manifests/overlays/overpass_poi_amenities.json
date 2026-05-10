@@ -12,7 +12,7 @@
   "coverage": "global",
   "metadata": {
     "label": "Overpass POI Amenities",
-    "default_opacity": 1.0,
+    "default_opacity": 1,
     "requires_key": false,
     "attribution": "© OpenStreetMap contributors (ODbL)",
     "keywords": [
@@ -72,5 +72,61 @@
     "last_validated": "2026-04-27"
   },
   "version": 1,
-  "last_modified": "2026-04-10T16:45:00+00:00"
+  "last_modified": "2026-04-10T16:45:00+00:00",
+  "capabilityKind": "search-index",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://wiki.openstreetmap.org/wiki/Overpass_API"
+  ],
+  "license": {
+    "name": "© OpenStreetMap contributors (ODbL)",
+    "url": "https://wiki.openstreetmap.org/wiki/Overpass_API",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "poi search",
+      "amenity lookup",
+      "nearby places",
+      "service discovery",
+      "urban context",
+      "overpass",
+      "osm",
+      "poi",
+      "amenities",
+      "places"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "point"
+  }
 }

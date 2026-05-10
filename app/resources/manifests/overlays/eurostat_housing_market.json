@@ -61,5 +61,62 @@
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
-  "last_modified": "2026-04-27T00:00:00+00:00"
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-introduction"
+  ],
+  "license": {
+    "name": "Eurostat / European Commission",
+    "url": "https://ec.europa.eu/eurostat/web/user-guides/data-browser/api-data-access/api-introduction",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "housing market",
+      "rent trends",
+      "economic indicators",
+      "EU housing context",
+      "market analysis",
+      "rent screening",
+      "eurostat",
+      "housing",
+      "rent",
+      "prices",
+      "market"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "regional/time-series"
+  }
 }

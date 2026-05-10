@@ -57,5 +57,61 @@
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
-  "last_modified": "2026-04-27T00:00:00+00:00"
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://developers.arcgis.com/rest/services-reference/enterprise/output-formats/"
+  ],
+  "license": {
+    "name": "ArcGIS service publishers",
+    "url": "https://developers.arcgis.com/rest/services-reference/enterprise/output-formats/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "arcgis",
+    "required": true,
+    "accessPageProviderId": "arcgis"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "catalog-discovery",
+      "feature-services",
+      "map-services",
+      "geospatial-discovery",
+      "metadata",
+      "arcgis",
+      "esri",
+      "feature service",
+      "map service",
+      "geoportal"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
 }

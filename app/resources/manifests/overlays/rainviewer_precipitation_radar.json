@@ -72,5 +72,59 @@
     "last_validated": "2026-04-27"
   },
   "version": 1,
-  "last_modified": "2026-04-10T16:45:00+00:00"
+  "last_modified": "2026-04-10T16:45:00+00:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "raster-tile",
+  "sourceOfficialDocs": [
+    "https://www.rainviewer.com/api.html"
+  ],
+  "license": {
+    "name": "© RainViewer",
+    "url": "https://www.rainviewer.com/api.html",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "precipitation",
+      "storm tracking",
+      "rain monitoring",
+      "storm awareness",
+      "commute weather checks",
+      "rainviewer",
+      "radar",
+      "rain intensity"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  }
 }

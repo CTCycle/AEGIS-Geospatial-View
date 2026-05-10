@@ -1,8 +1,27 @@
 {
-  "version": 3,
+  "version": 4,
   "providers_dir": "providers",
   "basemaps_dir": "basemaps",
   "overlays_dir": "overlays",
   "tools_dir": "tools",
-  "runtime_profiles_file": "runtime_profiles.json"
+  "runtime_profiles_file": "runtime_profiles.json",
+  "manifest_schema_version": 2,
+  "source_catalog_version": "2026.05.11",
+  "capability_groups": [
+    "basemap",
+    "raster-overlay",
+    "vector-overlay",
+    "search-index",
+    "camera-network",
+    "dataset-ingestion",
+    "analysis-tool",
+    "metadata-only"
+  ],
+  "health_summary": {
+    "functional": 20,
+    "partial": 30,
+    "broken": 0,
+    "disabled": 0,
+    "unknown": 6
+  }
 }

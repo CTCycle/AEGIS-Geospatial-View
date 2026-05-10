@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "profiles": [
     {
       "capability_id": "IMERG_Precipitation_Rate",
@@ -9,7 +9,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "precipitation",
+        "gibs",
+        "precipitation rate (imerg, 30min)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
@@ -19,7 +30,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "land-cover",
+        "gibs",
+        "land cover type (modis, annual)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Combined_Thermal_Anomalies_Fire",
@@ -29,7 +51,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "fires",
+        "gibs",
+        "active fires (modis, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Terra_Aerosol",
@@ -39,7 +72,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "aerosol",
+        "gibs",
+        "aerosol optical depth (modis, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Terra_L3_Land_Water_Mask",
@@ -49,7 +93,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "land-water",
+        "gibs",
+        "land/water mask (modis, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Terra_Land_Surface_Temp_Day",
@@ -59,7 +114,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "temperature",
+        "gibs",
+        "surface temperature day (modis, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Terra_Land_Surface_Temp_Night",
@@ -69,7 +135,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "temperature",
+        "gibs",
+        "surface temperature night (modis, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "MODIS_Terra_NDVI_8Day",
@@ -79,7 +156,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "vegetation",
+        "gibs",
+        "vegetation index ndvi (modis, 8-day)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "OMPS_Ozone_Total_Column",
@@ -89,7 +177,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "ozone",
+        "gibs",
+        "ozone column (omps, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "SRTM_Color_Index",
@@ -99,7 +198,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "elevation",
+        "gibs",
+        "elevation dem (srtm)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
@@ -109,7 +219,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "true-color",
+        "gibs",
+        "true color satellite (viirs, daily)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "VIIRS_SNPP_DayNightBand_ENCC",
@@ -119,7 +240,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "functional",
+      "planner_hints": [
+        "imagery",
+        "night-lights",
+        "gibs",
+        "nighttime lights (viirs, monthly)"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "census_tigerweb_demographics",
@@ -129,7 +261,24 @@
       "supports_direct_text": true,
       "coverage_policy": "us",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "choropleth",
+      "health_status": "partial",
+      "planner_hints": [
+        "demographics",
+        "population density",
+        "census tracts",
+        "demographic context",
+        "boundary lookup",
+        "regional analysis",
+        "census",
+        "tracts",
+        "boundaries",
+        "geojson"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "census_tigerweb_hydrography",
@@ -139,7 +288,24 @@
       "supports_direct_text": false,
       "coverage_policy": "us",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "geojson",
+      "health_status": "partial",
+      "planner_hints": [
+        "hydrology",
+        "water features",
+        "rivers",
+        "water context",
+        "geospatial features",
+        "environmental screening",
+        "water",
+        "census",
+        "tigerweb",
+        "geojson"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "eea_noise_2019",
@@ -149,7 +315,18 @@
       "supports_direct_text": false,
       "coverage_policy": "eu-eea",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wms",
+      "health_status": "partial",
+      "planner_hints": [
+        "noise",
+        "wms",
+        "eea",
+        "eea noise exposure 2019"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "esa_worldcover",
@@ -159,7 +336,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "wmts",
+      "health_status": "partial",
+      "planner_hints": [
+        "wmts",
+        "land-cover",
+        "esa",
+        "esa worldcover"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "eurostat_housing_market",
@@ -169,7 +357,25 @@
       "supports_direct_text": true,
       "coverage_policy": "eu-eea",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "metadata-only",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "housing market",
+        "rent trends",
+        "economic indicators",
+        "EU housing context",
+        "market analysis",
+        "rent screening",
+        "eurostat",
+        "housing",
+        "rent",
+        "prices",
+        "market"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "eurostat_regional_demographics",
@@ -179,7 +385,21 @@
       "supports_direct_text": true,
       "coverage_policy": "eu-eea",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "metadata-only",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "demographics",
+        "population density",
+        "age structure",
+        "EU regional demographics",
+        "population comparison",
+        "age analysis",
+        "eurostat"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "fred_regional_market_indicators",
@@ -189,7 +409,25 @@
       "supports_direct_text": true,
       "coverage_policy": "us",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "metadata-only",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "market data",
+        "housing prices",
+        "rent trends",
+        "market analysis",
+        "economic context",
+        "housing trends",
+        "fred",
+        "housing",
+        "rent",
+        "economic indicators",
+        "market"
+      ],
+      "manual_toggle": false,
+      "auth_required": true
     },
     {
       "capability_id": "geoapify_amenities",
@@ -199,7 +437,18 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "search-index",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": [
+        "places",
+        "geojson",
+        "geoapify",
+        "geoapify places (amenities)"
+      ],
+      "manual_toggle": true,
+      "auth_required": true
     },
     {
       "capability_id": "geoapify_osm",
@@ -209,7 +458,20 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "xyz",
+      "health_status": "partial",
+      "planner_hints": [
+        "presentation",
+        "clean_layout",
+        "places",
+        "bright",
+        "light",
+        "clean"
+      ],
+      "manual_toggle": true,
+      "auth_required": true
     },
     {
       "capability_id": "get_air_quality_forecast",
@@ -219,7 +481,22 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": "air_quality"
+      "handler_name": "air_quality",
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "functional",
+      "planner_hints": [
+        "air quality",
+        "pm25",
+        "pollution",
+        "direct_query",
+        "environment",
+        "openmeteo",
+        "direct-tool",
+        "Air Quality Forecast"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "get_nearby_poi",
@@ -229,7 +506,22 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": "poi"
+      "handler_name": "poi",
+      "capability_kind": "search-index",
+      "rendering_mode": "metadata-only",
+      "health_status": "functional",
+      "planner_hints": [
+        "poi",
+        "amenities",
+        "nearby",
+        "direct_query",
+        "mobility",
+        "overpass",
+        "direct-tool",
+        "Nearby Points Of Interest"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "get_weather_forecast",
@@ -239,7 +531,22 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": "weather"
+      "handler_name": "weather",
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "functional",
+      "planner_hints": [
+        "weather",
+        "forecast",
+        "precipitation",
+        "direct_query",
+        "environment",
+        "openmeteo",
+        "direct-tool",
+        "Weather Forecast"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "gibs_satellite",
@@ -249,7 +556,22 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "xyz",
+      "health_status": "functional",
+      "planner_hints": [
+        "realistic_view",
+        "context_imagery",
+        "land_cover",
+        "inspection",
+        "satellite",
+        "imagery",
+        "aerial",
+        "photographic"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "location_to_coordinates",
@@ -259,7 +581,22 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": "coordinates"
+      "handler_name": "coordinates",
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "functional",
+      "planner_hints": [
+        "coordinates",
+        "geocode",
+        "location_lookup",
+        "direct_query",
+        "location_resolution",
+        "nominatim",
+        "direct-tool",
+        "Location To Coordinates"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "openaq_air_quality",
@@ -269,7 +606,18 @@
       "supports_direct_text": true,
       "coverage_policy": "global-partial",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": [
+        "air-quality",
+        "point-insight",
+        "openaq",
+        "openaq air quality"
+      ],
+      "manual_toggle": true,
+      "auth_required": true
     },
     {
       "capability_id": "openmeteo_air_quality_forecast",
@@ -279,7 +627,24 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "air-quality",
+        "pollution forecast",
+        "air quality planning",
+        "exposure awareness",
+        "pollution trend checks",
+        "air quality",
+        "forecast",
+        "pm2.5",
+        "pm10",
+        "open-meteo"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "openmeteo_pressure_humidity_wind",
@@ -289,7 +654,22 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "weather",
+        "wind",
+        "humidity",
+        "pressure",
+        "weather planning",
+        "wind exposure",
+        "humidity pressure trends",
+        "forecast"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "openmeteo_weather_forecast",
@@ -299,7 +679,22 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "weather",
+        "temperature",
+        "precipitation",
+        "weather outlook",
+        "rain planning",
+        "temperature trend checks",
+        "forecast",
+        "open-meteo"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "osm_dark",
@@ -309,7 +704,21 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "xyz",
+      "health_status": "functional",
+      "planner_hints": [
+        "night_mode",
+        "traffic_focus",
+        "traffic",
+        "incidents",
+        "dark",
+        "night",
+        "contrast"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "osm_default",
@@ -319,7 +728,23 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "xyz",
+      "health_status": "functional",
+      "planner_hints": [
+        "routing",
+        "address_lookup",
+        "city_context",
+        "traffic",
+        "urban",
+        "street",
+        "roads",
+        "addresses",
+        "navigation"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "osm_terrain",
@@ -329,7 +754,21 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "xyz",
+      "health_status": "functional",
+      "planner_hints": [
+        "elevation_analysis",
+        "outdoor_planning",
+        "terrain",
+        "slope",
+        "elevation",
+        "relief",
+        "topographic"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "overpass_poi_amenities",
@@ -339,7 +778,24 @@
       "supports_direct_text": true,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "search-index",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": [
+        "poi search",
+        "amenity lookup",
+        "nearby places",
+        "service discovery",
+        "urban context",
+        "overpass",
+        "osm",
+        "poi",
+        "amenities",
+        "places"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "pvgis_solar",
@@ -349,7 +805,18 @@
       "supports_direct_text": true,
       "coverage_policy": "global-except-poles",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "analysis-tool",
+      "rendering_mode": "metadata-only",
+      "health_status": "partial",
+      "planner_hints": [
+        "solar",
+        "point-insight",
+        "pvgis",
+        "pvgis solar potential"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
     },
     {
       "capability_id": "rainviewer_precipitation_radar",
@@ -359,7 +826,22 @@
       "supports_direct_text": false,
       "coverage_policy": "global-partial",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "raster-tile",
+      "health_status": "partial",
+      "planner_hints": [
+        "precipitation",
+        "storm tracking",
+        "rain monitoring",
+        "storm awareness",
+        "commute weather checks",
+        "rainviewer",
+        "radar",
+        "rain intensity"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     },
     {
       "capability_id": "tomtom_basic",
@@ -369,7 +851,19 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "xyz",
+      "health_status": "partial",
+      "planner_hints": [
+        "routing",
+        "traffic_monitoring",
+        "traffic",
+        "street",
+        "navigation"
+      ],
+      "manual_toggle": true,
+      "auth_required": true
     },
     {
       "capability_id": "tomtom_traffic_flow",
@@ -379,7 +873,28 @@
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
-      "handler_name": null
+      "handler_name": null,
+      "capability_kind": "raster-overlay",
+      "rendering_mode": "raster-tile",
+      "health_status": "partial",
+      "planner_hints": [
+        "tile",
+        "traffic",
+        "tomtom",
+        "tomtom traffic flow"
+      ],
+      "manual_toggle": true,
+      "auth_required": true
     }
+  ],
+  "routing_profiles": [
+    "default",
+    "geoint",
+    "webcam",
+    "transit",
+    "hazards",
+    "environment",
+    "demographics",
+    "infrastructure"
   ]
 }

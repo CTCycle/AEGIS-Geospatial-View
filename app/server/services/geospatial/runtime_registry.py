@@ -11,6 +11,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 @dataclass(frozen=True)
 class RuntimeRegistrySnapshot:
     profiles: dict[str, dict[str, Any]]
+    manifests: dict[str, dict[str, Any]]
 
 
 class RuntimeRegistry:
@@ -21,9 +22,17 @@ class RuntimeRegistry:
         "geoapify": "GEOAPIFY_API_KEY",
         "google": "GOOGLE_API_KEY",
         "google_maps": "GOOGLE_MAPS_API_KEY",
+        "nasa": "NASA_API_KEY",
+        "nrel": "NREL_API_KEY",
         "openaq": "OPENAQ_API_KEY",
+        "openchargemap": "OPENCHARGEMAP_API_KEY",
+        "openaip": "OPENAIP_API_KEY",
         "openai": "OPENAI_API_KEY",
+        "opentripmap": "OPENTRIPMAP_API_KEY",
+        "sentinel_hub": "SENTINEL_HUB_CLIENT_ID",
         "tomtom": "TOMTOM_API_KEY",
+        "transitland": "TRANSITLAND_API_KEY",
+        "windy_webcams": "WINDY_WEBCAMS_API_KEY",
     }
 
     def __init__(
@@ -49,7 +58,13 @@ class RuntimeRegistry:
             for item in list(manifest.get("runtime_profiles") or [])
             if str(item.get("capability_id") or "").strip()
         }
-        self._snapshot = RuntimeRegistrySnapshot(profiles=profiles)
+        manifests: dict[str, dict[str, Any]] = {}
+        for collection_name in ("providers", "basemaps", "overlays", "tools"):
+            for item in list(manifest.get(collection_name) or []):
+                capability_id = str(item.get("id") or "").strip()
+                if capability_id:
+                    manifests[capability_id] = dict(item)
+        self._snapshot = RuntimeRegistrySnapshot(profiles=profiles, manifests=manifests)
         return self._snapshot
 
     def _ensure(self) -> RuntimeRegistrySnapshot:
@@ -68,12 +83,17 @@ class RuntimeRegistry:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):
             return False
-        provider = str(profile.get("credential_provider") or "").strip().lower()
-        if not provider:
+        manifest = self._ensure().manifests.get(str(capability_id), {})
+        auth = manifest.get("auth") if isinstance(manifest, dict) else None
+        auth_payload = auth if isinstance(auth, dict) else {}
+        if not bool(auth_payload.get("required", False)):
             return True
+        provider = str(auth_payload.get("providerKey") or "").strip().lower()
+        if not provider:
+            return False
         env_name = self.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
         if not env_name:
-            return True
+            return False
         if os.getenv(env_name, "").strip():
             return True
         try:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from enum import Enum
+from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,6 +10,186 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.agent.decision import ResolvedLocation
 
 TimeMode = Literal["current", "historical", "forecast"]
+
+
+class CapabilityKind(str, Enum):
+    BASEMAP = "basemap"
+    RASTER_OVERLAY = "raster-overlay"
+    VECTOR_OVERLAY = "vector-overlay"
+    SEARCH_INDEX = "search-index"
+    CAMERA_NETWORK = "camera-network"
+    DATASET_INGESTION = "dataset-ingestion"
+    ANALYSIS_TOOL = "analysis-tool"
+    METADATA_ONLY = "metadata-only"
+
+
+class ProviderAuthType(str, Enum):
+    NONE = "none"
+    API_KEY = "api-key"
+    OAUTH = "oauth"
+    TOKEN_HEADER = "token-header"
+    PAID_OR_GATED = "paid-or-gated"
+
+
+class LayerHealthStatus(str, Enum):
+    FUNCTIONAL = "functional"
+    PARTIAL = "partial"
+    BROKEN = "broken"
+    DISABLED = "disabled"
+    UNKNOWN = "unknown"
+
+
+class RenderingMode(str, Enum):
+    XYZ = "xyz"
+    WMTS = "wmts"
+    WMS = "wms"
+    GEOJSON = "geojson"
+    VECTOR_TILE = "vector-tile"
+    RASTER_TILE = "raster-tile"
+    CLUSTERED_POINTS = "clustered-points"
+    CHOROPLETH = "choropleth"
+    CAMERA_POINTS = "camera-points"
+    METADATA_ONLY = "metadata-only"
+
+
+class CommercialUse(str, Enum):
+    ALLOWED = "allowed"
+    RESTRICTED = "restricted"
+    UNKNOWN = "unknown"
+
+
+class EmbeddingAllowed(str, Enum):
+    YES = "yes"
+    NO = "no"
+    METADATA_ONLY = "metadata-only"
+    UNKNOWN = "unknown"
+
+
+class CacheMode(str, Enum):
+    NONE = "none"
+    MEMORY = "memory"
+    DISK = "disk"
+    DATABASE = "database"
+    PREPROCESSED = "preprocessed"
+
+
+class LicensePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    url: str
+    attribution_required: bool = Field(alias="attributionRequired")
+    commercial_use: CommercialUse = Field(alias="commercialUse")
+    embedding_allowed: EmbeddingAllowed = Field(alias="embeddingAllowed")
+
+
+class ProviderAuthPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: ProviderAuthType
+    required: bool = False
+    provider_key: str | None = Field(default=None, alias="providerKey")
+    access_page_provider_id: str | None = Field(
+        default=None, alias="accessPageProviderId"
+    )
+
+
+class AgenticUsePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    default_enabled: bool = Field(alias="defaultEnabled")
+    manual_toggle: bool = Field(alias="manualToggle")
+    planner_hints: list[str] = Field(default_factory=list, alias="plannerHints")
+    required_user_intent: list[str] = Field(
+        default_factory=list, alias="requiredUserIntent"
+    )
+    avoid_when: list[str] = Field(default_factory=list, alias="avoidWhen")
+
+
+class ReliabilityPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: LayerHealthStatus
+    last_audited: str = Field(alias="lastAudited")
+    known_limitations: list[str] = Field(default_factory=list, alias="knownLimitations")
+
+
+class CachePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: CacheMode
+    ttl_seconds: int = Field(ge=0, alias="ttlSeconds")
+    stale_while_revalidate_seconds: int = Field(
+        default=0, ge=0, alias="staleWhileRevalidateSeconds"
+    )
+
+
+class NormalizationPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    geometry_path: str | None = Field(default=None, alias="geometryPath")
+    id_path: str | None = Field(default=None, alias="idPath")
+    timestamp_path: str | None = Field(default=None, alias="timestampPath")
+    field_map: dict[str, str] = Field(default_factory=dict, alias="fieldMap")
+    expected_geometry: str = Field(default="not-applicable", alias="expectedGeometry")
+
+
+class CapabilityManifestV2(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    name: str
+    provider: str
+    type: str
+    description: str
+    capabilities: list[str]
+    coverage: str
+    version: int
+    last_modified: str = Field(alias="last_modified")
+    capability_kind: CapabilityKind = Field(alias="capabilityKind")
+    rendering_mode: RenderingMode = Field(alias="renderingMode")
+    source_official_docs: list[str] = Field(alias="sourceOfficialDocs")
+    license: LicensePolicy
+    auth: ProviderAuthPolicy
+    agentic_use: AgenticUsePolicy = Field(alias="agenticUse")
+    reliability: ReliabilityPolicy
+    cache_policy: CachePolicy = Field(alias="cachePolicy")
+    normalization: NormalizationPolicy
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CameraFeature(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    provider: str
+    camera_type: str
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+    last_update_time: datetime | None
+    preview_image_url: str | None
+    official_url: str
+    embed_url: str | None
+    embedding_allowed: bool
+    stale: bool
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PoiFeature(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str | None = None
+    category: str
+    source: str
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+    address: str | None = None
+    opening_hours: str | None = None
+    website: str | None = None
+    phone: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 ###############################################################################
 class ViewportPolicy(BaseModel):

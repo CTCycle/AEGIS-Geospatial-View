@@ -48,5 +48,59 @@
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
-  "last_modified": "2026-04-21T00:00:00+00:00"
+  "last_modified": "2026-04-21T00:00:00+00:00",
+  "capabilityKind": "analysis-tool",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://open-meteo.com/en/docs"
+  ],
+  "license": {
+    "name": "openmeteo attribution required where provider terms require it",
+    "url": "https://open-meteo.com/en/docs",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "weather",
+      "forecast",
+      "precipitation",
+      "direct_query",
+      "environment",
+      "openmeteo",
+      "direct-tool",
+      "Weather Forecast"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
 }

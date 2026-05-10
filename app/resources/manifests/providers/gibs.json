@@ -61,5 +61,56 @@
     "location_dependency": "Depends on selected map extent or requested location."
   },
   "version": 1,
-  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api"
+  ],
+  "license": {
+    "name": "gibs attribution required where provider terms require it",
+    "url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "imagery",
+      "wms",
+      "wmts",
+      "gibs",
+      "nasa gibs"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "none",
+    "ttlSeconds": 0,
+    "staleWhileRevalidateSeconds": 0
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
 }
