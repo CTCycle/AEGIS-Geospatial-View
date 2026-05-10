@@ -1,6 +1,6 @@
 # Capability Manifests
 
-Last updated: 2026-04-27
+Last updated: 2026-05-11
 
 ## Purpose
 
@@ -11,6 +11,7 @@ Default capability selection prioritizes free and openly accessible providers. G
 ## Capability Loading Contract
 
 - Providers, basemaps, overlays, and direct tools are loaded through `GeospatialManifestLoader`, `CapabilityRegistry`, and `RuntimeRegistry`.
+- Schema v2 is the only accepted manifest contract. The loader rejects manifests that omit v2 source, auth, rendering, reliability, cache, license, or normalization metadata.
 - Runtime availability is controlled by `runtime_profiles.json` plus credential presence.
 - Credential-backed geospatial providers use the encrypted credential repository with `api_key` labels; environment variables remain a runtime fallback.
 - Every capability entry must define purpose, data source, update frequency, access constraints, and dependencies.
@@ -108,3 +109,24 @@ Default capability selection prioritizes free and openly accessible providers. G
 - Credential-required providers must remain optional unless explicitly promoted by product policy.
 - Free/open alternatives should be preferred for default workflows.
 - UI pages should consume `/api/maps/catalog` rather than duplicating manifest parsing logic.
+
+## Schema V2 Required Fields
+
+Every manifest under `app/resources/manifests` must define:
+
+- `capabilityKind`: one of `basemap`, `raster-overlay`, `vector-overlay`, `search-index`, `camera-network`, `dataset-ingestion`, `analysis-tool`, or `metadata-only`.
+- `renderingMode`: one of `xyz`, `wmts`, `wms`, `geojson`, `vector-tile`, `raster-tile`, `clustered-points`, `choropleth`, `camera-points`, or `metadata-only`.
+- `sourceOfficialDocs`: official provider documentation URLs.
+- `license`: name, URL, attribution requirement, commercial-use status, and embedding allowance.
+- `auth`: provider auth type, provider key name, required flag, and access-page provider ID when credentials are required.
+- `agenticUse`: planner hints, default enablement, manual-toggle policy, and avoid-when rules.
+- `reliability`: health status, audit date, and known limitations.
+- `cachePolicy`: cache mode, TTL, and stale-while-revalidate TTL.
+- `normalization`: expected geometry model and field/path mapping for renderable or queryable payloads.
+
+Run the strict audit before merging manifest changes:
+
+```powershell
+cd app
+.\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict
+```

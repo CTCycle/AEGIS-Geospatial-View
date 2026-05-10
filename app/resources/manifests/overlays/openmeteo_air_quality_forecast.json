@@ -72,5 +72,61 @@
     "last_validated": "2026-04-27"
   },
   "version": 1,
-  "last_modified": "2026-04-10T16:45:00+00:00"
+  "last_modified": "2026-04-10T16:45:00+00:00",
+  "capabilityKind": "analysis-tool",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://open-meteo.com/en/docs"
+  ],
+  "license": {
+    "name": "© Open-Meteo",
+    "url": "https://open-meteo.com/en/docs",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "air-quality",
+      "pollution forecast",
+      "air quality planning",
+      "exposure awareness",
+      "pollution trend checks",
+      "air quality",
+      "forecast",
+      "pm2.5",
+      "pm10",
+      "open-meteo"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 900
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "regional/time-series"
+  }
 }

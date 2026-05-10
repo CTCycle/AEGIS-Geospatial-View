@@ -20,7 +20,10 @@ class GeospatialCatalogService:
     def _descriptor(self, item: dict[str, Any], kind: str) -> dict[str, Any]:
         metadata = dict(item.get("metadata") or {})
         capability_id = str(item.get("id") or "")
-        requires_credentials = bool(metadata.get("requires_key", False))
+        auth = dict(item.get("auth") or {})
+        reliability = dict(item.get("reliability") or {})
+        requires_credentials = bool(auth.get("required", False))
+        capability_kind = str(item.get("capabilityKind") or kind)
         is_available = (
             self.runtime_registry.is_enabled(capability_id)
             and self.runtime_registry.credentials_present(capability_id)
@@ -28,7 +31,7 @@ class GeospatialCatalogService:
         return {
             "id": capability_id,
             "name": str(item.get("name") or capability_id),
-            "kind": kind,
+            "kind": capability_kind,
             "type": str(item.get("type") or kind),
             "description": str(item.get("description") or ""),
             "provider": str(item.get("provider") or "unknown"),
@@ -46,16 +49,24 @@ class GeospatialCatalogService:
             "geometry_type": str(metadata.get("geometry_type") or ""),
             "queryable": bool(metadata.get("queryable", False)),
             "vectorizable": bool(metadata.get("vectorizable", False)),
-            "endpoint_health": str(metadata.get("endpoint_health") or "unknown"),
-            "auth_mode": str(metadata.get("auth_mode") or "none"),
-            "official_docs_url": str(metadata.get("official_docs_url") or ""),
+            "endpoint_health": str(reliability.get("status") or "unknown"),
+            "auth_mode": str(auth.get("type") or "none"),
+            "official_docs_url": "; ".join(
+                str(value) for value in item.get("sourceOfficialDocs") or []
+            ),
+            "capability_kind": capability_kind,
+            "rendering_mode": str(item.get("renderingMode") or ""),
+            "reliability": reliability,
+            "auth": auth,
             "metadata": metadata,
         }
 
     def _provider_descriptor(self, item: dict[str, Any]) -> dict[str, Any]:
         metadata = dict(item.get("metadata") or {})
         provider_id = str(item.get("id") or item.get("provider") or "unknown")
-        requires_credentials = bool(metadata.get("requires_key", False))
+        auth = dict(item.get("auth") or {})
+        reliability = dict(item.get("reliability") or {})
+        requires_credentials = bool(auth.get("required", False))
         is_available = True
         if requires_credentials:
             env_name = self.runtime_registry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
@@ -92,9 +103,15 @@ class GeospatialCatalogService:
             "geometry_type": str(metadata.get("geometry_type") or ""),
             "queryable": bool(metadata.get("queryable", False)),
             "vectorizable": bool(metadata.get("vectorizable", False)),
-            "endpoint_health": str(metadata.get("endpoint_health") or "unknown"),
-            "auth_mode": str(metadata.get("auth_mode") or "none"),
-            "official_docs_url": str(metadata.get("official_docs_url") or ""),
+            "endpoint_health": str(reliability.get("status") or "unknown"),
+            "auth_mode": str(auth.get("type") or "none"),
+            "official_docs_url": "; ".join(
+                str(value) for value in item.get("sourceOfficialDocs") or []
+            ),
+            "capability_kind": str(item.get("capabilityKind") or "metadata-only"),
+            "rendering_mode": str(item.get("renderingMode") or ""),
+            "reliability": reliability,
+            "auth": auth,
             "metadata": metadata,
         }
 

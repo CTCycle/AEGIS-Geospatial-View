@@ -1,6 +1,6 @@
 # API Access and Account Setup Guide
 
-Last updated: 2026-04-27
+Last updated: 2026-05-11
 
 ## Purpose
 
@@ -26,8 +26,16 @@ Environment fallback:
 | FRED | `FRED_API_KEY` | Yes |
 | Geoapify | `GEOAPIFY_API_KEY` | Yes |
 | Google Maps Platform | `GOOGLE_MAPS_API_KEY` | Yes |
+| NASA Open APIs | `NASA_API_KEY` | Optional for NASA API-backed endpoints, not required for public GIBS tiles |
+| NREL AFDC | `NREL_API_KEY` | Yes, when AFDC station capabilities are enabled |
 | OpenAQ | `OPENAQ_API_KEY` | Yes |
+| OpenAIP | `OPENAIP_API_KEY` | Yes, when aviation capabilities are enabled |
+| Open Charge Map | `OPENCHARGEMAP_API_KEY` | Depends on usage tier and endpoint |
+| OpenTripMap | `OPENTRIPMAP_API_KEY` | Yes, when tourism POI capabilities are enabled |
+| Sentinel Hub | `SENTINEL_HUB_CLIENT_ID`, `SENTINEL_HUB_CLIENT_SECRET` | Yes, when Sentinel Hub raster capabilities are enabled |
 | TomTom | `TOMTOM_API_KEY` | Yes |
+| Transitland | `TRANSITLAND_API_KEY` | Yes, when Transitland feed discovery is enabled |
+| Windy Webcams | `WINDY_WEBCAMS_API_KEY` | Yes, when webcam capabilities are enabled |
 
 ## Providers
 
@@ -126,6 +134,52 @@ Limits and restrictions:
 
 - Layers have different temporal cadences and native resolutions.
 - Some products are imagery/raster-only and are not machine-queryable vectors.
+
+### NASA Open APIs
+
+Use: optional NASA API-backed endpoints where a specific NASA service requires or benefits from a key. Public GIBS WMS/WMTS layers do not require this key.
+
+Setup:
+
+1. Request a key from [NASA Open APIs](https://api.nasa.gov/).
+2. Configure `NASA_API_KEY` only for NASA API-backed capabilities that declare `auth.providerKey` as `nasa`.
+3. Keep public GIBS manifests configured with `auth.type` set to `none`.
+
+Limits and restrictions:
+
+- NASA service quotas vary by API.
+- Do not store NASA keys in manifests; manifests store only the provider key name.
+
+### Windy Webcams
+
+Use: optional webcam network capability with camera locations, preview images, timelapses, and official links.
+
+Setup:
+
+1. Review the [Windy Webcams API documentation](https://api.windy.com/webcams/docs).
+2. Configure `WINDY_WEBCAMS_API_KEY` or add a Windy Webcams `api_key` credential in Access settings.
+3. Send the key with the `x-windy-api-key` header from backend provider clients.
+
+Limits and restrictions:
+
+- Preview image URL tokens expire and must be refreshed when loading the page.
+- Do not embed live feeds unless provider terms explicitly allow it.
+- If embedding is not allowed or unknown, render metadata, allowed preview images, and the official link only.
+
+### GTFS Realtime
+
+Use: optional transit updates for trip updates, service alerts, and vehicle positions.
+
+Setup:
+
+1. Review the [GTFS Realtime documentation](https://developers.google.com/transit/gtfs-realtime).
+2. Configure feed-specific credentials only when an agency requires them.
+3. Parse GTFS Realtime payloads as Protocol Buffers over HTTP.
+
+Limits and restrictions:
+
+- Feed access, licensing, and freshness are agency-specific.
+- Vehicle positions must not be displayed when the feed license or freshness policy does not support live vehicle rendering.
 
 ### ESA WorldCover
 

@@ -57,5 +57,54 @@
     "location_dependency": "Depends on selected map extent or requested location."
   },
   "version": 1,
-  "last_modified": "2026-04-06T15:08:00.882573+00:00"
+  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://docs.openaq.org/using-the-api/api-key"
+  ],
+  "license": {
+    "name": "openaq attribution required where provider terms require it",
+    "url": "https://docs.openaq.org/using-the-api/api-key",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "openaq",
+    "required": true,
+    "accessPageProviderId": "openaq"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "air-quality",
+      "point-insight",
+      "openaq"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
 }

@@ -60,5 +60,62 @@
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
-  "last_modified": "2026-04-27T02:00:00+02:00"
+  "last_modified": "2026-04-27T02:00:00+02:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://fred.stlouisfed.org/docs/api/fred/v2/api_key.html"
+  ],
+  "license": {
+    "name": "Federal Reserve Bank of St. Louis FRED",
+    "url": "https://fred.stlouisfed.org/docs/api/fred/v2/api_key.html",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "fred",
+    "required": true,
+    "accessPageProviderId": "fred"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "market data",
+      "housing prices",
+      "rent trends",
+      "market analysis",
+      "economic context",
+      "housing trends",
+      "fred",
+      "housing",
+      "rent",
+      "economic indicators",
+      "market"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "regional/time-series"
+  }
 }

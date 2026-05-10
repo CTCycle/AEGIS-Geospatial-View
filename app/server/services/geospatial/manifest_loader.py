@@ -4,7 +4,10 @@ import json
 import os
 from typing import Any
 
+from pydantic import ValidationError
+
 from server.common.constants import PROJECT_DIR
+from server.domain.geographics import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
 
@@ -26,6 +29,17 @@ class GeospatialManifestLoader:
         "last_modified",
         "metadata",
     }
+    REQUIRED_SCHEMA_V2_FIELDS = {
+        "capabilityKind",
+        "renderingMode",
+        "sourceOfficialDocs",
+        "license",
+        "auth",
+        "agenticUse",
+        "reliability",
+        "cachePolicy",
+        "normalization",
+    }
 
     def __init__(self, root_path: str | None = None) -> None:
         base = root_path or os.path.join(PROJECT_DIR, "resources", "manifests")
@@ -45,11 +59,21 @@ class GeospatialManifestLoader:
     def _validate_entry(
         self, entry: JsonDict, *, source: str, source_path: str | None = None
     ) -> JsonDict:
-        missing = [field for field in self.REQUIRED_FIELDS if field not in entry]
+        missing = [
+            field
+            for field in sorted(self.REQUIRED_FIELDS | self.REQUIRED_SCHEMA_V2_FIELDS)
+            if field not in entry
+        ]
         if missing:
             raise ManifestValidationError(
                 f"Manifest '{source}' entry '{entry.get('id')}' is missing fields: {', '.join(sorted(missing))}"
             )
+        try:
+            CapabilityManifestV2.model_validate(entry)
+        except ValidationError as exc:
+            raise ManifestValidationError(
+                f"Manifest '{source}' entry '{entry.get('id')}' failed schema v2 validation: {exc}"
+            ) from exc
         normalized = dict(entry)
         normalized["capabilities"] = list(entry.get("capabilities") or [])
         normalized["metadata"] = dict(entry.get("metadata") or {})

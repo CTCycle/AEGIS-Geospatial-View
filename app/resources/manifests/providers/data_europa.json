@@ -57,5 +57,59 @@
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
   "version": 1,
-  "last_modified": "2026-04-27T00:00:00+00:00"
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://data.europa.eu/en/developerscorner"
+  ],
+  "license": {
+    "name": "data.europa.eu and source publishers",
+    "url": "https://data.europa.eu/en/developerscorner",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "catalog-discovery",
+      "open-data",
+      "europe",
+      "geospatial-discovery",
+      "metadata",
+      "data.europa.eu",
+      "open data",
+      "geoportal"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
 }
