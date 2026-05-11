@@ -30,6 +30,80 @@ def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     assert "bBox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
 
 
+def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        assert "all_day.geojson" in url
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": "quake-1",
+                    "properties": {
+                        "place": "10 km S of Test",
+                        "mag": 2.5,
+                        "time": 1778486400000,
+                        "url": "https://earthquake.usgs.gov/quake-1",
+                    },
+                    "geometry": {"type": "Point", "coordinates": [-122.1, 38.2, 5.0]},
+                }
+            ],
+        }
+
+    response = asyncio.run(
+        USGSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(capability_id="usgs_earthquakes", params={"live": True})
+        )
+    )
+
+    assert response.payload["totalResults"] == 1
+    assert response.payload["features"][0]["category"] == "earthquake"
+    assert response.payload["features"][0]["magnitude"] == 2.5
+
+
+def test_usgs_provider_normalizes_live_water_gauges() -> None:
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        assert "waterservices.usgs.gov" in url
+        return {
+            "value": {
+                "timeSeries": [
+                    {
+                        "sourceInfo": {
+                            "siteName": "Potomac River",
+                            "siteCode": [{"value": "01646500"}],
+                            "geoLocation": {
+                                "geogLocation": {
+                                    "latitude": 38.949,
+                                    "longitude": -77.127,
+                                }
+                            },
+                        },
+                        "variable": {
+                            "variableName": "Gage height",
+                            "unit": {"unitCode": "ft"},
+                        },
+                        "values": [
+                            {
+                                "value": [
+                                    {"value": "4.1", "dateTime": "2026-05-11T12:00:00Z"}
+                                ]
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+    response = asyncio.run(
+        USGSProvider(fetcher=fetcher).fetch(
+            ProviderRequest(capability_id="usgs_water_gauges", params={"live": True})
+        )
+    )
+
+    assert response.payload["totalResults"] == 1
+    assert response.payload["features"][0]["id"] == "01646500"
+    assert response.payload["features"][0]["metadata"]["unit"] == "ft"
+
+
 def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     alerts = asyncio.run(
         NOAAProvider().fetch(ProviderRequest(capability_id="noaa_weather_alerts"))
