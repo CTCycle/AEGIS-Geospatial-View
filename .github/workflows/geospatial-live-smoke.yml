@@ -40,4 +40,5 @@ jobs:
           python -m pytest -c app/server/pyproject.toml \
             app/tests/unit/test_phase4_provider_adapters.py \
             app/tests/unit/test_phase8_provider_adapters.py \
+            app/tests/unit/test_gtfs_providers.py \
             app/tests/unit/test_geospatial_api_contracts.py

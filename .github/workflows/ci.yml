@@ -91,6 +91,7 @@ jobs:
             app/tests/unit/test_geospatial_ingestion.py \
             app/tests/unit/test_geospatial_normalizers.py \
             app/tests/unit/test_geospatial_api_contracts.py \
+            app/tests/unit/test_gtfs_providers.py \
             app/tests/unit/test_agentic_geospatial_selection.py \
             app/tests/unit/test_geospatial_e2e_scenarios.py
 
