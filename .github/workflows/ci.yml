@@ -53,6 +53,10 @@ jobs:
         working-directory: app/client
         run: npm run test -- --watch=false --browsers=ChromeHeadless
 
+      - name: Geospatial E2E scenario catalog
+        working-directory: app/client
+        run: npm run test:e2e:geospatial
+
   capability-contract-validation:
     runs-on: ubuntu-latest
     steps:
