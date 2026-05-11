@@ -13,7 +13,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class GeospatialLayerService {
-  listLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras'>> {
+  listLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'>> {
     return fetchGeospatialLayers();
   }
 
