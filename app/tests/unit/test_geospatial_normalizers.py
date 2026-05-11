@@ -65,6 +65,13 @@ def test_normalize_poi_category_maps_phase8_sources() -> None:
     assert normalize_poi_category("railway") == "rail"
     assert normalize_poi_category("pipeline") == "pipelines"
     assert normalize_poi_category("museum") == "tourism"
+    assert normalize_poi_category("heliport") == "airports"
+    assert normalize_poi_category("fuel stations") == "fuel"
+    assert normalize_poi_category("power substation") == "power"
+    assert normalize_poi_category("communication tower") == "telecom"
+    assert normalize_poi_category("hiking trail") == "trails"
+    assert normalize_poi_category("marina") == "ports"
+    assert normalize_poi_category("railway station") == "rail"
 
 
 def test_deduplicate_poi_features_by_name_category_and_coordinates() -> None:
