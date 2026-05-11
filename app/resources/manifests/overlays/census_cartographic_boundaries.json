@@ -4,30 +4,49 @@
   "provider": "census",
   "type": "dataset-ingestion",
   "description": "US Census cartographic boundary files for state, county, and tract joins.",
-  "capabilities": ["census", "boundaries", "dataset-ingestion"],
+  "capabilities": [
+    "census",
+    "boundaries",
+    "dataset-ingestion"
+  ],
   "coverage": "United States",
   "metadata": {
     "label": "Census cartographic boundaries",
     "requires_key": false,
     "attribution": "US Census Bureau",
-    "keywords": ["census", "county", "tract", "boundaries"],
-    "intent_tags": ["demographics", "county", "tract"],
-    "task_tags": ["show census boundaries", "join demographics"],
+    "keywords": [
+      "census",
+      "county",
+      "tract",
+      "boundaries"
+    ],
+    "intent_tags": [
+      "demographics",
+      "county",
+      "tract"
+    ],
+    "task_tags": [
+      "show census boundaries",
+      "join demographics"
+    ],
     "source_protocol": "download",
     "data_format": "shapefile",
     "geometry_type": "Polygon",
     "queryable": true,
-    "vectorizable": true,
+    "vectorizable": false,
     "endpoint_health": "functional",
     "auth_mode": "none",
     "official_docs_url": "https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "vector-tile",
-  "sourceOfficialDocs": ["https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html"],
+  "sourceOfficialDocs": [
+    "https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html"
+  ],
   "license": {
     "name": "US Census public data",
     "url": "https://www.census.gov/data/developers/about/terms-of-service.html",
@@ -35,25 +54,49 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["census", "county", "tract", "demographic boundary"],
-    "requiredUserIntent": ["demographics", "boundary", "choropleth"],
-    "avoidWhen": ["outside United States", "general chat"]
+    "plannerHints": [
+      "census",
+      "county",
+      "tract",
+      "demographic boundary"
+    ],
+    "requiredUserIntent": [
+      "demographics",
+      "boundary",
+      "choropleth"
+    ],
+    "avoidWhen": [
+      "outside United States",
+      "general chat"
+    ]
   },
   "reliability": {
     "status": "functional",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Requires optional GIS dependencies for shapefile normalization."]
+    "knownLimitations": [
+      "Requires optional GIS dependencies for shapefile normalization."
+    ]
   },
-  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 31536000, "staleWhileRevalidateSeconds": 31536000},
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 31536000,
+    "staleWhileRevalidateSeconds": 31536000
+  },
   "normalization": {
     "geometryPath": "geometry",
     "idPath": "GEOID",
     "timestampPath": "vintage",
-    "fieldMap": {"GEOID": "geoid", "NAME": "name"},
+    "fieldMap": {
+      "GEOID": "geoid",
+      "NAME": "name"
+    },
     "expectedGeometry": "Polygon"
   },
   "download": {
@@ -69,6 +112,22 @@
     "normalizedPath": "data/geospatial/normalized/census/cartographic_boundaries/",
     "tilePath": "data/geospatial/tiles/census/cartographic_boundaries/"
   },
-  "indexing": {"spatialIndex": true, "textIndex": true, "vectorTile": true},
-  "validation": {"minFeatureCount": 1, "requiredFields": ["GEOID", "NAME"], "bboxMustIntersect": [-180, -90, 180, 90]}
+  "indexing": {
+    "spatialIndex": true,
+    "textIndex": true,
+    "vectorTile": true
+  },
+  "validation": {
+    "minFeatureCount": 1,
+    "requiredFields": [
+      "GEOID",
+      "NAME"
+    ],
+    "bboxMustIntersect": [
+      -180,
+      -90,
+      180,
+      90
+    ]
+  }
 }

@@ -4,30 +4,50 @@
   "provider": "ourairports",
   "type": "dataset-ingestion",
   "description": "Public airport, heliport, and runway CSV dataset for searchable aviation infrastructure.",
-  "capabilities": ["airport", "aviation", "infrastructure", "dataset-ingestion"],
+  "capabilities": [
+    "airport",
+    "aviation",
+    "infrastructure",
+    "dataset-ingestion"
+  ],
   "coverage": "global",
   "metadata": {
     "label": "Airports",
     "requires_key": false,
     "attribution": "OurAirports",
-    "keywords": ["airport", "heliport", "runway", "aviation"],
-    "intent_tags": ["airport", "aviation", "infrastructure"],
-    "task_tags": ["find airports", "aviation context"],
+    "keywords": [
+      "airport",
+      "heliport",
+      "runway",
+      "aviation"
+    ],
+    "intent_tags": [
+      "airport",
+      "aviation",
+      "infrastructure"
+    ],
+    "task_tags": [
+      "find airports",
+      "aviation context"
+    ],
     "source_protocol": "CSV download",
     "data_format": "CSV",
     "geometry_type": "Point",
     "queryable": true,
-    "vectorizable": true,
+    "vectorizable": false,
     "endpoint_health": "functional",
     "auth_mode": "none",
     "official_docs_url": "https://ourairports.com/data/",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "clustered-points",
-  "sourceOfficialDocs": ["https://ourairports.com/data/"],
+  "sourceOfficialDocs": [
+    "https://ourairports.com/data/"
+  ],
   "license": {
     "name": "OurAirports public domain",
     "url": "https://ourairports.com/data/",
@@ -35,20 +55,41 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["airport", "aviation", "runway", "heliport"],
-    "requiredUserIntent": ["airport", "aviation", "nearby"],
-    "avoidWhen": ["general chat", "no geographic context"]
+    "plannerHints": [
+      "airport",
+      "aviation",
+      "runway",
+      "heliport"
+    ],
+    "requiredUserIntent": [
+      "airport",
+      "aviation",
+      "nearby"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "functional",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["CSV data must be ingested before low-latency map rendering."]
+    "knownLimitations": [
+      "CSV data must be ingested before low-latency map rendering."
+    ]
   },
-  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 604800, "staleWhileRevalidateSeconds": 2592000},
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 604800,
+    "staleWhileRevalidateSeconds": 2592000
+  },
   "normalization": {
     "geometryPath": "latitude_deg,longitude_deg",
     "idPath": "id",

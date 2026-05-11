@@ -4,15 +4,32 @@
   "provider": "openchargemap",
   "type": "vector-overlay",
   "description": "EV charging station points from Open Charge Map for bounded searches.",
-  "capabilities": ["ev", "charging", "infrastructure", "poi"],
+  "capabilities": [
+    "ev",
+    "charging",
+    "infrastructure",
+    "poi"
+  ],
   "coverage": "global-partial",
   "metadata": {
     "label": "EV Charging",
     "requires_key": false,
     "attribution": "Open Charge Map",
-    "keywords": ["ev charging", "charger", "electric vehicle", "infrastructure"],
-    "intent_tags": ["ev", "charging", "infrastructure"],
-    "task_tags": ["find chargers", "route charging"],
+    "keywords": [
+      "ev charging",
+      "charger",
+      "electric vehicle",
+      "infrastructure"
+    ],
+    "intent_tags": [
+      "ev",
+      "charging",
+      "infrastructure"
+    ],
+    "task_tags": [
+      "find chargers",
+      "route charging"
+    ],
     "source_protocol": "JSON API",
     "data_format": "JSON",
     "geometry_type": "Point",
@@ -21,13 +38,16 @@
     "endpoint_health": "partial",
     "auth_mode": "optional_api_key",
     "official_docs_url": "https://openchargemap.org/site/develop/api",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
-  "sourceOfficialDocs": ["https://openchargemap.org/site/develop/api"],
+  "sourceOfficialDocs": [
+    "https://openchargemap.org/site/develop/api"
+  ],
   "license": {
     "name": "Open Charge Map terms",
     "url": "https://openchargemap.org/site/about/terms",
@@ -35,20 +55,43 @@
     "commercialUse": "unknown",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "api-key", "required": false, "providerKey": "openchargemap", "accessPageProviderId": "openchargemap"},
+  "auth": {
+    "type": "api-key",
+    "required": false,
+    "providerKey": "openchargemap",
+    "accessPageProviderId": "openchargemap"
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["ev charging", "charger", "electric vehicle", "charging station"],
-    "requiredUserIntent": ["ev", "charging", "nearby"],
-    "avoidWhen": ["general chat", "no geographic context"]
+    "plannerHints": [
+      "ev charging",
+      "charger",
+      "electric vehicle",
+      "charging station"
+    ],
+    "requiredUserIntent": [
+      "ev",
+      "charging",
+      "nearby"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "partial",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Provider may require an API key or stricter usage terms depending on request volume."]
+    "knownLimitations": [
+      "Provider may require an API key or stricter usage terms depending on request volume."
+    ]
   },
-  "cachePolicy": {"mode": "memory", "ttlSeconds": 86400, "staleWhileRevalidateSeconds": 604800},
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
   "normalization": {
     "geometryPath": "[].AddressInfo.Latitude,[].AddressInfo.Longitude",
     "idPath": "[].ID",

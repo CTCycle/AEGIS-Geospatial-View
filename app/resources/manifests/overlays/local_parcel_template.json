@@ -4,15 +4,30 @@
   "provider": "local_open_data",
   "type": "dataset-ingestion",
   "description": "Template manifest for jurisdiction-specific parcel polygons with explicit license review.",
-  "capabilities": ["parcels", "property", "dataset-ingestion"],
+  "capabilities": [
+    "parcels",
+    "property",
+    "dataset-ingestion"
+  ],
   "coverage": "local jurisdiction",
   "metadata": {
     "label": "Local parcels",
     "requires_key": false,
     "attribution": "Local open data provider",
-    "keywords": ["parcel", "property", "cadastre"],
-    "intent_tags": ["parcel", "property", "land records"],
-    "task_tags": ["show parcels", "property context"],
+    "keywords": [
+      "parcel",
+      "property",
+      "cadastre"
+    ],
+    "intent_tags": [
+      "parcel",
+      "property",
+      "land records"
+    ],
+    "task_tags": [
+      "show parcels",
+      "property context"
+    ],
     "source_protocol": "local file or download",
     "data_format": "geojson",
     "geometry_type": "Polygon",
@@ -21,13 +36,16 @@
     "endpoint_health": "disabled",
     "auth_mode": "none",
     "official_docs_url": "https://example.invalid/local-parcel-template",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "metadata-only",
-  "sourceOfficialDocs": ["https://example.invalid/local-parcel-template"],
+  "sourceOfficialDocs": [
+    "https://example.invalid/local-parcel-template"
+  ],
   "license": {
     "name": "Jurisdiction-specific parcel license",
     "url": "https://example.invalid/local-parcel-template",
@@ -35,25 +53,48 @@
     "commercialUse": "unknown",
     "embeddingAllowed": "metadata-only"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,
-    "plannerHints": ["parcel", "property", "cadastre", "local open data"],
-    "requiredUserIntent": ["parcel", "property"],
-    "avoidWhen": ["no configured local parcel source", "privacy-sensitive request"]
+    "plannerHints": [
+      "parcel",
+      "property",
+      "cadastre",
+      "local open data"
+    ],
+    "requiredUserIntent": [
+      "parcel",
+      "property"
+    ],
+    "avoidWhen": [
+      "no configured local parcel source",
+      "privacy-sensitive request"
+    ]
   },
   "reliability": {
     "status": "disabled",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Template only; enable by replacing source URL, license, attribution, and jurisdiction coverage."]
+    "knownLimitations": [
+      "Template only; enable by replacing source URL, license, attribution, and jurisdiction coverage."
+    ]
   },
-  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 2592000, "staleWhileRevalidateSeconds": 2592000},
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 2592000,
+    "staleWhileRevalidateSeconds": 2592000
+  },
   "normalization": {
     "geometryPath": "geometry",
     "idPath": "parcel_id",
     "timestampPath": "source_vintage",
-    "fieldMap": {"parcel_id": "parcel_id", "owner_redacted": "owner_redacted"},
+    "fieldMap": {
+      "parcel_id": "parcel_id",
+      "owner_redacted": "owner_redacted"
+    },
     "expectedGeometry": "not-applicable"
   },
   "download": {
@@ -69,6 +110,21 @@
     "normalizedPath": "data/geospatial/normalized/local_open_data/parcels/",
     "tilePath": "data/geospatial/tiles/local_open_data/parcels/"
   },
-  "indexing": {"spatialIndex": true, "textIndex": true, "vectorTile": true},
-  "validation": {"minFeatureCount": 1, "requiredFields": ["parcel_id"], "bboxMustIntersect": [-180, -90, 180, 90]}
+  "indexing": {
+    "spatialIndex": true,
+    "textIndex": true,
+    "vectorTile": true
+  },
+  "validation": {
+    "minFeatureCount": 1,
+    "requiredFields": [
+      "parcel_id"
+    ],
+    "bboxMustIntersect": [
+      -180,
+      -90,
+      180,
+      90
+    ]
+  }
 }
