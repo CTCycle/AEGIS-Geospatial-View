@@ -46,7 +46,7 @@ describe('components/camera-popup.component', () => {
     expect(link.href).toBe('https://example.test/camera');
   });
 
-  it('does not embed camera player URLs unless a future component explicitly supports it', () => {
+  it('does not embed camera player URLs when embedding is not allowed', () => {
     component.camera = camera;
     fixture.detectChanges();
 
@@ -54,5 +54,20 @@ describe('components/camera-popup.component', () => {
 
     expect(element.querySelector('iframe')).toBeNull();
     expect(element.innerHTML).not.toContain('https://example.test/embed');
+  });
+
+  it('embeds camera player URLs only when provider permission allows it', () => {
+    component.camera = {
+      ...camera,
+      embedding_allowed: true,
+      stale: false,
+    };
+    fixture.detectChanges();
+
+    const iframe = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement;
+
+    expect(iframe).not.toBeNull();
+    expect(iframe.title).toBe('Pass view live camera');
+    expect(iframe.src).toBe('https://example.test/embed');
   });
 });

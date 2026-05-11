@@ -59,7 +59,28 @@ export class LayerCatalogComponent {
 
   canToggle(layer: CapabilityDescriptor): boolean {
     const status = String(layer.reliability?.status || layer.endpoint_health || '').toLowerCase();
-    return layer.supports_map && layer.rendering_mode !== 'metadata-only' && status !== 'broken';
+    return layer.supports_map
+      && layer.is_available
+      && layer.rendering_mode !== 'metadata-only'
+      && !this.hasCredentialGap(layer)
+      && !['broken', 'disabled'].includes(status);
+  }
+
+  hasCredentialGap(layer: CapabilityDescriptor): boolean {
+    return Boolean(layer.requires_credentials && !layer.is_available);
+  }
+
+  stateLabel(layer: CapabilityDescriptor): string | null {
+    if (this.hasCredentialGap(layer)) {
+      return 'Missing key';
+    }
+    if (!layer.is_available) {
+      return 'Unavailable';
+    }
+    if (layer.rendering_mode === 'metadata-only' || layer.capability_kind === 'metadata-only') {
+      return 'Metadata only';
+    }
+    return null;
   }
 
   private matchesCategory(layer: CapabilityDescriptor, category: string): boolean {

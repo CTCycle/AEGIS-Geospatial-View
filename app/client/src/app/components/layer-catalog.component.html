@@ -31,8 +31,8 @@
           <p>{{ layer.description }}</p>
         }
         <footer>
-          @if (layer.requires_credentials && !layer.is_available) {
-            <span>Missing key</span>
+          @if (stateLabel(layer); as label) {
+            <span>{{ label }}</span>
           }
           <button type="button" (click)="askAgent.emit(layer)">Ask agent</button>
           @if (canToggle(layer)) {
