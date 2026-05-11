@@ -19,7 +19,7 @@ export class GeospatialLayerService {
 
   fetchFeatures(
     layerId: string,
-    params: { bbox?: string; zoom?: number; time?: string } = {},
+    params: { bbox?: string; zoom?: number; time?: string; live?: boolean; incidents?: boolean } = {},
   ): Promise<GeospatialProviderPayload> {
     return fetchGeospatialLayerFeatures(layerId, params);
   }

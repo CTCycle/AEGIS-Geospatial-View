@@ -322,7 +322,7 @@ export const fetchGeospatialLayers = async (): Promise<Pick<CatalogResponse, 'ba
 
 export const fetchGeospatialLayerFeatures = async (
   layerId: string,
-  params: { bbox?: string; zoom?: number; time?: string } = {},
+  params: { bbox?: string; zoom?: number; time?: string; live?: boolean; incidents?: boolean } = {},
 ): Promise<GeospatialProviderPayload> => {
   const query = new URLSearchParams();
   if (params.bbox) {
@@ -333,6 +333,12 @@ export const fetchGeospatialLayerFeatures = async (
   }
   if (params.time) {
     query.set('time', params.time);
+  }
+  if (params.live) {
+    query.set('live', 'true');
+  }
+  if (params.incidents) {
+    query.set('incidents', 'true');
   }
   const suffix = query.toString() ? `?${query}` : '';
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}/${encodeURIComponent(layerId)}/features${suffix}`, {
