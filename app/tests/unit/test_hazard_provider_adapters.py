@@ -120,6 +120,48 @@ def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     assert "tidesandcurrents.noaa.gov" in coops.payload["featuresUrl"]
 
 
+def test_noaa_provider_normalizes_live_alert_geojson() -> None:
+    async def fetcher(url: str, headers=None):  # noqa: ANN001
+        assert "api.weather.gov/alerts/active" in url
+        assert headers and "User-Agent" in headers
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": "alert-1",
+                    "properties": {
+                        "event": "Flood Warning",
+                        "severity": "Severe",
+                        "certainty": "Likely",
+                        "urgency": "Expected",
+                        "areaDesc": "Test County",
+                        "effective": "2026-05-11T12:00:00Z",
+                        "expires": "2026-05-11T18:00:00Z",
+                        "senderName": "NWS Test",
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[-77.0, 38.0], [-76.9, 38.0], [-77.0, 38.0]]],
+                    },
+                }
+            ],
+        }
+
+    response = asyncio.run(
+        NOAAProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="noaa_weather_alerts",
+                bbox=(-78.0, 38.0, -77.0, 39.0),
+                params={"live": True},
+            )
+        )
+    )
+
+    assert response.payload["totalResults"] == 1
+    assert response.payload["features"][0]["category"] == "weather_alert"
+    assert response.payload["features"][0]["severity"] == "Severe"
+
+
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     response = asyncio.run(
         FEMAProvider().fetch(ProviderRequest(capability_id="fema_nfhl_flood_zones"))
