@@ -64,7 +64,20 @@ function assertContainsAll(content, ids, fileName) {
   }
 }
 
+function assertBrowserSmokeExists() {
+  const fullPath = path.join(__dirname, '..', 'src', 'app', 'e2e', 'geospatial-browser-smoke.spec.ts');
+  const content = fs.readFileSync(fullPath, 'utf8');
+  assertContainsAll(content, [
+    'DEFAULT_BASE_TILE_PROXY_URL',
+    'mock_clustered_points',
+    'metadata_context',
+    'windy_webcams_missing_key',
+    'forbiddenSecret',
+  ], 'src/app/e2e/geospatial-browser-smoke.spec.ts');
+}
+
 assertContainsAll(readScenarioFile('geospatial-layers.spec.ts'), requiredLayerIds, 'geospatial-layers.spec.ts');
 assertContainsAll(readScenarioFile('geospatial-webcams.spec.ts'), requiredWebcamIds, 'geospatial-webcams.spec.ts');
+assertBrowserSmokeExists();
 
-console.log('Geospatial e2e scenario catalog is complete.');
+console.log('Geospatial e2e scenario catalog and browser smoke coverage are complete.');
