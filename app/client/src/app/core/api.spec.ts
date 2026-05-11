@@ -9,6 +9,7 @@ import {
   parseChatTurnResponse,
   parseModelSettingsResponse,
   parseSearchResponse,
+  fetchGeospatialLayerFeatures,
   sendChatTurn,
   streamChatTurn,
 } from './api';
@@ -202,5 +203,35 @@ describe('core/api', () => {
     expect(fetchSpy).toHaveBeenCalled();
     const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
     expect(calledUrl).toBe(`${API_BASE_URL}${API_CHAT_TURN_PATH}`);
+  });
+
+  it('fetchGeospatialLayerFeatures forwards live provider query flags', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        status: 'ok',
+        provider: 'tomtom',
+        payload: {},
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await fetchGeospatialLayerFeatures('tomtom_traffic_flow', {
+      bbox: '12,41,13,42',
+      zoom: 10,
+      time: '2026-05-11T12:00:00Z',
+      live: true,
+      incidents: true,
+    });
+
+    const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
+    expect(calledUrl).toContain('/geospatial/layers/tomtom_traffic_flow/features?');
+    expect(calledUrl).toContain('bbox=12%2C41%2C13%2C42');
+    expect(calledUrl).toContain('zoom=10');
+    expect(calledUrl).toContain('time=2026-05-11T12%3A00%3A00Z');
+    expect(calledUrl).toContain('live=true');
+    expect(calledUrl).toContain('incidents=true');
   });
 });
