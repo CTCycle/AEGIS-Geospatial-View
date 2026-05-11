@@ -51,7 +51,7 @@ jobs:
 
       - name: Frontend unit tests
         working-directory: app/client
-        run: npm run test -- --watch=false --browsers=ChromeHeadless
+        run: npm run test -- --watch=false --browsers=ChromeHeadlessNoGpu
 
       - name: Geospatial E2E scenario catalog
         working-directory: app/client
