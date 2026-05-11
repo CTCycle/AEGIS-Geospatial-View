@@ -56,6 +56,30 @@
           </div>
         }
 
+        @if (metadataOnlyOverlays.length) {
+          <div class="metadata-panel" aria-label="Metadata-only layers">
+            @for (overlay of metadataOnlyOverlays; track overlay.id) {
+              <p><strong>{{ overlay.label }}</strong> is available as metadata or setup context only.</p>
+            }
+          </div>
+        }
+
+        @if (legendEntries.length) {
+          <div class="legend-panel" aria-label="Layer legend">
+            @for (entry of legendEntries; track entry.id) {
+              <p><span class="legend-swatch"></span>{{ entry.label }} <span>{{ entry.mode }}</span></p>
+            }
+          </div>
+        }
+
+        @if (attributionEntries.length) {
+          <div class="attribution-panel" aria-label="Map attribution">
+            @for (entry of attributionEntries; track entry) {
+              <span>{{ entry }}</span>
+            }
+          </div>
+        }
+
         @if (restoreNotice) {
           <div class="compliance-panel" role="status" aria-live="polite">
             <p>{{ restoreNotice }}</p>

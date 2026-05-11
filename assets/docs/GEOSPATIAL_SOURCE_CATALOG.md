@@ -15,7 +15,7 @@ AEGIS treats geographic data sources as manifest-backed capabilities. The single
 | `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, Open Charge Map, NREL AFDC, and ArcGIS REST descriptors are implemented for normalized API contracts. |
 | `search-index` | Overpass, Geoapify, and OpenTripMap sources are classified. Overpass has a concrete provider adapter; Geoapify and OpenTripMap are credential-gated. |
 | `camera-network` | Windy Webcams manifest, provider shell, credential status, API contract, and client types are implemented. |
-| `dataset-ingestion` | GTFS Static manifests and provider parsing exist for feed fixtures and configured ingestion. |
+| `dataset-ingestion` | GTFS Static, OurAirports, Natural Earth, Census boundaries, ACS joins, Eurostat NUTS, Overture Maps, OpenAddresses, and local parcel template manifests are classified. The ingestion service executes CSV/GeoJSON normalization and records partial status for heavy formats that need optional GIS dependencies. |
 | `analysis-tool` | Open-Meteo and PVGIS provider adapters are implemented for point or sampled analysis payloads. |
 | `metadata-only` | Statistical or restricted sources are classified and not exposed as normal map toggles. |
 
@@ -42,6 +42,12 @@ AEGIS treats geographic data sources as manifest-backed capabilities. The single
 - NREL AFDC: https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/
 - OurAirports: https://ourairports.com/data/
 - Transitland: https://www.transit.land/documentation/datastore/api-endpoints.html
+- Natural Earth: https://www.naturalearthdata.com/downloads/
+- Census cartographic boundaries: https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html
+- Census ACS: https://www.census.gov/data/developers/data-sets/acs-5year.html
+- Eurostat GISCO NUTS: https://ec.europa.eu/eurostat/web/gisco/geodata/statistical-units/territorial-units-statistics
+- Overture Maps: https://docs.overturemaps.org/
+- OpenAddresses: https://batch.openaddresses.io/data
 
 ## Current Provider Framework
 
@@ -72,3 +78,5 @@ Implemented adapters:
 - `windy_webcams.py`
 
 Adapters return normalized `ProviderResponse` objects with payload, attribution, warnings, stale state, and provider ID. Network-dependent behavior is tested through mocked services.
+
+Downloaded datasets are represented as manifests and processed by `app/server/services/geospatial/ingestion.py`. The default runtime can normalize CSV point data and GeoJSON feature collections; heavy formats remain optional to keep the web stack lightweight.

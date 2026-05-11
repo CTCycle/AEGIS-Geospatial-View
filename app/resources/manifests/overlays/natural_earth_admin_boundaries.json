@@ -1,0 +1,74 @@
+{
+  "id": "natural_earth_admin_boundaries",
+  "name": "Natural Earth Admin Boundaries",
+  "provider": "natural_earth",
+  "type": "dataset-ingestion",
+  "description": "Public Natural Earth administrative boundaries prepared for low-zoom geographic context.",
+  "capabilities": ["boundaries", "admin", "dataset-ingestion"],
+  "coverage": "global",
+  "metadata": {
+    "label": "Natural Earth boundaries",
+    "requires_key": false,
+    "attribution": "Natural Earth",
+    "keywords": ["countries", "boundaries", "admin"],
+    "intent_tags": ["boundary", "country", "admin"],
+    "task_tags": ["show boundaries", "country context"],
+    "source_protocol": "download",
+    "data_format": "shapefile",
+    "geometry_type": "Polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "functional",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.naturalearthdata.com/downloads/",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "dataset-ingestion",
+  "renderingMode": "vector-tile",
+  "sourceOfficialDocs": ["https://www.naturalearthdata.com/downloads/"],
+  "license": {
+    "name": "Natural Earth public domain",
+    "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {"type": "none", "required": false},
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": ["boundary", "country", "admin", "natural earth"],
+    "requiredUserIntent": ["boundary", "map context"],
+    "avoidWhen": ["general chat", "high precision parcel analysis"]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": ["Requires optional GIS dependencies for shapefile-to-tile processing."]
+  },
+  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 31536000, "staleWhileRevalidateSeconds": 31536000},
+  "normalization": {
+    "geometryPath": "geometry",
+    "idPath": "ne_id",
+    "timestampPath": "static",
+    "fieldMap": {"ADMIN": "name", "ISO_A3": "iso_a3"},
+    "expectedGeometry": "Polygon"
+  },
+  "download": {
+    "sourceUrl": "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip",
+    "license": "https://www.naturalearthdata.com/about/terms-of-use/",
+    "updateFrequency": "static",
+    "expectedFormat": "shapefile",
+    "checksumUrl": null,
+    "compression": "zip"
+  },
+  "storage": {
+    "rawPath": "data/geospatial/raw/natural_earth/admin_boundaries/",
+    "normalizedPath": "data/geospatial/normalized/natural_earth/admin_boundaries/",
+    "tilePath": "data/geospatial/tiles/natural_earth/admin_boundaries/"
+  },
+  "indexing": {"spatialIndex": true, "textIndex": true, "vectorTile": true},
+  "validation": {"minFeatureCount": 1, "requiredFields": ["ADMIN", "ISO_A3"], "bboxMustIntersect": [-180, -90, 180, 90]}
+}

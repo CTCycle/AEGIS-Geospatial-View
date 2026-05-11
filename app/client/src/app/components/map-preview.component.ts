@@ -188,6 +188,10 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
       return;
     }
 
+    if (renderingMode === 'vector-tile' && addVectorTileOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
+      return;
+    }
+
     if (overlay.type === 'point-insight') {
       const center = mapSession?.center;
       if (typeof center?.longitude !== 'number' || typeof center?.latitude !== 'number') {
@@ -252,8 +256,24 @@ const addGeoJsonOverlayLayer = (
     type: 'geojson',
     data: overlay.url,
   });
+  const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
   const geometryType = overlay.geometry_type?.toLowerCase() || '';
-  if (geometryType.includes('point')) {
+  if (renderingMode === 'camera-points') {
+    map.addLayer({
+      id: layerId,
+      source: sourceId,
+      type: 'circle',
+      paint: {
+        'circle-radius': 7,
+        'circle-color': '#f97316',
+        'circle-opacity': opacity,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#7c2d12',
+      },
+    });
+    return true;
+  }
+  if (geometryType.includes('point') || renderingMode === 'clustered-points') {
     map.addLayer({
       id: layerId,
       source: sourceId,
@@ -268,6 +288,19 @@ const addGeoJsonOverlayLayer = (
     });
     return true;
   }
+  if (renderingMode === 'choropleth' || geometryType.includes('polygon')) {
+    map.addLayer({
+      id: layerId,
+      source: sourceId,
+      type: 'fill',
+      paint: {
+        'fill-color': '#2563eb',
+        'fill-opacity': Math.min(opacity, 0.55),
+        'fill-outline-color': '#1e3a8a',
+      },
+    });
+    return true;
+  }
   map.addLayer({
     id: layerId,
     source: sourceId,
@@ -276,6 +309,34 @@ const addGeoJsonOverlayLayer = (
       'line-color': '#38bdf8',
       'line-width': 2,
       'line-opacity': opacity,
+    },
+  });
+  return true;
+};
+
+const addVectorTileOverlayLayer = (
+  map: Map,
+  overlay: OverlayEntry,
+  sourceId: string,
+  layerId: string,
+  opacity: number,
+): boolean => {
+  if (!overlay.url) {
+    return false;
+  }
+  map.addSource(sourceId, {
+    type: 'vector',
+    tiles: [overlay.url],
+  });
+  map.addLayer({
+    id: layerId,
+    source: sourceId,
+    'source-layer': overlay.layer_id || overlay.id,
+    type: 'fill',
+    paint: {
+      'fill-color': '#22c55e',
+      'fill-opacity': Math.min(opacity, 0.45),
+      'fill-outline-color': '#14532d',
     },
   });
   return true;
@@ -392,6 +453,28 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   get complianceWarnings(): string[] {
     return this.mapSession?.compliance_warnings || [];
+  }
+
+  get metadataOnlyOverlays(): OverlayEntry[] {
+    return this.overlays.filter((overlay) => {
+      const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
+      return renderingMode === 'metadata-only' || !overlay.url;
+    });
+  }
+
+  get attributionEntries(): string[] {
+    const entries = this.overlays
+      .map((overlay) => overlay.attribution || overlay.provider)
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    return Array.from(new Set(entries));
+  }
+
+  get legendEntries(): Array<{ id: string; label: string; mode: string }> {
+    return this.overlays.map((overlay) => ({
+      id: overlay.id,
+      label: overlay.label,
+      mode: String(overlay.rendering_mode || overlay.type || 'overlay'),
+    }));
   }
 
   get embeddedMapHtml(): SafeHtml | null {
@@ -583,7 +666,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         map.setPaintProperty(layerId, 'circle-opacity', opacityValue);
       } else if (isGeoJsonOverlay(overlay)) {
         const geometryType = overlay.geometry_type?.toLowerCase() || '';
-        map.setPaintProperty(layerId, geometryType.includes('point') ? 'circle-opacity' : 'line-opacity', opacityValue);
+        const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
+        if (geometryType.includes('point') || renderingMode === 'camera-points' || renderingMode === 'clustered-points') {
+          map.setPaintProperty(layerId, 'circle-opacity', opacityValue);
+        } else if (geometryType.includes('polygon') || renderingMode === 'choropleth') {
+          map.setPaintProperty(layerId, 'fill-opacity', Math.min(opacityValue, 0.55));
+        } else {
+          map.setPaintProperty(layerId, 'line-opacity', opacityValue);
+        }
+      } else if (String(overlay.rendering_mode || overlay.type).toLowerCase() === 'vector-tile') {
+        map.setPaintProperty(layerId, 'fill-opacity', Math.min(opacityValue, 0.45));
       } else {
         map.setPaintProperty(layerId, 'raster-opacity', opacityValue);
       }

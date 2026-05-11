@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "providers_dir": "providers",
   "basemaps_dir": "basemaps",
   "overlays_dir": "overlays",
@@ -20,10 +20,10 @@
     "metadata-only"
   ],
   "health_summary": {
-    "functional": 25,
-    "partial": 40,
+    "functional": 28,
+    "partial": 43,
     "broken": 0,
-    "disabled": 0,
+    "disabled": 1,
     "unknown": 6
   }
 }

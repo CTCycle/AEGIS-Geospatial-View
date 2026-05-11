@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from server.app import create_app
@@ -80,6 +81,31 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
     assert payload["required"] is True
     assert payload["configured"] is True
     assert payload["environmentVariable"] == "WINDY_WEBCAMS_API_KEY"
+
+
+@pytest.mark.parametrize(
+    ("provider_id", "env_name"),
+    [
+        ("opentripmap", "OPENTRIPMAP_API_KEY"),
+        ("openchargemap", "OPENCHARGEMAP_API_KEY"),
+        ("nrel", "NREL_API_KEY"),
+    ],
+)
+def test_phase8_credential_status_uses_provider_environment(
+    monkeypatch, provider_id: str, env_name: str
+) -> None:
+    monkeypatch.delenv(env_name, raising=False)
+    client = TestClient(create_app())
+
+    missing = client.get(f"/api/geospatial/sources/{provider_id}/credential-status")
+    assert missing.status_code == 200
+    assert missing.json()["environmentVariable"] == env_name
+    assert missing.json()["configured"] is False
+
+    monkeypatch.setenv(env_name, "test-key")
+    configured = client.get(f"/api/geospatial/sources/{provider_id}/credential-status")
+    assert configured.status_code == 200
+    assert configured.json()["configured"] is True
 
 
 def test_geospatial_audit_endpoint_passes() -> None:
