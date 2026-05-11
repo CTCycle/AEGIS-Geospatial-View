@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from server.services.geospatial.ingestion import (
     IngestionManifestError,
     build_ingestion_plan,
@@ -107,3 +109,45 @@ def test_execute_ingestion_plan_rejects_checksum_mismatch(tmp_path) -> None:
         assert "Checksum mismatch" in str(exc)
     else:
         raise AssertionError("Checksum mismatch did not fail ingestion.")
+
+
+def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None:
+    source = tmp_path / "source.geojson"
+    source.write_text(
+        """
+        {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "id": "valid-line",
+              "properties": {"name": "Valid line"},
+              "geometry": {
+                "type": "LineString",
+                "coordinates": [[7.0, 45.0], [7.2, 45.2]]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "bad-point",
+              "properties": {"name": "Bad point"},
+              "geometry": {"type": "Point", "coordinates": [220.0, 45.0]}
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    manifest = _manifest()
+    manifest["download"]["sourceUrl"] = str(source)
+    manifest["download"]["expectedFormat"] = "geojson"
+    manifest["download"]["compression"] = "none"
+    manifest["validation"] = {"minFeatureCount": 1}
+    plan = build_ingestion_plan(manifest)
+
+    result = execute_ingestion_plan(plan, workspace_root=tmp_path)
+
+    assert result.feature_count == 1
+    assert "Dropped 1 GeoJSON feature" in result.warnings[0]
+    assert result.spatial_index_file is not None
+    assert '"bbox": [' in Path(result.spatial_index_file).read_text(encoding="utf-8")
