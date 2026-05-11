@@ -4,15 +4,33 @@
   "provider": "nrel",
   "type": "vector-overlay",
   "description": "Alternative fuel station locations from the NREL AFDC API.",
-  "capabilities": ["fuel", "charging", "infrastructure", "transportation"],
+  "capabilities": [
+    "fuel",
+    "charging",
+    "infrastructure",
+    "transportation"
+  ],
   "coverage": "united-states",
   "metadata": {
     "label": "Alternative Fuel Stations",
     "requires_key": true,
     "attribution": "National Renewable Energy Laboratory",
-    "keywords": ["alternative fuel", "ev charging", "hydrogen", "cng", "station"],
-    "intent_tags": ["fuel", "charging", "infrastructure"],
-    "task_tags": ["find fuel stations", "route fueling"],
+    "keywords": [
+      "alternative fuel",
+      "ev charging",
+      "hydrogen",
+      "cng",
+      "station"
+    ],
+    "intent_tags": [
+      "fuel",
+      "charging",
+      "infrastructure"
+    ],
+    "task_tags": [
+      "find fuel stations",
+      "route fueling"
+    ],
     "source_protocol": "JSON API",
     "data_format": "JSON",
     "geometry_type": "Point",
@@ -21,13 +39,16 @@
     "endpoint_health": "credential-gated",
     "auth_mode": "api_key",
     "official_docs_url": "https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Credential-gated provider limits apply; use bounded requests and cache responses."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
-  "sourceOfficialDocs": ["https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/"],
+  "sourceOfficialDocs": [
+    "https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/"
+  ],
   "license": {
     "name": "NREL developer network terms",
     "url": "https://developer.nrel.gov/docs/terms/",
@@ -44,16 +65,34 @@
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["alternative fuel", "ev charging", "hydrogen", "fuel station"],
-    "requiredUserIntent": ["fuel", "charging", "nearby"],
-    "avoidWhen": ["general chat", "no geographic context"]
+    "plannerHints": [
+      "alternative fuel",
+      "ev charging",
+      "hydrogen",
+      "fuel station"
+    ],
+    "requiredUserIntent": [
+      "fuel",
+      "charging",
+      "nearby"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "partial",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Requires NREL API key and is primarily U.S.-focused."]
+    "knownLimitations": [
+      "Requires NREL API key and is primarily U.S.-focused."
+    ]
   },
-  "cachePolicy": {"mode": "memory", "ttlSeconds": 86400, "staleWhileRevalidateSeconds": 604800},
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
   "normalization": {
     "geometryPath": "fuel_stations[].latitude,fuel_stations[].longitude",
     "idPath": "fuel_stations[].id",

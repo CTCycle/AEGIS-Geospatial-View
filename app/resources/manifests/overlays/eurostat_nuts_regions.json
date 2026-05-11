@@ -4,15 +4,31 @@
   "provider": "eurostat",
   "type": "dataset-ingestion",
   "description": "Eurostat GISCO NUTS geometry for European regional statistics joins.",
-  "capabilities": ["eurostat", "nuts", "boundaries", "dataset-ingestion"],
+  "capabilities": [
+    "eurostat",
+    "nuts",
+    "boundaries",
+    "dataset-ingestion"
+  ],
   "coverage": "Europe",
   "metadata": {
     "label": "Eurostat NUTS regions",
     "requires_key": false,
     "attribution": "Eurostat GISCO",
-    "keywords": ["eurostat", "nuts", "regions"],
-    "intent_tags": ["europe", "regional demographics", "nuts"],
-    "task_tags": ["show NUTS boundaries", "join Eurostat statistics"],
+    "keywords": [
+      "eurostat",
+      "nuts",
+      "regions"
+    ],
+    "intent_tags": [
+      "europe",
+      "regional demographics",
+      "nuts"
+    ],
+    "task_tags": [
+      "show NUTS boundaries",
+      "join Eurostat statistics"
+    ],
     "source_protocol": "download",
     "data_format": "geojson",
     "geometry_type": "Polygon",
@@ -21,13 +37,16 @@
     "endpoint_health": "functional",
     "auth_mode": "none",
     "official_docs_url": "https://ec.europa.eu/eurostat/web/gisco/geodata/statistical-units/territorial-units-statistics",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "vector-tile",
-  "sourceOfficialDocs": ["https://ec.europa.eu/eurostat/web/gisco/geodata/statistical-units/territorial-units-statistics"],
+  "sourceOfficialDocs": [
+    "https://ec.europa.eu/eurostat/web/gisco/geodata/statistical-units/territorial-units-statistics"
+  ],
   "license": {
     "name": "Eurostat reuse policy",
     "url": "https://ec.europa.eu/eurostat/about/policies/copyright",
@@ -35,25 +54,49 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["eurostat", "nuts", "regional statistics", "europe"],
-    "requiredUserIntent": ["european statistics", "regional boundary", "choropleth"],
-    "avoidWhen": ["outside Europe", "general chat"]
+    "plannerHints": [
+      "eurostat",
+      "nuts",
+      "regional statistics",
+      "europe"
+    ],
+    "requiredUserIntent": [
+      "european statistics",
+      "regional boundary",
+      "choropleth"
+    ],
+    "avoidWhen": [
+      "outside Europe",
+      "general chat"
+    ]
   },
   "reliability": {
     "status": "functional",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Large geometry should be preprocessed before interactive rendering."]
+    "knownLimitations": [
+      "Large geometry should be preprocessed before interactive rendering."
+    ]
   },
-  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 31536000, "staleWhileRevalidateSeconds": 31536000},
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 31536000,
+    "staleWhileRevalidateSeconds": 31536000
+  },
   "normalization": {
     "geometryPath": "geometry",
     "idPath": "NUTS_ID",
     "timestampPath": "vintage",
-    "fieldMap": {"NUTS_ID": "nuts_id", "NAME_LATN": "name"},
+    "fieldMap": {
+      "NUTS_ID": "nuts_id",
+      "NAME_LATN": "name"
+    },
     "expectedGeometry": "Polygon"
   },
   "download": {
@@ -69,6 +112,21 @@
     "normalizedPath": "data/geospatial/normalized/eurostat/nuts_regions/",
     "tilePath": "data/geospatial/tiles/eurostat/nuts_regions/"
   },
-  "indexing": {"spatialIndex": true, "textIndex": true, "vectorTile": true},
-  "validation": {"minFeatureCount": 1, "requiredFields": ["NUTS_ID"], "bboxMustIntersect": [-31, 27, 45, 72]}
+  "indexing": {
+    "spatialIndex": true,
+    "textIndex": true,
+    "vectorTile": true
+  },
+  "validation": {
+    "minFeatureCount": 1,
+    "requiredFields": [
+      "NUTS_ID"
+    ],
+    "bboxMustIntersect": [
+      -31,
+      27,
+      45,
+      72
+    ]
+  }
 }

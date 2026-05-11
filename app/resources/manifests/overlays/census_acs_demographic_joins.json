@@ -4,15 +4,32 @@
   "provider": "census",
   "type": "dataset-ingestion",
   "description": "ACS tabular demographic fields joined to Census boundary geometries for choropleth rendering.",
-  "capabilities": ["acs", "demographics", "choropleth", "dataset-ingestion"],
+  "capabilities": [
+    "acs",
+    "demographics",
+    "choropleth",
+    "dataset-ingestion"
+  ],
   "coverage": "United States",
   "metadata": {
     "label": "ACS demographic joins",
     "requires_key": false,
     "attribution": "US Census Bureau ACS",
-    "keywords": ["acs", "population", "income", "demographics"],
-    "intent_tags": ["demographics", "population", "income"],
-    "task_tags": ["show demographics", "population choropleth"],
+    "keywords": [
+      "acs",
+      "population",
+      "income",
+      "demographics"
+    ],
+    "intent_tags": [
+      "demographics",
+      "population",
+      "income"
+    ],
+    "task_tags": [
+      "show demographics",
+      "population choropleth"
+    ],
     "source_protocol": "api",
     "data_format": "json",
     "geometry_type": "Polygon",
@@ -21,13 +38,16 @@
     "endpoint_health": "partial",
     "auth_mode": "none",
     "official_docs_url": "https://www.census.gov/data/developers/data-sets/acs-5year.html",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "choropleth",
-  "sourceOfficialDocs": ["https://www.census.gov/data/developers/data-sets/acs-5year.html"],
+  "sourceOfficialDocs": [
+    "https://www.census.gov/data/developers/data-sets/acs-5year.html"
+  ],
   "license": {
     "name": "US Census public data",
     "url": "https://www.census.gov/data/developers/about/terms-of-service.html",
@@ -35,25 +55,49 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["acs", "population", "income", "demographics", "choropleth"],
-    "requiredUserIntent": ["demographics", "population", "choropleth"],
-    "avoidWhen": ["outside United States", "no geographic context"]
+    "plannerHints": [
+      "acs",
+      "population",
+      "income",
+      "demographics",
+      "choropleth"
+    ],
+    "requiredUserIntent": [
+      "demographics",
+      "population",
+      "choropleth"
+    ],
+    "avoidWhen": [
+      "outside United States",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "partial",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Rendering requires a completed boundary join artifact."]
+    "knownLimitations": [
+      "Rendering requires a completed boundary join artifact."
+    ]
   },
-  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 31536000, "staleWhileRevalidateSeconds": 31536000},
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 31536000,
+    "staleWhileRevalidateSeconds": 31536000
+  },
   "normalization": {
     "geometryPath": "joined_boundary.geometry",
     "idPath": "GEO_ID",
     "timestampPath": "vintage",
-    "fieldMap": {"B01003_001E": "population"},
+    "fieldMap": {
+      "B01003_001E": "population"
+    },
     "expectedGeometry": "Polygon"
   },
   "download": {
@@ -69,6 +113,22 @@
     "normalizedPath": "data/geospatial/normalized/census/acs_demographic_joins/",
     "tilePath": "data/geospatial/tiles/census/acs_demographic_joins/"
   },
-  "indexing": {"spatialIndex": true, "textIndex": true, "vectorTile": true},
-  "validation": {"minFeatureCount": 1, "requiredFields": ["GEO_ID", "B01003_001E"], "bboxMustIntersect": [-180, -90, 180, 90]}
+  "indexing": {
+    "spatialIndex": true,
+    "textIndex": true,
+    "vectorTile": true
+  },
+  "validation": {
+    "minFeatureCount": 1,
+    "requiredFields": [
+      "GEO_ID",
+      "B01003_001E"
+    ],
+    "bboxMustIntersect": [
+      -180,
+      -90,
+      180,
+      90
+    ]
+  }
 }

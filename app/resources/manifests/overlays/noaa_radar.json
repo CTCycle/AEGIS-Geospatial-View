@@ -4,15 +4,31 @@
   "provider": "noaa",
   "type": "raster-overlay",
   "description": "NOAA radar raster layer for U.S. weather context.",
-  "capabilities": ["radar", "weather", "precipitation", "hazard"],
+  "capabilities": [
+    "radar",
+    "weather",
+    "precipitation",
+    "hazard"
+  ],
   "coverage": "united-states",
   "metadata": {
     "label": "NOAA Radar",
     "requires_key": false,
     "attribution": "NOAA/NCEP nowCOAST",
-    "keywords": ["radar", "weather", "precipitation"],
-    "intent_tags": ["weather", "precipitation", "hazard"],
-    "task_tags": ["weather radar", "storm context"],
+    "keywords": [
+      "radar",
+      "weather",
+      "precipitation"
+    ],
+    "intent_tags": [
+      "weather",
+      "precipitation",
+      "hazard"
+    ],
+    "task_tags": [
+      "weather radar",
+      "storm context"
+    ],
     "source_protocol": "WMS",
     "data_format": "PNG",
     "geometry_type": "Raster",
@@ -21,13 +37,16 @@
     "endpoint_health": "partial",
     "auth_mode": "none",
     "official_docs_url": "https://nowcoast.noaa.gov/",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "raster-overlay",
   "renderingMode": "wms",
-  "sourceOfficialDocs": ["https://nowcoast.noaa.gov/"],
+  "sourceOfficialDocs": [
+    "https://nowcoast.noaa.gov/"
+  ],
   "license": {
     "name": "NOAA public data",
     "url": "https://www.weather.gov/disclaimer",
@@ -35,20 +54,41 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["radar", "weather radar", "precipitation", "storm"],
-    "requiredUserIntent": ["weather", "precipitation", "freshness"],
-    "avoidWhen": ["general chat", "no geographic context"]
+    "plannerHints": [
+      "radar",
+      "weather radar",
+      "precipitation",
+      "storm"
+    ],
+    "requiredUserIntent": [
+      "weather",
+      "precipitation",
+      "freshness"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "partial",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["WMS layer names and regional availability may need provider metadata refresh."]
+    "knownLimitations": [
+      "WMS layer names and regional availability may need provider metadata refresh."
+    ]
   },
-  "cachePolicy": {"mode": "memory", "ttlSeconds": 300, "staleWhileRevalidateSeconds": 900},
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 900
+  },
   "normalization": {
     "geometryPath": "WMS tile",
     "idPath": "conus_bref_qcd",

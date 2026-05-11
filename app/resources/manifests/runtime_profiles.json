@@ -103,7 +103,11 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "clustered-points",
       "health_status": "functional",
-      "planner_hints": ["earthquake", "seismic", "hazard"],
+      "planner_hints": [
+        "earthquake",
+        "seismic",
+        "hazard"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -119,7 +123,12 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "geojson",
       "health_status": "functional",
-      "planner_hints": ["weather alert", "warning", "watch", "hazard"],
+      "planner_hints": [
+        "weather alert",
+        "warning",
+        "watch",
+        "hazard"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -135,7 +144,12 @@
       "capability_kind": "raster-overlay",
       "rendering_mode": "wms",
       "health_status": "functional",
-      "planner_hints": ["flood", "flood zone", "hazard", "risk"],
+      "planner_hints": [
+        "flood",
+        "flood zone",
+        "hazard",
+        "risk"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -151,7 +165,12 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "clustered-points",
       "health_status": "functional",
-      "planner_hints": ["water gauge", "stream", "river", "flood"],
+      "planner_hints": [
+        "water gauge",
+        "stream",
+        "river",
+        "flood"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -167,7 +186,12 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "clustered-points",
       "health_status": "partial",
-      "planner_hints": ["fire", "wildfire", "smoke", "active fire"],
+      "planner_hints": [
+        "fire",
+        "wildfire",
+        "smoke",
+        "active fire"
+      ],
       "manual_toggle": true,
       "auth_required": true
     },
@@ -183,7 +207,12 @@
       "capability_kind": "raster-overlay",
       "rendering_mode": "wms",
       "health_status": "partial",
-      "planner_hints": ["radar", "weather radar", "storm", "precipitation"],
+      "planner_hints": [
+        "radar",
+        "weather radar",
+        "storm",
+        "precipitation"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -199,7 +228,12 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "clustered-points",
       "health_status": "partial",
-      "planner_hints": ["tide", "water level", "coastal", "flood"],
+      "planner_hints": [
+        "tide",
+        "water level",
+        "coastal",
+        "flood"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -215,7 +249,12 @@
       "capability_kind": "search-index",
       "rendering_mode": "clustered-points",
       "health_status": "partial",
-      "planner_hints": ["tourism", "attraction", "heritage", "viewpoint"],
+      "planner_hints": [
+        "tourism",
+        "attraction",
+        "heritage",
+        "viewpoint"
+      ],
       "manual_toggle": true,
       "auth_required": true
     },
@@ -231,7 +270,11 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "clustered-points",
       "health_status": "partial",
-      "planner_hints": ["ev charging", "charger", "electric vehicle"],
+      "planner_hints": [
+        "ev charging",
+        "charger",
+        "electric vehicle"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -247,7 +290,12 @@
       "capability_kind": "vector-overlay",
       "rendering_mode": "clustered-points",
       "health_status": "partial",
-      "planner_hints": ["alternative fuel", "ev charging", "hydrogen", "fuel station"],
+      "planner_hints": [
+        "alternative fuel",
+        "ev charging",
+        "hydrogen",
+        "fuel station"
+      ],
       "manual_toggle": true,
       "auth_required": true
     },
@@ -263,7 +311,12 @@
       "capability_kind": "dataset-ingestion",
       "rendering_mode": "clustered-points",
       "health_status": "functional",
-      "planner_hints": ["airport", "aviation", "runway", "heliport"],
+      "planner_hints": [
+        "airport",
+        "aviation",
+        "runway",
+        "heliport"
+      ],
       "manual_toggle": true,
       "auth_required": false
     },
@@ -1151,6 +1204,153 @@
       ],
       "manual_toggle": true,
       "auth_required": true
+    },
+    {
+      "capability_id": "census_acs_demographic_joins",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "united-states",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "choropleth",
+      "health_status": "partial",
+      "planner_hints": [
+        "acs",
+        "population",
+        "income",
+        "demographics",
+        "choropleth"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
+      "capability_id": "census_cartographic_boundaries",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "united-states",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "vector-tile",
+      "health_status": "functional",
+      "planner_hints": [
+        "census",
+        "county",
+        "tract",
+        "demographic boundary"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
+      "capability_id": "eurostat_nuts_regions",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "europe",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "vector-tile",
+      "health_status": "functional",
+      "planner_hints": [
+        "eurostat",
+        "nuts",
+        "regional statistics",
+        "europe"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
+      "capability_id": "local_parcel_template",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "local-jurisdiction",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "metadata-only",
+      "health_status": "disabled",
+      "planner_hints": [
+        "parcel",
+        "property",
+        "cadastre",
+        "local open data"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
+    },
+    {
+      "capability_id": "natural_earth_admin_boundaries",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "vector-tile",
+      "health_status": "functional",
+      "planner_hints": [
+        "boundary",
+        "country",
+        "admin",
+        "natural earth"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
+      "capability_id": "openaddresses_points",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global-where-available",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": [
+        "address",
+        "geocode",
+        "openaddresses"
+      ],
+      "manual_toggle": false,
+      "auth_required": false
+    },
+    {
+      "capability_id": "overture_maps_places",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "preprocessed",
+      "handler_name": null,
+      "capability_kind": "dataset-ingestion",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": [
+        "overture",
+        "places",
+        "pois",
+        "amenities"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
     }
   ],
   "routing_profiles": [

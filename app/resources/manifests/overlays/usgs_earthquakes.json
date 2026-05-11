@@ -4,15 +4,31 @@
   "provider": "usgs",
   "type": "vector-overlay",
   "description": "Recent earthquake observations from USGS GeoJSON feeds.",
-  "capabilities": ["earthquake", "hazard", "seismic", "current"],
+  "capabilities": [
+    "earthquake",
+    "hazard",
+    "seismic",
+    "current"
+  ],
   "coverage": "global",
   "metadata": {
     "label": "USGS Earthquakes",
     "requires_key": false,
     "attribution": "U.S. Geological Survey",
-    "keywords": ["earthquake", "seismic", "hazard"],
-    "intent_tags": ["earthquake", "hazard", "current"],
-    "task_tags": ["hazard monitoring", "earthquake map"],
+    "keywords": [
+      "earthquake",
+      "seismic",
+      "hazard"
+    ],
+    "intent_tags": [
+      "earthquake",
+      "hazard",
+      "current"
+    ],
+    "task_tags": [
+      "hazard monitoring",
+      "earthquake map"
+    ],
     "source_protocol": "GeoJSON feed",
     "data_format": "GeoJSON",
     "geometry_type": "Point",
@@ -21,13 +37,16 @@
     "endpoint_health": "functional",
     "auth_mode": "none",
     "official_docs_url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
-  "sourceOfficialDocs": ["https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php"],
+  "sourceOfficialDocs": [
+    "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php"
+  ],
   "license": {
     "name": "USGS public domain",
     "url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
@@ -35,20 +54,40 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["earthquake", "seismic", "hazard", "current"],
-    "requiredUserIntent": ["hazard", "earthquake"],
-    "avoidWhen": ["general chat", "no geographic context"]
+    "plannerHints": [
+      "earthquake",
+      "seismic",
+      "hazard",
+      "current"
+    ],
+    "requiredUserIntent": [
+      "hazard",
+      "earthquake"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "functional",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Feed granularity depends on selected USGS summary feed."]
+    "knownLimitations": [
+      "Feed granularity depends on selected USGS summary feed."
+    ]
   },
-  "cachePolicy": {"mode": "memory", "ttlSeconds": 300, "staleWhileRevalidateSeconds": 900},
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 900
+  },
   "normalization": {
     "geometryPath": "features[].geometry.coordinates",
     "idPath": "features[].id",

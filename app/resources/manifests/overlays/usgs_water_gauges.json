@@ -4,15 +4,34 @@
   "provider": "usgs",
   "type": "vector-overlay",
   "description": "USGS water services observations for active stream and water-level gauges.",
-  "capabilities": ["water", "stream", "gauge", "flood", "current"],
+  "capabilities": [
+    "water",
+    "stream",
+    "gauge",
+    "flood",
+    "current"
+  ],
   "coverage": "united-states",
   "metadata": {
     "label": "USGS Water Gauges",
     "requires_key": false,
     "attribution": "U.S. Geological Survey",
-    "keywords": ["water", "stream", "gauge", "river", "flood"],
-    "intent_tags": ["water", "flood", "hazard"],
-    "task_tags": ["stream gauge map", "flood context"],
+    "keywords": [
+      "water",
+      "stream",
+      "gauge",
+      "river",
+      "flood"
+    ],
+    "intent_tags": [
+      "water",
+      "flood",
+      "hazard"
+    ],
+    "task_tags": [
+      "stream gauge map",
+      "flood context"
+    ],
     "source_protocol": "JSON API",
     "data_format": "JSON",
     "geometry_type": "Point",
@@ -21,13 +40,16 @@
     "endpoint_health": "functional",
     "auth_mode": "none",
     "official_docs_url": "https://waterservices.usgs.gov/",
-    "last_validated": "2026-05-11"
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
   "last_modified": "2026-05-11T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
-  "sourceOfficialDocs": ["https://waterservices.usgs.gov/"],
+  "sourceOfficialDocs": [
+    "https://waterservices.usgs.gov/"
+  ],
   "license": {
     "name": "USGS public domain",
     "url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
@@ -35,20 +57,41 @@
     "commercialUse": "allowed",
     "embeddingAllowed": "yes"
   },
-  "auth": {"type": "none", "required": false},
+  "auth": {
+    "type": "none",
+    "required": false
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": true,
-    "plannerHints": ["water gauge", "stream", "river", "flood"],
-    "requiredUserIntent": ["water", "flood", "hazard"],
-    "avoidWhen": ["general chat", "no geographic context"]
+    "plannerHints": [
+      "water gauge",
+      "stream",
+      "river",
+      "flood"
+    ],
+    "requiredUserIntent": [
+      "water",
+      "flood",
+      "hazard"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
   },
   "reliability": {
     "status": "functional",
     "lastAudited": "2026-05-11",
-    "knownLimitations": ["Measurements and station density vary by parameter and region."]
+    "knownLimitations": [
+      "Measurements and station density vary by parameter and region."
+    ]
   },
-  "cachePolicy": {"mode": "memory", "ttlSeconds": 900, "staleWhileRevalidateSeconds": 3600},
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 900,
+    "staleWhileRevalidateSeconds": 3600
+  },
   "normalization": {
     "geometryPath": "value.timeSeries[].sourceInfo.geoLocation.geogLocation",
     "idPath": "value.timeSeries[].sourceInfo.siteCode[].value",
