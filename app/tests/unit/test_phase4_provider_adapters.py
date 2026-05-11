@@ -15,6 +15,7 @@ from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 from server.services.geospatial.providers.overpass import OverpassProvider
 from server.services.geospatial.providers.pvgis import PVGISProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
+from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
 
 class _OpenMeteoService:
@@ -260,3 +261,74 @@ def test_census_provider_selects_demographic_choropleth() -> None:
     assert response.provider_id == "census"
     assert response.payload["renderingMode"] == "choropleth"
     assert "tigerweb.geo.census.gov" in response.payload["featuresUrl"]
+
+
+def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
+    calls: list[tuple[str, dict[str, str] | None]] = []
+
+    async def fetcher(url: str, headers: dict[str, str] | None = None):
+        calls.append((url, headers))
+        return {
+            "webcams": [
+                {
+                    "webcamId": "cam-1",
+                    "title": "Pass view",
+                    "location": {"latitude": 45.1, "longitude": 7.2},
+                    "images": {"current": {"url": "https://example.test/preview.jpg"}},
+                    "urls": {"detail": "https://example.test/cam"},
+                    "player": {"day": {"url": "https://example.test/player"}},
+                }
+            ]
+        }
+
+    response = asyncio.run(
+        WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="windy_webcams",
+                bbox=(7.0, 45.0, 7.5, 45.5),
+                params={"live": True},
+            )
+        )
+    )
+
+    assert calls[0][1] == {"x-windy-api-key": "windy-test"}
+    assert "bbox=7.0,45.0,7.5,45.5" in calls[0][0]
+    assert response.payload["renderingMode"] == "camera-points"
+    assert response.payload["features"][0]["preview_image_url"].endswith("preview.jpg")
+    assert response.payload["features"][0]["embedding_allowed"] is False
+
+
+def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
+    async def first_fetcher(url: str, headers: dict[str, str] | None = None):
+        return {
+            "webcams": [
+                {
+                    "id": "cam-1",
+                    "name": "Cached camera",
+                    "latitude": 45.1,
+                    "longitude": 7.2,
+                    "url": "https://example.test/cam",
+                }
+            ]
+        }
+
+    provider = WindyWebcamsProvider(api_key="windy-test", fetcher=first_fetcher)
+    asyncio.run(
+        provider.fetch(
+            ProviderRequest(capability_id="windy_webcams", params={"live": True})
+        )
+    )
+
+    async def failing_fetcher(url: str, headers: dict[str, str] | None = None):
+        raise RuntimeError("network down")
+
+    provider.fetcher = failing_fetcher
+    stale = asyncio.run(
+        provider.fetch(
+            ProviderRequest(capability_id="windy_webcams", params={"live": True})
+        )
+    )
+
+    assert stale.stale is True
+    assert stale.payload["features"][0]["name"] == "Cached camera"
+    assert stale.warnings
