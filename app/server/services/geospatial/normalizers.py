@@ -150,6 +150,7 @@ POI_CATEGORY_MAP = {
     "hospital": "hospitals",
     "hospitals": "hospitals",
     "museum": "tourism",
+    "museums": "tourism",
     "parking": "parking",
     "pharmacy": "pharmacies",
     "pharmacies": "pharmacies",
