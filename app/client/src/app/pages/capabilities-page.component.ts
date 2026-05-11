@@ -3,18 +3,19 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 
 import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
+import { LayerCatalogComponent } from '../components/layer-catalog.component';
 
-type CapabilityGroup = 'providers' | 'basemaps' | 'overlays' | 'tools';
+type CapabilityGroup = 'providers' | 'basemaps' | 'overlays' | 'cameras' | 'transit' | 'tools';
 
 @Component({
   selector: 'app-capabilities-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LayerCatalogComponent],
   templateUrl: './capabilities-page.component.html',
   styleUrl: './capabilities-page.component.css',
 })
 export class CapabilitiesPageComponent implements OnInit {
-  catalog: CatalogResponse = { capabilities: [], providers: [], basemaps: [], overlays: [], tools: [] };
+  catalog: CatalogResponse = { capabilities: [], providers: [], basemaps: [], overlays: [], cameras: [], transit: [], tools: [] };
   statusText = 'Loading capabilities';
   isLoading = true;
 
@@ -22,6 +23,8 @@ export class CapabilitiesPageComponent implements OnInit {
     { id: 'providers', label: 'Data Providers', description: 'Source systems and access constraints.' },
     { id: 'basemaps', label: 'Map Types', description: 'Base map render styles available to map sessions.' },
     { id: 'overlays', label: 'Layers', description: 'Analytical and contextual map layers.' },
+    { id: 'cameras', label: 'Cameras', description: 'Camera networks with preview and official-link policies.' },
+    { id: 'transit', label: 'Transit', description: 'GTFS static and realtime mobility feeds.' },
     { id: 'tools', label: 'Direct Tools', description: 'Fast non-map actions the assistant can execute.' },
   ];
 
@@ -35,7 +38,7 @@ export class CapabilitiesPageComponent implements OnInit {
       this.catalog = await this.apiClient.fetchCatalog();
       this.statusText = 'Capability catalog loaded';
     } catch {
-      this.catalog = { capabilities: [], providers: [], basemaps: [], overlays: [], tools: [] };
+      this.catalog = { capabilities: [], providers: [], basemaps: [], overlays: [], cameras: [], transit: [], tools: [] };
       this.statusText = 'Capability catalog unavailable.';
     } finally {
       this.isLoading = false;
@@ -45,6 +48,23 @@ export class CapabilitiesPageComponent implements OnInit {
 
   itemsFor(group: CapabilityGroup): CapabilityDescriptor[] {
     return this.catalog[group] ?? [];
+  }
+
+  get layerCatalogItems(): CapabilityDescriptor[] {
+    return [
+      ...(this.catalog.basemaps ?? []),
+      ...(this.catalog.overlays ?? []),
+      ...(this.catalog.cameras ?? []),
+      ...(this.catalog.transit ?? []),
+    ];
+  }
+
+  askAgentToUse(item: CapabilityDescriptor): void {
+    this.statusText = `Ask the agent to use ${item.name} from the main workspace chat.`;
+  }
+
+  requestManualToggle(item: CapabilityDescriptor): void {
+    this.statusText = `${item.name} is available for map sessions when selected by the agent or an eligible map control.`;
   }
 
   capabilityPurpose(item: CapabilityDescriptor): string {
