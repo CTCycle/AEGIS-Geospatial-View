@@ -250,17 +250,14 @@ describe('pages/settings-page.component', () => {
 
   it('syncQueryState and persistence update URL and store', async () => {
     window.history.replaceState({}, '', '/settings');
-    const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
     component.setSearchText('gpt');
     await fixture.whenStable();
-    expect(navigateSpy).toHaveBeenCalledWith(['/settings'], {
-      queryParams: { q: 'gpt' },
-      replaceUrl: true,
-    });
+    expect(window.location.pathname).toBe('/settings');
+    expect(window.location.search).toBe('?q=gpt');
     expect(store.updateSettingsPage).toHaveBeenCalled();
   });
 

@@ -152,7 +152,7 @@ describe('components/map-preview.component', () => {
             provider: 'census',
             url: 'https://example.test/query?f=geojson',
             data_format: 'GeoJSON',
-            geometry_type: 'line/polygon',
+            geometry_type: 'LineString',
           },
         ],
       }) as never,

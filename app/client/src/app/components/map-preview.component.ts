@@ -183,7 +183,7 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
       return;
     }
 
-    if (['geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
+    if (['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
       && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
       return;
     }
