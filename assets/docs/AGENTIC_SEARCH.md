@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-04-21
+Last updated: 2026-05-11
 
 ## Summary
 
@@ -70,6 +70,19 @@ Retrieval is two-stage:
 2. deterministic reranking (`intent`, `temporal`, `runtime`, `coverage`)
 
 Searchable kinds include basemaps, overlays, and tools from the same manifest source.
+
+## Geographic Intelligence Selection
+
+Geographic sources are agentic capabilities, not passive layers. The policy engine and manifest intent resolver select basemaps, overlays, camera networks, search indexes, and analysis tools only when the user request benefits from them.
+
+Selection rules:
+
+- General factual chat does not load map capabilities.
+- Location, nearby, route, show, overlay, live, current, camera, traffic, flood, fire, weather, demographic, amenity, or visual-confirmation requests can select geospatial capabilities.
+- Webcam and camera requests select `camera-network` capabilities such as `windy_webcams`.
+- Amenity requests select POI/search-index capabilities, not every available geographic layer.
+- Missing credentials do not crash the turn; the runtime returns access-needed state and should prefer public alternatives where possible.
+- Broken or metadata-only capabilities are not exposed as normal renderable toggles.
 
 ## Runtime and Coverage
 

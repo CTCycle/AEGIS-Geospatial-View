@@ -4,6 +4,10 @@ import {
   API_CHAT_SETTINGS_PATH,
   API_CHAT_STREAM_PATH,
   API_CHAT_TURN_PATH,
+  API_GEOSPATIAL_AUDIT_PATH,
+  API_GEOSPATIAL_CAMERAS_PATH,
+  API_GEOSPATIAL_CAPABILITIES_PATH,
+  API_GEOSPATIAL_LAYERS_PATH,
   API_MAPS_CATALOG_PATH,
   API_MAPS_SEARCH_PATH,
   API_OLLAMA_HEALTH_PATH,
@@ -17,6 +21,8 @@ import {
   ChatTurnRequest,
   ChatTurnResponse,
   GenericObjectResponse,
+  GeospatialCredentialStatus,
+  GeospatialProviderPayload,
   JsonValue,
   LocationSearchRequest,
   ModelCardDescriptor,
@@ -192,11 +198,15 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   const basemaps = normalizeCapabilities(value.basemaps);
   const overlays = normalizeCapabilities(value.overlays);
   const tools = normalizeCapabilities(value.tools);
+  const cameras = normalizeCapabilities(value.cameras);
+  const transit = normalizeCapabilities(value.transit);
   return {
     capabilities: normalized,
     providers: providers.length ? providers : normalized.filter((item) => item.kind === 'provider'),
     basemaps: basemaps.length ? basemaps : normalized.filter((item) => item.kind === 'basemap'),
-    overlays: overlays.length ? overlays : normalized.filter((item) => item.kind === 'overlay'),
+    overlays: overlays.length ? overlays : normalized.filter((item) => item.kind === 'overlay' || item.kind === 'raster-overlay' || item.kind === 'vector-overlay' || item.kind === 'search-index'),
+    cameras: cameras.length ? cameras : normalized.filter((item) => item.kind === 'camera-network'),
+    transit: transit.length ? transit : normalized.filter((item) => item.kind === 'transit' || item.kind === 'dataset-ingestion'),
     tools: tools.length ? tools : normalized.filter((item) => item.kind === 'tool'),
   };
 };
@@ -288,6 +298,87 @@ export const fetchCatalog = async (): Promise<CatalogResponse> => {
     method: 'GET',
   });
   return parseCatalogResponse(data);
+};
+
+export const fetchGeospatialCapabilities = async (): Promise<CatalogResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAPABILITIES_PATH}`, {
+    method: 'GET',
+  });
+  return parseCatalogResponse(data);
+};
+
+export const fetchGeospatialLayers = async (): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'>> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}`, {
+    method: 'GET',
+  });
+  const value = isRecord(data) ? data : {};
+  return {
+    basemaps: normalizeCapabilities(value.basemaps),
+    overlays: normalizeCapabilities(value.overlays),
+    cameras: normalizeCapabilities(value.cameras),
+    transit: normalizeCapabilities(value.transit),
+  };
+};
+
+export const fetchGeospatialLayerFeatures = async (
+  layerId: string,
+  params: { bbox?: string; zoom?: number; time?: string } = {},
+): Promise<GeospatialProviderPayload> => {
+  const query = new URLSearchParams();
+  if (params.bbox) {
+    query.set('bbox', params.bbox);
+  }
+  if (typeof params.zoom === 'number') {
+    query.set('zoom', String(params.zoom));
+  }
+  if (params.time) {
+    query.set('time', params.time);
+  }
+  const suffix = query.toString() ? `?${query}` : '';
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}/${encodeURIComponent(layerId)}/features${suffix}`, {
+    method: 'GET',
+  });
+  return isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
+};
+
+export const fetchGeospatialCameras = async (
+  params: { bbox?: string; provider?: string; camera_type?: string } = {},
+): Promise<GeospatialProviderPayload> => {
+  const query = new URLSearchParams();
+  if (params.bbox) {
+    query.set('bbox', params.bbox);
+  }
+  if (params.provider) {
+    query.set('provider', params.provider);
+  }
+  if (params.camera_type) {
+    query.set('camera_type', params.camera_type);
+  }
+  const suffix = query.toString() ? `?${query}` : '';
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}${suffix}`, {
+    method: 'GET',
+  });
+  return isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
+};
+
+export const fetchGeospatialCredentialStatus = async (providerId: string): Promise<GeospatialCredentialStatus> => {
+  const data = await executeApiRequest(`${API_BASE_URL}/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`, {
+    method: 'GET',
+  });
+  if (!isRecord(data)) {
+    return { provider: providerId, required: false, configured: false };
+  }
+  return {
+    provider: String(data.provider ?? providerId),
+    required: Boolean(data.required),
+    configured: Boolean(data.configured),
+    environmentVariable: typeof data.environmentVariable === 'string' ? data.environmentVariable : null,
+  };
+};
+
+export const runGeospatialAudit = async (): Promise<GenericObjectResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_AUDIT_PATH}`, { method: 'POST' });
+  return isRecord(data) ? data : {};
 };
 
 export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnResponse> => {

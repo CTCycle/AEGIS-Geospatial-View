@@ -23,6 +23,7 @@ class RuntimeRegistry:
         "google": "GOOGLE_API_KEY",
         "google_maps": "GOOGLE_MAPS_API_KEY",
         "nasa": "NASA_API_KEY",
+        "nasa_firms": "NASA_API_KEY",
         "nrel": "NREL_API_KEY",
         "openaq": "OPENAQ_API_KEY",
         "openchargemap": "OPENCHARGEMAP_API_KEY",
@@ -59,7 +60,7 @@ class RuntimeRegistry:
             if str(item.get("capability_id") or "").strip()
         }
         manifests: dict[str, dict[str, Any]] = {}
-        for collection_name in ("providers", "basemaps", "overlays", "tools"):
+        for collection_name in ("providers", "basemaps", "overlays", "cameras", "transit", "tools"):
             for item in list(manifest.get(collection_name) or []):
                 capability_id = str(item.get("id") or "").strip()
                 if capability_id:

@@ -128,11 +128,21 @@ class GeospatialCatalogService:
         overlays = [
             self._descriptor(item, "overlay") for item in self.capability_registry.list_overlays()
         ]
+        cameras = [
+            self._descriptor(item, "camera-network")
+            for item in self.capability_registry.list_cameras()
+        ]
+        transit = [
+            self._descriptor(item, "transit")
+            for item in self.capability_registry.list_transit()
+        ]
         tools = [self._descriptor(item, "tool") for item in self.capability_registry.list_tools()]
         return {
-            "capabilities": basemaps + overlays + tools,
+            "capabilities": basemaps + overlays + cameras + transit + tools,
             "providers": providers,
             "basemaps": basemaps,
             "overlays": overlays,
+            "cameras": cameras,
+            "transit": transit,
             "tools": tools,
         }

@@ -11,6 +11,8 @@ class CapabilityRegistrySnapshot:
     providers: list[dict[str, Any]]
     basemaps: list[dict[str, Any]]
     overlays: list[dict[str, Any]]
+    cameras: list[dict[str, Any]]
+    transit: list[dict[str, Any]]
     tools: list[dict[str, Any]]
 
 
@@ -25,6 +27,8 @@ class CapabilityRegistry:
             providers=list(manifest.get("providers") or []),
             basemaps=list(manifest.get("basemaps") or []),
             overlays=list(manifest.get("overlays") or []),
+            cameras=list(manifest.get("cameras") or []),
+            transit=list(manifest.get("transit") or []),
             tools=list(manifest.get("tools") or []),
         )
         return self._snapshot
@@ -38,6 +42,12 @@ class CapabilityRegistry:
     def list_overlays(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().overlays)
 
+    def list_cameras(self) -> list[dict[str, Any]]:
+        return list(self._ensure_snapshot().cameras)
+
+    def list_transit(self) -> list[dict[str, Any]]:
+        return list(self._ensure_snapshot().transit)
+
     def list_tools(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().tools)
 
@@ -46,7 +56,13 @@ class CapabilityRegistry:
         if not normalized:
             return None
         snapshot = self._ensure_snapshot()
-        for collection in (snapshot.basemaps, snapshot.overlays, snapshot.tools):
+        for collection in (
+            snapshot.basemaps,
+            snapshot.overlays,
+            snapshot.cameras,
+            snapshot.transit,
+            snapshot.tools,
+        ):
             for item in collection:
                 if str(item.get("id") or "") == normalized:
                     return dict(item)

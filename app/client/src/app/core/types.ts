@@ -43,7 +43,7 @@ export interface LocationSearchRequest {
 export interface CapabilityDescriptor {
   id: string;
   name: string;
-  kind: 'basemap' | 'overlay' | 'tool' | string;
+  kind: CapabilityKind | 'overlay' | 'tool' | string;
   type?: string;
   description?: string;
   provider: string;
@@ -62,6 +62,10 @@ export interface CapabilityDescriptor {
   endpoint_health?: string;
   auth_mode?: string;
   official_docs_url?: string;
+  capability_kind?: CapabilityKind | string;
+  rendering_mode?: RenderingMode | string;
+  reliability?: LayerReliability;
+  auth?: ProviderAuthPolicy;
   metadata?: Record<string, JsonValue>;
 }
 
@@ -70,7 +74,81 @@ export interface CatalogResponse {
   providers?: CapabilityDescriptor[];
   basemaps?: CapabilityDescriptor[];
   overlays?: CapabilityDescriptor[];
+  cameras?: CapabilityDescriptor[];
+  transit?: CapabilityDescriptor[];
   tools?: CapabilityDescriptor[];
+}
+
+export type CapabilityKind =
+  | 'basemap'
+  | 'raster-overlay'
+  | 'vector-overlay'
+  | 'search-index'
+  | 'camera-network'
+  | 'dataset-ingestion'
+  | 'analysis-tool'
+  | 'metadata-only';
+
+export type ProviderAuthType = 'none' | 'api-key' | 'oauth' | 'token-header' | 'paid-or-gated';
+
+export type LayerHealthStatus = 'functional' | 'partial' | 'broken' | 'disabled' | 'unknown';
+
+export type RenderingMode =
+  | 'xyz'
+  | 'wmts'
+  | 'wms'
+  | 'geojson'
+  | 'vector-tile'
+  | 'raster-tile'
+  | 'clustered-points'
+  | 'choropleth'
+  | 'camera-points'
+  | 'metadata-only';
+
+export interface ProviderAuthPolicy {
+  type: ProviderAuthType | string;
+  required: boolean;
+  providerKey?: string | null;
+  accessPageProviderId?: string | null;
+}
+
+export interface LayerReliability {
+  status: LayerHealthStatus | string;
+  lastAudited?: string;
+  knownLimitations?: string[];
+}
+
+export interface CameraFeature {
+  id: string;
+  name: string;
+  provider: string;
+  camera_type: string;
+  latitude: number;
+  longitude: number;
+  last_update_time?: string | null;
+  preview_image_url?: string | null;
+  official_url: string;
+  embed_url?: string | null;
+  embedding_allowed: boolean;
+  stale: boolean;
+  metadata: Record<string, JsonValue>;
+}
+
+export interface GeospatialCredentialStatus {
+  provider: string;
+  required: boolean;
+  configured: boolean;
+  environmentVariable?: string | null;
+}
+
+export interface GeospatialProviderPayload {
+  status: 'ok' | 'missing-credential' | 'unavailable' | string;
+  provider: string;
+  payload?: Record<string, JsonValue>;
+  attribution?: string[];
+  warnings?: string[];
+  stale?: boolean;
+  message?: string;
 }
 
 export interface MapSession {
@@ -95,6 +173,7 @@ export interface MapSession {
     label: string;
     provider: string;
     type: string;
+    rendering_mode?: RenderingMode | string;
     default_opacity?: number;
     url?: string | null;
     layers?: string;

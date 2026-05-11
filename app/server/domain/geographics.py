@@ -252,4 +252,6 @@ class GeospatialCatalogResponse(BaseModel):
     providers: list[dict[str, object]] = Field(default_factory=list)
     basemaps: list[dict[str, object]] = Field(default_factory=list)
     overlays: list[dict[str, object]] = Field(default_factory=list)
+    cameras: list[dict[str, object]] = Field(default_factory=list)
+    transit: list[dict[str, object]] = Field(default_factory=list)
     tools: list[dict[str, object]] = Field(default_factory=list)

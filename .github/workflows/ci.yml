@@ -72,6 +72,20 @@ jobs:
       - name: Validate manifest completeness
         run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/vector/test_capability_manifest_completeness.py
 
+      - name: Validate geospatial schema v2 audit
+        run: |
+          cd app
+          python -m server.services.geospatial.layer_auditor --strict
+
+      - name: Run geospatial provider and API contracts
+        run: |
+          python -m pytest -c app/server/pyproject.toml \
+            app/tests/unit/test_manifest_schema_v2.py \
+            app/tests/unit/test_provider_registry.py \
+            app/tests/unit/test_phase4_provider_adapters.py \
+            app/tests/unit/test_geospatial_api_contracts.py \
+            app/tests/unit/test_agentic_geospatial_selection.py
+
       - name: Validate runtime profile completeness
         run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/geospatial/test_runtime_registry.py::test_runtime_profiles_cover_all_capabilities
 

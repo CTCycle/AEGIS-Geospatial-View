@@ -5,6 +5,11 @@ import {
   fetchCatalog,
   fetchChatModels,
   fetchChatSettings,
+  fetchGeospatialCameras,
+  fetchGeospatialCapabilities,
+  fetchGeospatialCredentialStatus,
+  fetchGeospatialLayerFeatures,
+  fetchGeospatialLayers,
   pullOllamaModel,
   refreshOllamaModels,
   sendChatTurn,
@@ -15,6 +20,8 @@ import {
   ChatTurnRequest,
   ChatTurnResponse,
   GenericObjectResponse,
+  GeospatialCredentialStatus,
+  GeospatialProviderPayload,
   ModelCardDescriptor,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
@@ -25,6 +32,31 @@ import {
 export class ApiClientService {
   fetchCatalog(): Promise<CatalogResponse> {
     return fetchCatalog();
+  }
+
+  fetchGeospatialCapabilities(): Promise<CatalogResponse> {
+    return fetchGeospatialCapabilities();
+  }
+
+  fetchGeospatialLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras'>> {
+    return fetchGeospatialLayers();
+  }
+
+  fetchGeospatialLayerFeatures(
+    layerId: string,
+    params: { bbox?: string; zoom?: number; time?: string } = {},
+  ): Promise<GeospatialProviderPayload> {
+    return fetchGeospatialLayerFeatures(layerId, params);
+  }
+
+  fetchGeospatialCameras(
+    params: { bbox?: string; provider?: string; camera_type?: string } = {},
+  ): Promise<GeospatialProviderPayload> {
+    return fetchGeospatialCameras(params);
+  }
+
+  fetchGeospatialCredentialStatus(providerId: string): Promise<GeospatialCredentialStatus> {
+    return fetchGeospatialCredentialStatus(providerId);
   }
 
   sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnResponse> {

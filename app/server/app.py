@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.api.chat import router as chat_router
+from server.api.geospatial import router as geospatial_router
 from server.api.search import router as search_router
 from server.configurations import get_server_settings
 from server.repositories.database.initializer import initialize_sqlite_database
@@ -108,6 +109,7 @@ def create_app() -> FastAPI:
 
     app.include_router(search_router, prefix="/api")
     app.include_router(chat_router, prefix="/api")
+    app.include_router(geospatial_router, prefix="/api")
 
     if packaged_client_available():
         client_dist_path = get_client_dist_path()

@@ -177,11 +177,14 @@ const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
     const layerId = `overlay-layer-${overlay.id}`;
     const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
     const sourceBounds = normalizeOverlayBounds(overlay.bounds);
-    if (addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)) {
+    const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
+    if (['xyz', 'raster-tile', 'wmts', 'wms', 'tile'].includes(renderingMode)
+      && addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)) {
       return;
     }
 
-    if (addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
+    if (['geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
+      && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
       return;
     }
 
@@ -279,8 +282,8 @@ const addGeoJsonOverlayLayer = (
 };
 
 const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
-  const overlayType = overlay.type as RasterOverlayKind;
-  if (overlayType === 'tile' && overlay.url) {
+  const overlayType = String(overlay.rendering_mode || overlay.type) as RasterOverlayKind | 'raster-tile' | 'xyz';
+  if ((overlayType === 'tile' || overlayType === 'raster-tile' || overlayType === 'xyz') && overlay.url) {
     return [overlay.url];
   }
   if (overlayType === 'wms' && overlay.url) {

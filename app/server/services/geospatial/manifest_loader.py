@@ -131,6 +131,12 @@ class GeospatialManifestLoader:
             str(index.get("overlays_dir") or "overlays")
         )
         tools = self._load_directory_entries(str(index.get("tools_dir") or "tools"))
+        cameras = self._load_directory_entries(
+            str(index.get("cameras_dir") or "cameras")
+        )
+        transit = self._load_directory_entries(
+            str(index.get("transit_dir") or "transit")
+        )
         runtime_profiles = self._load_runtime_profiles(
             str(index.get("runtime_profiles_file") or "runtime_profiles.json")
         )
@@ -138,6 +144,8 @@ class GeospatialManifestLoader:
             "providers": providers,
             "basemaps": basemaps,
             "overlays": overlays,
+            "cameras": cameras,
+            "transit": transit,
             "tools": tools,
             "runtime_profiles": runtime_profiles,
         }

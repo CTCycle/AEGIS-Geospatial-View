@@ -1,0 +1,66 @@
+# Geospatial Source Catalog
+
+Last updated: 2026-05-11
+
+## Purpose
+
+AEGIS treats geographic data sources as manifest-backed capabilities. The single source of truth is `app/resources/manifests`; this document summarizes the current integration status.
+
+## Implemented Capability Classes
+
+| Kind | Current status |
+| --- | --- |
+| `basemap` | Schema-v2 manifests and runtime profiles are active. |
+| `raster-overlay` | NASA GIBS, RainViewer, TomTom traffic, ESA, and EEA manifests are classified. GIBS and RainViewer provider descriptors are implemented. |
+| `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, and ArcGIS REST descriptors are implemented for normalized API contracts. |
+| `search-index` | Overpass and Geoapify amenities are classified. Overpass has a concrete provider adapter; Geoapify is credential-gated. |
+| `camera-network` | Windy Webcams manifest, provider shell, credential status, API contract, and client types are implemented. |
+| `dataset-ingestion` | GTFS Static manifests and provider parsing exist for feed fixtures and configured ingestion. |
+| `analysis-tool` | Open-Meteo and PVGIS provider adapters are implemented for point or sampled analysis payloads. |
+| `metadata-only` | Statistical or restricted sources are classified and not exposed as normal map toggles. |
+
+## Official References
+
+- Windy Webcams API: https://api.windy.com/webcams/docs
+- GTFS Realtime: https://developers.google.com/transit/gtfs-realtime
+- NASA Open APIs: https://api.nasa.gov/
+- NASA GIBS: https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api
+- Open-Meteo: https://open-meteo.com/en/docs
+- OpenAQ: https://docs.openaq.org/using-the-api/api-key
+- Overpass: https://wiki.openstreetmap.org/wiki/Overpass_API
+- TomTom: https://docs.tomtom.com/platform/documentation/my-tomtom/how-to-get-a-tomtom-api-key/
+- Geoapify: https://apidocs.geoapify.com/
+- GTFS Schedule: https://gtfs.org/schedule/reference/
+- USGS Earthquake GeoJSON: https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php
+- USGS Water Services: https://waterservices.usgs.gov/
+- NOAA/NWS API: https://www.weather.gov/documentation/services-web-api
+- NOAA CO-OPS API: https://api.tidesandcurrents.noaa.gov/api/prod/
+- FEMA NFHL: https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS
+- NASA FIRMS API: https://firms.modaps.eosdis.nasa.gov/api/
+- Transitland: https://www.transit.land/documentation/datastore/api-endpoints.html
+
+## Current Provider Framework
+
+Provider adapters live under `app/server/services/geospatial/providers`.
+
+Implemented adapters:
+
+- `arcgis_rest.py`
+- `census.py`
+- `geoapify.py`
+- `gtfs_realtime.py`
+- `gtfs_static.py`
+- `fema.py`
+- `nasa_gibs.py`
+- `nasa_firms.py`
+- `noaa.py`
+- `openaq.py`
+- `openmeteo.py`
+- `overpass.py`
+- `pvgis.py`
+- `rainviewer.py`
+- `tomtom.py`
+- `usgs.py`
+- `windy_webcams.py`
+
+Adapters return normalized `ProviderResponse` objects with payload, attribution, warnings, stale state, and provider ID. Network-dependent behavior is tested through mocked services.

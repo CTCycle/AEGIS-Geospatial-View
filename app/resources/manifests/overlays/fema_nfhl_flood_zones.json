@@ -1,0 +1,59 @@
+{
+  "id": "fema_nfhl_flood_zones",
+  "name": "FEMA NFHL Flood Zones",
+  "provider": "fema",
+  "type": "raster-overlay",
+  "description": "FEMA National Flood Hazard Layer map service for flood-zone context.",
+  "capabilities": ["flood", "hazard", "risk", "fema"],
+  "coverage": "united-states",
+  "metadata": {
+    "label": "FEMA Flood Zones",
+    "requires_key": false,
+    "attribution": "Federal Emergency Management Agency",
+    "keywords": ["flood", "flood zone", "hazard", "risk"],
+    "intent_tags": ["flood", "hazard", "risk"],
+    "task_tags": ["flood zone map", "route safety", "site risk"],
+    "source_protocol": "ArcGIS REST export",
+    "data_format": "PNG",
+    "geometry_type": "Raster",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "functional",
+    "auth_mode": "none",
+    "official_docs_url": "https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "wms",
+  "sourceOfficialDocs": ["https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS"],
+  "license": {
+    "name": "FEMA public data",
+    "url": "https://www.fema.gov/about/openfema/terms-conditions",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {"type": "none", "required": false},
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": ["flood", "flood zone", "hazard", "risk"],
+    "requiredUserIntent": ["flood", "hazard", "risk"],
+    "avoidWhen": ["general chat", "no geographic context"]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": ["Authoritative interpretation requires FEMA source context and local regulation checks."]
+  },
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 86400, "staleWhileRevalidateSeconds": 604800},
+  "normalization": {
+    "geometryPath": "MapServer/export",
+    "idPath": "NFHL",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "Raster"
+  }
+}
