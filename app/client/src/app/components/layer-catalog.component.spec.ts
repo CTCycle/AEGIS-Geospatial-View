@@ -67,6 +67,15 @@ describe('components/layer-catalog.component', () => {
         provider: 'test',
         reliability: { status: 'broken' },
       }),
+      layer({
+        id: 'credential_layer',
+        name: 'Credential Layer',
+        kind: 'raster-overlay',
+        provider: 'test',
+        requires_credentials: true,
+        is_available: false,
+        rendering_mode: 'wms',
+      }),
     ];
   });
 
@@ -91,6 +100,19 @@ describe('components/layer-catalog.component', () => {
     expect(component.canToggle(byId['fema_nfhl_flood_zones'])).toBeTrue();
     expect(component.canToggle(byId['fred_regional_market_indicators'])).toBeFalse();
     expect(component.canToggle(byId['broken_layer'])).toBeFalse();
+    expect(component.canToggle(byId['credential_layer'])).toBeFalse();
+  });
+
+  it('labels unavailable, metadata-only, and credential-gated catalog states', () => {
+    const byId = Object.fromEntries(component.layers.map((item) => [item.id, item]));
+
+    expect(component.stateLabel(byId['credential_layer'])).toBe('Missing key');
+    expect(component.stateLabel(byId['fred_regional_market_indicators'])).toBe('Metadata only');
+    expect(component.stateLabel(layer({
+      id: 'unavailable_layer',
+      name: 'Unavailable Layer',
+      is_available: false,
+    }))).toBe('Unavailable');
   });
 
   it('emits ask-agent and manual-toggle actions from the rendered catalog', () => {
