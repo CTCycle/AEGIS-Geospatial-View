@@ -118,6 +118,33 @@ export const normalizeCapabilities = (input: unknown): CatalogResponse['capabili
     endpoint_health: typeof item.endpoint_health === 'string' ? item.endpoint_health : undefined,
     auth_mode: typeof item.auth_mode === 'string' ? item.auth_mode : undefined,
     official_docs_url: typeof item.official_docs_url === 'string' ? item.official_docs_url : undefined,
+    capability_kind: typeof item.capability_kind === 'string'
+      ? item.capability_kind
+      : (typeof item.capabilityKind === 'string' ? item.capabilityKind : undefined),
+    rendering_mode: typeof item.rendering_mode === 'string'
+      ? item.rendering_mode
+      : (typeof item.renderingMode === 'string' ? item.renderingMode : undefined),
+    reliability: isRecord(item.reliability)
+      ? {
+        status: String(item.reliability.status ?? 'unknown'),
+        lastAudited: typeof item.reliability.lastAudited === 'string'
+          ? item.reliability.lastAudited
+          : undefined,
+        knownLimitations: isStringArray(item.reliability.knownLimitations)
+          ? item.reliability.knownLimitations
+          : undefined,
+      }
+      : undefined,
+    auth: isRecord(item.auth)
+      ? {
+        type: String(item.auth.type ?? 'none'),
+        required: Boolean(item.auth.required),
+        providerKey: typeof item.auth.providerKey === 'string' ? item.auth.providerKey : null,
+        accessPageProviderId: typeof item.auth.accessPageProviderId === 'string'
+          ? item.auth.accessPageProviderId
+          : null,
+      }
+      : undefined,
     intent_tags: Array.isArray(item.intent_tags)
       ? item.intent_tags.filter((v): v is string => typeof v === 'string')
       : [],

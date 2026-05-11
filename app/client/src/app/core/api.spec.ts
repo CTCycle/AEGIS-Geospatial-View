@@ -33,13 +33,33 @@ describe('core/api', () => {
     const parsed = parseCatalogResponse({
       capabilities: [
         { id: 'b1', kind: 'basemap' },
-        { id: 'o1', kind: 'overlay' },
+        {
+          id: 'o1',
+          kind: 'overlay',
+          capabilityKind: 'raster-overlay',
+          renderingMode: 'wmts',
+          reliability: {
+            status: 'partial',
+            lastAudited: '2026-05-11',
+            knownLimitations: ['time dimension'],
+          },
+          auth: {
+            type: 'api-key',
+            required: true,
+            providerKey: 'tomtom',
+            accessPageProviderId: 'tomtom',
+          },
+        },
       ],
     });
     expect(parsed.basemaps?.[0].id).toBe('b1');
     expect(parsed.basemaps?.[0].name).toBe('b1');
     expect(parsed.overlays?.[0].id).toBe('o1');
     expect(parsed.overlays?.[0].name).toBe('o1');
+    expect(parsed.overlays?.[0].capability_kind).toBe('raster-overlay');
+    expect(parsed.overlays?.[0].rendering_mode).toBe('wmts');
+    expect(parsed.overlays?.[0].reliability?.status).toBe('partial');
+    expect(parsed.overlays?.[0].auth?.providerKey).toBe('tomtom');
   });
 
   it('parseModelSettingsResponse defaults correctly', () => {
