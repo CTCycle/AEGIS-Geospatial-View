@@ -12,8 +12,8 @@ AEGIS treats geographic data sources as manifest-backed capabilities. The single
 | --- | --- |
 | `basemap` | Schema-v2 manifests and runtime profiles are active. |
 | `raster-overlay` | NASA GIBS, RainViewer, TomTom traffic, ESA, and EEA manifests are classified. GIBS and RainViewer provider descriptors are implemented. |
-| `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, Open Charge Map, NREL AFDC, and ArcGIS REST descriptors are implemented for normalized API contracts. |
-| `search-index` | Overpass, Geoapify, and OpenTripMap sources are classified. Overpass has a concrete provider adapter; Geoapify and OpenTripMap are credential-gated. |
+| `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, Open Charge Map, NREL AFDC, and ArcGIS REST descriptors are implemented for normalized API contracts. Open Charge Map and NREL AFDC also support live JSON fetch, normalization, and stale-cache fallback. |
+| `search-index` | Overpass, Geoapify, and OpenTripMap sources are classified. Overpass has a concrete provider adapter; OpenTripMap supports live JSON fetch, normalization, and stale-cache fallback when credentials are configured. |
 | `camera-network` | Windy Webcams manifest, provider shell, credential status, API contract, and client types are implemented. |
 | `dataset-ingestion` | GTFS Static, OurAirports, Natural Earth, Census boundaries, ACS joins, Eurostat NUTS, Overture Maps, OpenAddresses, and local parcel template manifests are classified. The ingestion service executes CSV/GeoJSON normalization and records partial status for heavy formats that need optional GIS dependencies. |
 | `analysis-tool` | Open-Meteo and PVGIS provider adapters are implemented for point or sampled analysis payloads. |
