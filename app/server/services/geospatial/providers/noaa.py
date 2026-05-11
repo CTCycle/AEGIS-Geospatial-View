@@ -6,30 +6,58 @@ from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
     ProviderResponse,
+    ProviderUnavailableError,
+)
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
 )
 
 
 class NOAAProvider(GeospatialProvider):
     provider_id = "noaa"
 
+    def __init__(self, *, fetcher: JsonFetcher | None = None) -> None:
+        self.fetcher = fetcher or fetch_json_url
+
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if request.capability_id == "noaa_coops_water_levels":
             return self._coops_water_levels(request)
         if request.capability_id == "noaa_radar":
             return self._radar_tiles(request)
-        return self._weather_alerts(request)
+        return await self._weather_alerts(request)
 
-    def _weather_alerts(self, request: ProviderRequest) -> ProviderResponse:
+    async def _weather_alerts(self, request: ProviderRequest) -> ProviderResponse:
         params: dict[str, str] = {"status": "actual", "message_type": "alert"}
         if request.bbox is not None:
             west, south, east, north = request.bbox
             params["point"] = f"{(south + north) / 2},{(west + east) / 2}"
+        features_url = f"https://api.weather.gov/alerts/active?{urlencode(params)}"
+        if request.params.get("live"):
+            payload = await call_json_fetcher(
+                self.fetcher,
+                features_url,
+                {"User-Agent": "AEGIS-Geospatial-View/1.0"},
+            )
+            features = _normalize_noaa_alerts(payload)
+            return ProviderResponse(
+                capability_id=request.capability_id,
+                provider_id=self.provider_id,
+                payload={
+                    "renderingMode": "geojson",
+                    "features": features,
+                    "totalResults": len(features),
+                    "format": "geojson",
+                },
+                attribution=["NOAA National Weather Service"],
+            )
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={
                 "renderingMode": "geojson",
-                "featuresUrl": f"https://api.weather.gov/alerts/active?{urlencode(params)}",
+                "featuresUrl": features_url,
                 "format": "geojson",
             },
             attribution=["NOAA National Weather Service"],
@@ -65,3 +93,37 @@ class NOAAProvider(GeospatialProvider):
             },
             attribution=["NOAA CO-OPS"],
         )
+
+
+def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:
+    if not isinstance(payload, dict):
+        raise ProviderUnavailableError("NOAA alert payload must be a GeoJSON object.")
+    raw_features = payload.get("features")
+    if not isinstance(raw_features, list):
+        raise ProviderUnavailableError("NOAA alert payload is missing features.")
+    features: list[dict[str, object]] = []
+    for item in raw_features:
+        if not isinstance(item, dict):
+            continue
+        properties = item.get("properties") if isinstance(item.get("properties"), dict) else {}
+        geometry = item.get("geometry") if isinstance(item.get("geometry"), dict) else None
+        features.append(
+            {
+                "id": str(item.get("id") or properties.get("id") or ""),
+                "name": properties.get("event") or properties.get("headline"),
+                "category": "weather_alert",
+                "severity": properties.get("severity"),
+                "certainty": properties.get("certainty"),
+                "urgency": properties.get("urgency"),
+                "areaDescription": properties.get("areaDesc"),
+                "effective": properties.get("effective"),
+                "expires": properties.get("expires"),
+                "geometry": geometry,
+                "metadata": {
+                    "sender": properties.get("senderName"),
+                    "instruction": properties.get("instruction"),
+                    "description": properties.get("description"),
+                },
+            }
+        )
+    return features
