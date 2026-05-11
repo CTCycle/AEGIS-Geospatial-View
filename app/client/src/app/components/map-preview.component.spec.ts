@@ -164,6 +164,72 @@ describe('components/map-preview.component', () => {
     expect(fakeMap.addLayer.calls.mostRecent().args[0].type).toBe('line');
   });
 
+  it('renders choropleth and camera point modes with distinct map layers', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'demographics',
+            label: 'Demographics',
+            type: 'geojson',
+            rendering_mode: 'choropleth',
+            provider: 'census',
+            url: 'https://example.test/demographics.geojson',
+            data_format: 'GeoJSON',
+            geometry_type: 'Polygon',
+          },
+          {
+            id: 'webcams',
+            label: 'Webcams',
+            type: 'geojson',
+            rendering_mode: 'camera-points',
+            provider: 'windy_webcams',
+            url: 'https://example.test/cameras.geojson',
+            data_format: 'GeoJSON',
+            geometry_type: 'Point',
+          },
+        ],
+      }) as never,
+    };
+    fixture.detectChanges();
+    const layers = fakeMap.addLayer.calls.allArgs().map((args) => args[0] as { type: string; paint: Record<string, unknown> });
+    expect(layers.some((layer) => layer.type === 'fill' && 'fill-opacity' in layer.paint)).toBeTrue();
+    expect(layers.some((layer) => layer.type === 'circle' && layer.paint['circle-color'] === '#f97316')).toBeTrue();
+  });
+
+  it('renders vector tile overlays and exposes metadata-only notices', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'natural_earth',
+            label: 'Natural Earth',
+            type: 'vector-tile',
+            rendering_mode: 'vector-tile',
+            provider: 'natural_earth',
+            url: 'https://example.test/tiles/{z}/{x}/{y}.pbf',
+            layer_id: 'admin',
+            attribution: 'Natural Earth',
+          },
+          {
+            id: 'parcel_template',
+            label: 'Parcel template',
+            type: 'metadata-only',
+            rendering_mode: 'metadata-only',
+            provider: 'local_open_data',
+          },
+        ],
+      }) as never,
+    };
+    fixture.detectChanges();
+    const vectorSource = fakeMap.addSource.calls.allArgs()
+      .map((args) => args[1] as { type?: string; tiles?: string[] })
+      .find((source) => source.type === 'vector');
+    expect(vectorSource?.tiles?.[0]).toContain('.pbf');
+    expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
+    expect(component.attributionEntries).toContain('Natural Earth');
+  });
+
   it('does not crash when map session is absent', () => {
     component.payload = {};
     fixture.detectChanges();

@@ -4,7 +4,9 @@ import pytest
 
 from server.services.geospatial.normalizers import (
     NormalizationError,
+    deduplicate_poi_features,
     normalize_camera_feature,
+    normalize_poi_category,
     normalize_poi_feature,
 )
 
@@ -55,3 +57,33 @@ def test_normalize_camera_feature_defaults_to_no_embedding() -> None:
     assert camera.embedding_allowed is False
     assert camera.embed_url is None
     assert camera.official_url == "https://example.test/cam"
+
+
+def test_normalize_poi_category_maps_phase8_sources() -> None:
+    assert normalize_poi_category("charging station") == "ev_charging"
+    assert normalize_poi_category("gas-station") == "fuel"
+    assert normalize_poi_category("railway") == "rail"
+    assert normalize_poi_category("pipeline") == "pipelines"
+    assert normalize_poi_category("museum") == "tourism"
+
+
+def test_deduplicate_poi_features_by_name_category_and_coordinates() -> None:
+    first = normalize_poi_feature(
+        {"id": "osm-1", "name": "Central Charger", "lat": 45.0, "lon": 7.0},
+        source="overpass",
+        category="charging_station",
+    )
+    duplicate = normalize_poi_feature(
+        {"id": "ocm-1", "name": "Central Charger", "lat": 45.000004, "lon": 7.000004},
+        source="openchargemap",
+        category="ev_charging",
+    )
+    different = normalize_poi_feature(
+        {"id": "nrel-1", "name": "Central Fuel", "lat": 45.0, "lon": 7.0},
+        source="nrel",
+        category="fuel",
+    )
+
+    deduplicated = deduplicate_poi_features([first, duplicate, different])
+
+    assert [feature.id for feature in deduplicated] == ["osm-1", "nrel-1"]

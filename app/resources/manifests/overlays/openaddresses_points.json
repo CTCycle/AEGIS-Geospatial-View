@@ -1,0 +1,74 @@
+{
+  "id": "openaddresses_points",
+  "name": "OpenAddresses Points",
+  "provider": "openaddresses",
+  "type": "dataset-ingestion",
+  "description": "OpenAddresses address point extracts for local geocoding and address context.",
+  "capabilities": ["addresses", "geocoding", "search-index", "dataset-ingestion"],
+  "coverage": "global where available",
+  "metadata": {
+    "label": "OpenAddresses",
+    "requires_key": false,
+    "attribution": "OpenAddresses contributors",
+    "keywords": ["address", "geocode", "openaddresses"],
+    "intent_tags": ["address", "geocoding", "parcel context"],
+    "task_tags": ["search addresses", "address points"],
+    "source_protocol": "download",
+    "data_format": "csv",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "official_docs_url": "https://batch.openaddresses.io/data",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "dataset-ingestion",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": ["https://batch.openaddresses.io/data"],
+  "license": {
+    "name": "OpenAddresses source-specific licenses",
+    "url": "https://openaddresses.io/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {"type": "none", "required": false},
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": ["address", "geocode", "openaddresses"],
+    "requiredUserIntent": ["address search", "geocoding"],
+    "avoidWhen": ["general chat", "license-sensitive display"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": ["Licensing varies by source extract; use as search index unless display rights are confirmed."]
+  },
+  "cachePolicy": {"mode": "preprocessed", "ttlSeconds": 2592000, "staleWhileRevalidateSeconds": 2592000},
+  "normalization": {
+    "geometryPath": "LAT,LON",
+    "idPath": "HASH",
+    "timestampPath": "source_vintage",
+    "fieldMap": {"NUMBER": "number", "STREET": "street", "CITY": "city", "POSTCODE": "postcode"},
+    "expectedGeometry": "Point"
+  },
+  "download": {
+    "sourceUrl": "https://batch.openaddresses.io/data",
+    "license": "https://openaddresses.io/",
+    "updateFrequency": "monthly",
+    "expectedFormat": "csv",
+    "checksumUrl": null,
+    "compression": "zip"
+  },
+  "storage": {
+    "rawPath": "data/geospatial/raw/openaddresses/points/",
+    "normalizedPath": "data/geospatial/normalized/openaddresses/points/",
+    "tilePath": "data/geospatial/tiles/openaddresses/points/"
+  },
+  "indexing": {"spatialIndex": true, "textIndex": true, "vectorTile": false},
+  "validation": {"minFeatureCount": 1, "requiredFields": ["LAT", "LON"], "bboxMustIntersect": [-180, -90, 180, 90]}
+}

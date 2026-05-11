@@ -36,6 +36,7 @@ Coverage includes:
 - camera missing-key behavior
 - geospatial API contracts
 - agentic selection for cameras, amenities, and no-layer general chat
+- dataset ingestion plan execution for CSV/GeoJSON, checksum failure, lightweight indexes, and health artifacts
 
 ## Frontend Validation
 
@@ -49,7 +50,7 @@ The current frontend contract validates TypeScript integration for schema-v2 typ
 
 ## Browser Validation
 
-Visual validation is still required before marking the full geographic intelligence program complete. Browser scenarios should cover:
+Visual validation is required before releasing major renderer changes. Browser scenarios cover:
 
 - base map only
 - missing credential states

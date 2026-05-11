@@ -34,6 +34,35 @@ def normalize_poi_feature(
     )
 
 
+def normalize_poi_category(raw_category: str | None) -> str:
+    value = _category_key(raw_category)
+    return POI_CATEGORY_MAP.get(value, value or "unknown")
+
+
+def deduplicate_poi_features(features: list[PoiFeature]) -> list[PoiFeature]:
+    seen: set[tuple[str, str, float, float]] = set()
+    deduplicated: list[PoiFeature] = []
+    for feature in features:
+        key = (
+            (feature.name or "").strip().lower(),
+            normalize_poi_category(feature.category),
+            round(feature.latitude, 5),
+            round(feature.longitude, 5),
+        )
+        fallback_key = (
+            feature.source,
+            normalize_poi_category(feature.category),
+            round(feature.latitude, 5),
+            round(feature.longitude, 5),
+        )
+        if key in seen or fallback_key in seen:
+            continue
+        seen.add(key)
+        seen.add(fallback_key)
+        deduplicated.append(feature)
+    return deduplicated
+
+
 def normalize_camera_feature(
     payload: dict[str, Any],
     *,
@@ -84,6 +113,77 @@ def _optional_string(value: Any) -> str | None:
         return None
     normalized = str(value).strip()
     return normalized or None
+
+
+def _category_key(value: str | None) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().lower().replace("-", "_").replace(" ", "_")
+
+
+POI_CATEGORY_MAP = {
+    "airport": "airports",
+    "airports": "airports",
+    "aerodrome": "airports",
+    "amenity_charging_station": "ev_charging",
+    "attraction": "tourism",
+    "beach": "beaches",
+    "beaches": "beaches",
+    "bicycle_parking": "bike_parking",
+    "bike_lane": "trails",
+    "bike_lanes": "trails",
+    "camp_site": "campsites",
+    "campsite": "campsites",
+    "campsites": "campsites",
+    "charging_station": "ev_charging",
+    "clinic": "clinics",
+    "clinics": "clinics",
+    "drinking_water": "drinking_water",
+    "ev": "ev_charging",
+    "ev_charging": "ev_charging",
+    "fire_station": "fire_stations",
+    "fire_stations": "fire_stations",
+    "fuel": "fuel",
+    "gas_station": "fuel",
+    "heritage": "heritage_sites",
+    "heritage_sites": "heritage_sites",
+    "hospital": "hospitals",
+    "hospitals": "hospitals",
+    "museum": "tourism",
+    "parking": "parking",
+    "pharmacy": "pharmacies",
+    "pharmacies": "pharmacies",
+    "pipeline": "pipelines",
+    "pipelines": "pipelines",
+    "police": "police",
+    "port": "ports",
+    "ports": "ports",
+    "power": "power",
+    "public_toilets": "public_toilets",
+    "rail": "rail",
+    "railway": "rail",
+    "restaurant": "restaurants",
+    "restaurants": "restaurants",
+    "school": "schools",
+    "schools": "schools",
+    "shelter": "shelters",
+    "shelters": "shelters",
+    "shop": "shops",
+    "shops": "shops",
+    "station": "transit_stops",
+    "telecom": "telecom",
+    "toilets": "public_toilets",
+    "tourism": "tourism",
+    "trail": "trails",
+    "trailhead": "trailheads",
+    "trailheads": "trailheads",
+    "trails": "trails",
+    "transit": "transit_stops",
+    "transit_stop": "transit_stops",
+    "transit_stops": "transit_stops",
+    "viewpoint": "viewpoints",
+    "viewpoints": "viewpoints",
+}
 
 
 _POI_FIELDS = {
