@@ -12,8 +12,8 @@ AEGIS treats geographic data sources as manifest-backed capabilities. The single
 | --- | --- |
 | `basemap` | Schema-v2 manifests and runtime profiles are active. |
 | `raster-overlay` | NASA GIBS, RainViewer, TomTom traffic, ESA, and EEA manifests are classified. GIBS and RainViewer provider descriptors are implemented. |
-| `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, and ArcGIS REST descriptors are implemented for normalized API contracts. |
-| `search-index` | Overpass and Geoapify amenities are classified. Overpass has a concrete provider adapter; Geoapify is credential-gated. |
+| `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, Open Charge Map, NREL AFDC, and ArcGIS REST descriptors are implemented for normalized API contracts. |
+| `search-index` | Overpass, Geoapify, and OpenTripMap sources are classified. Overpass has a concrete provider adapter; Geoapify and OpenTripMap are credential-gated. |
 | `camera-network` | Windy Webcams manifest, provider shell, credential status, API contract, and client types are implemented. |
 | `dataset-ingestion` | GTFS Static manifests and provider parsing exist for feed fixtures and configured ingestion. |
 | `analysis-tool` | Open-Meteo and PVGIS provider adapters are implemented for point or sampled analysis payloads. |
@@ -37,6 +37,10 @@ AEGIS treats geographic data sources as manifest-backed capabilities. The single
 - NOAA CO-OPS API: https://api.tidesandcurrents.noaa.gov/api/prod/
 - FEMA NFHL: https://hazards.fema.gov/femaportal/wps/portal/NFHLWMS
 - NASA FIRMS API: https://firms.modaps.eosdis.nasa.gov/api/
+- OpenTripMap: https://opentripmap.io/docs
+- Open Charge Map: https://openchargemap.org/site/develop/api
+- NREL AFDC: https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/
+- OurAirports: https://ourairports.com/data/
 - Transitland: https://www.transit.land/documentation/datastore/api-endpoints.html
 
 ## Current Provider Framework
@@ -54,9 +58,13 @@ Implemented adapters:
 - `nasa_gibs.py`
 - `nasa_firms.py`
 - `noaa.py`
+- `nrel.py`
 - `openaq.py`
+- `openchargemap.py`
 - `openmeteo.py`
+- `opentripmap.py`
 - `overpass.py`
+- `ourairports.py`
 - `pvgis.py`
 - `rainviewer.py`
 - `tomtom.py`

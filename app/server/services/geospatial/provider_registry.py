@@ -235,6 +235,28 @@ class ProviderRegistry:
             )
 
             return NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY"))
+        if provider_id == "opentripmap":
+            from server.services.geospatial.providers.opentripmap import (
+                OpenTripMapProvider,
+            )
+
+            return OpenTripMapProvider(api_key=os.getenv("OPENTRIPMAP_API_KEY"))
+        if provider_id == "openchargemap":
+            from server.services.geospatial.providers.openchargemap import (
+                OpenChargeMapProvider,
+            )
+
+            return OpenChargeMapProvider(api_key=os.getenv("OPENCHARGEMAP_API_KEY"))
+        if provider_id == "nrel":
+            from server.services.geospatial.providers.nrel import NRELProvider
+
+            return NRELProvider(api_key=os.getenv("NREL_API_KEY"))
+        if provider_id == "ourairports":
+            from server.services.geospatial.providers.ourairports import (
+                OurAirportsProvider,
+            )
+
+            return OurAirportsProvider()
         if provider_id == "gtfs_static":
             from server.services.geospatial.providers.gtfs_static import (
                 GTFSStaticProvider,

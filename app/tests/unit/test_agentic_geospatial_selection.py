@@ -89,3 +89,13 @@ def test_agentic_selection_picks_hazard_layers_by_need() -> None:
 
     assert "fema_nfhl_flood_zones" in flood.overlay_ids
     assert "nasa_firms_active_fires" in fire.overlay_ids
+
+
+def test_agentic_selection_picks_phase8_sources() -> None:
+    charging = _resolve(["ev", "charging", "nearby"])
+    tourism = _resolve(["tourism", "heritage", "attractions"])
+    airport = _resolve(["airport", "aviation", "nearby"])
+
+    assert "openchargemap_ev_charging" in charging.overlay_ids
+    assert "opentripmap_tourism_pois" in tourism.overlay_ids
+    assert "ourairports_airports" in airport.overlay_ids

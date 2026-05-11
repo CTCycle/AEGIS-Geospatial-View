@@ -213,6 +213,22 @@ class ManifestIntentResolver:
             {"overpass_poi_amenities", "geoapify_amenities"},
         ),
         (
+            {"tourism", "tourist", "attraction", "attractions", "heritage", "museum"},
+            {"opentripmap_tourism_pois", "overpass_poi_amenities", "geoapify_amenities"},
+        ),
+        (
+            {"ev", "charging", "charger", "chargers", "electric", "fuel", "fueling"},
+            {
+                "openchargemap_ev_charging",
+                "nrel_afdc_alt_fuel_stations",
+                "overpass_poi_amenities",
+            },
+        ),
+        (
+            {"airport", "airports", "aviation", "runway", "heliport"},
+            {"ourairports_airports"},
+        ),
+        (
             {
                 "webcam",
                 "webcams",
