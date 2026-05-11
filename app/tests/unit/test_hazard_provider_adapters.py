@@ -193,6 +193,29 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
     assert "test-key" in response.payload["featuresUrl"]
 
 
+def test_nasa_firms_normalizes_live_csv() -> None:
+    async def fetcher(url: str) -> str:
+        assert "test-key" in url
+        return (
+            "latitude,longitude,bright_ti4,confidence,acq_date,acq_time,satellite,instrument,frp,daynight\n"
+            "38.2,-122.1,345.6,h,2026-05-11,0930,N,VIIRS,12.4,D\n"
+        )
+
+    response = asyncio.run(
+        NASAFIRMSProvider(api_key="test-key", fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="nasa_firms_active_fires",
+                bbox=(-123.0, 38.0, -121.0, 40.0),
+                params={"live": True},
+            )
+        )
+    )
+
+    assert response.payload["totalResults"] == 1
+    assert response.payload["features"][0]["category"] == "active_fire"
+    assert response.payload["features"][0]["timestamp"] == "2026-05-11T09:30:00Z"
+
+
 def test_provider_registry_binds_hazard_adapters_from_manifests() -> None:
     registry = ProviderRegistry()
 
