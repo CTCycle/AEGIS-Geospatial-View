@@ -7,7 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:e2e:geospatial": "node e2e/validate-geospatial-scenarios.cjs",
+    "test:e2e:geospatial": "ng test --watch=false --browsers=ChromeHeadlessNoGpu --include src/app/e2e/geospatial-browser-smoke.spec.ts && node e2e/validate-geospatial-scenarios.cjs",
     "preview": "ng serve --proxy-config proxy.conf.cjs",
     "tauri:icon": "tauri icon public/favicon.png && powershell -NoProfile -Command \"Remove-Item -Recurse -Force src-tauri/icons/android,src-tauri/icons/ios -ErrorAction SilentlyContinue\"",
     "tauri:dev": "tauri dev --config src-tauri/tauri.conf.json",

@@ -58,3 +58,5 @@ Visual validation is required before releasing major renderer changes. Browser s
 - OpenAQ/Open-Meteo/Overpass mocked vector payloads
 - Windy webcam missing-key and mocked camera payloads
 - layer catalog filtering and source-health display
+
+`npm --prefix app/client run test:e2e:geospatial` now runs a focused ChromeHeadless/Karma browser smoke before validating the static scenario catalog. The smoke uses mocked API responses to exercise an OSM basemap session, a clustered GeoJSON layer, metadata-only layer state, Windy Webcams missing-credential messaging, and DOM/map-input checks for secret leakage. Playwright is not currently a client dependency; add it only when broader screenshot/browser-flow coverage is needed.
