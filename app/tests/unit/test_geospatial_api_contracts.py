@@ -60,6 +60,18 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     assert response.json()["status"] in {"missing-credential", "ok"}
 
 
+def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
+    client = TestClient(create_app())
+
+    response = client.get(
+        "/api/geospatial/layers/tomtom_traffic_flow/features"
+        "?bbox=12,41,13,42&live=true&incidents=true"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] in {"missing-credential", "ok", "unavailable"}
+
+
 def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) -> None:
     monkeypatch.delenv("WINDY_WEBCAMS_API_KEY", raising=False)
     client = TestClient(create_app())

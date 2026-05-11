@@ -57,14 +57,22 @@ async def get_layer_features(
     bbox: str | None = Query(default=None),
     zoom: int | None = Query(default=None),
     time: str | None = Query(default=None),
+    live: bool = Query(default=False),
+    incidents: bool = Query(default=False),
 ) -> dict[str, Any]:
     manifest = _manifest_by_id(layer_id)
     provider_id = str(manifest.get("provider") or "")
+    params: dict[str, Any] = {}
+    if live:
+        params["live"] = True
+    if incidents:
+        params["incidents"] = True
     request = ProviderRequest(
         capability_id=layer_id,
         bbox=_parse_bbox(bbox),
         zoom=zoom,
         time=_parse_time(time),
+        params=params,
     )
     return await _fetch_provider_payload(provider_id, request)
 
@@ -79,7 +87,7 @@ async def get_geospatial_cameras(
     request = ProviderRequest(
         capability_id=provider_id,
         bbox=_parse_bbox(bbox),
-        params={"camera_type": camera_type} if camera_type else {},
+        params={"live": True, **({"camera_type": camera_type} if camera_type else {})},
     )
     return await _fetch_provider_payload(provider_id, request)
 
