@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from server.api import geospatial
 from server.app import create_app
+from server.services.geospatial.providers.base import ProviderRateLimitError, ProviderTimeoutError
 
 
 def test_geospatial_capabilities_include_camera_network() -> None:
@@ -70,6 +72,35 @@ def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] in {"missing-credential", "ok", "unavailable"}
+
+
+@pytest.mark.parametrize(
+    ("provider_error", "expected_status"),
+    [
+        (ProviderRateLimitError("provider quota exceeded"), "rate-limited"),
+        (ProviderTimeoutError("provider request timed out"), "unavailable"),
+    ],
+)
+def test_geospatial_features_map_provider_failures_without_500(
+    monkeypatch, provider_error: Exception, expected_status: str
+) -> None:
+    class FailingRegistry:
+        def build_from_manifests(self) -> None:
+            return None
+
+        async def fetch(self, provider_id, request):
+            del provider_id, request
+            raise provider_error
+
+    monkeypatch.setattr(geospatial, "ProviderRegistry", FailingRegistry)
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == expected_status
+    assert payload["provider"] == "usgs"
 
 
 def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) -> None:

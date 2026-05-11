@@ -15,7 +15,11 @@ from server.services.geospatial.provider_registry import (
 )
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
+    ProviderCircuitOpenError,
+    ProviderError,
+    ProviderRateLimitError,
     ProviderRequest,
+    ProviderTimeoutError,
     ProviderUnavailableError,
 )
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -143,7 +147,19 @@ async def _fetch_provider_payload(
             "provider": provider_id,
             "message": str(exc),
         }
-    except (ProviderNotRegisteredError, ProviderUnavailableError) as exc:
+    except ProviderRateLimitError as exc:
+        return {
+            "status": "rate-limited",
+            "provider": provider_id,
+            "message": str(exc),
+        }
+    except (
+        ProviderNotRegisteredError,
+        ProviderUnavailableError,
+        ProviderTimeoutError,
+        ProviderCircuitOpenError,
+        ProviderError,
+    ) as exc:
         return {
             "status": "unavailable",
             "provider": provider_id,
