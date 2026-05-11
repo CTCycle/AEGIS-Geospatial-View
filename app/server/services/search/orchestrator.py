@@ -99,9 +99,43 @@ class LocationSearchOrchestrator:
         )
         raw_url = self._apply_spatial_placeholders(raw_url, payload=payload)
         capability_type = str(capability.get("type") or "")
+        rendering_mode = str(capability.get("renderingMode") or "")
+        capability_kind = str(capability.get("capabilityKind") or "")
+        if capability_kind == "camera-network":
+            return {
+                "id": str(capability.get("id") or overlay_id),
+                "label": str(metadata.get("label") or capability.get("name") or overlay_id),
+                "provider": str(capability.get("provider") or "unknown"),
+                "type": "camera-points",
+                "rendering_mode": "camera-points",
+                "url": f"/api/geospatial/cameras?provider={capability.get('provider')}",
+                "attribution": str(metadata.get("attribution") or ""),
+                "source_protocol": metadata.get("source_protocol"),
+                "data_format": metadata.get("data_format"),
+                "geometry_type": metadata.get("geometry_type"),
+            }, warnings
+        if capability_kind in {"dataset-ingestion", "vector-overlay"} and rendering_mode in {
+            "clustered-points",
+            "geojson",
+            "vector-tile",
+            "choropleth",
+        } and raw_url is None:
+            return {
+                "id": str(capability.get("id") or overlay_id),
+                "label": str(metadata.get("label") or capability.get("name") or overlay_id),
+                "provider": str(capability.get("provider") or "unknown"),
+                "type": str(capability.get("type") or rendering_mode),
+                "rendering_mode": rendering_mode,
+                "url": f"/api/geospatial/layers/{overlay_id}/features",
+                "attribution": str(metadata.get("attribution") or ""),
+                "source_protocol": metadata.get("source_protocol"),
+                "data_format": metadata.get("data_format"),
+                "geometry_type": metadata.get("geometry_type"),
+            }, warnings
         is_point_insight = raw_url is None and (
             bool(capability.get("supports_direct_text"))
             or capability_type.endswith("insight")
+            or rendering_mode == "metadata-only"
         )
         if is_point_insight:
             resolved_url, url_warning = None, None
@@ -117,6 +151,7 @@ class LocationSearchOrchestrator:
             "label": str(metadata.get("label") or capability.get("name") or overlay_id),
             "provider": str(capability.get("provider") or "unknown"),
             "type": "point-insight" if is_point_insight else str(capability.get("type") or "tile"),
+            "rendering_mode": rendering_mode or ("metadata-only" if is_point_insight else ""),
         }
         optional_fields = {
             "url": resolved_url,

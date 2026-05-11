@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-05-02
+Last updated: 2026-05-11
 
 ## FILES INDEX
 
@@ -18,6 +18,18 @@ Last updated: 2026-05-02
 
 - CAPABILITY_MANIFESTS.md  
   Manifest schema and runtime-profile rules for basemaps, overlays, and tools under `app/resources/manifests`.
+
+- GEOSPATIAL_SOURCE_CATALOG.md
+  Source catalog for geographic intelligence providers, capability kinds, access modes, rendering modes, and integration status.
+
+- GEOSPATIAL_INGESTION.md
+  Manifest contract and planning flow for downloaded or preprocessed geospatial datasets.
+
+- GEOSPATIAL_VALIDATION.md
+  Static audit, provider contract, API, client, and visual validation workflow for geospatial capabilities.
+
+- WEBCAM_CAPABILITY.md
+  Camera-network policy and implementation notes for Windy Webcams and future public camera providers.
 
 - CODING_RULES.md  
   Unified coding standards across Python and TypeScript, including typing, validation, async boundaries, testing, and tooling.

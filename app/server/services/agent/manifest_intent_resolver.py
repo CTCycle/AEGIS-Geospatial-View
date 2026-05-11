@@ -108,6 +108,8 @@ class ManifestIntentResolver:
                 "IMERG_Precipitation_Rate",
                 "openmeteo_weather_forecast",
                 "openmeteo_pressure_humidity_wind",
+                "noaa_radar",
+                "noaa_weather_alerts",
             },
         ),
         (
@@ -121,7 +123,7 @@ class ManifestIntentResolver:
                 "thermal",
                 "active_fire",
             },
-            {"MODIS_Combined_Thermal_Anomalies_Fire"},
+            {"MODIS_Combined_Thermal_Anomalies_Fire", "nasa_firms_active_fires"},
         ),
         (
             {"smoke", "smoky", "dust", "dusty", "aerosol", "aerosols"},
@@ -182,6 +184,23 @@ class ManifestIntentResolver:
         ({"noise", "noisy"}, {"eea_noise_2019"}),
         ({"traffic", "congestion"}, {"tomtom_traffic_flow"}),
         (
+            {"flood", "flooding", "floodplain", "flood_zone", "floodzone"},
+            {
+                "fema_nfhl_flood_zones",
+                "usgs_water_gauges",
+                "noaa_coops_water_levels",
+                "noaa_weather_alerts",
+            },
+        ),
+        (
+            {"earthquake", "earthquakes", "seismic", "quake", "quakes"},
+            {"usgs_earthquakes"},
+        ),
+        (
+            {"weather", "alert", "alerts", "warning", "watch", "storm"},
+            {"noaa_weather_alerts", "noaa_radar", "openmeteo_weather_forecast"},
+        ),
+        (
             {"rivers", "river", "lakes", "lake", "hydrography"},
             {"census_tigerweb_hydrography"},
         ),
@@ -192,6 +211,40 @@ class ManifestIntentResolver:
         (
             {"amenities", "services", "places", "poi"},
             {"overpass_poi_amenities", "geoapify_amenities"},
+        ),
+        (
+            {
+                "webcam",
+                "webcams",
+                "camera",
+                "cameras",
+                "live",
+                "visual",
+                "view",
+                "road",
+                "beach",
+                "ski",
+            },
+            {"windy_webcams"},
+        ),
+        (
+            {
+                "transit",
+                "bus",
+                "train",
+                "station",
+                "stop",
+                "stops",
+                "route",
+                "routes",
+                "delay",
+                "delays",
+                "disruption",
+                "disruptions",
+                "vehicle",
+                "vehicles",
+            },
+            {"gtfs_static", "gtfs_realtime", "transitland_feeds"},
         ),
     )
 
@@ -252,7 +305,11 @@ class ManifestIntentResolver:
         if kind == "basemap":
             return capability_registry.list_basemaps()
         if kind == "overlay":
-            return capability_registry.list_overlays()
+            return [
+                *capability_registry.list_overlays(),
+                *capability_registry.list_cameras(),
+                *capability_registry.list_transit(),
+            ]
         if kind == "tool":
             return capability_registry.list_tools()
         return []
@@ -320,6 +377,8 @@ class ManifestIntentResolver:
         overlays = {
             str(item.get("id")): self._capability_tokens(item)
             for item in capability_registry.list_overlays()
+            + capability_registry.list_cameras()
+            + capability_registry.list_transit()
             if isinstance(item, dict)
             and str(item.get("id") or "") in available_ids
             and (

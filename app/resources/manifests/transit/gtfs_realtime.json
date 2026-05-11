@@ -1,0 +1,105 @@
+{
+  "id": "gtfs_realtime",
+  "name": "GTFS Realtime Feeds",
+  "provider": "gtfs_realtime",
+  "type": "vector-overlay",
+  "description": "Realtime public transit updates, including vehicle positions, service alerts, and trip updates from agency protobuf feeds.",
+  "capabilities": [
+    "transit",
+    "realtime",
+    "vehicle-positions",
+    "service-alerts",
+    "trip-updates"
+  ],
+  "coverage": "agency-defined",
+  "metadata": {
+    "label": "GTFS Realtime",
+    "requires_key": false,
+    "attribution": "Transit feed publisher",
+    "keywords": [
+      "transit",
+      "gtfs realtime",
+      "service alert",
+      "vehicle position",
+      "delay"
+    ],
+    "intent_tags": [
+      "transit",
+      "disruption",
+      "live",
+      "station"
+    ],
+    "task_tags": [
+      "service disruptions",
+      "vehicle positions",
+      "station alerts"
+    ],
+    "source_protocol": "HTTP Protobuf",
+    "data_format": "Protocol Buffers",
+    "geometry_type": "Point, metadata",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "agency-specific",
+    "official_docs_url": "https://developers.google.com/transit/gtfs-realtime",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://developers.google.com/transit/gtfs-realtime"
+  ],
+  "license": {
+    "name": "Agency-specific GTFS Realtime feed license",
+    "url": "https://developers.google.com/transit/gtfs-realtime",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "transit disruption",
+      "live transit",
+      "service alert",
+      "vehicle position",
+      "near station"
+    ],
+    "requiredUserIntent": [
+      "transit",
+      "freshness",
+      "disruption"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Agency feed URLs must be configured before live fetches.",
+      "Some feeds omit vehicle positions or require agency-specific credentials."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 60,
+    "staleWhileRevalidateSeconds": 300
+  },
+  "normalization": {
+    "geometryPath": "entity[].vehicle.position",
+    "idPath": "entity[].id",
+    "timestampPath": "header.timestamp",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  }
+}

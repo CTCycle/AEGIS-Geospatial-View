@@ -1,0 +1,24 @@
+@if (camera) {
+  <article class="camera-popup">
+    <header>
+      <strong>{{ camera.name }}</strong>
+      @if (camera.stale) {
+        <span>Stale</span>
+      }
+    </header>
+    @if (camera.preview_image_url) {
+      <img [src]="camera.preview_image_url" [alt]="camera.name" loading="lazy">
+    }
+    <dl>
+      <div>
+        <dt>Provider</dt>
+        <dd>{{ camera.provider }}</dd>
+      </div>
+      <div>
+        <dt>Type</dt>
+        <dd>{{ camera.camera_type }}</dd>
+      </div>
+    </dl>
+    <a [href]="camera.official_url" target="_blank" rel="noopener noreferrer">Official link</a>
+  </article>
+}

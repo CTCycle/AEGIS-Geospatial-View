@@ -1,0 +1,59 @@
+{
+  "id": "noaa_coops_water_levels",
+  "name": "NOAA CO-OPS Water Levels",
+  "provider": "noaa",
+  "type": "vector-overlay",
+  "description": "NOAA CO-OPS tide and water-level station observations.",
+  "capabilities": ["water", "tide", "coastal", "flood", "current"],
+  "coverage": "united-states-coastal",
+  "metadata": {
+    "label": "NOAA Water Levels",
+    "requires_key": false,
+    "attribution": "NOAA CO-OPS",
+    "keywords": ["tide", "water level", "coastal", "flood"],
+    "intent_tags": ["water", "coastal", "flood"],
+    "task_tags": ["coastal condition", "water level stations"],
+    "source_protocol": "JSON API",
+    "data_format": "JSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "official_docs_url": "https://api.tidesandcurrents.noaa.gov/api/prod/",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": ["https://api.tidesandcurrents.noaa.gov/api/prod/"],
+  "license": {
+    "name": "NOAA public data",
+    "url": "https://tidesandcurrents.noaa.gov/disclaimer.html",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {"type": "none", "required": false},
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": ["tide", "water level", "coastal", "flood"],
+    "requiredUserIntent": ["water", "coastal", "freshness"],
+    "avoidWhen": ["general chat", "no geographic context"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": ["Station discovery must be paired with observation requests for full rendering."]
+  },
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 900, "staleWhileRevalidateSeconds": 3600},
+  "normalization": {
+    "geometryPath": "stations[].lat,stations[].lng",
+    "idPath": "stations[].id",
+    "timestampPath": "data[].t",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  }
+}

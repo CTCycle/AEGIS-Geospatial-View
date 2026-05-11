@@ -41,6 +41,10 @@ const globalApiBase = typeof window !== 'undefined'
 export const API_BASE_URL = normalizeApiBaseUrl(globalApiBase || computeDefaultApiBaseUrl());
 export const API_MAPS_SEARCH_PATH = '/maps/search';
 export const API_MAPS_CATALOG_PATH = '/maps/catalog';
+export const API_GEOSPATIAL_CAPABILITIES_PATH = '/geospatial/capabilities';
+export const API_GEOSPATIAL_LAYERS_PATH = '/geospatial/layers';
+export const API_GEOSPATIAL_CAMERAS_PATH = '/geospatial/cameras';
+export const API_GEOSPATIAL_AUDIT_PATH = '/geospatial/audit';
 export const API_CHAT_TURN_PATH = '/chat/turn';
 export const API_CHAT_STREAM_PATH = '/chat/stream';
 export const API_CHAT_MODELS_PATH = '/chat/models';

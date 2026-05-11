@@ -23,7 +23,9 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
     overlays = manifests / "overlays"
     providers = manifests / "providers"
     tools = manifests / "tools"
-    for folder in (basemaps, overlays, providers, tools):
+    cameras = manifests / "cameras"
+    transit = manifests / "transit"
+    for folder in (basemaps, overlays, providers, tools, cameras, transit):
         folder.mkdir(parents=True)
     (manifests / "index.json").write_text(
         """
@@ -34,6 +36,8 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
   "providers_dir": "providers",
   "basemaps_dir": "basemaps",
   "overlays_dir": "overlays",
+  "cameras_dir": "cameras",
+  "transit_dir": "transit",
   "tools_dir": "tools",
   "runtime_profiles_file": "runtime_profiles.json",
   "capability_groups": [],
@@ -81,6 +85,7 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     loaded = loader.load_all()
     basemaps = loaded["basemaps"]
     overlays = loaded["overlays"]
+    transit = loaded["transit"]
 
     assert all(
         CapabilityManifestV2.model_validate(item).capability_kind
@@ -89,3 +94,6 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     )
     assert any(item["capabilityKind"] == "metadata-only" for item in overlays)
     assert any(item["renderingMode"] == "clustered-points" for item in overlays)
+    assert {item["id"] for item in transit}.issuperset(
+        {"gtfs_static", "gtfs_realtime", "transitland_feeds"}
+    )

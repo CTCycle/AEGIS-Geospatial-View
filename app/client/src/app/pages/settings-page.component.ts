@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
@@ -82,6 +83,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
+    private readonly router: Router,
   ) {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
@@ -313,6 +315,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   onModelGridScroll(event: Event): void {
     this.state.modelGridScrollTop = (event.target as HTMLDivElement).scrollTop;
     this.syncState();
+  }
+
+  navigateBack(): void {
+    this.syncState();
+    void this.router.navigateByUrl('/');
   }
 
   openAiConfigured(): boolean {

@@ -1,0 +1,45 @@
+<section class="layer-catalog">
+  <div class="layer-catalog__toolbar">
+    <input
+      type="search"
+      aria-label="Search layers"
+      [value]="searchText"
+      (input)="setSearchText($any($event.target).value)"
+    >
+    <select
+      aria-label="Layer category"
+      [value]="selectedCategory"
+      (change)="setCategory($any($event.target).value)"
+    >
+      @for (category of categories; track category) {
+        <option [value]="category">{{ category }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="layer-catalog__list">
+    @for (layer of filteredLayers; track layer.id) {
+      <article class="layer-catalog__item">
+        <header>
+          <div>
+            <strong>{{ layer.name }}</strong>
+            <span>{{ layer.provider }}</span>
+          </div>
+          <app-source-health-badge [status]="layer.reliability?.status || layer.endpoint_health"></app-source-health-badge>
+        </header>
+        @if (layer.description) {
+          <p>{{ layer.description }}</p>
+        }
+        <footer>
+          @if (layer.requires_credentials && !layer.is_available) {
+            <span>Missing key</span>
+          }
+          <button type="button" (click)="askAgent.emit(layer)">Ask agent</button>
+          @if (canToggle(layer)) {
+            <button type="button" (click)="manualToggle.emit(layer)">Toggle</button>
+          }
+        </footer>
+      </article>
+    }
+  </div>
+</section>

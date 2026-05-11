@@ -24,6 +24,8 @@ REQUIRED_INDEX_FIELDS = {
     "providers_dir",
     "basemaps_dir",
     "overlays_dir",
+    "cameras_dir",
+    "transit_dir",
     "tools_dir",
     "runtime_profiles_file",
     "capability_groups",

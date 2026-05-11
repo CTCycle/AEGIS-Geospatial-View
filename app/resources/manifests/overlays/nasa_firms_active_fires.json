@@ -1,0 +1,64 @@
+{
+  "id": "nasa_firms_active_fires",
+  "name": "NASA FIRMS Active Fires",
+  "provider": "nasa_firms",
+  "type": "vector-overlay",
+  "description": "NASA FIRMS active fire detections for bounded hazard checks.",
+  "capabilities": ["fire", "wildfire", "smoke", "hazard", "current"],
+  "coverage": "global",
+  "metadata": {
+    "label": "NASA FIRMS Active Fires",
+    "requires_key": true,
+    "attribution": "NASA FIRMS",
+    "keywords": ["fire", "wildfire", "active fire", "smoke"],
+    "intent_tags": ["fire", "hazard", "smoke"],
+    "task_tags": ["fire detections", "route safety", "smoke context"],
+    "source_protocol": "CSV API",
+    "data_format": "CSV",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "credential-gated",
+    "auth_mode": "api_key",
+    "official_docs_url": "https://firms.modaps.eosdis.nasa.gov/api/",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": ["https://firms.modaps.eosdis.nasa.gov/api/"],
+  "license": {
+    "name": "NASA FIRMS terms",
+    "url": "https://firms.modaps.eosdis.nasa.gov/api/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "api-key",
+    "required": true,
+    "providerKey": "nasa_firms",
+    "accessPageProviderId": "nasa"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": ["fire", "wildfire", "smoke", "active fire"],
+    "requiredUserIntent": ["fire", "hazard", "freshness"],
+    "avoidWhen": ["general chat", "no geographic context"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": ["Requires NASA FIRMS map key and bounded requests for responsible usage."]
+  },
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 1800, "staleWhileRevalidateSeconds": 3600},
+  "normalization": {
+    "geometryPath": "latitude,longitude",
+    "idPath": "source,latitude,longitude,acq_date,acq_time",
+    "timestampPath": "acq_date,acq_time",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  }
+}
