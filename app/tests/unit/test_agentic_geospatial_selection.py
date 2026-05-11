@@ -7,6 +7,8 @@ from server.domain.extraction.models import (
     TurnParseResult,
 )
 from server.services.agent.manifest_intent_resolver import ManifestIntentResolver
+from server.services.agent.manifest_intent_resolver import UserCapabilityAccess
+from server.services.agent.manifest_intent_resolver import select_geospatial_capabilities
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
@@ -99,3 +101,49 @@ def test_agentic_selection_picks_phase8_sources() -> None:
     assert "openchargemap_ev_charging" in charging.overlay_ids
     assert "opentripmap_tourism_pois" in tourism.overlay_ids
     assert "ourairports_airports" in airport.overlay_ids
+
+
+def test_select_geospatial_capabilities_gates_missing_location() -> None:
+    selected = select_geospatial_capabilities(
+        "show flood zones",
+        resolved_location=None,
+        bbox=None,
+        time_context=None,
+        user_permissions=UserCapabilityAccess(),
+    )
+
+    assert selected[0].status == "needs-location"
+
+
+def test_select_geospatial_capabilities_refuses_every_layer() -> None:
+    selected = select_geospatial_capabilities(
+        "show every possible map layer",
+        resolved_location=object(),
+        bbox=(12.0, 41.0, 13.0, 42.0),
+        time_context=None,
+        user_permissions=UserCapabilityAccess(),
+    )
+
+    assert selected == [
+        selected[0].__class__(
+            capability_id="category_offer",
+            status="refused",
+            reason="Indiscriminate layer loading is blocked; offer categories instead.",
+        )
+    ]
+
+
+def test_select_geospatial_capabilities_reports_missing_provider_key() -> None:
+    selected = select_geospatial_capabilities(
+        "show tourism attractions nearby",
+        resolved_location=object(),
+        bbox=(12.0, 41.0, 13.0, 42.0),
+        time_context=None,
+        user_permissions=UserCapabilityAccess(),
+    )
+
+    assert any(
+        item.capability_id == "opentripmap_tourism_pois"
+        and item.status == "missing-credential"
+        for item in selected
+    )

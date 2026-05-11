@@ -83,6 +83,8 @@ Selection rules:
 - Amenity requests select POI/search-index capabilities, not every available geographic layer.
 - Missing credentials do not crash the turn; the runtime returns access-needed state and should prefer public alternatives where possible.
 - Broken or metadata-only capabilities are not exposed as normal renderable toggles.
+- `select_geospatial_capabilities(user_query, resolved_location, bbox, time_context, user_permissions)` is the explicit selector for capability gating. It returns selected, missing-credential, unhealthy, privacy-gated, needs-location, or refused decisions before execution.
+- Requests to show every possible layer are refused as indiscriminate loading and should be answered with a concise category offer.
 
 ## Runtime and Coverage
 

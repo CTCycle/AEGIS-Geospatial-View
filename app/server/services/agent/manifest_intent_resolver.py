@@ -44,6 +44,20 @@ class ManifestResolution:
     concepts: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class UserCapabilityAccess:
+    configured_providers: set[str] = field(default_factory=set)
+    allow_expensive: bool = False
+    allow_privacy_sensitive: bool = False
+
+
+@dataclass(frozen=True)
+class SelectedCapability:
+    capability_id: str
+    status: str
+    reason: str
+
+
 class ManifestIntentResolver:
     OVERLAY_EXCLUDED_CONCEPTS = {
         "a",
@@ -472,3 +486,162 @@ class ManifestIntentResolver:
         ):
             return "location_to_coordinates"
         return None
+
+
+def select_geospatial_capabilities(
+    user_query: str,
+    resolved_location: object | None,
+    bbox: tuple[float, float, float, float] | None,
+    time_context: object | None,
+    user_permissions: UserCapabilityAccess,
+) -> list[SelectedCapability]:
+    del time_context
+    query_tokens = _tokenize(user_query)
+    if not query_tokens.intersection(_GEOSPATIAL_TRIGGER_TOKENS):
+        return []
+    if query_tokens.intersection({"all", "every", "everything"}) and query_tokens.intersection(
+        {"layer", "layers", "map", "maps"}
+    ):
+        return [
+            SelectedCapability(
+                capability_id="category_offer",
+                status="refused",
+                reason="Indiscriminate layer loading is blocked; offer categories instead.",
+            )
+        ]
+    if resolved_location is None and bbox is None:
+        return [
+            SelectedCapability(
+                capability_id="geographic_context",
+                status="needs-location",
+                reason="A location or bbox is required before selecting geospatial capabilities.",
+            )
+        ]
+
+    registry = CapabilityRegistry()
+    registry.load_capabilities()
+    manifests = [
+        *registry.list_basemaps(),
+        *registry.list_overlays(),
+        *registry.list_cameras(),
+        *registry.list_transit(),
+        *registry.list_tools(),
+    ]
+    available_ids = {str(item.get("id")) for item in manifests}
+    turn = _synthetic_turn(user_query, sorted(query_tokens), resolved_location)
+    resolution = ManifestIntentResolver().resolve(
+        turn=turn,
+        capability_registry=registry,
+        available_ids=available_ids,
+    )
+    manifest_by_id = {str(item.get("id")): item for item in manifests}
+    selected: list[SelectedCapability] = []
+    for capability_id in resolution.overlay_ids:
+        selected.append(
+            _gate_selected_capability(
+                capability_id=capability_id,
+                manifest=manifest_by_id.get(capability_id, {}),
+                user_permissions=user_permissions,
+            )
+        )
+    return selected
+
+
+def _gate_selected_capability(
+    *,
+    capability_id: str,
+    manifest: dict[str, object],
+    user_permissions: UserCapabilityAccess,
+) -> SelectedCapability:
+    auth = manifest.get("auth") if isinstance(manifest.get("auth"), dict) else {}
+    reliability = (
+        manifest.get("reliability") if isinstance(manifest.get("reliability"), dict) else {}
+    )
+    provider = str(auth.get("providerKey") or manifest.get("provider") or "")
+    if auth.get("required") and provider not in user_permissions.configured_providers:
+        return SelectedCapability(
+            capability_id=capability_id,
+            status="missing-credential",
+            reason=f"{provider} credentials are required.",
+        )
+    if str(reliability.get("status")) in {"broken", "disabled"}:
+        return SelectedCapability(
+            capability_id=capability_id,
+            status="unhealthy",
+            reason="Capability is not healthy enough for automatic selection.",
+        )
+    if "parcel" in capability_id and not user_permissions.allow_privacy_sensitive:
+        return SelectedCapability(
+            capability_id=capability_id,
+            status="privacy-gated",
+            reason="Parcel datasets require privacy-sensitive data permission.",
+        )
+    return SelectedCapability(
+        capability_id=capability_id,
+        status="selected",
+        reason="Matched user query and geographic context.",
+    )
+
+
+def _synthetic_turn(
+    user_query: str, tags: list[str], resolved_location: object | None
+) -> TurnParseResult:
+    from server.domain.extraction.models import (
+        ConversationContextSnapshot,
+        LocationSignal,
+        NormalizedIntent,
+    )
+
+    location_signals = []
+    latitude = getattr(resolved_location, "latitude", None)
+    longitude = getattr(resolved_location, "longitude", None)
+    if isinstance(latitude, int | float) and isinstance(longitude, int | float):
+        location_signals.append(
+            LocationSignal(
+                signal_type="coordinates",
+                raw_value=f"{latitude},{longitude}",
+                latitude=float(latitude),
+                longitude=float(longitude),
+                confidence=1.0,
+            )
+        )
+    return TurnParseResult(
+        user_text=user_query,
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        location_signals=location_signals,
+        normalized_intent=NormalizedIntent(
+            intent_id="_".join(tags) or "map",
+            intent_label=user_query,
+            task_tags=tags,
+            intent_tags=tags,
+            requested_visualizations=tags,
+            requires_location=True,
+        ),
+        parser_confidence=1.0,
+    )
+
+
+_GEOSPATIAL_TRIGGER_TOKENS = {
+    "amenities",
+    "camera",
+    "cameras",
+    "current",
+    "demographics",
+    "fire",
+    "flood",
+    "live",
+    "map",
+    "near",
+    "nearby",
+    "overlay",
+    "poi",
+    "route",
+    "satellite",
+    "show",
+    "traffic",
+    "transit",
+    "weather",
+    "webcam",
+    "webcams",
+}
