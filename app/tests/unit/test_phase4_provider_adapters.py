@@ -181,6 +181,47 @@ def test_tomtom_and_geoapify_require_keys_before_emitting_urls() -> None:
         )
 
 
+def test_tomtom_provider_normalizes_live_incidents() -> None:
+    calls: list[str] = []
+
+    async def fetcher(url: str, headers: dict[str, str] | None = None):
+        calls.append(url)
+        return {
+            "incidents": [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [[12.5, 41.9], [12.6, 42.0]],
+                    },
+                    "properties": {
+                        "id": "incident-1",
+                        "iconCategory": 6,
+                        "magnitudeOfDelay": 2,
+                        "events": [{"description": "Lane closed"}],
+                        "roadNumbers": ["A1"],
+                        "delay": 120,
+                    },
+                }
+            ]
+        }
+
+    response = asyncio.run(
+        TomTomProvider(api_key="tomtom-test", fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="tomtom_traffic_incidents",
+                bbox=(12.0, 41.0, 13.0, 42.0),
+            )
+        )
+    )
+
+    assert "key=tomtom-test" in calls[0]
+    assert "bbox=12.0%2C41.0%2C13.0%2C42.0" in calls[0]
+    assert response.payload["renderingMode"] == "clustered-points"
+    assert response.payload["features"][0]["name"] == "Lane closed"
+    assert response.payload["features"][0]["metadata"]["roadNumbers"] == ["A1"]
+
+
 def test_provider_registry_binds_phase4_adapters_from_manifests() -> None:
     registry = ProviderRegistry()
 
