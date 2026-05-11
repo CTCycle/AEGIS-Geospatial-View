@@ -77,6 +77,12 @@ export class LayerCatalogComponent {
     if (category === 'cameras') {
       return haystack.includes('camera') || haystack.includes('webcam');
     }
+    if (category === 'hazards') {
+      return haystack.includes('hazard') || haystack.includes('risk');
+    }
+    if (category === 'amenities') {
+      return haystack.includes('amenity') || haystack.includes('poi') || haystack.includes('places');
+    }
     return haystack.includes(category);
   }
 }
