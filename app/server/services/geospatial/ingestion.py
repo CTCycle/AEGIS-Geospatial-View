@@ -150,7 +150,11 @@ def execute_ingestion_plan(
     if expected_format == "csv":
         normalized_file, feature_count = _normalize_csv(plan, raw_file, normalized_dir)
     elif expected_format == "geojson":
-        normalized_file, feature_count = _normalize_geojson(plan, raw_file, normalized_dir)
+        normalized_file, feature_count, invalid_count = _normalize_geojson(
+            plan, raw_file, normalized_dir
+        )
+        if invalid_count:
+            warnings.append(f"Dropped {invalid_count} GeoJSON feature(s) with invalid geometry.")
     else:
         warnings.append(
             f"{plan.expected_format} normalization requires optional geospatial ingestion dependencies."
@@ -296,13 +300,20 @@ def _normalize_csv(
 
 def _normalize_geojson(
     plan: DatasetIngestionPlan, raw_file: Path, normalized_dir: Path
-) -> tuple[Path, int]:
+) -> tuple[Path, int, int]:
     output = normalized_dir / f"{plan.capability_id}.geojson"
     payload = json.loads(raw_file.read_text(encoding="utf-8"))
     if payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
         raise IngestionExecutionError("GeoJSON source must be a FeatureCollection.")
-    _write_json(output, payload)
-    return output, len(payload["features"])
+    valid_features = []
+    invalid_count = 0
+    for feature in payload["features"]:
+        if not isinstance(feature, dict) or not _valid_geometry(feature.get("geometry")):
+            invalid_count += 1
+            continue
+        valid_features.append(feature)
+    _write_json(output, {"type": "FeatureCollection", "features": valid_features})
+    return output, len(valid_features), invalid_count
 
 
 def _first_float(row: dict[str, str], field_names: tuple[str, ...]) -> float | None:
@@ -337,10 +348,13 @@ def _write_spatial_index(normalized_file: Path, normalized_dir: Path) -> Path:
     bounds = [180.0, 90.0, -180.0, -90.0]
     for feature in payload.get("features", []):
         coordinates = feature.get("geometry", {}).get("coordinates")
-        if not _is_point(coordinates):
-            continue
-        lon, lat = float(coordinates[0]), float(coordinates[1])
-        bounds = [min(bounds[0], lon), min(bounds[1], lat), max(bounds[2], lon), max(bounds[3], lat)]
+        for lon, lat in _iter_coordinate_pairs(coordinates):
+            bounds = [
+                min(bounds[0], lon),
+                min(bounds[1], lat),
+                max(bounds[2], lon),
+                max(bounds[3], lat),
+            ]
     if bounds == [180.0, 90.0, -180.0, -90.0]:
         bounds = [-180.0, -90.0, 180.0, 90.0]
     output = normalized_dir / "spatial_index.json"
@@ -385,6 +399,60 @@ def _is_point(value: Any) -> bool:
     return isinstance(value, list) and len(value) >= 2 and all(
         isinstance(item, int | float) for item in value[:2]
     )
+
+
+def _valid_geometry(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    geometry_type = str(value.get("type") or "")
+    coordinates = value.get("coordinates")
+    if geometry_type == "Point":
+        return _is_coordinate_pair(coordinates)
+    if geometry_type == "LineString":
+        return isinstance(coordinates, list) and any(
+            _is_coordinate_pair(item) for item in coordinates
+        )
+    if geometry_type == "Polygon":
+        return isinstance(coordinates, list) and any(
+            isinstance(ring, list) and any(_is_coordinate_pair(item) for item in ring)
+            for ring in coordinates
+        )
+    if geometry_type == "MultiPoint":
+        return isinstance(coordinates, list) and any(
+            _is_coordinate_pair(item) for item in coordinates
+        )
+    if geometry_type == "MultiLineString":
+        return isinstance(coordinates, list) and any(
+            isinstance(line, list) and any(_is_coordinate_pair(item) for item in line)
+            for line in coordinates
+        )
+    if geometry_type == "MultiPolygon":
+        return isinstance(coordinates, list) and any(
+            isinstance(polygon, list)
+            and any(
+                isinstance(ring, list) and any(_is_coordinate_pair(item) for item in ring)
+                for ring in polygon
+            )
+            for polygon in coordinates
+        )
+    return False
+
+
+def _iter_coordinate_pairs(value: Any):
+    if _is_coordinate_pair(value):
+        yield float(value[0]), float(value[1])
+        return
+    if not isinstance(value, list):
+        return
+    for item in value:
+        yield from _iter_coordinate_pairs(item)
+
+
+def _is_coordinate_pair(value: Any) -> bool:
+    if not _is_point(value):
+        return False
+    lon, lat = float(value[0]), float(value[1])
+    return -180 <= lon <= 180 and -90 <= lat <= 90
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
