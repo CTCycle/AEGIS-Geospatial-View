@@ -9,6 +9,7 @@ import {
   parseChatTurnResponse,
   parseModelSettingsResponse,
   parseSearchResponse,
+  fetchGeospatialCameraDetail,
   fetchGeospatialLayerFeatures,
   sendChatTurn,
   streamChatTurn,
@@ -253,5 +254,23 @@ describe('core/api', () => {
     expect(calledUrl).toContain('time=2026-05-11T12%3A00%3A00Z');
     expect(calledUrl).toContain('live=true');
     expect(calledUrl).toContain('incidents=true');
+  });
+
+  it('fetchGeospatialCameraDetail encodes camera identifiers', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        id: 'windy/cam 1',
+        status: 'metadata-unavailable',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await fetchGeospatialCameraDetail('windy/cam 1');
+
+    const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
+    expect(calledUrl).toContain('/geospatial/cameras/windy%2Fcam%201');
   });
 });

@@ -394,6 +394,15 @@ export const fetchGeospatialCameras = async (
   return isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
 };
 
+export const fetchGeospatialCameraDetail = async (cameraId: string): Promise<GeospatialProviderPayload> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}/${encodeURIComponent(cameraId)}`, {
+    method: 'GET',
+  });
+  return isRecord(data)
+    ? data as unknown as GeospatialProviderPayload
+    : { status: 'unavailable', provider: 'unknown' };
+};
+
 export const fetchGeospatialCredentialStatus = async (providerId: string): Promise<GeospatialCredentialStatus> => {
   const data = await executeApiRequest(`${API_BASE_URL}/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`, {
     method: 'GET',
