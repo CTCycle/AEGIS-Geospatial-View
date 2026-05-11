@@ -120,6 +120,74 @@ Limits and restrictions:
 - Coverage depends on station networks and available public data.
 - Observe rate-limit headers and avoid repeated 429 responses.
 
+### OpenTripMap
+
+Use: tourism POIs, attractions, heritage sites, viewpoints, museums, and other travel-oriented places.
+
+Setup:
+
+1. Create or log in to an OpenTripMap account.
+2. Review the [OpenTripMap API documentation](https://opentripmap.io/docs).
+3. Configure `OPENTRIPMAP_API_KEY` or add an OpenTripMap `api_key` credential in Access settings.
+4. Keep requests bounded by resolved location and radius; do not use OpenTripMap for unbounded global layer loading.
+
+Limits and restrictions:
+
+- OpenTripMap is credential-gated and quota-limited.
+- Category selection should be driven by user intent, such as tourism, attractions, heritage, viewpoints, or recreation.
+- If the key is missing, the catalog should show the source as unavailable and the agent should prefer public alternatives where possible.
+
+### Open Charge Map
+
+Use: EV charging station discovery and map rendering.
+
+Setup:
+
+1. Review the [Open Charge Map API documentation](https://openchargemap.org/site/develop/api).
+2. Configure `OPENCHARGEMAP_API_KEY` or add an Open Charge Map `api_key` credential when deployment volume or endpoint policy requires it.
+3. Keep requests bounded by map viewport, radius, and result count.
+4. Review the [Open Charge Map terms](https://openchargemap.org/site/about/terms) before production redistribution.
+
+Limits and restrictions:
+
+- Some usage can work without a key, but higher-volume or production usage should be configured with a provider key.
+- Station availability, status, and connector metadata vary by region and source contribution quality.
+- Cache station metadata and handle empty or stale results without breaking other active layers.
+
+### NREL AFDC
+
+Use: U.S. alternative fuel station discovery, including EV charging and other fuel station categories.
+
+Setup:
+
+1. Request an API key from [NREL Developer Network](https://developer.nrel.gov/).
+2. Review the [AFDC station API documentation](https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/).
+3. Configure `NREL_API_KEY` or add an NREL `api_key` credential in Access settings.
+4. Use the API only for bounded station searches, not whole-country bulk ingestion.
+
+Limits and restrictions:
+
+- NREL AFDC coverage is U.S.-focused.
+- The API key is required for normal backend access.
+- Fuel type, access, and station status should remain visible in normalized feature metadata.
+
+### OurAirports
+
+Use: airport, heliport, seaplane base, and closed-airport reference data through downloadable CSV datasets.
+
+Setup:
+
+1. Review the [OurAirports data downloads](https://ourairports.com/data/).
+2. No API key is required.
+3. Ingest the CSV through the geospatial ingestion pipeline before exposing it as a searchable or renderable airport layer.
+4. Preserve OurAirports attribution and source vintage metadata in generated normalized datasets.
+
+Limits and restrictions:
+
+- This is a downloadable dataset, not a live API.
+- The manifest should remain `dataset-ingestion` until normalized storage, indexing, and tile generation have completed for the target environment.
+- Updates should refresh the raw CSV, normalized point dataset, spatial index, and source timestamp together.
+
 ### NASA GIBS
 
 Use: satellite imagery, land-surface temperature, precipitation, aerosols, ozone, NDVI, fire, nighttime lights, and terrain relief.
