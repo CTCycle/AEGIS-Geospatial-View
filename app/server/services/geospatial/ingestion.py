@@ -123,10 +123,11 @@ def execute_ingestion_plan(
     warnings: list[str] = []
     raw_file = _materialize_source(plan, raw_dir)
     checksum = _sha256(raw_file)
-    if plan.checksum_sha256 and checksum.lower() != plan.checksum_sha256.lower():
+    expected_checksum = plan.checksum_sha256 or _resolve_checksum_url(plan)
+    if expected_checksum and checksum.lower() != expected_checksum.lower():
         raise IngestionExecutionError(
             f"Checksum mismatch for {plan.capability_id}: expected "
-            f"{plan.checksum_sha256}, got {checksum}."
+            f"{expected_checksum}, got {checksum}."
         )
 
     metadata_file = raw_dir / "source_metadata.json"
@@ -138,6 +139,7 @@ def execute_ingestion_plan(
             "sourceTimestamp": datetime.now(UTC).isoformat(),
             "rawFile": str(raw_file),
             "sha256": checksum,
+            "checksumSource": "checksumSha256" if plan.checksum_sha256 else ("checksumUrl" if plan.checksum_url else None),
             "expectedFormat": plan.expected_format,
             "compression": plan.compression,
             "targetCrs": plan.target_crs,
@@ -161,6 +163,7 @@ def execute_ingestion_plan(
         )
 
     _validate_feature_count(plan, feature_count)
+    _validate_bbox_intersection(plan, normalized_file)
     spatial_index_file = (
         _write_spatial_index(normalized_file, normalized_dir) if plan.spatial_index and normalized_file else None
     )
@@ -262,6 +265,27 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _resolve_checksum_url(plan: DatasetIngestionPlan) -> str | None:
+    if not plan.checksum_url:
+        return None
+    parsed = urlparse(plan.checksum_url)
+    if parsed.scheme in {"http", "https"}:
+        with urllib.request.urlopen(plan.checksum_url, timeout=30) as response:
+            text = response.read().decode("utf-8")
+    else:
+        source = Path(parsed.path if parsed.scheme == "file" else plan.checksum_url)
+        if not source.is_absolute():
+            source = Path.cwd() / source
+        if not source.is_file():
+            raise IngestionExecutionError(f"Checksum file does not exist: {source}")
+        text = source.read_text(encoding="utf-8")
+    for token in text.replace("\r", " ").replace("\n", " ").split():
+        candidate = token.strip()
+        if len(candidate) == 64 and all(char in "0123456789abcdefABCDEF" for char in candidate):
+            return candidate
+    raise IngestionExecutionError(f"Checksum URL did not contain a SHA-256 digest for {plan.capability_id}.")
+
+
 def _normalize_csv(
     plan: DatasetIngestionPlan, raw_file: Path, normalized_dir: Path
 ) -> tuple[Path, int]:
@@ -343,8 +367,39 @@ def _validate_feature_count(plan: DatasetIngestionPlan, feature_count: int) -> N
         )
 
 
+def _validate_bbox_intersection(plan: DatasetIngestionPlan, normalized_file: Path | None) -> None:
+    validation = plan.validation or {}
+    expected_bbox = validation.get("bboxMustIntersect")
+    if expected_bbox is None or normalized_file is None:
+        return
+    if (
+        not isinstance(expected_bbox, list)
+        or len(expected_bbox) != 4
+        or not all(isinstance(item, int | float) for item in expected_bbox)
+    ):
+        raise IngestionExecutionError("validation.bboxMustIntersect must contain four numbers.")
+    payload = json.loads(normalized_file.read_text(encoding="utf-8"))
+    feature_bbox = _feature_collection_bounds(payload)
+    if feature_bbox is None:
+        return
+    if not _bboxes_intersect(feature_bbox, [float(item) for item in expected_bbox]):
+        raise IngestionExecutionError(
+            f"{plan.capability_id} normalized bbox {feature_bbox} does not intersect "
+            f"required bbox {expected_bbox}."
+        )
+
+
 def _write_spatial_index(normalized_file: Path, normalized_dir: Path) -> Path:
     payload = json.loads(normalized_file.read_text(encoding="utf-8"))
+    bounds = _feature_collection_bounds(payload)
+    if bounds is None:
+        bounds = [-180.0, -90.0, 180.0, 90.0]
+    output = normalized_dir / "spatial_index.json"
+    _write_json(output, {"bbox": bounds, "indexType": "bbox-summary"})
+    return output
+
+
+def _feature_collection_bounds(payload: dict[str, Any]) -> list[float] | None:
     bounds = [180.0, 90.0, -180.0, -90.0]
     for feature in payload.get("features", []):
         coordinates = feature.get("geometry", {}).get("coordinates")
@@ -356,10 +411,17 @@ def _write_spatial_index(normalized_file: Path, normalized_dir: Path) -> Path:
                 max(bounds[3], lat),
             ]
     if bounds == [180.0, 90.0, -180.0, -90.0]:
-        bounds = [-180.0, -90.0, 180.0, 90.0]
-    output = normalized_dir / "spatial_index.json"
-    _write_json(output, {"bbox": bounds, "indexType": "bbox-summary"})
-    return output
+        return None
+    return bounds
+
+
+def _bboxes_intersect(left: list[float], right: list[float]) -> bool:
+    return not (
+        left[2] < right[0]
+        or right[2] < left[0]
+        or left[3] < right[1]
+        or right[3] < left[1]
+    )
 
 
 def _write_text_index(normalized_file: Path, normalized_dir: Path) -> Path:

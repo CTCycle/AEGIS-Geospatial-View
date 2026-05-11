@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from server.services.geospatial.ingestion import (
@@ -111,6 +112,25 @@ def test_execute_ingestion_plan_rejects_checksum_mismatch(tmp_path) -> None:
         raise AssertionError("Checksum mismatch did not fail ingestion.")
 
 
+def test_execute_ingestion_plan_accepts_checksum_url(tmp_path) -> None:
+    source = tmp_path / "source.geojson"
+    source.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    checksum = hashlib.sha256(source.read_bytes()).hexdigest()
+    checksum_file = tmp_path / "source.sha256"
+    checksum_file.write_text(f"{checksum}  source.geojson\n", encoding="utf-8")
+    manifest = _manifest()
+    manifest["download"]["sourceUrl"] = str(source)
+    manifest["download"]["expectedFormat"] = "geojson"
+    manifest["download"]["checksumUrl"] = str(checksum_file)
+    manifest["validation"] = {"minFeatureCount": 0}
+    plan = build_ingestion_plan(manifest)
+
+    result = execute_ingestion_plan(plan, workspace_root=tmp_path)
+
+    assert result.feature_count == 0
+    assert '"checksumSource": "checksumUrl"' in Path(result.metadata_file).read_text(encoding="utf-8")
+
+
 def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None:
     source = tmp_path / "source.geojson"
     source.write_text(
@@ -151,3 +171,39 @@ def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None
     assert "Dropped 1 GeoJSON feature" in result.warnings[0]
     assert result.spatial_index_file is not None
     assert '"bbox": [' in Path(result.spatial_index_file).read_text(encoding="utf-8")
+
+
+def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
+    source = tmp_path / "source.geojson"
+    source.write_text(
+        """
+        {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "id": "outside",
+              "properties": {"name": "Outside"},
+              "geometry": {"type": "Point", "coordinates": [7.0, 45.0]}
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    manifest = _manifest()
+    manifest["download"]["sourceUrl"] = str(source)
+    manifest["download"]["expectedFormat"] = "geojson"
+    manifest["download"]["compression"] = "none"
+    manifest["validation"] = {
+        "minFeatureCount": 1,
+        "bboxMustIntersect": [-125.0, 24.0, -66.0, 49.0],
+    }
+    plan = build_ingestion_plan(manifest)
+
+    try:
+        execute_ingestion_plan(plan, workspace_root=tmp_path)
+    except RuntimeError as exc:
+        assert "does not intersect" in str(exc)
+    else:
+        raise AssertionError("Non-intersecting bbox did not fail ingestion.")
