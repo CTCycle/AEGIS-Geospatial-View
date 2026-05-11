@@ -69,6 +69,7 @@
               "zone.js/testing"
             ],
             "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.cjs",
             "styles": [
               "src/styles.css"
             ]
