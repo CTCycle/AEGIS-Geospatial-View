@@ -217,6 +217,41 @@ def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch
     assert "geoapify-test" in str(geoapify.payload["tileUrl"])
 
 
+def test_geoapify_provider_normalizes_live_places() -> None:
+    calls: list[str] = []
+
+    async def fetcher(url: str, headers: dict[str, str] | None = None):
+        calls.append(url)
+        return {
+            "features": [
+                {
+                    "properties": {
+                        "place_id": "poi-1",
+                        "name": "Clinic",
+                        "categories": ["healthcare.clinic"],
+                        "formatted": "1 Test Street",
+                    },
+                    "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
+                }
+            ]
+        }
+
+    response = asyncio.run(
+        GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="geoapify_amenities",
+                bbox=(12.0, 41.0, 13.0, 42.0),
+                params={"live": True, "categories": "healthcare"},
+            )
+        )
+    )
+
+    assert "apiKey=geoapify-test" in calls[0]
+    assert "filter=rect%3A12.0%2C42.0%2C13.0%2C41.0" in calls[0]
+    assert response.payload["totalResults"] == 1
+    assert response.payload["features"][0]["source"] == "geoapify"
+
+
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
     response = asyncio.run(
         NASAGIBSProvider().fetch(
