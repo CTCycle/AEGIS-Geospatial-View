@@ -20,8 +20,8 @@
     "metadata-only"
   ],
   "health_summary": {
-    "functional": 24,
-    "partial": 37,
+    "functional": 25,
+    "partial": 40,
     "broken": 0,
     "disabled": 0,
     "unknown": 6

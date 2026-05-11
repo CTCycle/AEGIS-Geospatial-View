@@ -1,0 +1,64 @@
+{
+  "id": "opentripmap_tourism_pois",
+  "name": "OpenTripMap Tourism POIs",
+  "provider": "opentripmap",
+  "type": "search-index",
+  "description": "Credential-gated tourism, heritage, outdoor, and attraction points for bounded area discovery.",
+  "capabilities": ["tourism", "attractions", "heritage", "search-index", "poi"],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "Tourism POIs",
+    "requires_key": true,
+    "attribution": "OpenTripMap",
+    "keywords": ["tourism", "attraction", "heritage", "viewpoint", "museum"],
+    "intent_tags": ["tourism", "poi", "attraction"],
+    "task_tags": ["find attractions", "tourism context", "heritage sites"],
+    "source_protocol": "JSON API",
+    "data_format": "GeoJSON",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "credential-gated",
+    "auth_mode": "api_key",
+    "official_docs_url": "https://opentripmap.io/docs",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "search-index",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": ["https://opentripmap.io/docs"],
+  "license": {
+    "name": "OpenTripMap terms",
+    "url": "https://opentripmap.io/docs",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "api-key",
+    "required": true,
+    "providerKey": "opentripmap",
+    "accessPageProviderId": "opentripmap"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": ["tourism", "attraction", "heritage", "viewpoint", "museum"],
+    "requiredUserIntent": ["tourism", "poi", "nearby"],
+    "avoidWhen": ["general chat", "no geographic context"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": ["Requires OpenTripMap API key and category-specific quota controls."]
+  },
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 86400, "staleWhileRevalidateSeconds": 604800},
+  "normalization": {
+    "geometryPath": "features[].geometry.coordinates",
+    "idPath": "features[].properties.xid",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  }
+}
