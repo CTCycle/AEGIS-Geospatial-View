@@ -96,11 +96,12 @@ async def get_geospatial_cameras(
     return await _fetch_provider_payload(provider_id, request)
 
 
-@router.get("/cameras/{camera_id}", status_code=status.HTTP_200_OK)
+@router.get("/cameras/{camera_id:path}", status_code=status.HTTP_200_OK)
 async def get_geospatial_camera(camera_id: str) -> dict[str, Any]:
     return {
         "id": camera_id,
         "status": "metadata-unavailable",
+        "provider": "unknown",
         "message": "Camera detail lookup requires a configured camera provider response.",
     }
 
