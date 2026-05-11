@@ -5,6 +5,7 @@ import math
 import os
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlencode
 from urllib.request import urlopen
 
 from server.domain.geographics import LocationSearchRequest, MapSession
@@ -102,13 +103,17 @@ class LocationSearchOrchestrator:
         rendering_mode = str(capability.get("renderingMode") or "")
         capability_kind = str(capability.get("capabilityKind") or "")
         if capability_kind == "camera-network":
+            camera_params = {
+                "provider": str(capability.get("provider") or "unknown"),
+                "bbox": self._bbox_query_value(payload),
+            }
             return {
                 "id": str(capability.get("id") or overlay_id),
                 "label": str(metadata.get("label") or capability.get("name") or overlay_id),
                 "provider": str(capability.get("provider") or "unknown"),
                 "type": "camera-points",
                 "rendering_mode": "camera-points",
-                "url": f"/api/geospatial/cameras?provider={capability.get('provider')}",
+                "url": f"/api/geospatial/cameras?{urlencode(camera_params)}",
                 "attribution": str(metadata.get("attribution") or ""),
                 "source_protocol": metadata.get("source_protocol"),
                 "data_format": metadata.get("data_format"),
@@ -126,7 +131,7 @@ class LocationSearchOrchestrator:
                 "provider": str(capability.get("provider") or "unknown"),
                 "type": str(capability.get("type") or rendering_mode),
                 "rendering_mode": rendering_mode,
-                "url": f"/api/geospatial/layers/{overlay_id}/features",
+                "url": self._feature_endpoint_url(overlay_id, payload=payload),
                 "attribution": str(metadata.get("attribution") or ""),
                 "source_protocol": metadata.get("source_protocol"),
                 "data_format": metadata.get("data_format"),
@@ -194,6 +199,19 @@ class LocationSearchOrchestrator:
         if "{lon}" in template:
             template = template.replace("{lon}", str(payload.viewport.center_longitude))
         return template
+
+    def _feature_endpoint_url(
+        self, overlay_id: str, *, payload: LocationSearchRequest
+    ) -> str:
+        params = {
+            "bbox": self._bbox_query_value(payload),
+            "live": "true",
+        }
+        return f"/api/geospatial/layers/{overlay_id}/features?{urlencode(params)}"
+
+    def _bbox_query_value(self, payload: LocationSearchRequest) -> str:
+        bounds = payload.viewport.bbox or self._bounds_from_viewport(payload.viewport) or []
+        return ",".join(str(round(float(item), 6)) for item in bounds)
 
     @staticmethod
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:

@@ -225,6 +225,7 @@ def test_location_search_orchestrator_uses_point_insight_for_direct_text_overlay
         "label": "Open-Meteo Weather Forecast",
         "provider": "openmeteo",
         "type": "point-insight",
+        "rendering_mode": "metadata-only",
         "attribution": "© Open-Meteo",
         "default_opacity": 0.72,
         "source_protocol": "JSON time series",
@@ -232,6 +233,42 @@ def test_location_search_orchestrator_uses_point_insight_for_direct_text_overlay
         "geometry_type": "regional/time-series",
     }
     assert session.compliance_warnings == []
+
+
+def test_location_search_orchestrator_adds_bbox_to_live_feature_endpoints() -> None:
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Rome",
+            latitude=41.9,
+            longitude=12.5,
+        ),
+        intent_id="air_quality_nearby",
+        time_mode="current",
+        basemap_id="osm_default",
+        overlay_ids=["openaq_air_quality", "windy_webcams"],
+        viewport={
+            "center_latitude": 41.9,
+            "center_longitude": 12.5,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": True,
+            "high_contrast": False,
+            "show_legend": True,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    openaq = next(overlay for overlay in session.overlays if overlay["id"] == "openaq_air_quality")
+    webcams = next(overlay for overlay in session.overlays if overlay["id"] == "windy_webcams")
+    assert str(openaq["url"]).startswith("/api/geospatial/layers/openaq_air_quality/features?")
+    assert "live=true" in str(openaq["url"])
+    assert "bbox=" in str(openaq["url"])
+    assert str(webcams["url"]).startswith("/api/geospatial/cameras?")
+    assert "provider=windy_webcams" in str(webcams["url"])
+    assert "bbox=" in str(webcams["url"])
 
 
 def test_location_search_orchestrator_warns_on_rainviewer_fallback(monkeypatch) -> None:
