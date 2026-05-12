@@ -85,6 +85,8 @@ jobs:
         run: |
           python -m pytest -c app/server/pyproject.toml \
             app/tests/unit/test_manifest_schema_v2.py \
+            app/tests/unit/test_geospatial_implementation_completeness.py \
+            app/tests/unit/test_geospatial_plan_completion_surface.py \
             app/tests/unit/test_provider_registry.py \
             app/tests/unit/test_phase4_provider_adapters.py \
             app/tests/unit/test_phase8_provider_adapters.py \
