@@ -57,6 +57,51 @@ jobs:
         working-directory: app/client
         run: npm run test:e2e:geospatial
 
+  playwright-visual-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/client/package-lock.json
+
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "app/server[test]"
+          python -m playwright install --with-deps chromium
+
+      - name: Install frontend dependencies
+        working-directory: app/client
+        run: npm ci
+
+      - name: Start frontend preview
+        working-directory: app/client
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 7861 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:7861 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Frontend preview did not start in time" >&2
+          exit 1
+
+      - name: Run Playwright screenshot-diff suite
+        run: |
+          python -m pytest -c app/server/pyproject.toml app/tests/e2e/test_geospatial_visual_regressions.py -q
+
   capability-contract-validation:
     runs-on: ubuntu-latest
     steps:
@@ -96,6 +141,7 @@ jobs:
             app/tests/unit/test_gtfs_providers.py \
             app/tests/unit/test_hazard_provider_adapters.py \
             app/tests/unit/test_regional_provider_adapters.py \
+            app/tests/unit/test_geospatial_materialization_runner.py \
             app/tests/unit/test_agentic_geospatial_selection.py \
             app/tests/unit/test_geospatial_e2e_scenarios.py
 
