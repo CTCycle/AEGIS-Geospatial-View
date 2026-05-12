@@ -95,6 +95,7 @@ jobs:
             app/tests/unit/test_geospatial_api_contracts.py \
             app/tests/unit/test_gtfs_providers.py \
             app/tests/unit/test_hazard_provider_adapters.py \
+            app/tests/unit/test_regional_provider_adapters.py \
             app/tests/unit/test_agentic_geospatial_selection.py \
             app/tests/unit/test_geospatial_e2e_scenarios.py
 

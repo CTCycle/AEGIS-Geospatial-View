@@ -31,6 +31,10 @@ This document records progress against the AEGIS Geographic Intelligence complet
   - Realtime parser normalizes vehicles, service alerts, trip updates, feed timestamp, and vehicle rendering freshness.
   - Stale realtime feeds preserve metadata but suppress vehicle rendering.
 - Confirmed dataset ingestion support already covers source materialization, checksum validation, source timestamp records, CSV/GeoJSON normalization, invalid geometry dropping, spatial/text indexes, tile manifests, and health records.
+- Added concrete provider bindings for EEA, ESA, and Eurostat.
+  - EEA now returns a WMS descriptor with layer, bounds, legend, freshness label, and attribution.
+  - ESA now returns a WMTS descriptor for WorldCover with layer, tile matrix set, legend, freshness label, and attribution.
+  - Eurostat now returns metadata-only statistical descriptors until NUTS geometry joins are materialized, and a dataset-ingestion descriptor for NUTS geometry.
 - Added and expanded unit tests for implementation completeness, provider adapters, RainViewer, GTFS, ingestion surfaces, and manifest status truthfulness.
 
 ## Validation Evidence
@@ -41,6 +45,8 @@ The following checks passed after this increment:
   - Result: 79 manifests, 0 errors.
 - `.\app\server\.venv\Scripts\python.exe -m pytest -c app/server/pyproject.toml app/tests/unit/test_manifest_schema_v2.py app/tests/unit/test_provider_registry.py app/tests/unit/test_geospatial_plan_completion_surface.py app/tests/unit/test_geospatial_api_contracts.py app/tests/unit/test_agentic_geospatial_selection.py app/tests/unit/test_geospatial_implementation_completeness.py app/tests/unit/test_phase4_provider_adapters.py app/tests/unit/test_gtfs_providers.py app/tests/unit/services/geospatial -q`
   - Result: 84 passed.
+- `.\app\server\.venv\Scripts\python.exe -m pytest -c app/server/pyproject.toml app/tests/unit/test_regional_provider_adapters.py app/tests/unit/test_geospatial_implementation_completeness.py -q`
+  - Result: 7 passed.
 - `npm run build`
   - Result: passed.
 - `npm run test:e2e:geospatial`
@@ -51,7 +57,7 @@ For Windows local runs, pytest was executed with `TEMP` and `TMP` pointed at a r
 ## Known Remaining Gaps
 
 - Some raster/documented-service providers still return descriptor payloads rather than performing live service validation at request time. They are renderable, but not all have live timeout/malformed/stale tests.
-- EEA, ESA, Eurostat NUTS, and some statistical join capabilities still need fuller provider-specific fetch/normalize/render tests before they should be treated as end-to-end complete.
+- EEA, ESA, Eurostat NUTS, and Eurostat statistical joins now have provider bindings and unit coverage, but still need live availability checks, stale/error handling, and screenshot-backed browser validation.
 - Dataset-ingestion sources such as Natural Earth, OpenAddresses, Overture, OurAirports, and local parcel templates correctly remain partial or ingestion-gated until real source material is materialized in an environment.
 - GTFS live feed fetching remains adapter/configuration dependent; current work covers static ZIP parsing, realtime protobuf/decoded normalization, and freshness policy.
 - Visual browser validation is currently scenario-catalog and smoke-test based. More screenshot/assertion depth is still needed for every layer family listed in the original plan.

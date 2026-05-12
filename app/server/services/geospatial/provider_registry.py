@@ -179,6 +179,18 @@ class ProviderRegistry:
             )
 
             return NASAGIBSProvider()
+        if provider_id == "eea":
+            from server.services.geospatial.providers.eea import EEAProvider
+
+            return EEAProvider()
+        if provider_id == "esa":
+            from server.services.geospatial.providers.esa import ESAProvider
+
+            return ESAProvider()
+        if provider_id == "eurostat":
+            from server.services.geospatial.providers.eurostat import EurostatProvider
+
+            return EurostatProvider()
         if provider_id == "rainviewer":
             from server.services.geospatial.providers.rainviewer import (
                 RainViewerProvider,
