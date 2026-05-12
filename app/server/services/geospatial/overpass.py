@@ -22,6 +22,10 @@ class OverpassRequestError(OverpassServiceError):
     """Raised when Overpass cannot fulfill a request."""
 
 
+class OverpassRateLimitError(OverpassServiceError):
+    """Raised when Overpass rejects a request due to rate limits."""
+
+
 class OverpassService:
     DEFAULT_AMENITIES = (
         "cafe",
@@ -184,7 +188,11 @@ class OverpassService:
         try:
             with urlopen(request, timeout=self.timeout_s) as response:
                 body = response.read().decode("utf-8")
-        except (HTTPError, URLError, TimeoutError) as exc:
+        except HTTPError as exc:
+            if exc.code == 429:
+                raise OverpassRateLimitError("Overpass rate limit exceeded.") from exc
+            raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
+        except (URLError, TimeoutError) as exc:
             raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
         try:
             data = json.loads(body)

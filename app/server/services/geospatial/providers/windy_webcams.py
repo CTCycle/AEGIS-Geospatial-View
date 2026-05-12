@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from server.services.geospatial.normalizers import (
@@ -20,6 +21,7 @@ from server.services.geospatial.providers.http import (
 )
 
 WINDY_WEBCAMS_ENDPOINT = "https://api.windy.com/webcams/api/v3/webcams"
+STALE_CAMERA_AFTER = timedelta(hours=24)
 
 
 class WindyWebcamsProvider(GeospatialProvider):
@@ -126,19 +128,28 @@ def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
     official_url = _first_nested_url(urls, ("detail", "web", "provider")) or str(
         item.get("url") or ""
     )
+    last_update_time = item.get("lastUpdatedOn") or item.get("last_update_time")
+    preview_image_url = _preview_image_url(images)
+    embedding_allowed = _embedding_allowed(item, player)
     return {
         "id": item.get("webcamId") or item.get("id"),
         "name": item.get("title") or item.get("name"),
         "latitude": location.get("latitude") or item.get("latitude"),
         "longitude": location.get("longitude") or item.get("longitude"),
         "official_url": official_url,
-        "preview_image_url": _first_nested_url(
-            images, ("current", "preview", "thumbnail", "daylight")
+        "preview_image_url": preview_image_url,
+        "embed_url": (
+            _first_nested_url(player, ("day", "month", "lifetime"))
+            if embedding_allowed
+            else None
         ),
-        "embed_url": _first_nested_url(player, ("day", "month", "lifetime")),
-        "embedding_allowed": False,
-        "last_update_time": item.get("lastUpdatedOn") or item.get("last_update_time"),
-        "stale": bool(item.get("status") == "inactive"),
+        "embedding_allowed": embedding_allowed,
+        "last_update_time": last_update_time,
+        "stale": bool(item.get("status") == "inactive")
+        or _is_stale_timestamp(last_update_time),
+        "preview_expired": preview_image_url is None
+        and _first_nested_url(images, ("current", "preview", "thumbnail", "daylight"))
+        is not None,
         "source_payload": item,
     }
 
@@ -155,3 +166,55 @@ def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
             if isinstance(nested, str) and nested:
                 return nested
     return None
+
+
+def _preview_image_url(images: object) -> str | None:
+    if not isinstance(images, dict):
+        return None
+    for key in ("current", "preview", "thumbnail", "daylight"):
+        value = images.get(key)
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(value, dict):
+            if _is_expired_timestamp(value.get("expiresAt") or value.get("expires_at")):
+                continue
+            nested = value.get("url")
+            if isinstance(nested, str) and nested:
+                return nested
+    return None
+
+
+def _embedding_allowed(item: dict[str, object], player: object) -> bool:
+    if item.get("embedding_allowed") is True or item.get("embeddingAllowed") is True:
+        return True
+    if isinstance(player, dict):
+        return player.get("embedding_allowed") is True or player.get(
+            "embeddingAllowed"
+        ) is True
+    return False
+
+
+def _is_stale_timestamp(value: object) -> bool:
+    timestamp = _parse_timestamp(value)
+    if timestamp is None:
+        return False
+    return datetime.now(UTC) - timestamp > STALE_CAMERA_AFTER
+
+
+def _is_expired_timestamp(value: object) -> bool:
+    timestamp = _parse_timestamp(value)
+    if timestamp is None:
+        return False
+    return timestamp <= datetime.now(UTC)
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)

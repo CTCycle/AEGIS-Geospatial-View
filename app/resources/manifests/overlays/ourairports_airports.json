@@ -35,7 +35,7 @@
     "geometry_type": "Point",
     "queryable": true,
     "vectorizable": false,
-    "endpoint_health": "functional",
+    "endpoint_health": "partial",
     "auth_mode": "none",
     "official_docs_url": "https://ourairports.com/data/",
     "last_validated": "2026-05-11",
@@ -61,7 +61,7 @@
   },
   "agenticUse": {
     "defaultEnabled": false,
-    "manualToggle": true,
+    "manualToggle": false,
     "plannerHints": [
       "airport",
       "aviation",
@@ -79,7 +79,7 @@
     ]
   },
   "reliability": {
-    "status": "functional",
+    "status": "partial",
     "lastAudited": "2026-05-11",
     "knownLimitations": [
       "CSV data must be ingested before low-latency map rendering."

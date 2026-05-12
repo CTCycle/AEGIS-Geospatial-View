@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import os
+import urllib.error
+import urllib.request
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import Response
 
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.layer_auditor import audit_all_manifests
@@ -22,6 +25,7 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
@@ -79,6 +83,47 @@ async def get_layer_features(
         params=params,
     )
     return await _fetch_provider_payload(provider_id, request)
+
+
+@router.get(
+    "/proxy/tomtom/{kind}/{z}/{x}/{y}.png",
+    status_code=status.HTTP_200_OK,
+)
+async def proxy_tomtom_tile(kind: str, z: int, x: int, y: int) -> Response:
+    if kind not in {"basic", "traffic-flow"}:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unsupported TomTom tile type.",
+        )
+    api_key = os.getenv("TOMTOM_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="TomTom API key is required.",
+        )
+    url = build_tomtom_tile_url(kind, z, x, y, api_key)
+    try:
+        body = await _fetch_binary_url(url)
+    except urllib.error.HTTPError as exc:
+        if exc.code in {401, 403}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="TomTom rejected the configured API key.",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"TomTom tile request failed with HTTP {exc.code}.",
+        ) from exc
+    except (TimeoutError, urllib.error.URLError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="TomTom tile request failed.",
+        ) from exc
+    return Response(
+        content=body,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=60"},
+    )
 
 
 @router.get("/cameras", status_code=status.HTTP_200_OK)
@@ -213,3 +258,15 @@ def _provider_requires_credentials(provider_id: str) -> bool:
             auth = item.get("auth")
             return bool(isinstance(auth, dict) and auth.get("required"))
     return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
+
+
+async def _fetch_binary_url(url: str) -> bytes:
+    import asyncio
+
+    return await asyncio.to_thread(_fetch_binary_url_sync, url)
+
+
+def _fetch_binary_url_sync(url: str) -> bytes:
+    request = urllib.request.Request(url, headers={"User-Agent": "AEGIS/1.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.read()

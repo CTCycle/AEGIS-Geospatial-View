@@ -32,7 +32,7 @@ class OpenAQRequestError(OpenAQServiceError):
 
 ###############################################################################
 class OpenAQService:
-    """Fetches real-time air quality measurements from OpenAQ API (no auth required).
+    """Fetches real-time air quality measurements from OpenAQ API.
 
     OpenAQ provides free access to air quality data from monitoring stations
     worldwide, including PM2.5, PM10, NO2, O3, SO2, CO measurements.
@@ -59,6 +59,7 @@ class OpenAQService:
     def __init__(
         self,
         *,
+        api_key: str | None = None,
         user_agent: str | None = None,
         timeout_s: float = 15.0,
         max_locations: int = 10,
@@ -67,11 +68,13 @@ class OpenAQService:
         """Initialize OpenAQ service.
 
         Args:
+            api_key: Optional OpenAQ API key
             user_agent: User agent string for API requests
             timeout_s: Request timeout in seconds
             max_locations: Maximum number of nearby locations to fetch
             default_radius_m: Default search radius in meters
         """
+        self.api_key = (api_key or "").strip()
         self.user_agent = user_agent or "AEGIS-OpenAQ/1.0"
         self.timeout_s = timeout_s
         self.max_locations = max_locations
@@ -142,7 +145,10 @@ class OpenAQService:
         url = f"{self.BASE_URL}/locations?{urlencode(params)}"
         logger.debug("Fetching OpenAQ locations: url=%s", url)
 
-        request = Request(url, headers={"User-Agent": self.user_agent})
+        headers = {"User-Agent": self.user_agent}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        request = Request(url, headers=headers)
 
         try:
             with urlopen(request, timeout=self.timeout_s) as response:

@@ -46,18 +46,33 @@ class GTFSStaticProvider(GeospatialProvider):
             with zipfile.ZipFile(io.BytesIO(feed_bytes)) as archive:
                 stops = self._read_csv(archive, "stops.txt")
                 routes = self._read_csv(archive, "routes.txt")
+                agency = self._read_csv(archive, "agency.txt")
+                calendar = self._read_csv(archive, "calendar.txt")
                 shapes = self._read_csv(archive, "shapes.txt")
         except (zipfile.BadZipFile, KeyError, UnicodeDecodeError, csv.Error) as exc:
             raise ProviderUnavailableError(f"Invalid GTFS static feed: {exc}") from exc
 
+        shape_lines = self._shape_lines(shapes)
         return {
             "renderingMode": "clustered-points",
-            "stops": [self._stop_feature(row) for row in stops if self._has_stop_geometry(row)],
+            "stops": [
+                self._stop_feature(row) for row in stops if self._has_stop_geometry(row)
+            ],
             "routes": [self._route_feature(row) for row in routes],
-            "shapePointCount": sum(1 for row in shapes if row.get("shape_pt_lat") and row.get("shape_pt_lon")),
+            "shapes": shape_lines,
+            "agency": [self._agency_record(row) for row in agency],
+            "calendar": [self._calendar_record(row) for row in calendar],
+            "shapePointCount": sum(
+                1
+                for row in shapes
+                if row.get("shape_pt_lat") and row.get("shape_pt_lon")
+            ),
             "summary": {
                 "stopCount": len(stops),
                 "routeCount": len(routes),
+                "agencyCount": len(agency),
+                "calendarCount": len(calendar),
+                "shapeCount": len(shape_lines),
                 "shapePointCount": len(shapes),
             },
         }
@@ -95,6 +110,73 @@ class GTFSStaticProvider(GeospatialProvider):
             "color": row.get("route_color"),
             "textColor": row.get("route_text_color"),
         }
+
+    def _agency_record(self, row: dict[str, str]) -> dict[str, Any]:
+        return {
+            "id": row.get("agency_id") or row.get("agency_name"),
+            "name": row.get("agency_name"),
+            "url": row.get("agency_url"),
+            "timezone": row.get("agency_timezone"),
+            "language": row.get("agency_lang"),
+            "phone": row.get("agency_phone"),
+        }
+
+    def _calendar_record(self, row: dict[str, str]) -> dict[str, Any]:
+        return {
+            "serviceId": row.get("service_id"),
+            "days": {
+                day: row.get(day) == "1"
+                for day in (
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                )
+            },
+            "startDate": row.get("start_date"),
+            "endDate": row.get("end_date"),
+        }
+
+    def _shape_lines(self, rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+        grouped: dict[str, list[dict[str, str]]] = {}
+        for row in rows:
+            shape_id = row.get("shape_id")
+            if not shape_id:
+                continue
+            grouped.setdefault(shape_id, []).append(row)
+        features = []
+        for shape_id, points in grouped.items():
+            ordered = sorted(points, key=lambda row: self._sequence(row))
+            coordinates = [
+                [lon, lat]
+                for row in ordered
+                if (lat := self._float_or_none(row.get("shape_pt_lat"))) is not None
+                and (lon := self._float_or_none(row.get("shape_pt_lon"))) is not None
+            ]
+            if len(coordinates) < 2:
+                continue
+            features.append(
+                {
+                    "id": shape_id,
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": coordinates,
+                    },
+                    "properties": {"shape_id": shape_id},
+                }
+            )
+        return features
+
+    def _sequence(self, row: dict[str, str]) -> int:
+        value = row.get("shape_pt_sequence")
+        try:
+            return int(value or "0")
+        except ValueError:
+            return 0
 
     def _float_or_none(self, value: str | None) -> float | None:
         if value is None or not str(value).strip():
