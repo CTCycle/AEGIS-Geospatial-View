@@ -60,7 +60,7 @@
   },
   "agenticUse": {
     "defaultEnabled": false,
-    "manualToggle": true,
+    "manualToggle": false,
     "plannerHints": [
       "overture",
       "places",

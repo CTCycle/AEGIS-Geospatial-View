@@ -45,7 +45,24 @@ class RainViewerProvider(GeospatialProvider):
                         "RainViewer metadata refresh failed; using stale cached radar frame."
                     ],
                 )
-            raise ProviderUnavailableError(str(exc)) from exc
+            return self._empty_response(
+                request,
+                warning=f"RainViewer metadata could not be fetched: {exc}",
+            )
+        if not self._is_usable_metadata(metadata):
+            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+                return self._response(
+                    request,
+                    cached.value,
+                    stale=True,
+                    warnings=[
+                        "RainViewer metadata was malformed; using stale cached radar frame."
+                    ],
+                )
+            return self._empty_response(
+                request,
+                warning="RainViewer metadata did not include a usable radar tile frame.",
+            )
         self.cache.set(
             cache_key,
             metadata,
@@ -76,3 +93,24 @@ class RainViewerProvider(GeospatialProvider):
             warnings=warnings or [],
             stale=stale,
         )
+
+    def _empty_response(self, request: ProviderRequest, *, warning: str) -> ProviderResponse:
+        return ProviderResponse(
+            capability_id=request.capability_id,
+            provider_id=self.provider_id,
+            payload={
+                "renderingMode": "raster-tile",
+                "status": "empty",
+                "tileUrl": None,
+                "latestTime": None,
+                "frameCount": 0,
+                "resolvedAt": None,
+            },
+            attribution=["© RainViewer"],
+            warnings=[warning],
+        )
+
+    def _is_usable_metadata(self, metadata: dict[str, Any]) -> bool:
+        tile_url = str(metadata.get("tile_url_template") or "").strip()
+        latest_time = metadata.get("latest_time")
+        return bool(tile_url and latest_time)

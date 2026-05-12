@@ -198,7 +198,7 @@ class ProviderRegistry:
         if provider_id == "openaq":
             from server.services.geospatial.providers.openaq import OpenAQProvider
 
-            return OpenAQProvider()
+            return OpenAQProvider(api_key=os.getenv("OPENAQ_API_KEY"))
         if provider_id == "pvgis":
             from server.services.geospatial.providers.pvgis import PVGISProvider
 
@@ -269,6 +269,46 @@ class ProviderRegistry:
             )
 
             return GTFSRealtimeProvider()
+        if provider_id == "natural_earth":
+            from server.services.geospatial.providers.natural_earth import (
+                NaturalEarthProvider,
+            )
+
+            return NaturalEarthProvider()
+        if provider_id == "overture":
+            from server.services.geospatial.providers.overture import OvertureProvider
+
+            return OvertureProvider()
+        if provider_id == "openaddresses":
+            from server.services.geospatial.providers.openaddresses import (
+                OpenAddressesProvider,
+            )
+
+            return OpenAddressesProvider()
+        if provider_id == "local_open_data":
+            from server.services.geospatial.providers.local_open_data import (
+                LocalOpenDataProvider,
+            )
+
+            return LocalOpenDataProvider()
+        if provider_id == "transitland":
+            from server.services.geospatial.providers.transitland import (
+                TransitlandProvider,
+            )
+
+            return TransitlandProvider(api_key=os.getenv("TRANSITLAND_API_KEY"))
+        if provider_id == "fallback":
+            from server.services.geospatial.providers.fallback import FallbackTileProvider
+
+            return FallbackTileProvider()
+        if provider_id == "osm":
+            from server.services.geospatial.providers.osm import OSMProvider
+
+            return OSMProvider()
+        if provider_id == "mapillary":
+            from server.services.geospatial.providers.mapillary import MapillaryProvider
+
+            return MapillaryProvider(access_token=os.getenv("MAPILLARY_ACCESS_TOKEN"))
         return ManifestBackedProvider(provider_id=provider_id, manifest=manifest)
 
     def _normalize_provider_id(self, provider_id: str) -> str:

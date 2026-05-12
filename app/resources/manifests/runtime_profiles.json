@@ -46,7 +46,7 @@
         "route",
         "near station"
       ],
-      "manual_toggle": true,
+      "manual_toggle": false,
       "auth_required": false
     },
     {
@@ -68,7 +68,7 @@
         "vehicle position",
         "near station"
       ],
-      "manual_toggle": true,
+      "manual_toggle": false,
       "auth_required": false
     },
     {
@@ -310,14 +310,14 @@
       "handler_name": "ourairports_airports",
       "capability_kind": "dataset-ingestion",
       "rendering_mode": "clustered-points",
-      "health_status": "functional",
+      "health_status": "partial",
       "planner_hints": [
         "airport",
         "aviation",
         "runway",
         "heliport"
       ],
-      "manual_toggle": true,
+      "manual_toggle": false,
       "auth_required": false
     },
     {
@@ -1206,6 +1206,28 @@
       "auth_required": true
     },
     {
+      "capability_id": "tomtom_traffic_incidents",
+      "enabled_by_default": true,
+      "credential_provider": "tomtom",
+      "supports_map": true,
+      "supports_direct_text": true,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null,
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "clustered-points",
+      "health_status": "partial",
+      "planner_hints": [
+        "traffic incident",
+        "road closure",
+        "crash",
+        "traffic delay",
+        "tomtom"
+      ],
+      "manual_toggle": true,
+      "auth_required": true
+    },
+    {
       "capability_id": "census_acs_demographic_joins",
       "enabled_by_default": true,
       "credential_provider": null,
@@ -1301,14 +1323,14 @@
       "handler_name": null,
       "capability_kind": "dataset-ingestion",
       "rendering_mode": "vector-tile",
-      "health_status": "functional",
+      "health_status": "partial",
       "planner_hints": [
         "boundary",
         "country",
         "admin",
         "natural earth"
       ],
-      "manual_toggle": true,
+      "manual_toggle": false,
       "auth_required": false
     },
     {
@@ -1349,7 +1371,7 @@
         "pois",
         "amenities"
       ],
-      "manual_toggle": true,
+      "manual_toggle": false,
       "auth_required": false
     }
   ],

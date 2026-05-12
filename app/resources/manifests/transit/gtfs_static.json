@@ -64,7 +64,7 @@
   },
   "agenticUse": {
     "defaultEnabled": false,
-    "manualToggle": true,
+    "manualToggle": false,
     "plannerHints": [
       "transit",
       "bus stop",

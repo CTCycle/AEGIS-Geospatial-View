@@ -26,6 +26,10 @@
         <dt>Type</dt>
         <dd>{{ camera.camera_type }}</dd>
       </div>
+      <div>
+        <dt>Coordinates</dt>
+        <dd>{{ coordinates }}</dd>
+      </div>
       @if (camera.last_update_time) {
         <div>
           <dt>Updated</dt>
@@ -33,6 +37,7 @@
         </div>
       }
     </dl>
+    <p>Use official source terms before reusing or embedding camera media.</p>
     <a [href]="camera.official_url" target="_blank" rel="noopener noreferrer">Official link</a>
   </article>
 }

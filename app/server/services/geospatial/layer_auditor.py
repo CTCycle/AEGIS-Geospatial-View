@@ -31,6 +31,38 @@ REQUIRED_INDEX_FIELDS = {
     "capability_groups",
     "health_summary",
 }
+PLACEHOLDER_STATUSES = {
+    "download-required",
+    "feed-required",
+    "fetch-required",
+    "not-enabled",
+    "not-implemented",
+    "not-queried",
+    "requires-ingestion",
+    "requires-local-source",
+}
+PROVIDER_SOURCE_DIR = (
+    Path(PROJECT_DIR) / "server" / "services" / "geospatial" / "providers"
+)
+API_SOURCE_PATH = Path(PROJECT_DIR) / "server" / "api" / "geospatial.py"
+CLIENT_SOURCE_DIR = Path(PROJECT_DIR) / "client" / "src" / "app"
+TEST_SOURCE_DIR = Path(PROJECT_DIR) / "tests" / "unit"
+VISUAL_TEST_SOURCE_DIR = Path(PROJECT_DIR) / "client" / "e2e"
+CLIENT_RENDERING_MODES = {
+    "camera-points",
+    "choropleth",
+    "clustered-points",
+    "geojson",
+    "metadata-only",
+    "raster-tile",
+    "vector-tile",
+    "wms",
+    "wmts",
+    "xyz",
+}
+PROVIDER_SOURCE_ALIASES = {
+    "gibs": "nasa_gibs",
+}
 
 
 class LayerAuditIssue(BaseModel):
@@ -42,6 +74,23 @@ class LayerAuditIssue(BaseModel):
     message: str
 
 
+class CapabilityImplementationStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str
+    provider_id: str
+    schema_valid: bool = True
+    runtime_registered: bool
+    provider_fetch_implemented: bool
+    normalizer_implemented: bool
+    cache_implemented: bool
+    api_endpoint_covered: bool
+    client_renderer_covered: bool
+    unit_tested: bool
+    visual_tested: bool
+    placeholder_statuses: list[str] = Field(default_factory=list)
+
+
 class LayerAuditReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -49,6 +98,9 @@ class LayerAuditReport(BaseModel):
     error_count: int = 0
     warning_count: int = 0
     issues: list[LayerAuditIssue] = Field(default_factory=list)
+    implementation_statuses: list[CapabilityImplementationStatus] = Field(
+        default_factory=list
+    )
 
     @property
     def ok(self) -> bool:
@@ -93,6 +145,92 @@ def _manifest_paths(root_path: Path) -> list[Path]:
             continue
         paths.extend(sorted(folder.glob("*.json")))
     return paths
+
+
+def _read_text_if_exists(path: Path) -> str:
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
+def _combined_text(paths: list[Path]) -> str:
+    chunks: list[str] = []
+    for path in paths:
+        chunks.append(_read_text_if_exists(path))
+    return "\n".join(chunks)
+
+
+def _python_files(root: Path) -> list[Path]:
+    if not root.is_dir():
+        return []
+    ignored_parts = {"__pycache__", ".pytest_cache", ".angular", "dist", "node_modules"}
+    return [
+        path
+        for path in root.rglob("*.py")
+        if not any(part in ignored_parts for part in path.parts)
+    ]
+
+
+def _client_files(root: Path) -> list[Path]:
+    if not root.is_dir():
+        return []
+    ignored_parts = {"node_modules", ".angular", "dist"}
+    return [
+        path
+        for path in root.rglob("*")
+        if path.suffix in {".ts", ".html", ".scss"}
+        and not any(part in ignored_parts for part in path.parts)
+    ]
+
+
+def _provider_source(provider_id: str) -> str:
+    provider_filename = PROVIDER_SOURCE_ALIASES.get(
+        provider_id,
+        provider_id.replace("-", "_"),
+    )
+    return _read_text_if_exists(PROVIDER_SOURCE_DIR / f"{provider_filename}.py")
+
+
+def _placeholder_statuses(source: str) -> list[str]:
+    return sorted(status for status in PLACEHOLDER_STATUSES if status in source)
+
+
+def _status_for_manifest(
+    manifest: CapabilityManifestV2,
+    *,
+    runtime_ids: set[str],
+    api_source: str,
+    client_source: str,
+    test_source: str,
+    visual_test_source: str,
+) -> CapabilityImplementationStatus:
+    provider_source = _provider_source(manifest.provider)
+    placeholders = _placeholder_statuses(provider_source)
+    provider_fetch_implemented = (
+        bool(provider_source) and "not-implemented" not in placeholders
+    )
+    if manifest.capability_kind.value == "metadata-only":
+        provider_fetch_implemented = True
+    return CapabilityImplementationStatus(
+        capability_id=manifest.id,
+        provider_id=manifest.provider,
+        runtime_registered=manifest.id in runtime_ids,
+        provider_fetch_implemented=provider_fetch_implemented,
+        normalizer_implemented=bool(
+            manifest.normalization.expected_geometry
+            and manifest.normalization.expected_geometry != "not-applicable"
+        )
+        or manifest.rendering_mode.value == "metadata-only",
+        cache_implemented=manifest.cache_policy.mode.value != "none",
+        api_endpoint_covered=manifest.id in api_source or manifest.provider in api_source,
+        client_renderer_covered=manifest.rendering_mode.value in CLIENT_RENDERING_MODES
+        and manifest.rendering_mode.value in client_source,
+        unit_tested=manifest.id in test_source or manifest.provider in test_source,
+        visual_tested=manifest.id in visual_test_source
+        or manifest.provider in visual_test_source
+        or manifest.rendering_mode.value in visual_test_source,
+        placeholder_statuses=placeholders,
+    )
 
 
 def _contains_secret_value(value: Any) -> bool:
@@ -170,6 +308,17 @@ def _validate_renderability(
             manifest_id=manifest.id,
             message="Broken manifest cannot be exposed as a manual toggle.",
         )
+    if (
+        manifest.rendering_mode.value == "metadata-only"
+        or manifest.capability_kind.value == "metadata-only"
+    ) and manifest.agentic_use.manual_toggle:
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message="Metadata-only manifest cannot be exposed as a manual toggle.",
+        )
 
 
 def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
@@ -225,8 +374,64 @@ def audit_all_manifests(
     root = Path(root_path or Path(PROJECT_DIR) / "resources" / "manifests")
     report = LayerAuditReport()
     _validate_index(root, report)
+    manifest_items: list[tuple[Path, CapabilityManifestV2]] = []
     for path in _manifest_paths(root):
+        before = report.manifest_count
         _validate_manifest(path, report)
+        if report.manifest_count == before:
+            continue
+        manifest_items.append(
+            (path, CapabilityManifestV2.model_validate(_read_json(path)))
+        )
+    runtime_profiles = _read_json(root / "runtime_profiles.json").get("profiles") or []
+    runtime_ids = {
+        str(item.get("capability_id"))
+        for item in runtime_profiles
+        if isinstance(item, dict) and item.get("capability_id")
+    }
+    api_source = _read_text_if_exists(API_SOURCE_PATH)
+    client_source = _combined_text(_client_files(CLIENT_SOURCE_DIR))
+    test_source = _combined_text(_python_files(TEST_SOURCE_DIR))
+    visual_test_source = _combined_text(_client_files(VISUAL_TEST_SOURCE_DIR))
+    for path, manifest in manifest_items:
+        status = _status_for_manifest(
+            manifest,
+            runtime_ids=runtime_ids,
+            api_source=api_source,
+            client_source=client_source,
+            test_source=test_source,
+            visual_test_source=visual_test_source,
+        )
+        report.implementation_statuses.append(status)
+        if path.parent.name != "providers" and not status.runtime_registered:
+            _add_issue(
+                report,
+                path=path,
+                severity="error",
+                manifest_id=manifest.id,
+                message="Capability is not registered in runtime_profiles.json.",
+            )
+        if manifest.reliability.status.value == "functional" and status.placeholder_statuses:
+            _add_issue(
+                report,
+                path=path,
+                severity="error",
+                manifest_id=manifest.id,
+                message=(
+                    "Functional capability provider exposes placeholder statuses: "
+                    + ", ".join(status.placeholder_statuses)
+                ),
+            )
+        if status.placeholder_statuses and manifest.agentic_use.manual_toggle:
+            _add_issue(
+                report,
+                path=path,
+                severity="error",
+                manifest_id=manifest.id,
+                message=(
+                    "Placeholder-backed capability cannot be exposed as a manual toggle."
+                ),
+            )
     if strict and report.warning_count:
         report.error_count += report.warning_count
     return report

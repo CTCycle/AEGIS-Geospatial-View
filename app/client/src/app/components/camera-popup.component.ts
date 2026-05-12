@@ -19,4 +19,11 @@ export class CameraPopupComponent {
     }
     return this.sanitizer.bypassSecurityTrustResourceUrl(this.camera.embed_url);
   }
+
+  get coordinates(): string {
+    if (!this.camera) {
+      return '';
+    }
+    return `${this.camera.latitude.toFixed(5)}, ${this.camera.longitude.toFixed(5)}`;
+  }
 }

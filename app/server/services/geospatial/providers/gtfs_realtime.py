@@ -19,9 +19,9 @@ class GTFSRealtimeProvider(GeospatialProvider):
         feed_url = str(request.params.get("feed_url") or "").strip()
         feed_bytes = request.params.get("feed_bytes")
         if isinstance(decoded_feed, dict):
-            payload = self._normalize_decoded_feed(decoded_feed)
+            payload = self._normalize_decoded_feed(decoded_feed, request=request)
         elif isinstance(feed_bytes, bytes):
-            payload = self._parse_protobuf(feed_bytes)
+            payload = self._parse_protobuf(feed_bytes, request=request)
         elif feed_url:
             payload = {
                 "renderingMode": "metadata-only",
@@ -42,7 +42,9 @@ class GTFSRealtimeProvider(GeospatialProvider):
             attribution=["GTFS Realtime feed publisher"],
         )
 
-    def _parse_protobuf(self, feed_bytes: bytes) -> dict[str, Any]:
+    def _parse_protobuf(
+        self, feed_bytes: bytes, *, request: ProviderRequest | None = None
+    ) -> dict[str, Any]:
         try:
             from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]
         except ImportError as exc:
@@ -70,29 +72,55 @@ class GTFSRealtimeProvider(GeospatialProvider):
                     "incrementality": int(feed.header.incrementality),
                 },
                 "entities": entities,
-            }
+            },
+            request=request,
         )
 
-    def _normalize_decoded_feed(self, feed: dict[str, Any]) -> dict[str, Any]:
-        entities = [entity for entity in feed.get("entities") or [] if isinstance(entity, dict)]
-        vehicles = [entity["vehicle"] for entity in entities if isinstance(entity.get("vehicle"), dict)]
-        alerts = [entity["alert"] for entity in entities if isinstance(entity.get("alert"), dict)]
+    def _normalize_decoded_feed(
+        self, feed: dict[str, Any], *, request: ProviderRequest | None = None
+    ) -> dict[str, Any]:
+        entities = [
+            entity for entity in feed.get("entities") or [] if isinstance(entity, dict)
+        ]
+        vehicles = [
+            entity["vehicle"]
+            for entity in entities
+            if isinstance(entity.get("vehicle"), dict)
+        ]
+        alerts = [
+            self._alert_feature(entity["alert"])
+            for entity in entities
+            if isinstance(entity.get("alert"), dict)
+        ]
         trip_updates = [
-            entity["tripUpdate"]
+            self._trip_update_feature(entity["tripUpdate"])
             for entity in entities
             if isinstance(entity.get("tripUpdate"), dict)
         ]
+        feed_timestamp = self._feed_timestamp(feed.get("header"))
+        vehicle_rendering_allowed = self._vehicle_rendering_allowed(
+            feed_timestamp,
+            request=request,
+        )
         return {
             "renderingMode": "clustered-points",
-            "vehicles": [self._vehicle_feature(vehicle) for vehicle in vehicles],
+            "vehicles": [
+                self._vehicle_feature(vehicle) for vehicle in vehicles
+            ]
+            if vehicle_rendering_allowed
+            else [],
             "alerts": alerts,
             "tripUpdates": trip_updates,
             "summary": {
                 "vehicleCount": len(vehicles),
+                "renderedVehicleCount": len(vehicles)
+                if vehicle_rendering_allowed
+                else 0,
                 "alertCount": len(alerts),
                 "tripUpdateCount": len(trip_updates),
             },
-            "feedTimestamp": self._feed_timestamp(feed.get("header")),
+            "feedTimestamp": feed_timestamp,
+            "vehicleRenderingAllowed": vehicle_rendering_allowed,
         }
 
     def _vehicle_feature(self, vehicle: dict[str, Any]) -> dict[str, Any]:
@@ -115,6 +143,42 @@ class GTFSRealtimeProvider(GeospatialProvider):
         if not isinstance(value, (int, float)) or value <= 0:
             return None
         return datetime.fromtimestamp(value, tz=UTC).isoformat()
+
+    def _vehicle_rendering_allowed(
+        self, feed_timestamp: str | None, *, request: ProviderRequest | None
+    ) -> bool:
+        params = request.params if request is not None else {}
+        if params.get("allow_vehicle_rendering") is False:
+            return False
+        if not feed_timestamp:
+            return False
+        freshness_seconds = params.get("feed_freshness_seconds", 120)
+        try:
+            max_age = float(freshness_seconds)
+            timestamp = datetime.fromisoformat(feed_timestamp)
+        except (TypeError, ValueError):
+            return False
+        return (datetime.now(UTC) - timestamp).total_seconds() <= max_age
+
+    def _trip_update_feature(self, trip_update: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "tripId": trip_update.get("tripId") or trip_update.get("trip_id"),
+            "routeId": trip_update.get("routeId") or trip_update.get("route_id"),
+            "delay": trip_update.get("delay"),
+            "stopTimeUpdates": trip_update.get("stopTimeUpdates")
+            or trip_update.get("stop_time_updates")
+            or [],
+        }
+
+    def _alert_feature(self, alert: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "cause": alert.get("cause"),
+            "effect": alert.get("effect"),
+            "header": alert.get("header") or alert.get("headerText"),
+            "description": alert.get("description") or alert.get("descriptionText"),
+            "activePeriodCount": alert.get("activePeriodCount")
+            or len(alert.get("activePeriods") or []),
+        }
 
     def _vehicle_from_entity(self, entity: Any) -> dict[str, Any] | None:
         if not entity.HasField("vehicle"):

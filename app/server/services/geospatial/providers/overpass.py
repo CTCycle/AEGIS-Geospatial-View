@@ -3,14 +3,28 @@ from __future__ import annotations
 from typing import Any
 
 from server.services.geospatial.normalizers import NormalizationError, normalize_poi_feature
-from server.services.geospatial.overpass import OverpassService, OverpassServiceError
+from server.services.geospatial.overpass import (
+    OverpassRateLimitError,
+    OverpassService,
+    OverpassServiceError,
+)
 from server.services.geospatial.providers._request import request_center, request_radius_m
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
     ProviderResponse,
+    ProviderRateLimitError,
     ProviderUnavailableError,
 )
+
+AMENITY_GROUPS = {
+    "food": ["cafe", "restaurant", "bar", "fast_food"],
+    "healthcare": ["hospital", "clinic", "pharmacy", "doctors"],
+    "transit": ["bus_station", "train_station", "taxi", "ferry_terminal"],
+    "education": ["school", "college", "university", "library"],
+    "emergency": ["hospital", "fire_station", "police", "shelter"],
+    "fuel": ["fuel", "charging_station"],
+}
 
 
 class OverpassProvider(GeospatialProvider):
@@ -24,6 +38,9 @@ class OverpassProvider(GeospatialProvider):
         radius_m = request_radius_m(request, self.service.default_radius_m)
         tags = request.params.get("amenity_tags")
         amenity_tags = [str(tag) for tag in tags] if isinstance(tags, list) else None
+        if amenity_tags is None:
+            category = str(request.params.get("category") or "").strip().lower()
+            amenity_tags = AMENITY_GROUPS.get(category)
         try:
             payload = await self.service.get_nearby_poi(
                 latitude=latitude,
@@ -32,6 +49,8 @@ class OverpassProvider(GeospatialProvider):
                 amenity_tags=amenity_tags,
                 limit=_optional_int(request.params.get("limit")),
             )
+        except OverpassRateLimitError as exc:
+            raise ProviderRateLimitError(str(exc)) from exc
         except (OverpassServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
         features = []
