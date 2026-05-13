@@ -223,7 +223,19 @@ class ManifestIntentResolver:
             {"census_tigerweb_demographics"},
         ),
         (
-            {"amenities", "services", "places", "poi"},
+            {
+                "amenities",
+                "amenity",
+                "hospital",
+                "hospitals",
+                "shelter",
+                "shelters",
+                "restaurant",
+                "restaurants",
+                "services",
+                "places",
+                "poi",
+            },
             {"overpass_poi_amenities", "geoapify_amenities"},
         ),
         (
@@ -265,8 +277,6 @@ class ManifestIntentResolver:
                 "station",
                 "stop",
                 "stops",
-                "route",
-                "routes",
                 "delay",
                 "delays",
                 "disruption",
@@ -441,6 +451,16 @@ class ManifestIntentResolver:
             selected.append(concept_candidates[0])
             if len(selected) >= 4:
                 return selected
+
+        if {"smoke", "smoky"}.intersection(concept_set):
+            for capability_id in (
+                "openmeteo_air_quality_forecast",
+                "openaq_air_quality",
+                "MODIS_Terra_Aerosol",
+            ):
+                if capability_id in overlays and capability_id not in selected:
+                    selected.append(capability_id)
+                    break
 
         ranked = self._rank_kind(
             kind="overlay",
@@ -636,6 +656,8 @@ _GEOSPATIAL_TRIGGER_TOKENS = {
     "nearby",
     "overlay",
     "poi",
+    "population",
+    "restaurants",
     "route",
     "satellite",
     "show",

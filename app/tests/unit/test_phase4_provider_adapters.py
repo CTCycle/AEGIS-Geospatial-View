@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from server.services.geospatial.provider_registry import ProviderRegistry
+from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.overpass import OverpassRateLimitError, OverpassRequestError
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
@@ -603,6 +604,56 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
     assert response.payload["renderingMode"] == "wms"
     assert response.payload["crs"] == "EPSG:4326"
     assert response.attribution
+
+
+def test_nasa_gibs_provider_live_validation_uses_stale_cache() -> None:
+    clock = 0.0
+
+    def now() -> float:
+        return clock
+
+    async def ok_fetcher(url: str, headers: dict[str, str] | None = None):
+        return {"service": "WMS", "layers": ["VIIRS_SNPP_CorrectedReflectance_TrueColor"]}
+
+    provider = NASAGIBSProvider(
+        fetcher=ok_fetcher,
+        cache=GeospatialCache(clock=now),
+        cache_ttl_seconds=1,
+        stale_while_revalidate_seconds=10,
+    )
+    request = ProviderRequest(
+        capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
+        params={"live_validate": True},
+    )
+    first = asyncio.run(provider.fetch(request))
+
+    async def timeout_fetcher(url: str, headers: dict[str, str] | None = None):
+        raise TimeoutError("timed out")
+
+    clock = 2.0
+    provider.fetcher = timeout_fetcher
+    stale = asyncio.run(provider.fetch(request))
+
+    assert first.payload["liveValidation"]["service"] == "WMS"
+    assert stale.stale is True
+    assert stale.payload["liveValidation"]["layers"] == [
+        "VIIRS_SNPP_CorrectedReflectance_TrueColor"
+    ]
+
+
+def test_nasa_gibs_provider_rejects_malformed_live_validation_without_cache() -> None:
+    async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
+        return ["not", "metadata"]
+
+    with pytest.raises(ProviderUnavailableError):
+        asyncio.run(
+            NASAGIBSProvider(fetcher=malformed_fetcher).fetch(
+                ProviderRequest(
+                    capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
+                    params={"live_validate": True},
+                )
+            )
+        )
 
 
 def test_arcgis_rest_provider_builds_geojson_query_url() -> None:

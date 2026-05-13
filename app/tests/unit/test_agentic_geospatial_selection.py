@@ -59,18 +59,27 @@ def _resolve(tags: list[str]):
 
 
 def test_agentic_selection_picks_webcam_capability() -> None:
-    resolution = _resolve(["webcams", "road", "condition"])
+    resolution = _resolve(["webcams", "near", "mountain", "pass", "road", "condition"])
 
     assert "windy_webcams" in resolution.overlay_ids
 
 
-def test_agentic_selection_picks_amenity_capability_without_every_layer() -> None:
+def test_agentic_selection_picks_hospitals_and_shelters_as_poi_capability() -> None:
     resolution = _resolve(["hospitals", "amenities", "shelters"])
 
     assert set(resolution.overlay_ids).intersection(
         {"overpass_poi_amenities", "geoapify_amenities"}
     )
     assert len(resolution.overlay_ids) <= 4
+
+
+def test_agentic_selection_restaurants_nearby_stays_poi_only() -> None:
+    resolution = _resolve(["restaurants", "nearby", "poi"])
+
+    assert resolution.overlay_ids
+    assert set(resolution.overlay_ids).issubset(
+        {"overpass_poi_amenities", "geoapify_amenities"}
+    )
 
 
 def test_agentic_selection_general_chat_loads_no_overlays() -> None:
@@ -85,12 +94,21 @@ def test_agentic_selection_picks_transit_realtime_for_disruptions() -> None:
     assert "gtfs_realtime" in resolution.overlay_ids
 
 
+def test_agentic_selection_picks_county_population_layer() -> None:
+    resolution = _resolve(["county", "population", "demographics"])
+
+    assert "census_tigerweb_demographics" in resolution.overlay_ids
+
+
 def test_agentic_selection_picks_hazard_layers_by_need() -> None:
     flood = _resolve(["flood", "shelter", "hazard"])
     fire = _resolve(["fire", "smoke", "route"])
 
     assert "fema_nfhl_flood_zones" in flood.overlay_ids
     assert "nasa_firms_active_fires" in fire.overlay_ids
+    assert set(fire.overlay_ids).intersection(
+        {"openmeteo_air_quality_forecast", "openaq_air_quality", "MODIS_Terra_Aerosol"}
+    )
 
 
 def test_agentic_selection_picks_phase8_sources() -> None:
@@ -147,3 +165,17 @@ def test_select_geospatial_capabilities_reports_missing_provider_key() -> None:
         and item.status == "missing-credential"
         for item in selected
     )
+
+
+def test_select_geospatial_capabilities_prefers_public_alternative_for_restaurants() -> None:
+    selected = select_geospatial_capabilities(
+        "restaurants nearby",
+        resolved_location=object(),
+        bbox=(12.0, 41.0, 13.0, 42.0),
+        time_context=None,
+        user_permissions=UserCapabilityAccess(),
+    )
+
+    assert selected
+    assert selected[0].capability_id == "overpass_poi_amenities"
+    assert selected[0].status == "selected"

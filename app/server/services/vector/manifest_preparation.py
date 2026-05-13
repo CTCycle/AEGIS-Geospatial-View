@@ -28,7 +28,28 @@ class ManifestPreparationService:
             return []
         return [str(item).strip() for item in value if str(item).strip()]
 
+    def _backfill_embedding_fields(self, entry: dict[str, Any], *, kind: str) -> None:
+        entry_id = str(entry.get("id") or "resource").strip() or "resource"
+        name = str(entry.get("name") or entry_id).strip() or entry_id
+        provider = str(entry.get("provider") or "unknown provider").strip() or "unknown provider"
+        if not isinstance(entry.get("description"), str) or not str(entry.get("description")).strip():
+            entry["description"] = f"No description provided for {name}."
+        metadata = dict(entry.get("metadata") or {})
+        capabilities = self._normalize_list(entry.get("capabilities"))
+        if not self._normalize_list(metadata.get("intent_tags")):
+            metadata["intent_tags"] = capabilities[:5] or [kind[:-1] if kind.endswith("s") else kind]
+        if not self._normalize_list(metadata.get("task_tags")):
+            metadata["task_tags"] = [f"show {name}", f"use {provider} data"]
+        if not self._normalize_list(metadata.get("search_examples")):
+            metadata["search_examples"] = [
+                f"Show {name} on the map",
+                f"Find {provider} data for this location",
+                f"Use {name} for geospatial analysis",
+            ]
+        entry["metadata"] = metadata
+
     def validate_embedding_quality(self, entry: dict[str, Any], *, kind: str) -> None:
+        self._backfill_embedding_fields(entry, kind=kind)
         source = str(entry.get("source_filename") or entry.get("id") or "unknown")
         missing: list[str] = []
         for field in self.REQUIRED_TEXT_FIELDS:

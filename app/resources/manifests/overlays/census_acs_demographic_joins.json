@@ -30,6 +30,11 @@
       "show demographics",
       "population choropleth"
     ],
+    "search_examples": [
+      "Show county population choropleth in California",
+      "Map ACS demographics for Texas counties",
+      "Display population distribution by county in the United States"
+    ],
     "source_protocol": "api",
     "data_format": "json",
     "geometry_type": "Polygon",
