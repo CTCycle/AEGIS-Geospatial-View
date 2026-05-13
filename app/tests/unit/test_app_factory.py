@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shutil
 from types import SimpleNamespace
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -47,3 +49,29 @@ def test_access_keys_router_is_not_registered() -> None:
     route_paths = {route.path for route in created.routes}
     assert "/api/access-keys" not in route_paths
     assert "/api/access-keys/{key_id}" not in route_paths
+
+
+def test_get_client_dist_path_prefers_browser_subfolder(monkeypatch) -> None:
+    base = Path("G:/Projects/Repositories/Web applications/AEGIS Geospatial View/.tmp_test_app_factory")
+    if base.exists():
+        shutil.rmtree(base)
+    fake_app_dir = base / "app" / "server"
+    fake_app_dir.mkdir(parents=True)
+    fake_dist_browser = base / "app" / "client" / "dist" / "browser"
+    fake_dist_browser.mkdir(parents=True)
+    monkeypatch.setattr(app_module, "__file__", str(fake_app_dir / "app.py"))
+    assert app_module.get_client_dist_path() == str(fake_dist_browser)
+
+
+def test_packaged_client_available_allows_opt_in_serving(monkeypatch) -> None:
+    base = Path("G:/Projects/Repositories/Web applications/AEGIS Geospatial View/.tmp_test_app_factory_optin")
+    if base.exists():
+        shutil.rmtree(base)
+    fake_app_dir = base / "app" / "server"
+    fake_app_dir.mkdir(parents=True)
+    fake_dist = base / "app" / "client" / "dist" / "browser"
+    fake_dist.mkdir(parents=True)
+    monkeypatch.setattr(app_module, "__file__", str(fake_app_dir / "app.py"))
+    monkeypatch.setenv("AEGIS_TAURI_MODE", "false")
+    monkeypatch.setenv("AEGIS_SERVE_BUILT_CLIENT", "true")
+    assert app_module.packaged_client_available() is True
