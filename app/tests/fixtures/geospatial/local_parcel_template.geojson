@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "parcel-1",
+      "properties": {
+        "parcel_id": "parcel-1",
+        "owner": "Fixture Owner",
+        "use": "mixed"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-122.402, 37.788], [-122.400, 37.788], [-122.400, 37.790], [-122.402, 37.790], [-122.402, 37.788]]]
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 from server.services.geospatial.ingestion import (
@@ -207,3 +208,93 @@ def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
         assert "does not intersect" in str(exc)
     else:
         raise AssertionError("Non-intersecting bbox did not fail ingestion.")
+
+
+def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_health(tmp_path) -> None:
+    fixture_root = Path(__file__).resolve().parents[1] / "fixtures/geospatial"
+    cases = [
+        (
+            "natural_earth_admin_boundaries",
+            fixture_root / "natural_earth_admin_boundaries.geojson",
+            "geojson",
+            "Polygon",
+            "ne_id",
+        ),
+        (
+            "census_cartographic_boundaries",
+            fixture_root / "census_cartographic_boundary.geojson",
+            "geojson",
+            "Polygon",
+            "GEOID",
+        ),
+        (
+            "openaddresses_points",
+            fixture_root / "openaddresses_points.csv",
+            "csv",
+            "Point",
+            "id",
+        ),
+        (
+            "overture_maps_places",
+            fixture_root / "overture_places.geojson",
+            "geojson",
+            "Point",
+            "id",
+        ),
+        (
+            "ourairports_airports",
+            fixture_root / "ourairports_airports.csv",
+            "csv",
+            "Point",
+            "id",
+        ),
+        (
+            "local_parcel_template",
+            fixture_root / "local_parcel_template.geojson",
+            "geojson",
+            "Polygon",
+            "parcel_id",
+        ),
+    ]
+
+    for capability_id, source, expected_format, geometry_type, id_field in cases:
+        manifest = _manifest()
+        manifest["id"] = capability_id
+        manifest["download"]["sourceUrl"] = str(source)
+        manifest["download"]["expectedFormat"] = expected_format
+        manifest["download"]["compression"] = "none"
+        manifest["storage"] = {
+            "rawPath": f"data/geospatial/raw/{capability_id}/",
+            "normalizedPath": f"data/geospatial/normalized/{capability_id}/",
+            "tilePath": f"data/geospatial/tiles/{capability_id}/",
+        }
+        manifest["normalization"] = {
+            "targetCrs": "EPSG:4326",
+            "geometryType": geometry_type,
+            "idField": id_field,
+            "fieldMap": {},
+        }
+        manifest["validation"] = {"minFeatureCount": 1}
+        result = execute_ingestion_plan(
+            build_ingestion_plan(manifest), workspace_root=tmp_path
+        )
+
+        assert result.feature_count >= 1
+        assert result.normalized_file is not None
+        assert result.spatial_index_file is not None
+        assert result.text_index_file is not None
+        assert result.tile_manifest_file is not None
+        normalized = json.loads(Path(result.normalized_file).read_text(encoding="utf-8"))
+        spatial_index = json.loads(Path(result.spatial_index_file).read_text(encoding="utf-8"))
+        text_index = json.loads(Path(result.text_index_file).read_text(encoding="utf-8"))
+        tile_manifest = json.loads(Path(result.tile_manifest_file).read_text(encoding="utf-8"))
+        health = json.loads(Path(result.health_file).read_text(encoding="utf-8"))
+
+        assert normalized["type"] == "FeatureCollection"
+        assert normalized["features"]
+        assert spatial_index["indexType"] == "bbox-summary"
+        assert text_index["indexType"] == "term-to-feature"
+        assert tile_manifest["capabilityId"] == capability_id
+        assert tile_manifest["featureCount"] == result.feature_count
+        assert health["status"] == "functional"
+        assert health["featureCount"] == result.feature_count

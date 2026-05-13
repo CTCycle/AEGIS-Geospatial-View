@@ -1,7 +1,7 @@
 export interface GeospatialLayerScenario {
   id: string;
   description: string;
-  expectedState: 'renders' | 'missing-credential' | 'empty' | 'stale-fallback';
+  expectedState: 'renders' | 'missing-credential' | 'empty' | 'stale-fallback' | 'metadata-only';
 }
 
 export const geospatialLayerScenarios: GeospatialLayerScenario[] = [
@@ -17,9 +17,15 @@ export const geospatialLayerScenarios: GeospatialLayerScenario[] = [
   { id: 'MODIS_Combined_Thermal_Anomalies_Fire', description: 'NASA GIBS fire anomaly overlay renders', expectedState: 'renders' },
   { id: 'OMPS_Ozone_Total_Column', description: 'NASA GIBS ozone overlay renders', expectedState: 'renders' },
   { id: 'rainviewer_precipitation_radar', description: 'RainViewer radar uses latest or stale frame', expectedState: 'stale-fallback' },
+  { id: 'rainviewer_precipitation_radar_success', description: 'RainViewer latest radar frame renders from mocked public tiles', expectedState: 'renders' },
+  { id: 'rainviewer_precipitation_radar_stale', description: 'RainViewer stale radar frame shows freshness warning and attribution', expectedState: 'stale-fallback' },
+  { id: 'rainviewer_precipitation_radar_empty', description: 'RainViewer empty frame list produces a nonfatal empty state', expectedState: 'empty' },
   { id: 'tomtom_traffic_flow', description: 'TomTom traffic flow handles missing credentials or mocked tiles', expectedState: 'missing-credential' },
+  { id: 'tomtom_traffic_flow_mocked', description: 'TomTom traffic flow renders through backend proxy without browser key leakage', expectedState: 'renders' },
+  { id: 'tomtom_traffic_incidents_mocked', description: 'TomTom traffic incidents render from mocked vector payloads', expectedState: 'renders' },
   { id: 'geoapify_amenities', description: 'Geoapify amenities handles missing credentials or mocked vector points', expectedState: 'missing-credential' },
   { id: 'overpass_poi_amenities', description: 'Overpass amenity POIs render from mocked bounded responses', expectedState: 'renders' },
+  { id: 'overpass_poi_amenities_1000_clustered', description: '1,000 mocked Overpass POIs stay clustered and attributed', expectedState: 'renders' },
   { id: 'openmeteo_air_quality_forecast', description: 'Open-Meteo air quality sampled layer handles empty responses', expectedState: 'empty' },
   { id: 'openmeteo_pressure_humidity_wind', description: 'Open-Meteo wind and pressure sampled layer handles empty responses', expectedState: 'empty' },
   { id: 'usgs_earthquakes', description: 'USGS earthquake GeoJSON points render', expectedState: 'renders' },
@@ -35,8 +41,14 @@ export const geospatialLayerScenarios: GeospatialLayerScenario[] = [
   { id: 'census_cartographic_boundaries', description: 'Census cartographic boundary descriptor renders', expectedState: 'renders' },
   { id: 'census_acs_demographic_joins', description: 'ACS choropleth descriptor renders when joined data exists', expectedState: 'renders' },
   { id: 'eurostat_nuts_regions', description: 'Eurostat NUTS regions descriptor renders', expectedState: 'renders' },
+  { id: 'eea_noise_wms', description: 'EEA WMS descriptor renders as a proxied raster overlay with attribution', expectedState: 'renders' },
+  { id: 'esa_worldcover_wmts', description: 'ESA WorldCover WMTS descriptor renders as a tile matrix overlay with attribution', expectedState: 'renders' },
+  { id: 'eurostat_metadata_only', description: 'Eurostat statistical datasets remain metadata-only until joined geometry exists', expectedState: 'metadata-only' },
+  { id: 'eurostat_join_required', description: 'Eurostat join-required state is shown without enabling normal map toggles', expectedState: 'metadata-only' },
   { id: 'gtfs_static', description: 'GTFS static stops and routes render from fixture data', expectedState: 'renders' },
   { id: 'gtfs_realtime', description: 'GTFS realtime alerts and vehicles render from mocked protobuf fixtures', expectedState: 'renders' },
+  { id: 'gtfs_stops_routes_alerts_vehicles', description: 'GTFS stops, routes, alerts, and vehicles render from fixture payloads', expectedState: 'renders' },
+  { id: 'geospatial_5000_feature_performance', description: '5,000-feature mocked GeoJSON layer keeps stable source and layer contracts', expectedState: 'renders' },
   { id: 'openchargemap_ev_charging', description: 'Open Charge Map EV charging points render from mocked provider data', expectedState: 'renders' },
   { id: 'nrel_afdc_alt_fuel_stations', description: 'NREL AFDC stations handle missing key or mocked provider data', expectedState: 'missing-credential' },
   { id: 'opentripmap_tourism_pois', description: 'OpenTripMap tourism POIs handle missing key or mocked provider data', expectedState: 'missing-credential' },
