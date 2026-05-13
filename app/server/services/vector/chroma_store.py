@@ -27,6 +27,12 @@ class ChromaVectorStore:
         self.persist_path = persist_path or os.path.join(
             PROJECT_DIR, "resources", "vectors"
         )
+        # Keep Chroma cache/data inside the project so startup does not depend on
+        # user-profile writable paths that may be unavailable in restricted runs.
+        local_cache_root = os.path.join(PROJECT_DIR, ".cache")
+        os.makedirs(local_cache_root, exist_ok=True)
+        os.environ.setdefault("XDG_CACHE_HOME", local_cache_root)
+        os.environ.setdefault("CHROMA_CACHE_DIR", os.path.join(local_cache_root, "chroma"))
         self.collection_name = collection_name
         os.makedirs(self.persist_path, exist_ok=True)
         self._memory_docs: list[VectorDocument] = []

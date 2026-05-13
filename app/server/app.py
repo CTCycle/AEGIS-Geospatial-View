@@ -47,13 +47,24 @@ def tauri_mode_enabled() -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+def serve_built_client_enabled() -> bool:
+    value = os.getenv("AEGIS_SERVE_BUILT_CLIENT", "false").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def get_client_dist_path() -> str:
     project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    return os.path.join(project_path, "client", "dist")
+    dist_path = os.path.join(project_path, "client", "dist")
+    browser_path = os.path.join(dist_path, "browser")
+    if os.path.isdir(browser_path):
+        return browser_path
+    return dist_path
 
 
 def packaged_client_available() -> bool:
-    return tauri_mode_enabled() and os.path.isdir(get_client_dist_path())
+    return (tauri_mode_enabled() or serve_built_client_enabled()) and os.path.isdir(
+        get_client_dist_path()
+    )
 
 
 def serve_spa_root() -> FileResponse:
