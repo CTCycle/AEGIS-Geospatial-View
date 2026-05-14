@@ -1,0 +1,60 @@
+{
+  "id": "public_transport_cameras",
+  "name": "Public Transport Cameras",
+  "provider": "local_open_data",
+  "type": "camera-network",
+  "description": "Template for official public transport station, stop, and corridor camera sources with explicit permission checks.",
+  "capabilities": ["camera", "transit-camera", "station-condition"],
+  "coverage": "agency-defined",
+  "metadata": {
+    "label": "Public Transport Cameras",
+    "requires_key": false,
+    "attribution": "Source public transport agency",
+    "keywords": ["transit", "station", "camera", "public transport"],
+    "intent_tags": ["transit camera", "station condition"],
+    "task_tags": ["transit monitoring", "station status"],
+    "source_protocol": "agency-defined JSON/WMS/HTML",
+    "data_format": "template",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "requires-local-source",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.transit.dot.gov/",
+    "rate_limit_notes": "Validate each agency feed license and embedding permission before enabling.",
+    "last_validated": "2026-05-14"
+  },
+  "version": 1,
+  "last_modified": "2026-05-14T00:00:00+00:00",
+  "capabilityKind": "camera-network",
+  "renderingMode": "camera-points",
+  "sourceOfficialDocs": ["https://www.transit.dot.gov/"],
+  "license": {
+    "name": "Agency-specific public camera terms",
+    "url": "https://www.transit.dot.gov/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {"type": "none", "required": false, "providerKey": null, "accessPageProviderId": null},
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": ["transit camera", "station camera", "public transport"],
+    "requiredUserIntent": ["transit_monitoring", "travel_condition"],
+    "avoidWhen": ["general chat", "no geographic context", "source not configured"]
+  },
+  "reliability": {
+    "status": "disabled",
+    "lastAudited": "2026-05-14",
+    "knownLimitations": ["Template only until an official transport camera feed is configured."]
+  },
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 300, "staleWhileRevalidateSeconds": 3600},
+  "normalization": {
+    "geometryPath": "cameras[].location",
+    "idPath": "cameras[].id",
+    "timestampPath": "cameras[].last_update_time",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  }
+}
