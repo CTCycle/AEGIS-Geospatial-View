@@ -6,6 +6,8 @@ from enum import Enum
 from threading import RLock
 from typing import Any
 
+from server.services.geospatial.providers.base import ProviderRequest, provider_cache_key
+
 
 class CacheLookupStatus(str, Enum):
     HIT = "hit"
@@ -84,3 +86,7 @@ class GeospatialCache:
         if not normalized:
             raise ValueError("Cache key is required.")
         return normalized
+
+
+def cache_key_for_request(provider_id: str, request: ProviderRequest) -> str:
+    return provider_cache_key(provider_id, request)
