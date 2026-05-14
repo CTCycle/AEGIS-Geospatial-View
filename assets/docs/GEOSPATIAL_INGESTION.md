@@ -1,6 +1,6 @@
 # Geospatial Ingestion
 
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 ## Scope
 
@@ -57,4 +57,18 @@ The backend helper `build_ingestion_plan()` in `app/server/services/geospatial/i
 
 ## Optional Heavy Dependencies
 
-Use an optional `geospatial-ingestion` extra for packages such as GeoPandas, Rasterio, Pyogrio, DuckDB, or tile-generation tools. Do not add these to the default backend dependency set unless the default runtime needs them.
+Use the optional `geospatial-ingestion` extra for packages such as GeoPandas, Rasterio, Pyogrio, DuckDB, and Rtree. Do not add these to the default backend dependency set unless the default runtime needs them.
+
+## Validation
+
+Run focused ingestion checks from the repository root:
+
+```powershell
+app\server\.venv\Scripts\python.exe -m pytest `
+  app\tests\unit\test_geospatial_ingestion.py `
+  app\tests\unit\test_geospatial_ingestion_validation.py `
+  app\tests\unit\test_geospatial_dataset_health.py `
+  -q -p no:cacheprovider
+```
+
+These tests cover plan construction, local source materialization, checksum failure, CRS/field normalization metadata, invalid geometry or coordinate handling, lightweight spatial/text indexes, tile manifest creation, and dataset health output.

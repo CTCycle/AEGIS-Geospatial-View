@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 ## Summary
 
@@ -85,6 +85,8 @@ Selection rules:
 - Broken or metadata-only capabilities are not exposed as normal renderable toggles.
 - `select_geospatial_capabilities(user_query, resolved_location, bbox, time_context, user_permissions)` is the explicit selector for capability gating. It returns selected, missing-credential, unhealthy, privacy-gated, needs-location, or refused decisions before execution.
 - Requests to show every possible layer are refused as indiscriminate loading and should be answered with a concise category offer.
+- Selected capabilities flow into the backend `MapSession`; manual toggles and agent-selected layers both pass the same credential, health, freshness, privacy, cost, and permission gates.
+- Map sessions are expected for map-worthy webcam, traffic, hazard, amenity, transit, weather, demographic, infrastructure, and environmental queries. General factual questions continue through normal chat with no layer load.
 
 ## Runtime and Coverage
 

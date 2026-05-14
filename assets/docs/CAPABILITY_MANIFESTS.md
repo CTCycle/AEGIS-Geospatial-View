@@ -1,6 +1,6 @@
 # Capability Manifests
 
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 ## Purpose
 
@@ -12,11 +12,14 @@ Default capability selection prioritizes free and openly accessible providers. G
 
 - Providers, basemaps, overlays, and direct tools are loaded through `GeospatialManifestLoader`, `CapabilityRegistry`, and `RuntimeRegistry`.
 - Schema v2 is the only accepted manifest contract. The loader rejects manifests that omit v2 source, auth, rendering, reliability, cache, license, or normalization metadata.
+- The strict auditor reports schema, provider, renderer, auth, and source-doc coverage so missing operational metadata is visible before runtime.
 - Runtime availability is controlled by `runtime_profiles.json` plus credential presence.
 - Credential-backed geospatial providers use the encrypted credential repository with `api_key` labels; environment variables remain a runtime fallback.
 - Every capability entry must define purpose, data source, update frequency, access constraints, and dependencies.
 - Every metadata object must expose ingestion traits: `official_docs_url`, `source_protocol`, `data_format`, `geometry_type`, `queryable`, `vectorizable`, `endpoint_health`, `auth_mode`, and `rate_limit_notes`.
 - Queryable/vectorizable claims are reserved for GeoJSON, ArcGIS REST GeoJSON, point-insight, and time-series insight layers. Raster tile, WMS, and WMTS layers are OpenLayers-compatible but not advertised as machine-queryable vectors.
+- `metadata-only` capabilities must not claim renderable geometry, map feature layers, or normal manual toggles.
+- Disabled or broken layers must remain unavailable for normal manual toggles until the manifest, runtime profile, credentials, and health metadata allow rendering.
 - OpenLayers-compatible source protocols are the manifest standard. The active UI renderer remains MapLibre unless an OpenLayers adapter adds unique capability.
 
 ## Providers
@@ -123,6 +126,13 @@ Every manifest under `app/resources/manifests` must define:
 - `reliability`: health status, audit date, and known limitations.
 - `cachePolicy`: cache mode, TTL, and stale-while-revalidate TTL.
 - `normalization`: expected geometry model and field/path mapping for renderable or queryable payloads.
+
+Additional strict rules:
+
+- Credential-gated manifests must set both `auth.providerKey` and `auth.accessPageProviderId`.
+- Manifests must never contain raw secrets, access tokens, bearer values, or concrete API keys.
+- Renderable capabilities must declare a supported rendering mode and normalization geometry.
+- Metadata-only and analysis-tool capabilities may expose descriptive or computed payloads, but cannot masquerade as successful empty map geometry.
 
 Run the strict audit before merging manifest changes:
 

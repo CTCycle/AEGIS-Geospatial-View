@@ -1,6 +1,6 @@
 # Webcam Capability
 
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 ## Scope
 
@@ -29,4 +29,27 @@ Rules:
 - `GET /api/geospatial/cameras/{camera_id}`
 - `GET /api/geospatial/sources/windy_webcams/credential-status`
 
-The current provider shell supports normalized mocked camera payloads for deterministic contract testing. Live Windy fetch implementation is the next provider-specific step.
+The provider supports normalized mocked camera payloads for deterministic contract testing and provider-backed camera detail lookup for the API contract.
+
+Provider-backed camera detail lookup is required for `GET /api/geospatial/cameras/{camera_id}`. The backend resolves provider-prefixed IDs, fetches the matching provider result safely, and returns access-needed or not-found state instead of leaking provider errors.
+
+## Public Camera Templates
+
+Additional disabled templates exist for:
+
+- DOT traffic cameras.
+- Public transport cameras.
+- Tourism webcams.
+- Ski resort webcams.
+- Port and airport webcams.
+- Environmental monitoring cameras.
+
+These templates are not normal toggles until an official feed URL, provider attribution, license, embedding permission, freshness policy, and runtime profile are configured.
+
+## Rendering Rules
+
+- Camera dots render only for permitted, renderable camera layers.
+- Low-zoom camera clusters must preserve count, provider, stale, and access-needed state.
+- Popups must show camera name, provider, stale state, preview when allowed, and official link fallback.
+- Expired preview URLs are refreshed through the provider path; stale previews degrade to metadata and official links.
+- Live embed surfaces remain disabled unless the provider explicitly grants embedding rights.
