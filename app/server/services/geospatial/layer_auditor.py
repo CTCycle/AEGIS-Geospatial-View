@@ -424,7 +424,9 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
 
 
 def audit_all_manifests(
-    strict: bool = False, root_path: str | os.PathLike[str] | None = None
+    strict: bool = False,
+    root_path: str | os.PathLike[str] | None = None,
+    production: bool = False,
 ) -> LayerAuditReport:
     root = Path(root_path or Path(PROJECT_DIR) / "resources" / "manifests")
     report = LayerAuditReport()
@@ -487,6 +489,50 @@ def audit_all_manifests(
                     "Placeholder-backed capability cannot be exposed as a manual toggle."
                 ),
             )
+        if production and path.parent.name != "providers":
+            if status.placeholder_statuses:
+                _add_issue(
+                    report,
+                    path=path,
+                    severity="error",
+                    manifest_id=manifest.id,
+                    message=(
+                        "Production audit forbids placeholder provider states: "
+                        + ", ".join(status.placeholder_statuses)
+                    ),
+                )
+            if not status.provider_fetch_implemented:
+                _add_issue(
+                    report,
+                    path=path,
+                    severity="error",
+                    manifest_id=manifest.id,
+                    message="Production audit requires a concrete provider fetch path.",
+                )
+            if not status.unit_tested:
+                _add_issue(
+                    report,
+                    path=path,
+                    severity="error",
+                    manifest_id=manifest.id,
+                    message="Production audit requires unit test coverage.",
+                )
+            if not status.client_renderer_covered:
+                _add_issue(
+                    report,
+                    path=path,
+                    severity="error",
+                    manifest_id=manifest.id,
+                    message="Production audit requires client renderer coverage.",
+                )
+            if not status.visual_tested:
+                _add_issue(
+                    report,
+                    path=path,
+                    severity="error",
+                    manifest_id=manifest.id,
+                    message="Production audit requires browser scenario coverage.",
+                )
     if strict and report.warning_count:
         report.error_count += report.warning_count
     return report
@@ -500,9 +546,18 @@ def _format_report(report: LayerAuditReport) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Audit geospatial manifest schema v2.")
     parser.add_argument("--strict", action="store_true", help="Fail on any audit issue.")
+    parser.add_argument(
+        "--production",
+        action="store_true",
+        help="Require production-ready provider, renderer, unit, and browser coverage.",
+    )
     parser.add_argument("--root", default=None, help="Override manifest root path.")
     args = parser.parse_args(argv)
-    report = audit_all_manifests(strict=args.strict, root_path=args.root)
+    report = audit_all_manifests(
+        strict=args.strict,
+        root_path=args.root,
+        production=args.production,
+    )
     print(_format_report(report))
     return 0 if report.ok else 1
 

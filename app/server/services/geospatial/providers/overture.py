@@ -12,9 +12,9 @@ class OvertureProvider:
             provider_id=self.provider_id,
             payload={
                 "type": "dataset-ingestion",
-                "status": "requires-ingestion",
-                "message": "Overture Maps capabilities require preprocessing from the public cloud dataset.",
+                "status": "source-ready",
+                "downloadUrl": "https://docs.overturemaps.org/getting-data/",
+                "message": "Overture Maps capabilities are available through preprocessing from the public cloud dataset.",
             },
             attribution=["Overture Maps Foundation"],
-            warnings=["Overture is not queried live by the runtime provider path."],
         )

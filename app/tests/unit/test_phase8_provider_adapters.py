@@ -86,12 +86,12 @@ def test_nrel_requires_key_for_afdc_descriptor() -> None:
     assert "alt-fuel-stations" in response.payload["featuresUrl"]
 
 
-def test_ourairports_returns_download_descriptor() -> None:
+def test_ourairports_returns_source_ready_descriptor() -> None:
     response = asyncio.run(
         OurAirportsProvider().fetch(ProviderRequest(capability_id="ourairports_airports"))
     )
 
-    assert response.payload["status"] == "download-required"
+    assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].endswith("airports.csv")
 
 

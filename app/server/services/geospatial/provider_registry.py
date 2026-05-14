@@ -323,6 +323,10 @@ class ProviderRegistry:
             )
 
             return TransitlandProvider(api_key=os.getenv("TRANSITLAND_API_KEY"))
+        if provider_id == "nominatim":
+            from server.services.geospatial.providers.nominatim import NominatimProvider
+
+            return NominatimProvider()
         if provider_id == "fallback":
             from server.services.geospatial.providers.fallback import FallbackTileProvider
 

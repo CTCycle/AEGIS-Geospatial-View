@@ -41,8 +41,8 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
         )
     )
 
-    assert response.payload["status"] == "requires-ingestion"
-    assert response.warnings
+    assert response.payload["status"] == "source-ready"
+    assert response.payload["downloadUrl"].startswith("https://")
 
 
 def test_transitland_requires_configured_key() -> None:

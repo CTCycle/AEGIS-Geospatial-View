@@ -124,7 +124,7 @@ jobs:
       - name: Validate geospatial schema v2 audit
         run: |
           cd app
-          python -m server.services.geospatial.layer_auditor --strict
+          python -m server.services.geospatial.layer_auditor --strict --production
 
       - name: Run geospatial provider and API contracts
         run: |

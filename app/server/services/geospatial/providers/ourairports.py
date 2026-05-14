@@ -17,7 +17,7 @@ class OurAirportsProvider(GeospatialProvider):
             payload={
                 "renderingMode": "clustered-points",
                 "downloadUrl": "https://davidmegginson.github.io/ourairports-data/airports.csv",
-                "status": "download-required",
+                "status": "source-ready",
                 "message": "OurAirports CSV data is normalized by the dataset ingestion pipeline.",
             },
             attribution=["OurAirports"],

@@ -53,4 +53,6 @@ export const geospatialLayerScenarios: GeospatialLayerScenario[] = [
   { id: 'nrel_afdc_alt_fuel_stations', description: 'NREL AFDC stations handle missing key or mocked provider data', expectedState: 'missing-credential' },
   { id: 'opentripmap_tourism_pois', description: 'OpenTripMap tourism POIs handle missing key or mocked provider data', expectedState: 'missing-credential' },
   { id: 'ourairports_airports', description: 'OurAirports airports render after dataset ingestion', expectedState: 'renders' },
+  { id: 'openaddresses_points', description: 'OpenAddresses points render from ingested address data', expectedState: 'renders' },
+  { id: 'overture_maps_places', description: 'Overture Maps places render from ingested public cloud data', expectedState: 'renders' },
 ];

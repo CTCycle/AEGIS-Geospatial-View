@@ -16,5 +16,11 @@ export const geospatialWebcamScenarios: GeospatialWebcamScenario[] = [
   { id: 'windy_webcams_stale', description: 'Stale camera badge appears without failing the layer', expectedState: 'stale' },
   { id: 'windy_webcams_expired_preview', description: 'Expired preview refresh degrades to official link', expectedState: 'metadata-only' },
   { id: 'dot_traffic_camera_points', description: 'DOT traffic camera dots render from mocked agency metadata', expectedState: 'renders' },
+  { id: 'dot_traffic_cameras', description: 'DOT traffic camera capability renders from configured agency metadata', expectedState: 'renders' },
+  { id: 'public_transport_cameras', description: 'Public transport camera dots render from configured agency metadata', expectedState: 'renders' },
   { id: 'tourism_camera_metadata_only', description: 'Tourism camera sources default to official links when embedding permission is unknown', expectedState: 'metadata-only' },
+  { id: 'tourism_webcams', description: 'Tourism webcam sources render official-link camera metadata', expectedState: 'metadata-only' },
+  { id: 'ski_resort_webcams', description: 'Ski resort webcams render official-link camera metadata', expectedState: 'metadata-only' },
+  { id: 'port_airport_webcams', description: 'Port and airport webcams render official-link camera metadata', expectedState: 'metadata-only' },
+  { id: 'environmental_monitoring_cameras', description: 'Environmental monitoring cameras render official-link camera metadata', expectedState: 'metadata-only' },
 ];

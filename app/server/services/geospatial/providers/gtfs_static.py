@@ -5,16 +5,32 @@ import io
 import zipfile
 from typing import Any
 
+from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderError,
     ProviderRequest,
     ProviderResponse,
     ProviderUnavailableError,
+)
+from server.services.geospatial.providers.http import (
+    BytesFetcher,
+    call_bytes_fetcher,
+    fetch_bytes_url,
 )
 
 
 class GTFSStaticProvider(GeospatialProvider):
     provider_id = "gtfs_static"
+
+    def __init__(
+        self,
+        *,
+        fetcher: BytesFetcher | None = None,
+        cache: GeospatialCache | None = None,
+    ) -> None:
+        self.fetcher = fetcher or fetch_bytes_url
+        self.cache = cache or GeospatialCache()
 
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         feed_bytes = request.params.get("feed_bytes")
@@ -22,17 +38,12 @@ class GTFSStaticProvider(GeospatialProvider):
         if isinstance(feed_bytes, bytes):
             payload = self._parse_feed(feed_bytes)
         elif feed_url:
-            payload = {
-                "renderingMode": "metadata-only",
-                "feedUrl": feed_url,
-                "status": "download-required",
-                "message": "GTFS static feed download is handled by the ingestion pipeline.",
-            }
+            payload = await self._fetch_and_parse_feed(feed_url)
         else:
             payload = {
                 "renderingMode": "metadata-only",
-                "status": "feed-required",
-                "message": "Provide a GTFS static feed URL or ingested feed bytes before rendering stops and routes.",
+                "status": "configuration-needed",
+                "message": "Configure a GTFS static feed URL or provide ingested feed bytes before rendering stops and routes.",
             }
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -40,6 +51,33 @@ class GTFSStaticProvider(GeospatialProvider):
             payload=payload,
             attribution=["GTFS Static feed publisher"],
         )
+
+    async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
+        return await self.fetch(request)
+
+    async def _fetch_and_parse_feed(self, feed_url: str) -> dict[str, Any]:
+        cache_key = f"{self.provider_id}:{feed_url}"
+        try:
+            feed_bytes = await call_bytes_fetcher(self.fetcher, feed_url, None)
+            payload = self._parse_feed(feed_bytes)
+            payload["feedUrl"] = feed_url
+            self.cache.set(
+                cache_key,
+                payload,
+                ttl_seconds=86400,
+                stale_while_revalidate_seconds=604800,
+            )
+            return payload
+        except ProviderError:
+            cached = self.cache.get(cache_key)
+            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+                stale_payload = dict(cached.value)
+                stale_payload["stale"] = True
+                stale_payload.setdefault("warnings", []).append(
+                    "GTFS static feed fetch failed; serving stale parsed feed."
+                )
+                return stale_payload
+            raise
 
     def _parse_feed(self, feed_bytes: bytes) -> dict[str, Any]:
         try:
