@@ -42,6 +42,7 @@ geospatial-ingestion = [
     "geopandas>=1.1.0",
     "pyogrio>=0.12.0",
     "rasterio>=1.4.0",
+    "rtree>=1.4.0",
 ]
 
 [tool.hatch.build.targets.wheel]
