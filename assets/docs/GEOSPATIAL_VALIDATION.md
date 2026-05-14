@@ -81,3 +81,15 @@ Visual validation is required before releasing major renderer changes. Browser s
 ## CI Coverage
 
 The CI workflow runs the strict auditor, focused geospatial unit contracts, the client build/test suite, and the geospatial browser-smoke scenario command. New capability work should add contract tests first and only expand live provider coverage through mocked, credential-safe fixtures.
+
+## Live Provider Validation
+
+Run the live validator outside deterministic CI when network access is available:
+
+```powershell
+cd app
+.\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict
+.\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict --include-credentialed
+```
+
+The default command checks public no-key providers such as Nominatim, USGS, and Open-Meteo. `--include-credentialed` also checks providers such as Windy Webcams and Transitland when their environment credentials are configured; missing optional credentials are reported as skipped instead of leaking secrets.
