@@ -1,6 +1,6 @@
 # Geospatial Source Catalog
 
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 ## Purpose
 
@@ -14,7 +14,7 @@ AEGIS treats geographic data sources as manifest-backed capabilities. The single
 | `raster-overlay` | NASA GIBS, RainViewer, TomTom traffic, ESA, and EEA manifests are classified. GIBS and RainViewer provider descriptors are implemented. |
 | `vector-overlay` | OpenAQ, Census TIGERweb, USGS, NOAA, FEMA, NASA FIRMS, Open Charge Map, NREL AFDC, and ArcGIS REST descriptors are implemented for normalized API contracts. Open Charge Map and NREL AFDC also support live JSON fetch, normalization, and stale-cache fallback. |
 | `search-index` | Overpass, Geoapify, and OpenTripMap sources are classified. Overpass has a concrete provider adapter; OpenTripMap supports live JSON fetch, normalization, and stale-cache fallback when credentials are configured. |
-| `camera-network` | Windy Webcams manifest, provider shell, credential status, API contract, and client types are implemented. |
+| `camera-network` | Windy Webcams provider, credential status, provider-backed camera detail API, client camera popup, and disabled public/agency camera templates are implemented. |
 | `dataset-ingestion` | GTFS Static, OurAirports, Natural Earth, Census boundaries, ACS joins, Eurostat NUTS, Overture Maps, OpenAddresses, and local parcel template manifests are classified. The ingestion service executes CSV/GeoJSON normalization and records partial status for heavy formats that need optional GIS dependencies. |
 | `analysis-tool` | Open-Meteo and PVGIS provider adapters are implemented for point or sampled analysis payloads. |
 | `metadata-only` | Statistical or restricted sources are classified and not exposed as normal map toggles. |
@@ -78,5 +78,13 @@ Implemented adapters:
 - `windy_webcams.py`
 
 Adapters return normalized `ProviderResponse` objects with payload, attribution, warnings, stale state, and provider ID. Network-dependent behavior is tested through mocked services.
+
+Provider contract expectations:
+
+- Feature providers expose `fetch_features(request)` or an equivalent adapter path through the registry.
+- Cache keys include provider, layer ID, bbox, zoom, time, category, variables, and credential-safe request parameters.
+- Provider results include attribution and source-health metadata when available.
+- 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced as safe client payloads without raw credentials.
+- Hazard providers include legends and freshness labels for earthquakes, weather alerts, flood zones, water gauges, CO-OPS water levels, and active fires.
 
 Downloaded datasets are represented as manifests and processed by `app/server/services/geospatial/ingestion.py`. The default runtime can normalize CSV point data and GeoJSON feature collections; heavy formats remain optional to keep the web stack lightweight.

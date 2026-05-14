@@ -4,14 +4,30 @@ import { GeospatialLayerService } from './geospatial-layer.service';
 
 describe('services/geospatial-layer.service', () => {
   let service: GeospatialLayerService;
+  let hadFetch = false;
+  let originalFetch: typeof window.fetch | undefined;
 
   beforeEach(() => {
+    hadFetch = typeof window.fetch === 'function';
+    originalFetch = window.fetch;
+    if (!hadFetch) {
+      Object.defineProperty(window, 'fetch', {
+        configurable: true,
+        writable: true,
+        value: () => Promise.reject(new Error('fetch was not mocked')),
+      });
+    }
     TestBed.configureTestingModule({});
     service = TestBed.inject(GeospatialLayerService);
   });
 
   afterEach(() => {
     (window.fetch as jasmine.Spy | undefined)?.and?.stub();
+    if (hadFetch) {
+      window.fetch = originalFetch as typeof window.fetch;
+    } else {
+      delete (window as Partial<Window>).fetch;
+    }
   });
 
   it('lists grouped geospatial layers', async () => {

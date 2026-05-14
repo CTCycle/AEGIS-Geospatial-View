@@ -4,10 +4,30 @@ import { GeospatialCameraService } from './geospatial-camera.service';
 
 describe('services/geospatial-camera.service', () => {
   let service: GeospatialCameraService;
+  let hadFetch = false;
+  let originalFetch: typeof window.fetch | undefined;
 
   beforeEach(() => {
+    hadFetch = typeof window.fetch === 'function';
+    originalFetch = window.fetch;
+    if (!hadFetch) {
+      Object.defineProperty(window, 'fetch', {
+        configurable: true,
+        writable: true,
+        value: () => Promise.reject(new Error('fetch was not mocked')),
+      });
+    }
     TestBed.configureTestingModule({});
     service = TestBed.inject(GeospatialCameraService);
+  });
+
+  afterEach(() => {
+    (window.fetch as jasmine.Spy | undefined)?.and?.stub();
+    if (hadFetch) {
+      window.fetch = originalFetch as typeof window.fetch;
+    } else {
+      delete (window as Partial<Window>).fetch;
+    }
   });
 
   it('fetches camera collections with bbox and provider filters', async () => {

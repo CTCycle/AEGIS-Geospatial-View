@@ -1,6 +1,6 @@
 # API Access and Account Setup Guide
 
-Last updated: 2026-05-11
+Last updated: 2026-05-14
 
 ## Purpose
 
@@ -36,6 +36,8 @@ Environment fallback:
 | TomTom | `TOMTOM_API_KEY` | Yes |
 | Transitland | `TRANSITLAND_API_KEY` | Yes, when Transitland feed discovery is enabled |
 | Windy Webcams | `WINDY_WEBCAMS_API_KEY` | Yes, when webcam capabilities are enabled |
+
+Credential-gated manifests must reference only the provider key name and Access setup provider ID. Raw key values are prohibited in manifests, provider responses, browser logs, network URLs, and snapshots.
 
 ## Providers
 
@@ -233,6 +235,12 @@ Limits and restrictions:
 - Preview image URL tokens expire and must be refreshed when loading the page.
 - Do not embed live feeds unless provider terms explicitly allow it.
 - If embedding is not allowed or unknown, render metadata, allowed preview images, and the official link only.
+
+Public and agency camera templates:
+
+- DOT traffic cameras, public transport cameras, tourism webcams, ski resort webcams, port/airport webcams, and environmental monitoring cameras are represented as disabled `camera-network` templates until a local official feed is configured.
+- Every camera source must expose an official provider link.
+- Live embedding is allowed only when the provider terms explicitly permit it; otherwise the UI uses metadata, refreshable preview images, stale state, and official links.
 
 ### GTFS Realtime
 
