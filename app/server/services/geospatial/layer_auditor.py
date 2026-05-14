@@ -10,7 +10,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from server.common.constants import PROJECT_DIR
-from server.domain.geographics import CapabilityManifestV2, ProviderAuthType
+from server.domain.geographics import (
+    CapabilityKind,
+    CapabilityManifestV2,
+    ProviderAuthType,
+    RenderingMode,
+)
 
 type JsonDict = dict[str, Any]
 
@@ -97,6 +102,11 @@ class LayerAuditReport(BaseModel):
     manifest_count: int = 0
     error_count: int = 0
     warning_count: int = 0
+    schema_coverage: dict[str, int] = Field(default_factory=dict)
+    provider_coverage: dict[str, int] = Field(default_factory=dict)
+    renderer_coverage: dict[str, int] = Field(default_factory=dict)
+    auth_coverage: dict[str, int] = Field(default_factory=dict)
+    source_doc_coverage: dict[str, int] = Field(default_factory=dict)
     issues: list[LayerAuditIssue] = Field(default_factory=list)
     implementation_statuses: list[CapabilityImplementationStatus] = Field(
         default_factory=list
@@ -250,6 +260,21 @@ def _contains_secret_value(value: Any) -> bool:
     return False
 
 
+def _increment(counter: dict[str, int], key: str) -> None:
+    counter[key] = counter.get(key, 0) + 1
+
+
+def _record_coverage(manifest: CapabilityManifestV2, report: LayerAuditReport) -> None:
+    _increment(report.schema_coverage, f"schema_v{manifest.version}")
+    _increment(report.provider_coverage, manifest.provider)
+    _increment(report.renderer_coverage, manifest.rendering_mode.value)
+    _increment(report.auth_coverage, manifest.auth.type.value)
+    _increment(
+        report.source_doc_coverage,
+        "with_source_docs" if manifest.source_official_docs else "missing_source_docs",
+    )
+
+
 def _validate_index(root_path: Path, report: LayerAuditReport) -> None:
     path = root_path / "index.json"
     try:
@@ -292,7 +317,20 @@ def _validate_auth_policy(
 def _validate_renderability(
     path: Path, manifest: CapabilityManifestV2, report: LayerAuditReport
 ) -> None:
-    if manifest.rendering_mode.value != "metadata-only" and not manifest.normalization.expected_geometry:
+    metadata_only_capability = manifest.capability_kind == CapabilityKind.METADATA_ONLY
+    renderable_mode = manifest.rendering_mode != RenderingMode.METADATA_ONLY
+    if metadata_only_capability and manifest.rendering_mode != RenderingMode.METADATA_ONLY:
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message="Metadata-only capability must use metadata-only renderingMode.",
+        )
+    if (
+        manifest.rendering_mode.value != "metadata-only"
+        and not manifest.normalization.expected_geometry
+    ):
         _add_issue(
             report,
             path=path,
@@ -308,16 +346,32 @@ def _validate_renderability(
             manifest_id=manifest.id,
             message="Broken manifest cannot be exposed as a manual toggle.",
         )
-    if (
-        manifest.rendering_mode.value == "metadata-only"
-        or manifest.capability_kind.value == "metadata-only"
-    ) and manifest.agentic_use.manual_toggle:
+    if metadata_only_capability and manifest.agentic_use.manual_toggle:
         _add_issue(
             report,
             path=path,
             severity="error",
             manifest_id=manifest.id,
             message="Metadata-only manifest cannot be exposed as a manual toggle.",
+        )
+    if metadata_only_capability and (
+        manifest.normalization.geometry_path
+        or manifest.normalization.expected_geometry not in {"not-applicable", "none"}
+    ):
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message="Metadata-only manifest cannot claim map geometry.",
+        )
+    if renderable_mode and manifest.normalization.expected_geometry == "not-applicable":
+        _add_issue(
+            report,
+            path=path,
+            severity="error",
+            manifest_id=manifest.id,
+            message="Renderable manifest must use a concrete expectedGeometry.",
         )
 
 
@@ -340,6 +394,7 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
         )
         return
     report.manifest_count += 1
+    _record_coverage(manifest, report)
     if not manifest.source_official_docs:
         _add_issue(
             report,

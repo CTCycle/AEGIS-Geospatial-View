@@ -50,7 +50,7 @@
     "data_format": "JSON",
     "geometry_type": "regional/time-series",
     "queryable": true,
-    "vectorizable": true,
+    "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",
     "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
@@ -117,6 +117,6 @@
     "idPath": null,
     "timestampPath": null,
     "fieldMap": {},
-    "expectedGeometry": "regional/time-series"
+    "expectedGeometry": "not-applicable"
   }
 }
