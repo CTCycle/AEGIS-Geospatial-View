@@ -31,6 +31,23 @@ def build_feature_search_index(features: list[IndexedFeature]) -> SearchIndex:
     return SearchIndex(features=features, terms=terms)
 
 
+def deduplicate_features(features: list[IndexedFeature]) -> list[IndexedFeature]:
+    deduped: list[IndexedFeature] = []
+    seen: set[tuple[object, ...]] = set()
+    for feature in features:
+        key = (
+            round(feature.latitude, 6) if feature.latitude is not None else None,
+            round(feature.longitude, 6) if feature.longitude is not None else None,
+            feature.label.strip().casefold(),
+            (feature.category or "").strip().casefold(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(feature)
+    return deduped
+
+
 def build_geojson_search_index(path: str | Path) -> SearchIndex:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     indexed: list[IndexedFeature] = []
