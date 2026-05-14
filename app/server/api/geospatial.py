@@ -143,10 +143,42 @@ async def get_geospatial_cameras(
 
 @router.get("/cameras/{camera_id:path}", status_code=status.HTTP_200_OK)
 async def get_geospatial_camera(camera_id: str) -> dict[str, Any]:
+    provider_id, provider_camera_id = _parse_camera_identifier(camera_id)
+    if provider_id:
+        request = ProviderRequest(
+            capability_id=provider_id,
+            params={"live": True, "camera_id": provider_camera_id},
+        )
+        listing = await _fetch_provider_payload(provider_id, request)
+        if listing.get("status") != "ok":
+            return {
+                "id": camera_id,
+                "status": listing.get("status", "metadata-unavailable"),
+                "provider": provider_id,
+                "message": listing.get("message")
+                or "Camera detail lookup is not available.",
+            }
+        payload = listing.get("payload")
+        features = payload.get("features") if isinstance(payload, dict) else None
+        if isinstance(features, list):
+            for feature in features:
+                if not isinstance(feature, dict):
+                    continue
+                feature_id = str(feature.get("id") or "")
+                if feature_id in {camera_id, provider_camera_id}:
+                    return {
+                        "id": camera_id,
+                        "status": "ok",
+                        "provider": provider_id,
+                        "camera": feature,
+                        "attribution": listing.get("attribution", []),
+                        "warnings": listing.get("warnings", []),
+                        "stale": listing.get("stale", False),
+                    }
     return {
         "id": camera_id,
         "status": "metadata-unavailable",
-        "provider": "unknown",
+        "provider": provider_id or "unknown",
         "message": "Camera detail lookup requires a configured camera provider response.",
     }
 
@@ -249,6 +281,19 @@ def _parse_time(value: str | None) -> datetime | None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="time must be ISO-8601.",
         ) from exc
+
+
+def _parse_camera_identifier(camera_id: str) -> tuple[str | None, str]:
+    normalized = camera_id.strip()
+    for separator in ("/", ":"):
+        if separator in normalized:
+            provider_id, provider_camera_id = normalized.split(separator, 1)
+            provider_id = provider_id.strip()
+            provider_camera_id = provider_camera_id.strip()
+            if provider_id and provider_camera_id:
+                provider_aliases = {"windy": "windy_webcams"}
+                return provider_aliases.get(provider_id, provider_id), provider_camera_id
+    return None, normalized
 
 
 def _provider_requires_credentials(provider_id: str) -> bool:

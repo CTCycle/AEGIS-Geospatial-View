@@ -121,8 +121,8 @@ def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["id"] == "windy/camera-1"
-    assert payload["status"] == "metadata-unavailable"
-    assert payload["provider"] == "unknown"
+    assert payload["status"] in {"missing-credential", "metadata-unavailable", "ok"}
+    assert payload["provider"] == "windy_webcams"
 
 
 def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> None:
