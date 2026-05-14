@@ -1,0 +1,50 @@
+{
+  "id": "tourism_webcams",
+  "name": "Tourism Webcams",
+  "provider": "local_open_data",
+  "type": "camera-network",
+  "description": "Template for official tourism board webcams with official-link fallback and explicit embed permission requirements.",
+  "capabilities": ["camera", "tourism-webcam", "destination-view"],
+  "coverage": "source-defined",
+  "metadata": {
+    "label": "Tourism Webcams",
+    "requires_key": false,
+    "attribution": "Source tourism authority",
+    "keywords": ["tourism", "webcam", "destination", "camera"],
+    "intent_tags": ["tourism webcam", "destination condition"],
+    "task_tags": ["tourism view", "destination status"],
+    "source_protocol": "source-defined JSON/HTML",
+    "data_format": "template",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "requires-local-source",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.unwto.org/",
+    "rate_limit_notes": "Use official links unless explicit embedding permission is documented.",
+    "last_validated": "2026-05-14"
+  },
+  "version": 1,
+  "last_modified": "2026-05-14T00:00:00+00:00",
+  "capabilityKind": "camera-network",
+  "renderingMode": "camera-points",
+  "sourceOfficialDocs": ["https://www.unwto.org/"],
+  "license": {
+    "name": "Source-specific tourism webcam terms",
+    "url": "https://www.unwto.org/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {"type": "none", "required": false, "providerKey": null, "accessPageProviderId": null},
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": ["tourism webcam", "destination view", "live view"],
+    "requiredUserIntent": ["visual_status", "tourism"],
+    "avoidWhen": ["general chat", "no geographic context", "source not configured"]
+  },
+  "reliability": {"status": "disabled", "lastAudited": "2026-05-14", "knownLimitations": ["Template only until official source configuration is added."]},
+  "cachePolicy": {"mode": "memory", "ttlSeconds": 300, "staleWhileRevalidateSeconds": 3600},
+  "normalization": {"geometryPath": "cameras[].location", "idPath": "cameras[].id", "timestampPath": "cameras[].last_update_time", "fieldMap": {}, "expectedGeometry": "Point"}
+}
