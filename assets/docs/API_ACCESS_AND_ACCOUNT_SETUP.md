@@ -36,8 +36,11 @@ Environment fallback:
 | TomTom | `TOMTOM_API_KEY` | Yes |
 | Transitland | `TRANSITLAND_API_KEY` | Yes, when Transitland feed discovery is enabled |
 | Windy Webcams | `WINDY_WEBCAMS_API_KEY` | Yes, when webcam capabilities are enabled |
+| Local/agency open data | `LOCAL_OPEN_DATA_SOURCES` | Yes, when local camera or parcel templates are enabled |
 
 Credential-gated manifests must reference only the provider key name and Access setup provider ID. Raw key values are prohibited in manifests, provider responses, browser logs, network URLs, and snapshots.
+
+`LOCAL_OPEN_DATA_SOURCES` is a JSON object that maps capability IDs to official JSON source URLs or local files, for example `{"dot_traffic_cameras":"https://agency.example/cameras.json"}`.
 
 ## Providers
 
