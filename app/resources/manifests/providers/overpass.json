@@ -110,6 +110,6 @@
     "idPath": null,
     "timestampPath": null,
     "fieldMap": {},
-    "expectedGeometry": "point"
+    "expectedGeometry": "not-applicable"
   }
 }
