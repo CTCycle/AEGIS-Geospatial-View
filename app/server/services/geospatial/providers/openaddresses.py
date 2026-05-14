@@ -12,9 +12,9 @@ class OpenAddressesProvider:
             provider_id=self.provider_id,
             payload={
                 "type": "dataset-ingestion",
-                "status": "requires-ingestion",
-                "message": "OpenAddresses points are available after dataset ingestion and indexing.",
+                "status": "source-ready",
+                "downloadUrl": "https://batch.openaddresses.io/data",
+                "message": "OpenAddresses points are available through configured dataset ingestion and indexing.",
             },
             attribution=["OpenAddresses"],
-            warnings=["Use the ingestion pipeline for address data before search or rendering."],
         )

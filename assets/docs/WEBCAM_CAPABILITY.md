@@ -46,6 +46,8 @@ Additional disabled templates exist for:
 
 These templates are not normal toggles until an official feed URL, provider attribution, license, embedding permission, freshness policy, and runtime profile are configured.
 
+Configured local/agency camera sources can be supplied through `LOCAL_OPEN_DATA_SOURCES` as a JSON object mapping capability IDs to official JSON source URLs or local files. Supported source payloads are GeoJSON `FeatureCollection` objects or `{ "cameras": [...] }` lists with latitude/longitude and official links.
+
 ## Rendering Rules
 
 - Camera dots render only for permitted, renderable camera layers.

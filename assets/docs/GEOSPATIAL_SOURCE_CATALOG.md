@@ -86,5 +86,8 @@ Provider contract expectations:
 - Provider results include attribution and source-health metadata when available.
 - 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced as safe client payloads without raw credentials.
 - Hazard providers include legends and freshness labels for earthquakes, weather alerts, flood zones, water gauges, CO-OPS water levels, and active fires.
+- GTFS static and GTFS Realtime providers fetch configured feed URLs, parse ZIP CSV or Protocol Buffer payloads, and use stale parsed cache fallback on provider failure.
+- Transitland performs bounded feed discovery when a credential is configured; discovered feed URLs still pass agency license and freshness gates before rendering.
+- Local open-data camera templates read configured JSON source URLs or files through `LOCAL_OPEN_DATA_SOURCES` and degrade to configuration-needed metadata when no official feed is configured.
 
 Downloaded datasets are represented as manifests and processed by `app/server/services/geospatial/ingestion.py`. The default runtime can normalize CSV point data and GeoJSON feature collections; heavy formats remain optional to keep the web stack lightweight.

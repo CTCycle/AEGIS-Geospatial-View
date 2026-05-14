@@ -9,9 +9,12 @@ Run from the repository root:
 ```powershell
 cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict
+.\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict --production
 ```
 
 The audit fails when any manifest omits schema-v2 fields, source docs, license, auth, reliability, cache policy, or normalization metadata. It also reports schema, provider, renderer, auth, and source-doc coverage; rejects metadata-only geometry claims; rejects normal toggles for broken layers; verifies credential-gated access setup IDs; and scans manifests for secret-like values.
+
+The production audit additionally fails any non-provider capability with placeholder provider states, missing concrete provider fetch support, missing unit coverage, missing client renderer coverage, or missing browser scenario coverage.
 
 ## Backend Contract Tests
 

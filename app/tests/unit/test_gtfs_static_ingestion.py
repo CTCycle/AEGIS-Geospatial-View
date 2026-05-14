@@ -34,3 +34,24 @@ def test_gtfs_static_ingestion_parses_core_feed_tables() -> None:
     assert response.payload["agency"][0]["timezone"] == "Europe/Rome"
     assert response.payload["calendar"][0]["serviceId"] == "wk"
     assert response.payload["shapes"][0]["geometry"]["type"] == "LineString"
+
+
+def test_gtfs_static_provider_fetches_configured_feed_url() -> None:
+    calls: list[str] = []
+
+    async def fetcher(url: str, headers: dict[str, str] | None = None) -> bytes:
+        calls.append(url)
+        return _sample_gtfs_static_zip()
+
+    response = asyncio.run(
+        GTFSStaticProvider(fetcher=fetcher).fetch(
+            ProviderRequest(
+                capability_id="gtfs_static",
+                params={"feed_url": "https://agency.example/gtfs.zip"},
+            )
+        )
+    )
+
+    assert calls == ["https://agency.example/gtfs.zip"]
+    assert response.payload["feedUrl"] == "https://agency.example/gtfs.zip"
+    assert response.payload["summary"]["stopCount"] == 1

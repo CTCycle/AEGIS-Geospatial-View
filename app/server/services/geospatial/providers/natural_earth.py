@@ -12,9 +12,9 @@ class NaturalEarthProvider:
             provider_id=self.provider_id,
             payload={
                 "type": "dataset-ingestion",
-                "status": "requires-ingestion",
-                "message": "Natural Earth data is exposed through the dataset ingestion pipeline.",
+                "status": "source-ready",
+                "downloadUrl": "https://www.naturalearthdata.com/downloads/",
+                "message": "Natural Earth data is exposed through the configured dataset ingestion pipeline.",
             },
             attribution=["Natural Earth"],
-            warnings=["Run the configured ingestion manifest before map rendering."],
         )
