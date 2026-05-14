@@ -40,6 +40,8 @@ class USGSProvider(GeospatialProvider):
                     "features": features,
                     "totalResults": len(features),
                     "timeMode": "current",
+                    "legend": {"type": "magnitude", "label": "Earthquake magnitude"},
+                    "freshnessLabel": "USGS all-day earthquake feed",
                 },
                 attribution=["U.S. Geological Survey"],
             )
@@ -50,6 +52,8 @@ class USGSProvider(GeospatialProvider):
                 "renderingMode": "clustered-points",
                 "featuresUrl": features_url,
                 "timeMode": "current",
+                "legend": {"type": "magnitude", "label": "Earthquake magnitude"},
+                "freshnessLabel": "USGS all-day earthquake feed",
             },
             attribution=["U.S. Geological Survey"],
         )
@@ -75,6 +79,8 @@ class USGSProvider(GeospatialProvider):
                     "features": features,
                     "totalResults": len(features),
                     "format": "json",
+                    "legend": {"type": "water-level", "label": "Latest gauge observation"},
+                    "freshnessLabel": "USGS instantaneous values feed",
                 },
                 attribution=["U.S. Geological Survey"],
             )
@@ -85,6 +91,8 @@ class USGSProvider(GeospatialProvider):
                 "renderingMode": "clustered-points",
                 "featuresUrl": features_url,
                 "format": "json",
+                "legend": {"type": "water-level", "label": "Latest gauge observation"},
+                "freshnessLabel": "USGS instantaneous values feed",
             },
             attribution=["U.S. Geological Survey"],
         )

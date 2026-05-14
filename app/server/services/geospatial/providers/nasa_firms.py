@@ -47,6 +47,8 @@ class NASAFIRMSProvider(GeospatialProvider):
                     "features": features,
                     "totalResults": len(features),
                     "query": params,
+                    "legend": {"type": "active-fire", "label": "Active fire detection"},
+                    "freshnessLabel": "NASA FIRMS near-real-time detections",
                 },
                 attribution=["NASA FIRMS"],
             )
@@ -57,6 +59,8 @@ class NASAFIRMSProvider(GeospatialProvider):
                 "renderingMode": "clustered-points",
                 "featuresUrl": features_url,
                 "query": params,
+                "legend": {"type": "active-fire", "label": "Active fire detection"},
+                "freshnessLabel": "NASA FIRMS near-real-time detections",
             },
             attribution=["NASA FIRMS"],
         )

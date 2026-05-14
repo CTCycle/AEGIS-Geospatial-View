@@ -18,6 +18,8 @@ class FEMAProvider(GeospatialProvider):
                 "renderingMode": "wms",
                 "tileUrl": "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image",
                 "layer": "NFHL",
+                "legend": {"type": "flood-zone", "label": "NFHL flood hazard zone"},
+                "freshnessLabel": "FEMA NFHL public map service",
             },
             attribution=["Federal Emergency Management Agency"],
         )
