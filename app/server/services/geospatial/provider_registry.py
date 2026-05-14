@@ -16,6 +16,7 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderTimeoutError,
     ProviderUnavailableError,
+    response_without_credentials,
 )
 
 
@@ -61,6 +62,9 @@ class ManifestBackedProvider:
             if name:
                 return [name]
         return []
+
+    async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
+        return await self.fetch(request)
 
 
 class ProviderRegistry:
@@ -133,7 +137,7 @@ class ProviderRegistry:
         for attempt in range(attempts):
             try:
                 response = await asyncio.wait_for(
-                    provider.fetch(request),
+                    self._fetch_provider(provider, request),
                     timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
                 )
             except ProviderAuthError:
@@ -155,10 +159,20 @@ class ProviderRegistry:
                 raise
             else:
                 self._failures[normalized] = 0
-                return response
+                return response_without_credentials(response)
         if last_error is not None:
             raise last_error
         raise ProviderUnavailableError(f"Provider '{normalized}' did not return data.")
+
+    async def _fetch_provider(
+        self, provider: GeospatialProvider, request: ProviderRequest
+    ) -> ProviderResponse:
+        fetch_features = getattr(provider, "fetch_features", None)
+        if callable(fetch_features):
+            response = await fetch_features(request)
+            if isinstance(response, ProviderResponse):
+                return response
+        return await provider.fetch(request)
 
     def _provider_for_manifest(
         self, provider_id: str, manifest: dict[str, Any]

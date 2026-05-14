@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
+from server.services.geospatial.cache import (
+    CacheLookupStatus,
+    GeospatialCache,
+    cache_key_for_request,
+)
+from server.services.geospatial.providers.base import ProviderRequest
 
 
 class _Clock:
@@ -33,3 +38,18 @@ def test_geospatial_cache_can_invalidate_entries() -> None:
     cache.invalidate("openaq:stations")
 
     assert cache.get("openaq:stations").status == CacheLookupStatus.MISS
+
+
+def test_geospatial_cache_key_for_request_excludes_raw_credentials() -> None:
+    key = cache_key_for_request(
+        "openaq",
+        ProviderRequest(
+            capability_id="openaq_air_quality",
+            bbox=(1, 2, 3, 4),
+            zoom=9,
+            params={"api_key": "raw-secret", "pollutant": "pm25"},
+        ),
+    )
+
+    assert "raw-secret" not in key
+    assert key.startswith("openaq:openaq_air_quality:")
