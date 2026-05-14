@@ -49,6 +49,8 @@ class NOAAProvider(GeospatialProvider):
                     "features": features,
                     "totalResults": len(features),
                     "format": "geojson",
+                    "legend": {"type": "alert-severity", "label": "NWS alert severity"},
+                    "freshnessLabel": "NOAA active alerts feed",
                 },
                 attribution=["NOAA National Weather Service"],
             )
@@ -59,6 +61,8 @@ class NOAAProvider(GeospatialProvider):
                 "renderingMode": "geojson",
                 "featuresUrl": features_url,
                 "format": "geojson",
+                "legend": {"type": "alert-severity", "label": "NWS alert severity"},
+                "freshnessLabel": "NOAA active alerts feed",
             },
             attribution=["NOAA National Weather Service"],
         )
@@ -71,6 +75,8 @@ class NOAAProvider(GeospatialProvider):
                 "renderingMode": "raster-tile",
                 "tileUrl": "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.3.0&request=GetMap&layers=conus_bref_qcd&styles=&format=image/png&transparent=true&width=256&height=256&crs=EPSG:3857&bbox={bbox-epsg-3857}",
                 "format": "wms",
+                "legend": {"type": "radar-reflectivity", "label": "Radar reflectivity"},
+                "freshnessLabel": "NOAA/NCEP radar layer",
             },
             attribution=["NOAA/NCEP nowCOAST"],
         )
@@ -90,6 +96,8 @@ class NOAAProvider(GeospatialProvider):
                 "renderingMode": "clustered-points",
                 "featuresUrl": f"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?{urlencode(params)}",
                 "format": "json",
+                "legend": {"type": "water-level", "label": "Observed water level"},
+                "freshnessLabel": "NOAA CO-OPS water-level observations",
             },
             attribution=["NOAA CO-OPS"],
         )
