@@ -34,15 +34,25 @@ class CensusProvider(ArcGISRestProvider):
                 params=params,
             )
         )
+        payload = {
+            **response.payload,
+            "renderingMode": "choropleth"
+            if "demographics" in request.capability_id
+            else "geojson",
+        }
+        if "demographics" in request.capability_id:
+            payload.update(
+                {
+                    "classificationField": "population_density",
+                    "joinKey": "GEOID",
+                    "vintage": request.params.get("vintage") or "latest",
+                    "marginOfErrorFields": [],
+                }
+            )
         return ProviderResponse(
             capability_id=response.capability_id,
             provider_id=self.provider_id,
-            payload={
-                **response.payload,
-                "renderingMode": "choropleth"
-                if "demographics" in request.capability_id
-                else "geojson",
-            },
+            payload=payload,
             attribution=response.attribution,
             warnings=response.warnings,
             stale=response.stale,
