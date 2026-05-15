@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 set "script_dir=%~dp0"
 for %%I in ("%script_dir%..\..") do set "repo_root=%%~fI"
-set "project_folder=%repo_root%\AEGIS\"
+set "project_folder=%repo_root%\app\"
 set "client_dir=%project_folder%client"
 set "tauri_dir=%client_dir%\src-tauri"
 set "bundle_source_dir=%tauri_dir%\r"
@@ -11,9 +11,9 @@ set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "release_export_dir=%repo_root%\release\windows"
 set "runtime_python_exe=%repo_root%\runtimes\python\python.exe"
 set "runtime_uv_exe=%repo_root%\runtimes\uv\uv.exe"
-set "runtime_uv_lock=%repo_root%\runtimes\uv.lock"
+set "runtime_uv_lock=%repo_root%\app\server\uv.lock"
 set "runtime_node_dir=%repo_root%\runtimes\nodejs"
-set "runtime_database=%project_folder%resources\database.db"
+set "runtime_database=%repo_root%\app\resources\database.db"
 set "node_cmd=%runtime_node_dir%\node.exe"
 set "npm_cmd=%runtime_node_dir%\npm.cmd"
 
@@ -25,6 +25,18 @@ call :require_file "%runtime_uv_exe%" "embedded uv runtime" || goto build_error
 call :require_file "%runtime_uv_lock%" "runtime uv lockfile" || goto build_error
 call :require_file "%node_cmd%" "embedded Node.js runtime" || goto build_error
 call :require_file "%npm_cmd%" "embedded npm runtime" || goto build_error
+
+if not exist "%runtime_database%" (
+  echo [CHECK] Initializing runtime database at "%runtime_database%"...
+  pushd "%repo_root%\app\server" >nul
+  "%runtime_uv_exe%" run --project "%repo_root%\app\server" --python "%runtime_python_exe%" python ..\scripts\initialize_database.py
+  set "db_init_error=%ERRORLEVEL%"
+  popd >nul
+  if not "%db_init_error%"=="0" (
+    echo [FATAL] Failed to initialize runtime database.
+    goto build_error
+  )
+)
 
 echo [CHECK] Preparing short Tauri bundle sources...
 call :prepare_bundle_sources || goto build_error
@@ -120,7 +132,7 @@ if exist "%~1" (
   exit /b 0
 )
 echo [FATAL] Missing %~2 at "%~1"
-echo         Run AEGIS\start_on_windows.bat first to install the portable runtimes.
+echo         Run start_on_windows.bat first to install the portable runtimes.
 exit /b 1
 
 :ensure_cargo_toolchain
@@ -189,7 +201,7 @@ md "%bundle_source_dir%\resources" >nul 2>&1
 md "%bundle_source_dir%\client" >nul 2>&1
 md "%bundle_source_dir%\runtimes" >nul 2>&1
 
-copy /y "%repo_root%\pyproject.toml" "%bundle_source_dir%\pyproject.toml" >nul
+copy /y "%repo_root%\app\server\pyproject.toml" "%bundle_source_dir%\pyproject.toml" >nul
 if errorlevel 1 (
   echo [FATAL] Failed to stage pyproject.toml for Tauri bundling.
   exit /b 1
@@ -197,7 +209,7 @@ if errorlevel 1 (
 copy /y "%runtime_uv_lock%" "%bundle_source_dir%\uv.lock" >nul
 if errorlevel 1 (
   echo [FATAL] Failed to stage uv.lock for Tauri bundling from "%runtime_uv_lock%".
-  echo         Run AEGIS\start_on_windows.bat to install and stage runtime lockfiles.
+  echo         Run start_on_windows.bat to install and stage runtime lockfiles.
   exit /b 1
 )
 
@@ -209,7 +221,7 @@ if exist "%runtime_database%" (
 
 call :make_junction "%bundle_source_dir%\server" "%project_folder%server" || exit /b 1
 call :make_junction "%bundle_source_dir%\scripts" "%project_folder%scripts" || exit /b 1
-call :make_junction "%bundle_source_dir%\settings" "%project_folder%settings" || exit /b 1
+call :make_junction "%bundle_source_dir%\settings" "%repo_root%\settings" || exit /b 1
 call :make_junction "%bundle_source_dir%\client\dist" "%client_dir%\dist" || exit /b 1
 call :make_junction "%bundle_source_dir%\runtimes\python" "%repo_root%\runtimes\python" || exit /b 1
 call :make_junction "%bundle_source_dir%\runtimes\uv" "%repo_root%\runtimes\uv" || exit /b 1

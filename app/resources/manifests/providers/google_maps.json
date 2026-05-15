@@ -1,0 +1,113 @@
+{
+  "id": "google_maps",
+  "name": "Google Maps Platform",
+  "provider": "google_maps",
+  "type": "credentialed-provider",
+  "description": "Credential-gated provider metadata for Google Maps Platform integrations.",
+  "capabilities": [
+    "places",
+    "commercial-poi",
+    "geocoding"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Google Maps Platform",
+    "requires_key": true,
+    "attribution": "Google Maps Platform",
+    "keywords": [
+      "google maps",
+      "places",
+      "commercial poi",
+      "geocoding"
+    ],
+    "intent_tags": [
+      "places",
+      "commercial-poi",
+      "geocoding"
+    ],
+    "task_tags": [
+      "poi",
+      "geospatial-discovery"
+    ],
+    "temporal_behavior": "current",
+    "dataset_time_reference": "Provider live API response time",
+    "source_freshness": "Provider-managed live index",
+    "query_mode": "credentialed-api",
+    "integration_requirements": [
+      "Requires Google Maps Platform API key configured in Access"
+    ],
+    "official_docs_url": "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "point",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "api_key",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show Google Maps Platform",
+      "find Google Maps Platform near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing"
+  ],
+  "license": {
+    "name": "Google Maps Platform",
+    "url": "https://developers.google.com/maps/documentation/places/web-service/usage-and-billing",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "google_maps",
+    "required": true,
+    "accessPageProviderId": "google_maps"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "places",
+      "commercial-poi",
+      "geocoding",
+      "poi",
+      "geospatial-discovery",
+      "google maps",
+      "commercial poi"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

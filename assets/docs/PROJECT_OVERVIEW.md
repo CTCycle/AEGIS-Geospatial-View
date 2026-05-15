@@ -1,11 +1,14 @@
 # Project Overview
 
-Last updated: 2026-04-24
+Last updated: 2026-05-14
 
 ## FILES INDEX
 
 - AGENTIC_SEARCH.md  
   Contract-first chat orchestration architecture (parser -> policy -> execution), decision states, and capability/runtime enforcement.
+
+- API_ACCESS_AND_ACCOUNT_SETUP.md  
+  Account setup, credential configuration, API key handling, quotas, restrictions, and official links for all external geospatial data providers.
 
 - ARCHITECTURE.md  
   End-to-end technical architecture for frontend and backend, including module responsibilities, API surfaces, data persistence, and execution model.
@@ -14,7 +17,19 @@ Last updated: 2026-04-24
   In-process background job lifecycle, API contract, cancellation model, and operational constraints.
 
 - CAPABILITY_MANIFESTS.md  
-  Manifest schema and runtime-profile rules for basemaps, overlays, and tools under `AEGIS/resources/manifests`.
+  Manifest schema and runtime-profile rules for basemaps, overlays, and tools under `app/resources/manifests`.
+
+- GEOSPATIAL_SOURCE_CATALOG.md
+  Source catalog for geographic intelligence providers, capability kinds, access modes, rendering modes, provider contract coverage, and integration status.
+
+- GEOSPATIAL_INGESTION.md
+  Manifest contract and planning flow for downloaded or preprocessed geospatial datasets.
+
+- GEOSPATIAL_VALIDATION.md
+  Static audit, provider contract, API, client, CI, and browser-smoke validation workflow for geospatial capabilities.
+
+- WEBCAM_CAPABILITY.md
+  Camera-network policy and implementation notes for Windy Webcams and future public camera providers.
 
 - CODING_RULES.md  
   Unified coding standards across Python and TypeScript, including typing, validation, async boundaries, testing, and tooling.
@@ -44,13 +59,13 @@ Last updated: 2026-04-24
 - Keep affected docs synchronized with code changes; update docs in the same change set when behavior changes.
 - Include a `Last updated: YYYY-MM-DD` line whenever a document is modified.
 - Do not read all `SKILL.md` files by default.
-- Pre-select relevant docs based on folder structure (`AEGIS/server`, `AEGIS/client`, `tests`, `release`) and explicit user intent.
+- Pre-select relevant docs based on folder structure (`app/server`, `app/client`, `app/tests`, `release`) and explicit user intent.
 
 ## ENVIRONMENT RULES
 
 - Treat Windows as the default execution environment for commands, scripts, and troubleshooting.
 - Provide command examples for both PowerShell and CMD when documenting operational workflows.
 - Prefer PowerShell for structured inspection and automation (`Get-ChildItem`, `Select-String`, object pipelines).
-- Use CMD syntax for existing `.bat` entry points (`AEGIS\start_on_windows.bat`, `tests\run_tests.bat`, `release\tauri\build_with_tauri.bat`).
+- Use CMD syntax for existing `.bat` entry points (`start_on_windows.bat`, `app\tests\run_tests.bat`, `release\tauri\build_with_tauri.bat`).
 - Document environment-specific decisions when discovered (for example, portable runtimes under `runtimes/`, lockfile sync flow, port-kill behavior).
 - Keep paths and quoting Windows-safe in documentation (`\` separators, quoted paths for spaces).

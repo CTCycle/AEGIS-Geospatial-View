@@ -1,0 +1,106 @@
+{
+  "id": "get_weather_forecast",
+  "name": "Weather Forecast",
+  "provider": "openmeteo",
+  "type": "direct-tool",
+  "description": "Fetch weather forecast for a resolved location.",
+  "capabilities": [
+    "weather",
+    "forecast"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "intent_tags": [
+      "weather",
+      "forecast",
+      "precipitation"
+    ],
+    "task_tags": [
+      "direct_query",
+      "environment"
+    ],
+    "search_examples": [
+      "weather around Milan"
+    ],
+    "handler_name": "weather",
+    "requires_location": true,
+    "supports_direct_text": true,
+    "supports_map": true,
+    "requires_key": false,
+    "official_docs_url": "https://open-meteo.com/en/docs",
+    "source_protocol": "direct-tool",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "keywords": [
+      "openmeteo",
+      "direct-tool",
+      "Weather Forecast"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-21T00:00:00+00:00",
+  "capabilityKind": "analysis-tool",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://open-meteo.com/en/docs"
+  ],
+  "license": {
+    "name": "openmeteo attribution required where provider terms require it",
+    "url": "https://open-meteo.com/en/docs",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "weather",
+      "forecast",
+      "precipitation",
+      "direct_query",
+      "environment",
+      "openmeteo",
+      "direct-tool",
+      "Weather Forecast"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

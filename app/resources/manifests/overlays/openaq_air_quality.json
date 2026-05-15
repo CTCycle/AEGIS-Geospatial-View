@@ -1,0 +1,123 @@
+{
+  "id": "openaq_air_quality",
+  "name": "OpenAQ Air Quality",
+  "provider": "openaq",
+  "type": "point-insight",
+  "description": "OpenAQ air-quality overlay based on available measurement and station data.",
+  "capabilities": [
+    "air-quality",
+    "point-insight"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "OpenAQ Air Quality",
+    "default_opacity": 1,
+    "requires_key": true,
+    "attribution": "© OpenAQ and source providers",
+    "keywords": [
+      "air-quality",
+      "point-insight",
+      "openaq",
+      "openaq air quality"
+    ],
+    "intent_tags": [
+      "air-quality",
+      "point-insight"
+    ],
+    "task_tags": [
+      "air-quality",
+      "point-insight"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global-partial",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "8e07770793eb3ce9077833ec50826125a8304a9282f8368670eedba55402014b",
+    "human_summary": "Point-insight air quality layer reflecting available pollutant observations.",
+    "primary_use_cases": [
+      "air quality screening",
+      "pollution hotspot awareness",
+      "public health context"
+    ],
+    "search_examples": [
+      "show air quality around Rome",
+      "find polluted areas near Milan"
+    ],
+    "disambiguation_notes": [
+      "Prefer this for local measured air-quality insights; use aerosol overlays for broader atmospheric patterns."
+    ],
+    "location_dependency": "Location-specific and dependent on station/data availability.",
+    "integration_requirements": [
+      "No API key required for configured OpenAQ access"
+    ],
+    "official_docs_url": "https://docs.openaq.org/using-the-api/api-key",
+    "source_protocol": "JSON point insight",
+    "data_format": "JSON",
+    "geometry_type": "point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "api_key",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://docs.openaq.org/using-the-api/api-key"
+  ],
+  "license": {
+    "name": "© OpenAQ and source providers",
+    "url": "https://docs.openaq.org/using-the-api/api-key",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "openaq",
+    "required": true,
+    "accessPageProviderId": "openaq"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "air-quality",
+      "point-insight",
+      "openaq",
+      "openaq air quality"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 900
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "point"
+  }
+}

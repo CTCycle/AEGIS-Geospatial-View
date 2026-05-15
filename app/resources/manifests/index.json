@@ -1,0 +1,29 @@
+{
+  "version": 6,
+  "providers_dir": "providers",
+  "basemaps_dir": "basemaps",
+  "overlays_dir": "overlays",
+  "cameras_dir": "cameras",
+  "transit_dir": "transit",
+  "tools_dir": "tools",
+  "runtime_profiles_file": "runtime_profiles.json",
+  "manifest_schema_version": 2,
+  "source_catalog_version": "2026.05.11",
+  "capability_groups": [
+    "basemap",
+    "raster-overlay",
+    "vector-overlay",
+    "search-index",
+    "camera-network",
+    "dataset-ingestion",
+    "analysis-tool",
+    "metadata-only"
+  ],
+  "health_summary": {
+    "functional": 28,
+    "partial": 43,
+    "broken": 0,
+    "disabled": 1,
+    "unknown": 6
+  }
+}

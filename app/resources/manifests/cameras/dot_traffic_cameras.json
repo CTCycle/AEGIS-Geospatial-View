@@ -1,0 +1,69 @@
+{
+  "id": "dot_traffic_cameras",
+  "name": "DOT Traffic Cameras",
+  "provider": "local_open_data",
+  "type": "camera-network",
+  "description": "Template for official state and municipal DOT traffic camera feeds where redistribution and embedding permissions vary by jurisdiction.",
+  "capabilities": ["camera", "traffic-camera", "road-condition"],
+  "coverage": "jurisdiction-defined",
+  "metadata": {
+    "label": "DOT Traffic Cameras",
+    "requires_key": false,
+    "attribution": "Source DOT or transport agency",
+    "keywords": ["dot", "traffic camera", "road condition", "camera"],
+    "intent_tags": ["traffic camera", "road condition"],
+    "task_tags": ["traffic monitoring", "road condition"],
+    "source_protocol": "agency-defined JSON/WMS/HTML",
+    "data_format": "template",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "requires-local-source",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.transportation.gov/",
+    "rate_limit_notes": "Validate each agency feed license, refresh policy, and embedding permission before enabling.",
+    "last_validated": "2026-05-14"
+  },
+  "version": 1,
+  "last_modified": "2026-05-14T00:00:00+00:00",
+  "capabilityKind": "camera-network",
+  "renderingMode": "camera-points",
+  "sourceOfficialDocs": ["https://www.transportation.gov/"],
+  "license": {
+    "name": "Agency-specific public camera terms",
+    "url": "https://www.transportation.gov/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": ["traffic camera", "road condition", "DOT camera"],
+    "requiredUserIntent": ["traffic_monitoring", "travel_condition"],
+    "avoidWhen": ["general chat", "no geographic context", "source not configured"]
+  },
+  "reliability": {
+    "status": "disabled",
+    "lastAudited": "2026-05-14",
+    "knownLimitations": ["Template only until a jurisdiction-specific official feed is configured."]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 3600
+  },
+  "normalization": {
+    "geometryPath": "cameras[].location",
+    "idPath": "cameras[].id",
+    "timestampPath": "cameras[].last_update_time",
+    "fieldMap": {},
+    "expectedGeometry": "Point"
+  }
+}

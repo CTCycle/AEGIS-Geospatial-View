@@ -1,0 +1,21 @@
+.model-card__actions {
+  display: flex;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.model-card__actions button {
+  border: 1px solid #344953;
+  border-radius: 999px;
+  padding: 0.24rem 0.55rem;
+  background: #162833;
+  color: #dce8ed;
+  font-size: 0.76rem;
+}
+
+.model-card__actions button.active {
+  border-color: #2f9bd7;
+  background: #17384a;
+  color: #e6f7ff;
+}

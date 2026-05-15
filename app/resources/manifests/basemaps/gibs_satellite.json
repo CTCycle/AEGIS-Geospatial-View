@@ -1,0 +1,127 @@
+{
+  "id": "gibs_satellite",
+  "name": "Satellite Imagery Basemap",
+  "provider": "gibs",
+  "type": "tile",
+  "description": "NASA GIBS true-color satellite basemap for visual earth-surface context.",
+  "capabilities": [
+    "tile",
+    "imagery"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Satellite Imagery",
+    "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "attribution": "Tiles © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    "requires_key": false,
+    "keywords": [
+      "satellite",
+      "imagery",
+      "aerial",
+      "photographic"
+    ],
+    "map_type_tags": [
+      "satellite"
+    ],
+    "intent_tags": [
+      "realistic_view",
+      "context_imagery"
+    ],
+    "task_tags": [
+      "land_cover",
+      "inspection"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "daily imagery snapshots",
+    "constraints": "imagery tile availability and attribution are governed by the upstream basemap provider",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "293c6d23aa1556a75b91919dd4293596a15feb2322dbc760d2cd3a47e422f7d4",
+    "human_summary": "Satellite imagery basemap for natural-color visual inspection of land, coasts, and clouds.",
+    "primary_use_cases": [
+      "satellite visual context",
+      "environmental situational awareness",
+      "regional overview"
+    ],
+    "search_examples": [
+      "show satellite view over Sicily",
+      "display earth imagery around Athens"
+    ],
+    "disambiguation_notes": [
+      "Prefer this over street basemaps when the user asks for imagery, land cover context, or large-area visual inspection."
+    ],
+    "location_dependency": "Location-specific; supports local and regional map extents.",
+    "integration_requirements": [
+      "No API key required"
+    ],
+    "official_docs_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+    "source_protocol": "raster-tile",
+    "data_format": "image tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "imagery tile availability and attribution are governed by the upstream basemap provider",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "capabilityKind": "basemap",
+  "renderingMode": "xyz",
+  "sourceOfficialDocs": [
+    "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api"
+  ],
+  "license": {
+    "name": "Tiles © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    "url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": true,
+    "plannerHints": [
+      "realistic_view",
+      "context_imagery",
+      "land_cover",
+      "inspection",
+      "satellite",
+      "imagery",
+      "aerial",
+      "photographic"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "none",
+    "ttlSeconds": 0,
+    "staleWhileRevalidateSeconds": 0
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  }
+}

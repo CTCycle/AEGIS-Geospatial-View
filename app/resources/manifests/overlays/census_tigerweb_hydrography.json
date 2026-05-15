@@ -1,0 +1,119 @@
+{
+  "id": "census_tigerweb_hydrography",
+  "name": "Census TIGERweb Hydrography",
+  "provider": "census",
+  "type": "arcgis-geojson",
+  "description": "U.S. TIGERweb hydrography overlay returned as bounded ArcGIS REST GeoJSON for rivers, lakes, and water features.",
+  "capabilities": [
+    "hydrology",
+    "arcgis-geojson",
+    "geojson"
+  ],
+  "coverage": "us",
+  "metadata": {
+    "label": "Census TIGERweb Hydrography",
+    "default_opacity": 0.65,
+    "requires_key": false,
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Hydro/MapServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&geometryType=esriGeometryEnvelope&geometry={bbox}&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&f=geojson",
+    "attribution": "U.S. Census Bureau TIGERweb",
+    "keywords": [
+      "hydrology",
+      "water",
+      "census",
+      "tigerweb",
+      "geojson"
+    ],
+    "intent_tags": [
+      "hydrology",
+      "water features",
+      "rivers"
+    ],
+    "task_tags": [
+      "water context",
+      "geospatial features",
+      "environmental screening"
+    ],
+    "human_summary": "Queryable U.S. hydrography features from TIGERweb as bounded GeoJSON.",
+    "primary_use_cases": [
+      "show rivers and water features",
+      "screen parcels near water",
+      "hydrology context"
+    ],
+    "search_examples": [
+      "show hydrography near Austin",
+      "display water features around Seattle"
+    ],
+    "official_docs_url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "source_protocol": "ArcGIS REST GeoJSON",
+    "data_format": "GeoJSON",
+    "geometry_type": "line/polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "bounded",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "geojson",
+  "sourceOfficialDocs": [
+    "https://www.census.gov/data/developers/guidance/api-user-guide.html"
+  ],
+  "license": {
+    "name": "U.S. Census Bureau TIGERweb",
+    "url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "hydrology",
+      "water features",
+      "rivers",
+      "water context",
+      "geospatial features",
+      "environmental screening",
+      "water",
+      "census",
+      "tigerweb",
+      "geojson"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "line/polygon"
+  }
+}

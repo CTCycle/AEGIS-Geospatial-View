@@ -1,0 +1,120 @@
+{
+  "id": "census_tigerweb_demographics",
+  "name": "Census TIGERweb Demographic Boundaries",
+  "provider": "census",
+  "type": "arcgis-geojson",
+  "description": "U.S. Census tract boundary overlay for joining Census demographic attributes such as population, income, and age structure.",
+  "capabilities": [
+    "demographics",
+    "boundaries",
+    "arcgis-geojson",
+    "geojson"
+  ],
+  "coverage": "us",
+  "metadata": {
+    "label": "Census TIGERweb Demographic Boundaries",
+    "default_opacity": 0.35,
+    "requires_key": false,
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&geometryType=esriGeometryEnvelope&geometry={bbox}&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&f=geojson",
+    "attribution": "U.S. Census Bureau TIGERweb",
+    "keywords": [
+      "census",
+      "tracts",
+      "demographics",
+      "boundaries",
+      "geojson"
+    ],
+    "intent_tags": [
+      "demographics",
+      "population density",
+      "census tracts"
+    ],
+    "task_tags": [
+      "demographic context",
+      "boundary lookup",
+      "regional analysis"
+    ],
+    "human_summary": "Queryable U.S. tract-level geometry for demographic joins and regional context.",
+    "primary_use_cases": [
+      "population density context",
+      "income and age structure joins",
+      "tract boundary inspection"
+    ],
+    "search_examples": [
+      "show census tracts around Chicago",
+      "display demographic boundaries near Phoenix"
+    ],
+    "official_docs_url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "source_protocol": "ArcGIS REST GeoJSON",
+    "data_format": "GeoJSON",
+    "geometry_type": "polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "bounded",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "choropleth",
+  "sourceOfficialDocs": [
+    "https://www.census.gov/data/developers/guidance/api-user-guide.html"
+  ],
+  "license": {
+    "name": "U.S. Census Bureau TIGERweb",
+    "url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "demographics",
+      "population density",
+      "census tracts",
+      "demographic context",
+      "boundary lookup",
+      "regional analysis",
+      "census",
+      "tracts",
+      "boundaries",
+      "geojson"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "polygon"
+  }
+}

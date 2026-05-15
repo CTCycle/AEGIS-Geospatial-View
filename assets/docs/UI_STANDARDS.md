@@ -1,7 +1,7 @@
 # UI Standards
 
-Last updated: 2026-04-24
-Scope: `AEGIS/client/src`
+Last updated: 2026-05-02
+Scope: `app/client/src`
 
 ## Typography
 
@@ -12,7 +12,7 @@ Scope: `AEGIS/client/src`
 
 ### Scale hierarchy
 
-Defined in `AEGIS/client/src/styles.css`:
+Defined in `app/client/src/styles.css`:
 - Caption: `--font-size-caption` (`0.8rem`)
 - Label: `--font-size-label` (`0.9rem`)
 - Body: `--font-size-body` (`1rem`)
@@ -38,6 +38,7 @@ Defined in `AEGIS/client/src/styles.css`:
   - max: `760px`
   - map minimum width guard: `320px`
 - Settings page uses two-column layout (`7fr/3fr`) with responsive fallback rules in page CSS.
+- The app shell uses an Operations Bar for top-level navigation and status; content pages render below it.
 
 ### Spacing scale
 
@@ -77,6 +78,7 @@ Defined in `styles.css`:
 - `model-role-actions.component.*`: model role assignment actions
 - `settings-icon-action.component.*`: compact icon action controls
 - `settings-modal-shell.component.*`: modal shell pattern for settings dialogs
+- `model-stats-panel.component.*`: settings statistics table/card presentation across desktop and mobile
 
 ### Standard interaction states
 
@@ -106,10 +108,17 @@ All interactive components must provide:
   - search/filter controls
   - model cards and assignment UI
   - API key and Ollama management modals
+- `/capabilities` (`CapabilitiesPageComponent`):
+  - manifest-backed capability tables
+  - grouped providers, map types, layers, and direct tools
+  - explicit access and dependency metadata
+- `/access-configurations` (`AccessConfigurationsPageComponent`):
+  - optional geospatial provider credentials
+  - status for key-backed Geoapify and TomTom capabilities
 
 ### Navigation hierarchy
 
-- Top-level route pair: workspace and settings.
+- Top-level Operations Bar routes: workspace, capabilities, access, and model settings.
 - Unknown routes redirect to workspace.
 
 ## User Experience Standards
@@ -117,7 +126,9 @@ All interactive components must provide:
 ### Core user journeys
 
 - Ask geospatial question -> receive assistant response -> inspect map session and overlays.
-- Open settings -> manage provider/model assignments -> return to workspace.
+- Review capabilities -> understand available layers/tools and access constraints.
+- Open access configurations -> optionally add geospatial provider keys.
+- Open model settings -> manage provider/model assignments -> return to workspace.
 
 ### Interaction consistency rules
 
@@ -130,6 +141,7 @@ All interactive components must provide:
 - Use persistent status text for settings operations.
 - Use inline alerts for map/session concerns.
 - Keep progress indicator visible during in-flight chat requests.
+- Verify Operations Bar navigation, routed page layout, map controls, and text wrapping at desktop and mobile widths after significant UI edits.
 
 ### Loading and empty states
 

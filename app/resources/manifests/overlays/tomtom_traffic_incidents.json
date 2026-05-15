@@ -1,0 +1,106 @@
+{
+  "id": "tomtom_traffic_incidents",
+  "name": "TomTom Traffic Incidents",
+  "provider": "tomtom",
+  "type": "vector",
+  "description": "TomTom live traffic incident points normalized from bounded incident detail queries.",
+  "capabilities": [
+    "traffic",
+    "incidents",
+    "road closures"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "TomTom Traffic Incidents",
+    "requires_key": true,
+    "attribution": "© TomTom",
+    "keywords": [
+      "traffic",
+      "incidents",
+      "closures",
+      "tomtom"
+    ],
+    "intent_tags": [
+      "traffic",
+      "incident",
+      "road closure"
+    ],
+    "task_tags": [
+      "show traffic incidents",
+      "road closures nearby"
+    ],
+    "source_protocol": "JSON API",
+    "data_format": "GeoJSON-like normalized points",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "credential-gated",
+    "auth_mode": "api_key",
+    "official_docs_url": "https://developer.tomtom.com/traffic-api/documentation/traffic-incidents/incident-details",
+    "last_validated": "2026-05-12",
+    "rate_limit_notes": "Use bounded bbox queries and cache normalized incident responses briefly."
+  },
+  "version": 1,
+  "last_modified": "2026-05-12T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://developer.tomtom.com/traffic-api/documentation/traffic-incidents/incident-details"
+  ],
+  "license": {
+    "name": "© TomTom",
+    "url": "https://www.tomtom.com/legal/terms-and-conditions/",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "tomtom",
+    "required": true,
+    "accessPageProviderId": "tomtom"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "traffic incident",
+      "road closure",
+      "crash",
+      "traffic delay",
+      "tomtom"
+    ],
+    "requiredUserIntent": [
+      "traffic",
+      "incident",
+      "road closure"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-12",
+    "knownLimitations": [
+      "Requires a configured TomTom API key and provider coverage varies by region."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 120,
+    "staleWhileRevalidateSeconds": 600
+  },
+  "normalization": {
+    "geometryPath": "incidents[].geometry",
+    "idPath": "incidents[].properties.id",
+    "timestampPath": "incidents[].properties.startTime",
+    "fieldMap": {
+      "properties.events[].description": "name",
+      "properties.iconCategory": "category",
+      "properties.delay": "delay"
+    },
+    "expectedGeometry": "Point"
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "id": "overture_maps_places",
+  "name": "Overture Maps Places",
+  "provider": "overture",
+  "type": "dataset-ingestion",
+  "description": "Optional Overture Maps places dataset for high-volume local POI indexing.",
+  "capabilities": [
+    "overture",
+    "places",
+    "search-index",
+    "dataset-ingestion"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Overture places",
+    "requires_key": false,
+    "attribution": "Overture Maps Foundation",
+    "keywords": [
+      "overture",
+      "places",
+      "pois"
+    ],
+    "intent_tags": [
+      "poi",
+      "places",
+      "amenities"
+    ],
+    "task_tags": [
+      "search places",
+      "local POI index"
+    ],
+    "source_protocol": "cloud dataset",
+    "data_format": "parquet",
+    "geometry_type": "Point",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "official_docs_url": "https://docs.overturemaps.org/",
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "dataset-ingestion",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://docs.overturemaps.org/"
+  ],
+  "license": {
+    "name": "Overture Maps data license",
+    "url": "https://overturemaps.org/resources/data/",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "overture",
+      "places",
+      "pois",
+      "amenities"
+    ],
+    "requiredUserIntent": [
+      "poi",
+      "amenity",
+      "search places"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Parquet processing requires optional ingestion dependencies."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 2592000,
+    "staleWhileRevalidateSeconds": 2592000
+  },
+  "normalization": {
+    "geometryPath": "geometry",
+    "idPath": "id",
+    "timestampPath": "version",
+    "fieldMap": {
+      "names.primary": "name",
+      "categories.primary": "category"
+    },
+    "expectedGeometry": "Point"
+  },
+  "download": {
+    "sourceUrl": "s3://overturemaps-us-west-2/release/latest/theme=places/type=place/",
+    "license": "https://overturemaps.org/resources/data/",
+    "updateFrequency": "monthly",
+    "expectedFormat": "parquet",
+    "checksumUrl": null,
+    "compression": "none"
+  },
+  "storage": {
+    "rawPath": "data/geospatial/raw/overture/places/",
+    "normalizedPath": "data/geospatial/normalized/overture/places/",
+    "tilePath": "data/geospatial/tiles/overture/places/"
+  },
+  "indexing": {
+    "spatialIndex": true,
+    "textIndex": true,
+    "vectorTile": true
+  },
+  "validation": {
+    "minFeatureCount": 1,
+    "requiredFields": [
+      "id",
+      "geometry"
+    ],
+    "bboxMustIntersect": [
+      -180,
+      -90,
+      180,
+      90
+    ]
+  }
+}

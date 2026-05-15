@@ -1,0 +1,92 @@
+<div class="map-canvas">
+  <div class="map-content">
+    @if (isLoading) {
+      <div class="spinner-container">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+        <p class="loading-text">Rendering map...</p>
+      </div>
+    } @else if (!payload || (!payload.satellite_imagery && !payload.map_session)) {
+      <div class="empty-state empty-state--operations">
+        <div class="empty-state__card">
+          <p class="empty-state__eyebrow">Map Workspace</p>
+          @if (emptyMessage) {
+          <p class="empty-state__message">{{ emptyMessage }}</p>
+          }
+        </div>
+      </div>
+    } @else if (embeddedMapHtml) {
+      <div class="map-html-frame-wrap">
+        <iframe
+          class="map-html-frame"
+          title="Rendered map preview"
+          [attr.srcdoc]="embeddedMapHtml"
+        ></iframe>
+      </div>
+    } @else if (!hasCenter) {
+      <div class="empty-state">
+        <div class="empty-state__card">
+          <p class="empty-state__eyebrow">Map Workspace</p>
+          <p class="empty-state__message">Map center unavailable for interactive rendering.</p>
+        </div>
+      </div>
+    } @else {
+      <div class="maplibre-wrap">
+        <div #mapContainer class="maplibre-container"></div>
+
+        <div class="map-zoom-controls" aria-label="Map zoom controls">
+          <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>
+          <button type="button" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">&minus;</button>
+        </div>
+
+        @if (overlays.length) {
+          <app-overlay-controls
+            [overlays]="overlays"
+            [overlayVisibility]="overlayVisibility"
+            [overlayOpacity]="overlayOpacity"
+            (overlayVisibilityChange)="onOverlayVisibilityChange($event)"
+            (overlayOpacityChange)="onOverlayOpacityChange($event)"
+          ></app-overlay-controls>
+        }
+
+        @if (complianceWarnings.length) {
+          <div class="compliance-panel">
+            @for (warning of complianceWarnings; track warning) {
+              <p>{{ warning }}</p>
+            }
+          </div>
+        }
+
+        @if (metadataOnlyOverlays.length) {
+          <div class="metadata-panel" aria-label="Metadata-only layers">
+            @for (overlay of metadataOnlyOverlays; track overlay.id) {
+              <p><strong>{{ overlay.label }}</strong> is available as metadata or setup context only.</p>
+            }
+          </div>
+        }
+
+        @if (legendEntries.length) {
+          <div class="legend-panel" aria-label="Layer legend">
+            @for (entry of legendEntries; track entry.id) {
+              <p><span class="legend-swatch"></span>{{ entry.label }} <span>{{ entry.mode }}</span></p>
+            }
+          </div>
+        }
+
+        @if (attributionEntries.length) {
+          <div class="attribution-panel" aria-label="Map attribution">
+            @for (entry of attributionEntries; track entry) {
+              <span>{{ entry }}</span>
+            }
+          </div>
+        }
+
+        @if (restoreNotice) {
+          <div class="compliance-panel" role="status" aria-live="polite">
+            <p>{{ restoreNotice }}</p>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+

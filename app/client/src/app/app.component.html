@@ -1,0 +1,26 @@
+<div class="app-shell">
+  <header class="operations-bar" aria-label="Primary navigation">
+    <a class="operations-bar__brand" routerLink="/" aria-label="AEGIS workspace">
+      <svg class="operations-bar__mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path class="crest-outline" d="M16 2.8 27.2 6.9v7.8c0 7.3-4.5 12.4-11.2 14.6C9.3 27.1 4.8 22 4.8 14.7V6.9L16 2.8Z" />
+        <path class="crest-field" d="M8.8 9.3 16 6.6l7.2 2.7v4.9c0 5-2.9 8.7-7.2 10.6-4.3-1.9-7.2-5.6-7.2-10.6V9.3Z" />
+        <path class="crest-cut" d="M16 8.7 21.1 22h-2.5l-.9-2.6h-3.4l-.9 2.6h-2.5L16 8.7Zm-.9 8.5h1.8L16 13.7l-.9 3.5Z" />
+        <path class="crest-signal" d="M10.7 12.7h3.1M18.2 12.7h3.1M12.1 23.2l2.2-3.8M19.9 23.2l-2.2-3.8" />
+      </svg>
+      <span>AEGIS</span>
+    </a>
+    <nav class="operations-bar__nav" aria-label="Application sections">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Workspace</a>
+      <a routerLink="/capabilities" routerLinkActive="active">Capabilities</a>
+      <a routerLink="/access-configurations" routerLinkActive="active">Access</a>
+      <a routerLink="/settings" routerLinkActive="active">
+        <span class="nav-label nav-label--full">Model Settings</span>
+        <span class="nav-label nav-label--compact">Settings</span>
+      </a>
+    </nav>
+    <div class="operations-bar__spacer" aria-hidden="true"></div>
+  </header>
+  <main class="app-content" role="main">
+    <router-outlet></router-outlet>
+  </main>
+</div>

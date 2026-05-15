@@ -1,0 +1,105 @@
+{
+  "id": "gtfs_static",
+  "name": "GTFS Static Feeds",
+  "provider": "gtfs_static",
+  "type": "dataset-ingestion",
+  "description": "Static public transit schedule feeds for agencies, stops, routes, shapes, service calendars, and stop search.",
+  "capabilities": [
+    "transit",
+    "stops",
+    "routes",
+    "dataset-ingestion",
+    "search-index"
+  ],
+  "coverage": "agency-defined",
+  "metadata": {
+    "label": "GTFS Static",
+    "requires_key": false,
+    "attribution": "Transit feed publisher",
+    "keywords": [
+      "transit",
+      "gtfs",
+      "stops",
+      "routes",
+      "stations"
+    ],
+    "intent_tags": [
+      "transit",
+      "station",
+      "route",
+      "nearby"
+    ],
+    "task_tags": [
+      "transit stop search",
+      "route map",
+      "station context"
+    ],
+    "source_protocol": "download",
+    "data_format": "ZIP CSV",
+    "geometry_type": "Point, LineString",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "partial",
+    "auth_mode": "none",
+    "official_docs_url": "https://gtfs.org/schedule/reference/",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "dataset-ingestion",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://gtfs.org/schedule/reference/"
+  ],
+  "license": {
+    "name": "Agency-specific GTFS feed license",
+    "url": "https://gtfs.org/schedule/reference/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "transit",
+      "bus stop",
+      "train station",
+      "route",
+      "near station"
+    ],
+    "requiredUserIntent": [
+      "transit",
+      "nearby",
+      "route_context"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Agency feed discovery and scheduled ingestion must be configured before map rendering.",
+      "Feed licensing is agency-specific and must be preserved in generated layers."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "preprocessed",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
+  "normalization": {
+    "geometryPath": "stops.txt.stop_lat,stops.txt.stop_lon; shapes.txt.shape_pt_lat,shapes.txt.shape_pt_lon",
+    "idPath": "stops.txt.stop_id",
+    "timestampPath": "feed_info.txt.feed_version",
+    "fieldMap": {},
+    "expectedGeometry": "Point,LineString"
+  }
+}

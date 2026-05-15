@@ -1,7 +1,7 @@
 # Web App State Preservation
 
-Last updated: 2026-04-21
-Scope: `AEGIS/client/src`
+Last updated: 2026-05-02
+Scope: `app/client/src`
 
 ## Overview
 

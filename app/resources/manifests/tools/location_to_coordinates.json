@@ -1,0 +1,106 @@
+{
+  "id": "location_to_coordinates",
+  "name": "Location To Coordinates",
+  "provider": "nominatim",
+  "type": "direct-tool",
+  "description": "Resolve a location phrase into latitude/longitude coordinates.",
+  "capabilities": [
+    "geocode",
+    "coordinates"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "intent_tags": [
+      "coordinates",
+      "geocode",
+      "location_lookup"
+    ],
+    "task_tags": [
+      "direct_query",
+      "location_resolution"
+    ],
+    "search_examples": [
+      "coordinates of Colosseum in Rome"
+    ],
+    "handler_name": "coordinates",
+    "requires_location": true,
+    "supports_direct_text": true,
+    "supports_map": false,
+    "requires_key": false,
+    "official_docs_url": "https://nominatim.org/release-docs/latest/api/Overview/",
+    "source_protocol": "direct-tool",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "keywords": [
+      "nominatim",
+      "direct-tool",
+      "Location To Coordinates"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-21T00:00:00+00:00",
+  "capabilityKind": "analysis-tool",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://nominatim.org/release-docs/latest/api/Overview/"
+  ],
+  "license": {
+    "name": "nominatim attribution required where provider terms require it",
+    "url": "https://nominatim.org/release-docs/latest/api/Overview/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "coordinates",
+      "geocode",
+      "location_lookup",
+      "direct_query",
+      "location_resolution",
+      "nominatim",
+      "direct-tool",
+      "Location To Coordinates"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}
