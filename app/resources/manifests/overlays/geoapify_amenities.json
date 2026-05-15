@@ -1,0 +1,123 @@
+{
+  "id": "geoapify_amenities",
+  "name": "Geoapify Places (Amenities)",
+  "provider": "geoapify",
+  "type": "geojson",
+  "description": "Geoapify amenities overlay for nearby points of interest and services.",
+  "capabilities": [
+    "places",
+    "geojson"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Geoapify Places (Amenities)",
+    "default_opacity": 0.9,
+    "requires_key": true,
+    "attribution": "© Geoapify",
+    "keywords": [
+      "places",
+      "geojson",
+      "geoapify",
+      "geoapify places (amenities)"
+    ],
+    "intent_tags": [
+      "places",
+      "geojson"
+    ],
+    "task_tags": [
+      "places",
+      "geojson"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "17908e443612b7972d450ca2068facbb60f93afc60ac4a610435603b76ed5b58",
+    "human_summary": "Point-based amenity layer highlighting services such as food, health, and public facilities.",
+    "primary_use_cases": [
+      "nearby amenity discovery",
+      "service accessibility context",
+      "urban POI screening"
+    ],
+    "search_examples": [
+      "show amenities near Termini station",
+      "find points of interest in Bologna"
+    ],
+    "disambiguation_notes": [
+      "Use when users ask for nearby services or POIs; this is a dynamic point-insight layer."
+    ],
+    "location_dependency": "Location-specific and query-dependent.",
+    "integration_requirements": [
+      "Requires Geoapify API key"
+    ],
+    "official_docs_url": "https://apidocs.geoapify.com/docs/places/",
+    "source_protocol": "GeoJSON",
+    "data_format": "GeoJSON",
+    "geometry_type": "point",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "api_key",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "capabilityKind": "search-index",
+  "renderingMode": "clustered-points",
+  "sourceOfficialDocs": [
+    "https://apidocs.geoapify.com/docs/places/"
+  ],
+  "license": {
+    "name": "© Geoapify",
+    "url": "https://apidocs.geoapify.com/docs/places/",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "geoapify",
+    "required": true,
+    "accessPageProviderId": "geoapify"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "places",
+      "geojson",
+      "geoapify",
+      "geoapify places (amenities)"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "point"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "id": "rainviewer",
+  "name": "RainViewer",
+  "provider": "rainviewer",
+  "type": "provider",
+  "description": "RainViewer precipitation radar tiles and time-aware metadata feeds.",
+  "capabilities": [
+    "radar",
+    "precipitation",
+    "tile"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "docs_url": "https://www.rainviewer.com/api.html",
+    "commercial_notes": "Validate commercial usage rights and tile caching terms before production use.",
+    "warning_level": "medium",
+    "keywords": [
+      "rainviewer",
+      "radar",
+      "precipitation",
+      "weather tiles"
+    ],
+    "intent_tags": [
+      "rain radar",
+      "precipitation"
+    ],
+    "task_tags": [
+      "storm tracking",
+      "rainfall context"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global-partial",
+    "temporal_behavior": "dynamic",
+    "constraints": "Respect update cadence and provider terms for high-frequency requests.",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "rainviewer-provider-v1",
+    "requires_key": false,
+    "official_docs_url": "https://www.rainviewer.com/api.html",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect update cadence and provider terms for high-frequency requests.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show RainViewer",
+      "find RainViewer near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
+  },
+  "version": 1,
+  "last_modified": "2026-04-10T16:45:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://www.rainviewer.com/api.html"
+  ],
+  "license": {
+    "name": "rainviewer attribution required where provider terms require it",
+    "url": "https://www.rainviewer.com/api.html",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "rain radar",
+      "precipitation",
+      "storm tracking",
+      "rainfall context",
+      "rainviewer",
+      "radar",
+      "weather tiles"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

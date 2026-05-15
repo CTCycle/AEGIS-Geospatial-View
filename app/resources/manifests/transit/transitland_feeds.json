@@ -1,0 +1,99 @@
+{
+  "id": "transitland_feeds",
+  "name": "Transitland Feed Discovery",
+  "provider": "transitland",
+  "type": "search-index",
+  "description": "Optional feed registry for discovering agency GTFS static and realtime feeds before ingestion.",
+  "capabilities": [
+    "transit",
+    "feed-discovery",
+    "search-index"
+  ],
+  "coverage": "global-partial",
+  "metadata": {
+    "label": "Transitland Feeds",
+    "requires_key": true,
+    "attribution": "Transitland",
+    "keywords": [
+      "transit feed",
+      "gtfs",
+      "agency",
+      "feed discovery"
+    ],
+    "intent_tags": [
+      "transit",
+      "dataset",
+      "feed"
+    ],
+    "task_tags": [
+      "find transit feeds",
+      "agency discovery"
+    ],
+    "source_protocol": "JSON API",
+    "data_format": "JSON",
+    "geometry_type": "metadata",
+    "queryable": true,
+    "vectorizable": false,
+    "endpoint_health": "partial",
+    "auth_mode": "api_key",
+    "official_docs_url": "https://www.transit.land/documentation/datastore/api-endpoints.html",
+    "last_validated": "2026-05-11"
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "search-index",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://www.transit.land/documentation/datastore/api-endpoints.html"
+  ],
+  "license": {
+    "name": "Transitland terms and feed-specific licenses",
+    "url": "https://www.transit.land/documentation/datastore/api-endpoints.html",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "metadata-only"
+  },
+  "auth": {
+    "type": "api-key",
+    "required": true,
+    "providerKey": "transitland",
+    "accessPageProviderId": "transitland"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "transit feed",
+      "agency feed",
+      "GTFS discovery"
+    ],
+    "requiredUserIntent": [
+      "transit",
+      "dataset"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "direct map overlay"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Requires optional Transitland access for some usage.",
+      "Discovery results must be validated against agency feed licenses before ingestion."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 604800
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": "feeds[].id",
+    "timestampPath": "feeds[].feed_versions[].sha1",
+    "fieldMap": {},
+    "expectedGeometry": "metadata"
+  }
+}

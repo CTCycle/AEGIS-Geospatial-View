@@ -1,0 +1,128 @@
+{
+  "id": "MODIS_Terra_NDVI_8Day",
+  "name": "Vegetation Index NDVI (MODIS, 8-day)",
+  "provider": "gibs",
+  "type": "wms",
+  "description": "NASA GIBS NDVI vegetation index overlay aggregated on an 8-day cadence.",
+  "capabilities": [
+    "imagery",
+    "vegetation"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Vegetation Index NDVI (MODIS, 8-day)",
+    "default_opacity": 0.68,
+    "requires_key": false,
+    "attribution": "© NASA GIBS",
+    "keywords": [
+      "imagery",
+      "vegetation",
+      "gibs",
+      "vegetation index ndvi (modis, 8-day)"
+    ],
+    "intent_tags": [
+      "imagery",
+      "vegetation"
+    ],
+    "task_tags": [
+      "imagery",
+      "vegetation"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static",
+    "constraints": "verify provider availability and attribution requirements",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "13e6f165dc3d6a6b1fdcd08d818e0e88c6be9435f3ee74c2ff2bb4a79263fe68",
+    "human_summary": "Vegetation vigor layer indicating relative greenness and plant activity.",
+    "primary_use_cases": [
+      "vegetation health context",
+      "agricultural monitoring",
+      "seasonal greenness comparison"
+    ],
+    "search_examples": [
+      "show NDVI over Tuscany",
+      "where is vegetation stress visible"
+    ],
+    "disambiguation_notes": [
+      "Use for vegetation condition questions, not direct air quality or temperature analysis."
+    ],
+    "location_dependency": "Location-dependent with periodic refresh.",
+    "integration_requirements": [
+      "No API key required"
+    ],
+    "layer_id": "MODIS_Terra_NDVI_8Day",
+    "layers": "MODIS_Terra_NDVI_8Day",
+    "url": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+    "wms_version": "1.1.1",
+    "wms_exceptions": "application/vnd.ogc.se_inimage",
+    "official_docs_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+    "source_protocol": "WMS",
+    "data_format": "image/png via WMS",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "verify provider availability and attribution requirements",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T17:08:00.882573+02:00",
+  "capabilityKind": "raster-overlay",
+  "renderingMode": "wms",
+  "sourceOfficialDocs": [
+    "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api"
+  ],
+  "license": {
+    "name": "© NASA GIBS",
+    "url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "imagery",
+      "vegetation",
+      "gibs",
+      "vegetation index ndvi (modis, 8-day)"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "none",
+    "ttlSeconds": 0,
+    "staleWhileRevalidateSeconds": 0
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  }
+}

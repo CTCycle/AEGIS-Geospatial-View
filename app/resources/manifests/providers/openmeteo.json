@@ -1,0 +1,114 @@
+{
+  "id": "openmeteo",
+  "name": "Open-Meteo",
+  "provider": "openmeteo",
+  "type": "provider",
+  "description": "Open-Meteo weather and air-quality forecast APIs suitable for location-based overlays.",
+  "capabilities": [
+    "weather",
+    "air-quality",
+    "forecast"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "docs_url": "https://open-meteo.com/",
+    "commercial_notes": "Free tier is typically intended for non-commercial use; validate usage terms before production rollout.",
+    "warning_level": "medium",
+    "keywords": [
+      "weather",
+      "forecast",
+      "air quality",
+      "open-meteo"
+    ],
+    "intent_tags": [
+      "weather",
+      "air quality"
+    ],
+    "task_tags": [
+      "weather forecast",
+      "environmental context"
+    ],
+    "map_type_tags": [
+      "thematic"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "dynamic",
+    "constraints": "Check non-commercial limits and attribution obligations before high-scale use.",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "openmeteo-provider-v1",
+    "requires_key": false,
+    "official_docs_url": "https://open-meteo.com/en/docs",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Check non-commercial limits and attribution obligations before high-scale use.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show Open-Meteo",
+      "find Open-Meteo near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location."
+  },
+  "version": 1,
+  "last_modified": "2026-04-10T16:45:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://open-meteo.com/en/docs"
+  ],
+  "license": {
+    "name": "openmeteo attribution required where provider terms require it",
+    "url": "https://open-meteo.com/en/docs",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "weather",
+      "air quality",
+      "weather forecast",
+      "environmental context",
+      "forecast",
+      "open-meteo"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

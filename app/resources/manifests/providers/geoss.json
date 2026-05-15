@@ -1,0 +1,116 @@
+{
+  "id": "geoss",
+  "name": "GEOSS Platform",
+  "provider": "geoss",
+  "type": "catalog-provider",
+  "description": "GEOSS discovery source for earth observation and institutional geospatial datasets.",
+  "capabilities": [
+    "catalog-discovery",
+    "earth-observation",
+    "institutional-data"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "GEOSS Platform",
+    "requires_key": false,
+    "attribution": "GEOSS Platform and contributing providers",
+    "keywords": [
+      "geoss",
+      "earth observation",
+      "geoportal",
+      "metadata",
+      "institutional"
+    ],
+    "intent_tags": [
+      "catalog-discovery",
+      "earth-observation",
+      "institutional-data"
+    ],
+    "task_tags": [
+      "geospatial-discovery",
+      "metadata"
+    ],
+    "temporal_behavior": "dataset-dependent",
+    "dataset_time_reference": "Provided by individual discovery records",
+    "source_freshness": "Dataset-specific metadata modified timestamp",
+    "query_mode": "catalog-discovery",
+    "integration_requirements": [
+      "No default API key required for public discovery"
+    ],
+    "official_docs_url": "https://www.earthobservations.org/geoss.php",
+    "source_protocol": "catalog-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show GEOSS Platform",
+      "find GEOSS Platform near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://www.earthobservations.org/geoss.php"
+  ],
+  "license": {
+    "name": "GEOSS Platform and contributing providers",
+    "url": "https://www.earthobservations.org/geoss.php",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "catalog-discovery",
+      "earth-observation",
+      "institutional-data",
+      "geospatial-discovery",
+      "metadata",
+      "geoss",
+      "earth observation",
+      "geoportal",
+      "institutional"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

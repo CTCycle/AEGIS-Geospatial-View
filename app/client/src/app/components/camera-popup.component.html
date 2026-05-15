@@ -1,0 +1,43 @@
+@if (camera) {
+  <article class="camera-popup">
+    <header>
+      <strong>{{ camera.name }}</strong>
+      @if (camera.stale) {
+        <span>Stale</span>
+      }
+    </header>
+    @if (camera.preview_image_url) {
+      <img [src]="camera.preview_image_url" [alt]="camera.name" loading="lazy">
+    }
+    @if (safeEmbedUrl) {
+      <iframe
+        title="{{ camera.name }} live camera"
+        [src]="safeEmbedUrl"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      ></iframe>
+    }
+    <dl>
+      <div>
+        <dt>Provider</dt>
+        <dd>{{ camera.provider }}</dd>
+      </div>
+      <div>
+        <dt>Type</dt>
+        <dd>{{ camera.camera_type }}</dd>
+      </div>
+      <div>
+        <dt>Coordinates</dt>
+        <dd>{{ coordinates }}</dd>
+      </div>
+      @if (camera.last_update_time) {
+        <div>
+          <dt>Updated</dt>
+          <dd>{{ camera.last_update_time }}</dd>
+        </div>
+      }
+    </dl>
+    <p>Use official source terms before reusing or embedding camera media.</p>
+    <a [href]="camera.official_url" target="_blank" rel="noopener noreferrer">Official link</a>
+  </article>
+}

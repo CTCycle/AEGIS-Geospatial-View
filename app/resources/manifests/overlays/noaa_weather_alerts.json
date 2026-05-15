@@ -1,0 +1,100 @@
+{
+  "id": "noaa_weather_alerts",
+  "name": "NOAA Weather Alerts",
+  "provider": "noaa",
+  "type": "vector-overlay",
+  "description": "Active NOAA/NWS weather alerts as GeoJSON features.",
+  "capabilities": [
+    "weather",
+    "alerts",
+    "hazard",
+    "current"
+  ],
+  "coverage": "united-states",
+  "metadata": {
+    "label": "NOAA Weather Alerts",
+    "requires_key": false,
+    "attribution": "NOAA National Weather Service",
+    "keywords": [
+      "weather",
+      "alert",
+      "warning",
+      "watch"
+    ],
+    "intent_tags": [
+      "weather",
+      "hazard",
+      "alert"
+    ],
+    "task_tags": [
+      "weather alert map",
+      "route safety"
+    ],
+    "source_protocol": "JSON API",
+    "data_format": "GeoJSON",
+    "geometry_type": "Polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "functional",
+    "auth_mode": "none",
+    "official_docs_url": "https://www.weather.gov/documentation/services-web-api",
+    "last_validated": "2026-05-11",
+    "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
+  },
+  "version": 1,
+  "last_modified": "2026-05-11T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "geojson",
+  "sourceOfficialDocs": [
+    "https://www.weather.gov/documentation/services-web-api"
+  ],
+  "license": {
+    "name": "NOAA/NWS public data",
+    "url": "https://www.weather.gov/disclaimer",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": true,
+    "plannerHints": [
+      "weather alert",
+      "warning",
+      "watch",
+      "route safety"
+    ],
+    "requiredUserIntent": [
+      "weather",
+      "hazard",
+      "freshness"
+    ],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": [
+      "Coverage is U.S.-focused and depends on active alert availability."
+    ]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 900
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": "features[].properties.sent",
+    "fieldMap": {},
+    "expectedGeometry": "Polygon"
+  }
+}

@@ -1,7 +1,7 @@
 # Coding Rules
 
-Last updated: 2026-04-24
-Scope: `AEGIS/server`, `AEGIS/client`, `tests`
+Last updated: 2026-05-02
+Scope: `app/server`, `app/client`, `app/tests`
 
 ## Python Rules
 
@@ -9,7 +9,7 @@ Scope: `AEGIS/server`, `AEGIS/client`, `tests`
 
 - Target version: `>=3.14` (from `pyproject.toml`).
 - Use virtual environment at `runtimes/.venv` when present; otherwise use root `.venv`.
-- Keep dependency state aligned with `uv` and `runtimes/uv.lock`.
+- Keep dependency state aligned with `app/server/pyproject.toml` and `app/server/uv.lock`.
 - Do not create ad-hoc environments outside repository conventions.
 
 ### Typing
@@ -52,15 +52,15 @@ Scope: `AEGIS/server`, `AEGIS/client`, `tests`
 - Lint/format with Ruff or project-standard equivalent.
 - Type-check with Pylance-compatible typing discipline.
 - Test with pytest.
-- Cover `tests/unit` and relevant `tests/e2e` for user-visible or contract changes.
+- Cover `app/tests/unit` and relevant `app/tests/e2e` for user-visible or contract changes.
 
 ## TypeScript Rules
 
 ### Baseline
 
 - Angular 19 standalone architecture with TypeScript strict mode.
-- Keep frontend contracts in `AEGIS/client/src/app/core/types.ts`.
-- Route all backend calls through `AEGIS/client/src/app/core/api.ts`.
+- Keep frontend contracts in `app/client/src/app/core/types.ts`.
+- Route all backend calls through `app/client/src/app/core/api.ts`.
 
 ### Typing and data safety
 
@@ -83,9 +83,9 @@ Scope: `AEGIS/server`, `AEGIS/client`, `tests`
 
 ### Build and tests
 
-- Maintain `npm run build` success in `AEGIS/client`.
+- Maintain `npm run build` success in `app/client`.
 - Update E2E tests for user-visible behavior changes.
-- Keep regressions covered in `tests/e2e` where flows are affected.
+- Keep regressions covered in `app/tests/e2e` where flows are affected.
 
 ## Cross-Language Rules
 

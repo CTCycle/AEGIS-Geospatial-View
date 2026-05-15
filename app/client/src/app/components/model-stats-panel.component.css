@@ -1,0 +1,25 @@
+.settings-page__stats-table-wrap {
+  overflow: auto;
+  max-height: min(72vh, 58rem);
+  border: 1px solid #263a45;
+  border-radius: 0.35rem;
+  background: #101c23;
+}
+
+.settings-page__stats-mobile-list { display: none; }
+.settings-page__stats-mobile-card { border: 1px solid #263a45; border-radius: 0.35rem; background: #101c23; padding: 0.72rem 0.82rem; }
+.settings-page__stats-mobile-card h3 { margin: 0 0 0.5rem; font-size: 0.92rem; color: #f0f7fa; }
+.settings-page__stats-mobile-card dl { margin: 0; display: grid; gap: 0.38rem; }
+.settings-page__stats-mobile-card dl div { display: grid; grid-template-columns: 4.4rem minmax(0, 1fr); gap: 0.4rem; align-items: start; }
+.settings-page__stats-mobile-card dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8fa6b0; font-weight: var(--font-weight-semibold); }
+.settings-page__stats-mobile-card dd { margin: 0; font-size: 0.8rem; color: #d5e3e8; line-height: 1.35; overflow-wrap: anywhere; }
+.settings-page__stats-mobile-empty { margin: 0; font-size: 0.8rem; color: #a9bac2; }
+.settings-page__stats-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.settings-page__stats-table th,
+.settings-page__stats-table td { border-bottom: 1px solid #22343e; padding: 0.5rem; text-align: left; vertical-align: top; }
+.settings-page__stats-table th { background: #13242d; color: #9eb4bf; position: sticky; top: 0; }
+
+@media (max-width: 760px) {
+  .settings-page__stats-table-wrap { display: none; max-height: none; overflow: visible; }
+  .settings-page__stats-mobile-list { display: grid; gap: 0.55rem; }
+}

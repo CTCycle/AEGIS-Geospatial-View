@@ -1,0 +1,125 @@
+{
+  "id": "osm_terrain",
+  "name": "Terrain Context",
+  "provider": "fallback",
+  "type": "tile",
+  "description": "Terrain-focused OpenStreetMap basemap highlighting elevation and landform context.",
+  "capabilities": [
+    "tile"
+  ],
+  "coverage": "global",
+  "metadata": {
+    "label": "Terrain Context",
+    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "attribution": "© OpenStreetMap contributors",
+    "requires_key": false,
+    "keywords": [
+      "terrain",
+      "elevation",
+      "relief",
+      "topographic"
+    ],
+    "map_type_tags": [
+      "terrain"
+    ],
+    "intent_tags": [
+      "elevation_analysis",
+      "outdoor_planning"
+    ],
+    "task_tags": [
+      "terrain",
+      "slope"
+    ],
+    "coverage_scope": "global",
+    "temporal_behavior": "static tiles",
+    "constraints": "terrain semantics mapped to OSM fallback tiles",
+    "last_embedded": null,
+    "embedding_provider": "ollama",
+    "embedding_model": "nomic-embed-text",
+    "content_hash": "78436aa4ec76d2188f3525ec7ac3559e45e9e9300e9c5ec21c97844cd5be120b",
+    "human_summary": "Terrain basemap that helps interpret relief, slopes, and natural landform structure.",
+    "primary_use_cases": [
+      "terrain interpretation",
+      "outdoor planning",
+      "landform-aware overlay analysis"
+    ],
+    "search_examples": [
+      "show terrain around the Alps",
+      "map elevation-sensitive routes"
+    ],
+    "disambiguation_notes": [
+      "Prefer this over standard street maps when topography and landform are important to the user intent."
+    ],
+    "location_dependency": "Location-specific; useful from local to continental extents.",
+    "integration_requirements": [
+      "No API key required"
+    ],
+    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Tile_servers",
+    "source_protocol": "raster-tile",
+    "data_format": "image tiles",
+    "geometry_type": "raster-grid",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "terrain semantics mapped to OSM fallback tiles",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27"
+  },
+  "version": 1,
+  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "capabilityKind": "basemap",
+  "renderingMode": "xyz",
+  "sourceOfficialDocs": [
+    "https://wiki.openstreetmap.org/wiki/Tile_servers"
+  ],
+  "license": {
+    "name": "© OpenStreetMap contributors",
+    "url": "https://wiki.openstreetmap.org/wiki/Tile_servers",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": true,
+    "plannerHints": [
+      "elevation_analysis",
+      "outdoor_planning",
+      "terrain",
+      "slope",
+      "elevation",
+      "relief",
+      "topographic"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "functional",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "none",
+    "ttlSeconds": 0,
+    "staleWhileRevalidateSeconds": 0
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "raster-grid"
+  }
+}

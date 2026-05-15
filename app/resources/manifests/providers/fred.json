@@ -1,0 +1,124 @@
+{
+  "id": "fred",
+  "name": "FRED Economic Data API",
+  "provider": "fred",
+  "type": "credentialed-provider",
+  "description": "Federal Reserve Economic Data API for U.S. economic, housing, rent, and market time-series indicators.",
+  "capabilities": [
+    "market-data",
+    "economic-indicators",
+    "housing",
+    "time-series-insight"
+  ],
+  "coverage": "us",
+  "metadata": {
+    "label": "FRED Economic Data API",
+    "requires_key": true,
+    "attribution": "Federal Reserve Bank of St. Louis FRED",
+    "keywords": [
+      "fred",
+      "economic indicators",
+      "housing",
+      "rent",
+      "market data"
+    ],
+    "intent_tags": [
+      "market data",
+      "economic indicators",
+      "housing trends"
+    ],
+    "task_tags": [
+      "regional market context",
+      "housing trend analysis",
+      "economic screening"
+    ],
+    "temporal_behavior": "dynamic",
+    "dataset_time_reference": "Series-specific observation dates",
+    "source_freshness": "Series-specific release calendar",
+    "query_mode": "credentialed-json-api",
+    "human_summary": "Credential-backed U.S. economic and housing indicators for location-aware market analysis.",
+    "primary_use_cases": [
+      "housing market context",
+      "regional economic trend checks",
+      "rent and price indicator retrieval"
+    ],
+    "integration_requirements": [
+      "Requires FRED API key"
+    ],
+    "official_docs_url": "https://fred.stlouisfed.org/docs/api/fred/v2/api_key.html",
+    "source_protocol": "provider-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "api_key",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show FRED Economic Data API",
+      "find FRED Economic Data API near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://fred.stlouisfed.org/docs/api/fred/v2/api_key.html"
+  ],
+  "license": {
+    "name": "Federal Reserve Bank of St. Louis FRED",
+    "url": "https://fred.stlouisfed.org/docs/api/fred/v2/api_key.html",
+    "attributionRequired": true,
+    "commercialUse": "restricted",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "api-key",
+    "providerKey": "fred",
+    "required": true,
+    "accessPageProviderId": "fred"
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "market data",
+      "economic indicators",
+      "housing trends",
+      "regional market context",
+      "housing trend analysis",
+      "economic screening",
+      "fred",
+      "housing",
+      "rent"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}

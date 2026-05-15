@@ -1,0 +1,115 @@
+{
+  "id": "inspire",
+  "name": "INSPIRE Geoportal",
+  "provider": "inspire",
+  "type": "catalog-provider",
+  "description": "European INSPIRE discovery catalog for institutional geospatial datasets and services.",
+  "capabilities": [
+    "catalog-discovery",
+    "institutional-data",
+    "europe"
+  ],
+  "coverage": "eu-eea",
+  "metadata": {
+    "label": "INSPIRE Geoportal",
+    "requires_key": false,
+    "attribution": "INSPIRE Geoportal and contributing institutions",
+    "keywords": [
+      "inspire",
+      "geoportal",
+      "institutional",
+      "europe",
+      "metadata"
+    ],
+    "intent_tags": [
+      "catalog-discovery",
+      "institutional-data",
+      "europe"
+    ],
+    "task_tags": [
+      "geospatial-discovery",
+      "metadata"
+    ],
+    "temporal_behavior": "dataset-dependent",
+    "dataset_time_reference": "Provided by individual catalog records",
+    "source_freshness": "Dataset-specific metadata modified timestamp",
+    "query_mode": "catalog-discovery",
+    "integration_requirements": [
+      "No default API key required for public discovery"
+    ],
+    "official_docs_url": "https://inspire.ec.europa.eu/",
+    "source_protocol": "catalog-api",
+    "data_format": "JSON/API",
+    "geometry_type": "not-applicable",
+    "queryable": false,
+    "vectorizable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-04-27",
+    "search_examples": [
+      "show INSPIRE Geoportal",
+      "find INSPIRE Geoportal near a selected location"
+    ],
+    "location_dependency": "Depends on selected map extent or requested location.",
+    "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
+  },
+  "version": 1,
+  "last_modified": "2026-04-27T00:00:00+00:00",
+  "capabilityKind": "metadata-only",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": [
+    "https://inspire.ec.europa.eu/"
+  ],
+  "license": {
+    "name": "INSPIRE Geoportal and contributing institutions",
+    "url": "https://inspire.ec.europa.eu/",
+    "attributionRequired": true,
+    "commercialUse": "unknown",
+    "embeddingAllowed": "unknown"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": false,
+    "manualToggle": false,
+    "plannerHints": [
+      "catalog-discovery",
+      "institutional-data",
+      "europe",
+      "geospatial-discovery",
+      "metadata",
+      "inspire",
+      "geoportal",
+      "institutional"
+    ],
+    "requiredUserIntent": [],
+    "avoidWhen": [
+      "general chat",
+      "no geographic context"
+    ]
+  },
+  "reliability": {
+    "status": "unknown",
+    "lastAudited": "2026-05-11",
+    "knownLimitations": []
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 86400,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "not-applicable"
+  }
+}
