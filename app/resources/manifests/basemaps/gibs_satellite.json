@@ -11,8 +11,8 @@
   "coverage": "global",
   "metadata": {
     "label": "Satellite Imagery",
-    "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "attribution": "Tiles © Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    "tile_url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "attribution": "Tiles (c) Esri, Maxar, Earthstar Geographics, and the GIS User Community",
     "requires_key": false,
     "keywords": [
       "satellite",

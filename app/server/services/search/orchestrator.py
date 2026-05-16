@@ -103,6 +103,14 @@ class LocationSearchOrchestrator:
         rendering_mode = str(capability.get("renderingMode") or "")
         capability_kind = str(capability.get("capabilityKind") or "")
         if capability_kind == "camera-network":
+            auth = capability.get("auth") if isinstance(capability.get("auth"), dict) else {}
+            credential_env = self._credential_env_for_provider(
+                str(auth.get("providerKey") or capability.get("provider") or "")
+            )
+            if bool(auth.get("required")) and credential_env and not os.getenv(credential_env, "").strip():
+                warnings.append(
+                    f"{overlay_id}: {credential_env} is required for live camera metadata."
+                )
             camera_params = {
                 "provider": str(capability.get("provider") or "unknown"),
                 "bbox": self._bbox_query_value(payload),
@@ -296,6 +304,12 @@ class LocationSearchOrchestrator:
         if not api_key:
             return template, f"{env_name} is required to render this provider tile layer."
         return template.replace("{api_key}", api_key), None
+
+    @staticmethod
+    def _credential_env_for_provider(provider: str) -> str | None:
+        return {
+            "windy_webcams": "WINDY_WEBCAMS_API_KEY",
+        }.get(provider.strip().lower())
 
     @staticmethod
     def _resolve_rainviewer_tile_url() -> str | None:

@@ -414,6 +414,8 @@ class ManifestIntentResolver:
         available_ids: set[str],
     ) -> list[str]:
         allowed_overlay_ids = self._allowed_overlay_ids(concepts)
+        if not allowed_overlay_ids:
+            return []
         overlays = {
             str(item.get("id")): self._capability_tokens(item)
             for item in capability_registry.list_overlays()
