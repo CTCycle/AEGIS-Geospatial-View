@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
+from server.domain.geographics import ProviderCredentialValidationResult
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,
@@ -20,7 +22,88 @@ from server.services.geospatial.providers.base import (
     response_without_credentials,
     unsupported_credential_validation,
 )
-from server.domain.geographics import ProviderCredentialValidationResult
+from server.services.geospatial.providers.census import CensusProvider
+from server.services.geospatial.providers.eea import EEAProvider
+from server.services.geospatial.providers.esa import ESAProvider
+from server.services.geospatial.providers.eurostat import EurostatProvider
+from server.services.geospatial.providers.fallback import FallbackTileProvider
+from server.services.geospatial.providers.fema import FEMAProvider
+from server.services.geospatial.providers.geoapify import GeoapifyProvider
+from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
+from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
+from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
+from server.services.geospatial.providers.mapillary import MapillaryProvider
+from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
+from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
+from server.services.geospatial.providers.natural_earth import NaturalEarthProvider
+from server.services.geospatial.providers.noaa import NOAAProvider
+from server.services.geospatial.providers.nominatim import NominatimProvider
+from server.services.geospatial.providers.nrel import NRELProvider
+from server.services.geospatial.providers.openaddresses import OpenAddressesProvider
+from server.services.geospatial.providers.openaq import OpenAQProvider
+from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
+from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
+from server.services.geospatial.providers.opentripmap import OpenTripMapProvider
+from server.services.geospatial.providers.osm import OSMProvider
+from server.services.geospatial.providers.ourairports import OurAirportsProvider
+from server.services.geospatial.providers.overpass import OverpassProvider
+from server.services.geospatial.providers.overture import OvertureProvider
+from server.services.geospatial.providers.pvgis import PVGISProvider
+from server.services.geospatial.providers.rainviewer import RainViewerProvider
+from server.services.geospatial.providers.tomtom import TomTomProvider
+from server.services.geospatial.providers.transitland import TransitlandProvider
+from server.services.geospatial.providers.usgs import USGSProvider
+from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
+
+
+ProviderFactory = Callable[[], GeospatialProvider]
+
+
+PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
+    "arcgis": ArcGISRestProvider,
+    "census": CensusProvider,
+    "gibs": NASAGIBSProvider,
+    "eea": EEAProvider,
+    "esa": ESAProvider,
+    "eurostat": EurostatProvider,
+    "rainviewer": RainViewerProvider,
+    "openmeteo": OpenMeteoProvider,
+    "overpass": OverpassProvider,
+    "openaq": lambda: OpenAQProvider(api_key=os.getenv("OPENAQ_API_KEY")),
+    "pvgis": PVGISProvider,
+    "tomtom": lambda: TomTomProvider(api_key=os.getenv("TOMTOM_API_KEY")),
+    "geoapify": lambda: GeoapifyProvider(api_key=os.getenv("GEOAPIFY_API_KEY")),
+    "windy_webcams": lambda: WindyWebcamsProvider(
+        api_key=os.getenv("WINDY_WEBCAMS_API_KEY")
+    ),
+    "usgs": USGSProvider,
+    "noaa": NOAAProvider,
+    "fema": FEMAProvider,
+    "nasa_firms": lambda: NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY")),
+    "opentripmap": lambda: OpenTripMapProvider(
+        api_key=os.getenv("OPENTRIPMAP_API_KEY")
+    ),
+    "openchargemap": lambda: OpenChargeMapProvider(
+        api_key=os.getenv("OPENCHARGEMAP_API_KEY")
+    ),
+    "nrel": lambda: NRELProvider(api_key=os.getenv("NREL_API_KEY")),
+    "ourairports": OurAirportsProvider,
+    "gtfs_static": GTFSStaticProvider,
+    "gtfs_realtime": GTFSRealtimeProvider,
+    "natural_earth": NaturalEarthProvider,
+    "overture": OvertureProvider,
+    "openaddresses": OpenAddressesProvider,
+    "local_open_data": LocalOpenDataProvider,
+    "transitland": lambda: TransitlandProvider(
+        api_key=os.getenv("TRANSITLAND_API_KEY")
+    ),
+    "nominatim": NominatimProvider,
+    "fallback": FallbackTileProvider,
+    "osm": OSMProvider,
+    "mapillary": lambda: MapillaryProvider(
+        access_token=os.getenv("MAPILLARY_ACCESS_TOKEN")
+    ),
+}
 
 
 class ProviderRegistryError(Exception):
@@ -185,168 +268,9 @@ class ProviderRegistry:
     def _provider_for_manifest(
         self, provider_id: str, manifest: dict[str, Any]
     ) -> GeospatialProvider:
-        if provider_id == "arcgis":
-            from server.services.geospatial.providers.arcgis_rest import (
-                ArcGISRestProvider,
-            )
-
-            return ArcGISRestProvider()
-        if provider_id == "census":
-            from server.services.geospatial.providers.census import CensusProvider
-
-            return CensusProvider()
-        if provider_id == "gibs":
-            from server.services.geospatial.providers.nasa_gibs import (
-                NASAGIBSProvider,
-            )
-
-            return NASAGIBSProvider()
-        if provider_id == "eea":
-            from server.services.geospatial.providers.eea import EEAProvider
-
-            return EEAProvider()
-        if provider_id == "esa":
-            from server.services.geospatial.providers.esa import ESAProvider
-
-            return ESAProvider()
-        if provider_id == "eurostat":
-            from server.services.geospatial.providers.eurostat import EurostatProvider
-
-            return EurostatProvider()
-        if provider_id == "rainviewer":
-            from server.services.geospatial.providers.rainviewer import (
-                RainViewerProvider,
-            )
-
-            return RainViewerProvider()
-        if provider_id == "openmeteo":
-            from server.services.geospatial.providers.openmeteo import (
-                OpenMeteoProvider,
-            )
-
-            return OpenMeteoProvider()
-        if provider_id == "overpass":
-            from server.services.geospatial.providers.overpass import OverpassProvider
-
-            return OverpassProvider()
-        if provider_id == "openaq":
-            from server.services.geospatial.providers.openaq import OpenAQProvider
-
-            return OpenAQProvider(api_key=os.getenv("OPENAQ_API_KEY"))
-        if provider_id == "pvgis":
-            from server.services.geospatial.providers.pvgis import PVGISProvider
-
-            return PVGISProvider()
-        if provider_id == "tomtom":
-            from server.services.geospatial.providers.tomtom import TomTomProvider
-
-            return TomTomProvider(api_key=os.getenv("TOMTOM_API_KEY"))
-        if provider_id == "geoapify":
-            from server.services.geospatial.providers.geoapify import GeoapifyProvider
-
-            return GeoapifyProvider(api_key=os.getenv("GEOAPIFY_API_KEY"))
-        if provider_id == "windy_webcams":
-            from server.services.geospatial.providers.windy_webcams import (
-                WindyWebcamsProvider,
-            )
-
-            return WindyWebcamsProvider(api_key=os.getenv("WINDY_WEBCAMS_API_KEY"))
-        if provider_id == "usgs":
-            from server.services.geospatial.providers.usgs import USGSProvider
-
-            return USGSProvider()
-        if provider_id == "noaa":
-            from server.services.geospatial.providers.noaa import NOAAProvider
-
-            return NOAAProvider()
-        if provider_id == "fema":
-            from server.services.geospatial.providers.fema import FEMAProvider
-
-            return FEMAProvider()
-        if provider_id == "nasa_firms":
-            from server.services.geospatial.providers.nasa_firms import (
-                NASAFIRMSProvider,
-            )
-
-            return NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY"))
-        if provider_id == "opentripmap":
-            from server.services.geospatial.providers.opentripmap import (
-                OpenTripMapProvider,
-            )
-
-            return OpenTripMapProvider(api_key=os.getenv("OPENTRIPMAP_API_KEY"))
-        if provider_id == "openchargemap":
-            from server.services.geospatial.providers.openchargemap import (
-                OpenChargeMapProvider,
-            )
-
-            return OpenChargeMapProvider(api_key=os.getenv("OPENCHARGEMAP_API_KEY"))
-        if provider_id == "nrel":
-            from server.services.geospatial.providers.nrel import NRELProvider
-
-            return NRELProvider(api_key=os.getenv("NREL_API_KEY"))
-        if provider_id == "ourairports":
-            from server.services.geospatial.providers.ourairports import (
-                OurAirportsProvider,
-            )
-
-            return OurAirportsProvider()
-        if provider_id == "gtfs_static":
-            from server.services.geospatial.providers.gtfs_static import (
-                GTFSStaticProvider,
-            )
-
-            return GTFSStaticProvider()
-        if provider_id == "gtfs_realtime":
-            from server.services.geospatial.providers.gtfs_realtime import (
-                GTFSRealtimeProvider,
-            )
-
-            return GTFSRealtimeProvider()
-        if provider_id == "natural_earth":
-            from server.services.geospatial.providers.natural_earth import (
-                NaturalEarthProvider,
-            )
-
-            return NaturalEarthProvider()
-        if provider_id == "overture":
-            from server.services.geospatial.providers.overture import OvertureProvider
-
-            return OvertureProvider()
-        if provider_id == "openaddresses":
-            from server.services.geospatial.providers.openaddresses import (
-                OpenAddressesProvider,
-            )
-
-            return OpenAddressesProvider()
-        if provider_id == "local_open_data":
-            from server.services.geospatial.providers.local_open_data import (
-                LocalOpenDataProvider,
-            )
-
-            return LocalOpenDataProvider()
-        if provider_id == "transitland":
-            from server.services.geospatial.providers.transitland import (
-                TransitlandProvider,
-            )
-
-            return TransitlandProvider(api_key=os.getenv("TRANSITLAND_API_KEY"))
-        if provider_id == "nominatim":
-            from server.services.geospatial.providers.nominatim import NominatimProvider
-
-            return NominatimProvider()
-        if provider_id == "fallback":
-            from server.services.geospatial.providers.fallback import FallbackTileProvider
-
-            return FallbackTileProvider()
-        if provider_id == "osm":
-            from server.services.geospatial.providers.osm import OSMProvider
-
-            return OSMProvider()
-        if provider_id == "mapillary":
-            from server.services.geospatial.providers.mapillary import MapillaryProvider
-
-            return MapillaryProvider(access_token=os.getenv("MAPILLARY_ACCESS_TOKEN"))
+        factory = PROVIDER_FACTORIES.get(provider_id)
+        if factory is not None:
+            return factory()
         return ManifestBackedProvider(provider_id=provider_id, manifest=manifest)
 
     def _normalize_provider_id(self, provider_id: str) -> str:

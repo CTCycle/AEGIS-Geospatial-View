@@ -4,7 +4,12 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from server.domain.extraction.models import TurnParseResult
+from server.domain.extraction.models import (
+    ConversationContextSnapshot,
+    LocationSignal,
+    NormalizedIntent,
+    TurnParseResult,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
@@ -608,12 +613,6 @@ def _gate_selected_capability(
 def _synthetic_turn(
     user_query: str, tags: list[str], resolved_location: object | None
 ) -> TurnParseResult:
-    from server.domain.extraction.models import (
-        ConversationContextSnapshot,
-        LocationSignal,
-        NormalizedIntent,
-    )
-
     location_signals = []
     latitude = getattr(resolved_location, "latitude", None)
     longitude = getattr(resolved_location, "longitude", None)

@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from server.api import geospatial
 from server.app import create_app
+from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.providers.base import ProviderRateLimitError, ProviderTimeoutError
 
 
@@ -92,8 +93,10 @@ def test_geospatial_features_map_provider_failures_without_500(
             del provider_id, request
             raise provider_error
 
-    monkeypatch.setattr(geospatial, "ProviderRegistry", FailingRegistry)
     client = TestClient(create_app())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = (
+        lambda: GeospatialApiService(provider_registry=FailingRegistry())
+    )
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")
 

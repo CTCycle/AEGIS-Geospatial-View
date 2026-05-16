@@ -59,6 +59,7 @@ AEGIS Geospatial View/
 ```text
 api/
   chat.py
+  geospatial.py
   search.py
 common/
   constants.py
@@ -121,24 +122,36 @@ services/
   chat/settings_service.py
   chat/streaming.py
   geospatial/capability_registry.py
+  geospatial/api_service.py
   geospatial/catalog.py
   geospatial/coverage.py
   geospatial/elevation.py
   geospatial/gibs_errors.py
   geospatial/gibs_runtime.py
   geospatial/gibs.py
+  geospatial/ingestion.py
+  geospatial/layer_auditor.py
   geospatial/layers.py
+  geospatial/live_validator.py
   geospatial/manifest_loader.py
   geospatial/maps.py
+  geospatial/materialization_runner.py
   geospatial/nominatim.py
+  geospatial/normalizers.py
   geospatial/openaq.py
   geospatial/openmeteo.py
   geospatial/osm_tiles.py
   geospatial/overpass.py
+  geospatial/provider_account_setup_service.py
+  geospatial/provider_credential_validation_service.py
+  geospatial/provider_registry.py
   geospatial/pvgis.py
   geospatial/rainviewer.py
   geospatial/rendering.py
   geospatial/runtime_registry.py
+  geospatial/search_index.py
+  geospatial/source_health.py
+  geospatial/tiler.py
   llm/base.py
   llm/cloud_catalog.py
   llm/context_budget.py
@@ -259,6 +272,41 @@ All routers are mounted with prefix `/api` in `app/server/app.py`.
 - `DELETE /api/maps/jobs/{job_id}`  
   Requests async job cancellation (`JobCancelResponse`).
 
+### Geospatial provider endpoints (`app/server/api/geospatial.py`)
+
+- `GET /api/geospatial/capabilities`  
+  Returns `GeospatialCatalogResponse`.
+
+- `GET /api/geospatial/layers`  
+  Returns grouped layer descriptors (`GeospatialLayersResponse`).
+
+- `GET /api/geospatial/layers/{layer_id}/health`  
+  Returns manifest reliability and runtime health (`GeospatialLayerHealthResponse`).
+
+- `GET /api/geospatial/layers/{layer_id}/features`  
+  Returns provider-backed feature payloads (`GeospatialProviderPayloadResponse`).
+
+- `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`  
+  Proxies TomTom tiles as a binary image response.
+
+- `GET /api/geospatial/cameras`  
+  Returns camera provider feature payloads (`GeospatialProviderPayloadResponse`).
+
+- `GET /api/geospatial/cameras/{camera_id}`  
+  Returns camera detail metadata (`GeospatialCameraDetailResponse`).
+
+- `GET /api/geospatial/sources/{provider_id}/credential-status`  
+  Returns provider credential availability (`GeospatialCredentialStatusResponse`).
+
+- `GET /api/geospatial/providers/account-setup` and `GET /api/geospatial/providers/{provider_id}/account-setup`  
+  Return provider account setup instructions.
+
+- `POST /api/geospatial/providers/{provider_id}/credentials/validate`  
+  Validates provider credentials without returning secret values.
+
+- `POST /api/geospatial/audit`  
+  Returns `LayerAuditReport`.
+
 ### Chat/settings/model endpoints (`app/server/api/chat.py`)
 
 - `POST /api/chat/turn`  
@@ -302,6 +350,7 @@ All routers are mounted with prefix `/api` in `app/server/app.py`.
 
 Representative path:
 - endpoint (`chat.py` / `search.py`) -> service composition (`services/*/composition.py`) -> orchestration/execution (`services/agent`, `services/search`, `services/geospatial`) -> repository/database operations (`repositories/*`)
+- geospatial endpoint (`geospatial.py`) -> `GeospatialApiService` -> geospatial provider/runtime services -> manifest/database repositories where required
 
 Layering constraints:
 - API routes translate service exceptions into HTTP responses.
