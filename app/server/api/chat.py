@@ -215,6 +215,31 @@ def update_settings(
     ],
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
+    local_models = {
+        str(item.get("id", ""))
+        for item in runtime.model_library_service.list_models(
+            ollama_url=runtime.settings_service.get_ollama_url()
+        ).get("local", [])
+        if isinstance(item, dict)
+    }
+    unavailable_local_assignments = [
+        model_name
+        for provider, model_name in (
+            (payload.chat_model_provider, payload.chat_model_name),
+            (payload.parser_model_provider, payload.parser_model_name),
+            (payload.agent_model_provider, payload.agent_model_name),
+        )
+        if provider == "ollama" and model_name and model_name not in local_models
+    ]
+    if unavailable_local_assignments:
+        unavailable = ", ".join(sorted(set(unavailable_local_assignments)))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Cannot assign unavailable local Ollama model(s): {unavailable}. "
+                "Pull the model first or choose an installed local model."
+            ),
+        )
     return runtime.settings_service.update_settings(payload)
 
 

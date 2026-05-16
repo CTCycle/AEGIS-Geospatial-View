@@ -108,6 +108,7 @@ All interactive components must provide:
   - search/filter controls
   - model cards and assignment UI
   - API key and Ollama management modals
+  - Ollama cards visually separate installed local models from pullable library entries
 - `/capabilities` (`CapabilitiesPageComponent`):
   - manifest-backed capability tables
   - grouped providers, map types, layers, and direct tools

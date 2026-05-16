@@ -33,6 +33,21 @@
     min-height: 0;
 }
 
+.settings-page__warning {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid #8f4350;
+    border-radius: 0.35rem;
+    background: #281820;
+    color: #f1d7dc;
+}
+
+.settings-page__warning strong {
+    white-space: nowrap;
+}
+
 .settings-page__layout {
     display: grid;
     grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);

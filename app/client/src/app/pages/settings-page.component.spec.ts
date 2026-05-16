@@ -122,6 +122,37 @@ describe('pages/settings-page.component', () => {
     expect(component.statusText).toContain('Selected');
   });
 
+  it('pulls a missing Ollama model before assigning it', async () => {
+    fetchChatModelsMock.and.resolveTo({
+      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: [], metadata: {} }],
+      local: [],
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.setProviderFilter('ollama');
+
+    fetchChatModelsMock.and.resolveTo({
+      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: [], metadata: {} }],
+      local: [{ id: 'llama3.1', name: 'llama3.1', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
+    });
+
+    await component.applyModelSelection('parser', {
+      id: 'llama3.1',
+      name: 'llama3.1',
+      description: 'library',
+      provider: 'ollama',
+      capabilities: [],
+      metadata: {},
+    });
+
+    expect(pullOllamaModelMock).toHaveBeenCalledWith('llama3.1');
+    expect(refreshOllamaModelsMock).toHaveBeenCalled();
+    expect(updateChatSettingsMock).toHaveBeenCalled();
+    expect(component.statusText).toContain('Selected llama3.1 for parser');
+  });
+
   it('applyModelSelection does not send read-only credential health fields', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'local',
