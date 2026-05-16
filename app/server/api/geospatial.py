@@ -291,8 +291,7 @@ def _parse_camera_identifier(camera_id: str) -> tuple[str | None, str]:
             provider_id = provider_id.strip()
             provider_camera_id = provider_camera_id.strip()
             if provider_id and provider_camera_id:
-                provider_aliases = {"windy": "windy_webcams"}
-                return provider_aliases.get(provider_id, provider_id), provider_camera_id
+                return provider_id, provider_camera_id
     return None, normalized
 
 

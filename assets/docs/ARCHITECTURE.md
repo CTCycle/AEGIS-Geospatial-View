@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-02
+Last updated: 2026-05-16
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -87,16 +87,12 @@ repositories/
   credentials.py
   manifest_embeddings.py
   model_settings.py
-  session_catalog.py
-  session_details.py
   database/backend.py
   database/initializer.py
   database/postgres.py
   database/sqlite.py
   database/utils.py
   queries/manifest_embeddings.py
-  queries/session_catalog.py
-  queries/session_details.py
   schemas/models.py
   serialization/serializer.py
 services/
@@ -343,7 +339,7 @@ Core tables (defined in constants/schema layer) include:
 - chat sessions/messages
 - model provider settings
 - encrypted model credentials
-- geospatial metadata/session data
+- GIBS layer metadata and manifest embedding records
 
 ### Vector persistence
 
