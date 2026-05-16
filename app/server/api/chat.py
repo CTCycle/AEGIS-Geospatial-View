@@ -215,6 +215,7 @@ def update_settings(
     ],
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
+    current_settings = runtime.settings_service.get_settings()
     local_models = {
         str(item.get("id", ""))
         for item in runtime.model_library_service.list_models(
@@ -222,14 +223,33 @@ def update_settings(
         ).get("local", [])
         if isinstance(item, dict)
     }
+    requested_assignments = (
+        (
+            payload.chat_model_provider,
+            payload.chat_model_name,
+            current_settings.chat_model_provider,
+            current_settings.chat_model_name,
+        ),
+        (
+            payload.parser_model_provider,
+            payload.parser_model_name,
+            current_settings.parser_model_provider,
+            current_settings.parser_model_name,
+        ),
+        (
+            payload.agent_model_provider,
+            payload.agent_model_name,
+            current_settings.agent_model_provider,
+            current_settings.agent_model_name,
+        ),
+    )
     unavailable_local_assignments = [
         model_name
-        for provider, model_name in (
-            (payload.chat_model_provider, payload.chat_model_name),
-            (payload.parser_model_provider, payload.parser_model_name),
-            (payload.agent_model_provider, payload.agent_model_name),
-        )
-        if provider == "ollama" and model_name and model_name not in local_models
+        for provider, model_name, current_provider, current_model_name in requested_assignments
+        if provider == "ollama"
+        and model_name
+        and model_name not in local_models
+        and (provider, model_name) != (current_provider, current_model_name)
     ]
     if unavailable_local_assignments:
         unavailable = ", ".join(sorted(set(unavailable_local_assignments)))

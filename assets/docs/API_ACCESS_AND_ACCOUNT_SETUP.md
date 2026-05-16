@@ -1,12 +1,32 @@
 # API Access and Account Setup Guide
 
-Last updated: 2026-05-14
+Last updated: 2026-05-16
 
 ## Purpose
 
 This guide lists the external services used by the AEGIS geospatial layer catalog and explains how to activate full coverage. Free/open providers remain enabled where no key is required. Credentialed providers stay unavailable until credentials are configured in the Access settings page or through environment variables.
 
 Store secrets only through the encrypted credential repository or local environment variables. Do not commit API keys, tokens, `.env` files, shell history, screenshots, or provider dashboard exports.
+
+## Provider Setup Wizard
+
+The Access configurations page exposes a guided provider setup wizard. It links to provider account pages, dashboards, and official documentation, renders only the credential fields declared by provider manifests, validates user-supplied access keys where a provider implementation supports validation, and saves keys through the existing encrypted local credential storage path.
+
+## Why Account Creation Is Manual
+
+AEGIS does not automate third-party account creation or API-key harvesting with Chromium, Playwright, Puppeteer, Selenium, or similar browser automation in production onboarding. Provider portals can require billing, MFA, CAPTCHA, changing UI flows, or account-specific policy review. Provider account and key creation must be completed in the provider's own portal unless the provider exposes an official API for that operation.
+
+## Credential Validation
+
+Credential validation posts a temporary key to the backend validation endpoint and does not persist it. Providers without credentials return a valid no-key-required result. Providers with concrete validation support perform the cheapest existing provider request available; providers without validation support return an unsupported validation result.
+
+## Credential Storage Policy
+
+AEGIS does not store provider portal passwords. AEGIS stores provider access keys or tokens only through encrypted local credential storage, or reads them from explicit environment variables. Stored credential status is shown as metadata only; raw credential values are never returned by setup, validation, status, or catalog APIs.
+
+## Unsupported Automation
+
+Chromium automation is useful for controlled local UI testing, but it is not part of production provider onboarding. Do not add browser automation dependencies or flows for external provider signup, login replay, or key retrieval.
 
 ## Credential Configuration
 

@@ -2,8 +2,8 @@
   <header class="access-page__header">
     <div>
       <p class="page-kicker">Access Configurations</p>
-      <h1>Optional Geospatial Provider Keys</h1>
-      <p>AEGIS uses free and openly accessible sources by default. Add keys only for optional premium-style map providers.</p>
+      <h1>Provider Setup Wizard</h1>
+      <p>Configure optional geospatial provider access keys without storing provider portal passwords.</p>
       <p class="access-page__default-inline">
         <strong>Default workflow:</strong>
         OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim remain available without user-supplied API keys, subject to provider attribution and usage limits.
@@ -13,79 +13,126 @@
 
   <main class="access-page__content">
     <p class="access-page__status" aria-live="polite">{{ statusText }}</p>
-    <section class="access-grid" aria-label="Optional providers">
-      @for (provider of providers; track provider.id) {
-        <article class="access-provider">
-          <header>
-            <div>
-              <h2>{{ provider.name }}</h2>
-              <p>{{ provider.purpose }}</p>
-            </div>
-          </header>
 
-          <dl>
-            <div>
-              <dt>Access</dt>
-              <dd>Optional API key</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd
-                class="access-provider__status"
-                [class.access-provider__status--enabled]="configured(provider.id)"
-              >
-                <span aria-hidden="true"></span>
-                {{ health(provider.id) }}
-              </dd>
-            </div>
-            <div>
-              <dt>Provider docs</dt>
-              <dd><a [href]="provider.docsUrl" target="_blank" rel="noreferrer">{{ provider.docsUrl }}</a></dd>
-            </div>
-          </dl>
-
-          <footer>
-            <label class="access-provider__key-field">
-              API key
-              <div class="access-provider__key-input-row">
-                <input
-                  type="password"
-                  autocomplete="off"
-                  [placeholder]="provider.placeholder"
-                  [(ngModel)]="drafts[provider.id]"
-                  [name]="provider.id + '_api_key'"
-                />
-                <div class="access-provider__key-actions" role="group" [attr.aria-label]="'API key actions for ' + provider.name">
-                  <button
-                    type="button"
-                    class="access-provider__icon-button access-provider__icon-button--primary"
-                    [disabled]="isSaving"
-                    (click)="saveProvider(provider.id)"
-                    [attr.aria-label]="'Save key for ' + provider.name"
-                    title="Save key"
-                  >
-                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
-                      <path d="M5 3h11.2L21 7.8V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v14h14V8.7L15.3 5H15v4.8a1.2 1.2 0 0 1-1.2 1.2H8.2A1.2 1.2 0 0 1 7 9.8V5H5Zm4 0v4h4V5H9Zm-1 9h8a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Z" fill="currentColor" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="access-provider__icon-button"
-                    [disabled]="isSaving || !configured(provider.id)"
-                    (click)="clearProvider(provider.id)"
-                    [attr.aria-label]="'Clear key for ' + provider.name"
-                    title="Clear saved key"
-                  >
-                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
-                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-1.4 6h8.8l-.7 10.2A2 2 0 0 1 13.7 21H10.3a2 2 0 0 1-2-1.8L7.6 9Zm2.2 1.8.3 7.2h1.5l-.3-7.2H9.8Zm3.9 0-.3 7.2h1.5l.3-7.2h-1.5Z" fill="currentColor" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </label>
-          </footer>
-        </article>
+    <section class="provider-setup-grid" aria-label="Provider setup guides">
+      @for (setup of accountSetups; track setup.provider_id) {
+        <button
+          type="button"
+          class="provider-setup-card"
+          [class.provider-setup-card--active]="selectedSetup?.provider_id === setup.provider_id"
+          (click)="selectProvider(setup.provider_id)"
+        >
+          <span class="provider-setup-card__name">{{ providerName(setup) }}</span>
+          <span class="provider-setup-card__status" [class.provider-setup-card__status--configured]="configured(setup)">
+            {{ validationStatus(setup) }}
+          </span>
+          <span class="provider-setup-card__meta">
+            {{ setup.mode === 'not_required' ? 'No access key required' : 'Access key required' }}
+          </span>
+        </button>
       }
     </section>
+
+    @if (selectedSetup; as setup) {
+      <section class="wizard-shell" aria-label="Selected provider setup wizard">
+        <aside class="wizard-steps" aria-label="Setup steps">
+          @for (step of wizardSteps; track step; let index = $index) {
+            <button
+              type="button"
+              class="wizard-step"
+              [class.active]="activeStepIndex === index"
+              (click)="goToStep(index)"
+            >
+              <span>{{ index + 1 }}</span>
+              {{ step }}
+            </button>
+          }
+        </aside>
+
+        <div class="wizard-panel">
+          <header>
+            <p class="page-kicker">{{ setup.provider_id }}</p>
+            <h2>{{ wizardSteps[activeStepIndex] }}</h2>
+            <p>{{ setup.mode === 'not_required' ? 'This provider is available without a stored access key.' : maskConfiguredCredential(setup) }}</p>
+          </header>
+
+          @if (!setup.automation_supported && setup.automation_reason) {
+            <p class="automation-notice">{{ setup.automation_reason }}</p>
+          }
+
+          @if (activeStepIndex === 0) {
+            <dl class="wizard-details">
+              <div>
+                <dt>Credential requirement</dt>
+                <dd>{{ setup.mode === 'not_required' ? 'No access key required' : 'API key required' }}</dd>
+              </div>
+              <div>
+                <dt>Stored status</dt>
+                <dd>{{ validationStatus(setup) }}</dd>
+              </div>
+            </dl>
+          }
+
+          @if (activeStepIndex >= 1 && activeStepIndex <= 3) {
+            <div class="setup-links">
+              <button type="button" (click)="openSetupUrl(setup.account_url)" [disabled]="!setup.account_url">Open provider account</button>
+              <button type="button" (click)="openSetupUrl(setup.dashboard_url)" [disabled]="!setup.dashboard_url">Open provider dashboard</button>
+              <button type="button" (click)="openSetupUrl(setup.documentation_url)" [disabled]="!setup.documentation_url">Open provider docs</button>
+            </div>
+            <ol class="provider-steps">
+              @for (providerStep of setup.steps; track providerStep.id) {
+                <li>
+                  <strong>{{ providerStep.title }}</strong>
+                  <span>{{ providerStep.description }}</span>
+                </li>
+              }
+            </ol>
+          }
+
+          @if (activeStepIndex === 4) {
+            @if (setup.mode === 'not_required') {
+              <p class="empty-state">No access key required.</p>
+            } @else {
+              <form [formGroup]="credentialForm" class="credential-form">
+                @for (field of setup.credential_fields; track field.name) {
+                  <label class="credential-field-row">
+                    <span>{{ field.label }}</span>
+                    <input
+                      [type]="field.secret ? 'password' : 'text'"
+                      autocomplete="off"
+                      [formControlName]="field.name"
+                      [placeholder]="field.placeholder || field.label"
+                    />
+                  </label>
+                }
+              </form>
+            }
+          }
+
+          @if (activeStepIndex === 5) {
+            <button type="button" class="primary-action" [disabled]="setup.mode === 'not_required' || isValidating" (click)="validateCredentials()">
+              Validate key
+            </button>
+            @if (validationResult) {
+              <p class="validation-result" [class.valid]="validationResult.valid" [class.invalid]="!validationResult.valid">
+                {{ validationResult.message }}
+              </p>
+            }
+          }
+
+          @if (activeStepIndex === 6) {
+            <button type="button" class="primary-action" [disabled]="setup.mode === 'not_required' || isSaving || !validationResult?.valid" (click)="saveCredentials()">
+              Save key
+            </button>
+            <p class="save-note">AEGIS stores access keys only through encrypted local credential storage.</p>
+          }
+
+          <footer class="wizard-actions">
+            <button type="button" (click)="previousStep()" [disabled]="activeStepIndex === 0">Previous</button>
+            <button type="button" (click)="nextStep()" [disabled]="activeStepIndex === wizardSteps.length - 1">Next</button>
+          </footer>
+        </div>
+      </section>
+    }
   </main>
 </div>
