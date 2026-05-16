@@ -16,6 +16,7 @@ const ROLE_BUTTON_ORDER: ModelRole[] = ['parser', 'chat', 'agent'];
 export class ModelRoleActionsComponent {
   @Input({ required: true }) model!: ModelCardDescriptor;
   @Input({ required: true }) settings!: ModelSettingsResponse;
+  @Input() requiresPull = false;
   @Output() selectRole = new EventEmitter<ModelRole>();
 
   readonly roles = ROLE_BUTTON_ORDER;
@@ -27,10 +28,19 @@ export class ModelRoleActionsComponent {
   getLabel(role: ModelRole): string {
     const selected = this.isSelected(role);
     if (role === 'parser') {
+      if (this.requiresPull && !selected) {
+        return 'Pull & use for parser';
+      }
       return selected ? 'Parser model' : 'Use for parser';
     }
     if (role === 'chat') {
+      if (this.requiresPull && !selected) {
+        return 'Pull & use for chat';
+      }
       return selected ? 'Chat model' : 'Use for chat';
+    }
+    if (this.requiresPull && !selected) {
+      return 'Pull & use for agent';
     }
     return selected ? 'Agent model' : 'Use for agent';
   }

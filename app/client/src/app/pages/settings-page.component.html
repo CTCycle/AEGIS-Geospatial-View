@@ -27,6 +27,15 @@
   </header>
 
   <div class="settings-page__content">
+    @if (unavailableAssignedOllamaModels.length > 0) {
+      <section class="settings-page__warning" role="alert">
+        <strong>Assigned local model unavailable.</strong>
+        <span>
+          {{ unavailableAssignedOllamaModels.join(', ') }} {{ unavailableAssignedOllamaModels.length === 1 ? 'is' : 'are' }}
+          selected but not installed in Ollama. Pull the model or assign an installed local model before using the workspace.
+        </span>
+      </section>
+    }
     <div class="settings-page__layout">
       <section class="settings-page__left-column">
         <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
@@ -79,7 +88,7 @@
                 @if (providerKeys.length > 1) {
                   <header class="model-grid-provider__separator">
                     <span></span>
-                    <p>{{ provider }}</p>
+                    <p>{{ providerLabel(provider) }}</p>
                   </header>
                 }
                 <div class="model-grid">
@@ -101,6 +110,7 @@
                       <app-model-role-actions
                         [model]="model"
                         [settings]="settings"
+                        [requiresPull]="requiresPull(model)"
                         (selectRole)="applyModelSelection($event, model)"
                       ></app-model-role-actions>
                     </article>

@@ -12,6 +12,7 @@
   </header>
 
   <main class="access-page__content">
+    <p class="access-page__status" aria-live="polite">{{ statusText }}</p>
     <section class="access-grid" aria-label="Optional providers">
       @for (provider of providers; track provider.id) {
         <article class="access-provider">
