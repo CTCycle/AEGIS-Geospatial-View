@@ -394,6 +394,12 @@ class PolicyEngine:
         )
 
     def _build_clarification(self, ambiguities: list[str]) -> ClarificationRequest:
+        if any(item.strip().lower() == "ambiguous_place_name" for item in ambiguities):
+            return ClarificationRequest(
+                question="Which place do you mean? For example: Naples, Italy or Naples, Florida?",
+                reason=", ".join(ambiguities),
+                missing_fields=["location"],
+            )
         return ClarificationRequest(
             question="I need one clarification before continuing. Could you provide a specific location?",
             reason=", ".join(ambiguities),
@@ -502,6 +508,8 @@ class PolicyEngine:
                     if item.capability_id in set(resolution.overlay_ids)
                 ]
         requested_markers = self._requested_overlay_markers(turn)
+        if not requested_markers:
+            return []
         ranked_overlays = sorted(
             overlays,
             key=lambda item: (self._overlay_marker_score(item, requested_markers), item.score),

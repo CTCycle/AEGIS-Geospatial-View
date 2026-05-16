@@ -67,6 +67,23 @@ describe('components/map-preview.component', () => {
     expect(style.layers.find((layer: { id: string }) => layer.id === 'basemap')?.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
   });
 
+  it('preserves external satellite imagery tile URLs', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        basemap_id: 'gibs_satellite',
+        basemap: {
+          id: 'gibs_satellite',
+          label: 'Satellite Imagery',
+          provider: 'gibs',
+          tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        },
+      }) as never,
+    };
+    fixture.detectChanges();
+    const style = (maplibregl.Map as unknown as jasmine.Spy).calls.mostRecent().args[0].style;
+    expect(style.sources.basemap.tiles[0]).toContain('World_Imagery/MapServer/tile/{z}/{y}/{x}');
+  });
+
   it('fits bounds with a capped max zoom and resizes after load', () => {
     component.payload = {
       map_session: makeMapSession({
