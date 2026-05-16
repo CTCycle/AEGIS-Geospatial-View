@@ -206,6 +206,11 @@ class ParserService:
             raise
         except Exception as exc:
             LOGGER.exception("Parser LLM extraction failed: %s", exc)
+            failure_ambiguity = (
+                "parser_authentication_failed"
+                if "invalid_api_key" in str(exc).lower() or "401" in str(exc)
+                else "parser_unavailable"
+            )
             extracted = _LLMParserExtraction(
                 task_class="unclear",
                 intent_id="general_map",
@@ -213,7 +218,7 @@ class ParserService:
                 task_tags=["map"],
                 intent_tags=["map"],
                 requires_location=False,
-                ambiguities=["parser_unavailable"],
+                ambiguities=[failure_ambiguity],
                 parser_confidence=0.0,
             )
 

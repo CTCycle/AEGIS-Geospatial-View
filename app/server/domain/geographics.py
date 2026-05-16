@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from server.domain.agent.decision import ResolvedLocation
 
@@ -92,6 +92,54 @@ class ProviderAuthPolicy(BaseModel):
     access_page_provider_id: str | None = Field(
         default=None, alias="accessPageProviderId"
     )
+
+
+class ProviderAccountSetupStep(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    title: str
+    description: str
+    url: str | None = None
+
+
+class ProviderCredentialField(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    label: str
+    secret: bool = True
+    required: bool = True
+    placeholder: str | None = None
+
+
+class ProviderAccountSetup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    mode: Literal["manual", "not_required"]
+    automation_supported: bool
+    automation_reason: str | None = None
+    account_url: str | None = None
+    dashboard_url: str | None = None
+    documentation_url: str | None = None
+    credential_fields: list[ProviderCredentialField]
+    steps: list[ProviderAccountSetupStep]
+
+
+class ProviderCredentialValidationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    credentials: dict[str, SecretStr]
+
+
+class ProviderCredentialValidationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    valid: bool
+    status: Literal["valid", "invalid", "unsupported", "error"]
+    message: str
 
 
 class AgenticUsePolicy(BaseModel):

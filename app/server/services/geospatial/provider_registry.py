@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any
@@ -17,7 +18,9 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
     ProviderUnavailableError,
     response_without_credentials,
+    unsupported_credential_validation,
 )
+from server.domain.geographics import ProviderCredentialValidationResult
 
 
 class ProviderRegistryError(Exception):
@@ -65,6 +68,11 @@ class ManifestBackedProvider:
 
     async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
         return await self.fetch(request)
+
+    async def validate_credentials(
+        self, credentials: Mapping[str, str]
+    ) -> ProviderCredentialValidationResult:
+        return await unsupported_credential_validation(self.provider_id)
 
 
 class ProviderRegistry:

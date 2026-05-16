@@ -58,6 +58,42 @@ class AgentOrchestrator:
             conversation_messages=recent_messages,
         )
         context_usage = self.parser_service.last_context_usage
+        if self._has_parser_authentication_failure(turn_contract):
+            assistant_message = (
+                "I could not use the configured parser model because the saved API key was rejected. "
+                "Open Model Settings and replace the key before using that cloud model."
+            )
+            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            self.history_repo.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                structured_payload={
+                    "turn_contract": turn_contract.model_dump(mode="json"),
+                    "decision": decision.model_dump(mode="json"),
+                    "memory_snapshot": latest_memory,
+                    "previous_turn_contract": latest_contract,
+                    "request_id": request_id,
+                },
+                tool_payload=None,
+                map_session=None,
+            )
+            LOGGER.info(
+                "chat_turn_parser_authentication_failed request_id=%s session_id=%s",
+                request_id,
+                session.id,
+            )
+            return ChatTurnResponse(
+                request_id=request_id,
+                session_id=session.id,
+                assistant_message=assistant_message,
+                turn_contract=turn_contract,
+                decision=decision,
+                tool_payload=None,
+                map_session=None,
+                memory_snapshot=latest_memory,
+                context_usage=context_usage,
+            )
         if self._has_parser_runtime_failure(turn_contract):
             assistant_message = (
                 "I could not process this request because the configured parser model is unavailable. "
@@ -227,6 +263,10 @@ class AgentOrchestrator:
     @staticmethod
     def _has_parser_runtime_failure(turn_contract) -> bool:
         return "parser_unavailable" in set(turn_contract.ambiguities or [])
+
+    @staticmethod
+    def _has_parser_authentication_failure(turn_contract) -> bool:
+        return "parser_authentication_failed" in set(turn_contract.ambiguities or [])
 
     def _compose_assistant_message(
         self,

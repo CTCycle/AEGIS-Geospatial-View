@@ -113,10 +113,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const source = (() => {
       if (this.providerFilter === 'all') {
-        return [...this.cloudModels];
+        return this.mergeModelLists(this.localModels, this.cloudModels);
       }
       if (this.providerFilter === 'ollama') {
-        return [...this.cloudModels.filter((model) => model.provider === 'ollama')];
+        return this.mergeModelLists(
+          this.localModels,
+          this.cloudModels.filter((model) => model.provider === 'ollama'),
+        );
       }
       return this.cloudModels.filter((model) => model.provider === this.providerFilter);
     })();
@@ -458,6 +461,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
     return this.apiClient.updateChatSettings(payload);
+  }
+
+  private mergeModelLists(...groups: ModelCardDescriptor[][]): ModelCardDescriptor[] {
+    const models = new Map<string, ModelCardDescriptor>();
+    groups.flat().forEach((model) => {
+      models.set(`${model.provider}:${model.id}`, model);
+    });
+    return [...models.values()];
   }
 
   private settingsUpdateBase(): ModelSettingsUpdateRequest {

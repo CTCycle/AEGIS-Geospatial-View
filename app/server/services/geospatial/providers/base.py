@@ -4,7 +4,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import json
+from collections.abc import Mapping
 from typing import Any, Protocol
+
+from server.domain.geographics import ProviderCredentialValidationResult
 
 
 class ProviderError(Exception):
@@ -121,3 +124,19 @@ class GeospatialProvider(Protocol):
 
     async def fetch_features(self, request: FeatureRequest) -> ProviderResult:
         """Fetch features using the canonical geospatial provider contract."""
+
+    async def validate_credentials(
+        self, credentials: Mapping[str, str]
+    ) -> ProviderCredentialValidationResult:
+        """Validate provider credentials without persisting them."""
+
+
+async def unsupported_credential_validation(
+    provider_id: str,
+) -> ProviderCredentialValidationResult:
+    return ProviderCredentialValidationResult(
+        provider_id=provider_id,
+        valid=False,
+        status="unsupported",
+        message="Credential validation is not implemented for this provider.",
+    )

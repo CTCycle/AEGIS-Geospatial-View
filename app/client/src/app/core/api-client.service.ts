@@ -10,10 +10,13 @@ import {
   fetchGeospatialCredentialStatus,
   fetchGeospatialLayerFeatures,
   fetchGeospatialLayers,
+  fetchProviderAccountSetup,
+  fetchProviderAccountSetups,
   pullOllamaModel,
   refreshOllamaModels,
   sendChatTurn,
   updateChatSettings,
+  validateProviderCredentials,
 } from './api';
 import {
   CatalogResponse,
@@ -26,6 +29,8 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
+  ProviderAccountSetup,
+  ProviderCredentialValidationResult,
 } from './types';
 
 @Injectable({ providedIn: 'root' })
@@ -57,6 +62,21 @@ export class ApiClientService {
 
   fetchGeospatialCredentialStatus(providerId: string): Promise<GeospatialCredentialStatus> {
     return fetchGeospatialCredentialStatus(providerId);
+  }
+
+  getProviderAccountSetups(): Promise<ProviderAccountSetup[]> {
+    return fetchProviderAccountSetups();
+  }
+
+  getProviderAccountSetup(providerId: string): Promise<ProviderAccountSetup> {
+    return fetchProviderAccountSetup(providerId);
+  }
+
+  validateProviderCredentials(
+    providerId: string,
+    credentials: Record<string, string>,
+  ): Promise<ProviderCredentialValidationResult> {
+    return validateProviderCredentials(providerId, credentials);
   }
 
   sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnResponse> {
