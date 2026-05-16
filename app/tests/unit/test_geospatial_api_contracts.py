@@ -116,11 +116,11 @@ def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) ->
 def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
     client = TestClient(create_app())
 
-    response = client.get("/api/geospatial/cameras/windy%2Fcamera-1")
+    response = client.get("/api/geospatial/cameras/windy_webcams%2Fcamera-1")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["id"] == "windy/camera-1"
+    assert payload["id"] == "windy_webcams/camera-1"
     assert payload["status"] in {"missing-credential", "metadata-unavailable", "ok"}
     assert payload["provider"] == "windy_webcams"
 

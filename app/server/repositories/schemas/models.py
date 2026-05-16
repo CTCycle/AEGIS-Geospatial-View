@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
@@ -113,49 +112,6 @@ class ChatMessageRecord(Base):
     map_session_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
-    )
-
-
-###############################################################################
-class SessionCatalogRecord(Base):
-    __tablename__ = "session_catalog"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str | None] = mapped_column(String(120))
-    session_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-    )
-    models_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
-    start_time: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    duration_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    num_messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-
-###############################################################################
-class SessionDetailsRecord(Base):
-    __tablename__ = "session_details"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    user_message: Mapped[str] = mapped_column(Text, nullable=False)
-    chat_response: Mapped[str] = mapped_column(Text, nullable=False)
-    extracted_info_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    response_time: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    has_triggered_search: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
     )
 
 
