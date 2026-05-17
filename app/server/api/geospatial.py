@@ -11,6 +11,8 @@ from server.domain.geographics import (
     GeospatialCredentialStatusResponse,
     GeospatialLayerHealthResponse,
     GeospatialLayersResponse,
+    GeospatialProviderAccountSetupListResponse,
+    GeospatialProviderAccountSetupResponse,
     GeospatialProviderPayloadResponse,
     LayerAuditReport,
 )
@@ -191,6 +193,32 @@ async def get_credential_status(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialCredentialStatusResponse:
     return service.get_credential_status(provider_id)
+
+
+@router.get(
+    "/providers/account-setup",
+    response_model=GeospatialProviderAccountSetupListResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_provider_account_setups(
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> GeospatialProviderAccountSetupListResponse:
+    return service.list_provider_account_setup()
+
+
+@router.get(
+    "/providers/{provider_id}/account-setup",
+    response_model=GeospatialProviderAccountSetupResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_provider_account_setup(
+    provider_id: str,
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> GeospatialProviderAccountSetupResponse:
+    try:
+        return service.get_provider_account_setup(provider_id)
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
 
 
 @router.post(

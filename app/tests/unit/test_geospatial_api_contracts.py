@@ -141,6 +141,32 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
     assert payload["environmentVariable"] == "WINDY_WEBCAMS_API_KEY"
 
 
+def test_geospatial_provider_account_setup_list_matches_documented_route() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/account-setup")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["providers"]
+    assert any(item["provider_id"] == "tomtom" for item in payload["providers"])
+
+
+def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> None:
+    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/tomtom/account-setup")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider_id"] == "tomtom"
+    assert payload["requires_credentials"] is True
+    assert payload["environment_variable"] == "TOMTOM_API_KEY"
+    assert payload["configured"] is False
+    assert payload["instructions"]
+
+
 @pytest.mark.parametrize(
     ("provider_id", "env_name"),
     [

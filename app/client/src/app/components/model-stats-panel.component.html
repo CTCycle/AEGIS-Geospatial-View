@@ -11,14 +11,15 @@
     <tbody>
       @if (isLoading) {
         <tr><td colSpan="4">Loading model assignments...</td></tr>
-      }
-      @for (row of rows; track row.assignedRoles[0] + ':' + row.provider + ':' + row.model) {
-        <tr>
-          <td>{{ row.model }}</td>
-          <td>{{ row.provider }}</td>
-          <td>{{ row.local ? 'Yes' : 'No' }}</td>
-          <td>{{ row.assignedRoles.join(', ') }}</td>
-        </tr>
+      } @else {
+        @for (row of rows; track row.assignedRoles[0] + ':' + row.provider + ':' + row.model) {
+          <tr>
+            <td>{{ row.model }}</td>
+            <td>{{ row.provider }}</td>
+            <td>{{ row.local ? 'Yes' : 'No' }}</td>
+            <td>{{ row.assignedRoles.join(', ') }}</td>
+          </tr>
+        }
       }
     </tbody>
   </table>
@@ -29,15 +30,16 @@
     <article class="settings-page__stats-mobile-card">
       <p class="settings-page__stats-mobile-empty">Loading model assignments...</p>
     </article>
-  }
-  @for (row of rows; track row.assignedRoles[0] + ':' + row.provider + ':' + row.model) {
-    <article class="settings-page__stats-mobile-card">
-      <h3>{{ row.model }}</h3>
-      <dl>
-        <div><dt>Provider</dt><dd>{{ row.provider }}</dd></div>
-        <div><dt>Local</dt><dd>{{ row.local ? 'Yes' : 'No' }}</dd></div>
-        <div><dt>Assigned</dt><dd>{{ row.assignedRoles.join(', ') }}</dd></div>
-      </dl>
-    </article>
+  } @else {
+    @for (row of rows; track row.assignedRoles[0] + ':' + row.provider + ':' + row.model) {
+      <article class="settings-page__stats-mobile-card">
+        <h3>{{ row.model }}</h3>
+        <dl>
+          <div><dt>Provider</dt><dd>{{ row.provider }}</dd></div>
+          <div><dt>Local</dt><dd>{{ row.local ? 'Yes' : 'No' }}</dd></div>
+          <div><dt>Assigned</dt><dd>{{ row.assignedRoles.join(', ') }}</dd></div>
+        </dl>
+      </article>
+    }
   }
 </div>
