@@ -172,3 +172,27 @@ Run the strict audit before merging manifest changes:
 cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict
 ```
+
+## Account setup automation metadata
+
+Credential-gated manifests may include an `account_setup.automation` object used by the Access settings page experimental guided setup trigger. The object is metadata only unless a provider-specific runtime explicitly implements a guided session.
+
+Required fields:
+
+```json
+{
+  "support": "agent_assisted",
+  "signup_url": "https://provider.example/signup",
+  "developer_portal_url": "https://provider.example/dashboard",
+  "docs_url": "https://provider.example/docs",
+  "required_fields": [],
+  "user_action_notes": [],
+  "safety_notes": [],
+  "experimental": true,
+  "experimental_label": "Experimental guided setup"
+}
+```
+
+`support` must be one of `manual_only`, `guided_playwright`, `agent_assisted`, or `unsupported`. The metadata must never request or describe storage for provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials. Use `safety_notes` to state provider-specific boundaries such as Google Maps billing/project setup, and use `user_action_notes` to explain where the user must complete provider-controlled steps.
+
+All experimental guided setup flows must degrade to manual instructions and official provider links when automation is unavailable, blocked, or unreliable.

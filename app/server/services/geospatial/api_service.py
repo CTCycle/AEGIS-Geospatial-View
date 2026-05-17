@@ -200,20 +200,20 @@ class GeospatialApiService:
         }
 
     def list_provider_account_setup(self) -> dict[str, list[dict[str, Any]]]:
-        payload = self.manifest_loader.load_all()
-        providers = [
-            self._build_provider_account_setup(item)
-            for item in payload.get("providers") or []
-            if isinstance(item, dict)
+        records = [
+            record
+            for payload in self._iter_manifest_payloads_for_account_setup()
+            if (record := self._extract_account_setup_record(payload)) is not None
         ]
+        providers = self._dedupe_account_setup_records(records)
         providers.sort(key=lambda item: str(item.get("name") or item.get("provider_id")))
         return {"providers": providers}
 
     def get_provider_account_setup(self, provider_id: str) -> dict[str, Any]:
-        payload = self.manifest_loader.load_all()
-        for item in payload.get("providers") or []:
-            if isinstance(item, dict) and str(item.get("id") or "") == provider_id:
-                return self._build_provider_account_setup(item)
+        normalized = provider_id.strip()
+        for record in self.list_provider_account_setup()["providers"]:
+            if str(record.get("provider_id") or "") == normalized:
+                return record
         raise GeospatialCapabilityNotFoundError(
             f"Geospatial provider '{provider_id}' was not found."
         )
@@ -315,46 +315,191 @@ class GeospatialApiService:
         return None, normalized
 
     def _provider_requires_credentials(self, provider_id: str) -> bool:
-        payload = self.manifest_loader.load_all()
-        for item in payload.get("providers") or []:
-            if str(item.get("id") or "") == provider_id:
-                auth = item.get("auth")
-                return bool(isinstance(auth, dict) and auth.get("required"))
+        for item in self._iter_manifest_payloads_for_account_setup():
+            auth = item.get("auth") if isinstance(item.get("auth"), dict) else {}
+            manifest_provider = str(item.get("provider") or item.get("id") or "")
+            access_id = str(auth.get("accessPageProviderId") or "")
+            provider_key = str(auth.get("providerKey") or "")
+            if provider_id in {manifest_provider, access_id, provider_key}:
+                return bool(auth.get("required"))
         return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
 
-    def _build_provider_account_setup(self, provider: dict[str, Any]) -> dict[str, Any]:
-        provider_id = str(provider.get("id") or "")
-        auth = provider.get("auth") if isinstance(provider.get("auth"), dict) else {}
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
-        docs_url = self._extract_docs_url(provider)
-        required = bool(auth.get("required")) or provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
-        auth_mode = str(auth.get("type") or ("api-key" if env_name else "none"))
+    def _iter_manifest_payloads_for_account_setup(self):
+        payload = self.manifest_loader.load_all()
+        for collection_name in ("providers", "overlays", "transit", "cameras"):
+            for item in payload.get(collection_name) or []:
+                if isinstance(item, dict):
+                    yield item
+
+    def _extract_account_setup_record(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+        auth = payload.get("auth") if isinstance(payload.get("auth"), dict) else {}
+        requires_credentials = bool(auth.get("required"))
+        provider_key = str(auth.get("providerKey") or payload.get("provider") or payload.get("id") or "").strip()
+        access_provider_id = str(auth.get("accessPageProviderId") or provider_key).strip()
+        if access_provider_id == "nasa":
+            access_provider_id = "nasa_firms"
+        account_setup = payload.get("account_setup") if isinstance(payload.get("account_setup"), dict) else {}
+        has_account_setup = isinstance(account_setup.get("automation"), dict)
+        if (not requires_credentials and not has_account_setup) or not provider_key or not access_provider_id:
+            return None
+        if provider_key in {"census", "openaip", "sentinel_hub"}:
+            return None
+
+        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_key)
+        docs_url = self._extract_docs_url(payload)
+        automation = self._build_account_setup_automation(
+            provider_key=provider_key,
+            docs_url=docs_url,
+            account_setup=account_setup,
+        )
         instructions = self._build_account_setup_instructions(
-            provider_id=provider_id,
+            provider_id=provider_key,
             docs_url=docs_url,
             env_name=env_name,
-            required=required,
+            required=True,
         )
+        metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
         return {
-            "provider_id": provider_id,
-            "name": str(provider.get("name") or provider_id),
-            "requires_credentials": required,
-            "auth_mode": auth_mode,
+            "provider_id": provider_key,
+            "name": str(metadata.get("label") or payload.get("name") or provider_key),
+            "requires_credentials": True,
+            "auth_mode": str(auth.get("type") or "api-key"),
             "docs_url": docs_url,
             "environment_variable": env_name,
             "configured": bool(env_name and os.getenv(env_name, "").strip()),
             "instructions": instructions,
+            "automation": automation,
+            "credential_storage_key": provider_key,
+            "credential_label": "api_key",
+            "key_format_hint": self._key_format_hint(provider_key),
+            "validation_supported": provider_key in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
+        }
+
+    def _dedupe_account_setup_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        deduped: dict[str, dict[str, Any]] = {}
+        for record in records:
+            key = str(record.get("provider_id") or "")
+            if not key:
+                continue
+            current = deduped.get(key)
+            if current is None or self._account_setup_specificity(record) > self._account_setup_specificity(current):
+                deduped[key] = record
+        return list(deduped.values())
+
+    @staticmethod
+    def _account_setup_specificity(record: dict[str, Any]) -> int:
+        automation = record.get("automation") if isinstance(record.get("automation"), dict) else {}
+        return sum(
+            1
+            for field in ("signup_url", "developer_portal_url", "docs_url")
+            if automation.get(field)
+        ) + len(automation.get("user_action_notes") or []) + len(automation.get("safety_notes") or [])
+
+    def _build_account_setup_automation(
+        self,
+        *,
+        provider_key: str,
+        docs_url: str | None,
+        account_setup: dict[str, Any],
+    ) -> dict[str, Any]:
+        raw = account_setup.get("automation") if isinstance(account_setup.get("automation"), dict) else {}
+        support = str(raw.get("support") or self._default_automation_support(provider_key))
+        signup_url = raw.get("signup_url") or account_setup.get("account_url")
+        portal_url = raw.get("developer_portal_url") or account_setup.get("dashboard_url") or signup_url
+        automation_docs_url = raw.get("docs_url") or account_setup.get("documentation_url") or docs_url
+        return {
+            "support": support,
+            "signup_url": signup_url if isinstance(signup_url, str) else None,
+            "developer_portal_url": portal_url if isinstance(portal_url, str) else None,
+            "docs_url": automation_docs_url if isinstance(automation_docs_url, str) else None,
+            "required_fields": [
+                field for field in raw.get("required_fields", []) if isinstance(field, dict) and not field.get("sensitive")
+            ],
+            "user_action_notes": self._string_list(raw.get("user_action_notes")) or self._default_user_action_notes(provider_key, support),
+            "safety_notes": self._string_list(raw.get("safety_notes")) or self._default_safety_notes(provider_key, support),
+            "experimental": bool(raw.get("experimental", True)),
+            "experimental_label": str(raw.get("experimental_label") or "Experimental guided setup"),
         }
 
     @staticmethod
+    def _default_automation_support(provider_key: str) -> str:
+        if provider_key == "opentripmap":
+            return "unsupported"
+        if provider_key == "google_maps":
+            return "manual_only"
+        return "agent_assisted"
+
+    @staticmethod
+    def _default_user_action_notes(provider_key: str, support: str) -> list[str]:
+        if support == "unsupported":
+            return ["Open the official documentation and complete provider setup manually."]
+        notes = [
+            "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+            "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+            "Paste the generated API key back into AEGIS when the provider flow is complete.",
+        ]
+        if provider_key == "google_maps":
+            notes.insert(1, "Create or select a Google Cloud project, enable required APIs, configure billing, and restrict the key in Google Cloud.")
+        return notes
+
+    @staticmethod
+    def _default_safety_notes(provider_key: str, support: str) -> list[str]:
+        notes = [
+            "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+            "Guided setup is experimental and best-effort; manual provider instructions remain the fallback.",
+        ]
+        if provider_key == "google_maps":
+            notes.append("Google Maps Platform production API-key setup requires the user to complete Google Cloud account, project, API, and billing setup manually.")
+        if support == "unsupported":
+            notes.append("Automation support is not currently verified for this provider.")
+        return notes
+
+    @staticmethod
+    def _key_format_hint(provider_key: str) -> str | None:
+        return {
+            "nasa_firms": "NASA FIRMS MAP_KEY value",
+            "openaq": "OpenAQ API key sent with the X-API-Key header",
+            "windy_webcams": "Windy Webcams API key",
+        }.get(provider_key)
+
+    @staticmethod
+    def _string_list(value: Any) -> list[str]:
+        return [item for item in value if isinstance(item, str) and item.strip()] if isinstance(value, list) else []
+
+    def _build_provider_account_setup(self, provider: dict[str, Any]) -> dict[str, Any]:
+        record = self._extract_account_setup_record(provider)
+        if record is None:
+            provider_id = str(provider.get("id") or "")
+            docs_url = self._extract_docs_url(provider)
+            return {
+                "provider_id": provider_id,
+                "name": str(provider.get("name") or provider_id),
+                "requires_credentials": False,
+                "auth_mode": "none",
+                "docs_url": docs_url,
+                "environment_variable": None,
+                "configured": False,
+                "instructions": ["No account setup is required for public access."],
+                "automation": self._build_account_setup_automation(provider_key=provider_id, docs_url=docs_url, account_setup={}),
+                "credential_storage_key": provider_id,
+                "credential_label": "api_key",
+                "key_format_hint": None,
+                "validation_supported": False,
+            }
+        return record
+
+    @staticmethod
     def _extract_docs_url(provider: dict[str, Any]) -> str | None:
+        metadata = provider.get("metadata") if isinstance(provider.get("metadata"), dict) else {}
+        for value in (metadata.get("official_docs_url"), provider.get("official_docs_url"), provider.get("source")):
+            if isinstance(value, str) and value.strip():
+                return value.strip()
         docs = provider.get("sourceOfficialDocs")
         if isinstance(docs, list):
             for item in docs:
                 if isinstance(item, str) and item.strip():
                     return item.strip()
-        docs_url = provider.get("official_docs_url") or provider.get("source")
-        return docs_url.strip() if isinstance(docs_url, str) and docs_url.strip() else None
+        return None
 
     @staticmethod
     def _build_account_setup_instructions(
@@ -373,10 +518,10 @@ class GeospatialApiService:
             instructions.append("Create or sign in to the provider account.")
         instructions.append("Generate an API key or access token with map/data read permissions.")
         if env_name:
-            instructions.append(f"Set the key in the {env_name} environment variable.")
+            instructions.append(f"Set the key in the {env_name} environment variable or save it through Access settings.")
         else:
             instructions.append(f"Store the key using the access configuration for {provider_id}.")
-        instructions.append("Restart or refresh AEGIS so the runtime can detect the credential.")
+        instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
 
     async def _fetch_binary_url(self, url: str) -> bytes:

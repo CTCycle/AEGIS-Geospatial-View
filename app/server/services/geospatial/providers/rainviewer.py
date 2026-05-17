@@ -7,7 +7,6 @@ from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderRequest,
     ProviderResponse,
-    ProviderUnavailableError,
 )
 from server.services.geospatial.rainviewer import RainViewerService, RainViewerServiceError
 

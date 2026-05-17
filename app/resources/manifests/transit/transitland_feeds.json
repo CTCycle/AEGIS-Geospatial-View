@@ -95,5 +95,25 @@
     "timestampPath": "feeds[].feed_versions[].sha1",
     "fieldMap": {},
     "expectedGeometry": "metadata"
+  },
+  "account_setup": {
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://www.transit.land/documentation/datastore/api-endpoints.html",
+      "developer_portal_url": "https://www.transit.land/documentation/datastore/api-endpoints.html",
+      "docs_url": "https://www.transit.land/documentation/",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
   }
 }
