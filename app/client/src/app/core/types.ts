@@ -134,6 +134,54 @@ export interface CameraFeature {
   metadata: Record<string, JsonValue>;
 }
 
+
+export type GeospatialProviderAutomationSupport =
+  | 'manual_only'
+  | 'guided_playwright'
+  | 'agent_assisted'
+  | 'unsupported';
+
+export interface GeospatialProviderSignupField {
+  key: string;
+  label: string;
+  fieldType: 'text' | 'email' | 'textarea' | 'select';
+  required: boolean;
+  sensitive: boolean;
+  helpText?: string | null;
+}
+
+export interface GeospatialProviderSignupAutomation {
+  support: GeospatialProviderAutomationSupport;
+  signupUrl?: string | null;
+  developerPortalUrl?: string | null;
+  docsUrl?: string | null;
+  requiredFields: GeospatialProviderSignupField[];
+  userActionNotes: string[];
+  safetyNotes: string[];
+  experimental: boolean;
+  experimentalLabel: string;
+}
+
+export interface GeospatialProviderAccountSetup {
+  providerId: string;
+  name: string;
+  requiresCredentials: boolean;
+  authMode: string;
+  docsUrl?: string | null;
+  environmentVariable?: string | null;
+  configured: boolean;
+  instructions: string[];
+  automation: GeospatialProviderSignupAutomation;
+  credentialStorageKey: string;
+  credentialLabel: string;
+  keyFormatHint?: string | null;
+  validationSupported: boolean;
+}
+
+export interface GeospatialProviderAccountSetupListResponse {
+  providers: GeospatialProviderAccountSetup[];
+}
+
 export interface GeospatialCredentialStatus {
   provider: string;
   required: boolean;

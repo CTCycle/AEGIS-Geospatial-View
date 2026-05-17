@@ -117,7 +117,25 @@
         "title": "Save and validate in AEGIS",
         "description": "Paste the key into AEGIS and run validation."
       }
-    ]
+    ],
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://developer.tomtom.com/user/me/apps",
+      "developer_portal_url": "https://developer.tomtom.com/user/me/apps",
+      "docs_url": "https://docs.tomtom.com/platform/documentation/my-tomtom/how-to-get-a-tomtom-api-key/",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
   },
   "agenticUse": {
     "defaultEnabled": false,

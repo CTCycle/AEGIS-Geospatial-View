@@ -281,3 +281,47 @@
         justify-content: flex-start;
     }
 }
+
+
+.access-signup-trigger {
+    border: 1px solid #2f9bd7;
+    border-radius: 0.35rem;
+    background: #162833;
+    color: #dce8ed;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.provider-signup-modal {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(4 10 14 / 72%);
+    z-index: 50;
+}
+
+.provider-signup-modal__notes {
+    margin-top: 0.8rem;
+    border: 1px solid #263a45;
+    background: #0f1c24;
+    padding: 0.7rem 0.8rem;
+}
+
+.provider-signup-modal__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.provider-signup-modal__key-input {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.85rem;
+    color: #c9d8de;
+    font-size: 0.78rem;
+    font-weight: 800;
+}

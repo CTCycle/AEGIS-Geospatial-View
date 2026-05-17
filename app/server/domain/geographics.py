@@ -12,6 +12,12 @@ from server.domain.agent.decision import ResolvedLocation
 TimeMode = Literal["current", "historical", "forecast"]
 
 
+GeospatialProviderAutomationSupport = Literal[
+    "manual_only", "guided_playwright", "agent_assisted", "unsupported"
+]
+GeospatialProviderSignupFieldType = Literal["text", "email", "textarea", "select"]
+
+
 class CapabilityKind(str, Enum):
     BASEMAP = "basemap"
     RASTER_OVERLAY = "raster-overlay"
@@ -146,6 +152,31 @@ class GeospatialCredentialStatusResponse(BaseModel):
     environmentVariable: str | None = None
 
 
+class GeospatialProviderSignupField(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    field_type: GeospatialProviderSignupFieldType = "text"
+    required: bool = True
+    sensitive: bool = False
+    help_text: str | None = None
+
+
+class GeospatialProviderSignupAutomation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    support: GeospatialProviderAutomationSupport
+    signup_url: str | None = None
+    developer_portal_url: str | None = None
+    docs_url: str | None = None
+    required_fields: list[GeospatialProviderSignupField] = Field(default_factory=list)
+    user_action_notes: list[str] = Field(default_factory=list)
+    safety_notes: list[str] = Field(default_factory=list)
+    experimental: bool = True
+    experimental_label: str = "Experimental guided setup"
+
+
 class GeospatialProviderAccountSetupResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -157,6 +188,11 @@ class GeospatialProviderAccountSetupResponse(BaseModel):
     environment_variable: str | None = None
     configured: bool = False
     instructions: list[str] = Field(default_factory=list)
+    automation: GeospatialProviderSignupAutomation
+    credential_storage_key: str
+    credential_label: str
+    key_format_hint: str | None = None
+    validation_supported: bool = False
 
 
 class GeospatialProviderAccountSetupListResponse(BaseModel):

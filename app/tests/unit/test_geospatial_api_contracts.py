@@ -192,6 +192,79 @@ def test_phase8_credential_status_uses_provider_environment(
     assert configured.json()["configured"] is True
 
 
+
+
+def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/account-setup")
+
+    assert response.status_code == 200
+    provider_ids = {item["provider_id"] for item in response.json()["providers"]}
+    assert provider_ids == {
+        "arcgis",
+        "fred",
+        "geoapify",
+        "google_maps",
+        "nasa_firms",
+        "nrel",
+        "openaq",
+        "openchargemap",
+        "opentripmap",
+        "tomtom",
+        "transitland",
+        "windy_webcams",
+    }
+
+
+def test_account_setup_includes_experimental_automation_support() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/account-setup")
+
+    assert response.status_code == 200
+    supported = {"manual_only", "guided_playwright", "agent_assisted", "unsupported"}
+    for item in response.json()["providers"]:
+        assert item["automation"]["support"] in supported
+        assert item["automation"]["experimental"] is True
+        assert item["automation"]["experimental_label"] == "Experimental guided setup"
+
+
+def test_google_maps_is_manual_only_and_billing_aware() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/account-setup")
+
+    assert response.status_code == 200
+    google_maps = next(
+        item for item in response.json()["providers"] if item["provider_id"] == "google_maps"
+    )
+    assert google_maps["automation"]["support"] == "manual_only"
+    assert any("billing" in note.lower() for note in google_maps["automation"]["safety_notes"])
+
+
+def test_opentripmap_is_unsupported() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/account-setup")
+
+    assert response.status_code == 200
+    opentripmap = next(
+        item for item in response.json()["providers"] if item["provider_id"] == "opentripmap"
+    )
+    assert opentripmap["automation"]["support"] == "unsupported"
+
+
+def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
+    monkeypatch.setenv("TOMTOM_API_KEY", "secret-tomtom-value")
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/providers/account-setup")
+
+    assert response.status_code == 200
+    assert "secret-tomtom-value" not in str(response.json())
+
+
 def test_geospatial_audit_endpoint_passes() -> None:
     client = TestClient(create_app())
 

@@ -102,5 +102,24 @@
     "timestampPath": null,
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "account_setup": {
+    "automation": {
+      "support": "unsupported",
+      "signup_url": "https://opentripmap.io/docs",
+      "developer_portal_url": "https://opentripmap.io/docs",
+      "docs_url": "https://opentripmap.io/docs",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the official documentation and complete provider setup manually."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback.",
+        "Automation support is not currently verified for this provider."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
   }
 }

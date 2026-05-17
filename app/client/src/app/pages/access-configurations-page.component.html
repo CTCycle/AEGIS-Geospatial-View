@@ -45,6 +45,15 @@
           </dl>
 
           <footer>
+            <button
+              *ngIf="canShowSignupTrigger(provider.id)"
+              type="button"
+              class="access-signup-trigger"
+              [disabled]="isLoadingAccountSetups"
+              (click)="openProviderSignup(getAccountSetupForProvider(provider.id))"
+            >
+              Get API key
+            </button>
             <label class="access-provider__key-field">
               API key
               <div class="access-provider__key-input-row">
@@ -88,4 +97,79 @@
       }
     </section>
   </main>
+
+  <div
+    *ngIf="isSignupModalOpen && selectedProviderAccountSetup as setup"
+    class="provider-signup-modal"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'API key setup for ' + setup.name"
+  >
+    <div class="provider-signup-modal__panel">
+      <header>
+        <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
+        <h2>{{ setup.name }}</h2>
+        <p>{{ supportLabel(setup) }}. Automation is best-effort and pauses for provider-controlled steps.</p>
+      </header>
+
+      <section class="provider-signup-modal__notes" aria-label="Guided setup notes">
+        <h3>What AEGIS can help with</h3>
+        <ul>
+          <li *ngFor="let note of setup.automation.userActionNotes">{{ note }}</li>
+        </ul>
+      </section>
+
+      <section class="provider-signup-modal__notes" aria-label="Safety boundaries">
+        <h3>Safety boundaries</h3>
+        <ul>
+          <li *ngFor="let note of setup.automation.safetyNotes">{{ note }}</li>
+        </ul>
+      </section>
+
+      <section *ngIf="setup.automation.requiredFields.length" class="provider-signup-modal__notes" aria-label="Provider information guidance">
+        <h3>Provider information</h3>
+        <ul>
+          <li *ngFor="let field of setup.automation.requiredFields">
+            {{ field.label }}<span *ngIf="field.helpText"> — {{ field.helpText }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <p *ngIf="signupModalError" class="access-page__status" aria-live="polite">{{ signupModalError }}</p>
+
+      <label *ngIf="setup.automation.support !== 'unsupported'" class="provider-signup-modal__key-input">
+        Generated API key
+        <input
+          type="password"
+          autocomplete="off"
+          [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
+          [(ngModel)]="signupKeyInput"
+          name="guided_signup_api_key"
+        />
+      </label>
+
+      <div class="provider-signup-modal__actions">
+        <button type="button" class="access-signup-trigger" (click)="openProviderPortal(setup)">
+          {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
+        </button>
+        <button
+          *ngIf="setup.automation.support !== 'unsupported'"
+          type="button"
+          class="access-provider__icon-button access-provider__icon-button--primary"
+          [disabled]="isSaving"
+          (click)="saveGeneratedCredential(setup)"
+          aria-label="Save generated API key"
+          title="Save generated API key"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+            <path d="M5 3h11.2L21 7.8V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v14h14V8.7L15.3 5H15v4.8a1.2 1.2 0 0 1-1.2 1.2H8.2A1.2 1.2 0 0 1 7 9.8V5H5Zm4 0v4h4V5H9Zm-1 9h8a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Z" fill="currentColor" />
+          </svg>
+        </button>
+        <button type="button" class="access-provider__icon-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup" title="Cancel">
+          ×
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>

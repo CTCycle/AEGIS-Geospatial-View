@@ -116,7 +116,27 @@
         "title": "Save and validate in AEGIS",
         "description": "Paste the key into AEGIS and run validation."
       }
-    ]
+    ],
+    "automation": {
+      "support": "manual_only",
+      "signup_url": "https://console.cloud.google.com/google/maps-apis/credentials",
+      "developer_portal_url": "https://console.cloud.google.com/google/maps-apis/credentials",
+      "docs_url": "https://developers.google.com/maps/documentation/javascript/get-api-key",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Create or select a Google Cloud project, enable required APIs, configure billing, and restrict the key in Google Cloud.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback.",
+        "Google Maps Platform production API-key setup requires the user to complete Google Cloud account, project, API, and billing setup manually."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
   },
   "agenticUse": {
     "defaultEnabled": false,
