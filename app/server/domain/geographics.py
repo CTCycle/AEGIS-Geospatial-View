@@ -146,6 +146,27 @@ class GeospatialCredentialStatusResponse(BaseModel):
     environmentVariable: str | None = None
 
 
+class GeospatialProviderAccountSetupResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    name: str
+    requires_credentials: bool
+    auth_mode: str
+    docs_url: str | None = None
+    environment_variable: str | None = None
+    configured: bool = False
+    instructions: list[str] = Field(default_factory=list)
+
+
+class GeospatialProviderAccountSetupListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    providers: list[GeospatialProviderAccountSetupResponse] = Field(
+        default_factory=list
+    )
+
+
 class ProviderCredentialValidationResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

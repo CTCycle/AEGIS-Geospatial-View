@@ -199,6 +199,25 @@ class GeospatialApiService:
             "environmentVariable": env_name,
         }
 
+    def list_provider_account_setup(self) -> dict[str, list[dict[str, Any]]]:
+        payload = self.manifest_loader.load_all()
+        providers = [
+            self._build_provider_account_setup(item)
+            for item in payload.get("providers") or []
+            if isinstance(item, dict)
+        ]
+        providers.sort(key=lambda item: str(item.get("name") or item.get("provider_id")))
+        return {"providers": providers}
+
+    def get_provider_account_setup(self, provider_id: str) -> dict[str, Any]:
+        payload = self.manifest_loader.load_all()
+        for item in payload.get("providers") or []:
+            if isinstance(item, dict) and str(item.get("id") or "") == provider_id:
+                return self._build_provider_account_setup(item)
+        raise GeospatialCapabilityNotFoundError(
+            f"Geospatial provider '{provider_id}' was not found."
+        )
+
     def audit_sources(self) -> LayerAuditReport:
         return audit_all_manifests(strict=True)
 
@@ -302,6 +321,63 @@ class GeospatialApiService:
                 auth = item.get("auth")
                 return bool(isinstance(auth, dict) and auth.get("required"))
         return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
+
+    def _build_provider_account_setup(self, provider: dict[str, Any]) -> dict[str, Any]:
+        provider_id = str(provider.get("id") or "")
+        auth = provider.get("auth") if isinstance(provider.get("auth"), dict) else {}
+        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
+        docs_url = self._extract_docs_url(provider)
+        required = bool(auth.get("required")) or provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
+        auth_mode = str(auth.get("type") or ("api-key" if env_name else "none"))
+        instructions = self._build_account_setup_instructions(
+            provider_id=provider_id,
+            docs_url=docs_url,
+            env_name=env_name,
+            required=required,
+        )
+        return {
+            "provider_id": provider_id,
+            "name": str(provider.get("name") or provider_id),
+            "requires_credentials": required,
+            "auth_mode": auth_mode,
+            "docs_url": docs_url,
+            "environment_variable": env_name,
+            "configured": bool(env_name and os.getenv(env_name, "").strip()),
+            "instructions": instructions,
+        }
+
+    @staticmethod
+    def _extract_docs_url(provider: dict[str, Any]) -> str | None:
+        docs = provider.get("sourceOfficialDocs")
+        if isinstance(docs, list):
+            for item in docs:
+                if isinstance(item, str) and item.strip():
+                    return item.strip()
+        docs_url = provider.get("official_docs_url") or provider.get("source")
+        return docs_url.strip() if isinstance(docs_url, str) and docs_url.strip() else None
+
+    @staticmethod
+    def _build_account_setup_instructions(
+        *,
+        provider_id: str,
+        docs_url: str | None,
+        env_name: str | None,
+        required: bool,
+    ) -> list[str]:
+        if not required:
+            return ["No account setup is required for public access."]
+        instructions = []
+        if docs_url:
+            instructions.append(f"Create or sign in to a provider account using {docs_url}.")
+        else:
+            instructions.append("Create or sign in to the provider account.")
+        instructions.append("Generate an API key or access token with map/data read permissions.")
+        if env_name:
+            instructions.append(f"Set the key in the {env_name} environment variable.")
+        else:
+            instructions.append(f"Store the key using the access configuration for {provider_id}.")
+        instructions.append("Restart or refresh AEGIS so the runtime can detect the credential.")
+        return instructions
 
     async def _fetch_binary_url(self, url: str) -> bytes:
         return await asyncio.to_thread(self._fetch_binary_url_sync, url)

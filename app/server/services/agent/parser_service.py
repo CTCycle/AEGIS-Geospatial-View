@@ -329,6 +329,7 @@ class ParserService:
         conversation_messages: list[dict],
     ) -> TurnParseResult:
         normalized_recent = self._normalize_recent_messages(conversation_messages)
+        parser_failure_ambiguity: str | None = None
         try:
             extracted = self._extract_turn(
                 user_message=user_message,
@@ -344,6 +345,7 @@ class ParserService:
                 if "invalid_api_key" in str(exc).lower() or "401" in str(exc)
                 else "parser_unavailable"
             )
+            parser_failure_ambiguity = failure_ambiguity
             extracted = _LLMParserExtraction(
                 task_class="unclear",
                 intent_id="general_map",
@@ -357,6 +359,11 @@ class ParserService:
 
         fallback = self._fallback_extraction(user_message)
         if self._should_use_fallback(extracted=extracted, fallback=fallback):
+            if parser_failure_ambiguity is not None:
+                fallback.ambiguities = self._dedupe(
+                    [*fallback.ambiguities, parser_failure_ambiguity]
+                )
+                fallback.parser_confidence = min(fallback.parser_confidence, 0.35)
             extracted = fallback
 
         extracted_location_signals = list(extracted.location_signals)

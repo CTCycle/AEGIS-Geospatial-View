@@ -402,6 +402,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async loadData(): Promise<void> {
     this.isLoadingModels = true;
+    this.statusText = 'Loading model settings';
+    this.syncState();
     try {
       const [nextSettings, modelLibrary] = await Promise.all([
         this.apiClient.fetchChatSettings(),
@@ -415,6 +417,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.cloudModels = modelLibrary.cloud;
       this.localModels = modelLibrary.local;
+      this.statusText = 'Ready';
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
