@@ -7,7 +7,7 @@ import { SettingsPageComponent } from './pages/settings-page.component';
 
 export const routes: Routes = [
   { path: '', component: GeospatialPageComponent },
-  { path: 'capabilities', component: CapabilitiesPageComponent },
+  { path: 'geodata', component: CapabilitiesPageComponent },
   { path: 'access-configurations', component: AccessConfigurationsPageComponent },
   { path: 'settings', component: SettingsPageComponent },
   { path: '**', redirectTo: '' },

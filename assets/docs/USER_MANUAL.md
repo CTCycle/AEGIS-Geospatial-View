@@ -1,6 +1,6 @@
 # User Manual
 
-Last updated: 2026-04-10
+Last updated: 2026-05-17
 Scope: End-user operation of AEGIS Geospatial View
 
 ## 1. What the Application Does
@@ -10,7 +10,7 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 ## 2. Primary Screens
 
 - Workspace (`/`): chat panel + map canvas.
-- Capabilities (`/capabilities`): manifest-backed overview of map types, layers, direct tools, data providers, access constraints, and dependencies.
+- Geodata (`/geodata`): manifest-backed overview of map types, layers, direct tools, data providers, access constraints, and dependencies.
 - Access configurations (`/access-configurations`): optional geospatial provider keys for Geoapify and TomTom.
 - Model Settings (`/settings`): model selection, cloud/local LLM keys, and Ollama management.
 
@@ -20,7 +20,7 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 2. In chat, ask for a place or coordinates and what you want to see.
 3. Wait for the assistant to return a response and map session.
 4. Review map output and overlay controls.
-5. Use the top Operations Bar to open capabilities, optional access configuration, or model settings.
+5. Use the top Operations Bar to open geodata, optional access configuration, or model settings.
 
 ## 4. User Journeys
 
@@ -66,7 +66,7 @@ Toolbar and layout:
 
 Navigation:
 - Workspace: chat and map canvas.
-- Capabilities: available map types, layers, tools, providers, and access status.
+- Geodata: available map types, layers, tools, providers, and access status.
 - Access: optional geospatial provider keys.
 - Model Settings: LLM provider/model configuration.
 
@@ -97,7 +97,7 @@ Examples:
 - Chat-first geospatial orchestration.
 - Interactive map payload preview with overlay controls.
 - Lightweight map zoom controls and chat zoom commands.
-- Manifest-backed capability overview.
+- Manifest-backed geodata overview.
 - Persisted session state across page refreshes within the same tab.
 - Default free/open data workflow with optional geospatial provider keys.
 - Configurable model roles (parser, chat, agent).

@@ -141,44 +141,6 @@ export interface GeospatialCredentialStatus {
   environmentVariable?: string | null;
 }
 
-export interface ProviderAccountSetupStep {
-  id: string;
-  title: string;
-  description: string;
-  url?: string | null;
-}
-
-export interface ProviderCredentialField {
-  name: string;
-  label: string;
-  secret: boolean;
-  required: boolean;
-  placeholder?: string | null;
-}
-
-export interface ProviderAccountSetup {
-  provider_id: string;
-  mode: 'manual' | 'not_required';
-  automation_supported: boolean;
-  automation_reason?: string | null;
-  account_url?: string | null;
-  dashboard_url?: string | null;
-  documentation_url?: string | null;
-  credential_fields: ProviderCredentialField[];
-  steps: ProviderAccountSetupStep[];
-}
-
-export interface ProviderCredentialValidationRequest {
-  credentials: Record<string, string>;
-}
-
-export interface ProviderCredentialValidationResult {
-  provider_id: string;
-  valid: boolean;
-  status: 'valid' | 'invalid' | 'unsupported' | 'error';
-  message: string;
-}
-
 export interface GeospatialProviderPayload {
   status: 'ok' | 'missing-credential' | 'unavailable' | string;
   provider: string;
