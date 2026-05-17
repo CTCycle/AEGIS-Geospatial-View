@@ -13,9 +13,6 @@ from server.domain.geographics import (
     GeospatialLayersResponse,
     GeospatialProviderPayloadResponse,
     LayerAuditReport,
-    ProviderAccountSetup,
-    ProviderCredentialValidationRequest,
-    ProviderCredentialValidationResult,
 )
 from server.services.geospatial.api_service import (
     GeospatialApiService,
@@ -26,14 +23,6 @@ from server.services.geospatial.api_service import (
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
-from server.services.geospatial.provider_account_setup_service import (
-    ProviderAccountSetupService,
-)
-from server.services.geospatial.provider_credential_validation_service import (
-    ProviderCredentialValidationService,
-)
-from server.services.geospatial.provider_registry import ProviderNotRegisteredError
-
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
 
@@ -202,54 +191,6 @@ async def get_credential_status(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialCredentialStatusResponse:
     return service.get_credential_status(provider_id)
-
-
-@router.get(
-    "/providers/account-setup",
-    response_model=list[ProviderAccountSetup],
-    status_code=status.HTTP_200_OK,
-)
-async def list_provider_account_setups() -> list[ProviderAccountSetup]:
-    return ProviderAccountSetupService().list_setups()
-
-
-@router.get(
-    "/providers/{provider_id}/account-setup",
-    response_model=ProviderAccountSetup,
-    status_code=status.HTTP_200_OK,
-)
-async def get_provider_account_setup(provider_id: str) -> ProviderAccountSetup:
-    try:
-        return ProviderAccountSetupService().get_setup(provider_id)
-    except ProviderNotRegisteredError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-
-
-@router.post(
-    "/providers/{provider_id}/credentials/validate",
-    response_model=ProviderCredentialValidationResult,
-    status_code=status.HTTP_200_OK,
-)
-async def validate_provider_credentials(
-    provider_id: str,
-    request: ProviderCredentialValidationRequest,
-) -> ProviderCredentialValidationResult:
-    credentials = {
-        key: value.get_secret_value()
-        for key, value in request.credentials.items()
-    }
-    try:
-        return await ProviderCredentialValidationService().validate(
-            provider_id, credentials
-        )
-    except ProviderNotRegisteredError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
 
 
 @router.post(

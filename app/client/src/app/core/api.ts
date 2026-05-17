@@ -8,7 +8,6 @@ import {
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
-  API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUPS_PATH,
   API_MAPS_CATALOG_PATH,
   API_MAPS_SEARCH_PATH,
   API_OLLAMA_HEALTH_PATH,
@@ -30,8 +29,6 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
-  ProviderAccountSetup,
-  ProviderCredentialValidationResult,
   SearchResponse,
   VectorizationResponse,
 } from './types';
@@ -419,32 +416,6 @@ export const fetchGeospatialCredentialStatus = async (providerId: string): Promi
     configured: Boolean(data.configured),
     environmentVariable: typeof data.environmentVariable === 'string' ? data.environmentVariable : null,
   };
-};
-
-export const fetchProviderAccountSetups = async (): Promise<ProviderAccountSetup[]> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUPS_PATH}`, {
-    method: 'GET',
-  });
-  return Array.isArray(data) ? data as ProviderAccountSetup[] : [];
-};
-
-export const fetchProviderAccountSetup = async (providerId: string): Promise<ProviderAccountSetup> => {
-  const data = await executeApiRequest(`${API_BASE_URL}/geospatial/providers/${encodeURIComponent(providerId)}/account-setup`, {
-    method: 'GET',
-  });
-  return data as ProviderAccountSetup;
-};
-
-export const validateProviderCredentials = async (
-  providerId: string,
-  credentials: Record<string, string>,
-): Promise<ProviderCredentialValidationResult> => {
-  const data = await executeApiRequest(`${API_BASE_URL}/geospatial/providers/${encodeURIComponent(providerId)}/credentials/validate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credentials }),
-  });
-  return data as ProviderCredentialValidationResult;
 };
 
 export const runGeospatialAudit = async (): Promise<GenericObjectResponse> => {

@@ -190,6 +190,138 @@ class ParserService:
         )
         return extracted
 
+    @staticmethod
+    def _extract_coordinate_signal(user_message: str) -> _LLMLocationSignal | None:
+        match = re.search(
+            r"(?P<lat>[+-]?\d{1,2}(?:\.\d+)?)\s*[,;]\s*(?P<lon>[+-]?\d{1,3}(?:\.\d+)?)",
+            user_message,
+        )
+        if match is None:
+            return None
+        latitude = float(match.group("lat"))
+        longitude = float(match.group("lon"))
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            return None
+        raw_value = match.group(0)
+        return _LLMLocationSignal(
+            signal_type="coordinates",
+            raw_value=raw_value,
+            normalized_value=raw_value,
+            latitude=latitude,
+            longitude=longitude,
+            confidence=0.98,
+        )
+
+    @staticmethod
+    def _looks_like_map_request(user_message: str) -> bool:
+        text = user_message.casefold()
+        markers = (
+            "map",
+            "show",
+            "display",
+            "locate",
+            "where is",
+            "satellite",
+            "overlay",
+            "weather",
+            "traffic",
+            "amenities",
+            "coordinates",
+            "coordinate",
+            "mapa",
+            "carte",
+            "karte",
+            "mappa",
+            "mostrar",
+            "muestra",
+            "montre",
+        )
+        return any(marker in text for marker in markers)
+
+    @classmethod
+    def _extract_text_location_signal(cls, user_message: str) -> _LLMLocationSignal | None:
+        coordinate_signal = cls._extract_coordinate_signal(user_message)
+        if coordinate_signal is not None:
+            return coordinate_signal
+
+        text = user_message.strip()
+        if not text or not cls._looks_like_map_request(text):
+            return None
+
+        cleaned = re.sub(r"(?i)\b(please|pls|could you|can you|show me|show|display|map|locate|find|open|create|make|muestra|mostrar|montre|carte|karte|mappa|mapa)\b", " ", text)
+        cleaned = re.sub(r"(?i)\b(a|an|the|of|for|near|around|on|in|to|with|using|me)\b", " ", cleaned)
+        cleaned = re.sub(r"(?i)\b(weather|traffic|amenities|overlay|overlays|layer|layers|satellite|imagery|coordinates?)\b", " ", cleaned)
+        cleaned = re.sub(r"[.?!]+$", "", cleaned)
+        cleaned = " ".join(cleaned.replace(":", " ").split())
+        if len(cleaned) < 2:
+            return None
+
+        signal_type: Literal["address", "city"] = "address" if re.search(r"\d", cleaned) else "city"
+        return _LLMLocationSignal(
+            signal_type=signal_type,
+            raw_value=cleaned,
+            normalized_value=cleaned,
+            confidence=0.72 if signal_type == "address" else 0.68,
+        )
+
+    @classmethod
+    def _fallback_extraction(cls, user_message: str) -> _LLMParserExtraction:
+        location_signal = cls._extract_text_location_signal(user_message)
+        if location_signal is not None:
+            task_tags = ["map"]
+            intent_tags = ["map"]
+            requested_visualizations = ["map"]
+            text = user_message.casefold()
+            if any(marker in text for marker in ("weather", "rain", "precipitation", "radar")):
+                intent_tags.append("weather")
+                requested_visualizations.append("weather")
+            if "traffic" in text:
+                intent_tags.append("traffic")
+                requested_visualizations.append("traffic")
+            if any(marker in text for marker in ("amenit", "poi", "nearby")):
+                intent_tags.append("amenities")
+                requested_visualizations.append("amenities")
+            if any(marker in text for marker in ("satellite", "imagery")):
+                intent_tags.append("satellite")
+                requested_visualizations.append("satellite")
+            return _LLMParserExtraction(
+                task_class="map_search",
+                intent_id="general_map",
+                intent_label="General map request",
+                task_tags=task_tags,
+                intent_tags=intent_tags,
+                requested_visualizations=requested_visualizations,
+                requires_location=True,
+                location_signals=[location_signal],
+                parser_confidence=0.72,
+            )
+
+        return _LLMParserExtraction(
+            task_class="general_question",
+            intent_id="general_question",
+            intent_label="General question",
+            task_tags=["chat"],
+            intent_tags=["general"],
+            requires_location=False,
+            parser_confidence=0.65,
+        )
+
+    @classmethod
+    def _should_use_fallback(
+        cls,
+        *,
+        extracted: _LLMParserExtraction,
+        fallback: _LLMParserExtraction,
+    ) -> bool:
+        if fallback.task_class == "map_search" and (
+            extracted.task_class in {"unclear", "general_question"}
+            or not extracted.location_signals
+        ):
+            return True
+        if extracted.parser_confidence < 0.35 and fallback.task_class != "unclear":
+            return True
+        return False
+
     def parse_turn(
         self,
         user_message: str,
@@ -222,6 +354,10 @@ class ParserService:
                 ambiguities=[failure_ambiguity],
                 parser_confidence=0.0,
             )
+
+        fallback = self._fallback_extraction(user_message)
+        if self._should_use_fallback(extracted=extracted, fallback=fallback):
+            extracted = fallback
 
         extracted_location_signals = list(extracted.location_signals)
         verbatim_signals = [
@@ -295,13 +431,22 @@ class ParserService:
         if ambiguities:
             confidence -= 0.15
 
+        task_class = extracted.task_class
+        if (
+            task_class == "general_question"
+            and normalized_intent.requires_location
+            and location_signals
+            and self._looks_like_map_request(user_message)
+        ):
+            task_class = "map_search"
+
         return TurnParseResult(
             user_text=user_message,
             conversation_context=ConversationContextSnapshot(
                 recent_messages=normalized_recent,
                 memory_snapshot=memory_snapshot,
             ),
-            task_class=extracted.task_class,
+            task_class=task_class,
             location_signals=location_signals,
             normalized_intent=normalized_intent,
             temporal_signal=temporal_signal,

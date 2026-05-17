@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 
 ## FILES INDEX
 
@@ -18,8 +18,6 @@ Last updated: 2026-05-16
 
 - CAPABILITY_MANIFESTS.md  
   Manifest schema and runtime-profile rules for basemaps, overlays, and tools under `app/resources/manifests`.
-
-Provider access is configured through a guided setup wizard that links to provider portals, validates user-supplied access keys, and stores only access keys or tokens through encrypted local credential storage.
 
 - GEOSPATIAL_SOURCE_CATALOG.md
   Source catalog for geographic intelligence providers, capability kinds, access modes, rendering modes, provider contract coverage, and integration status.

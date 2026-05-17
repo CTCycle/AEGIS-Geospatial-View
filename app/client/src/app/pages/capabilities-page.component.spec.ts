@@ -11,6 +11,8 @@ describe('pages/capabilities-page.component', () => {
       providers: [{ id: 'gibs', name: 'NASA GIBS', kind: 'provider', provider: 'gibs', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: { docs_url: 'https://earthdata.nasa.gov/' } }],
       basemaps: [{ id: 'osm_default', name: 'OpenStreetMap', kind: 'basemap', type: 'tile', description: 'Street map', provider: 'fallback', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: { temporal_behavior: 'static tiles' } }],
       overlays: [{ id: 'tomtom_traffic_flow', name: 'TomTom Traffic Flow', kind: 'overlay', type: 'tile', description: 'Traffic', provider: 'tomtom', requires_credentials: true, is_available: false, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
+      cameras: [{ id: 'windy_webcams', name: 'Windy Webcams', kind: 'overlay', type: 'camera-network', description: 'Cameras', provider: 'windy', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global-partial', intent_tags: [], task_tags: [], metadata: {} }],
+      transit: [{ id: 'gtfs_static', name: 'GTFS Static', kind: 'overlay', type: 'vector', description: 'Transit feeds', provider: 'gtfs', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'regional', intent_tags: [], task_tags: [], metadata: {} }],
       tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', type: 'direct-tool', description: 'Forecast', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
     });
     apiClient.fetchCatalog.and.callFake(() => fetchCatalogMock());
@@ -30,7 +32,10 @@ describe('pages/capabilities-page.component', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Data Providers');
     expect(text).toContain('Map Types');
+    expect(text).toContain('Cameras');
+    expect(text).toContain('Transit');
     expect(text).toContain('TomTom Traffic Flow');
     expect(text).toContain('Optional provider key required before use.');
+    expect(text).not.toContain('Ask agent');
   });
 });

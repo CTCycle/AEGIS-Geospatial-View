@@ -269,7 +269,12 @@ class AgentOrchestrator:
 
     @staticmethod
     def _asks_about_previous_user_turn(text: str) -> bool:
-        return "what did i just ask" in text or "what was my last question" in text
+        return (
+            "what did i just ask" in text
+            or "what was my last question" in text
+            or "what did i ask you to remember" in text
+            or "what did i ask you to keep in mind" in text
+        )
 
     @staticmethod
     def _previous_user_message(

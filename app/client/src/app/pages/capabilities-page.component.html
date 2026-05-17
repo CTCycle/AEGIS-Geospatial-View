@@ -1,7 +1,7 @@
 <div class="capabilities-page">
   <header class="capabilities-page__header">
     <div>
-      <h1>Capability Overview</h1>
+      <h1>Geodata</h1>
       <p>Manifest-backed map types, layers, direct actions, and data providers exposed by AEGIS.</p>
     </div>
   </header>
@@ -10,21 +10,6 @@
     @if (isLoading) {
       <section class="capabilities-empty" aria-live="polite">Loading catalog...</section>
     } @else {
-      <section class="capability-section" aria-label="Layer catalog">
-        <header class="capability-section__header">
-          <div>
-            <h2>Layer Catalog</h2>
-            <p>Search, filter, and route manifest-backed map capabilities through the agent.</p>
-          </div>
-          <span class="capability-section__count">{{ layerCatalogItems.length }} items</span>
-        </header>
-        <app-layer-catalog
-          [layers]="layerCatalogItems"
-          (askAgent)="askAgentToUse($event)"
-          (manualToggle)="requestManualToggle($event)"
-        ></app-layer-catalog>
-      </section>
-
       @for (group of groups; track group.id) {
         <section class="capability-section" [attr.aria-label]="group.label">
           <header class="capability-section__header">

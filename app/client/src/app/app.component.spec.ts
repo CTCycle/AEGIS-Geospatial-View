@@ -16,7 +16,7 @@ describe('app.component', () => {
 
     expect(text).toContain('AEGIS');
     expect(text).toContain('Workspace');
-    expect(text).toContain('Capabilities');
+    expect(text).toContain('Geodata');
     expect(text).toContain('Access');
     expect(text).toContain('Model Settings');
   });

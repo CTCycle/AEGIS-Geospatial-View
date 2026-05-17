@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -426,6 +426,7 @@ Core tables (defined in constants/schema layer) include:
 
 - Route-level pages:
   - `GeospatialPageComponent` (`/`) for chat + map workspace
+  - `CapabilitiesPageComponent` (`/geodata`) for manifest-backed geodata tables
   - `SettingsPageComponent` (`/settings`) for model/provider and credential management
 - API client + response normalization: `core/api.ts`
 - Persisted view/application state: `core/app-state.ts` + store service
