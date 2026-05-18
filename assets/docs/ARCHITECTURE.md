@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-17
+Last updated: 2026-05-18
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -142,8 +142,6 @@ services/
   geospatial/openmeteo.py
   geospatial/osm_tiles.py
   geospatial/overpass.py
-  geospatial/provider_account_setup_service.py
-  geospatial/provider_credential_validation_service.py
   geospatial/provider_registry.py
   geospatial/pvgis.py
   geospatial/rainviewer.py
@@ -299,10 +297,7 @@ All routers are mounted with prefix `/api` in `app/server/app.py`.
   Returns provider credential availability (`GeospatialCredentialStatusResponse`).
 
 - `GET /api/geospatial/providers/account-setup` and `GET /api/geospatial/providers/{provider_id}/account-setup`  
-  Return provider account setup instructions.
-
-- `POST /api/geospatial/providers/{provider_id}/credentials/validate`  
-  Validates provider credentials without returning secret values.
+  Return provider account setup instructions assembled by `app/server/services/geospatial/api_service.py`.
 
 - `POST /api/geospatial/audit`  
   Returns `LayerAuditReport`.
@@ -356,6 +351,7 @@ Layering constraints:
 - API routes translate service exceptions into HTTP responses.
 - Services do not import FastAPI.
 - Repositories remain the persistence boundary.
+- Current geospatial account setup payload construction lives in `app/server/services/geospatial/api_service.py`; there is no separate credential-validation endpoint or provider account setup service module.
 
 ### Chat orchestration pipeline
 

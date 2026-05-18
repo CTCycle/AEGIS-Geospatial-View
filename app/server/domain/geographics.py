@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from server.common.time import utc_now
 from server.domain.agent.decision import ResolvedLocation
 
 TimeMode = Literal["current", "historical", "forecast"]
@@ -356,6 +357,7 @@ class PoiFeature(BaseModel):
     phone: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class ViewportPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -365,6 +367,7 @@ class ViewportPolicy(BaseModel):
     radius_m: float = Field(default=2500.0, gt=0)
     bbox: list[float] | None = None
 
+
 ###############################################################################
 class PresentationPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -372,6 +375,7 @@ class PresentationPolicy(BaseModel):
     emphasize_overlays: bool = False
     high_contrast: bool = False
     show_legend: bool = True
+
 
 ###############################################################################
 class LocationSearchRequest(BaseModel):
@@ -385,6 +389,7 @@ class LocationSearchRequest(BaseModel):
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
 
+
 ###############################################################################
 class MapSession(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -394,7 +399,7 @@ class MapSession(BaseModel):
     basemap_id: str
     overlay_ids: list[str] = Field(default_factory=list)
     viewport: ViewportPolicy
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    generated_at: datetime = Field(default_factory=utc_now)
     payload: dict[str, object] = Field(default_factory=dict)
     center: dict[str, float | None] | None = None
     bounds: list[float] | None = None
@@ -408,6 +413,7 @@ class SearchByLocationResponse(BaseModel):
 
     status_message: str
     map_session: MapSession
+
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):

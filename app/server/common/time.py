@@ -3,5 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 def utc_now_naive() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return utc_now().replace(tzinfo=None)

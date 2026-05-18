@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -84,7 +85,7 @@ def redirect_to_docs() -> RedirectResponse:
 
 
 @asynccontextmanager
-async def app_lifespan(app: FastAPI):
+async def app_lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings().database
     if settings.embedded_database:
         initialize_sqlite_database(settings)

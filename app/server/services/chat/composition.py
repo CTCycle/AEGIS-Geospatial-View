@@ -30,7 +30,11 @@ class ChatRuntime:
 
 def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatRuntime:
     settings_repo = ModelSettingsRepository()
-    settings_service = ChatSettingsService(settings_repo=settings_repo)
+    model_library_service = ChatModelLibraryService()
+    settings_service = ChatSettingsService(
+        settings_repo=settings_repo,
+        model_library_service=model_library_service,
+    )
     vector_indexer = VectorIndexer()
 
     runtime_registry = RuntimeRegistry()
@@ -47,7 +51,7 @@ def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatR
 
     return ChatRuntime(
         settings_service=settings_service,
-        model_library_service=ChatModelLibraryService(),
+        model_library_service=model_library_service,
         vector_indexer=vector_indexer,
         maintenance_service=ChatMaintenanceService(
             get_ollama_url=settings_service.get_ollama_url,

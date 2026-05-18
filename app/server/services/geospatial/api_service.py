@@ -4,6 +4,7 @@ import asyncio
 import os
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -145,7 +146,10 @@ class GeospatialApiService:
         request = ProviderRequest(
             capability_id=provider_id,
             bbox=self._parse_bbox(bbox),
-            params={"live": True, **({"camera_type": camera_type} if camera_type else {})},
+            params={
+                "live": True,
+                **({"camera_type": camera_type} if camera_type else {}),
+            },
         )
         return await self._fetch_provider_payload(provider_id, request)
 
@@ -206,7 +210,9 @@ class GeospatialApiService:
             if (record := self._extract_account_setup_record(payload)) is not None
         ]
         providers = self._dedupe_account_setup_records(records)
-        providers.sort(key=lambda item: str(item.get("name") or item.get("provider_id")))
+        providers.sort(
+            key=lambda item: str(item.get("name") or item.get("provider_id"))
+        )
         return {"providers": providers}
 
     def get_provider_account_setup(self, provider_id: str) -> dict[str, Any]:
@@ -278,11 +284,13 @@ class GeospatialApiService:
             "stale": response.stale,
         }
 
-    def _parse_bbox(self, value: str | None) -> tuple[float, float, float, float] | None:
+    def _parse_bbox(
+        self, value: str | None
+    ) -> tuple[float, float, float, float] | None:
         if not value:
             return None
         try:
-            parts = tuple(float(part.strip()) for part in value.split(","))
+            parts = [float(part.strip()) for part in value.split(",")]
         except ValueError as exc:
             raise GeospatialInvalidRequestError(
                 "bbox must be four comma-separated numbers."
@@ -291,7 +299,8 @@ class GeospatialApiService:
             raise GeospatialInvalidRequestError(
                 "bbox must be four comma-separated numbers."
             )
-        return parts  # type: ignore[return-value]
+        min_lon, min_lat, max_lon, max_lat = parts
+        return min_lon, min_lat, max_lon, max_lat
 
     def _parse_time(self, value: str | None) -> datetime | None:
         if not value:
@@ -324,23 +333,40 @@ class GeospatialApiService:
                 return bool(auth.get("required"))
         return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
 
-    def _iter_manifest_payloads_for_account_setup(self):
+    def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
         payload = self.manifest_loader.load_all()
         for collection_name in ("providers", "overlays", "transit", "cameras"):
             for item in payload.get(collection_name) or []:
                 if isinstance(item, dict):
                     yield item
 
-    def _extract_account_setup_record(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+    def _extract_account_setup_record(
+        self, payload: dict[str, Any]
+    ) -> dict[str, Any] | None:
         auth = payload.get("auth") if isinstance(payload.get("auth"), dict) else {}
         requires_credentials = bool(auth.get("required"))
-        provider_key = str(auth.get("providerKey") or payload.get("provider") or payload.get("id") or "").strip()
-        access_provider_id = str(auth.get("accessPageProviderId") or provider_key).strip()
+        provider_key = str(
+            auth.get("providerKey")
+            or payload.get("provider")
+            or payload.get("id")
+            or ""
+        ).strip()
+        access_provider_id = str(
+            auth.get("accessPageProviderId") or provider_key
+        ).strip()
         if access_provider_id == "nasa":
             access_provider_id = "nasa_firms"
-        account_setup = payload.get("account_setup") if isinstance(payload.get("account_setup"), dict) else {}
+        account_setup = (
+            payload.get("account_setup")
+            if isinstance(payload.get("account_setup"), dict)
+            else {}
+        )
         has_account_setup = isinstance(account_setup.get("automation"), dict)
-        if (not requires_credentials and not has_account_setup) or not provider_key or not access_provider_id:
+        if (
+            (not requires_credentials and not has_account_setup)
+            or not provider_key
+            or not access_provider_id
+        ):
             return None
         if provider_key in {"census", "openaip", "sentinel_hub"}:
             return None
@@ -358,7 +384,9 @@ class GeospatialApiService:
             env_name=env_name,
             required=True,
         )
-        metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        metadata = (
+            payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        )
         return {
             "provider_id": provider_key,
             "name": str(metadata.get("label") or payload.get("name") or provider_key),
@@ -372,28 +400,41 @@ class GeospatialApiService:
             "credential_storage_key": provider_key,
             "credential_label": "api_key",
             "key_format_hint": self._key_format_hint(provider_key),
-            "validation_supported": provider_key in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
+            "validation_supported": provider_key
+            in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
         }
 
-    def _dedupe_account_setup_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _dedupe_account_setup_records(
+        self, records: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         deduped: dict[str, dict[str, Any]] = {}
         for record in records:
             key = str(record.get("provider_id") or "")
             if not key:
                 continue
             current = deduped.get(key)
-            if current is None or self._account_setup_specificity(record) > self._account_setup_specificity(current):
+            if current is None or self._account_setup_specificity(
+                record
+            ) > self._account_setup_specificity(current):
                 deduped[key] = record
         return list(deduped.values())
 
     @staticmethod
     def _account_setup_specificity(record: dict[str, Any]) -> int:
-        automation = record.get("automation") if isinstance(record.get("automation"), dict) else {}
-        return sum(
-            1
-            for field in ("signup_url", "developer_portal_url", "docs_url")
-            if automation.get(field)
-        ) + len(automation.get("user_action_notes") or []) + len(automation.get("safety_notes") or [])
+        automation = (
+            record.get("automation")
+            if isinstance(record.get("automation"), dict)
+            else {}
+        )
+        return (
+            sum(
+                1
+                for field in ("signup_url", "developer_portal_url", "docs_url")
+                if automation.get(field)
+            )
+            + len(automation.get("user_action_notes") or [])
+            + len(automation.get("safety_notes") or [])
+        )
 
     def _build_account_setup_automation(
         self,
@@ -402,23 +443,43 @@ class GeospatialApiService:
         docs_url: str | None,
         account_setup: dict[str, Any],
     ) -> dict[str, Any]:
-        raw = account_setup.get("automation") if isinstance(account_setup.get("automation"), dict) else {}
-        support = str(raw.get("support") or self._default_automation_support(provider_key))
+        raw = (
+            account_setup.get("automation")
+            if isinstance(account_setup.get("automation"), dict)
+            else {}
+        )
+        support = str(
+            raw.get("support") or self._default_automation_support(provider_key)
+        )
         signup_url = raw.get("signup_url") or account_setup.get("account_url")
-        portal_url = raw.get("developer_portal_url") or account_setup.get("dashboard_url") or signup_url
-        automation_docs_url = raw.get("docs_url") or account_setup.get("documentation_url") or docs_url
+        portal_url = (
+            raw.get("developer_portal_url")
+            or account_setup.get("dashboard_url")
+            or signup_url
+        )
+        automation_docs_url = (
+            raw.get("docs_url") or account_setup.get("documentation_url") or docs_url
+        )
         return {
             "support": support,
             "signup_url": signup_url if isinstance(signup_url, str) else None,
             "developer_portal_url": portal_url if isinstance(portal_url, str) else None,
-            "docs_url": automation_docs_url if isinstance(automation_docs_url, str) else None,
+            "docs_url": automation_docs_url
+            if isinstance(automation_docs_url, str)
+            else None,
             "required_fields": [
-                field for field in raw.get("required_fields", []) if isinstance(field, dict) and not field.get("sensitive")
+                field
+                for field in raw.get("required_fields", [])
+                if isinstance(field, dict) and not field.get("sensitive")
             ],
-            "user_action_notes": self._string_list(raw.get("user_action_notes")) or self._default_user_action_notes(provider_key, support),
-            "safety_notes": self._string_list(raw.get("safety_notes")) or self._default_safety_notes(provider_key, support),
+            "user_action_notes": self._string_list(raw.get("user_action_notes"))
+            or self._default_user_action_notes(provider_key, support),
+            "safety_notes": self._string_list(raw.get("safety_notes"))
+            or self._default_safety_notes(provider_key, support),
             "experimental": bool(raw.get("experimental", True)),
-            "experimental_label": str(raw.get("experimental_label") or "Experimental guided setup"),
+            "experimental_label": str(
+                raw.get("experimental_label") or "Experimental guided setup"
+            ),
         }
 
     @staticmethod
@@ -432,14 +493,19 @@ class GeospatialApiService:
     @staticmethod
     def _default_user_action_notes(provider_key: str, support: str) -> list[str]:
         if support == "unsupported":
-            return ["Open the official documentation and complete provider setup manually."]
+            return [
+                "Open the official documentation and complete provider setup manually."
+            ]
         notes = [
             "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
             "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
             "Paste the generated API key back into AEGIS when the provider flow is complete.",
         ]
         if provider_key == "google_maps":
-            notes.insert(1, "Create or select a Google Cloud project, enable required APIs, configure billing, and restrict the key in Google Cloud.")
+            notes.insert(
+                1,
+                "Create or select a Google Cloud project, enable required APIs, configure billing, and restrict the key in Google Cloud.",
+            )
         return notes
 
     @staticmethod
@@ -449,9 +515,13 @@ class GeospatialApiService:
             "Guided setup is experimental and best-effort; manual provider instructions remain the fallback.",
         ]
         if provider_key == "google_maps":
-            notes.append("Google Maps Platform production API-key setup requires the user to complete Google Cloud account, project, API, and billing setup manually.")
+            notes.append(
+                "Google Maps Platform production API-key setup requires the user to complete Google Cloud account, project, API, and billing setup manually."
+            )
         if support == "unsupported":
-            notes.append("Automation support is not currently verified for this provider.")
+            notes.append(
+                "Automation support is not currently verified for this provider."
+            )
         return notes
 
     @staticmethod
@@ -464,34 +534,24 @@ class GeospatialApiService:
 
     @staticmethod
     def _string_list(value: Any) -> list[str]:
-        return [item for item in value if isinstance(item, str) and item.strip()] if isinstance(value, list) else []
-
-    def _build_provider_account_setup(self, provider: dict[str, Any]) -> dict[str, Any]:
-        record = self._extract_account_setup_record(provider)
-        if record is None:
-            provider_id = str(provider.get("id") or "")
-            docs_url = self._extract_docs_url(provider)
-            return {
-                "provider_id": provider_id,
-                "name": str(provider.get("name") or provider_id),
-                "requires_credentials": False,
-                "auth_mode": "none",
-                "docs_url": docs_url,
-                "environment_variable": None,
-                "configured": False,
-                "instructions": ["No account setup is required for public access."],
-                "automation": self._build_account_setup_automation(provider_key=provider_id, docs_url=docs_url, account_setup={}),
-                "credential_storage_key": provider_id,
-                "credential_label": "api_key",
-                "key_format_hint": None,
-                "validation_supported": False,
-            }
-        return record
+        return (
+            [item for item in value if isinstance(item, str) and item.strip()]
+            if isinstance(value, list)
+            else []
+        )
 
     @staticmethod
     def _extract_docs_url(provider: dict[str, Any]) -> str | None:
-        metadata = provider.get("metadata") if isinstance(provider.get("metadata"), dict) else {}
-        for value in (metadata.get("official_docs_url"), provider.get("official_docs_url"), provider.get("source")):
+        metadata = (
+            provider.get("metadata")
+            if isinstance(provider.get("metadata"), dict)
+            else {}
+        )
+        for value in (
+            metadata.get("official_docs_url"),
+            provider.get("official_docs_url"),
+            provider.get("source"),
+        ):
             if isinstance(value, str) and value.strip():
                 return value.strip()
         docs = provider.get("sourceOfficialDocs")
@@ -513,14 +573,22 @@ class GeospatialApiService:
             return ["No account setup is required for public access."]
         instructions = []
         if docs_url:
-            instructions.append(f"Create or sign in to a provider account using {docs_url}.")
+            instructions.append(
+                f"Create or sign in to a provider account using {docs_url}."
+            )
         else:
             instructions.append("Create or sign in to the provider account.")
-        instructions.append("Generate an API key or access token with map/data read permissions.")
+        instructions.append(
+            "Generate an API key or access token with map/data read permissions."
+        )
         if env_name:
-            instructions.append(f"Set the key in the {env_name} environment variable or save it through Access settings.")
+            instructions.append(
+                f"Set the key in the {env_name} environment variable or save it through Access settings."
+            )
         else:
-            instructions.append(f"Store the key using the access configuration for {provider_id}.")
+            instructions.append(
+                f"Store the key using the access configuration for {provider_id}."
+            )
         instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
 
