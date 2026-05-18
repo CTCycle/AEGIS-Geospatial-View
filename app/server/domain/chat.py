@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from server.common.time import utc_now
 from server.domain.agent.decision import PolicyDecision
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
@@ -12,15 +13,13 @@ from server.domain.geographics import MapSession
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
-###############################################################################
-def utc_chat_message_timestamp() -> datetime:
-    return datetime.now(UTC)
 
 ###############################################################################
 class ChatMessage(BaseModel):
     role: ChatRole
     content: str
-    created_at: datetime = Field(default_factory=utc_chat_message_timestamp)
+    created_at: datetime = Field(default_factory=utc_now)
+
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -30,6 +29,7 @@ class ChatTurnRequest(BaseModel):
     datetime: str | None = None
     request_id: str | None = None
 
+
 ###############################################################################
 class ContextUsageResponse(BaseModel):
     estimated_input_tokens: int
@@ -38,6 +38,7 @@ class ContextUsageResponse(BaseModel):
     usage_percent: float
     provider: str
     model: str
+
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
@@ -51,10 +52,12 @@ class ChatTurnResponse(BaseModel):
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     context_usage: ContextUsageResponse | None = None
 
+
 ###############################################################################
 class ChatStreamEvent(BaseModel):
     event: Literal["status", "assistant_delta", "tool_status", "final", "error"]
     data: dict[str, Any]
+
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
@@ -64,6 +67,7 @@ class ModelCardDescriptor(BaseModel):
     provider: str
     capabilities: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -79,6 +83,7 @@ class ModelSettingsResponse(BaseModel):
     google_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
     credential_health: dict[str, dict[str, str]] = Field(default_factory=dict)
+
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
@@ -108,10 +113,12 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
+
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     cloud: list[ModelCardDescriptor] = Field(default_factory=list)
     local: list[ModelCardDescriptor] = Field(default_factory=list)
+
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
@@ -119,13 +126,16 @@ class OllamaRefreshResponse(BaseModel):
     library_models: list[str] = Field(default_factory=list)
     local_models: list[str] = Field(default_factory=list)
 
+
 ###############################################################################
 class OllamaPullRequest(BaseModel):
     model: str
 
+
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
+
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):
@@ -133,6 +143,7 @@ class OllamaHealthResponse(BaseModel):
 
     ok: bool | None = None
     detail: str | None = None
+
 
 ###############################################################################
 class VectorizationResponse(BaseModel):

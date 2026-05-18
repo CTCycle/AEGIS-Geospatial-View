@@ -25,6 +25,7 @@ from server.services.geospatial.api_service import (
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
+
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
 
@@ -72,7 +73,7 @@ def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
 async def get_geospatial_capabilities(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialCatalogResponse:
-    return service.list_capabilities()
+    return GeospatialCatalogResponse.model_validate(service.list_capabilities())
 
 
 @router.get(
@@ -83,7 +84,7 @@ async def get_geospatial_capabilities(
 async def get_geospatial_layers(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialLayersResponse:
-    return service.list_layers()
+    return GeospatialLayersResponse.model_validate(service.list_layers())
 
 
 @router.get(
@@ -96,7 +97,9 @@ async def get_layer_health(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialLayerHealthResponse:
     try:
-        return service.get_layer_health(layer_id)
+        return GeospatialLayerHealthResponse.model_validate(
+            service.get_layer_health(layer_id)
+        )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
@@ -116,13 +119,15 @@ async def get_layer_features(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialProviderPayloadResponse:
     try:
-        return await service.get_layer_features(
-            layer_id,
-            bbox=bbox,
-            zoom=zoom,
-            time=time,
-            live=live,
-            incidents=incidents,
+        return GeospatialProviderPayloadResponse.model_validate(
+            await service.get_layer_features(
+                layer_id,
+                bbox=bbox,
+                zoom=zoom,
+                time=time,
+                live=live,
+                incidents=incidents,
+            )
         )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
@@ -162,10 +167,12 @@ async def get_geospatial_cameras(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialProviderPayloadResponse:
     try:
-        return await service.list_cameras(
-            bbox=bbox,
-            provider=provider,
-            camera_type=camera_type,
+        return GeospatialProviderPayloadResponse.model_validate(
+            await service.list_cameras(
+                bbox=bbox,
+                provider=provider,
+                camera_type=camera_type,
+            )
         )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
@@ -180,7 +187,9 @@ async def get_geospatial_camera(
     camera_id: str,
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialCameraDetailResponse:
-    return await service.get_camera(camera_id)
+    return GeospatialCameraDetailResponse.model_validate(
+        await service.get_camera(camera_id)
+    )
 
 
 @router.get(
@@ -192,7 +201,9 @@ async def get_credential_status(
     provider_id: str,
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialCredentialStatusResponse:
-    return service.get_credential_status(provider_id)
+    return GeospatialCredentialStatusResponse.model_validate(
+        service.get_credential_status(provider_id)
+    )
 
 
 @router.get(
@@ -203,7 +214,9 @@ async def get_credential_status(
 async def get_provider_account_setups(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialProviderAccountSetupListResponse:
-    return service.list_provider_account_setup()
+    return GeospatialProviderAccountSetupListResponse.model_validate(
+        service.list_provider_account_setup()
+    )
 
 
 @router.get(
@@ -216,7 +229,9 @@ async def get_provider_account_setup(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialProviderAccountSetupResponse:
     try:
-        return service.get_provider_account_setup(provider_id)
+        return GeospatialProviderAccountSetupResponse.model_validate(
+            service.get_provider_account_setup(provider_id)
+        )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)
 
