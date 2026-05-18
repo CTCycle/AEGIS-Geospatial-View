@@ -82,7 +82,7 @@ describe('pages/access-configurations-page.component', () => {
     }).compileComponents();
   });
 
-  it('renders existing access page content and Get API key triggers', async () => {
+  it('renders existing access page content and Get API triggers', async () => {
     const fixture = TestBed.createComponent(AccessConfigurationsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -91,7 +91,7 @@ describe('pages/access-configurations-page.component', () => {
     expect(fixture.nativeElement.textContent).toContain('Optional Geospatial Provider Keys');
     const triggers = fixture.debugElement.queryAll(By.css('.access-signup-trigger'));
     expect(triggers.length).toBeGreaterThanOrEqual(2);
-    expect(fixture.nativeElement.textContent).toContain('Get API key');
+    expect(fixture.nativeElement.textContent).toContain('Get API');
   });
 
   it('opens modal with experimental notice, portal link action, and safe guidance', async () => {

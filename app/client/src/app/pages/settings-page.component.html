@@ -47,12 +47,6 @@
               <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
             </div>
 
-            @if (providerFilter === 'ollama') {
-              <label class="settings-page__local-filter">
-                <input type="checkbox" [checked]="showLocalOnly" (change)="onLocalOnlyChange($event)" />
-                <span>Select all available</span>
-              </label>
-            }
           </div>
 
           <div class="settings-page__controls-right">

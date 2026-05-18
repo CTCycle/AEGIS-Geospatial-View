@@ -25,24 +25,35 @@ export class ModelRoleActionsComponent {
     return isModelSelectedForRole(this.settings, role, this.model);
   }
 
-  getLabel(role: ModelRole): string {
-    const selected = this.isSelected(role);
+  roleName(role: ModelRole): string {
     if (role === 'parser') {
-      if (this.requiresPull && !selected) {
-        return 'Pull & use for parser';
-      }
-      return selected ? 'Parser model' : 'Use for parser';
+      return 'Parser';
     }
     if (role === 'chat') {
-      if (this.requiresPull && !selected) {
-        return 'Pull & use for chat';
-      }
-      return selected ? 'Chat model' : 'Use for chat';
+      return 'Chat';
     }
-    if (this.requiresPull && !selected) {
-      return 'Pull & use for agent';
+    return 'Agent';
+  }
+
+  roleHint(role: ModelRole): string {
+    const selected = this.isSelected(role);
+    if (selected) {
+      return 'Assigned';
     }
-    return selected ? 'Agent model' : 'Use for agent';
+    if (this.requiresPull) {
+      return 'Pull + assign';
+    }
+    return 'Assign';
+  }
+
+  roleIcon(role: ModelRole): string {
+    if (role === 'parser') {
+      return 'parser';
+    }
+    if (role === 'chat') {
+      return 'chat';
+    }
+    return 'agent';
   }
 
   onSelect(role: ModelRole): void {

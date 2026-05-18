@@ -25,14 +25,14 @@ describe('ModelStatsPanelComponent', () => {
   it('renders table headers even without rows', () => {
     component.rows = [];
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Model');
-    expect(fixture.nativeElement.textContent).toContain('Assigned');
+    expect(fixture.nativeElement.textContent).toContain('Duty');
+    expect(fixture.nativeElement.textContent).toContain('Status');
   });
 
   it('renders provider and assigned metadata', () => {
     component.rows = [{ model: 'm2', provider: 'openai', local: false, assignedRoles: ['parser', 'agent'] }];
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('openai');
-    expect(fixture.nativeElement.textContent).toContain('parser, agent');
+    expect(fixture.nativeElement.textContent).toContain('Assigned');
   });
 });

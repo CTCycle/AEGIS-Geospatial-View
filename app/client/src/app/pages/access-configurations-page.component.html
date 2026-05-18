@@ -1,18 +1,13 @@
 <div class="access-page">
   <header class="access-page__header">
     <div>
-      <p class="page-kicker">Access Configurations</p>
       <h1>Optional Geospatial Provider Keys</h1>
-      <p>AEGIS uses free and openly accessible sources by default. Add keys only for optional premium-style map providers.</p>
-      <p class="access-page__default-inline">
-        <strong>Default workflow:</strong>
-        OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim remain available without user-supplied API keys, subject to provider attribution and usage limits.
-      </p>
+      <p>Manage optional API keys for commercial geospatial providers in AEGIS to unlock premium mapping and credential-gated data services.</p>
+      <p>By default, AEGIS runs on open sources including OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim, available without user-supplied keys under each provider's attribution and usage limits.</p>
     </div>
   </header>
 
   <main class="access-page__content">
-    <p class="access-page__status" aria-live="polite">{{ statusText }}</p>
     <section class="access-grid" aria-label="Optional providers">
       @for (provider of providers; track provider.id) {
         <article class="access-provider">
@@ -45,18 +40,18 @@
           </dl>
 
           <footer>
-            <button
-              *ngIf="canShowSignupTrigger(provider.id)"
-              type="button"
-              class="access-signup-trigger"
-              [disabled]="isLoadingAccountSetups"
-              (click)="openProviderSignup(getAccountSetupForProvider(provider.id))"
-            >
-              Get API key
-            </button>
             <label class="access-provider__key-field">
               API key
               <div class="access-provider__key-input-row">
+                <button
+                  *ngIf="canShowSignupTrigger(provider.id)"
+                  type="button"
+                  class="access-signup-trigger access-signup-trigger--inline"
+                  [disabled]="isLoadingAccountSetups"
+                  (click)="openProviderSignup(getAccountSetupForProvider(provider.id))"
+                >
+                  Get API
+                </button>
                 <input
                   type="password"
                   autocomplete="off"
