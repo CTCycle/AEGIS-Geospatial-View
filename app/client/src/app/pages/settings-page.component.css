@@ -116,17 +116,6 @@
     justify-content: flex-end;
 }
 
-.settings-page__local-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-size: var(--font-size-caption);
-    color: #a9bac2;
-    white-space: nowrap;
-}
-
-.settings-page__local-filter input { margin: 0; }
-
 .settings-page__status {
     font-size: var(--font-size-caption);
     color: #9fb1ba;
@@ -297,28 +286,6 @@
     color: #8fa6b0;
     font-weight: 700;
     white-space: nowrap;
-}
-
-.model-card__actions {
-    display: flex;
-    gap: 0.42rem;
-    flex-wrap: wrap;
-    margin-top: var(--space-3);
-}
-
-.model-card__actions button {
-    border: 1px solid #344953;
-    border-radius: 999px;
-    padding: 0.24rem 0.55rem;
-    background: #162833;
-    color: #dce8ed;
-    font-size: 0.76rem;
-}
-
-.model-card__actions button.active {
-    border-color: #2f9bd7;
-    background: #17384a;
-    color: #e6f7ff;
 }
 
 .row-actions {

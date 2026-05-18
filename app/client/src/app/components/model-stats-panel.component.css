@@ -1,9 +1,10 @@
 .settings-page__stats-table-wrap {
   overflow: auto;
   max-height: min(72vh, 58rem);
-  border: 1px solid #263a45;
-  border-radius: 0.35rem;
-  background: #101c23;
+  border: 1px solid #205064;
+  border-radius: 0.7rem;
+  background: radial-gradient(circle at top right, rgb(24 68 82 / 35%) 0%, #0f1d26 45%, #0d171f 100%);
+  box-shadow: inset 0 0 0 1px rgb(83 158 184 / 16%), 0 12px 28px rgb(1 8 16 / 28%);
 }
 
 .settings-page__stats-mobile-list { display: none; }
@@ -16,8 +17,74 @@
 .settings-page__stats-mobile-empty { margin: 0; font-size: 0.8rem; color: #a9bac2; }
 .settings-page__stats-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .settings-page__stats-table th,
-.settings-page__stats-table td { border-bottom: 1px solid #22343e; padding: 0.5rem; text-align: left; vertical-align: top; }
-.settings-page__stats-table th { background: #13242d; color: #9eb4bf; position: sticky; top: 0; }
+.settings-page__stats-table td { border-bottom: 1px solid #1f3945; padding: 0.58rem 0.62rem; text-align: left; vertical-align: middle; }
+.settings-page__stats-table th {
+  background: rgb(18 40 53 / 92%);
+  color: #8eb2bf;
+  position: sticky;
+  top: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.settings-page__duty-cell {
+  min-width: 10rem;
+}
+
+.settings-page__duty-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  color: #dcedf4;
+  font-size: 1.02rem;
+}
+
+.settings-page__duty-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  display: grid;
+  place-items: center;
+  color: #9fc6d6;
+}
+
+.settings-page__duty-meta {
+  margin: 0.18rem 0 0;
+  font-size: 0.73rem;
+  color: #88a9b7;
+}
+
+.settings-page__status-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #355569;
+  border-radius: 999px;
+  padding: 0.18rem 0.54rem;
+  font-size: 0.74rem;
+  color: #98b5c2;
+  white-space: nowrap;
+}
+
+.settings-page__status-pill--on {
+  border-color: #2f7f67;
+  background: rgb(35 86 70 / 26%);
+  color: #7be0b8;
+}
+
+.settings-page__model-name {
+  display: block;
+  color: #d7ebf4;
+  font-size: 0.84rem;
+  line-height: 1.25;
+}
+
+.settings-page__model-provider {
+  display: block;
+  color: #84a7b5;
+  font-size: 0.73rem;
+  margin-top: 0.1rem;
+}
 
 @media (max-width: 760px) {
   .settings-page__stats-table-wrap { display: none; max-height: none; overflow: visible; }

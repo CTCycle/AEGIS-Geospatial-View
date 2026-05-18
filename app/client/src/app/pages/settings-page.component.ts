@@ -75,7 +75,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   keyValidationErrors: { openai?: string; google?: string } = {};
 
   providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
-  showLocalOnly = false;
   private isDestroyed = false;
 
   constructor(
@@ -126,9 +125,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const query = this.searchText.trim().toLowerCase();
     return source.filter((model) => {
-      if (this.providerFilter === 'ollama' && this.showLocalOnly && !localModelIds.has(model.id)) {
-        return false;
-      }
       if (!query) {
         return true;
       }
@@ -205,19 +201,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google'): void {
     this.providerFilter = filter;
-    if (filter !== 'ollama') {
-      this.showLocalOnly = false;
-    }
     this.syncState();
-  }
-
-  setShowLocalOnly(checked: boolean): void {
-    this.showLocalOnly = checked;
-  }
-
-  onLocalOnlyChange(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    this.setShowLocalOnly(Boolean(target?.checked));
   }
 
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
