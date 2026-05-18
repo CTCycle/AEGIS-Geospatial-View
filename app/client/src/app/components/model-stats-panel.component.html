@@ -45,12 +45,13 @@
               <span class="settings-page__model-provider">{{ entry.row?.provider || '-' }}</span>
             </td>
             <td>
-              <span class="settings-page__status-pill" [class.settings-page__status-pill--on]="entry.row?.local">
+              <span class="settings-page__installed-pill" [class.settings-page__installed-pill--on]="entry.row?.local">
                 {{ entry.row ? (entry.row.local ? 'Yes' : 'No') : '-' }}
               </span>
             </td>
             <td>
               <span class="settings-page__status-pill" [class.settings-page__status-pill--on]="!!entry.row">
+                <span class="settings-page__status-dot" aria-hidden="true"></span>
                 {{ statusText(entry.row) }}
               </span>
             </td>

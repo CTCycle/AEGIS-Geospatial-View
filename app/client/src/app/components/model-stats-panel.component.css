@@ -58,6 +58,7 @@
 .settings-page__status-pill {
   display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
   border: 1px solid #355569;
   border-radius: 999px;
   padding: 0.18rem 0.54rem;
@@ -67,6 +68,37 @@
 }
 
 .settings-page__status-pill--on {
+  border-color: #2f7f67;
+  background: rgb(35 86 70 / 26%);
+  color: #7be0b8;
+}
+
+.settings-page__status-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid #6f8fa0;
+  background: transparent;
+}
+
+.settings-page__status-pill--on .settings-page__status-dot {
+  border-color: #64d4aa;
+  background: #64d4aa;
+}
+
+.settings-page__installed-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #355569;
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.71rem;
+  color: #9cb7c3;
+  min-width: 2.1rem;
+  justify-content: center;
+}
+
+.settings-page__installed-pill--on {
   border-color: #2f7f67;
   background: rgb(35 86 70 / 26%);
   color: #7be0b8;
