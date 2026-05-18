@@ -223,6 +223,8 @@
 
 
 .model-card {
+    display: flex;
+    flex-direction: column;
     border: 1px solid #263a45;
     border-radius: 0.35rem;
     padding: var(--space-3);
@@ -260,6 +262,7 @@
 
 .model-card p {
     margin-top: var(--space-2);
+    margin-bottom: 0;
     color: #a9bac2;
     font-size: var(--font-size-caption);
 }

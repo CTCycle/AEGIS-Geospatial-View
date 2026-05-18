@@ -2,7 +2,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  margin-top: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-3);
   border-top: 1px solid #213742;
   border-bottom: 1px solid #213742;
 }
