@@ -11,6 +11,7 @@ import {
   parseSearchResponse,
   fetchGeospatialCameraDetail,
   fetchGeospatialLayerFeatures,
+  buildModelDescription,
   sendChatTurn,
   streamChatTurn,
 } from './api';
@@ -272,5 +273,34 @@ describe('core/api', () => {
 
     const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
     expect(calledUrl).toContain('/geospatial/cameras/windy_webcams%2Fcam%201');
+  });
+
+  it('treats placeholder local Ollama descriptions as missing', () => {
+    expect(buildModelDescription({
+      description: 'local',
+      metadata: {
+        family: 'qwen2',
+        parameter_size: '7.6B',
+        quantization_level: 'Q4_K_M',
+      },
+    })).toBe('Optimized for qwen2 7.6B Q4_K_M.');
+  });
+
+  it('treats Ollama technical summaries as generated metadata, not authored descriptions', () => {
+    expect(buildModelDescription({
+      description: 'qwen2 | 7.6B | Q4_K_M',
+      metadata: {
+        family: 'qwen2',
+        parameter_size: '7.6B',
+        quantization_level: 'Q4_K_M',
+      },
+    })).toBe('Optimized for qwen2 7.6B Q4_K_M.');
+  });
+
+  it('keeps provider-authored model descriptions', () => {
+    expect(buildModelDescription({
+      description: 'A provider-authored summary.',
+      metadata: {},
+    })).toBe('A provider-authored summary.');
   });
 });

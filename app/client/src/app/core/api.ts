@@ -256,15 +256,22 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
 
 export const buildModelDescription = (item: Record<string, unknown>): string => {
   const rawDescription = String(item.description ?? '').trim();
-  if (rawDescription && !rawDescription.toLowerCase().startsWith('local ollama model ')) {
-    return rawDescription;
-  }
   const metadata = isRecord(item.metadata) ? item.metadata : {};
   const family = typeof metadata.family === 'string' ? metadata.family : '';
   const parameterSize = typeof metadata.parameter_size === 'string' ? metadata.parameter_size : '';
   const quantization = typeof metadata.quantization_level === 'string' ? metadata.quantization_level : '';
   const details = [family, parameterSize, quantization].filter(Boolean).join(' ');
-  return details ? `Optimized for ${details}.` : rawDescription || 'General purpose local model.';
+  const technicalDescription = [family, parameterSize, quantization].filter(Boolean).join(' | ').toLowerCase();
+  const normalizedDescription = rawDescription.toLowerCase();
+  if (
+    rawDescription
+    && normalizedDescription !== 'local'
+    && normalizedDescription !== technicalDescription
+    && !normalizedDescription.startsWith('local ollama model ')
+  ) {
+    return rawDescription;
+  }
+  return details ? `Optimized for ${details}.` : 'General purpose local model.';
 };
 
 export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {

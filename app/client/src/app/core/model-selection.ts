@@ -73,10 +73,10 @@ export const buildSelectedModelStats = (
   localModelIds: ReadonlySet<string>,
 ): SelectedModelStat[] => {
   const rows: SelectedModelStat[] = [];
-  const assignments: Array<{ role: string; provider: string; name: string }> = [
-    { role: 'Parser', provider: settings.parser_model_provider, name: settings.parser_model_name },
-    { role: 'Chat', provider: settings.chat_model_provider, name: settings.chat_model_name },
-    { role: 'Agent', provider: settings.agent_model_provider, name: settings.agent_model_name },
+  const assignments: Array<{ role: ModelRole; provider: string; name: string }> = [
+    { role: 'parser', provider: settings.parser_model_provider, name: settings.parser_model_name },
+    { role: 'chat', provider: settings.chat_model_provider, name: settings.chat_model_name },
+    { role: 'agent', provider: settings.agent_model_provider, name: settings.agent_model_name },
   ];
 
   assignments.forEach(({ role, provider, name }) => {

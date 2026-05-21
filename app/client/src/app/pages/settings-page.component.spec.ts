@@ -112,6 +112,48 @@ describe('pages/settings-page.component', () => {
     expect(component.displayedModels.length).toBe(1);
   });
 
+  it('keeps richer Ollama library descriptions for installed models', async () => {
+    window.history.replaceState({}, '', '/settings');
+    fetchChatModelsMock.and.resolveTo({
+      cloud: [{
+        id: 'gemma4',
+        name: 'gemma4',
+        description: 'Detailed library description for the installed model family.',
+        provider: 'ollama',
+        capabilities: ['chat'],
+        metadata: { source: 'library' },
+      }],
+      local: [{
+        id: 'gemma4:31b',
+        name: 'gemma4:31b',
+        description: 'local',
+        provider: 'ollama',
+        capabilities: [],
+        metadata: { quantization: 'Q4_K_M' },
+      }],
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const model = fixture.componentInstance.displayedModels.find((item) => item.id === 'gemma4:31b');
+    expect(model?.description).toContain('Detailed library description');
+  });
+
+  it('provides fallback descriptions for installed local models', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const localModel = {
+      id: 'qwen2.5:7b',
+      name: 'qwen2.5:7b',
+      description: 'local',
+      provider: 'ollama',
+      capabilities: [],
+      metadata: {},
+    };
+    expect(fixture.componentInstance.modelDescription(localModel)).toContain('Installed Ollama model');
+  });
+
   it('applyModelSelection updates settings and status text', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();

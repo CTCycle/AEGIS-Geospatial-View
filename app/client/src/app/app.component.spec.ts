@@ -15,7 +15,7 @@ describe('app.component', () => {
     const text = fixture.nativeElement.textContent as string;
 
     expect(text).toContain('AEGIS');
-    expect(text).toContain('Workspace');
+    expect(text).toContain('Search');
     expect(text).toContain('Geodata');
     expect(text).toContain('Access');
     expect(text).toContain('Model Settings');
