@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-04-24
+Last updated: 2026-05-21
 
 ## Supported Modes
 
@@ -55,10 +55,10 @@ What it does:
 
 ```powershell
 uv sync
-uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 5002
+uv run python -m uvicorn AEGIS.server.app:app --host 127.0.0.1 --port 7059
 Set-Location app/client
 npm install
-npm run start -- --host 127.0.0.1 --port 5000
+npm run start -- --host 127.0.0.1 --port 4512
 ```
 
 ### Desktop packaging (Windows CMD)

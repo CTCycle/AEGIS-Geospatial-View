@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-18
+Last updated: 2026-05-21
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -232,8 +232,8 @@ app/
 - Import/runtime entry: `app/server/app.py`
 - ASGI app object: `app = create_app()`
 - Standard startup invocation:
-  - PowerShell: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002`
-  - CMD: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002`
+  - PowerShell: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059`
+  - CMD: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059`
 
 ### Frontend web app
 

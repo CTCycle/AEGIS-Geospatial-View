@@ -35,17 +35,6 @@ export class ModelRoleActionsComponent {
     return 'Agent';
   }
 
-  roleHint(role: ModelRole): string {
-    const selected = this.isSelected(role);
-    if (selected) {
-      return 'Assigned';
-    }
-    if (this.requiresPull) {
-      return 'Pull + assign';
-    }
-    return 'Assign';
-  }
-
   roleIcon(role: ModelRole): string {
     if (role === 'parser') {
       return 'parser';

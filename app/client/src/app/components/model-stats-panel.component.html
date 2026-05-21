@@ -36,9 +36,6 @@
                 </span>
                 <span>{{ dutyLabel(entry.duty) }}</span>
               </div>
-              @if (entry.row) {
-                <p class="settings-page__duty-meta">{{ entry.row.model }} · {{ entry.row.provider }}</p>
-              }
             </td>
             <td>
               <span class="settings-page__model-name">{{ entry.row?.model || 'None' }}</span>
@@ -81,3 +78,18 @@
     }
   }
 </div>
+
+<section class="settings-page__model-boundaries" aria-labelledby="model-boundaries-title" aria-describedby="model-boundaries-description">
+  <div class="settings-page__model-boundaries-copy">
+    <h2 id="model-boundaries-title">One model can do everything, but it does not have to.</h2>
+    <p id="model-boundaries-description">
+      Parser, chat, and agent duties are assigned independently so AEGIS can keep intent parsing,
+      user-facing conversation, and tool-planning behavior explicit.
+    </p>
+    <ul>
+      <li><strong>Parser</strong> turns requests into structured intent.</li>
+      <li><strong>Chat</strong> handles the user-facing response.</li>
+      <li><strong>Agent</strong> plans tool and workflow execution.</li>
+    </ul>
+  </div>
+</section>

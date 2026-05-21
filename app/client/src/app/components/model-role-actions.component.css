@@ -3,7 +3,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   margin-top: auto;
-  padding-top: var(--space-3);
+  padding-top: 0.95rem;
   border-top: 1px solid #213742;
   border-bottom: 1px solid #213742;
 }
@@ -17,8 +17,8 @@
   color: #dce8ed;
   display: grid;
   justify-items: center;
-  gap: 0.2rem;
-  min-height: 4.15rem;
+  gap: 0.28rem;
+  min-height: 3.55rem;
   transition: border-color 130ms ease, background-color 130ms ease, color 130ms ease;
 }
 
@@ -44,23 +44,14 @@
   letter-spacing: 0.01em;
 }
 
-.model-card__duty-hint {
-  font-size: 0.74rem;
-  color: #8eabb8;
-}
-
 .model-card__duty--active {
   border-bottom-color: #59d6a5;
-  background: linear-gradient(180deg, rgb(34 81 74 / 22%) 0%, rgb(16 30 38 / 0%) 100%);
+  background: linear-gradient(180deg, rgb(51 117 101 / 28%) 0%, rgb(19 48 44 / 14%) 100%);
   color: #ebf8ff;
 }
 
 .model-card__duty--active .model-card__duty-icon {
   color: #79d8b8;
-}
-
-.model-card__duty--active .model-card__duty-hint {
-  color: #70e0af;
 }
 
 @media (max-width: 760px) {

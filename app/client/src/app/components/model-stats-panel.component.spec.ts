@@ -35,4 +35,23 @@ describe('ModelStatsPanelComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('openai');
     expect(fixture.nativeElement.textContent).toContain('Assigned');
   });
+
+  it('maps lowercase assigned roles to duty rows', () => {
+    component.rows = [{ model: 'qwen2.5:7b', provider: 'ollama', local: true, assignedRoles: ['parser'] }];
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('qwen2.5:7b');
+    expect(text).toContain('ollama');
+    expect(text).toContain('Yes');
+  });
+
+  it('renders duty boundary explainer content', () => {
+    component.rows = [];
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('Duty boundaries');
+    expect(text).toContain('Parser');
+    expect(text).toContain('Agent');
+    expect(fixture.nativeElement.querySelector('.settings-page__model-boundaries img')).toBeNull();
+  });
 });

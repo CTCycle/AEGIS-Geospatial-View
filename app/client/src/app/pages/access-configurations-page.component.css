@@ -8,16 +8,15 @@
 
 .access-page__header {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: flex-start;
     gap: 1rem;
-    padding: 1.2rem 1.35rem;
+    padding: 0.95rem 1.35rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
 }
 
 .page-kicker,
-.access-page__header h1,
 .access-page__header p,
 .access-provider h2,
 .access-provider p {
@@ -33,14 +32,7 @@
     font-weight: 800;
 }
 
-.access-page__header h1 {
-    margin-top: 0.4rem;
-    font-size: 1.55rem;
-    color: #f0f7fa;
-}
-
 .access-page__header p {
-    margin-top: 0.35rem;
     max-width: 70rem;
     color: #a9bac2;
     font-size: 0.92rem;
@@ -89,7 +81,7 @@
     display: grid;
     grid-template-columns: minmax(12rem, 1.15fr) minmax(14rem, 1fr) minmax(22rem, 1.4fr);
     gap: 0.9rem;
-    align-items: start;
+    align-items: stretch;
 }
 
 .access-provider header,
@@ -105,7 +97,7 @@
 }
 
 .access-provider footer {
-    align-self: start;
+    align-self: center;
     justify-content: flex-start;
     padding-top: 0;
     align-items: center;

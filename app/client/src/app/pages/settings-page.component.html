@@ -1,8 +1,7 @@
 <div class="settings-page">
   <header class="settings-page__header">
     <div class="settings-page__heading">
-      <h1>Model Settings</h1>
-      <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
+      <p>Select AEGIS models across cloud providers and local Ollama, then assign parser, chat, and agent duties.</p>
     </div>
     <div class="settings-page__header-actions">
       <app-settings-icon-action
@@ -99,7 +98,7 @@
                         }
                       </header>
 
-                      <p>{{ model.description }}</p>
+                      <p>{{ modelDescription(model) }}</p>
 
                       <app-model-role-actions
                         [model]="model"

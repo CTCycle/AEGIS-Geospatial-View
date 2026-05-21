@@ -88,7 +88,7 @@ describe('pages/access-configurations-page.component', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Optional Geospatial Provider Keys');
+    expect(fixture.nativeElement.textContent).toContain('Manage optional API keys');
     const triggers = fixture.debugElement.queryAll(By.css('.access-signup-trigger'));
     expect(triggers.length).toBeGreaterThanOrEqual(2);
     expect(fixture.nativeElement.textContent).toContain('Get API');

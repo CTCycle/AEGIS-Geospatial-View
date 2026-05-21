@@ -8,23 +8,16 @@
 
 .capabilities-page__header {
     display: block;
-    padding: 1.2rem 1.35rem;
+    padding: 0.95rem 1.35rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
 }
 
-.capabilities-page__header h1,
 .capabilities-page__header p {
     margin: 0;
 }
 
-.capabilities-page__header h1 {
-    font-size: 1.55rem;
-    color: #f0f7fa;
-}
-
 .capabilities-page__header p {
-    margin-top: 0.35rem;
     max-width: 72rem;
     color: #a9bac2;
     font-size: 0.92rem;
@@ -109,12 +102,12 @@
 
 .capability-table th:nth-child(2),
 .capability-table td:nth-child(2) {
-    width: 35%;
+    width: 27%;
 }
 
 .capability-table th:nth-child(3),
 .capability-table td:nth-child(3) {
-    width: 18%;
+    width: 11%;
 }
 
 .capability-table th:nth-child(4),
@@ -129,7 +122,7 @@
 
 .capability-table th:nth-child(6),
 .capability-table td:nth-child(6) {
-    width: 9%;
+    width: 24%;
 }
 
 .capability-table th,
@@ -152,6 +145,8 @@
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .capability-table strong,
@@ -170,7 +165,9 @@
 }
 
 .capability-table__source {
+    white-space: normal;
     overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .access-status {
