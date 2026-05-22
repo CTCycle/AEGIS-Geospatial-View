@@ -1,0 +1,53 @@
+.model-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #263a45;
+  border-radius: 0.35rem;
+  padding: var(--space-3);
+  background: #101c23;
+  box-shadow: none;
+  min-height: 13.25rem;
+}
+
+.model-card--local {
+  border-color: #376b5d;
+  background: #10251f;
+}
+
+.model-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.model-card__pull {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  border: 1px solid #344953;
+  background: #162833;
+  color: #dce8ed;
+  display: grid;
+  place-items: center;
+}
+
+.model-card h3 {
+  font-size: var(--font-size-label);
+  color: #f0f7fa;
+}
+
+.model-card p {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+  color: #a9bac2;
+  font-size: var(--font-size-caption);
+  line-height: 1.45;
+  flex: 1 1 auto;
+  padding-bottom: 0.85rem;
+}
+
+.model-card app-model-role-actions {
+  display: block;
+  margin-top: auto;
+}

@@ -1,10 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import { ModelRole, isModelSelectedForRole } from '../core/model-selection';
+import { MODEL_ROLES, ModelRole, isModelSelectedForRole } from '../core/model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from '../core/types';
-
-const ROLE_BUTTON_ORDER: ModelRole[] = ['parser', 'chat', 'agent'];
 
 @Component({
   selector: 'app-model-role-actions',
@@ -19,7 +17,7 @@ export class ModelRoleActionsComponent {
   @Input() requiresPull = false;
   @Output() selectRole = new EventEmitter<ModelRole>();
 
-  readonly roles = ROLE_BUTTON_ORDER;
+  readonly roles = MODEL_ROLES;
 
   isSelected(role: ModelRole): boolean {
     return isModelSelectedForRole(this.settings, role, this.model);

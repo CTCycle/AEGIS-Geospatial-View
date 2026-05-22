@@ -343,6 +343,13 @@ describe('pages/settings-page.component', () => {
     expect(input?.getAttribute('aria-label')).toBe('Search models');
   });
 
+  it('renders model cards through the extracted model card component host', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelectorAll('article[appmodelcard]').length).toBeGreaterThan(0);
+  });
+
   it('navigateBack preserves state before routing', async () => {
     const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     const fixture = TestBed.createComponent(SettingsPageComponent);

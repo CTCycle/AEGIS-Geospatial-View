@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { MODEL_ROLES, ModelRole } from '../core/model-selection';
 import { ModelStatsPanelComponent } from './model-stats-panel.component';
 
 describe('ModelStatsPanelComponent', () => {
@@ -53,5 +54,11 @@ describe('ModelStatsPanelComponent', () => {
     expect(text).toContain('Parser');
     expect(text).toContain('Agent');
     expect(fixture.nativeElement.querySelector('.settings-page__model-boundaries img')).toBeNull();
+  });
+
+  it('uses model role values for assigned roles', () => {
+    const row = { model: 'm3', provider: 'openai', local: false, assignedRoles: ['chat'] as ModelRole[] };
+    component.rows = [row];
+    expect(row.assignedRoles.every((role) => MODEL_ROLES.includes(role))).toBeTrue();
   });
 });

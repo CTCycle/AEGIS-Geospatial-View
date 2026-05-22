@@ -8,10 +8,11 @@ import {
   OnChanges,
   OnDestroy,
   Output,
+  SecurityContext,
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
 import maplibregl, { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
 
 import { OverlayControlsComponent } from './overlay-controls.component';
@@ -65,12 +66,19 @@ const appendQuery = (baseUrl: string, query: string): string => {
 const normalizeOverlayBounds = (
   bounds?: [number, number, number, number],
 ): [number, number, number, number] | undefined => {
-  if (!Array.isArray(bounds) || bounds.length !== 4) {
+  if (!isFiniteBoundsTuple(bounds)) {
     return undefined;
   }
-  const [minLon, minLat, maxLon, maxLat] = bounds;
-  return [minLon, minLat, maxLon, maxLat];
+  return bounds;
 };
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+const isFiniteBoundsTuple = (value: unknown): value is [number, number, number, number] => (
+  Array.isArray(value)
+  && value.length === 4
+  && value.every(isFiniteNumber)
+);
 
 const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
   if (!overlay.url) {
@@ -398,7 +406,7 @@ const addRasterOverlayLayer = (
 };
 
 const normalizeBounds = (bounds: unknown): LngLatBoundsLike | null => {
-  if (!Array.isArray(bounds) || bounds.length !== 4) {
+  if (!isFiniteBoundsTuple(bounds)) {
     return null;
   }
   const [minx, miny, maxx, maxy] = bounds;
@@ -477,11 +485,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     }));
   }
 
-  get embeddedMapHtml(): SafeHtml | null {
-    const mapHtml = this.payload?.satellite_imagery?.map_html;
-    return typeof mapHtml === 'string' && mapHtml.trim()
-      ? this.sanitizer.bypassSecurityTrustHtml(mapHtml)
-      : null;
+  get embeddedMapHtml(): string | null {
+    const mapHtml = this.mapSession?.payload?.embedded_map_html ?? this.payload?.satellite_imagery?.map_html;
+    if (typeof mapHtml !== 'string' || mapHtml.trim().length === 0) {
+      return null;
+    }
+    const trusted = this.sanitizer.bypassSecurityTrustHtml(mapHtml);
+    return this.sanitizer.sanitize(SecurityContext.HTML, trusted);
   }
 
   ngAfterViewInit(): void {
