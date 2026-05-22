@@ -7,6 +7,8 @@ import {
 
 export type ModelRole = 'parser' | 'chat' | 'agent';
 
+export const MODEL_ROLES: readonly ModelRole[] = ['parser', 'chat', 'agent'];
+
 const ROLE_FIELD_MAP: Record<ModelRole, { provider: keyof ModelSettingsResponse; name: keyof ModelSettingsResponse }> = {
   parser: { provider: 'parser_model_provider', name: 'parser_model_name' },
   chat: { provider: 'chat_model_provider', name: 'chat_model_name' },
@@ -65,7 +67,7 @@ export interface SelectedModelStat {
   model: string;
   provider: string;
   local: boolean;
-  assignedRoles: string[];
+  assignedRoles: ModelRole[];
 }
 
 export const buildSelectedModelStats = (
@@ -73,15 +75,18 @@ export const buildSelectedModelStats = (
   localModelIds: ReadonlySet<string>,
 ): SelectedModelStat[] => {
   const rows: SelectedModelStat[] = [];
-  const assignments: Array<{ role: ModelRole; provider: string; name: string }> = [
-    { role: 'parser', provider: settings.parser_model_provider, name: settings.parser_model_name },
-    { role: 'chat', provider: settings.chat_model_provider, name: settings.chat_model_name },
-    { role: 'agent', provider: settings.agent_model_provider, name: settings.agent_model_name },
-  ];
+  const assignments: Array<{ role: ModelRole; provider: string; name: string }> = MODEL_ROLES.map((role) => {
+    const fields = ROLE_FIELD_MAP[role];
+    return {
+      role,
+      provider: normalizeSettingField(settings[fields.provider]),
+      name: normalizeSettingField(settings[fields.name]),
+    };
+  });
 
   assignments.forEach(({ role, provider, name }) => {
-    const normalizedProvider = provider.trim();
-    const normalizedName = name.trim();
+    const normalizedProvider = provider;
+    const normalizedName = name;
     const hasSelection = Boolean(normalizedProvider) && Boolean(normalizedName);
     const local = hasSelection && localModelIds.has(normalizedName);
     rows.push({

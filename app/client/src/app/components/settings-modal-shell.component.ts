@@ -13,7 +13,7 @@ export class SettingsModalShellComponent {
   @Output() requestClose = new EventEmitter<void>();
 
   onBackdropClick(event: MouseEvent): void {
-    if ((event.target as HTMLElement).classList.contains('settings-modal-backdrop')) {
+    if (event.target === event.currentTarget) {
       this.requestClose.emit();
     }
   }

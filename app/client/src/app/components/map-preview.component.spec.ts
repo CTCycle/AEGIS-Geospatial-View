@@ -101,6 +101,16 @@ describe('components/map-preview.component', () => {
     );
   });
 
+  it('ignores invalid bounds for fitBounds', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        bounds: [12.49, Number.NaN, 12.50, 41.9],
+      }) as never,
+    };
+    fixture.detectChanges();
+    expect(fakeMap.fitBounds).not.toHaveBeenCalled();
+  });
+
   it('rebuilds overlay state from session and emits notice for stale ids', () => {
     component.initialOverlayVisibility = { stale_overlay: true };
     component.initialOverlayOpacity = { stale_overlay: 0.2 };
@@ -251,6 +261,17 @@ describe('components/map-preview.component', () => {
     component.payload = {};
     fixture.detectChanges();
     expect(component.mapSession).toBeUndefined();
+  });
+
+  it('binds embedded html as plain srcdoc string', () => {
+    component.payload = {
+      satellite_imagery: { map_html: '<html><body><h1>Map</h1></body></html>' },
+    } as never;
+    fixture.detectChanges();
+    const iframe = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement | null;
+    expect(iframe).not.toBeNull();
+    expect(iframe?.getAttribute('srcdoc')).toContain('<h1>Map</h1>');
+    expect(iframe?.getAttribute('srcdoc')).not.toContain('SafeValue must use [property]=');
   });
 
   it('maps overlay ids directly when overlay descriptors are absent', () => {

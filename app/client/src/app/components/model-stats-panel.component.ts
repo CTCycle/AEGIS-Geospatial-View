@@ -1,12 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
-export interface ModelStatsRow {
-  model: string;
-  provider: string;
-  local: boolean;
-  assignedRoles: string[];
-}
+import { ModelRole, SelectedModelStat } from '../core/model-selection';
 
 @Component({
   selector: 'app-model-stats-panel',
@@ -16,18 +11,18 @@ export interface ModelStatsRow {
   styleUrl: './model-stats-panel.component.css',
 })
 export class ModelStatsPanelComponent {
-  @Input({ required: true }) rows: ModelStatsRow[] = [];
+  @Input({ required: true }) rows: readonly SelectedModelStat[] = [];
   @Input() isLoading = false;
 
-  get dutyRows(): Array<{ duty: 'parser' | 'chat' | 'agent'; row: ModelStatsRow | null }> {
-    const duties: Array<'parser' | 'chat' | 'agent'> = ['parser', 'chat', 'agent'];
+  get dutyRows(): Array<{ duty: ModelRole; row: SelectedModelStat | null }> {
+    const duties: readonly ModelRole[] = ['parser', 'chat', 'agent'];
     return duties.map((duty) => ({
       duty,
       row: this.rows.find((row) => row.assignedRoles.includes(duty)) ?? null,
     }));
   }
 
-  dutyLabel(duty: 'parser' | 'chat' | 'agent'): string {
+  dutyLabel(duty: ModelRole): string {
     if (duty === 'parser') {
       return 'Parser';
     }
@@ -37,7 +32,7 @@ export class ModelStatsPanelComponent {
     return 'Agent';
   }
 
-  statusText(row: ModelStatsRow | null): string {
+  statusText(row: SelectedModelStat | null): string {
     if (!row) {
       return 'Not assigned';
     }

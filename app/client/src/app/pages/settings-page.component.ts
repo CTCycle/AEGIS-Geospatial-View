@@ -3,7 +3,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
+import { ModelCardComponent } from '../components/model-card.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
@@ -12,6 +12,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
 import {
   ModelRole,
+  SelectedModelStat,
   buildModelSelectionPayload,
   buildSelectedModelStats,
 } from '../core/model-selection';
@@ -30,7 +31,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
   imports: [
     CommonModule,
     FormsModule,
-    ModelRoleActionsComponent,
+    ModelCardComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
     ModelStatsPanelComponent,
@@ -108,8 +109,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get displayedModels(): ModelCardDescriptor[] {
-    const localModelIds = new Set(this.localModels.map((item) => item.id));
-
     const source = (() => {
       if (this.providerFilter === 'all') {
         return this.mergeModelLists(this.localModels, this.cloudModels);
@@ -161,6 +160,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return providerKey;
   }
 
+  trackProviderGroup(provider: string): string {
+    return provider;
+  }
+
   get hasDisplayedModels(): boolean {
     return this.displayedModels.length > 0;
   }
@@ -169,7 +172,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return new Set(this.localModels.map((item) => item.id));
   }
 
-  get selectedModelStats(): Array<{ model: string; provider: string; local: boolean; assignedRoles: string[] }> {
+  get selectedModelStats(): SelectedModelStat[] {
     return buildSelectedModelStats(this.settings, this.localModelIds);
   }
 
@@ -318,6 +321,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not pull ${model.name}.`);
       return false;
     }
+  }
+
+  onModelRoleSelected(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
+    return this.applyModelSelection(role, model);
   }
 
   closeModal(): void {

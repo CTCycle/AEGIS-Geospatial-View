@@ -36,4 +36,13 @@ export class OverlayControlsComponent {
     const target = event.target as HTMLInputElement | null;
     this.overlayOpacityChange.emit({ overlayId, percentValue: target?.value ?? '0' });
   }
+
+  onOpacityChange(overlayId: string, rawValue: string): void {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    const clampedPercent = Math.min(100, Math.max(0, parsed));
+    this.overlayOpacityChange.emit({ overlayId, percentValue: String(clampedPercent) });
+  }
 }

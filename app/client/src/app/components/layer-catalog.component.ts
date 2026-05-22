@@ -57,6 +57,14 @@ export class LayerCatalogComponent {
     this.selectedCategory = value;
   }
 
+  onCategoryChange(value: string): void {
+    this.selectedCategory = this.categories.includes(value) ? value : 'all';
+  }
+
+  onSearchInput(value: string): void {
+    this.searchText = value;
+  }
+
   canToggle(layer: CapabilityDescriptor): boolean {
     const status = String(layer.reliability?.status || layer.endpoint_health || '').toLowerCase();
     return layer.supports_map
