@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, Protocol
 
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMToolDefinition,
     ModelDescriptor,
 )
 
@@ -15,7 +16,14 @@ class LLMProvider(Protocol):
 
     def list_models(self) -> list[ModelDescriptor]: ...
 
-    def chat(self, request: LLMRequest) -> LLMResult: ...
+    def chat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult: ...
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]: ...
 

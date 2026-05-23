@@ -39,11 +39,11 @@ describe('e2e/geospatial browser smoke', () => {
       user_text: 'show mocked map',
       task_class: 'map_search',
       location_signals: [],
-      normalized_intent: {
-        intent_id: 'mocked_map',
-        intent_label: 'Mocked map',
+      normalized_action: {
+        action_id: 'mocked_map',
+        action_label: 'Mocked map',
         task_tags: ['map'],
-        intent_tags: ['geospatial'],
+        action_tags: ['geospatial'],
         requires_location: true,
       },
       temporal_signal: { mode: 'none' },
@@ -53,7 +53,7 @@ describe('e2e/geospatial browser smoke', () => {
     decision: {
       plan: {
         state: 'map_search',
-        intent_id: 'mocked_map',
+        action_id: 'mocked_map',
         basemap_id: 'osm_default',
         overlay_ids: [
           'mock_clustered_points',

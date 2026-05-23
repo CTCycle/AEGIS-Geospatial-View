@@ -3,7 +3,7 @@ from __future__ import annotations
 
 AGENT_EXTRACTION_PROMPT = """
 Role:
-You are the parser model. You extract only the Stage-A structured routing intent.
+You are the parser model. You extract only the Stage-A structured routing action.
 
 Goal:
 Return a JSON object with exactly:
@@ -49,7 +49,7 @@ Rules:
 1. Output JSON only.
 2. Select at most one base_map.
 3. Only use basemap/overlay ids present in retrieval evidence.
-4. Extract area-nearby intent into location/address fields when phrases like "nearby", "around", "area nearby" are present.
+4. Extract area-nearby action into location/address fields when phrases like "nearby", "around", "area nearby" are present.
 5. Keep null when information is unknown.
 6. Do not include explanatory text.
 """.strip()
@@ -132,15 +132,15 @@ Response rules:
 
 PARSER_SYSTEM_PROMPT = """
 Role:
-You are the AEGIS parser. Extract turn-routing intent from the current user message.
+You are the AEGIS parser. Extract turn-routing action from the current user message.
 
 Output:
 Return JSON only with this schema:
 - task_class: map_search|direct_query|general_question|unclear
-- intent_id: short snake_case id
-- intent_label: short human label
+- action_id: one of map_search, location_render, geospatial_data_retrieval, data_layer_query, overlay_control, dataset_display, visible_layer_interrogation, map_external_source_combination, chat_response, unknown
+- action_label: short human label
 - task_tags: array of tags
-- intent_tags: array of tags
+- action_tags: array of tags
 - requested_visualizations: array of explicit requested map concepts such as satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire
 - requires_location: boolean
 - location_signals: array of {signal_type,address/city/country/coordinates/deictic, raw_value, normalized_value, latitude, longitude, confidence}
@@ -158,7 +158,7 @@ Rules:
 6. Do not invent extra locations that are not explicitly present in the current user message.
 7. requested_visualizations must use only canonical ids when relevant:
    satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire, weather, aerosol, ozone, solar, noise
-8. When the request is for air quality, prefer air_quality in requested_visualizations and intent tags unless the user explicitly requests another theme.
+8. When the request is for air quality, prefer air_quality in requested_visualizations and action tags unless the user explicitly requests another theme.
 """.strip()
 
 

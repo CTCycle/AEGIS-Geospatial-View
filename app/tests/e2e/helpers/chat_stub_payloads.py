@@ -35,11 +35,11 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
         "conversation_context": {"recent_messages": [], "memory_snapshot": {}},
         "task_class": "direct_query",
         "location_signals": [],
-        "normalized_intent": {
-            "intent_id": "stub",
-            "intent_label": "Stub",
+        "normalized_action": {
+            "action_id": "stub",
+            "action_label": "Stub",
             "task_tags": [],
-            "intent_tags": [],
+            "action_tags": [],
             "requires_location": False,
         },
         "temporal_signal": {"mode": "none"},
@@ -53,7 +53,7 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
         "plan": {
             "state": state,
-            "intent_id": "stub",
+            "action_id": "stub",
             "overlay_ids": [],
         },
         "trace": {"steps": ["stub"]},

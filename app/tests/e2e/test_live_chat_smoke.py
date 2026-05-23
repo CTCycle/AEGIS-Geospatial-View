@@ -22,6 +22,10 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
         data={"message": "Give me the coordinates of Rome, Italy"},
     )
     if response.status == 200:
+        body = response.json()
+        assistant = str(body.get("assistant_message") or "").lower()
+        if "configured parser model is unavailable" in assistant:
+            return False, "Configured parser model is unavailable"
         return True, ""
     if response.status in {400, 502, 503}:
         return False, f"Live provider precondition failed with status {response.status}"
@@ -140,7 +144,7 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
     page.get_by_role("button", name="Send").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     page.get_by_role("button", name="Start new chat").click()
-    expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
+    expect(page.get_by_text("Map Workspace")).to_be_visible()
     expect(page.locator(".overlay-controls")).not_to_be_visible()
 
 

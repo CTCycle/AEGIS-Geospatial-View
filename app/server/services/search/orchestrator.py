@@ -58,7 +58,7 @@ class LocationSearchOrchestrator:
             overlays=overlays,
             compliance_warnings=warnings,
             payload={
-                "intent_id": payload.intent_id,
+                "action_id": payload.action_id,
                 "time_mode": payload.time_mode,
                 "presentation": payload.presentation.model_dump(mode="json"),
             },

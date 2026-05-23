@@ -18,7 +18,7 @@ class ManifestEmbeddingValidationError(ValueError):
 class ManifestPreparationService:
     REQUIRED_TEXT_FIELDS = ("description",)
     REQUIRED_METADATA_LIST_FIELDS = (
-        "intent_tags",
+        "action_tags",
         "task_tags",
         "search_examples",
     )
@@ -36,8 +36,8 @@ class ManifestPreparationService:
             entry["description"] = f"No description provided for {name}."
         metadata = dict(entry.get("metadata") or {})
         capabilities = self._normalize_list(entry.get("capabilities"))
-        if not self._normalize_list(metadata.get("intent_tags")):
-            metadata["intent_tags"] = capabilities[:5] or [kind[:-1] if kind.endswith("s") else kind]
+        if not self._normalize_list(metadata.get("action_tags")):
+            metadata["action_tags"] = capabilities[:5] or [kind[:-1] if kind.endswith("s") else kind]
         if not self._normalize_list(metadata.get("task_tags")):
             metadata["task_tags"] = [f"show {name}", f"use {provider} data"]
         if not self._normalize_list(metadata.get("search_examples")):
@@ -80,7 +80,7 @@ class ManifestPreparationService:
             f"Provider: {entry.get('provider') or 'Unknown provider'}",
             f"Description: {entry.get('description') or 'No description provided.'}",
             f"Coverage: {entry.get('coverage') or 'global'}",
-            f"Intent tags: {', '.join(self._normalize_list(metadata.get('intent_tags')))}",
+            f"Action tags: {', '.join(self._normalize_list(metadata.get('action_tags')))}",
             f"Task tags: {', '.join(self._normalize_list(metadata.get('task_tags')))}",
             f"Search examples: {', '.join(self._normalize_list(metadata.get('search_examples')))}",
             f"Location dependency: {metadata.get('location_dependency') or 'location-specific'}",
@@ -118,7 +118,7 @@ class ManifestPreparationService:
             "document_kind": kind[:-1] if kind.endswith("s") else kind,
             "capabilities": ",".join(self._normalize_list(entry.get("capabilities"))),
             "coverage": entry.get("coverage"),
-            "intent_tags": ",".join(self._normalize_list(metadata.get("intent_tags"))),
+            "action_tags": ",".join(self._normalize_list(metadata.get("action_tags"))),
             "task_tags": ",".join(self._normalize_list(metadata.get("task_tags"))),
             "runtime_supports_map": bool((runtime_profile or {}).get("supports_map", False)),
             "runtime_supports_direct_text": bool((runtime_profile or {}).get("supports_direct_text", False)),

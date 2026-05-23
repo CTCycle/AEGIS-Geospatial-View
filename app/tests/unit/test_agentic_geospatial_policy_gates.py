@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.services.agent.manifest_intent_resolver import (
+from server.services.agent.manifest_action_resolver import (
     UserCapabilityAccess,
     select_geospatial_capabilities,
 )

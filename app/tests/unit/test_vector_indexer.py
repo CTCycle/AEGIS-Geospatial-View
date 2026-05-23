@@ -25,7 +25,7 @@ class _ManifestLoaderStub:
                     "source_path": "/tmp/basemaps/osm_default.json",
                     "metadata": {
                         "keywords": ["street", "city"],
-                        "intent_tags": ["routing"],
+                        "action_tags": ["routing"],
                         "task_tags": ["orientation"],
                         "map_type_tags": ["street"],
                         "human_summary": "Default city street basemap.",
@@ -53,7 +53,7 @@ class _ManifestLoaderStub:
                     "source_path": "/tmp/overlays/openaq_air_quality.json",
                     "metadata": {
                         "keywords": ["air", "quality"],
-                        "intent_tags": ["air-quality"],
+                        "action_tags": ["air-quality"],
                         "task_tags": ["environmental context"],
                         "map_type_tags": ["thematic"],
                         "human_summary": "Air-quality overlay for station-level pollution context.",

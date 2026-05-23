@@ -11,7 +11,7 @@ from server.domain.agent.decision import (
 from server.domain.extraction.models import TurnParseResult
 from server.services.agent.capability_retriever import CapabilityRetriever
 from server.services.agent.location_resolver import LocationResolver
-from server.services.agent.manifest_intent_resolver import ManifestIntentResolver
+from server.services.agent.manifest_action_resolver import ManifestActionResolver
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistrySnapshot
 
@@ -22,11 +22,11 @@ class PolicyEngine:
         *,
         location_resolver: LocationResolver,
         capability_retriever: CapabilityRetriever,
-        manifest_intent_resolver: ManifestIntentResolver | None = None,
+        manifest_action_resolver: ManifestActionResolver | None = None,
     ) -> None:
         self.location_resolver = location_resolver
         self.capability_retriever = capability_retriever
-        self.manifest_intent_resolver = manifest_intent_resolver or ManifestIntentResolver()
+        self.manifest_action_resolver = manifest_action_resolver or ManifestActionResolver()
 
     async def decide(
         self,
@@ -41,7 +41,7 @@ class PolicyEngine:
         task_validation = self._validate_task_class(turn)
         if task_validation is not None:
             return PolicyDecision(
-                plan=ExecutionPlan(state="reject", intent_id=turn.normalized_intent.intent_id),
+                plan=ExecutionPlan(state="reject", action_id=turn.normalized_action.action_id),
                 clarification=task_validation,
                 trace=trace,
             )
@@ -50,7 +50,7 @@ class PolicyEngine:
         location_policy = self._enforce_location_policy(turn)
         if location_policy is not None:
             return PolicyDecision(
-                plan=ExecutionPlan(state="clarify", intent_id=turn.normalized_intent.intent_id),
+                plan=ExecutionPlan(state="clarify", action_id=turn.normalized_action.action_id),
                 clarification=location_policy,
                 trace=trace,
             )
@@ -59,7 +59,7 @@ class PolicyEngine:
         safety_policy = self._enforce_safety_policy(turn)
         if safety_policy is not None:
             return PolicyDecision(
-                plan=ExecutionPlan(state="reject", intent_id=turn.normalized_intent.intent_id),
+                plan=ExecutionPlan(state="reject", action_id=turn.normalized_action.action_id),
                 clarification=safety_policy,
                 trace=trace,
             )
@@ -68,7 +68,7 @@ class PolicyEngine:
         resolved = await self._resolve_location(turn, memory_snapshot)
         if isinstance(resolved, ClarificationRequest):
             return PolicyDecision(
-                plan=ExecutionPlan(state="clarify", intent_id=turn.normalized_intent.intent_id),
+                plan=ExecutionPlan(state="clarify", action_id=turn.normalized_action.action_id),
                 clarification=resolved,
                 trace=trace,
             )
@@ -77,7 +77,7 @@ class PolicyEngine:
         blocking_ambiguities = self._blocking_ambiguities(turn, resolved)
         if blocking_ambiguities:
             return PolicyDecision(
-                plan=ExecutionPlan(state="clarify", intent_id=turn.normalized_intent.intent_id),
+                plan=ExecutionPlan(state="clarify", action_id=turn.normalized_action.action_id),
                 clarification=self._build_clarification(blocking_ambiguities),
                 resolved_location=resolved,
                 trace=trace,
@@ -98,7 +98,7 @@ class PolicyEngine:
             for capability_id, profile in runtime_registry.profiles.items()
             if isinstance(profile, dict) and bool(profile.get("enabled_by_default", False))
         }
-        manifest_resolution = self.manifest_intent_resolver.resolve(
+        manifest_resolution = self.manifest_action_resolver.resolve(
             turn=turn,
             capability_registry=capability_registry,
             available_ids=available_ids,
@@ -117,7 +117,7 @@ class PolicyEngine:
             return PolicyDecision(
                 plan=ExecutionPlan(
                     state="clarify",
-                    intent_id=turn.normalized_intent.intent_id,
+                    action_id=turn.normalized_action.action_id,
                     temporal_mode=turn.temporal_signal.mode,
                     temporal_text=turn.temporal_signal.raw_text,
                     basemap_id=manifest_resolution.basemap_id,
@@ -144,7 +144,7 @@ class PolicyEngine:
         plan = ExecutionPlan(
             state=mode_state,
             mode="direct_text" if mode_state == "direct_tool" else "map",
-            intent_id=turn.normalized_intent.intent_id,
+            action_id=turn.normalized_action.action_id,
             temporal_mode=turn.temporal_signal.mode,
             temporal_text=turn.temporal_signal.raw_text,
             basemap_id=manifest_resolution.basemap_id,
@@ -153,7 +153,7 @@ class PolicyEngine:
             or (selected_tool.capability_id if selected_tool is not None else None),
         )
         if mode_state == "direct_tool" and not plan.tool_id:
-            plan = plan.model_copy(update={"tool_id": self._default_tool_for_intent(turn.normalized_intent.intent_id)})
+            plan = plan.model_copy(update={"tool_id": self._default_tool_for_action(turn.normalized_action.action_id)})
 
         return PolicyDecision(
             plan=plan,
@@ -187,10 +187,10 @@ class PolicyEngine:
                 reason="The request refers to a previous location, but no active location is available.",
                 missing_fields=["location"],
             )
-        if turn.normalized_intent.requires_location and not turn.location_signals and not turn.conversation_context.memory_snapshot.get("active_location"):
+        if turn.normalized_action.requires_location and not turn.location_signals and not turn.conversation_context.memory_snapshot.get("active_location"):
             return ClarificationRequest(
                 question="Which location should I use?",
-                reason="Location is required for this intent.",
+                reason="Location is required for this action.",
                 missing_fields=["location"],
             )
         return None
@@ -235,17 +235,17 @@ class PolicyEngine:
         ):
             return True
 
-        intent_markers = {
+        action_markers = {
             str(item).strip().lower()
             for item in (
-                *turn.normalized_intent.task_tags,
-                *turn.normalized_intent.intent_tags,
+                *turn.normalized_action.task_tags,
+                *turn.normalized_action.action_tags,
                 *turn.ambiguities,
             )
             if str(item).strip()
         }
         return bool(
-            intent_markers.intersection(
+            action_markers.intersection(
                 {
                     "overlay_exclusion",
                     "overlay_prohibition",
@@ -364,13 +364,13 @@ class PolicyEngine:
     def _is_coordinate_lookup(self, turn: TurnParseResult, tool_id: str | None) -> bool:
         if tool_id == "location_to_coordinates":
             return True
-        intent = turn.normalized_intent
+        action = turn.normalized_action
         text = " ".join(
             [
-                intent.intent_id,
-                intent.intent_label,
-                *intent.task_tags,
-                *intent.intent_tags,
+                action.action_id,
+                action.action_label,
+                *action.task_tags,
+                *action.action_tags,
             ]
         ).lower()
         markers = ("coordinate", "coordinates", "geocode", "location_lookup")
@@ -389,7 +389,7 @@ class PolicyEngine:
         )
         if selected_overlays:
             return True
-        return bool(turn.normalized_intent.requested_visualizations) and any(
+        return bool(turn.normalized_action.requested_visualizations) and any(
             item.kind in {"basemap", "overlay"} for item in candidates
         )
 
@@ -406,15 +406,15 @@ class PolicyEngine:
             missing_fields=["location"],
         )
 
-    def _intent_text(self, turn: TurnParseResult) -> str:
-        intent = turn.normalized_intent
+    def _action_text(self, turn: TurnParseResult) -> str:
+        action = turn.normalized_action
         return " ".join(
             [
-                intent.intent_id,
-                intent.intent_label,
-                *intent.task_tags,
-                *intent.intent_tags,
-                *intent.requested_visualizations,
+                action.action_id,
+                action.action_label,
+                *action.task_tags,
+                *action.action_tags,
+                *action.requested_visualizations,
             ]
         ).lower()
 
@@ -428,42 +428,42 @@ class PolicyEngine:
             "osm_terrain",
             "gibs_satellite",
         }
-        resolution = self.manifest_intent_resolver.resolve(
+        resolution = self.manifest_action_resolver.resolve(
             turn=turn,
             capability_registry=CapabilityRegistry(),
             available_ids=available_ids,
         )
         if resolution.basemap_id:
             return resolution.basemap_id
-        intent_text = self._intent_text(turn)
-        if any(marker in intent_text for marker in ("satellite", "imagery", "truecolor")):
+        action_text = self._action_text(turn)
+        if any(marker in action_text for marker in ("satellite", "imagery", "truecolor")):
             return "gibs_satellite"
-        if "dark" in intent_text:
+        if "dark" in action_text:
             return "osm_dark"
-        if any(marker in intent_text for marker in ("terrain", "topographic", "topography")):
+        if any(marker in action_text for marker in ("terrain", "topographic", "topography")):
             return "osm_terrain"
         preferred = next((item.capability_id for item in candidates if item.kind == "basemap"), None)
         return preferred or "osm_default"
 
     def _requested_overlay_markers(self, turn: TurnParseResult) -> set[str]:
-        intent_text = self._intent_text(turn)
+        action_text = self._action_text(turn)
         markers: set[str] = set()
-        if any(marker in intent_text for marker in ("air quality", "air_quality", "pollution", "aerosol")):
+        if any(marker in action_text for marker in ("air quality", "air_quality", "pollution", "aerosol")):
             markers.update({"air_quality", "openaq", "aerosol"})
-        if any(marker in intent_text for marker in ("traffic", "congestion", "road flow", "traffic flow")):
+        if any(marker in action_text for marker in ("traffic", "congestion", "road flow", "traffic flow")):
             markers.update({"traffic", "tomtom_traffic"})
-        if any(marker in intent_text for marker in ("radar", "rainviewer")):
+        if any(marker in action_text for marker in ("radar", "rainviewer")):
             markers.add("rainviewer")
-        has_precipitation_intent = any(
-            marker in intent_text for marker in ("precipitation", "rain", "storm")
+        has_precipitation_action = any(
+            marker in action_text for marker in ("precipitation", "rain", "storm")
         )
-        if has_precipitation_intent:
+        if has_precipitation_action:
             markers.update({"precipitation", "rainviewer", "imerg", "radar"})
-        if any(marker in intent_text for marker in ("weather", "temperature", "forecast")):
+        if any(marker in action_text for marker in ("weather", "temperature", "forecast")):
             markers.update({"weather", "temperature", "forecast"})
-        if any(marker in intent_text for marker in ("active fire", "active fires", "wildfire", "wildfires", "thermal anomaly", "thermal anomalies")):
+        if any(marker in action_text for marker in ("active fire", "active fires", "wildfire", "wildfires", "thermal anomaly", "thermal anomalies")):
             markers.update({"fire", "fires", "thermal_anomalies", "thermal_anomaly"})
-        if any(marker in intent_text for marker in ("land cover", "landcover", "worldcover", "igbp")):
+        if any(marker in action_text for marker in ("land cover", "landcover", "worldcover", "igbp")):
             markers.update({"land_cover", "landcover", "worldcover", "igbp"})
         return markers
 
@@ -496,7 +496,7 @@ class PolicyEngine:
         candidate_ids = {item.capability_id for item in candidates}
         overlays = [item for item in candidates if item.kind == "overlay"]
         if candidate_ids:
-            resolution = self.manifest_intent_resolver.resolve(
+            resolution = self.manifest_action_resolver.resolve(
                 turn=turn,
                 capability_registry=CapabilityRegistry(),
                 available_ids=candidate_ids | {"osm_default", "osm_terrain", "gibs_satellite"},
@@ -543,10 +543,10 @@ class PolicyEngine:
                 break
         return selected
 
-    def _default_tool_for_intent(self, intent_id: str) -> str:
+    def _default_tool_for_action(self, action_id: str) -> str:
         return {
             "location_lookup": "location_to_coordinates",
             "weather": "get_weather_forecast",
             "air_quality": "get_air_quality_forecast",
             "poi": "get_nearby_poi",
-        }.get(intent_id, "location_to_coordinates")
+        }.get(action_id, "location_to_coordinates")

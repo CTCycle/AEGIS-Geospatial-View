@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
     LocationSignal,
-    NormalizedIntent,
+    NormalizedAction,
     TurnParseResult,
 )
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -63,7 +63,7 @@ class SelectedCapability:
     reason: str
 
 
-class ManifestIntentResolver:
+class ManifestActionResolver:
     OVERLAY_EXCLUDED_CONCEPTS = {
         "a",
         "an",
@@ -315,13 +315,13 @@ class ManifestIntentResolver:
         )
 
     def _extract_concepts(self, turn: TurnParseResult) -> list[str]:
-        intent = turn.normalized_intent
+        action = turn.normalized_action
         ordered_signals: list[object] = [
-            *intent.requested_visualizations,
-            *intent.intent_tags,
-            *intent.task_tags,
-            intent.intent_id,
-            intent.intent_label,
+            *action.requested_visualizations,
+            *action.action_tags,
+            *action.task_tags,
+            action.action_id,
+            action.action_label,
         ]
         seen: set[str] = set()
         concepts: list[str] = []
@@ -365,7 +365,7 @@ class ManifestIntentResolver:
             metadata = {}
         sources: list[object] = [
             capability.get("capabilities"),
-            metadata.get("intent_tags"),
+            metadata.get("action_tags"),
             metadata.get("task_tags"),
             metadata.get("keywords"),
             metadata.get("map_type_tags"),
@@ -556,7 +556,7 @@ def select_geospatial_capabilities(
     ]
     available_ids = {str(item.get("id")) for item in manifests}
     turn = _synthetic_turn(user_query, sorted(query_tokens), resolved_location)
-    resolution = ManifestIntentResolver().resolve(
+    resolution = ManifestActionResolver().resolve(
         turn=turn,
         capability_registry=registry,
         available_ids=available_ids,
@@ -631,11 +631,11 @@ def _synthetic_turn(
         conversation_context=ConversationContextSnapshot(),
         task_class="map_search",
         location_signals=location_signals,
-        normalized_intent=NormalizedIntent(
-            intent_id="_".join(tags) or "map",
-            intent_label=user_query,
+        normalized_action=NormalizedAction(
+            action_id="_".join(tags) or "map",
+            action_label=user_query,
             task_tags=tags,
-            intent_tags=tags,
+            action_tags=tags,
             requested_visualizations=tags,
             requires_location=True,
         ),

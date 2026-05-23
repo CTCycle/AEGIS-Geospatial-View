@@ -16,7 +16,7 @@ def test_agentic_geospatial_selected_capabilities_flow_into_map_session() -> Non
     )
     plan = ExecutionPlan(
         state="map_search",
-        intent_id="traffic",
+        action_id="traffic",
         basemap_id="osm_default",
         overlay_ids=["tomtom_traffic_flow", "windy_webcams"],
     )
@@ -41,7 +41,7 @@ def test_agentic_geospatial_map_session_keeps_credential_warnings() -> None:
     )
     plan = ExecutionPlan(
         state="map_search",
-        intent_id="traffic",
+        action_id="traffic",
         basemap_id="tomtom_basic",
         overlay_ids=["tomtom_traffic_flow"],
     )

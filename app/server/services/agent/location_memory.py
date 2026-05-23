@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.extraction.models import LocationSignal, NormalizedIntent
+from server.domain.extraction.models import LocationSignal, NormalizedAction
 
 ###############################################################################
 class LocationMemoryService:
@@ -45,7 +45,7 @@ class LocationMemoryService:
         self,
         snapshot: dict,
         resolved_location: ResolvedLocation,
-        intent: NormalizedIntent,
+        action: NormalizedAction,
     ) -> dict:
         slots = list(snapshot.get("location_slots") or []) if isinstance(snapshot, dict) else []
         location_payload = {
@@ -55,7 +55,7 @@ class LocationMemoryService:
             "country": resolved_location.country,
             "city": resolved_location.city,
             "address": resolved_location.address,
-            "intent_id": intent.intent_id,
+            "action_id": action.action_id,
         }
         slots = [entry for entry in slots if not isinstance(entry, dict) or entry.get("label") != resolved_location.label]
         slots.insert(0, location_payload)

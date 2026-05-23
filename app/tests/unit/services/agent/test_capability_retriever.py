@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
-    NormalizedIntent,
+    NormalizedAction,
     TemporalSignal,
     TurnParseResult,
 )
@@ -16,11 +16,11 @@ def test_capability_retriever_returns_candidates() -> None:
         conversation_context=ConversationContextSnapshot(recent_messages=[], memory_snapshot={}),
         task_class="map_search",
         location_signals=[],
-        normalized_intent=NormalizedIntent(
-            intent_id="weather",
-            intent_label="Weather",
+        normalized_action=NormalizedAction(
+            action_id="weather",
+            action_label="Weather",
             task_tags=["environment"],
-            intent_tags=["weather"],
+            action_tags=["weather"],
             requires_location=True,
         ),
         temporal_signal=TemporalSignal(mode="forecast"),
@@ -39,11 +39,11 @@ def test_capability_retriever_uses_manifest_ranking_without_vector_bootstrap() -
         conversation_context=ConversationContextSnapshot(recent_messages=[], memory_snapshot={}),
         task_class="map_search",
         location_signals=[],
-        normalized_intent=NormalizedIntent(
-            intent_id="precipitation",
-            intent_label="Precipitation map",
+        normalized_action=NormalizedAction(
+            action_id="precipitation",
+            action_label="Precipitation map",
             task_tags=["rain", "storm"],
-            intent_tags=["precipitation"],
+            action_tags=["precipitation"],
             requested_visualizations=["precipitation"],
             requires_location=True,
         ),

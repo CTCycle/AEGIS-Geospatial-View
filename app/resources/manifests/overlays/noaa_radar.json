@@ -20,7 +20,7 @@
       "weather",
       "precipitation"
     ],
-    "intent_tags": [
+    "action_tags": [
       "weather",
       "precipitation",
       "hazard"
@@ -67,7 +67,7 @@
       "precipitation",
       "storm"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "weather",
       "precipitation",
       "freshness"

@@ -20,7 +20,7 @@
       "geoapify",
       "geoapify places (amenities)"
     ],
-    "intent_tags": [
+    "action_tags": [
       "places",
       "geojson"
     ],
@@ -97,7 +97,7 @@
       "geoapify",
       "geoapify places (amenities)"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

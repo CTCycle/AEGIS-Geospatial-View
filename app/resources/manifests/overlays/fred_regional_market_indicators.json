@@ -24,7 +24,7 @@
       "economic indicators",
       "market"
     ],
-    "intent_tags": [
+    "action_tags": [
       "market data",
       "housing prices",
       "rent trends"
@@ -95,7 +95,7 @@
       "economic indicators",
       "market"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

@@ -48,11 +48,11 @@ def _turn_payload() -> dict[str, Any]:
             "user_text": "show fixture map",
             "task_class": "map_search",
             "location_signals": [],
-            "normalized_intent": {
-                "intent_id": "visual_fixture_map",
-                "intent_label": "Visual fixture map",
+            "normalized_action": {
+                "action_id": "visual_fixture_map",
+                "action_label": "Visual fixture map",
                 "task_tags": ["map"],
-                "intent_tags": ["geospatial"],
+                "action_tags": ["geospatial"],
                 "requires_location": True,
             },
             "temporal_signal": {"mode": "none"},
@@ -62,7 +62,7 @@ def _turn_payload() -> dict[str, Any]:
         "decision": {
             "plan": {
                 "state": "map_search",
-                "intent_id": "visual_fixture_map",
+                "action_id": "visual_fixture_map",
                 "basemap_id": "osm_default",
                 "overlay_ids": ["visual_fixture_points"],
             }

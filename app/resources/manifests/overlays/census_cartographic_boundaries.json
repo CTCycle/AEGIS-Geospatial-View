@@ -20,7 +20,7 @@
       "tract",
       "boundaries"
     ],
-    "intent_tags": [
+    "action_tags": [
       "demographics",
       "county",
       "tract"
@@ -67,7 +67,7 @@
       "tract",
       "demographic boundary"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "demographics",
       "boundary",
       "choropleth"

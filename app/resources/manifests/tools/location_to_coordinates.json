@@ -10,7 +10,7 @@
   ],
   "coverage": "global",
   "metadata": {
-    "intent_tags": [
+    "action_tags": [
       "coordinates",
       "geocode",
       "location_lookup"
@@ -80,7 +80,7 @@
       "direct-tool",
       "Location To Coordinates"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

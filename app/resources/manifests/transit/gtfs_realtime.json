@@ -23,7 +23,7 @@
       "vehicle position",
       "delay"
     ],
-    "intent_tags": [
+    "action_tags": [
       "transit",
       "disruption",
       "live",
@@ -72,7 +72,7 @@
       "vehicle position",
       "near station"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "transit",
       "freshness",
       "disruption"

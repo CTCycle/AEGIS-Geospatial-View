@@ -23,7 +23,7 @@
       "viewpoint",
       "museum"
     ],
-    "intent_tags": [
+    "action_tags": [
       "tourism",
       "poi",
       "attraction"
@@ -74,7 +74,7 @@
       "viewpoint",
       "museum"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "tourism",
       "poi",
       "nearby"

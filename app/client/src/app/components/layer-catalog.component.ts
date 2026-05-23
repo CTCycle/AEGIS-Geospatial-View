@@ -43,7 +43,7 @@ export class LayerCatalogComponent {
       const queryMatch = !query
         || layer.name.toLowerCase().includes(query)
         || layer.description?.toLowerCase().includes(query)
-        || layer.intent_tags.some((tag) => tag.toLowerCase().includes(query))
+        || layer.action_tags.some((tag) => tag.toLowerCase().includes(query))
         || layer.task_tags.some((tag) => tag.toLowerCase().includes(query));
       return categoryMatch && queryMatch;
     });
@@ -97,7 +97,7 @@ export class LayerCatalogComponent {
       layer.capability_kind,
       layer.rendering_mode,
       layer.provider,
-      ...layer.intent_tags,
+      ...layer.action_tags,
       ...layer.task_tags,
     ].join(' ').toLowerCase();
     if (category === 'base maps') {

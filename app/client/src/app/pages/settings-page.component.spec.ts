@@ -347,7 +347,8 @@ describe('pages/settings-page.component', () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelectorAll('article[appmodelcard]').length).toBeGreaterThan(0);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
   });
 
   it('navigateBack preserves state before routing', async () => {

@@ -22,7 +22,7 @@
       "hydrography",
       "boundaries"
     ],
-    "intent_tags": [
+    "action_tags": [
       "demographics",
       "census boundaries",
       "hydrology"
@@ -99,7 +99,7 @@
       "hydrography",
       "boundaries"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

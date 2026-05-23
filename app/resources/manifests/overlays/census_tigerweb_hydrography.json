@@ -23,7 +23,7 @@
       "tigerweb",
       "geojson"
     ],
-    "intent_tags": [
+    "action_tags": [
       "hydrology",
       "water features",
       "rivers"
@@ -93,7 +93,7 @@
       "tigerweb",
       "geojson"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

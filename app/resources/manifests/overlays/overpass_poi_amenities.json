@@ -22,7 +22,7 @@
       "amenities",
       "places"
     ],
-    "intent_tags": [
+    "action_tags": [
       "poi search",
       "amenity lookup"
     ],
@@ -106,7 +106,7 @@
       "amenities",
       "places"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

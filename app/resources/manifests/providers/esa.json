@@ -19,7 +19,7 @@
       "esa",
       "esa"
     ],
-    "intent_tags": [
+    "action_tags": [
       "wmts",
       "land-cover"
     ],
@@ -84,7 +84,7 @@
       "land-cover",
       "esa"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

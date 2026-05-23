@@ -2,7 +2,7 @@ from server.domain.extraction.models import (
     ConversationContextSnapshot,
     DisallowedPattern,
     LocationSignal,
-    NormalizedIntent,
+    NormalizedAction,
     TemporalSignal,
     TurnParseResult,
 )
@@ -11,7 +11,7 @@ __all__ = [
     "ConversationContextSnapshot",
     "LocationSignal",
     "TemporalSignal",
-    "NormalizedIntent",
+    "NormalizedAction",
     "TurnParseResult",
     "DisallowedPattern",
 ]

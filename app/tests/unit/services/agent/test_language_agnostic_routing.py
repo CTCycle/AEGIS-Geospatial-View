@@ -4,13 +4,13 @@ from server.domain.agent.decision import CapabilityCandidate
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
     DisallowedPattern,
-    NormalizedIntent,
+    NormalizedAction,
     TemporalSignal,
     TurnParseResult,
 )
 from server.services.agent.capability_retriever import CapabilityRetriever
 from server.services.agent.location_resolver import LocationResolver
-from server.services.agent.manifest_intent_resolver import ManifestIntentResolver
+from server.services.agent.manifest_action_resolver import ManifestActionResolver
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -20,10 +20,10 @@ def _turn(
     *,
     user_text: str,
     task_class: str,
-    intent_id: str,
-    intent_label: str,
+    action_id: str,
+    action_label: str,
     task_tags: list[str],
-    intent_tags: list[str],
+    action_tags: list[str],
     requested_visualizations: list[str],
 ) -> TurnParseResult:
     return TurnParseResult(
@@ -34,11 +34,11 @@ def _turn(
         ),
         task_class=task_class,
         location_signals=[],
-        normalized_intent=NormalizedIntent(
-            intent_id=intent_id,
-            intent_label=intent_label,
+        normalized_action=NormalizedAction(
+            action_id=action_id,
+            action_label=action_label,
             task_tags=task_tags,
-            intent_tags=intent_tags,
+            action_tags=action_tags,
             requested_visualizations=requested_visualizations,
             requires_location=True,
         ),
@@ -53,10 +53,10 @@ def test_manifest_resolver_routes_non_english_query_from_structured_signals() ->
     turn = _turn(
         user_text="Affiche les précipitations et la météo autour de Naples.",
         task_class="map_search",
-        intent_id="meteo_precipitations_naples",
-        intent_label="Météo et précipitations",
+        action_id="meteo_precipitations_naples",
+        action_label="Météo et précipitations",
         task_tags=["map", "weather"],
-        intent_tags=["weather", "precipitation", "radar"],
+        action_tags=["weather", "precipitation", "radar"],
         requested_visualizations=["weather", "precipitation"],
     )
     runtime_snapshot = RuntimeRegistry().build_snapshot()
@@ -66,7 +66,7 @@ def test_manifest_resolver_routes_non_english_query_from_structured_signals() ->
         if isinstance(profile, dict) and bool(profile.get("enabled_by_default", False))
     }
 
-    resolution = ManifestIntentResolver().resolve(
+    resolution = ManifestActionResolver().resolve(
         turn=turn,
         capability_registry=CapabilityRegistry(),
         available_ids=available_ids,
@@ -84,10 +84,10 @@ def test_direct_query_map_routing_does_not_depend_on_english_display_markers() -
     turn = _turn(
         user_text="Mostra radar pioggia e previsione meteo per Napoli",
         task_class="direct_query",
-        intent_id="previsione_meteo_radar",
-        intent_label="Previsione meteo con radar",
+        action_id="previsione_meteo_radar",
+        action_label="Previsione meteo con radar",
         task_tags=["weather", "radar"],
-        intent_tags=["weather", "forecast", "precipitation"],
+        action_tags=["weather", "forecast", "precipitation"],
         requested_visualizations=["weather", "precipitation"],
     )
     candidates = [
@@ -121,10 +121,10 @@ def test_overlay_suppression_uses_structured_policy_signals() -> None:
     turn = _turn(
         user_text="Usa solo lo stile mappa base",
         task_class="map_search",
-        intent_id="stile_mappa_base",
-        intent_label="Solo basemap",
+        action_id="stile_mappa_base",
+        action_label="Solo basemap",
         task_tags=["map"],
-        intent_tags=["basemap_only"],
+        action_tags=["basemap_only"],
         requested_visualizations=[],
     )
     turn = turn.model_copy(

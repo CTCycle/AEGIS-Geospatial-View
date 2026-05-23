@@ -11,7 +11,7 @@
     "requires_key": false,
     "attribution": "Source public transport agency",
     "keywords": ["transit", "station", "camera", "public transport"],
-    "intent_tags": ["transit camera", "station condition"],
+    "action_tags": ["transit camera", "station condition"],
     "task_tags": ["transit monitoring", "station status"],
     "source_protocol": "agency-defined JSON/WMS/HTML",
     "data_format": "template",
@@ -41,7 +41,7 @@
     "defaultEnabled": false,
     "manualToggle": false,
     "plannerHints": ["transit camera", "station camera", "public transport"],
-    "requiredUserIntent": ["transit_monitoring", "travel_condition"],
+    "requiredUserAction": ["transit_monitoring", "travel_condition"],
     "avoidWhen": ["general chat", "no geographic context", "source not configured"]
   },
   "reliability": {

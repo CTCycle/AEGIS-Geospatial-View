@@ -20,7 +20,7 @@ def _payload(**overrides: object) -> dict[str, object]:
             "source": "test",
             "confidence": 1.0,
         },
-        "intent_id": "map_search",
+        "action_id": "map_search",
         "time_mode": "current",
         "basemap_id": "osm_default",
         "overlay_ids": [],

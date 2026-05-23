@@ -21,7 +21,7 @@
       "income",
       "demographics"
     ],
-    "intent_tags": [
+    "action_tags": [
       "demographics",
       "population",
       "income"
@@ -74,7 +74,7 @@
       "demographics",
       "choropleth"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "demographics",
       "population",
       "choropleth"

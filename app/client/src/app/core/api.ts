@@ -147,8 +147,8 @@ export const normalizeCapabilities = (input: unknown): CatalogResponse['capabili
           : null,
       }
       : undefined,
-    intent_tags: Array.isArray(item.intent_tags)
-      ? item.intent_tags.filter((v): v is string => typeof v === 'string')
+    action_tags: Array.isArray(item.action_tags)
+      ? item.action_tags.filter((v): v is string => typeof v === 'string')
       : [],
     task_tags: Array.isArray(item.task_tags)
       ? item.task_tags.filter((v): v is string => typeof v === 'string')

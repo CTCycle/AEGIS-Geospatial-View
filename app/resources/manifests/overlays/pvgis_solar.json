@@ -20,7 +20,7 @@
       "pvgis",
       "pvgis solar potential"
     ],
-    "intent_tags": [
+    "action_tags": [
       "solar",
       "point-insight"
     ],
@@ -97,7 +97,7 @@
       "pvgis",
       "pvgis solar potential"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

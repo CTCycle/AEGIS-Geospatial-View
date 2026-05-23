@@ -5,11 +5,12 @@ import logging
 import re
 from typing import Literal
 
+from server.domain.agent.actions import AgentAction
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
     DisallowedPattern,
     LocationSignal,
-    NormalizedIntent,
+    NormalizedAction,
     TemporalSignal,
     TurnParseResult,
 )
@@ -58,10 +59,10 @@ class _LLMParserExtraction(BaseModel):
     task_class: Literal["map_search", "direct_query", "general_question", "unclear"] = (
         "unclear"
     )
-    intent_id: str = "general_map"
-    intent_label: str = "General map request"
+    action_id: str = AgentAction.UNKNOWN.value
+    action_label: str = "General map request"
     task_tags: list[str] = Field(default_factory=list)
-    intent_tags: list[str] = Field(default_factory=list)
+    action_tags: list[str] = Field(default_factory=list)
     requested_visualizations: list[str] = Field(default_factory=list)
     requires_location: bool = True
     location_signals: list[_LLMLocationSignal] = Field(default_factory=list)
@@ -150,9 +151,17 @@ class ParserService:
         return any(self._contains_verbatim_span(user_message, term) for term in quoted_terms)
 
     def _extract_turn(self, *, user_message: str, memory_snapshot: dict, recent_messages: list[dict[str, str]]) -> _LLMParserExtraction:
-        settings = self.settings_repo.get_or_create()
-        provider_name = self.provider or settings.parser_model_provider
-        model_name = self.model or settings.parser_model_name
+        settings = None
+        if self.provider is None or self.model is None:
+            settings = self.settings_repo.get_or_create()
+        if settings is None:
+            provider_name = self.provider
+            model_name = self.model
+        else:
+            provider_name = self.provider or settings.parser_model_provider
+            model_name = self.model or settings.parser_model_name
+        if provider_name is None or model_name is None:
+            raise LLMConfigurationError("Parser provider and model must be configured.")
         parser_provider = self.llm_factory.get_parser_provider(provider_name)
         self.last_context_usage = None
         prompt_payload = {
@@ -182,11 +191,11 @@ class ParserService:
         self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
         extracted = _LLMParserExtraction.model_validate(payload)
         LOGGER.debug(
-            "Parser LLM extraction: provider=%s model=%s task=%s intent=%s",
+            "Parser LLM extraction: provider=%s model=%s task=%s action=%s",
             provider_name,
             model_name,
             extracted.task_class,
-            extracted.intent_id,
+            extracted.action_id,
         )
         return extracted
 
@@ -269,27 +278,27 @@ class ParserService:
         location_signal = cls._extract_text_location_signal(user_message)
         if location_signal is not None:
             task_tags = ["map"]
-            intent_tags = ["map"]
+            action_tags = ["map"]
             requested_visualizations = ["map"]
             text = user_message.casefold()
             if any(marker in text for marker in ("weather", "rain", "precipitation", "radar")):
-                intent_tags.append("weather")
+                action_tags.append("weather")
                 requested_visualizations.append("weather")
             if "traffic" in text:
-                intent_tags.append("traffic")
+                action_tags.append("traffic")
                 requested_visualizations.append("traffic")
             if any(marker in text for marker in ("amenit", "poi", "nearby")):
-                intent_tags.append("amenities")
+                action_tags.append("amenities")
                 requested_visualizations.append("amenities")
             if any(marker in text for marker in ("satellite", "imagery")):
-                intent_tags.append("satellite")
+                action_tags.append("satellite")
                 requested_visualizations.append("satellite")
             return _LLMParserExtraction(
                 task_class="map_search",
-                intent_id="general_map",
-                intent_label="General map request",
+                action_id=AgentAction.MAP_SEARCH.value,
+                action_label="General map request",
                 task_tags=task_tags,
-                intent_tags=intent_tags,
+                action_tags=action_tags,
                 requested_visualizations=requested_visualizations,
                 requires_location=True,
                 location_signals=[location_signal],
@@ -298,10 +307,10 @@ class ParserService:
 
         return _LLMParserExtraction(
             task_class="general_question",
-            intent_id="general_question",
-            intent_label="General question",
+            action_id=AgentAction.CHAT_RESPONSE.value,
+            action_label="General question",
             task_tags=["chat"],
-            intent_tags=["general"],
+            action_tags=["general"],
             requires_location=False,
             parser_confidence=0.65,
         )
@@ -348,10 +357,10 @@ class ParserService:
             parser_failure_ambiguity = failure_ambiguity
             extracted = _LLMParserExtraction(
                 task_class="unclear",
-                intent_id="general_map",
-                intent_label="General map request",
+                action_id=AgentAction.UNKNOWN.value,
+                action_label="General map request",
                 task_tags=["map"],
-                intent_tags=["map"],
+                action_tags=["map"],
                 requires_location=False,
                 ambiguities=[failure_ambiguity],
                 parser_confidence=0.0,
@@ -388,11 +397,11 @@ class ParserService:
             for item in extracted_location_signals
             if item.raw_value.strip()
         ]
-        normalized_intent = NormalizedIntent(
-            intent_id=extracted.intent_id.strip() or "general_map",
-            intent_label=extracted.intent_label.strip() or "General map request",
+        normalized_action = NormalizedAction(
+            action_id=self._normalize_action_id(extracted.action_id, extracted.parser_confidence),
+            action_label=extracted.action_label.strip() or "General map request",
             task_tags=[tag for tag in extracted.task_tags if str(tag).strip()],
-            intent_tags=[tag for tag in extracted.intent_tags if str(tag).strip()],
+            action_tags=[tag for tag in extracted.action_tags if str(tag).strip()],
             requested_visualizations=[
                 tag for tag in extracted.requested_visualizations if str(tag).strip()
             ],
@@ -419,15 +428,15 @@ class ParserService:
             if self._ambiguity_has_text_evidence(user_message, item)
         ]
         has_deictic = any(item.signal_type == "deictic" for item in location_signals)
-        if normalized_intent.requires_location and not location_signals:
+        if normalized_action.requires_location and not location_signals:
             ambiguities = self._dedupe([*ambiguities, "missing_location"])
         if has_deictic and not memory_snapshot.get("active_location"):
             ambiguities = self._dedupe([*ambiguities, "deictic_without_memory"])
 
-        if normalized_intent.requires_location and not location_signals:
+        if normalized_action.requires_location and not location_signals:
             LOGGER.info(
-                "Parser missing location: intent=%s ambiguities=%s user_text=%r",
-                normalized_intent.intent_id,
+                "Parser missing location: action=%s ambiguities=%s user_text=%r",
+                normalized_action.action_id,
                 ambiguities,
                 user_message,
             )
@@ -441,7 +450,7 @@ class ParserService:
         task_class = extracted.task_class
         if (
             task_class == "general_question"
-            and normalized_intent.requires_location
+            and normalized_action.requires_location
             and location_signals
             and self._looks_like_map_request(user_message)
         ):
@@ -455,12 +464,21 @@ class ParserService:
             ),
             task_class=task_class,
             location_signals=location_signals,
-            normalized_intent=normalized_intent,
+            normalized_action=normalized_action,
             temporal_signal=temporal_signal,
             ambiguities=ambiguities,
             disallowed_patterns=disallowed,
             parser_confidence=max(0.0, min(1.0, confidence)),
         )
+
+    @staticmethod
+    def _normalize_action_id(action_id: str, confidence: float) -> str:
+        if confidence < 0.25:
+            return AgentAction.UNKNOWN.value
+        try:
+            return AgentAction(str(action_id).strip()).value
+        except ValueError:
+            return AgentAction.UNKNOWN.value
 
     @staticmethod
     def _is_known_ambiguous_bare_place(

@@ -22,7 +22,7 @@ def _location_search_request() -> LocationSearchRequest:
             city="Rome",
             country="Italy",
         ),
-        intent_id="air_quality",
+        action_id="air_quality",
         time_mode="current",
         basemap_id="osm_default",
         overlay_ids=["openaq_air_quality"],
