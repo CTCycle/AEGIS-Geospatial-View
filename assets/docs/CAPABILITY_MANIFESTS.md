@@ -1,6 +1,6 @@
 # Capability Manifests
 
-Last updated: 2026-05-14
+Last updated: 2026-05-16
 
 ## Purpose
 
@@ -122,6 +122,7 @@ Every manifest under `app/resources/manifests` must define:
 - `sourceOfficialDocs`: official provider documentation URLs.
 - `license`: name, URL, attribution requirement, commercial-use status, and embedding allowance.
 - `auth`: provider auth type, provider key name, required flag, and access-page provider ID when credentials are required.
+- `account_setup`: optional provider setup guide metadata consumed by the Access configurations wizard.
 - `agenticUse`: planner hints, default enablement, manual-toggle policy, and avoid-when rules.
 - `reliability`: health status, audit date, and known limitations.
 - `cachePolicy`: cache mode, TTL, and stale-while-revalidate TTL.
@@ -131,8 +132,39 @@ Additional strict rules:
 
 - Credential-gated manifests must set both `auth.providerKey` and `auth.accessPageProviderId`.
 - Manifests must never contain raw secrets, access tokens, bearer values, or concrete API keys.
+- `account_setup.credential_fields` must contain access keys or tokens only, never third-party portal usernames or passwords.
 - Renderable capabilities must declare a supported rendering mode and normalization geometry.
 - Metadata-only and analysis-tool capabilities may expose descriptive or computed payloads, but cannot masquerade as successful empty map geometry.
+
+Example `account_setup` block:
+
+```json
+{
+  "account_setup": {
+    "mode": "manual",
+    "automation_supported": false,
+    "automation_reason": "Third-party provider signup and key retrieval require external account, billing, MFA, CAPTCHA, or portal flows that are not stable product APIs.",
+    "account_url": "https://console.cloud.google.com",
+    "dashboard_url": "https://console.cloud.google.com/google/maps-apis/credentials",
+    "documentation_url": "https://developers.google.com/maps/documentation/javascript/get-api-key",
+    "credential_fields": [
+      {
+        "name": "api_key",
+        "label": "API key",
+        "secret": true,
+        "required": true
+      }
+    ],
+    "steps": [
+      {
+        "id": "create_account",
+        "title": "Create or sign in to the provider account",
+        "description": "Open the provider account page and complete signup or sign in."
+      }
+    ]
+  }
+}
+```
 
 Run the strict audit before merging manifest changes:
 
@@ -140,3 +172,27 @@ Run the strict audit before merging manifest changes:
 cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict
 ```
+
+## Account setup automation metadata
+
+Credential-gated manifests may include an `account_setup.automation` object used by the Access settings page experimental guided setup trigger. The object is metadata only unless a provider-specific runtime explicitly implements a guided session.
+
+Required fields:
+
+```json
+{
+  "support": "agent_assisted",
+  "signup_url": "https://provider.example/signup",
+  "developer_portal_url": "https://provider.example/dashboard",
+  "docs_url": "https://provider.example/docs",
+  "required_fields": [],
+  "user_action_notes": [],
+  "safety_notes": [],
+  "experimental": true,
+  "experimental_label": "Experimental guided setup"
+}
+```
+
+`support` must be one of `manual_only`, `guided_playwright`, `agent_assisted`, or `unsupported`. The metadata must never request or describe storage for provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials. Use `safety_notes` to state provider-specific boundaries such as Google Maps billing/project setup, and use `user_action_notes` to explain where the user must complete provider-controlled steps.
+
+All experimental guided setup flows must degrade to manual instructions and official provider links when automation is unavailable, blocked, or unreliable.

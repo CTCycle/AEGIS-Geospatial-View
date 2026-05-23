@@ -1,8 +1,7 @@
 <div class="settings-page">
   <header class="settings-page__header">
     <div class="settings-page__heading">
-      <h1>Model Settings</h1>
-      <p>Configure active providers and assign dedicated parser, agent, and chat models.</p>
+      <p>Select AEGIS models across cloud providers and local Ollama, then assign parser, chat, and agent duties.</p>
     </div>
     <div class="settings-page__header-actions">
       <app-settings-icon-action
@@ -27,6 +26,15 @@
   </header>
 
   <div class="settings-page__content">
+    @if (unavailableAssignedOllamaModels.length > 0) {
+      <section class="settings-page__warning" role="alert">
+        <strong>Assigned local model unavailable.</strong>
+        <span>
+          {{ unavailableAssignedOllamaModels.join(', ') }} {{ unavailableAssignedOllamaModels.length === 1 ? 'is' : 'are' }}
+          selected but not installed in Ollama. Pull the model or assign an installed local model before using the workspace.
+        </span>
+      </section>
+    }
     <div class="settings-page__layout">
       <section class="settings-page__left-column">
         <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
@@ -38,12 +46,6 @@
               <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
             </div>
 
-            @if (providerFilter === 'ollama') {
-              <label class="settings-page__local-filter">
-                <input type="checkbox" [checked]="showLocalOnly" (change)="onLocalOnlyChange($event)" />
-                <span>Select all available</span>
-              </label>
-            }
           </div>
 
           <div class="settings-page__controls-right">
@@ -74,36 +76,26 @@
               <p>Adjust the provider tabs or search query to show available models.</p>
             </section>
           } @else {
-            @for (provider of providerKeys; track provider) {
+            @for (provider of providerKeys; track trackProviderGroup(provider)) {
               <section class="model-grid-provider">
                 @if (providerKeys.length > 1) {
                   <header class="model-grid-provider__separator">
                     <span></span>
-                    <p>{{ provider }}</p>
+                    <p>{{ providerLabel(provider) }}</p>
                   </header>
                 }
                 <div class="model-grid">
                   @for (model of groupedDisplayedModels[provider]; track model.provider + ':' + model.id) {
-                    <article class="model-card" [class.model-card--local]="localModelIds.has(model.id)">
-                      <header>
-                        <h3>{{ model.name }}</h3>
-                        @if (model.provider === 'ollama' && !localModelIds.has(model.id)) {
-                          <button type="button" class="model-card__pull" (click)="pullLocalModel(model)" [attr.aria-label]="'Pull ' + model.name" title="Pull model">
-                            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
-                              <path d="M12 3.5a1 1 0 0 1 1 1v8l2.7-2.7a1 1 0 1 1 1.4 1.4l-4.4 4.4a1 1 0 0 1-1.4 0l-4.4-4.4a1 1 0 0 1 1.4-1.4L11 12.5v-8a1 1 0 0 1 1-1zm-6 14h12a1 1 0 1 1 0 2H6a1 1 0 1 1 0-2z" fill="currentColor" />
-                            </svg>
-                          </button>
-                        }
-                      </header>
-
-                      <p>{{ model.description }}</p>
-
-                      <app-model-role-actions
-                        [model]="model"
-                        [settings]="settings"
-                        (selectRole)="applyModelSelection($event, model)"
-                      ></app-model-role-actions>
-                    </article>
+                    <article
+                      appModelCard
+                      [model]="model"
+                      [settings]="settings"
+                      [description]="modelDescription(model)"
+                      [isLocal]="localModelIds.has(model.id)"
+                      [requiresPull]="requiresPull(model)"
+                      (roleSelected)="onModelRoleSelected($event, model)"
+                      (pullRequested)="pullLocalModel($event)"
+                    ></article>
                   }
                 </div>
               </section>

@@ -17,6 +17,12 @@ from server.services.geospatial.providers.http import (
     fetch_bytes_url,
 )
 
+gtfs_realtime_pb2: Any | None
+try:
+    from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]
+except ImportError:
+    gtfs_realtime_pb2 = None
+
 
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"
@@ -73,7 +79,9 @@ class GTFSRealtimeProvider(GeospatialProvider):
             return payload
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and isinstance(
+                cached.value, dict
+            ):
                 stale_payload = dict(cached.value)
                 stale_payload["stale"] = True
                 stale_payload.setdefault("warnings", []).append(
@@ -85,12 +93,10 @@ class GTFSRealtimeProvider(GeospatialProvider):
     def _parse_protobuf(
         self, feed_bytes: bytes, *, request: ProviderRequest | None = None
     ) -> dict[str, Any]:
-        try:
-            from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]
-        except ImportError as exc:
+        if gtfs_realtime_pb2 is None:
             raise ProviderUnavailableError(
                 "GTFS Realtime protobuf parser is unavailable; install gtfs-realtime-bindings."
-            ) from exc
+            )
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(feed_bytes)
         entities: list[dict[str, Any]] = []
@@ -144,9 +150,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
         )
         return {
             "renderingMode": "clustered-points",
-            "vehicles": [
-                self._vehicle_feature(vehicle) for vehicle in vehicles
-            ]
+            "vehicles": [self._vehicle_feature(vehicle) for vehicle in vehicles]
             if vehicle_rendering_allowed
             else [],
             "alerts": alerts,
@@ -164,7 +168,9 @@ class GTFSRealtimeProvider(GeospatialProvider):
         }
 
     def _vehicle_feature(self, vehicle: dict[str, Any]) -> dict[str, Any]:
-        position = vehicle.get("position") if isinstance(vehicle.get("position"), dict) else {}
+        position = (
+            vehicle.get("position") if isinstance(vehicle.get("position"), dict) else {}
+        )
         return {
             "id": vehicle.get("id") or vehicle.get("vehicleId") or vehicle.get("label"),
             "tripId": vehicle.get("tripId"),

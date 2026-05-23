@@ -269,6 +269,7 @@ def test_location_search_orchestrator_adds_bbox_to_live_feature_endpoints() -> N
     assert str(webcams["url"]).startswith("/api/geospatial/cameras?")
     assert "provider=windy_webcams" in str(webcams["url"])
     assert "bbox=" in str(webcams["url"])
+    assert any("WINDY_WEBCAMS_API_KEY" in warning for warning in session.compliance_warnings)
 
 
 def test_location_search_orchestrator_warns_on_rainviewer_fallback(monkeypatch) -> None:

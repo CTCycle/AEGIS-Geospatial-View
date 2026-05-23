@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from urllib.parse import urlencode
 
+from server.domain.geographics import ProviderCredentialValidationResult
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,
+    ProviderError,
     ProviderRequest,
     ProviderResponse,
 )
@@ -58,6 +61,48 @@ class TomTomProvider(GeospatialProvider):
                 "credentialPolicy": "server-side-only",
             },
             attribution=["TomTom"],
+        )
+
+    async def validate_credentials(
+        self, credentials: Mapping[str, str]
+    ) -> ProviderCredentialValidationResult:
+        api_key = credentials.get("api_key", "").strip()
+        if not api_key:
+            return ProviderCredentialValidationResult(
+                provider_id=self.provider_id,
+                valid=False,
+                status="invalid",
+                message="TomTom API key is required.",
+            )
+        request = ProviderRequest(
+            capability_id="tomtom_incidents",
+            bbox=(-0.2, 51.45, -0.1, 51.55),
+            params={"incidents": True},
+        )
+        try:
+            payload = await call_json_fetcher(
+                self.fetcher, _build_incidents_url(request, api_key)
+            )
+            _normalize_incidents(payload)
+        except ProviderAuthError:
+            return ProviderCredentialValidationResult(
+                provider_id=self.provider_id,
+                valid=False,
+                status="invalid",
+                message="TomTom rejected the supplied API key.",
+            )
+        except ProviderError:
+            return ProviderCredentialValidationResult(
+                provider_id=self.provider_id,
+                valid=False,
+                status="error",
+                message="TomTom validation request failed.",
+            )
+        return ProviderCredentialValidationResult(
+            provider_id=self.provider_id,
+            valid=True,
+            status="valid",
+            message="TomTom accepted the supplied API key.",
         )
 
 

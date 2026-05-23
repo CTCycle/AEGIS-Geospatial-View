@@ -1,15 +1,17 @@
 <section class="layer-catalog">
   <div class="layer-catalog__toolbar">
     <input
+      #searchInput
       type="search"
       aria-label="Search layers"
       [value]="searchText"
-      (input)="setSearchText($any($event.target).value)"
+      (input)="onSearchInput(searchInput.value)"
     >
     <select
+      #categorySelect
       aria-label="Layer category"
       [value]="selectedCategory"
-      (change)="setCategory($any($event.target).value)"
+      (change)="onCategoryChange(categorySelect.value)"
     >
       @for (category of categories; track category) {
         <option [value]="category">{{ category }}</option>

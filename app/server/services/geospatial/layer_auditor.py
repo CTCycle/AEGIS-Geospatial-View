@@ -7,12 +7,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from server.common.constants import PROJECT_DIR
 from server.domain.geographics import (
+    CapabilityImplementationStatus,
     CapabilityKind,
     CapabilityManifestV2,
+    LayerAuditIssue,
+    LayerAuditReport,
     ProviderAuthType,
     RenderingMode,
 )
@@ -68,53 +71,6 @@ CLIENT_RENDERING_MODES = {
 PROVIDER_SOURCE_ALIASES = {
     "gibs": "nasa_gibs",
 }
-
-
-class LayerAuditIssue(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    path: str
-    manifest_id: str | None = None
-    severity: str
-    message: str
-
-
-class CapabilityImplementationStatus(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    capability_id: str
-    provider_id: str
-    schema_valid: bool = True
-    runtime_registered: bool
-    provider_fetch_implemented: bool
-    normalizer_implemented: bool
-    cache_implemented: bool
-    api_endpoint_covered: bool
-    client_renderer_covered: bool
-    unit_tested: bool
-    visual_tested: bool
-    placeholder_statuses: list[str] = Field(default_factory=list)
-
-
-class LayerAuditReport(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    manifest_count: int = 0
-    error_count: int = 0
-    warning_count: int = 0
-    schema_coverage: dict[str, int] = Field(default_factory=dict)
-    provider_coverage: dict[str, int] = Field(default_factory=dict)
-    renderer_coverage: dict[str, int] = Field(default_factory=dict)
-    auth_coverage: dict[str, int] = Field(default_factory=dict)
-    source_doc_coverage: dict[str, int] = Field(default_factory=dict)
-    issues: list[LayerAuditIssue] = Field(default_factory=list)
-    implementation_statuses: list[CapabilityImplementationStatus] = Field(
-        default_factory=list
-    )
-
-    @property
-    def ok(self) -> bool:
-        return self.error_count == 0
 
 
 def _read_json(path: Path) -> JsonDict:

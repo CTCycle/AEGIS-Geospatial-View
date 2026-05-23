@@ -22,6 +22,8 @@ import {
   ChatTurnResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
+  GeospatialProviderAccountSetup,
+  GeospatialProviderAccountSetupListResponse,
   GeospatialProviderPayload,
   JsonValue,
   LocationSearchRequest,
@@ -154,6 +156,90 @@ export const normalizeCapabilities = (input: unknown): CatalogResponse['capabili
     metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
   }));
 
+
+interface GeospatialProviderSignupFieldDto {
+  key?: unknown;
+  label?: unknown;
+  field_type?: unknown;
+  required?: unknown;
+  sensitive?: unknown;
+  help_text?: unknown;
+}
+
+interface GeospatialProviderSignupAutomationDto {
+  support?: unknown;
+  signup_url?: unknown;
+  developer_portal_url?: unknown;
+  docs_url?: unknown;
+  required_fields?: unknown;
+  user_action_notes?: unknown;
+  safety_notes?: unknown;
+  experimental?: unknown;
+  experimental_label?: unknown;
+}
+
+interface GeospatialProviderAccountSetupDto {
+  provider_id?: unknown;
+  name?: unknown;
+  requires_credentials?: unknown;
+  auth_mode?: unknown;
+  docs_url?: unknown;
+  environment_variable?: unknown;
+  configured?: unknown;
+  instructions?: unknown;
+  automation?: unknown;
+  credential_storage_key?: unknown;
+  credential_label?: unknown;
+  key_format_hint?: unknown;
+  validation_supported?: unknown;
+}
+
+export const mapGeospatialProviderSignupField = (dto: GeospatialProviderSignupFieldDto): GeospatialProviderAccountSetup['automation']['requiredFields'][number] => ({
+  key: String(dto.key ?? ''),
+  label: String(dto.label ?? dto.key ?? ''),
+  fieldType: dto.field_type === 'email' || dto.field_type === 'textarea' || dto.field_type === 'select' ? dto.field_type : 'text',
+  required: dto.required !== false,
+  sensitive: Boolean(dto.sensitive),
+  helpText: typeof dto.help_text === 'string' ? dto.help_text : null,
+});
+
+export const mapGeospatialProviderSignupAutomation = (dto: GeospatialProviderSignupAutomationDto): GeospatialProviderAccountSetup['automation'] => ({
+  support: dto.support === 'guided_playwright' || dto.support === 'agent_assisted' || dto.support === 'unsupported' ? dto.support : 'manual_only',
+  signupUrl: typeof dto.signup_url === 'string' ? dto.signup_url : null,
+  developerPortalUrl: typeof dto.developer_portal_url === 'string' ? dto.developer_portal_url : null,
+  docsUrl: typeof dto.docs_url === 'string' ? dto.docs_url : null,
+  requiredFields: Array.isArray(dto.required_fields)
+    ? dto.required_fields.filter((item): item is GeospatialProviderSignupFieldDto => isRecord(item)).map(mapGeospatialProviderSignupField).filter((field) => !field.sensitive)
+    : [],
+  userActionNotes: isStringArray(dto.user_action_notes) ? dto.user_action_notes : [],
+  safetyNotes: isStringArray(dto.safety_notes) ? dto.safety_notes : [],
+  experimental: dto.experimental !== false,
+  experimentalLabel: typeof dto.experimental_label === 'string' ? dto.experimental_label : 'Experimental guided setup',
+});
+
+export const mapGeospatialProviderAccountSetup = (dto: GeospatialProviderAccountSetupDto): GeospatialProviderAccountSetup => ({
+  providerId: String(dto.provider_id ?? ''),
+  name: String(dto.name ?? dto.provider_id ?? ''),
+  requiresCredentials: Boolean(dto.requires_credentials),
+  authMode: String(dto.auth_mode ?? 'api-key'),
+  docsUrl: typeof dto.docs_url === 'string' ? dto.docs_url : null,
+  environmentVariable: typeof dto.environment_variable === 'string' ? dto.environment_variable : null,
+  configured: Boolean(dto.configured),
+  instructions: isStringArray(dto.instructions) ? dto.instructions : [],
+  automation: mapGeospatialProviderSignupAutomation(isRecord(dto.automation) ? dto.automation : {}),
+  credentialStorageKey: String(dto.credential_storage_key ?? dto.provider_id ?? ''),
+  credentialLabel: String(dto.credential_label ?? 'api_key'),
+  keyFormatHint: typeof dto.key_format_hint === 'string' ? dto.key_format_hint : null,
+  validationSupported: Boolean(dto.validation_supported),
+});
+
+export const parseGeospatialProviderAccountSetups = (value: unknown): GeospatialProviderAccountSetupListResponse => {
+  const providers = isRecord(value) && Array.isArray(value.providers)
+    ? value.providers.filter((item): item is GeospatialProviderAccountSetupDto => isRecord(item)).map(mapGeospatialProviderAccountSetup)
+    : [];
+  return { providers };
+};
+
 export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usage'] => {
   if (!isRecord(input)) {
     return undefined;
@@ -170,15 +256,22 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
 
 export const buildModelDescription = (item: Record<string, unknown>): string => {
   const rawDescription = String(item.description ?? '').trim();
-  if (rawDescription && !rawDescription.toLowerCase().startsWith('local ollama model ')) {
-    return rawDescription;
-  }
   const metadata = isRecord(item.metadata) ? item.metadata : {};
   const family = typeof metadata.family === 'string' ? metadata.family : '';
   const parameterSize = typeof metadata.parameter_size === 'string' ? metadata.parameter_size : '';
   const quantization = typeof metadata.quantization_level === 'string' ? metadata.quantization_level : '';
   const details = [family, parameterSize, quantization].filter(Boolean).join(' ');
-  return details ? `Optimized for ${details}.` : rawDescription || 'General purpose local model.';
+  const technicalDescription = [family, parameterSize, quantization].filter(Boolean).join(' | ').toLowerCase();
+  const normalizedDescription = rawDescription.toLowerCase();
+  if (
+    rawDescription
+    && normalizedDescription !== 'local'
+    && normalizedDescription !== technicalDescription
+    && !normalizedDescription.startsWith('local ollama model ')
+  ) {
+    return rawDescription;
+  }
+  return details ? `Optimized for ${details}.` : 'General purpose local model.';
 };
 
 export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
@@ -416,6 +509,12 @@ export const fetchGeospatialCredentialStatus = async (providerId: string): Promi
     configured: Boolean(data.configured),
     environmentVariable: typeof data.environmentVariable === 'string' ? data.environmentVariable : null,
   };
+};
+
+
+export const fetchGeospatialProviderAccountSetups = async (): Promise<GeospatialProviderAccountSetupListResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}/geospatial/providers/account-setup`, { method: 'GET' });
+  return parseGeospatialProviderAccountSetups(data);
 };
 
 export const runGeospatialAudit = async (): Promise<GenericObjectResponse> => {

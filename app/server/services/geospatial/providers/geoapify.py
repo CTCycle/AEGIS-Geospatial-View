@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from urllib.parse import urlencode
+from collections.abc import Mapping
 
+from server.domain.geographics import ProviderCredentialValidationResult
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.normalizers import (
     NormalizationError,
@@ -11,6 +13,7 @@ from server.services.geospatial.normalizers import (
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,
+    ProviderError,
     ProviderRequest,
     ProviderResponse,
 )
@@ -86,6 +89,46 @@ class GeoapifyProvider(GeospatialProvider):
                 "credentialPolicy": "server-side-only",
             },
             attribution=["Geoapify, OpenStreetMap contributors"],
+        )
+
+    async def validate_credentials(
+        self, credentials: Mapping[str, str]
+    ) -> ProviderCredentialValidationResult:
+        api_key = credentials.get("api_key", "").strip()
+        if not api_key:
+            return ProviderCredentialValidationResult(
+                provider_id=self.provider_id,
+                valid=False,
+                status="invalid",
+                message="Geoapify API key is required.",
+            )
+        request = ProviderRequest(
+            capability_id="geoapify_amenities",
+            bbox=(-0.2, 51.45, -0.1, 51.55),
+            params={"live": True, "limit": 1, "categories": "amenity"},
+        )
+        try:
+            payload = await call_json_fetcher(self.fetcher, _build_places_url(request, api_key))
+            _normalize_places_payload(payload)
+        except ProviderAuthError:
+            return ProviderCredentialValidationResult(
+                provider_id=self.provider_id,
+                valid=False,
+                status="invalid",
+                message="Geoapify rejected the supplied API key.",
+            )
+        except ProviderError:
+            return ProviderCredentialValidationResult(
+                provider_id=self.provider_id,
+                valid=False,
+                status="error",
+                message="Geoapify validation request failed.",
+            )
+        return ProviderCredentialValidationResult(
+            provider_id=self.provider_id,
+            valid=True,
+            status="valid",
+            message="Geoapify accepted the supplied API key.",
         )
 
 

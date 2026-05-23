@@ -112,3 +112,16 @@ def test_parser_runtime_failure_message_is_actionable() -> None:
         ambiguities = ["parser_unavailable"]
 
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
+
+
+def test_general_question_can_answer_previous_user_request() -> None:
+    message = AgentOrchestrator._compose_general_question_message(
+        "What did I just ask?",
+        [
+            {"role": "user", "content": "Show me Rome"},
+            {"role": "assistant", "content": "Map ready for Rome."},
+            {"role": "user", "content": "What did I just ask?"},
+        ],
+    )
+
+    assert message == "You just asked: Show me Rome"

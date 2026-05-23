@@ -8,6 +8,7 @@ import {
   fetchGeospatialCameras,
   fetchGeospatialCapabilities,
   fetchGeospatialCredentialStatus,
+  fetchGeospatialProviderAccountSetups,
   fetchGeospatialLayerFeatures,
   fetchGeospatialLayers,
   pullOllamaModel,
@@ -21,6 +22,7 @@ import {
   ChatTurnResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
+  GeospatialProviderAccountSetupListResponse,
   GeospatialProviderPayload,
   ModelCardDescriptor,
   ModelSettingsResponse,
@@ -57,6 +59,10 @@ export class ApiClientService {
 
   fetchGeospatialCredentialStatus(providerId: string): Promise<GeospatialCredentialStatus> {
     return fetchGeospatialCredentialStatus(providerId);
+  }
+
+  fetchGeospatialProviderAccountSetups(): Promise<GeospatialProviderAccountSetupListResponse> {
+    return fetchGeospatialProviderAccountSetups();
   }
 
   sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnResponse> {

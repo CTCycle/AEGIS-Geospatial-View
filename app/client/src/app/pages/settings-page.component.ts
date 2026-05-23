@@ -3,7 +3,7 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { ModelRoleActionsComponent } from '../components/model-role-actions.component';
+import { ModelCardComponent } from '../components/model-card.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
@@ -12,6 +12,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
 import {
   ModelRole,
+  SelectedModelStat,
   buildModelSelectionPayload,
   buildSelectedModelStats,
 } from '../core/model-selection';
@@ -30,7 +31,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
   imports: [
     CommonModule,
     FormsModule,
-    ModelRoleActionsComponent,
+    ModelCardComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
     ModelStatsPanelComponent,
@@ -75,7 +76,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   keyValidationErrors: { openai?: string; google?: string } = {};
 
   providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
-  showLocalOnly = false;
   private isDestroyed = false;
 
   constructor(
@@ -109,23 +109,21 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get displayedModels(): ModelCardDescriptor[] {
-    const localModelIds = new Set(this.localModels.map((item) => item.id));
-
     const source = (() => {
       if (this.providerFilter === 'all') {
-        return [...this.cloudModels];
+        return this.mergeModelLists(this.localModels, this.cloudModels);
       }
       if (this.providerFilter === 'ollama') {
-        return [...this.cloudModels.filter((model) => model.provider === 'ollama')];
+        return this.mergeModelLists(
+          this.localModels,
+          this.cloudModels.filter((model) => model.provider === 'ollama'),
+        );
       }
       return this.cloudModels.filter((model) => model.provider === this.providerFilter);
     })();
 
     const query = this.searchText.trim().toLowerCase();
     return source.filter((model) => {
-      if (this.providerFilter === 'ollama' && this.showLocalOnly && !localModelIds.has(model.id)) {
-        return false;
-      }
       if (!query) {
         return true;
       }
@@ -137,7 +135,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get groupedDisplayedModels(): Record<string, ModelCardDescriptor[]> {
     return this.displayedModels.reduce<Record<string, ModelCardDescriptor[]>>((acc, model) => {
-      const key = model.provider.toLowerCase();
+      const key = model.provider === 'ollama'
+        ? (this.localModelIds.has(model.id) ? 'ollama-installed' : 'ollama-library')
+        : model.provider.toLowerCase();
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -150,6 +150,20 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return Object.keys(this.groupedDisplayedModels);
   }
 
+  providerLabel(providerKey: string): string {
+    if (providerKey === 'ollama-installed') {
+      return 'ollama · installed';
+    }
+    if (providerKey === 'ollama-library') {
+      return 'ollama · available to pull';
+    }
+    return providerKey;
+  }
+
+  trackProviderGroup(provider: string): string {
+    return provider;
+  }
+
   get hasDisplayedModels(): boolean {
     return this.displayedModels.length > 0;
   }
@@ -158,8 +172,17 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return new Set(this.localModels.map((item) => item.id));
   }
 
-  get selectedModelStats(): Array<{ model: string; provider: string; local: boolean; assignedRoles: string[] }> {
+  get selectedModelStats(): SelectedModelStat[] {
     return buildSelectedModelStats(this.settings, this.localModelIds);
+  }
+
+  get unavailableAssignedOllamaModels(): string[] {
+    const assignedModels = [
+      this.settings.parser_model_provider === 'ollama' ? this.settings.parser_model_name : '',
+      this.settings.chat_model_provider === 'ollama' ? this.settings.chat_model_name : '',
+      this.settings.agent_model_provider === 'ollama' ? this.settings.agent_model_name : '',
+    ].filter(Boolean);
+    return [...new Set(assignedModels.filter((model) => !this.localModelIds.has(model)))];
   }
 
   get visibleStatusText(): string {
@@ -181,22 +204,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google'): void {
     this.providerFilter = filter;
-    if (filter !== 'ollama') {
-      this.showLocalOnly = false;
-    }
     this.syncState();
   }
 
-  setShowLocalOnly(checked: boolean): void {
-    this.showLocalOnly = checked;
-  }
-
-  onLocalOnlyChange(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    this.setShowLocalOnly(Boolean(target?.checked));
-  }
-
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
+    if (model.provider === 'ollama' && !this.localModelIds.has(model.id)) {
+      const pulled = await this.pullLocalModel(model);
+      if (!pulled || !this.localModelIds.has(model.id)) {
+        return;
+      }
+    }
     const payload = buildModelSelectionPayload(this.settings, role, model);
     try {
       const updated = await this.saveModelSettings(payload);
@@ -292,16 +309,22 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  async pullLocalModel(model: ModelCardDescriptor): Promise<void> {
+  async pullLocalModel(model: ModelCardDescriptor): Promise<boolean> {
     try {
       await this.apiClient.pullOllamaModel(model.name);
       await this.apiClient.refreshOllamaModels();
       await this.loadData();
       this.statusText = `Pulled ${model.name}`;
       this.syncState();
+      return true;
     } catch (error: unknown) {
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not pull ${model.name}.`);
+      return false;
     }
+  }
+
+  onModelRoleSelected(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
+    return this.applyModelSelection(role, model);
   }
 
   closeModal(): void {
@@ -338,6 +361,21 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.credentialHealth('google');
   }
 
+  requiresPull(model: ModelCardDescriptor): boolean {
+    return model.provider === 'ollama' && !this.localModelIds.has(model.id);
+  }
+
+  modelDescription(model: ModelCardDescriptor): string {
+    const description = model.description.trim();
+    if (description && description.toLowerCase() !== 'local') {
+      return description;
+    }
+    if (model.provider === 'ollama') {
+      return `Installed Ollama model available for parser, chat, and agent duties. ${this.modelDetails(model)}`;
+    }
+    return description || 'Model available for assignment.';
+  }
+
   private credentialHealth(provider: 'openai' | 'google'): string | null {
     const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
     if (!configured) {
@@ -366,6 +404,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async loadData(): Promise<void> {
     this.isLoadingModels = true;
+    this.statusText = 'Loading model settings';
+    this.syncState();
     try {
       const [nextSettings, modelLibrary] = await Promise.all([
         this.apiClient.fetchChatSettings(),
@@ -378,7 +418,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.cloudModels = modelLibrary.cloud;
-      this.localModels = modelLibrary.local;
+      this.localModels = modelLibrary.local.map((model) => this.enrichInstalledOllamaModel(model, modelLibrary.cloud));
+      this.statusText = 'Ready';
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
@@ -425,6 +466,76 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async saveModelSettings(payload: ModelSettingsUpdateRequest): Promise<ModelSettingsResponse> {
     return this.apiClient.updateChatSettings(payload);
+  }
+
+  private mergeModelLists(...groups: ModelCardDescriptor[][]): ModelCardDescriptor[] {
+    const models = new Map<string, ModelCardDescriptor>();
+    groups.flat().forEach((model) => {
+      const key = `${model.provider}:${model.id}`;
+      const current = models.get(key);
+      models.set(key, current ? this.mergeModelCard(current, model) : model);
+    });
+    return [...models.values()];
+  }
+
+  private mergeModelCard(current: ModelCardDescriptor, next: ModelCardDescriptor): ModelCardDescriptor {
+    const currentDescription = current.description.trim();
+    const nextDescription = next.description.trim();
+    const richerDescription = nextDescription.length > currentDescription.length ? nextDescription : currentDescription;
+    return {
+      ...current,
+      ...next,
+      description: richerDescription || current.description || next.description,
+      capabilities: next.capabilities.length ? next.capabilities : current.capabilities,
+      metadata: { ...current.metadata, ...next.metadata },
+    };
+  }
+
+  private enrichInstalledOllamaModel(model: ModelCardDescriptor, library: ModelCardDescriptor[]): ModelCardDescriptor {
+    if (model.provider !== 'ollama') {
+      return model;
+    }
+    const libraryMatch = this.findOllamaLibraryMatch(model, library);
+    if (!libraryMatch) {
+      return model;
+    }
+    return {
+      ...model,
+      description: libraryMatch.description,
+      metadata: { ...libraryMatch.metadata, ...model.metadata },
+      capabilities: model.capabilities.length ? model.capabilities : libraryMatch.capabilities,
+    };
+  }
+
+  private findOllamaLibraryMatch(model: ModelCardDescriptor, library: ModelCardDescriptor[]): ModelCardDescriptor | undefined {
+    const modelKeys = new Set([
+      model.id.toLowerCase(),
+      model.name.toLowerCase(),
+      this.baseModelName(model.id),
+      this.baseModelName(model.name),
+      String(model.metadata['family'] ?? '').toLowerCase(),
+    ].filter(Boolean));
+    return library.find((candidate) => (
+      candidate.provider === 'ollama'
+      && (
+        modelKeys.has(candidate.id.toLowerCase())
+        || modelKeys.has(candidate.name.toLowerCase())
+        || modelKeys.has(this.baseModelName(candidate.id))
+        || modelKeys.has(this.baseModelName(candidate.name))
+      )
+    ));
+  }
+
+  private baseModelName(value: string): string {
+    return value.toLowerCase().split('/').pop()?.split(':')[0] ?? '';
+  }
+
+  private modelDetails(model: ModelCardDescriptor): string {
+    const details = String(model.metadata['details'] ?? '').trim();
+    if (details) {
+      return details;
+    }
+    return model.name;
   }
 
   private settingsUpdateBase(): ModelSettingsUpdateRequest {

@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { MapPreviewComponent } from '../components/map-preview.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
+import { LocalCommandService } from '../core/local-command.service';
 import { PersistedChatPageState } from '../core/app-state';
 import {
   MapSession,
@@ -15,7 +16,6 @@ import {
   ChatTurnResponse,
   ContextUsage,
 } from '../core/types';
-import { formatCapabilitySummary } from '../core/local-command-response';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 
@@ -63,6 +63,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     private readonly router: Router,
     private readonly apiClient: ApiClientService,
     private readonly appStateStore: AppStateStoreService,
+    private readonly localCommandService: LocalCommandService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
   ) {
@@ -312,65 +313,23 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   }
 
   private async tryHandleLocalCommand(message: string): Promise<boolean> {
-    const normalized = message.trim().toLowerCase();
-    const zoomInPattern = /^(zoom\s*in|map\s*zoom\s*in|increase\s+zoom)$/i;
-    const zoomOutPattern = /^(zoom\s*out|map\s*zoom\s*out|decrease\s+zoom)$/i;
-    if (zoomInPattern.test(message.trim()) || zoomOutPattern.test(message.trim())) {
-      const isZoomIn = zoomInPattern.test(message.trim());
-      const ok = isZoomIn ? this.mapPreview?.zoomIn() : this.mapPreview?.zoomOut();
-      const reply = ok
-        ? `Map ${isZoomIn ? 'zoomed in' : 'zoomed out'}.`
-        : 'No active interactive map is available to zoom yet.';
-      this.messages = [...this.messages, { role: 'user', content: message }, { role: 'assistant', content: reply }];
-      this.composerDraft = '';
-      this.status = ok ? 'Complete' : 'Need map session';
-      this.syncState();
-      queueMicrotask(() => this.scrollTranscriptToBottom());
-      return true;
+    const result = await this.localCommandService.resolve(message, {
+      zoomIn: () => this.mapPreview?.zoomIn() ?? false,
+      zoomOut: () => this.mapPreview?.zoomOut() ?? false,
+    });
+    if (!result.handled) {
+      return false;
     }
 
-    if (
-      normalized.includes('what can you do')
-      || normalized.includes('your capabilities')
-      || normalized.includes('available layers')
-      || normalized.includes('map types')
-    ) {
-      this.messages = [...this.messages, { role: 'user', content: message }];
-      this.composerDraft = '';
-      this.isLoading = true;
-      this.status = 'Loading capabilities';
-      this.syncState();
-      try {
-        const catalog = await this.apiClient.fetchCatalog();
-        const optional = catalog.capabilities
-          .filter((item) => item.requires_credentials)
-          .map((item) => item.name);
-        const sampleBasemaps = (catalog.basemaps ?? []).slice(0, 4).map((item) => item.name).join(', ');
-        const sampleOverlays = (catalog.overlays ?? []).slice(0, 6).map((item) => item.name).join(', ');
-        const optionalText = optional.length
-          ? ` Optional key-based capabilities include ${optional.slice(0, 6).join(', ')}${optional.length > 6 ? ', and more' : ''}; configure those from Access.`
-          : '';
-        const reply = [
-          `I can create location-focused map sessions, resolve coordinates, show basemaps, add thematic overlays, run weather, air-quality, POI, and coordinate tools, and adjust the active map with lightweight zoom commands.`,
-          formatCapabilitySummary(catalog),
-          sampleBasemaps ? `Map types include ${sampleBasemaps}.` : '',
-          sampleOverlays ? `Layers include ${sampleOverlays}.` : '',
-          `The default workflow uses free/open sources; ask for a place plus a goal, such as satellite context, precipitation, air quality, POIs, terrain, or solar potential.${optionalText}`,
-        ].filter(Boolean).join(' ');
-        this.messages = [...this.messages, { role: 'assistant', content: reply }];
-        this.status = 'Complete';
-      } catch {
-        this.messages = [...this.messages, { role: 'assistant', content: 'I can explain map types, layers, direct tools, access requirements, and how to use them, but the live catalog is unavailable right now.' }];
-        this.status = 'Failed';
-      } finally {
-        this.isLoading = false;
-        this.syncState();
-        queueMicrotask(() => this.scrollTranscriptToBottom());
-      }
-      return true;
+    this.messages = [...this.messages, { role: 'user', content: message }];
+    if (result.assistantMessage) {
+      this.messages = [...this.messages, { role: 'assistant', content: result.assistantMessage }];
     }
-
-    return false;
+    this.composerDraft = '';
+    this.status = result.status ?? 'Complete';
+    this.syncState();
+    queueMicrotask(() => this.scrollTranscriptToBottom());
+    return true;
   }
 
   private handleMapSession(mapSession: MapSession | undefined): void {
