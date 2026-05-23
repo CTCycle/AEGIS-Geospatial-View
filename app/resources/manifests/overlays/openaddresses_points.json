@@ -20,7 +20,7 @@
       "geocode",
       "openaddresses"
     ],
-    "intent_tags": [
+    "action_tags": [
       "address",
       "geocoding",
       "parcel context"
@@ -66,7 +66,7 @@
       "geocode",
       "openaddresses"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "address search",
       "geocoding"
     ],

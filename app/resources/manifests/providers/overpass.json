@@ -20,7 +20,7 @@
       "poi",
       "features"
     ],
-    "intent_tags": [
+    "action_tags": [
       "poi",
       "osm features"
     ],
@@ -89,7 +89,7 @@
       "osm",
       "features"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

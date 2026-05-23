@@ -1,11 +1,11 @@
 # Project Overview
 
-Last updated: 2026-05-17
+Last updated: 2026-05-23
 
 ## FILES INDEX
 
 - AGENTIC_SEARCH.md  
-  Contract-first chat orchestration architecture (parser -> policy -> execution), decision states, and capability/runtime enforcement.
+  Action-aware chat orchestration architecture, provider-native tool calling, overlay tools, and internal agent responsibilities.
 
 - API_ACCESS_AND_ACCOUNT_SETUP.md  
   Account setup, credential configuration, API key handling, quotas, restrictions, and official links for all external geospatial data providers.
@@ -59,7 +59,13 @@ Last updated: 2026-05-17
 - Keep affected docs synchronized with code changes; update docs in the same change set when behavior changes.
 - Include a `Last updated: YYYY-MM-DD` line whenever a document is modified.
 - Do not read all `SKILL.md` files by default.
-- Pre-select relevant docs based on folder structure (`app/server`, `app/client`, `app/tests`, `release`) and explicit user intent.
+- Pre-select relevant docs based on folder structure (`app/server`, `app/client`, `app/tests`, `release`) and explicit user request.
+
+## ARCHITECTURE NOTE
+
+- The chat interface delegates map-aware requests to an action-aware agent pipeline.
+- Action routing, map rendering, overlay resolution, external data fusion, and final chat response are separate internal service responsibilities.
+- Capability manifests remain the source of truth for geospatial overlays and generated agent tools.
 
 ## ENVIRONMENT RULES
 

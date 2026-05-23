@@ -22,7 +22,7 @@
     "map_type_tags": [
       "terrain"
     ],
-    "intent_tags": [
+    "action_tags": [
       "elevation_analysis",
       "outdoor_planning"
     ],
@@ -99,7 +99,7 @@
       "relief",
       "topographic"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

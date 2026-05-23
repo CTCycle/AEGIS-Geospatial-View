@@ -3,12 +3,12 @@ from __future__ import annotations
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
     LocationSignal,
-    NormalizedIntent,
+    NormalizedAction,
     TurnParseResult,
 )
-from server.services.agent.manifest_intent_resolver import ManifestIntentResolver
-from server.services.agent.manifest_intent_resolver import UserCapabilityAccess
-from server.services.agent.manifest_intent_resolver import select_geospatial_capabilities
+from server.services.agent.manifest_action_resolver import ManifestActionResolver
+from server.services.agent.manifest_action_resolver import UserCapabilityAccess
+from server.services.agent.manifest_action_resolver import select_geospatial_capabilities
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
@@ -26,11 +26,11 @@ def _turn(text: str, tags: list[str]) -> TurnParseResult:
                 confidence=1.0,
             )
         ],
-        normalized_intent=NormalizedIntent(
-            intent_id="_".join(tags) or "map",
-            intent_label=text,
+        normalized_action=NormalizedAction(
+            action_id="_".join(tags) or "map",
+            action_label=text,
             task_tags=tags,
-            intent_tags=tags,
+            action_tags=tags,
             requested_visualizations=tags,
             requires_location=True,
         ),
@@ -51,7 +51,7 @@ def _resolve(tags: list[str]):
             *registry.list_tools(),
         ]
     }
-    return ManifestIntentResolver().resolve(
+    return ManifestActionResolver().resolve(
         turn=_turn(" ".join(tags), tags),
         capability_registry=registry,
         available_ids=ids,

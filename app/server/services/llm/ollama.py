@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from html.parser import HTMLParser
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -19,6 +19,8 @@ from server.services.llm.langchain_runtime import (
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMToolCall,
+    LLMToolDefinition,
     ModelDescriptor,
 )
 
@@ -171,9 +173,63 @@ class OllamaProvider(LLMProvider):
     def pull_model(self, *, model: str) -> dict[str, Any]:
         return self._post_json("/api/pull", {"name": model, "stream": False})
 
-    def chat(self, request: LLMRequest) -> LLMResult:
+    @staticmethod
+    def tool_to_ollama_schema(tool: LLMToolDefinition) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters_json_schema,
+            },
+        }
+
+    @staticmethod
+    def _parse_tool_calls(message: dict[str, Any]) -> list[LLMToolCall]:
+        calls: list[LLMToolCall] = []
+        for item in message.get("tool_calls", []) if isinstance(message, dict) else []:
+            if not isinstance(item, dict):
+                continue
+            function = item.get("function") if isinstance(item.get("function"), dict) else {}
+            calls.append(
+                LLMToolCall(
+                    id=item.get("id"),
+                    name=str(function.get("name") or item.get("name") or ""),
+                    arguments=function.get("arguments") if isinstance(function.get("arguments"), dict) else {},
+                )
+            )
+        return calls
+
+    def chat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
         usage = compute_ollama_context_usage(request)
         self.last_context_usage = usage.to_dict()
+        selected_tools = list(tools or request.tools or [])
+        schema = response_json_schema or request.response_json_schema
+        if selected_tools or schema:
+            payload: dict[str, Any] = {
+                "model": request.model,
+                "messages": request.messages,
+                "stream": False,
+                "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            }
+            if selected_tools:
+                payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in selected_tools]
+            if schema:
+                payload["format"] = schema
+            response = self._post_json("/api/chat", payload)
+            message = response.get("message") if isinstance(response.get("message"), dict) else {}
+            return LLMResult(
+                content=str(message.get("content") or ""),
+                raw=response,
+                tool_calls=self._parse_tool_calls(message),
+            )
         return invoke_chat_model(
             chat_model=self._build_chat_model(
                 model=request.model,

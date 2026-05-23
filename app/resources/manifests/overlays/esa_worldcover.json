@@ -25,7 +25,7 @@
       "esa",
       "esa worldcover"
     ],
-    "intent_tags": [
+    "action_tags": [
       "wmts",
       "land-cover"
     ],
@@ -102,7 +102,7 @@
       "esa",
       "esa worldcover"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

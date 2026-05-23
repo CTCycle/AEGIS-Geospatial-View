@@ -22,7 +22,7 @@
       "coastal",
       "flood"
     ],
-    "intent_tags": [
+    "action_tags": [
       "water",
       "coastal",
       "flood"
@@ -69,7 +69,7 @@
       "coastal",
       "flood"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "water",
       "coastal",
       "freshness"

@@ -23,7 +23,7 @@
     "map_type_tags": [
       "satellite"
     ],
-    "intent_tags": [
+    "action_tags": [
       "realistic_view",
       "context_imagery"
     ],
@@ -101,7 +101,7 @@
       "aerial",
       "photographic"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

@@ -72,7 +72,7 @@ def test_post_map_jobs_endpoint_maps_initialization_error_to_http_500() -> None:
                 "latitude": 41.9,
                 "longitude": 12.5,
             },
-            "intent_id": "air_quality",
+            "action_id": "air_quality",
             "time_mode": "current",
             "basemap_id": "osm_default",
             "overlay_ids": ["openaq_air_quality"],

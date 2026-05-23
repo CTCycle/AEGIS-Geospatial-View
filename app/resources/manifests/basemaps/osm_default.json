@@ -22,7 +22,7 @@
     "map_type_tags": [
       "street"
     ],
-    "intent_tags": [
+    "action_tags": [
       "routing",
       "address_lookup",
       "city_context"
@@ -102,7 +102,7 @@
       "addresses",
       "navigation"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

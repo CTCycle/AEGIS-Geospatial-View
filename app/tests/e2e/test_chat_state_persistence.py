@@ -193,7 +193,7 @@ def test_back_forward_between_routes_restores_both_states(
 def test_unknown_path_redirects_to_root(page: Page, base_url: str) -> None:
     page.goto(f"{base_url.rstrip('/')}/unknown-path")
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
-    expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
+    expect(page.get_by_text("Map Workspace")).to_be_visible()
 
 
 def test_duplicate_tab_isolation_rotates_owner_and_resets_state(
@@ -215,7 +215,7 @@ def test_duplicate_tab_isolation_rotates_owner_and_resets_state(
     )
     page.goto(base_url)
     expect(page.get_by_label("Chat message")).to_have_value("")
-    expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
+    expect(page.get_by_text("Map Workspace")).to_be_visible()
 
 
 def test_corrupted_session_storage_resets_to_defaults(
@@ -233,7 +233,7 @@ def test_corrupted_session_storage_resets_to_defaults(
     )
     page.goto(base_url)
     expect(page.get_by_label("Chat message")).to_have_value("")
-    expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
+    expect(page.get_by_text("Map Workspace")).to_be_visible()
 
 
 def test_expired_state_resets_to_defaults(page: Page, base_url: str) -> None:
@@ -241,7 +241,7 @@ def test_expired_state_resets_to_defaults(page: Page, base_url: str) -> None:
     _seed_persisted_state(page, _base_state(saved_at=old_timestamp), "expired-tab")
     page.goto(base_url)
     expect(page.get_by_label("Chat message")).to_have_value("")
-    expect(page.get_by_text("Enter a location-based request to begin.")).to_be_visible()
+    expect(page.get_by_text("Map Workspace")).to_be_visible()
 
 
 def test_stale_overlay_ids_are_ignored_and_notice_shown(

@@ -11,7 +11,7 @@
     "requires_key": false,
     "attribution": "Source port, airport, or aviation authority",
     "keywords": ["airport", "port", "harbor", "webcam", "camera"],
-    "intent_tags": ["airport camera", "port camera"],
+    "action_tags": ["airport camera", "port camera"],
     "task_tags": ["airport condition", "port condition"],
     "source_protocol": "source-defined JSON/HTML",
     "data_format": "template",
@@ -31,7 +31,7 @@
   "sourceOfficialDocs": ["https://www.faa.gov/airports"],
   "license": {"name": "Facility-specific public camera terms", "url": "https://www.faa.gov/airports", "attributionRequired": true, "commercialUse": "unknown", "embeddingAllowed": "unknown"},
   "auth": {"type": "none", "required": false, "providerKey": null, "accessPageProviderId": null},
-  "agenticUse": {"defaultEnabled": false, "manualToggle": false, "plannerHints": ["airport camera", "port camera", "harbor webcam"], "requiredUserIntent": ["visual_status", "travel_condition"], "avoidWhen": ["general chat", "no geographic context", "source not configured"]},
+  "agenticUse": {"defaultEnabled": false, "manualToggle": false, "plannerHints": ["airport camera", "port camera", "harbor webcam"], "requiredUserAction": ["visual_status", "travel_condition"], "avoidWhen": ["general chat", "no geographic context", "source not configured"]},
   "reliability": {"status": "disabled", "lastAudited": "2026-05-14", "knownLimitations": ["Template only until official source configuration is added."]},
   "cachePolicy": {"mode": "memory", "ttlSeconds": 300, "staleWhileRevalidateSeconds": 3600},
   "normalization": {"geometryPath": "cameras[].location", "idPath": "cameras[].id", "timestampPath": "cameras[].last_update_time", "fieldMap": {}, "expectedGeometry": "Point"}

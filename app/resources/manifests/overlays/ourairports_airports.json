@@ -21,7 +21,7 @@
       "runway",
       "aviation"
     ],
-    "intent_tags": [
+    "action_tags": [
       "airport",
       "aviation",
       "infrastructure"
@@ -68,7 +68,7 @@
       "runway",
       "heliport"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "airport",
       "aviation",
       "nearby"

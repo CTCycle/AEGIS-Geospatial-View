@@ -21,7 +21,7 @@
       "metadata",
       "geoportal"
     ],
-    "intent_tags": [
+    "action_tags": [
       "catalog-discovery",
       "open-data",
       "europe"
@@ -89,7 +89,7 @@
       "open data",
       "geoportal"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

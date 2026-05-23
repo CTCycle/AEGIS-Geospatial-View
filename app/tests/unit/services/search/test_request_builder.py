@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.domain.extraction.models import NormalizedIntent
+from server.domain.extraction.models import NormalizedAction
 from server.services.search.request_builder import RequestBuilder
 
 
@@ -9,11 +9,11 @@ def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     builder = RequestBuilder()
     viewport = builder.build_viewport(
         ResolvedLocation(label="Berlin", latitude=52.5173885, longitude=13.3951309),
-        NormalizedIntent(
-            intent_id="show_city_map_berlin",
-            intent_label="Show city map Berlin",
+        NormalizedAction(
+            action_id="show_city_map_berlin",
+            action_label="Show city map Berlin",
             task_tags=["map", "city", "wide_view"],
-            intent_tags=["city_level"],
+            action_tags=["city_level"],
         ),
     )
 
@@ -24,11 +24,11 @@ def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
     builder = RequestBuilder()
     viewport = builder.build_viewport(
         ResolvedLocation(label="1600 Pennsylvania Avenue", latitude=38.8976387, longitude=-77.0365528),
-        NormalizedIntent(
-            intent_id="show_exact_address_map",
-            intent_label="Show exact address map",
+        NormalizedAction(
+            action_id="show_exact_address_map",
+            action_label="Show exact address map",
             task_tags=["map", "address"],
-            intent_tags=["exact_address"],
+            action_tags=["exact_address"],
         ),
     )
 
@@ -40,7 +40,7 @@ def test_request_builder_plan_path_preserves_city_scale_hint() -> None:
         ExecutionPlan(
             state="map_search",
             mode="map",
-            intent_id="show_city_map_berlin",
+            action_id="show_city_map_berlin",
             basemap_id="osm_default",
             overlay_ids=[],
         ),

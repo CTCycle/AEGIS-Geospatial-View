@@ -63,7 +63,7 @@ class AgentOrchestrator:
                 "I could not use the configured parser model because the saved API key was rejected. "
                 "Open Model Settings and replace the key before using that cloud model."
             )
-            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -99,7 +99,7 @@ class AgentOrchestrator:
                 "I could not process this request because the configured parser model is unavailable. "
                 "Open Model Settings, choose an installed model, or refresh/pull the configured Ollama model."
             )
-            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -155,7 +155,7 @@ class AgentOrchestrator:
                 session_id=session.id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
-                decision=self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id),
+                decision=self._build_direct_reject_decision(turn_contract.normalized_action.action_id),
                 tool_payload=None,
                 map_session=None,
                 memory_snapshot=latest_memory,
@@ -181,7 +181,7 @@ class AgentOrchestrator:
             memory_snapshot = self.location_memory_service.update_memory_snapshot(
                 latest_memory,
                 decision.resolved_location,
-                turn_contract.normalized_intent,
+                turn_contract.normalized_action,
             )
         elif decision.plan.state == "map_search" and decision.resolved_location is not None:
             request = self.request_builder.build_location_search_request(
@@ -200,7 +200,7 @@ class AgentOrchestrator:
             memory_snapshot = self.location_memory_service.update_memory_snapshot(
                 latest_memory,
                 decision.resolved_location,
-                turn_contract.normalized_intent,
+                turn_contract.normalized_action,
             )
         elif decision.clarification is not None:
             assistant_message = decision.clarification.question
@@ -241,9 +241,9 @@ class AgentOrchestrator:
         )
 
     @staticmethod
-    def _build_direct_reject_decision(intent_id: str):
+    def _build_direct_reject_decision(action_id: str):
         return PolicyDecision(
-            plan=ExecutionPlan(state="direct_response", intent_id=intent_id),
+            plan=ExecutionPlan(state="direct_response", action_id=action_id),
             trace=DecisionTrace(steps=["general_question.direct_response"]),
         )
 

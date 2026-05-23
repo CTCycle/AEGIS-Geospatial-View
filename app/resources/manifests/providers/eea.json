@@ -19,7 +19,7 @@
       "eea",
       "eea"
     ],
-    "intent_tags": [
+    "action_tags": [
       "wms",
       "noise"
     ],
@@ -84,7 +84,7 @@
       "noise",
       "eea"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

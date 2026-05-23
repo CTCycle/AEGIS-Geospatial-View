@@ -21,7 +21,7 @@
     "map_type_tags": [
       "dark"
     ],
-    "intent_tags": [
+    "action_tags": [
       "night_mode",
       "traffic_focus"
     ],
@@ -98,7 +98,7 @@
       "night",
       "contrast"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

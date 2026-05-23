@@ -21,7 +21,7 @@
       "warning",
       "watch"
     ],
-    "intent_tags": [
+    "action_tags": [
       "weather",
       "hazard",
       "alert"
@@ -68,7 +68,7 @@
       "watch",
       "route safety"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "weather",
       "hazard",
       "freshness"

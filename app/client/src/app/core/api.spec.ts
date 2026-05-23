@@ -84,11 +84,11 @@ describe('core/api', () => {
         user_text: 'show weather',
         task_class: 'direct_query',
         location_signals: [],
-        normalized_intent: {
-          intent_id: 'weather',
-          intent_label: 'Weather',
+        normalized_action: {
+          action_id: 'weather',
+          action_label: 'Weather',
           task_tags: [],
-          intent_tags: [],
+          action_tags: [],
           requires_location: false,
         },
         temporal_signal: { mode: 'none' },
@@ -96,7 +96,7 @@ describe('core/api', () => {
         parser_confidence: 0.9,
       },
       decision: {
-        plan: { state: 'direct_tool', mode: 'direct_text', intent_id: 'weather', overlay_ids: [] },
+        plan: { state: 'direct_tool', mode: 'direct_text', action_id: 'weather', overlay_ids: [] },
       },
       context_usage: {
         estimated_input_tokens: 100,

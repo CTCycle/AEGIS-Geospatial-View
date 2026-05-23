@@ -1,6 +1,6 @@
 # Capability Manifests
 
-Last updated: 2026-05-16
+Last updated: 2026-05-23
 
 ## Purpose
 
@@ -11,6 +11,9 @@ Default capability selection prioritizes free and openly accessible providers. G
 ## Capability Loading Contract
 
 - Providers, basemaps, overlays, and direct tools are loaded through `GeospatialManifestLoader`, `CapabilityRegistry`, and `RuntimeRegistry`.
+- Capability manifests are the source of truth for generated agent tools.
+- Overlay capabilities are first-class agent tools and can be selected by the action-aware tool manifest service.
+- Capability IDs must remain stable because they are used to generate deterministic tool names in the form `overlay__{safe_capability_id}`.
 - Schema v2 is the only accepted manifest contract. The loader rejects manifests that omit v2 source, auth, rendering, reliability, cache, license, or normalization metadata.
 - The strict auditor reports schema, provider, renderer, auth, and source-doc coverage so missing operational metadata is visible before runtime.
 - Runtime availability is controlled by `runtime_profiles.json` plus credential presence.
@@ -124,6 +127,8 @@ Every manifest under `app/resources/manifests` must define:
 - `auth`: provider auth type, provider key name, required flag, and access-page provider ID when credentials are required.
 - `account_setup`: optional provider setup guide metadata consumed by the Access configurations wizard.
 - `agenticUse`: planner hints, default enablement, manual-toggle policy, and avoid-when rules.
+- `agenticUse.action_tags`: action-selection hints used by the agent tool manifest and capability ranking.
+- `agenticUse.requiredUserAction`: optional required user action hint for gating geospatial capability use.
 - `reliability`: health status, audit date, and known limitations.
 - `cachePolicy`: cache mode, TTL, and stale-while-revalidate TTL.
 - `normalization`: expected geometry model and field/path mapping for renderable or queryable payloads.

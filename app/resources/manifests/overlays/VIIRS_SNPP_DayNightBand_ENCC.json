@@ -20,7 +20,7 @@
       "gibs",
       "nighttime lights (viirs, monthly)"
     ],
-    "intent_tags": [
+    "action_tags": [
       "imagery",
       "night-lights"
     ],
@@ -102,7 +102,7 @@
       "gibs",
       "nighttime lights (viirs, monthly)"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

@@ -20,7 +20,7 @@
       "closures",
       "tomtom"
     ],
-    "intent_tags": [
+    "action_tags": [
       "traffic",
       "incident",
       "road closure"
@@ -70,7 +70,7 @@
       "traffic delay",
       "tomtom"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "traffic",
       "incident",
       "road closure"

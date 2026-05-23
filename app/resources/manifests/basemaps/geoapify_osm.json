@@ -22,7 +22,7 @@
       "light",
       "street"
     ],
-    "intent_tags": [
+    "action_tags": [
       "presentation",
       "clean_layout"
     ],
@@ -97,7 +97,7 @@
       "light",
       "clean"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

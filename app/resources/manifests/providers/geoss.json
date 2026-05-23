@@ -21,7 +21,7 @@
       "metadata",
       "institutional"
     ],
-    "intent_tags": [
+    "action_tags": [
       "catalog-discovery",
       "earth-observation",
       "institutional-data"
@@ -90,7 +90,7 @@
       "geoportal",
       "institutional"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

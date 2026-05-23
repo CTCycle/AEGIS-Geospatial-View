@@ -20,7 +20,7 @@
       "places",
       "pois"
     ],
-    "intent_tags": [
+    "action_tags": [
       "poi",
       "places",
       "amenities"
@@ -67,7 +67,7 @@
       "pois",
       "amenities"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "poi",
       "amenity",
       "search places"

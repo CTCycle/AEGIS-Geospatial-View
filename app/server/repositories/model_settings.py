@@ -16,6 +16,9 @@ from server.repositories.schemas.models import ModelProviderSettingsRecord
 class ModelSettingsRepository:
     def __init__(self) -> None:
         backend = get_database().backend
+        ensure_schema = getattr(backend, "ensure_schema", None)
+        if callable(ensure_schema):
+            ensure_schema()
         self._session_factory = backend.session
 
     def get_or_create(self) -> ModelProviderSettingsRecord:

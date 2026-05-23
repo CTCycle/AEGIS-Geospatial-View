@@ -20,7 +20,7 @@ class CapabilityRetriever:
         self.capability_registry = capability_registry or CapabilityRegistry()
 
     def compose_retrieval_query(self, turn: TurnParseResult) -> str:
-        parts = [turn.normalized_intent.intent_label, turn.user_text]
+        parts = [turn.normalized_action.action_label, turn.user_text]
         if turn.temporal_signal.mode != "none":
             parts.append(turn.temporal_signal.mode)
         return " | ".join(parts)
@@ -68,7 +68,7 @@ class CapabilityRetriever:
                 capability.get("description"),
                 capability.get("capabilities"),
                 metadata.get("keywords"),
-                metadata.get("intent_tags"),
+                metadata.get("action_tags"),
                 metadata.get("task_tags"),
                 metadata.get("map_type_tags"),
                 metadata.get("human_summary"),

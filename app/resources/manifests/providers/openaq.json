@@ -19,7 +19,7 @@
       "openaq",
       "openaq"
     ],
-    "intent_tags": [
+    "action_tags": [
       "air-quality",
       "point-insight"
     ],
@@ -84,7 +84,7 @@
       "point-insight",
       "openaq"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

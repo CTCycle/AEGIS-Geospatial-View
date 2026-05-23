@@ -6,7 +6,7 @@ from server.domain.extraction.models import (
     ConversationContextSnapshot,
     DisallowedPattern,
     LocationSignal,
-    NormalizedIntent,
+    NormalizedAction,
     TemporalSignal,
     TurnParseResult,
 )
@@ -28,11 +28,11 @@ def test_policy_engine_clarifies_when_location_missing() -> None:
         conversation_context=ConversationContextSnapshot(recent_messages=[], memory_snapshot={}),
         task_class="map_search",
         location_signals=[],
-        normalized_intent=NormalizedIntent(
-            intent_id="air_quality",
-            intent_label="Air quality",
+        normalized_action=NormalizedAction(
+            action_id="air_quality",
+            action_label="Air quality",
             task_tags=["environment"],
-            intent_tags=["air quality"],
+            action_tags=["air quality"],
             requires_location=True,
         ),
         temporal_signal=TemporalSignal(mode="current"),
@@ -56,9 +56,9 @@ def test_policy_engine_clarifies_when_location_missing() -> None:
 def _turn(
     *,
     user_text: str,
-    intent_id: str,
+    action_id: str,
     task_tags: list[str],
-    intent_tags: list[str],
+    action_tags: list[str],
     task_class: str = "map_search",
 ) -> TurnParseResult:
     return TurnParseResult(
@@ -69,11 +69,11 @@ def _turn(
         ),
         task_class=task_class,
         location_signals=[],
-        normalized_intent=NormalizedIntent(
-            intent_id=intent_id,
-            intent_label=intent_id.replace("_", " ").title(),
+        normalized_action=NormalizedAction(
+            action_id=action_id,
+            action_label=action_id.replace("_", " ").title(),
             task_tags=task_tags,
-            intent_tags=intent_tags,
+            action_tags=action_tags,
             requires_location=True,
         ),
         temporal_signal=TemporalSignal(mode="current"),
@@ -83,16 +83,16 @@ def _turn(
     )
 
 
-def test_policy_engine_honors_satellite_basemap_from_intent_tags() -> None:
+def test_policy_engine_honors_satellite_basemap_from_action_tags() -> None:
     engine = PolicyEngine(
         location_resolver=LocationResolver(),
         capability_retriever=CapabilityRetriever(),
     )
     turn = _turn(
         user_text="Show me Rome with air quality overlay on satellite imagery",
-        intent_id="show_air_quality_overlay_rome",
+        action_id="show_air_quality_overlay_rome",
         task_tags=["map", "air_quality", "satellite_imagery"],
-        intent_tags=["air_quality", "overlay", "satellite"],
+        action_tags=["air_quality", "overlay", "satellite"],
     )
 
     assert engine._select_basemap(turn, []) == "gibs_satellite"
@@ -105,9 +105,9 @@ def test_policy_engine_filters_unrelated_zero_score_overlays() -> None:
     )
     turn = _turn(
         user_text="Show Tokyo precipitation radar on a dark map",
-        intent_id="show_precipitation_radar",
+        action_id="show_precipitation_radar",
         task_tags=["weather", "radar", "map", "precipitation"],
-        intent_tags=["precipitation", "radar", "dark_map"],
+        action_tags=["precipitation", "radar", "dark_map"],
     )
     candidates = [
         CapabilityCandidate(
@@ -140,9 +140,9 @@ def test_policy_engine_keeps_weather_forecast_when_radar_is_also_requested() -> 
     )
     turn = _turn(
         user_text="Show weather forecast and rain radar around Naples",
-        intent_id="weather_forecast_rain_radar",
+        action_id="weather_forecast_rain_radar",
         task_tags=["weather", "radar"],
-        intent_tags=["weather", "forecast", "rain", "radar"],
+        action_tags=["weather", "forecast", "rain", "radar"],
     )
     candidates = [
         CapabilityCandidate(
@@ -178,9 +178,9 @@ def test_policy_engine_selects_traffic_overlay_for_traffic_intent() -> None:
     )
     turn = _turn(
         user_text="Show current traffic flow around Times Square",
-        intent_id="show_current_traffic_flow",
+        action_id="show_current_traffic_flow",
         task_tags=["traffic", "map"],
-        intent_tags=["traffic", "flow"],
+        action_tags=["traffic", "flow"],
     )
     candidates = [
         CapabilityCandidate(
@@ -207,9 +207,9 @@ def test_policy_engine_does_not_treat_satellite_basemap_as_overlay_topic() -> No
     )
     turn = _turn(
         user_text="Show Rome with air quality overlay on satellite imagery",
-        intent_id="show_air_quality_rome_satellite",
+        action_id="show_air_quality_rome_satellite",
         task_tags=["map", "air_quality", "satellite_imagery"],
-        intent_tags=["air_quality", "overlay", "satellite"],
+        action_tags=["air_quality", "overlay", "satellite"],
     )
     candidates = [
         CapabilityCandidate(
@@ -236,9 +236,9 @@ def test_policy_engine_keeps_simple_place_prompt_basemap_only() -> None:
     )
     turn = _turn(
         user_text="Show me Rome",
-        intent_id="show_rome",
+        action_id="show_rome",
         task_tags=["map"],
-        intent_tags=["show", "map"],
+        action_tags=["show", "map"],
     )
     candidates = [
         CapabilityCandidate(
@@ -276,9 +276,9 @@ def test_policy_engine_renders_display_direct_query_with_overlays_as_map() -> No
     )
     turn = _turn(
         user_text="Show weather forecast and rain radar around Naples, Italy.",
-        intent_id="weather_forecast_rain_radar",
+        action_id="weather_forecast_rain_radar",
         task_tags=["weather", "radar"],
-        intent_tags=["weather", "rain", "radar"],
+        action_tags=["weather", "rain", "radar"],
         task_class="direct_query",
     )
     candidates = [
@@ -311,9 +311,9 @@ def test_policy_engine_keeps_coordinate_direct_query_as_tool() -> None:
     )
     turn = _turn(
         user_text="Convert Shibuya Crossing to coordinates only.",
-        intent_id="convert_location_to_coordinates",
+        action_id="convert_location_to_coordinates",
         task_tags=["coordinates"],
-        intent_tags=["geocode"],
+        action_tags=["geocode"],
         task_class="direct_query",
     )
     candidates = [
@@ -341,9 +341,9 @@ def test_policy_engine_keeps_coordinate_query_as_direct_tool_even_with_overlay_c
     )
     turn = _turn(
         user_text="Coordinates for Shibuya Crossing",
-        intent_id="shibuya_crossing_coordinates",
+        action_id="shibuya_crossing_coordinates",
         task_tags=["coordinates", "location_query"],
-        intent_tags=["coordinates", "landmark"],
+        action_tags=["coordinates", "landmark"],
         task_class="direct_query",
     )
     candidates = [
@@ -395,11 +395,11 @@ def test_policy_engine_clarifies_deictic_reference_without_memory_before_resolvi
                 source="model",
             )
         ],
-        normalized_intent=NormalizedIntent(
-            intent_id="traffic",
-            intent_label="Traffic",
+        normalized_action=NormalizedAction(
+            action_id="traffic",
+            action_label="Traffic",
             task_tags=["traffic", "map"],
-            intent_tags=["traffic"],
+            action_tags=["traffic"],
             requires_location=True,
         ),
         temporal_signal=TemporalSignal(mode="current"),
@@ -442,11 +442,11 @@ def test_policy_engine_ignores_non_blocking_location_ambiguity_after_resolution(
                 source="model",
             )
         ],
-        normalized_intent=NormalizedIntent(
-            intent_id="map_search_terrain",
-            intent_label="Terrain Map Search",
+        normalized_action=NormalizedAction(
+            action_id="map_search_terrain",
+            action_label="Terrain Map Search",
             task_tags=["map_search", "terrain"],
-            intent_tags=["terrain", "no_overlays"],
+            action_tags=["terrain", "no_overlays"],
             requires_location=True,
         ),
         temporal_signal=TemporalSignal(mode="none"),
@@ -493,11 +493,11 @@ def test_policy_engine_rejects_actionable_disallowed_patterns_for_map_search() -
                 source="model",
             )
         ],
-        normalized_intent=NormalizedIntent(
-            intent_id="map_search",
-            intent_label="Map Search",
+        normalized_action=NormalizedAction(
+            action_id="map_search",
+            action_label="Map Search",
             task_tags=["map"],
-            intent_tags=["map"],
+            action_tags=["map"],
             requires_location=True,
         ),
         temporal_signal=TemporalSignal(mode="none"),
@@ -535,7 +535,7 @@ def test_location_resolver_ignores_memory_metadata_when_using_active_location() 
                     "label": "Venezia, Veneto, Italia",
                     "latitude": 45.4551388,
                     "longitude": 12.2505972,
-                    "intent_id": "show_rainfall_forecast_venice_italy",
+                    "action_id": "show_rainfall_forecast_venice_italy",
                 }
             },
         )
@@ -586,9 +586,9 @@ def test_policy_engine_ranks_fire_and_land_cover_over_generic_satellite_layers()
     )
     turn = _turn(
         user_text="Show active fires and land cover around Sicily on satellite",
-        intent_id="active_fires_land_cover",
+        action_id="active_fires_land_cover",
         task_tags=["map", "satellite", "active_fires", "land_cover"],
-        intent_tags=["active fires", "land cover", "satellite"],
+        action_tags=["active fires", "land cover", "satellite"],
     )
     candidates = [
         CapabilityCandidate(
