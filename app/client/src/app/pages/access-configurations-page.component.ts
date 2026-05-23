@@ -3,9 +3,9 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { ApiClientService } from '../core/api-client.service';
-import { ModelSettingsResponse } from '../core/types';
+import { GeospatialProviderAccountSetup, ModelSettingsResponse } from '../core/types';
 
-type GeoProviderId = 'geoapify' | 'tomtom' | 'google_maps' | 'arcgis';
+type GeoProviderId = string;
 
 interface GeoProviderAccess {
   id: GeoProviderId;
@@ -26,38 +26,15 @@ export class AccessConfigurationsPageComponent implements OnInit {
   settings?: ModelSettingsResponse;
   statusText = 'Loading access configuration';
   isSaving = false;
-  drafts: Record<GeoProviderId, string> = { geoapify: '', tomtom: '', google_maps: '', arcgis: '' };
+  isLoadingAccountSetups = false;
+  drafts: Record<GeoProviderId, string> = {};
+  providerAccountSetups: GeospatialProviderAccountSetup[] = [];
+  selectedProviderAccountSetup?: GeospatialProviderAccountSetup;
+  isSignupModalOpen = false;
+  signupModalError = '';
+  signupKeyInput = '';
 
-  readonly providers: GeoProviderAccess[] = [
-    {
-      id: 'geoapify',
-      name: 'Geoapify',
-      purpose: 'Optional OSM Bright basemap and Geoapify amenities provider.',
-      placeholder: 'Geoapify API key',
-      docsUrl: 'https://www.geoapify.com/',
-    },
-    {
-      id: 'tomtom',
-      name: 'TomTom',
-      purpose: 'Optional traffic and TomTom basemap provider.',
-      placeholder: 'TomTom API key',
-      docsUrl: 'https://developer.tomtom.com/',
-    },
-    {
-      id: 'google_maps',
-      name: 'Google Maps Platform',
-      purpose: 'Optional Google Places, commercial POI, and geocoding metadata provider.',
-      placeholder: 'Google Maps API key',
-      docsUrl: 'https://developers.google.com/maps',
-    },
-    {
-      id: 'arcgis',
-      name: 'ArcGIS',
-      purpose: 'Optional access token/API key for credentialed ArcGIS portal and REST services.',
-      placeholder: 'ArcGIS API key',
-      docsUrl: 'https://developers.arcgis.com/',
-    },
-  ];
+  providers: GeoProviderAccess[] = [];
 
   constructor(
     private readonly apiClient: ApiClientService,
@@ -65,7 +42,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    await this.loadSettings();
+    await Promise.all([this.loadSettings(), this.loadProviderAccountSetups()]);
   }
 
   configured(provider: GeoProviderId): boolean {
@@ -84,7 +61,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
     if (!this.settings || this.isSaving) {
       return;
     }
-    const value = this.drafts[provider].trim();
+    const value = (this.drafts[provider] ?? '').trim();
     if (!value) {
       this.statusText = `Enter a ${provider} API key before saving, or clear the saved key.`;
       return;
@@ -103,6 +80,87 @@ export class AccessConfigurationsPageComponent implements OnInit {
       this.drafts[provider] = '';
       this.statusText = `${this.providerName(provider)} key cleared. Optional capabilities are disabled.`;
     }
+  }
+
+  async loadProviderAccountSetups(): Promise<void> {
+    this.isLoadingAccountSetups = true;
+    try {
+      const response = await this.apiClient.fetchGeospatialProviderAccountSetups();
+      this.providerAccountSetups = response.providers.filter((setup) => setup.requiresCredentials);
+      this.providers = this.providerAccountSetups.map((setup) => this.providerFromSetup(setup));
+      this.providerAccountSetups.forEach((setup) => {
+        this.drafts[setup.credentialStorageKey] = this.drafts[setup.credentialStorageKey] ?? '';
+      });
+    } catch {
+      this.statusText = 'Could not load guided provider setup metadata.';
+    } finally {
+      this.isLoadingAccountSetups = false;
+      this.changeDetector.detectChanges();
+    }
+  }
+
+  getAccountSetupForProvider(providerKey: string): GeospatialProviderAccountSetup | undefined {
+    return this.providerAccountSetups.find(
+      (setup) => setup.providerId === providerKey || setup.credentialStorageKey === providerKey,
+    );
+  }
+
+  canShowSignupTrigger(providerKey: string): boolean {
+    return Boolean(this.getAccountSetupForProvider(providerKey));
+  }
+
+  openProviderSignup(setup: GeospatialProviderAccountSetup | undefined): void {
+    if (!setup) {
+      return;
+    }
+    this.selectedProviderAccountSetup = setup;
+    this.signupKeyInput = '';
+    this.signupModalError = '';
+    this.isSignupModalOpen = true;
+  }
+
+  closeProviderSignup(): void {
+    this.isSignupModalOpen = false;
+    this.selectedProviderAccountSetup = undefined;
+    this.signupModalError = '';
+    this.signupKeyInput = '';
+  }
+
+  openProviderPortal(setup: GeospatialProviderAccountSetup): void {
+    const target = setup.automation.developerPortalUrl ?? setup.automation.signupUrl ?? setup.automation.docsUrl ?? setup.docsUrl;
+    if (!target) {
+      this.signupModalError = 'No provider portal link is available for this setup.';
+      return;
+    }
+    window.open(target, '_blank', 'noreferrer');
+  }
+
+  async saveGeneratedCredential(setup: GeospatialProviderAccountSetup): Promise<void> {
+    if (setup.automation.support === 'unsupported') {
+      this.signupModalError = 'This provider is documentation-only until automation support is verified.';
+      return;
+    }
+    const value = this.signupKeyInput.trim();
+    if (!value) {
+      this.signupModalError = 'Paste the generated API key before saving.';
+      return;
+    }
+    if (await this.persistCredential(setup.credentialStorageKey, value)) {
+      this.signupKeyInput = '';
+      this.isSignupModalOpen = false;
+      this.selectedProviderAccountSetup = undefined;
+      this.statusText = `${setup.name} key saved. Provider access has not been validated.`;
+    }
+  }
+
+  supportLabel(setup: GeospatialProviderAccountSetup): string {
+    const labels: Record<string, string> = {
+      agent_assisted: 'Agent-assisted guidance',
+      guided_playwright: 'Guided browser setup',
+      manual_only: 'Manual setup guidance',
+      unsupported: 'Documentation only',
+    };
+    return labels[setup.automation.support] ?? setup.automation.support;
   }
 
   private async loadSettings(): Promise<void> {
@@ -149,5 +207,15 @@ export class AccessConfigurationsPageComponent implements OnInit {
 
   private providerName(provider: GeoProviderId): string {
     return this.providers.find((item) => item.id === provider)?.name ?? provider;
+  }
+
+  private providerFromSetup(setup: GeospatialProviderAccountSetup): GeoProviderAccess {
+    return {
+      id: setup.credentialStorageKey,
+      name: setup.name,
+      purpose: `${this.supportLabel(setup)} for credential-gated geospatial capabilities.`,
+      placeholder: setup.keyFormatHint ?? `${setup.name} API key`,
+      docsUrl: setup.automation.docsUrl ?? setup.docsUrl ?? setup.automation.developerPortalUrl ?? '',
+    };
   }
 }

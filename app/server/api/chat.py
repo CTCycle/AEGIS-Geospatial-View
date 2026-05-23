@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import uuid4
@@ -35,11 +34,11 @@ from server.domain.chat import (
     VectorizationResponse,
 )
 from server.services.chat.composition import ChatRuntime
+from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
-logger = logging.getLogger(__name__)
 
 
 ###############################################################################
@@ -65,84 +64,6 @@ async def _serialize_chat_event_stream(
     payload = _ensure_request_id(payload)
     async for event in streaming_service.stream_turn(payload):
         yield _stream_event(event)
-
-
-async def _chat_event_stream(
-    payload: ChatTurnRequest,
-    runtime: ChatRuntime,
-) -> AsyncIterator[str]:
-    payload = _ensure_request_id(payload)
-    request_id = payload.request_id or ""
-    yield _stream_event(
-        ChatStreamEvent(
-            event="status",
-            data={"message": "received", "request_id": request_id},
-        )
-    )
-    try:
-        result = await runtime.agent_orchestrator.run_turn(payload)
-        for token in result.assistant_message.split():
-            yield _stream_event(
-                ChatStreamEvent(
-                    event="assistant_delta",
-                    data={"delta": f"{token} "},
-                )
-            )
-        if result.tool_payload is not None:
-            yield _stream_event(
-                ChatStreamEvent(
-                    event="tool_status",
-                    data=_build_tool_status_payload(result.tool_payload),
-                )
-            )
-        yield _stream_event(
-            ChatStreamEvent(
-                event="final",
-                data=ChatStreamingService._serialize_chat_turn_response(result),
-            )
-        )
-    except (LLMConfigurationError, ValueError) as exc:
-        yield _stream_event(
-            ChatStreamEvent(
-                event="error",
-                data={
-                    "message": str(exc),
-                    "status": status.HTTP_503_SERVICE_UNAVAILABLE,
-                    "request_id": request_id,
-                },
-            )
-        )
-    except Exception as exc:
-        logger.exception("Chat stream failed")
-        yield _stream_event(
-            ChatStreamEvent(
-                event="error",
-                data={
-                    "message": str(exc) or "Unexpected server error while streaming response.",
-                    "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    "request_id": request_id,
-                },
-            )
-        )
-
-
-def _build_tool_status_payload(tool_payload: object) -> dict[str, object]:
-    if not isinstance(tool_payload, dict):
-        return {"available": False}
-    satellite_imagery = tool_payload.get("satellite_imagery")
-    map_session = tool_payload.get("map_session")
-    overlay_count = 0
-    if isinstance(map_session, dict):
-        overlays = map_session.get("overlays")
-        if isinstance(overlays, list):
-            overlay_count = len(overlays)
-    return {
-        "available": True,
-        "execution": tool_payload.get("execution"),
-        "has_satellite_imagery": isinstance(satellite_imagery, dict),
-        "has_map_session": isinstance(map_session, dict),
-        "overlay_count": overlay_count,
-    }
 
 
 ###############################################################################
@@ -186,7 +107,9 @@ async def chat_stream(
     response_model=ModelLibraryResponse,
     status_code=status.HTTP_200_OK,
 )
-def get_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelLibraryResponse:
+def get_models(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> ModelLibraryResponse:
     response = runtime.model_library_service.list_models(
         ollama_url=runtime.settings_service.get_ollama_url()
     )
@@ -199,7 +122,9 @@ def get_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelLibrary
     response_model=ModelSettingsResponse,
     status_code=status.HTTP_200_OK,
 )
-def get_settings(runtime: ChatRuntime = Depends(get_chat_runtime)) -> ModelSettingsResponse:
+def get_settings(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> ModelSettingsResponse:
     return runtime.settings_service.get_settings()
 
 
@@ -215,7 +140,13 @@ def update_settings(
     ],
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelSettingsResponse:
-    return runtime.settings_service.update_settings(payload)
+    try:
+        return runtime.settings_service.update_settings(payload)
+    except ChatSettingsValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 ###############################################################################
@@ -224,7 +155,9 @@ def update_settings(
     response_model=OllamaRefreshResponse,
     status_code=status.HTTP_200_OK,
 )
-def refresh_ollama_models(runtime: ChatRuntime = Depends(get_chat_runtime)) -> OllamaRefreshResponse:
+def refresh_ollama_models(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> OllamaRefreshResponse:
     return runtime.maintenance_service.refresh_ollama_models()
 
 
@@ -262,7 +195,9 @@ def pull_ollama_model(
     response_model=VectorizationResponse,
     status_code=status.HTTP_200_OK,
 )
-def rebuild_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> VectorizationResponse:
+def rebuild_vectors(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> VectorizationResponse:
     return runtime.maintenance_service.rebuild_vectors()
 
 
@@ -272,7 +207,9 @@ def rebuild_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> Vectori
     response_model=VectorizationResponse,
     status_code=status.HTTP_200_OK,
 )
-def sync_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> VectorizationResponse:
+def sync_vectors(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> VectorizationResponse:
     return runtime.maintenance_service.sync_vectors()
 
 
@@ -282,5 +219,7 @@ def sync_vectors(runtime: ChatRuntime = Depends(get_chat_runtime)) -> Vectorizat
     response_model=OllamaHealthResponse,
     status_code=status.HTTP_200_OK,
 )
-def check_ollama_health(runtime: ChatRuntime = Depends(get_chat_runtime)) -> OllamaHealthResponse:
+def check_ollama_health(
+    runtime: ChatRuntime = Depends(get_chat_runtime),
+) -> OllamaHealthResponse:
     return runtime.maintenance_service.get_ollama_health()

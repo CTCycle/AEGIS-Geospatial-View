@@ -8,8 +8,6 @@ from server.repositories.schemas.models import (
     ManifestEmbeddingRecord,
     ModelCredentialRecord,
     ModelProviderSettingsRecord,
-    SessionCatalogRecord,
-    SessionDetailsRecord,
 )
 
 __all__ = [
@@ -20,6 +18,4 @@ __all__ = [
     "ManifestEmbeddingRecord",
     "ModelCredentialRecord",
     "ModelProviderSettingsRecord",
-    "SessionCatalogRecord",
-    "SessionDetailsRecord",
 ]

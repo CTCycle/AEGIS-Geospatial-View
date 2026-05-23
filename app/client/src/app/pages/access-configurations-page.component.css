@@ -8,16 +8,15 @@
 
 .access-page__header {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: flex-start;
     gap: 1rem;
-    padding: 1.2rem 1.35rem;
+    padding: 0.95rem 1.35rem;
     border-bottom: 1px solid #263640;
     background: #101c23;
 }
 
 .page-kicker,
-.access-page__header h1,
 .access-page__header p,
 .access-provider h2,
 .access-provider p {
@@ -33,37 +32,25 @@
     font-weight: 800;
 }
 
-.access-page__header h1 {
-    margin-top: 0.4rem;
-    font-size: 1.55rem;
-    color: #f0f7fa;
-}
-
 .access-page__header p {
-    margin-top: 0.35rem;
     max-width: 70rem;
     color: #a9bac2;
     font-size: 0.92rem;
-}
-
-.access-page__default-inline {
-    margin-top: 0.55rem;
-    padding: 0.55rem 0.65rem;
-    border: 1px solid #263a45;
-    background: #0f1c24;
-    color: #a9bac2;
-    font-size: 0.84rem;
-    line-height: 1.45;
-}
-
-.access-page__default-inline strong {
-    color: #dbe7ec;
 }
 
 .access-page__content {
     display: grid;
     gap: 0.85rem;
     padding: 1rem 1.35rem 1.4rem;
+}
+
+.access-page__status {
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #263a45;
+    background: #101c23;
+    color: #a9bac2;
+    font-size: 0.8rem;
 }
 
 .access-provider {
@@ -94,7 +81,7 @@
     display: grid;
     grid-template-columns: minmax(12rem, 1.15fr) minmax(14rem, 1fr) minmax(22rem, 1.4fr);
     gap: 0.9rem;
-    align-items: start;
+    align-items: stretch;
 }
 
 .access-provider header,
@@ -110,9 +97,10 @@
 }
 
 .access-provider footer {
-    align-self: start;
+    align-self: center;
     justify-content: flex-start;
     padding-top: 0;
+    align-items: center;
 }
 
 .access-provider dl {
@@ -271,4 +259,57 @@
     .access-provider__key-actions {
         justify-content: flex-start;
     }
+}
+
+
+.access-signup-trigger {
+    border: 1px solid #2f9bd7;
+    border-radius: 0.35rem;
+    background: #162833;
+    color: #dce8ed;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.access-signup-trigger--inline {
+    flex: 0 0 auto;
+    min-width: 5.5rem;
+    min-height: 2.15rem;
+    padding: 0.3rem 0.55rem;
+    line-height: 1;
+    align-self: center;
+}
+
+.provider-signup-modal {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(4 10 14 / 72%);
+    z-index: 50;
+}
+
+.provider-signup-modal__notes {
+    margin-top: 0.8rem;
+    border: 1px solid #263a45;
+    background: #0f1c24;
+    padding: 0.7rem 0.8rem;
+}
+
+.provider-signup-modal__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.provider-signup-modal__key-input {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.85rem;
+    color: #c9d8de;
+    font-size: 0.78rem;
+    font-weight: 800;
 }

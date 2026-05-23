@@ -3,14 +3,13 @@ import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 
 import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
-import { LayerCatalogComponent } from '../components/layer-catalog.component';
 
 type CapabilityGroup = 'providers' | 'basemaps' | 'overlays' | 'cameras' | 'transit' | 'tools';
 
 @Component({
   selector: 'app-capabilities-page',
   standalone: true,
-  imports: [CommonModule, LayerCatalogComponent],
+  imports: [CommonModule],
   templateUrl: './capabilities-page.component.html',
   styleUrl: './capabilities-page.component.css',
 })
@@ -48,23 +47,6 @@ export class CapabilitiesPageComponent implements OnInit {
 
   itemsFor(group: CapabilityGroup): CapabilityDescriptor[] {
     return this.catalog[group] ?? [];
-  }
-
-  get layerCatalogItems(): CapabilityDescriptor[] {
-    return [
-      ...(this.catalog.basemaps ?? []),
-      ...(this.catalog.overlays ?? []),
-      ...(this.catalog.cameras ?? []),
-      ...(this.catalog.transit ?? []),
-    ];
-  }
-
-  askAgentToUse(item: CapabilityDescriptor): void {
-    this.statusText = `Ask the agent to use ${item.name} from the main workspace chat.`;
-  }
-
-  requestManualToggle(item: CapabilityDescriptor): void {
-    this.statusText = `${item.name} is available for map sessions when selected by the agent or an eligible map control.`;
   }
 
   capabilityPurpose(item: CapabilityDescriptor): string {

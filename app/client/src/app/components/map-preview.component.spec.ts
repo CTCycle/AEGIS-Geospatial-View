@@ -67,6 +67,23 @@ describe('components/map-preview.component', () => {
     expect(style.layers.find((layer: { id: string }) => layer.id === 'basemap')?.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
   });
 
+  it('preserves external satellite imagery tile URLs', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        basemap_id: 'gibs_satellite',
+        basemap: {
+          id: 'gibs_satellite',
+          label: 'Satellite Imagery',
+          provider: 'gibs',
+          tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        },
+      }) as never,
+    };
+    fixture.detectChanges();
+    const style = (maplibregl.Map as unknown as jasmine.Spy).calls.mostRecent().args[0].style;
+    expect(style.sources.basemap.tiles[0]).toContain('World_Imagery/MapServer/tile/{z}/{y}/{x}');
+  });
+
   it('fits bounds with a capped max zoom and resizes after load', () => {
     component.payload = {
       map_session: makeMapSession({
@@ -82,6 +99,16 @@ describe('components/map-preview.component', () => {
       [[12.4963044, 41.902725], [12.4964044, 41.902825]],
       { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM },
     );
+  });
+
+  it('ignores invalid bounds for fitBounds', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        bounds: [12.49, Number.NaN, 12.50, 41.9],
+      }) as never,
+    };
+    fixture.detectChanges();
+    expect(fakeMap.fitBounds).not.toHaveBeenCalled();
   });
 
   it('rebuilds overlay state from session and emits notice for stale ids', () => {
@@ -234,6 +261,17 @@ describe('components/map-preview.component', () => {
     component.payload = {};
     fixture.detectChanges();
     expect(component.mapSession).toBeUndefined();
+  });
+
+  it('binds embedded html as plain srcdoc string', () => {
+    component.payload = {
+      satellite_imagery: { map_html: '<html><body><h1>Map</h1></body></html>' },
+    } as never;
+    fixture.detectChanges();
+    const iframe = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement | null;
+    expect(iframe).not.toBeNull();
+    expect(iframe?.getAttribute('srcdoc')).toContain('<h1>Map</h1>');
+    expect(iframe?.getAttribute('srcdoc')).not.toContain('SafeValue must use [property]=');
   });
 
   it('maps overlay ids directly when overlay descriptors are absent', () => {

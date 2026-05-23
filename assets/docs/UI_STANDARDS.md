@@ -1,6 +1,6 @@
 # UI Standards
 
-Last updated: 2026-05-02
+Last updated: 2026-05-17
 Scope: `app/client/src`
 
 ## Typography
@@ -108,7 +108,8 @@ All interactive components must provide:
   - search/filter controls
   - model cards and assignment UI
   - API key and Ollama management modals
-- `/capabilities` (`CapabilitiesPageComponent`):
+  - Ollama cards visually separate installed local models from pullable library entries
+- `/geodata` (`CapabilitiesPageComponent`):
   - manifest-backed capability tables
   - grouped providers, map types, layers, and direct tools
   - explicit access and dependency metadata
@@ -118,7 +119,7 @@ All interactive components must provide:
 
 ### Navigation hierarchy
 
-- Top-level Operations Bar routes: workspace, capabilities, access, and model settings.
+- Top-level Operations Bar routes: workspace, geodata, access, and model settings.
 - Unknown routes redirect to workspace.
 
 ## User Experience Standards
@@ -126,7 +127,7 @@ All interactive components must provide:
 ### Core user journeys
 
 - Ask geospatial question -> receive assistant response -> inspect map session and overlays.
-- Review capabilities -> understand available layers/tools and access constraints.
+- Review geodata -> understand available layers/tools and access constraints.
 - Open access configurations -> optionally add geospatial provider keys.
 - Open model settings -> manage provider/model assignments -> return to workspace.
 

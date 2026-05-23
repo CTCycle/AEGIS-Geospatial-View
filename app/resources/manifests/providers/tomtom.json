@@ -76,6 +76,67 @@
     "required": true,
     "accessPageProviderId": "tomtom"
   },
+  "account_setup": {
+    "mode": "manual",
+    "automation_supported": false,
+    "automation_reason": "Third-party provider signup and key retrieval require external account, billing, MFA, CAPTCHA, or portal flows that are not stable product APIs.",
+    "account_url": "https://developer.tomtom.com",
+    "dashboard_url": "https://developer.tomtom.com/user/me/apps",
+    "documentation_url": "https://developer.tomtom.com/how-to-get-tomtom-api-key",
+    "credential_fields": [
+      {
+        "name": "api_key",
+        "label": "API key",
+        "secret": true,
+        "required": true
+      }
+    ],
+    "steps": [
+      {
+        "id": "create_account",
+        "title": "Create or sign in to the provider account",
+        "description": "Open the provider account page and complete signup or sign in."
+      },
+      {
+        "id": "create_project",
+        "title": "Create or select a project",
+        "description": "Create a project or application in the provider dashboard if required."
+      },
+      {
+        "id": "create_key",
+        "title": "Create an API key",
+        "description": "Generate an API key for the required geospatial APIs."
+      },
+      {
+        "id": "restrict_key",
+        "title": "Restrict the API key",
+        "description": "Apply provider-supported restrictions before saving the key."
+      },
+      {
+        "id": "save_and_validate",
+        "title": "Save and validate in AEGIS",
+        "description": "Paste the key into AEGIS and run validation."
+      }
+    ],
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://developer.tomtom.com/user/me/apps",
+      "developer_portal_url": "https://developer.tomtom.com/user/me/apps",
+      "docs_url": "https://docs.tomtom.com/platform/documentation/my-tomtom/how-to-get-a-tomtom-api-key/",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
+  },
   "agenticUse": {
     "defaultEnabled": false,
     "manualToggle": false,

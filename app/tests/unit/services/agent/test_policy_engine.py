@@ -229,6 +229,46 @@ def test_policy_engine_does_not_treat_satellite_basemap_as_overlay_topic() -> No
     assert engine._select_overlays(turn, candidates) == ["openaq_air_quality"]
 
 
+def test_policy_engine_keeps_simple_place_prompt_basemap_only() -> None:
+    engine = PolicyEngine(
+        location_resolver=LocationResolver(),
+        capability_retriever=CapabilityRetriever(),
+    )
+    turn = _turn(
+        user_text="Show me Rome",
+        intent_id="show_rome",
+        task_tags=["map"],
+        intent_tags=["show", "map"],
+    )
+    candidates = [
+        CapabilityCandidate(
+            capability_id="openaq_air_quality",
+            kind="overlay",
+            provider="openaq",
+            score=0.2,
+        ),
+        CapabilityCandidate(
+            capability_id="rainviewer_precipitation_radar",
+            kind="overlay",
+            provider="rainviewer",
+            score=0.2,
+        ),
+    ]
+
+    assert engine._select_overlays(turn, candidates) == []
+
+
+def test_policy_engine_clarifies_known_ambiguous_place_name() -> None:
+    engine = PolicyEngine(
+        location_resolver=LocationResolver(),
+        capability_retriever=CapabilityRetriever(),
+    )
+    clarification = engine._build_clarification(["ambiguous_place_name"])
+
+    assert "Naples, Italy" in clarification.question
+    assert "Naples, Florida" in clarification.question
+
+
 def test_policy_engine_renders_display_direct_query_with_overlays_as_map() -> None:
     engine = PolicyEngine(
         location_resolver=LocationResolver(),

@@ -1,10 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import { ModelRole, isModelSelectedForRole } from '../core/model-selection';
+import { MODEL_ROLES, ModelRole, isModelSelectedForRole } from '../core/model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from '../core/types';
-
-const ROLE_BUTTON_ORDER: ModelRole[] = ['parser', 'chat', 'agent'];
 
 @Component({
   selector: 'app-model-role-actions',
@@ -16,23 +14,33 @@ const ROLE_BUTTON_ORDER: ModelRole[] = ['parser', 'chat', 'agent'];
 export class ModelRoleActionsComponent {
   @Input({ required: true }) model!: ModelCardDescriptor;
   @Input({ required: true }) settings!: ModelSettingsResponse;
+  @Input() requiresPull = false;
   @Output() selectRole = new EventEmitter<ModelRole>();
 
-  readonly roles = ROLE_BUTTON_ORDER;
+  readonly roles = MODEL_ROLES;
 
   isSelected(role: ModelRole): boolean {
     return isModelSelectedForRole(this.settings, role, this.model);
   }
 
-  getLabel(role: ModelRole): string {
-    const selected = this.isSelected(role);
+  roleName(role: ModelRole): string {
     if (role === 'parser') {
-      return selected ? 'Parser model' : 'Use for parser';
+      return 'Parser';
     }
     if (role === 'chat') {
-      return selected ? 'Chat model' : 'Use for chat';
+      return 'Chat';
     }
-    return selected ? 'Agent model' : 'Use for agent';
+    return 'Agent';
+  }
+
+  roleIcon(role: ModelRole): string {
+    if (role === 'parser') {
+      return 'parser';
+    }
+    if (role === 'chat') {
+      return 'chat';
+    }
+    return 'agent';
   }
 
   onSelect(role: ModelRole): void {

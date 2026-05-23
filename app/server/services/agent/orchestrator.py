@@ -58,6 +58,42 @@ class AgentOrchestrator:
             conversation_messages=recent_messages,
         )
         context_usage = self.parser_service.last_context_usage
+        if self._has_parser_authentication_failure(turn_contract):
+            assistant_message = (
+                "I could not use the configured parser model because the saved API key was rejected. "
+                "Open Model Settings and replace the key before using that cloud model."
+            )
+            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            self.history_repo.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                structured_payload={
+                    "turn_contract": turn_contract.model_dump(mode="json"),
+                    "decision": decision.model_dump(mode="json"),
+                    "memory_snapshot": latest_memory,
+                    "previous_turn_contract": latest_contract,
+                    "request_id": request_id,
+                },
+                tool_payload=None,
+                map_session=None,
+            )
+            LOGGER.info(
+                "chat_turn_parser_authentication_failed request_id=%s session_id=%s",
+                request_id,
+                session.id,
+            )
+            return ChatTurnResponse(
+                request_id=request_id,
+                session_id=session.id,
+                assistant_message=assistant_message,
+                turn_contract=turn_contract,
+                decision=decision,
+                tool_payload=None,
+                map_session=None,
+                memory_snapshot=latest_memory,
+                context_usage=context_usage,
+            )
         if self._has_parser_runtime_failure(turn_contract):
             assistant_message = (
                 "I could not process this request because the configured parser model is unavailable. "
@@ -96,7 +132,10 @@ class AgentOrchestrator:
             )
 
         if turn_contract.task_class == "general_question" or self._is_capability_question(turn_contract.user_text):
-            assistant_message = self._compose_general_question_message(turn_contract.user_text)
+            assistant_message = self._compose_general_question_message(
+                turn_contract.user_text,
+                recent_messages,
+            )
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -208,9 +247,18 @@ class AgentOrchestrator:
             trace=DecisionTrace(steps=["general_question.direct_response"]),
         )
 
-    @staticmethod
-    def _compose_general_question_message(user_text: str) -> str:
+    @classmethod
+    def _compose_general_question_message(
+        cls,
+        user_text: str,
+        recent_messages: list[dict[str, Any]] | None = None,
+    ) -> str:
         text = user_text.lower()
+        if cls._asks_about_previous_user_turn(text):
+            previous = cls._previous_user_message(recent_messages or [], current_text=user_text)
+            if previous:
+                return f"You just asked: {previous}"
+            return "I do not have a previous user request in this chat yet."
         if "capabil" in text or "model" in text:
             return (
                 "I can parse geospatial requests, resolve locations, build map sessions with supported basemaps and overlays, "
@@ -220,6 +268,30 @@ class AgentOrchestrator:
         return "I can help with location-based maps, coordinates, weather, rainfall, traffic layers, and related geospatial questions."
 
     @staticmethod
+    def _asks_about_previous_user_turn(text: str) -> bool:
+        return (
+            "what did i just ask" in text
+            or "what was my last question" in text
+            or "what did i ask you to remember" in text
+            or "what did i ask you to keep in mind" in text
+        )
+
+    @staticmethod
+    def _previous_user_message(
+        recent_messages: list[dict[str, Any]],
+        *,
+        current_text: str,
+    ) -> str | None:
+        current = str(current_text or "").strip()
+        for message in reversed(recent_messages):
+            if str(message.get("role") or "") != "user":
+                continue
+            content = str(message.get("content") or "").strip()
+            if content and content != current:
+                return content
+        return None
+
+    @staticmethod
     def _is_capability_question(user_text: str) -> bool:
         text = user_text.lower()
         return "capabil" in text and any(marker in text for marker in ("model", "you", "app", "aegis"))
@@ -227,6 +299,10 @@ class AgentOrchestrator:
     @staticmethod
     def _has_parser_runtime_failure(turn_contract) -> bool:
         return "parser_unavailable" in set(turn_contract.ambiguities or [])
+
+    @staticmethod
+    def _has_parser_authentication_failure(turn_contract) -> bool:
+        return "parser_authentication_failed" in set(turn_contract.ambiguities or [])
 
     def _compose_assistant_message(
         self,
@@ -342,9 +418,11 @@ class AgentOrchestrator:
         replacements = {
             "TOMTOM_API_KEY": "TomTom API key",
             "GEOAPIFY_API_KEY": "Geoapify API key",
+            "WINDY_WEBCAMS_API_KEY": "Windy Webcams API key",
             "osm_default": "OpenStreetMap",
             "tomtom_basic": "TomTom Basic",
             "tomtom_traffic_flow": "TomTom Traffic Flow",
+            "windy_webcams": "Windy Webcams",
         }
         for raw, readable in replacements.items():
             message = message.replace(raw, readable)

@@ -1,13 +1,7 @@
 <div class="access-page">
   <header class="access-page__header">
     <div>
-      <p class="page-kicker">Access Configurations</p>
-      <h1>Optional Geospatial Provider Keys</h1>
-      <p>AEGIS uses free and openly accessible sources by default. Add keys only for optional premium-style map providers.</p>
-      <p class="access-page__default-inline">
-        <strong>Default workflow:</strong>
-        OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim remain available without user-supplied API keys, subject to provider attribution and usage limits.
-      </p>
+      <p>Manage optional API keys for commercial geospatial providers in AEGIS to unlock premium mapping and credential-gated data services. By default, AEGIS runs on open sources including OpenStreetMap, NASA GIBS, ESA WorldCover, EEA, OpenAQ, Open-Meteo, Overpass, PVGIS, RainViewer, and Nominatim, available without user-supplied keys under each provider's attribution and usage limits.</p>
     </div>
   </header>
 
@@ -45,8 +39,16 @@
 
           <footer>
             <label class="access-provider__key-field">
-              API key
               <div class="access-provider__key-input-row">
+                <button
+                  *ngIf="canShowSignupTrigger(provider.id)"
+                  type="button"
+                  class="access-signup-trigger access-signup-trigger--inline"
+                  [disabled]="isLoadingAccountSetups"
+                  (click)="openProviderSignup(getAccountSetupForProvider(provider.id))"
+                >
+                  Get API
+                </button>
                 <input
                   type="password"
                   autocomplete="off"
@@ -76,7 +78,7 @@
                     title="Clear saved key"
                   >
                     <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
-                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-1.4 6h8.8l-.7 10.2A2 2 0 0 1 13.7 21H10.3a2 2 0 0 1-2-1.8L7.6 9Zm2.2 1.8.3 7.2h1.5l-.3-7.2H9.8Zm3.9 0-.3 7.2h1.5l.3-7.2h-1.5Z" fill="currentColor" />
+                      <path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1l.8 11a2 2 0 0 0 2 1.9h6.4a2 2 0 0 0 2-1.9L18 7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9Zm1 2V5h4V5h-4Zm-1.2 4h6.4l-.7 9H9.5l-.7-9Zm2.2 1.5a1 1 0 0 0-1 1v5a1 1 0 1 0 2 0v-5a1 1 0 0 0-1-1Zm3 0a1 1 0 0 0-1 1v5a1 1 0 1 0 2 0v-5a1 1 0 0 0-1-1Z" fill="currentColor" />
                     </svg>
                   </button>
                 </div>
@@ -87,4 +89,79 @@
       }
     </section>
   </main>
+
+  <div
+    *ngIf="isSignupModalOpen && selectedProviderAccountSetup as setup"
+    class="provider-signup-modal"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'API key setup for ' + setup.name"
+  >
+    <div class="provider-signup-modal__panel">
+      <header>
+        <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
+        <h2>{{ setup.name }}</h2>
+        <p>{{ supportLabel(setup) }}. Automation is best-effort and pauses for provider-controlled steps.</p>
+      </header>
+
+      <section class="provider-signup-modal__notes" aria-label="Guided setup notes">
+        <h3>What AEGIS can help with</h3>
+        <ul>
+          <li *ngFor="let note of setup.automation.userActionNotes">{{ note }}</li>
+        </ul>
+      </section>
+
+      <section class="provider-signup-modal__notes" aria-label="Safety boundaries">
+        <h3>Safety boundaries</h3>
+        <ul>
+          <li *ngFor="let note of setup.automation.safetyNotes">{{ note }}</li>
+        </ul>
+      </section>
+
+      <section *ngIf="setup.automation.requiredFields.length" class="provider-signup-modal__notes" aria-label="Provider information guidance">
+        <h3>Provider information</h3>
+        <ul>
+          <li *ngFor="let field of setup.automation.requiredFields">
+            {{ field.label }}<span *ngIf="field.helpText"> — {{ field.helpText }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <p *ngIf="signupModalError" class="access-page__status" aria-live="polite">{{ signupModalError }}</p>
+
+      <label *ngIf="setup.automation.support !== 'unsupported'" class="provider-signup-modal__key-input">
+        Generated API key
+        <input
+          type="password"
+          autocomplete="off"
+          [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
+          [(ngModel)]="signupKeyInput"
+          name="guided_signup_api_key"
+        />
+      </label>
+
+      <div class="provider-signup-modal__actions">
+        <button type="button" class="access-signup-trigger" (click)="openProviderPortal(setup)">
+          {{ setup.automation.support === 'unsupported' ? 'Open documentation' : 'Start guided setup' }}
+        </button>
+        <button
+          *ngIf="setup.automation.support !== 'unsupported'"
+          type="button"
+          class="access-provider__icon-button access-provider__icon-button--primary"
+          [disabled]="isSaving"
+          (click)="saveGeneratedCredential(setup)"
+          aria-label="Save generated API key"
+          title="Save generated API key"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+            <path d="M5 3h11.2L21 7.8V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v14h14V8.7L15.3 5H15v4.8a1.2 1.2 0 0 1-1.2 1.2H8.2A1.2 1.2 0 0 1 7 9.8V5H5Zm4 0v4h4V5H9Zm-1 9h8a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Z" fill="currentColor" />
+          </svg>
+        </button>
+        <button type="button" class="access-provider__icon-button" (click)="closeProviderSignup()" aria-label="Cancel guided setup" title="Cancel">
+          ×
+        </button>
+      </div>
+    </div>
+  </div>
+
 </div>

@@ -99,5 +99,25 @@
     "timestampPath": "fuel_stations[].updated_at",
     "fieldMap": {},
     "expectedGeometry": "Point"
+  },
+  "account_setup": {
+    "automation": {
+      "support": "agent_assisted",
+      "signup_url": "https://developer.nrel.gov/signup/",
+      "developer_portal_url": "https://developer.nrel.gov/signup/",
+      "docs_url": "https://developer.nrel.gov/docs/transportation/alt-fuel-stations-v1/",
+      "required_fields": [],
+      "user_action_notes": [
+        "Open the provider portal from AEGIS and complete account-controlled steps in the provider site.",
+        "Pause for any CAPTCHA, login, email verification, 2FA, billing, consent, or key-generation prompts.",
+        "Paste the generated API key back into AEGIS when the provider flow is complete."
+      ],
+      "safety_notes": [
+        "AEGIS does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials.",
+        "Guided setup is experimental and best-effort; manual provider instructions remain the fallback."
+      ],
+      "experimental": true,
+      "experimental_label": "Experimental guided setup"
+    }
   }
 }

@@ -4,7 +4,12 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from server.domain.extraction.models import TurnParseResult
+from server.domain.extraction.models import (
+    ConversationContextSnapshot,
+    LocationSignal,
+    NormalizedIntent,
+    TurnParseResult,
+)
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
@@ -414,6 +419,8 @@ class ManifestIntentResolver:
         available_ids: set[str],
     ) -> list[str]:
         allowed_overlay_ids = self._allowed_overlay_ids(concepts)
+        if not allowed_overlay_ids:
+            return []
         overlays = {
             str(item.get("id")): self._capability_tokens(item)
             for item in capability_registry.list_overlays()
@@ -606,12 +613,6 @@ def _gate_selected_capability(
 def _synthetic_turn(
     user_query: str, tags: list[str], resolved_location: object | None
 ) -> TurnParseResult:
-    from server.domain.extraction.models import (
-        ConversationContextSnapshot,
-        LocationSignal,
-        NormalizedIntent,
-    )
-
     location_signals = []
     latitude = getattr(resolved_location, "latitude", None)
     longitude = getattr(resolved_location, "longitude", None)

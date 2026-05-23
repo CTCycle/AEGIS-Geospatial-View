@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from server.common.time import utc_now
 from server.domain.agent.decision import ResolvedLocation
 
 TimeMode = Literal["current", "historical", "forecast"]
+
+
+GeospatialProviderAutomationSupport = Literal[
+    "manual_only", "guided_playwright", "agent_assisted", "unsupported"
+]
+GeospatialProviderSignupFieldType = Literal["text", "email", "textarea", "select"]
 
 
 class CapabilityKind(str, Enum):
@@ -92,6 +99,165 @@ class ProviderAuthPolicy(BaseModel):
     access_page_provider_id: str | None = Field(
         default=None, alias="accessPageProviderId"
     )
+
+
+class GeospatialLayersResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    basemaps: list[dict[str, Any]] = Field(default_factory=list)
+    overlays: list[dict[str, Any]] = Field(default_factory=list)
+    cameras: list[dict[str, Any]] = Field(default_factory=list)
+    transit: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class GeospatialLayerHealthResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    provider: str | None = None
+    reliability: dict[str, Any] = Field(default_factory=dict)
+    runtime: Any = None
+
+
+class GeospatialProviderPayloadResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    provider: str
+    message: str | None = None
+    payload: Any = None
+    attribution: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    stale: bool = False
+
+
+class GeospatialCameraDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    status: str
+    provider: str
+    message: str | None = None
+    camera: dict[str, Any] | None = None
+    attribution: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    stale: bool = False
+
+
+class GeospatialCredentialStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    required: bool
+    configured: bool
+    environmentVariable: str | None = None
+
+
+class GeospatialProviderSignupField(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    field_type: GeospatialProviderSignupFieldType = "text"
+    required: bool = True
+    sensitive: bool = False
+    help_text: str | None = None
+
+
+class GeospatialProviderSignupAutomation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    support: GeospatialProviderAutomationSupport
+    signup_url: str | None = None
+    developer_portal_url: str | None = None
+    docs_url: str | None = None
+    required_fields: list[GeospatialProviderSignupField] = Field(default_factory=list)
+    user_action_notes: list[str] = Field(default_factory=list)
+    safety_notes: list[str] = Field(default_factory=list)
+    experimental: bool = True
+    experimental_label: str = "Experimental guided setup"
+
+
+class GeospatialProviderAccountSetupResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    name: str
+    requires_credentials: bool
+    auth_mode: str
+    docs_url: str | None = None
+    environment_variable: str | None = None
+    configured: bool = False
+    instructions: list[str] = Field(default_factory=list)
+    automation: GeospatialProviderSignupAutomation
+    credential_storage_key: str
+    credential_label: str
+    key_format_hint: str | None = None
+    validation_supported: bool = False
+
+
+class GeospatialProviderAccountSetupListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    providers: list[GeospatialProviderAccountSetupResponse] = Field(
+        default_factory=list
+    )
+
+
+class ProviderCredentialValidationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    valid: bool
+    status: Literal["valid", "invalid", "unsupported", "error"]
+    message: str
+
+
+class LayerAuditIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    manifest_id: str | None = None
+    severity: str
+    message: str
+
+
+class CapabilityImplementationStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability_id: str
+    provider_id: str
+    schema_valid: bool = True
+    runtime_registered: bool
+    provider_fetch_implemented: bool
+    normalizer_implemented: bool
+    cache_implemented: bool
+    api_endpoint_covered: bool
+    client_renderer_covered: bool
+    unit_tested: bool
+    visual_tested: bool
+    placeholder_statuses: list[str] = Field(default_factory=list)
+
+
+class LayerAuditReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    manifest_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    schema_coverage: dict[str, int] = Field(default_factory=dict)
+    provider_coverage: dict[str, int] = Field(default_factory=dict)
+    renderer_coverage: dict[str, int] = Field(default_factory=dict)
+    auth_coverage: dict[str, int] = Field(default_factory=dict)
+    source_doc_coverage: dict[str, int] = Field(default_factory=dict)
+    issues: list[LayerAuditIssue] = Field(default_factory=list)
+    implementation_statuses: list[CapabilityImplementationStatus] = Field(
+        default_factory=list
+    )
+
+    @property
+    def ok(self) -> bool:
+        return self.error_count == 0
 
 
 class AgenticUsePolicy(BaseModel):
@@ -191,6 +357,7 @@ class PoiFeature(BaseModel):
     phone: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+
 ###############################################################################
 class ViewportPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -200,6 +367,7 @@ class ViewportPolicy(BaseModel):
     radius_m: float = Field(default=2500.0, gt=0)
     bbox: list[float] | None = None
 
+
 ###############################################################################
 class PresentationPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -207,6 +375,7 @@ class PresentationPolicy(BaseModel):
     emphasize_overlays: bool = False
     high_contrast: bool = False
     show_legend: bool = True
+
 
 ###############################################################################
 class LocationSearchRequest(BaseModel):
@@ -220,6 +389,7 @@ class LocationSearchRequest(BaseModel):
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
 
+
 ###############################################################################
 class MapSession(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -229,7 +399,7 @@ class MapSession(BaseModel):
     basemap_id: str
     overlay_ids: list[str] = Field(default_factory=list)
     viewport: ViewportPolicy
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    generated_at: datetime = Field(default_factory=utc_now)
     payload: dict[str, object] = Field(default_factory=dict)
     center: dict[str, float | None] | None = None
     bounds: list[float] | None = None
@@ -243,6 +413,7 @@ class SearchByLocationResponse(BaseModel):
 
     status_message: str
     map_session: MapSession
+
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):

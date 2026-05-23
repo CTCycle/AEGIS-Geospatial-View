@@ -1,21 +1,61 @@
 .model-card__actions {
-  display: flex;
-  gap: 0.42rem;
-  flex-wrap: wrap;
-  margin-top: var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: auto;
+  padding-top: 0.95rem;
+  border-top: 1px solid #213742;
+  border-bottom: 1px solid #213742;
 }
 
-.model-card__actions button {
-  border: 1px solid #344953;
-  border-radius: 999px;
-  padding: 0.24rem 0.55rem;
-  background: #162833;
+.model-card__duty {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-right: 1px solid #213742;
+  padding: 0.62rem 0.45rem 0.6rem;
+  background: transparent;
   color: #dce8ed;
-  font-size: 0.76rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.28rem;
+  min-height: 3.55rem;
+  transition: border-color 130ms ease, background-color 130ms ease, color 130ms ease;
 }
 
-.model-card__actions button.active {
-  border-color: #2f9bd7;
-  background: #17384a;
-  color: #e6f7ff;
+.model-card__duty:hover {
+  background: rgb(23 50 65 / 36%);
+}
+
+.model-card__duty:last-child {
+  border-right: 0;
+}
+
+.model-card__duty-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: #9eb7c4;
+  display: grid;
+  place-items: center;
+}
+
+.model-card__duty-name {
+  font-size: 1.01rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.model-card__duty--active {
+  border-bottom-color: #59d6a5;
+  background: linear-gradient(180deg, rgb(51 117 101 / 28%) 0%, rgb(19 48 44 / 14%) 100%);
+  color: #ebf8ff;
+}
+
+.model-card__duty--active .model-card__duty-icon {
+  color: #79d8b8;
+}
+
+@media (max-width: 760px) {
+  .model-card__actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

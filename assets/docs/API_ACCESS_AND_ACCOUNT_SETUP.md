@@ -1,6 +1,6 @@
 # API Access and Account Setup Guide
 
-Last updated: 2026-05-14
+Last updated: 2026-05-17
 
 ## Purpose
 
@@ -41,6 +41,25 @@ Environment fallback:
 Credential-gated manifests must reference only the provider key name and Access setup provider ID. Raw key values are prohibited in manifests, provider responses, browser logs, network URLs, and snapshots.
 
 `LOCAL_OPEN_DATA_SOURCES` is a JSON object that maps capability IDs to official JSON source URLs or local files, for example `{"dot_traffic_cameras":"https://agency.example/cameras.json"}`.
+
+## Experimental guided provider signup
+
+AEGIS exposes an experimental `Get API key` trigger on the Access settings page for credential-gated geospatial providers. The trigger is a human-in-the-loop onboarding aid: it can open the provider portal or documentation, show provider-specific setup notes, and give the user a safe place to paste the generated API key back into the existing credential-management flow.
+
+This feature is best-effort and does not guarantee end-to-end account creation. Users must complete provider-controlled steps themselves, including CAPTCHA, login, email verification, 2FA, billing setup, consent screens, project creation, and final key generation.
+
+AEGIS does not create provider accounts autonomously and does not collect provider passwords, CAPTCHA responses, 2FA codes, recovery codes, or billing credentials. If guided assistance is unavailable or fails, every provider flow must fall back to manual setup guidance and official provider links.
+
+Provider automation support values:
+
+| Value | Meaning |
+| --- | --- |
+| `manual_only` | AEGIS provides instructions and links only; provider setup is fully manual. |
+| `guided_playwright` | A future/provider-specific guided browser flow may advance stable steps while pausing for user-controlled actions. |
+| `agent_assisted` | AEGIS guides the user, opens stable portal/docs links, and relies on the user to complete provider-controlled steps. |
+| `unsupported` | Automation support is not verified; show documentation-only behavior. |
+
+The current rollout is experimental. Google Maps remains manual and billing-aware. OpenTripMap is documentation-only until automation support is verified.
 
 ## Providers
 

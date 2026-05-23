@@ -112,6 +112,48 @@ describe('pages/settings-page.component', () => {
     expect(component.displayedModels.length).toBe(1);
   });
 
+  it('keeps richer Ollama library descriptions for installed models', async () => {
+    window.history.replaceState({}, '', '/settings');
+    fetchChatModelsMock.and.resolveTo({
+      cloud: [{
+        id: 'gemma4',
+        name: 'gemma4',
+        description: 'Detailed library description for the installed model family.',
+        provider: 'ollama',
+        capabilities: ['chat'],
+        metadata: { source: 'library' },
+      }],
+      local: [{
+        id: 'gemma4:31b',
+        name: 'gemma4:31b',
+        description: 'local',
+        provider: 'ollama',
+        capabilities: [],
+        metadata: { quantization: 'Q4_K_M' },
+      }],
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const model = fixture.componentInstance.displayedModels.find((item) => item.id === 'gemma4:31b');
+    expect(model?.description).toContain('Detailed library description');
+  });
+
+  it('provides fallback descriptions for installed local models', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const localModel = {
+      id: 'qwen2.5:7b',
+      name: 'qwen2.5:7b',
+      description: 'local',
+      provider: 'ollama',
+      capabilities: [],
+      metadata: {},
+    };
+    expect(fixture.componentInstance.modelDescription(localModel)).toContain('Installed Ollama model');
+  });
+
   it('applyModelSelection updates settings and status text', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -120,6 +162,37 @@ describe('pages/settings-page.component', () => {
     await component.applyModelSelection('chat', component.displayedModels[0]);
     expect(updateChatSettingsMock).toHaveBeenCalled();
     expect(component.statusText).toContain('Selected');
+  });
+
+  it('pulls a missing Ollama model before assigning it', async () => {
+    fetchChatModelsMock.and.resolveTo({
+      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: [], metadata: {} }],
+      local: [],
+    });
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.setProviderFilter('ollama');
+
+    fetchChatModelsMock.and.resolveTo({
+      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: [], metadata: {} }],
+      local: [{ id: 'llama3.1', name: 'llama3.1', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
+    });
+
+    await component.applyModelSelection('parser', {
+      id: 'llama3.1',
+      name: 'llama3.1',
+      description: 'library',
+      provider: 'ollama',
+      capabilities: [],
+      metadata: {},
+    });
+
+    expect(pullOllamaModelMock).toHaveBeenCalledWith('llama3.1');
+    expect(refreshOllamaModelsMock).toHaveBeenCalled();
+    expect(updateChatSettingsMock).toHaveBeenCalled();
+    expect(component.statusText).toContain('Selected llama3.1 for parser');
   });
 
   it('applyModelSelection does not send read-only credential health fields', async () => {
@@ -268,6 +341,13 @@ describe('pages/settings-page.component', () => {
     const input = fixture.nativeElement.querySelector('input.model-search-bar') as HTMLInputElement | null;
     expect(input).not.toBeNull();
     expect(input?.getAttribute('aria-label')).toBe('Search models');
+  });
+
+  it('renders model cards through the extracted model card component host', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelectorAll('article[appmodelcard]').length).toBeGreaterThan(0);
   });
 
   it('navigateBack preserves state before routing', async () => {

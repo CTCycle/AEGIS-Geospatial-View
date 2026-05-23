@@ -376,7 +376,7 @@ describe('e2e/geospatial browser smoke', () => {
 
   it('renders Windy popup states without embedding unless provider permission is explicit', async () => {
     const activeCamera: CameraFeature = {
-      id: 'windy/active',
+      id: 'windy_webcams/active',
       name: 'Windy Active Harbor',
       provider: 'windy_webcams',
       camera_type: 'webcam',
@@ -392,7 +392,7 @@ describe('e2e/geospatial browser smoke', () => {
     };
     const staleCamera: CameraFeature = {
       ...activeCamera,
-      id: 'windy/stale',
+      id: 'windy_webcams/stale',
       name: 'Windy Stale Mountain',
       preview_image_url: null,
       embed_url: 'https://embed.windy.example/stale',

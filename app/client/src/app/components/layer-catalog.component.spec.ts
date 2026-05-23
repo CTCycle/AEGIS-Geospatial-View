@@ -93,6 +93,11 @@ describe('components/layer-catalog.component', () => {
     ]);
   });
 
+  it('falls back to all category on invalid values', () => {
+    component.onCategoryChange('invalid');
+    expect(component.selectedCategory).toBe('all');
+  });
+
   it('allows manual toggles only for healthy renderable map layers', () => {
     const byId = Object.fromEntries(component.layers.map((item) => [item.id, item]));
 
