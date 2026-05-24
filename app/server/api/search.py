@@ -19,6 +19,7 @@ from server.services.search.errors import (
     MapSearchExecutionError,
     MapSearchJobInitializationError,
     MapSearchJobNotFoundError,
+    MapSearchTileProxyError,
 )
 from server.services.search.execution import MapSearchExecutionService
 from server.common.constants import (
@@ -85,7 +86,7 @@ def proxy_osm_basemap_tile(
             media_type=media_type,
             headers={"Cache-Control": cache_control},
         )
-    except Exception as exc:
+    except MapSearchTileProxyError as exc:
         return Response(
             content=str(exc) or "OSM basemap tile provider is unavailable.",
             status_code=status.HTTP_502_BAD_GATEWAY,

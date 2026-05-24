@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import replace
 from collections.abc import Iterable, Sequence
 from html.parser import HTMLParser
@@ -25,6 +24,7 @@ from server.services.llm.types import (
     LLMToolDefinition,
     ModelDescriptor,
 )
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
 
 class _OllamaLibraryParser(HTMLParser):
@@ -70,11 +70,15 @@ class _OllamaLibraryParser(HTMLParser):
 
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
-    _tool_capability_cache: dict[tuple[str, str], tuple[float, bool, str]] = {}
-    _tool_capability_ttl_seconds = 3600
 
-    def __init__(self, *, base_url: str) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        tool_capability_cache: OllamaToolCapabilityCache | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
         self.last_context_usage: dict[str, Any] | None = None
 
     def _build_chat_model(
@@ -186,10 +190,11 @@ class OllamaProvider(LLMProvider):
         if show_capabilities is not None:
             if "tools" in show_capabilities:
                 capabilities.add("tools")
-            self._tool_capability_cache[(self.base_url, model)] = (
-                time.time(),
+            self.tool_capability_cache.set(
+                self.base_url,
+                model,
                 "tools" in show_capabilities,
-                "ollama_show",
+                source="ollama_show",
             )
             return capabilities
         if self._probe_tool_support(model):
@@ -214,11 +219,9 @@ class OllamaProvider(LLMProvider):
         return {str(item).strip().lower() for item in raw if str(item).strip()}
 
     def _probe_tool_support(self, model: str) -> bool:
-        key = (self.base_url, model)
-        cached = self._tool_capability_cache.get(key)
-        now = time.time()
-        if cached is not None and now - cached[0] < self._tool_capability_ttl_seconds:
-            return cached[1]
+        cached = self.tool_capability_cache.get(self.base_url, model)
+        if cached is not None:
+            return cached
         tool = LLMToolDefinition(
             name="aegis_tool_probe",
             description="Harmless capability probe.",
@@ -245,12 +248,16 @@ class OllamaProvider(LLMProvider):
             )
         except Exception:
             supported = False
-        self._tool_capability_cache[key] = (now, supported, "ollama_probe")
+        self.tool_capability_cache.set(
+            self.base_url,
+            model,
+            supported,
+            source="ollama_probe",
+        )
         return supported
 
     def _tool_support_source(self, model: str) -> str:
-        cached = self._tool_capability_cache.get((self.base_url, model))
-        return cached[2] if cached is not None else "unknown"
+        return self.tool_capability_cache.source(self.base_url, model) or "unknown"
 
     def list_library_models(self) -> list[ModelDescriptor]:
         try:

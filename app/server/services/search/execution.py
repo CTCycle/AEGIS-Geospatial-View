@@ -10,11 +10,12 @@ from server.domain.geographics import (
 )
 from server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from server.services.geospatial.catalog import GeospatialCatalogService
-from server.services.geospatial.osm_tiles import OsmTileProxyService
+from server.services.geospatial.osm_tiles import OsmTileProxyError, OsmTileProxyService
 from server.services.jobs import JobManager
 from server.services.search.errors import (
     MapSearchJobInitializationError,
     MapSearchJobNotFoundError,
+    MapSearchTileProxyError,
 )
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.common.constants import (
@@ -90,7 +91,10 @@ class MapSearchExecutionService:
         return GeospatialCatalogResponse.model_validate(catalog)
 
     def fetch_osm_basemap_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:
-        return self.osm_tile_proxy_service.fetch_tile(z, x, y)
+        try:
+            return self.osm_tile_proxy_service.fetch_tile(z, x, y)
+        except OsmTileProxyError as exc:
+            raise MapSearchTileProxyError(str(exc)) from exc
 
 
 def run_search_job(

@@ -68,7 +68,7 @@ class NativeToolLoop:
         self.tool_timeout_seconds = tool_timeout_seconds
 
     async def run(self, request: AgentToolLoopRequest) -> AgentToolLoopResult:
-        provider = self.provider_factory.get_agent_provider(request.provider)
+        provider = self.provider_factory.get_provider(request.provider)
         messages = list(request.messages)
         all_calls: list[LLMToolCall] = []
         all_results: list[LLMToolResult] = []

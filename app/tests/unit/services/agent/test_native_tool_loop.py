@@ -38,7 +38,7 @@ class _Factory:
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
-    def get_agent_provider(self, provider: str) -> _Provider:
+    def get_provider(self, provider: str) -> _Provider:
         return self.provider
 
 
