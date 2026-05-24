@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import { MODEL_ROLES, ModelRole, isModelSelectedForRole } from '../core/model-selection';
+import { MODEL_ROLES, ModelRole, isModelSelectedForRole, roleDisabledReason } from '../core/model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from '../core/types';
 
 @Component({
@@ -43,7 +43,21 @@ export class ModelRoleActionsComponent {
     return 'agent';
   }
 
+  disabledReason(role: ModelRole): string | null {
+    if (this.requiresPull) {
+      return 'Pull this model before assigning a role.';
+    }
+    return roleDisabledReason(this.model, role);
+  }
+
+  isDisabled(role: ModelRole): boolean {
+    return this.disabledReason(role) !== null;
+  }
+
   onSelect(role: ModelRole): void {
+    if (this.isDisabled(role)) {
+      return;
+    }
     this.selectRole.emit(role);
   }
 }

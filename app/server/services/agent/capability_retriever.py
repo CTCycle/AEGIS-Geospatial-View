@@ -10,6 +10,12 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
 class CapabilityRetriever:
+    """Deprecated for agent execution.
+
+    This retriever is retained only for non-agent search or diagnostic callers.
+    Agent tool exposure must use AgentToolCatalogService and NativeToolLoop.
+    """
+
     def __init__(
         self,
         *,

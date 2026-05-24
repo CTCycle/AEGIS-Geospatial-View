@@ -415,6 +415,11 @@ export interface ModelCardDescriptor {
   description: string;
   provider: string;
   capabilities: string[];
+  supports_tools?: boolean;
+  supports_structured_output?: boolean;
+  supports_vision?: boolean;
+  supports_embeddings?: boolean;
+  tool_support_source?: string;
   metadata: Record<string, JsonValue>;
 }
 

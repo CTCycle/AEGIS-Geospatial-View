@@ -35,7 +35,19 @@ def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatc
 
         def list_models(self):  # noqa: ANN201
             provider_calls.append(("list_models", None))
-            return [type("Model", (), {"name": "llama3.2"})()]
+            return [
+                type(
+                    "Model",
+                    (),
+                    {
+                        "name": "llama3.2",
+                        "description": "local",
+                        "provider": "ollama",
+                        "capabilities": ["chat", "tools"],
+                        "metadata": {"tool_support_source": "ollama_probe"},
+                    },
+                )()
+            ]
 
         def pull_model(self, *, model: str):  # noqa: ANN201
             provider_calls.append(("pull_model", model))
@@ -60,6 +72,8 @@ def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatc
     rebuild = service.rebuild_vectors()
 
     assert isinstance(refresh, OllamaRefreshResponse)
+    assert refresh.local_model_capabilities[0].supports_tools is True
+    assert refresh.local_model_capabilities[0].tool_support_source == "ollama_probe"
     assert isinstance(pull, OllamaPullResponse)
     assert health.ok is True
     assert isinstance(sync, VectorizationResponse)

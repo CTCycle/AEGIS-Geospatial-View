@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -40,6 +41,19 @@ class GoogleProvider(LLMProvider):
             entry for entry in get_cloud_model_catalog() if entry.provider == "google"
         ]
 
+    def supports_tools(self, model: str) -> bool:
+        return "tools" in self._capabilities_for_model(model)
+
+    def supports_structured_output(self, model: str) -> bool:
+        capabilities = self._capabilities_for_model(model)
+        return "structured" in capabilities or "structured_output" in capabilities
+
+    def _capabilities_for_model(self, model: str) -> set[str]:
+        for entry in self.list_models():
+            if entry.name == model:
+                return set(entry.capabilities)
+        return {"chat", "stream", "structured", "structured_output", "tools"}
+
     @staticmethod
     def tool_to_google_schema(tool: LLMToolDefinition) -> dict[str, Any]:
         return {
@@ -68,6 +82,10 @@ class GoogleProvider(LLMProvider):
                 )
         return calls
 
+    @staticmethod
+    def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return messages
+
     def chat(
         self,
         request: LLMRequest,
@@ -80,14 +98,22 @@ class GoogleProvider(LLMProvider):
             request, provider=self.provider_name
         ).to_dict()
         config = self._config_from_request(request)
-        selected_tools = list(tools or request.tools or [])
-        if selected_tools:
-            config["tools"] = [
-                {"function_declarations": [self.tool_to_google_schema(tool) for tool in selected_tools]}
-            ]
-            config["tool_config"] = {"function_calling_config": {"mode": "AUTO" if (tool_choice or request.tool_choice) != "none" else "NONE"}}
+        native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
-        if schema:
+        effective_request = replace(
+            request,
+            tools=native_tools or None,
+            response_json_schema=schema,
+        )
+        self._validate_request_capabilities(effective_request)
+        if native_tools:
+            config["tools"] = [
+                {"function_declarations": [self.tool_to_google_schema(tool) for tool in native_tools]}
+            ]
+            choice = tool_choice or request.tool_choice or "auto"
+            mode = "ANY" if choice == "required" else "NONE" if choice == "none" else "AUTO"
+            config["tool_config"] = {"function_calling_config": {"mode": mode}}
+        if schema and not native_tools:
             config["response_mime_type"] = "application/json"
             config["response_json_schema"] = schema
         response = self._client().models.generate_content(
@@ -100,6 +126,7 @@ class GoogleProvider(LLMProvider):
             content=str(getattr(response, "text", "") or ""),
             raw=raw,
             tool_calls=self._parse_tool_calls(raw),
+            finish_reason=self._extract_finish_reason(raw),
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
@@ -122,8 +149,10 @@ class GoogleProvider(LLMProvider):
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
-        schema_dump = getattr(schema, "model_json_schema", None)
-        json_schema = schema_dump() if callable(schema_dump) else {}
+        json_schema = schema.model_json_schema() if hasattr(schema, "model_json_schema") else {}
+        self._validate_request_capabilities(
+            replace(request, response_json_schema=json_schema)
+        )
         response = self._client().models.generate_content(
             model=request.model,
             contents=self._contents_from_messages(request.messages),
@@ -155,11 +184,43 @@ class GoogleProvider(LLMProvider):
         return {"ok": True, "detail": "configured"}
 
     @staticmethod
-    def _contents_from_messages(messages: list[dict[str, str]]) -> list[dict[str, Any]]:
+    def _contents_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         contents: list[dict[str, Any]] = []
         for message in messages:
             role = str(message.get("role") or "").strip().lower()
             if role == "system":
+                continue
+            if role == "assistant" and isinstance(message.get("tool_calls"), list):
+                contents.append(
+                    {
+                        "role": "model",
+                        "parts": [
+                            {
+                                "function_call": {
+                                    "name": call.get("name"),
+                                    "args": call.get("arguments") or {},
+                                }
+                            }
+                            for call in message["tool_calls"]
+                            if isinstance(call, dict)
+                        ],
+                    }
+                )
+                continue
+            if role == "tool":
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "function_response": {
+                                    "name": message.get("name"),
+                                    "response": {"content": message.get("content")},
+                                }
+                            }
+                        ],
+                    }
+                )
                 continue
             mapped_role = "model" if role == "assistant" else "user"
             contents.append(
@@ -169,6 +230,17 @@ class GoogleProvider(LLMProvider):
                 }
             )
         return contents or [{"role": "user", "parts": [{"text": ""}]}]
+
+    @staticmethod
+    def _extract_finish_reason(raw: dict[str, Any]) -> str | None:
+        candidates = raw.get("candidates") if isinstance(raw, dict) else None
+        if not isinstance(candidates, list) or not candidates:
+            return None
+        candidate = candidates[0]
+        if not isinstance(candidate, dict):
+            return None
+        reason = candidate.get("finishReason") or candidate.get("finish_reason")
+        return str(reason) if reason else None
 
     @staticmethod
     def _config_from_request(request: LLMRequest) -> dict[str, Any]:

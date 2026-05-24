@@ -1,6 +1,6 @@
 # Capability Manifests
 
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## Purpose
 
@@ -11,9 +11,9 @@ Default capability selection prioritizes free and openly accessible providers. G
 ## Capability Loading Contract
 
 - Providers, basemaps, overlays, and direct tools are loaded through `GeospatialManifestLoader`, `CapabilityRegistry`, and `RuntimeRegistry`.
-- Capability manifests are the source of truth for generated agent tools.
-- Overlay capabilities are first-class agent tools and can be selected by the action-aware tool manifest service.
-- Capability IDs must remain stable because they are used to generate deterministic tool names in the form `overlay__{safe_capability_id}`.
+- Capability manifests are the source of truth for agent catalog, describe, and execute operations.
+- Overlay capabilities are exposed to the agent through stable catalog tools, not through generated per-overlay tool names.
+- Capability IDs must remain stable because the agent executes geospatial capabilities by `capability_id`.
 - Schema v2 is the only accepted manifest contract. The loader rejects manifests that omit v2 source, auth, rendering, reliability, cache, license, or normalization metadata.
 - The strict auditor reports schema, provider, renderer, auth, and source-doc coverage so missing operational metadata is visible before runtime.
 - Runtime availability is controlled by `runtime_profiles.json` plus credential presence.
@@ -127,7 +127,7 @@ Every manifest under `app/resources/manifests` must define:
 - `auth`: provider auth type, provider key name, required flag, and access-page provider ID when credentials are required.
 - `account_setup`: optional provider setup guide metadata consumed by the Access configurations wizard.
 - `agenticUse`: planner hints, default enablement, manual-toggle policy, and avoid-when rules.
-- `agenticUse.action_tags`: action-selection hints used by the agent tool manifest and capability ranking.
+- `agenticUse.action_tags`: discovery hints returned by catalog and describe responses. They are not used to rank or select which tools the agent may call.
 - `agenticUse.requiredUserAction`: optional required user action hint for gating geospatial capability use.
 - `reliability`: health status, audit date, and known limitations.
 - `cachePolicy`: cache mode, TTL, and stale-while-revalidate TTL.
@@ -177,6 +177,16 @@ Run the strict audit before merging manifest changes:
 cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict
 ```
+
+## Agent Catalog Contract
+
+Agent access to manifests uses three stable native tools:
+
+- `list_geospatial_capabilities` returns compact metadata only and must paginate deterministically. Page size is capped at 50.
+- `describe_geospatial_capability` returns one full manifest descriptor plus the executable argument JSON schema.
+- `execute_geospatial_capability` validates supplied arguments against the manifest schema before execution.
+
+The agent must not depend on embeddings, semantic retrieval, `top_k` ranking, or vector indexes to decide which manifest tools are visible. Vectorized manifest data may remain available to non-agent search UI, but agent tool exposure is catalog-based.
 
 ## Account setup automation metadata
 

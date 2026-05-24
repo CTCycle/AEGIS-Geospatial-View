@@ -173,6 +173,8 @@ class ParserService:
             model=model_name,
             temperature=0.0,
             provider=provider_name,
+            tools=[],
+            tool_choice="none",
             messages=[
                 {
                     "role": "system",

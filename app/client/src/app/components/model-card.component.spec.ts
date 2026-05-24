@@ -19,6 +19,11 @@ describe('ModelCardComponent', () => {
       description: 'cloud model',
       provider: 'openai',
       capabilities: [],
+      supports_tools: true,
+      supports_structured_output: true,
+      supports_vision: false,
+      supports_embeddings: false,
+      tool_support_source: 'catalog',
       metadata: {},
     };
     component.settings = {

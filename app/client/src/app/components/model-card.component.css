@@ -39,12 +39,28 @@
 
 .model-card p {
   margin-top: var(--space-2);
-  margin-bottom: 0;
+  margin-bottom: var(--space-2);
   color: #a9bac2;
   font-size: var(--font-size-caption);
   line-height: 1.45;
   flex: 1 1 auto;
   padding-bottom: 0.85rem;
+}
+
+.model-card__capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.model-card__capabilities span {
+  border: 1px solid #314753;
+  border-radius: 0.35rem;
+  padding: 0.18rem 0.42rem;
+  color: #c9d8de;
+  font-size: 0.73rem;
+  line-height: 1.2;
 }
 
 .model-card app-model-role-actions {

@@ -116,6 +116,13 @@ class ChatSettingsService:
             agent_model_name=next_agent_model_name,
             ollama_url=next_ollama_url,
         )
+        self._validate_role_capabilities(
+            parser_model_provider=next_parser_model_provider,
+            parser_model_name=next_parser_model_name,
+            agent_model_provider=next_agent_model_provider,
+            agent_model_name=next_agent_model_name,
+            ollama_url=next_ollama_url,
+        )
         for provider, labels in payload.credentials.items():
             for label, raw_value in labels.items():
                 if not raw_value.strip():
@@ -180,4 +187,34 @@ class ChatSettingsService:
         if unavailable:
             raise ChatSettingsValidationError(
                 "Selected embedding model is not available from Ollama."
+            )
+
+    def _validate_role_capabilities(
+        self,
+        *,
+        parser_model_provider: str,
+        parser_model_name: str,
+        agent_model_provider: str,
+        agent_model_name: str,
+        ollama_url: str,
+    ) -> None:
+        agent_model = self.model_library_service.find_model(
+            provider=agent_model_provider,
+            model_name=agent_model_name,
+            ollama_url=ollama_url,
+        )
+        if agent_model is not None and not bool(agent_model.get("supports_tools")):
+            raise ChatSettingsValidationError(
+                "Selected agent model does not support native tool calling."
+            )
+        parser_model = self.model_library_service.find_model(
+            provider=parser_model_provider,
+            model_name=parser_model_name,
+            ollama_url=ollama_url,
+        )
+        if parser_model is not None and not bool(
+            parser_model.get("supports_structured_output")
+        ):
+            raise ChatSettingsValidationError(
+                "Selected parser model does not support structured output."
             )
