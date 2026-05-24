@@ -1,17 +1,18 @@
 # Agentic Search
 
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## Summary
 
-The chat workflow is action-first and tool-native:
+The chat workflow separates structured parsing from provider-native tool calling:
 
-1. Parser emits evidence-only `TurnParseResult` with `normalized_action`.
-2. `ActionRouter` validates the action against `ACTION_CATALOG`.
-3. `ToolManifestService` selects a focused provider-neutral tool set.
-4. LLM providers receive those tools through their native tool-calling APIs.
-5. `AgentToolExecutor` runs approved calls and returns structured map operations.
-6. Internal service roles render location state, resolve overlays, combine map data, and produce the final chat response.
+1. Parser emits evidence-only `TurnParseResult` for request extraction.
+2. Policy builds constraints, authorization checks, confirmation requirements, and audit metadata.
+3. `AgentToolCatalogService` exposes stable catalog, describe, and execute tools.
+4. `NativeToolLoop` sends those tools to the selected provider through native tool-calling APIs.
+5. The model alone decides exact tool names and arguments.
+6. `ToolRegistry` executes exact emitted tool names and returns provider-native tool-result messages.
+7. The loop continues until the model returns final text or a production limit is reached.
 
 No legacy routing compatibility is preserved.
 
@@ -28,7 +29,7 @@ Parser output is `TurnParseResult` and contains only:
 - disallowed patterns
 - parser confidence
 
-Parser output never contains provider-specific tool schemas, overlay execution directives, or final map operation payloads.
+Parser output never contains provider-specific tool schemas, concrete tool names, action IDs selected for execution, overlay execution directives, or final map operation payloads.
 
 ## Action Catalog
 
@@ -49,23 +50,15 @@ Supported action values:
 
 Each action definition declares its user-facing label, description, tool groups, map-context requirement, and whether external sources are allowed. Unknown or low-confidence parser classifications are normalized to `unknown` before policy selection.
 
-## Tool Manifest
+## Native Catalog Tools
 
-Provider-neutral tools are defined by `AgentToolDefinition` in `app/server/domain/agent/tools.py` and selected by `ToolManifestService`.
+Agent-visible geospatial manifests are exposed through a small stable native tool set:
 
-Base tools:
+- `list_geospatial_capabilities`: paginated, filterable compact catalog metadata.
+- `describe_geospatial_capability`: full descriptor and executable JSON schema for one stable capability ID.
+- `execute_geospatial_capability`: schema-validated execution by stable capability ID.
 
-- `search_maps`
-- `resolve_location`
-- `retrieve_geospatial_data`
-- `query_data_layer_api`
-- `load_map_overlay`
-- `toggle_map_overlay`
-- `display_dataset_on_map`
-- `interrogate_visible_layers`
-- `combine_map_data_with_external_sources`
-
-Tool definitions include a JSON Schema parameters contract, action scope, map-context requirement, and optional source manifest or capability IDs.
+The catalog page size is capped at 50. Catalog and describe responses are deterministic and permission-aware.
 
 ## Provider-Native Tool Calling
 
@@ -77,60 +70,38 @@ The shared LLM boundary exposes provider-neutral `LLMToolDefinition`, `LLMToolCa
 
 Provider-specific schemas do not leak into parser, policy, or executor models.
 
-## Overlay Tools
+## Manifest Exposure
 
-Overlay-specific tools are generated from `CapabilityRegistry`. Names are deterministic:
+Capability manifests remain the source of truth for overlays, layers, datasets, and geospatial operations, but manifest vectorization is not used to decide which tools the agent may see or call. The agent sees the stable catalog tools, discovers capabilities by catalog/describe calls, and executes by stable capability ID.
 
-```text
-overlay__{safe_capability_id}
-```
+## Internal Agent Services
 
-Overlay tool definitions retain `source_manifest_id` and `source_capability_id`, and resolve back through the registry at execution time. They are scoped to overlay control, dataset display, data-layer query, or visible-layer interrogation actions.
+The pipeline uses internal services, not user-facing bots:
 
-## Action-Aware Tool Selection
-
-`ToolManifestService.select_tools(...)` enforces deterministic limits:
-
-- maximum 12 active tools per provider call
-- location resolver included for map search, location rendering, and unresolved map requests
-- no more than 4 overlay-specific tools for non-overlay actions
-- visible layers preferred when layer IDs are present
-- topic-matching capability names and tags preferred
-- external-source tools excluded unless the action is `map_external_source_combination`
-
-Requests to show every possible layer should be refused as indiscriminate loading and answered with a concise category offer.
-
-## Internal Agent Roles
-
-The pipeline uses internal service roles, not user-facing bots:
-
-- `ChatAgent`: final user-facing response only.
-- `ActionRouter`: action classification validation and focused tool selection.
-- `LocationRenderAgent`: location resolution and map viewport operations.
-- `OverlayResolutionAgent`: overlay, layer, and dataset operations.
-- `MapDataFusionAgent`: visible map data plus permitted external sources.
+- `ParserService`: structured extraction only.
+- `PolicyEngine`: constraints, authorization, validation, and clarification/rejection checks.
+- `AgentToolCatalogService`: stable catalog, describe, and execute tools.
+- `NativeToolLoop`: provider-native multi-turn tool loop.
+- `ToolRegistry`: exact-name tool resolution, schema validation, and execution envelopes.
 
 ## Execution Pipeline
 
-`AgentPipeline.run(...)` executes:
+`NativeToolLoop.run(...)` executes:
 
-1. Parse the user message into `NormalizedAction`.
-2. Route through `ActionRouter`.
-3. Select focused tools through `ToolManifestService`.
-4. Invoke provider-native tool calling.
-5. Execute returned calls through `AgentToolExecutor`.
-6. Delegate location-heavy work to `LocationRenderAgent`.
-7. Delegate overlay-heavy work to `OverlayResolutionAgent`.
-8. Delegate external-source combination to `MapDataFusionAgent`.
-9. Pass final structured state to `ChatAgent`.
-10. Return chat text plus frontend-actionable map operations.
+1. Send conversation, constraints, and stable native tools to the provider.
+2. If the provider returns tool calls, validate exact tool names and arguments.
+3. Execute allowed tools through `ToolRegistry`.
+4. Append assistant tool-call and tool-result messages using provider-native roles.
+5. Repeat until final text or a limit is reached.
 
 Safety limits:
 
-- maximum provider tool-calling rounds: 4
-- maximum active tools per provider call: 12
+- maximum provider tool-calling rounds: 8
+- maximum parallel tool calls per round: 8
+- maximum tool-result payload before deterministic truncation: 12000 characters
+- tool timeout: 30 seconds
 - unknown tool names are rejected
-- map-rendering tools return structured payloads, not free text
+- tools return structured envelopes, not free text
 
 ## API Contracts
 
@@ -139,8 +110,6 @@ Agent responses expose:
 - `action`
 - `action_label`
 - `action_confidence`
-- `tools_considered`
-- `tools_selected`
 - `tool_calls`
 - `map_operations`
 - `message`
@@ -153,6 +122,6 @@ To add capabilities, update manifests and runtime profiles first.
 
 - Basemap/overlay: add manifest + runtime profile entry.
 - Direct tool: add tool manifest + runtime profile entry + handler module.
-- Agent-visible overlay operations are generated from the manifest registry.
+- Agent-visible manifest operations are discovered through catalog, describe, and execute native tools.
 
-Core parser, provider abstraction, and executor code should not need edits for additive capabilities unless a new action or base tool is introduced.
+Core parser, provider abstraction, and executor code should not need edits for additive capabilities unless a new stable native tool category is introduced.

@@ -16,7 +16,9 @@ def _tool() -> LLMToolDefinition:
 
 def test_provider_tool_schema_conversion() -> None:
     tool = _tool()
-    assert OpenAIProvider.tool_to_openai_schema(tool)["type"] == "function"
+    openai_schema = OpenAIProvider.tool_to_openai_schema(tool)
+    assert openai_schema["type"] == "function"
+    assert openai_schema["function"]["name"] == "resolve_location"
     assert GoogleProvider.tool_to_google_schema(tool)["name"] == "resolve_location"
     assert OllamaProvider.tool_to_ollama_schema(tool)["function"]["name"] == "resolve_location"
 

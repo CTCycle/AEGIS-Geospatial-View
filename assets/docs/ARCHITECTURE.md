@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-21
+Last updated: 2026-05-24
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -102,7 +102,7 @@ services/
   sanitization.py
   startup_validation.py
   agent/candidate_ranker.py
-  agent/capability_retriever.py
+  agent/capability_retriever.py  # non-agent search/diagnostic retrieval only
   agent/executor.py
   agent/location_memory.py
   agent/location_resolver.py
@@ -357,11 +357,11 @@ Layering constraints:
 
 1. `AgentOrchestrator` receives chat turn.
 2. `ParserService` produces structured parse output.
-3. `PolicyEngine` resolves decision and execution plan.
-4. Execution branch:
-   - direct tool via `ToolRegistry` handlers, or
-   - map search via `RequestBuilder` + `LocationSearchOrchestrator`.
-5. Response payload persisted through repositories (chat history/session tables).
+3. `PolicyEngine` builds constraints and authorizes or validates tool activity.
+4. `AgentToolCatalogService` exposes stable catalog, describe, and execute tools for geospatial manifests.
+5. `NativeToolLoop` calls the selected provider with native tool schemas and appends provider-native tool-result messages after execution.
+6. `ToolRegistry` executes exact model-emitted tool names with schema validation and structured result envelopes.
+7. Response payload persisted through repositories (chat history/session tables).
 
 ### Geospatial capability pipeline
 
@@ -390,6 +390,15 @@ Core tables (defined in constants/schema layer) include:
 
 - Vector services in `app/server/services/vector/*`
 - Index lifecycle managed by `VectorIndexer` and maintenance endpoints.
+- Agent execution does not use manifest vectorization to decide which tools are visible or selected. Agent manifest access uses catalog, describe, and execute native tools.
+
+### Model capabilities
+
+- Cloud model capabilities are declared in `services/llm/cloud_catalog.py`.
+- Ollama tool support is detected from `/api/show` capabilities when available and otherwise by a cached native-tool probe.
+- Agent model assignment requires tool support.
+- Parser model assignment requires structured-output support.
+- Frontend role controls mirror backend assignment gates and show capability chips.
 
 ### Frontend persistence
 

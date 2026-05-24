@@ -1,5 +1,5 @@
-import { buildSelectedModelStats, MODEL_ROLES } from './model-selection';
-import { ModelSettingsResponse } from './types';
+import { buildSelectedModelStats, canAssignRole, MODEL_ROLES, roleDisabledReason } from './model-selection';
+import { ModelCardDescriptor, ModelSettingsResponse } from './types';
 
 const baseSettings = (): ModelSettingsResponse => ({
   active_provider_mode: 'cloud',
@@ -13,6 +13,21 @@ const baseSettings = (): ModelSettingsResponse => ({
   openai_base_url: null,
   google_base_url: null,
   credentials: {},
+});
+
+const model = (overrides: Partial<ModelCardDescriptor> = {}): ModelCardDescriptor => ({
+  id: 'm',
+  name: 'm',
+  description: 'model',
+  provider: 'openai',
+  capabilities: ['chat'],
+  supports_tools: false,
+  supports_structured_output: false,
+  supports_vision: false,
+  supports_embeddings: false,
+  tool_support_source: 'unknown',
+  metadata: {},
+  ...overrides,
 });
 
 describe('model-selection', () => {
@@ -37,5 +52,21 @@ describe('model-selection', () => {
     const rows = buildSelectedModelStats(settings, new Set<string>(['shared-model']));
     expect(rows[0]).toEqual(jasmine.objectContaining({ model: 'shared-model', assignedRoles: ['parser'] }));
     expect(rows[1]).toEqual(jasmine.objectContaining({ model: 'shared-model', assignedRoles: ['chat'] }));
+  });
+
+  it('blocks agent assignment without tools', () => {
+    expect(canAssignRole(model({ supports_tools: false }), 'agent')).toBeFalse();
+    expect(roleDisabledReason(model({ supports_tools: false }), 'agent')).toBe('Agent role requires native tool calling.');
+  });
+
+  it('blocks parser assignment without structured output', () => {
+    expect(canAssignRole(model({ supports_structured_output: false }), 'parser')).toBeFalse();
+    expect(roleDisabledReason(model({ supports_structured_output: false }), 'parser')).toBe(
+      'Parser role requires structured output.',
+    );
+  });
+
+  it('allows chat assignment for normal chat models', () => {
+    expect(canAssignRole(model(), 'chat')).toBeTrue();
   });
 });

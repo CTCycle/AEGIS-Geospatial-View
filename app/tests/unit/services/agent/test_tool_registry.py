@@ -19,7 +19,7 @@ def test_tool_registry_executes_coordinates() -> None:
     asyncio.run(_run())
 
 
-def test_tool_registry_has_binding_for_all_tool_manifests() -> None:
+def test_tool_registry_has_binding_for_all_direct_tool_capabilities() -> None:
     registry = ToolRegistry()
     bindings = registry.load_tool_bindings()
     tools = CapabilityRegistry().load_capabilities().tools

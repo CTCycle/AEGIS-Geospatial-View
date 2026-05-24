@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from server.domain.chat import (
+    ModelCardDescriptor,
     OllamaHealthResponse,
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,
     VectorizationResponse,
 )
+from server.services.chat.model_library import ChatModelLibraryService
 from server.services.llm.ollama import OllamaProvider
 from server.services.vector.indexer import VectorIndexer
 
@@ -28,6 +30,12 @@ class ChatMaintenanceService:
             status="ok",
             library_models=[model.name for model in library_models],
             local_models=[model.name for model in local_models],
+            local_model_capabilities=[
+                ModelCardDescriptor.model_validate(
+                    ChatModelLibraryService._model_payload(model)
+                )
+                for model in local_models
+            ],
         )
 
     def pull_ollama_model(self, request: OllamaPullRequest) -> OllamaPullResponse:

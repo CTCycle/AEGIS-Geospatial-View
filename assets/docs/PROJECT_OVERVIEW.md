@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-05-23
+Last updated: 2026-05-24
 
 ## FILES INDEX
 
@@ -63,9 +63,10 @@ Last updated: 2026-05-23
 
 ## ARCHITECTURE NOTE
 
-- The chat interface delegates map-aware requests to an action-aware agent pipeline.
-- Action routing, map rendering, overlay resolution, external data fusion, and final chat response are separate internal service responsibilities.
-- Capability manifests remain the source of truth for geospatial overlays and generated agent tools.
+- The chat interface delegates map-aware requests to a provider-native tool-calling agent loop.
+- Structured parsing and native tool calling are separate LLM execution paths.
+- Capability manifests remain the source of truth for geospatial overlays and catalog/describe/execute agent tools.
+- Ollama models are capability-checked before agent assignment; unsupported models cannot be selected for the agent role.
 
 ## ENVIRONMENT RULES
 
