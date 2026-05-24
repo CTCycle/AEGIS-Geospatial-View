@@ -16,6 +16,7 @@ from server.services.chat.settings_service import ChatSettingsService
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.factory import LLMFactory
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 from server.services.vector.indexer import VectorIndexer
@@ -32,7 +33,10 @@ class ChatRuntime:
 
 def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatRuntime:
     settings_repo = ModelSettingsRepository()
-    model_library_service = ChatModelLibraryService()
+    ollama_tool_capability_cache = OllamaToolCapabilityCache()
+    model_library_service = ChatModelLibraryService(
+        ollama_tool_capability_cache=ollama_tool_capability_cache
+    )
     settings_service = ChatSettingsService(
         settings_repo=settings_repo,
         model_library_service=model_library_service,
@@ -52,7 +56,10 @@ def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatR
         runtime_registry=runtime_registry,
     )
     native_tool_loop = NativeToolLoop(
-        provider_factory=LLMFactory(settings_repo=settings_repo),
+        provider_factory=LLMFactory(
+            settings_repo=settings_repo,
+            ollama_tool_capability_cache=ollama_tool_capability_cache,
+        ),
         tool_registry=tool_registry,
     )
     request_builder = RequestBuilder()
@@ -64,6 +71,8 @@ def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatR
         maintenance_service=ChatMaintenanceService(
             get_ollama_url=settings_service.get_ollama_url,
             vector_indexer=vector_indexer,
+            model_library_service=model_library_service,
+            ollama_tool_capability_cache=ollama_tool_capability_cache,
         ),
         agent_orchestrator=AgentOrchestrator(
             search_orchestrator=search_orchestrator,

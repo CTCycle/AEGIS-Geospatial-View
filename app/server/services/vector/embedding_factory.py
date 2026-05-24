@@ -27,7 +27,7 @@ class EmbeddingFactory:
             request = Request(f"{ollama_url}/api/tags", method="GET")
             with urlopen(request, timeout=1):
                 self._ollama_reachable = True
-        except OSError, URLError, TimeoutError:
+        except (OSError, URLError, TimeoutError):
             self._ollama_reachable = False
         return self._ollama_reachable
 

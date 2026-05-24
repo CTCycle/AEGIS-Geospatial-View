@@ -204,14 +204,26 @@ def test_local_chat_model_validation_rejects_unavailable_ollama_model() -> None:
         )
 
 
-def test_local_embedding_model_validation_rejects_unavailable_ollama_model() -> None:
+def test_local_parser_model_validation_rejects_unavailable_ollama_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
-    with pytest.raises(ChatSettingsValidationError, match="not available from Ollama"):
+    with pytest.raises(ChatSettingsValidationError, match="Selected parser model"):
         service.update_settings(
             ModelSettingsUpdateRequest(
                 parser_model_provider="ollama",
                 parser_model_name="missing-parser",
+            )
+        )
+
+
+def test_local_agent_model_validation_rejects_unavailable_ollama_model() -> None:
+    service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
+
+    with pytest.raises(ChatSettingsValidationError, match="Selected agent model"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider="ollama",
+                agent_model_name="missing-agent",
             )
         )
 

@@ -8,7 +8,7 @@ from typing import Any
 
 from collections.abc import Callable
 
-from server.domain.job_state import JobState
+from server.services.job_state import JobState
 from server.common.constants import (
     JOB_STATUS_CANCELLED,
     JOB_STATUS_COMPLETED,

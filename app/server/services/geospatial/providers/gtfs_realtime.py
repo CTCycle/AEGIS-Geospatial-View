@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,8 +20,8 @@ from server.services.geospatial.providers.http import (
 
 gtfs_realtime_pb2: Any | None
 try:
-    from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]
-except ImportError:
+    gtfs_realtime_pb2 = importlib.import_module("google.transit.gtfs_realtime_pb2")
+except ModuleNotFoundError:
     gtfs_realtime_pb2 = None
 
 

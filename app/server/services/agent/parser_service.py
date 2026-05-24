@@ -162,7 +162,7 @@ class ParserService:
             model_name = self.model or settings.parser_model_name
         if provider_name is None or model_name is None:
             raise LLMConfigurationError("Parser provider and model must be configured.")
-        parser_provider = self.llm_factory.get_parser_provider(provider_name)
+        parser_provider = self.llm_factory.get_provider(provider_name)
         self.last_context_usage = None
         prompt_payload = {
             "user_message": user_message,

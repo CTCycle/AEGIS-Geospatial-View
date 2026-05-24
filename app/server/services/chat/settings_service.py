@@ -184,9 +184,13 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Selected chat model is not available from Ollama."
             )
-        if unavailable:
+        if parser_model_provider == "ollama" and parser_model_name in unavailable:
             raise ChatSettingsValidationError(
-                "Selected embedding model is not available from Ollama."
+                "Selected parser model is not available from Ollama."
+            )
+        if agent_model_provider == "ollama" and agent_model_name in unavailable:
+            raise ChatSettingsValidationError(
+                "Selected agent model is not available from Ollama."
             )
 
     def _validate_role_capabilities(

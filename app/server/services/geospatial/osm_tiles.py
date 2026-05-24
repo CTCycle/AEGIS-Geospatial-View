@@ -4,6 +4,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
 ###############################################################################
+class OsmTileProxyError(RuntimeError):
+    """Raised when OSM tile proxy retrieval fails."""
+
+
+###############################################################################
 class OsmTileProxyService:
     def fetch_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:
         tile_url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -22,8 +27,8 @@ class OsmTileProxyService:
                 )
                 return upstream.read(), media_type, cache_control
         except HTTPError as exc:
-            raise RuntimeError(
+            raise OsmTileProxyError(
                 f"OSM basemap tile request failed with status {exc.code}."
             ) from exc
         except URLError as exc:
-            raise RuntimeError("OSM basemap tile provider is unavailable.") from exc
+            raise OsmTileProxyError("OSM basemap tile provider is unavailable.") from exc

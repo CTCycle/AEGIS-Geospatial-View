@@ -92,12 +92,12 @@ class _ProviderStub:
 
 
 class _FactoryStub:
-    def get_parser_provider(self, provider: str):  # noqa: ARG002
+    def get_provider(self, provider: str):  # noqa: ARG002
         return _ProviderStub()
 
 
 class _ConfigErrorFactoryStub:
-    def get_parser_provider(self, provider: str):  # noqa: ARG002
+    def get_provider(self, provider: str):  # noqa: ARG002
         raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
 
 

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import cache
-from typing import Any, Protocol
+from typing import Any, Final, Protocol
 
 from server.configurations import DatabaseSettings, get_server_settings
 from server.repositories.database.initializer import validate_postgres_schema
@@ -32,22 +31,9 @@ class DatabaseBackend(Protocol):
     def list_columns(self, table_name: str) -> list[str]: ...
 
 
-BackendFactory = Callable[[DatabaseSettings], DatabaseBackend]
-
-
-# -----------------------------------------------------------------------------
-def build_sqlite_backend(settings: DatabaseSettings) -> DatabaseBackend:
-    return SQLiteRepository(settings)
-
-
-# -----------------------------------------------------------------------------
-def build_postgres_backend(settings: DatabaseSettings) -> DatabaseBackend:
-    return PostgresRepository(settings)
-
-
-BACKEND_FACTORIES: dict[str, BackendFactory] = {
-    "sqlite": build_sqlite_backend,
-    "postgresql+psycopg": build_postgres_backend,
+BACKEND_FACTORIES: Final[dict[str, type[DatabaseBackend]]] = {
+    "sqlite": SQLiteRepository,
+    "postgresql+psycopg": PostgresRepository,
 }
 
 
@@ -65,8 +51,8 @@ class AEGISDatabase:
         logger.info("Initializing %s database backend", backend_name)
         if normalized_name not in BACKEND_FACTORIES:
             raise ValueError(f"Unsupported database engine: {backend_name}")
-        factory = BACKEND_FACTORIES[normalized_name]
-        backend = factory(self.settings)
+        backend_type = BACKEND_FACTORIES[normalized_name]
+        backend = backend_type(self.settings)
         if normalized_name != "sqlite":
             validate_postgres_schema(self.settings)
         return backend
