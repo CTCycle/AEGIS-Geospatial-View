@@ -182,7 +182,7 @@ class AgentOrchestrator:
                 context_usage=context_usage,
             )
 
-        preflight_decision = self._evaluate_policy_preflight(turn_contract)
+        preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
         if preflight_decision is not None:
             assistant_message = (
                 preflight_decision.clarification.question
@@ -322,42 +322,6 @@ class AgentOrchestrator:
             memory_snapshot=memory_snapshot,
             context_usage=context_usage,
         )
-
-    def _evaluate_policy_preflight(self, turn_contract) -> PolicyDecision | None:
-        trace = DecisionTrace(steps=["1.validate_task_class"])
-        task_validation = self.policy_engine._validate_task_class(turn_contract)
-        if task_validation is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="reject",
-                    action_id=turn_contract.normalized_action.action_id,
-                ),
-                clarification=task_validation,
-                trace=trace,
-            )
-        trace.steps.append("2.enforce_location_requirement")
-        location_policy = self.policy_engine._enforce_location_policy(turn_contract)
-        if location_policy is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="clarify",
-                    action_id=turn_contract.normalized_action.action_id,
-                ),
-                clarification=location_policy,
-                trace=trace,
-            )
-        trace.steps.append("3.enforce_safety_policy")
-        safety_policy = self.policy_engine._enforce_safety_policy(turn_contract)
-        if safety_policy is not None:
-            return PolicyDecision(
-                plan=ExecutionPlan(
-                    state="reject",
-                    action_id=turn_contract.normalized_action.action_id,
-                ),
-                clarification=safety_policy,
-                trace=trace,
-            )
-        return None
 
     @staticmethod
     def _build_native_agent_messages(
