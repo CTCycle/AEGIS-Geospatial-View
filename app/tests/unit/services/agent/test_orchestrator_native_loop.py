@@ -74,7 +74,7 @@ class _Parser:
 
 
 class _Policy:
-    decide_called = False
+    preflight_calls = 0
 
     def _validate_task_class(self, turn):
         return None
@@ -91,9 +91,9 @@ class _Policy:
             allowed_tool_names=["list_geospatial_capabilities"],
         )
 
-    async def decide(self, *args, **kwargs):
-        self.decide_called = True
-        raise AssertionError("legacy policy selection should not be called")
+    def evaluate_preflight(self, turn):
+        self.preflight_calls += 1
+        return None
 
 
 class _Catalog:
@@ -168,7 +168,6 @@ def test_orchestrator_uses_native_tool_loop_for_agent_path() -> None:
         assert response.tool_payload is not None
         assert response.tool_payload["tool_calls"][0]["name"] == "list_geospatial_capabilities"
         assert native_loop.requests[0].tools[0].name == "list_geospatial_capabilities"
-        assert policy.decide_called is False
+        assert policy.preflight_calls == 1
 
     asyncio.run(_run())
-

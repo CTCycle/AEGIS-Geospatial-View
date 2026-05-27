@@ -44,13 +44,7 @@ class PolicyEngine:
     ) -> None:
         self.location_resolver = location_resolver
 
-    async def decide(
-        self,
-        turn: TurnParseResult,
-        *_: Any,
-        **__: Any,
-    ) -> PolicyDecision:
-        """Compatibility preflight only; tool selection is handled by native LLM calls."""
+    def evaluate_preflight(self, turn: TurnParseResult) -> PolicyDecision | None:
         trace = DecisionTrace(steps=["1.validate_task_class"])
         task_validation = self._validate_task_class(turn)
         if task_validation is not None:
@@ -84,14 +78,7 @@ class PolicyEngine:
                 clarification=safety_policy,
                 trace=trace,
             )
-        return PolicyDecision(
-            plan=ExecutionPlan(
-                state="direct_response",
-                mode="direct_text",
-                action_id=turn.normalized_action.action_id,
-            ),
-            trace=trace,
-        )
+        return None
 
     def build_agent_constraints(
         self,
@@ -206,4 +193,3 @@ class PolicyEngine:
                 "no_overlays",
             }
         ]
-
