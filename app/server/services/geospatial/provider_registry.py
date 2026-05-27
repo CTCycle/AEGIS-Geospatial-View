@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
-from server.domain.geographics import ProviderCredentialValidationResult
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import (
@@ -20,13 +19,11 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
     ProviderUnavailableError,
     response_without_credentials,
-    unsupported_credential_validation,
 )
 from server.services.geospatial.providers.census import CensusProvider
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
-from server.services.geospatial.providers.fallback import FallbackTileProvider
 from server.services.geospatial.providers.fema import FEMAProvider
 from server.services.geospatial.providers.geoapify import GeoapifyProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
@@ -44,7 +41,6 @@ from server.services.geospatial.providers.openaq import OpenAQProvider
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 from server.services.geospatial.providers.opentripmap import OpenTripMapProvider
-from server.services.geospatial.providers.osm import OSMProvider
 from server.services.geospatial.providers.ourairports import OurAirportsProvider
 from server.services.geospatial.providers.overpass import OverpassProvider
 from server.services.geospatial.providers.overture import OvertureProvider
@@ -98,8 +94,6 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
         api_key=os.getenv("TRANSITLAND_API_KEY")
     ),
     "nominatim": NominatimProvider,
-    "fallback": FallbackTileProvider,
-    "osm": OSMProvider,
     "mapillary": lambda: MapillaryProvider(
         access_token=os.getenv("MAPILLARY_ACCESS_TOKEN")
     ),
@@ -119,43 +113,6 @@ class ProviderExecutionPolicy:
     timeout_seconds: float = 10.0
     max_attempts: int = 1
     circuit_breaker_failures: int = 3
-
-
-@dataclass(frozen=True)
-class ManifestBackedProvider:
-    provider_id: str
-    manifest: dict[str, Any]
-
-    async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        return ProviderResponse(
-            capability_id=request.capability_id,
-            provider_id=self.provider_id,
-            payload={
-                "status": "not-implemented",
-                "provider": self.provider_id,
-                "capability_id": request.capability_id,
-            },
-            attribution=self._attribution(),
-            warnings=[
-                "Provider framework is registered, but no concrete fetcher is bound."
-            ],
-        )
-
-    def _attribution(self) -> list[str]:
-        license_payload = self.manifest.get("license")
-        if isinstance(license_payload, dict):
-            name = str(license_payload.get("name") or "").strip()
-            if name:
-                return [name]
-        return []
-
-    async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
-        return await self.fetch(request)
-
-    async def validate_credentials(
-        self, credentials: Mapping[str, str]
-    ) -> ProviderCredentialValidationResult:
-        return await unsupported_credential_validation(self.provider_id)
 
 
 class ProviderRegistry:
@@ -204,12 +161,20 @@ class ProviderRegistry:
     def build_from_manifests(self) -> None:
         payload = self.manifest_loader.load_all()
         items = []
-        for collection_name in ("providers", "basemaps", "overlays", "cameras", "transit", "tools"):
+        for collection_name in (
+            "providers",
+            "basemaps",
+            "overlays",
+            "cameras",
+            "transit",
+            "tools",
+        ):
             items.extend(payload.get(collection_name) or [])
         for item in items:
-            provider_id = str(item.get("id") or item.get("provider") or "").strip()
-            if str(item.get("capabilityKind") or "") != "metadata-only":
-                provider_id = str(item.get("provider") or "").strip()
+            capability_kind = str(item.get("capabilityKind") or "").strip().lower()
+            if capability_kind in {"basemap", "metadata", "metadata-only"}:
+                continue
+            provider_id = str(item.get("provider") or "").strip()
             if not provider_id:
                 continue
             if provider_id.lower() in self._providers:
@@ -271,7 +236,10 @@ class ProviderRegistry:
         factory = PROVIDER_FACTORIES.get(provider_id)
         if factory is not None:
             return factory()
-        return ManifestBackedProvider(provider_id=provider_id, manifest=manifest)
+        capability_id = str(manifest.get("id") or "").strip()
+        raise ProviderNotRegisteredError(
+            f"Provider '{provider_id}' is not registered for manifest '{capability_id}'."
+        )
 
     def _normalize_provider_id(self, provider_id: str) -> str:
         normalized = str(provider_id).strip().lower()

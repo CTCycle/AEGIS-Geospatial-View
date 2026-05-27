@@ -1,7 +1,7 @@
 {
   "id": "osm_default",
   "name": "OpenStreetMap",
-  "provider": "fallback",
+  "provider": "osm_tiles",
   "type": "tile",
   "description": "Standard OpenStreetMap streets basemap for general-purpose map context.",
   "capabilities": [

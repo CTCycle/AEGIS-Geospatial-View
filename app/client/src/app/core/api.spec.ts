@@ -35,6 +35,11 @@ describe('core/api', () => {
     const parsed = parseCatalogResponse({
       capabilities: [
         { id: 'b1', kind: 'basemap' },
+      ],
+      basemaps: [
+        { id: 'b1', kind: 'basemap' },
+      ],
+      overlays: [
         {
           id: 'o1',
           kind: 'overlay',
@@ -53,6 +58,10 @@ describe('core/api', () => {
           },
         },
       ],
+      providers: [],
+      cameras: [],
+      transit: [],
+      tools: [],
     });
     expect(parsed.basemaps?.[0].id).toBe('b1');
     expect(parsed.basemaps?.[0].name).toBe('b1');
@@ -62,6 +71,15 @@ describe('core/api', () => {
     expect(parsed.overlays?.[0].rendering_mode).toBe('wmts');
     expect(parsed.overlays?.[0].reliability?.status).toBe('partial');
     expect(parsed.overlays?.[0].auth?.providerKey).toBe('tomtom');
+  });
+
+  it('parseCatalogResponse does not reconstruct grouped arrays from capabilities', () => {
+    const parsed = parseCatalogResponse({
+      capabilities: [{ id: 'b1', kind: 'basemap' }],
+    });
+    expect(parsed.capabilities.length).toBe(1);
+    expect(parsed.basemaps?.length ?? 0).toBe(0);
+    expect(parsed.overlays?.length ?? 0).toBe(0);
   });
 
   it('parseModelSettingsResponse defaults correctly', () => {

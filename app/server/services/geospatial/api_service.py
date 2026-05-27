@@ -317,8 +317,6 @@ class GeospatialApiService:
                 provider_id, provider_camera_id = normalized.split(separator, 1)
                 provider_id = provider_id.strip()
                 provider_camera_id = provider_camera_id.strip()
-                if provider_id == "windy":
-                    provider_id = "windy_webcams"
                 if provider_id and provider_camera_id:
                     return provider_id, provider_camera_id
         return None, normalized
@@ -354,8 +352,6 @@ class GeospatialApiService:
         access_provider_id = str(
             auth.get("accessPageProviderId") or provider_key
         ).strip()
-        if access_provider_id == "nasa":
-            access_provider_id = "nasa_firms"
         account_setup = (
             payload.get("account_setup")
             if isinstance(payload.get("account_setup"), dict)

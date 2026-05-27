@@ -12,6 +12,7 @@ describe('core/app-state', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
     window.localStorage.clear();
+    spyOn(window.crypto, 'randomUUID').and.returnValue('11111111-1111-4111-8111-111111111111');
   });
 
   it('creates default state', () => {
@@ -72,6 +73,7 @@ describe('core/app-state', () => {
   it('rotates tab on heartbeat ownership conflict', () => {
     window.sessionStorage.setItem(tabKey, 'tab-owned');
     window.localStorage.setItem(`${heartbeatPrefix}tab-owned`, String(Date.now()));
+    (window.crypto.randomUUID as jasmine.Spy).and.returnValue('22222222-2222-4222-8222-222222222222');
     window.sessionStorage.setItem(storageKey, JSON.stringify({
       ...defaultAppState(),
       tabId: 'tab-owned',
@@ -86,7 +88,7 @@ describe('core/app-state', () => {
     }));
     const state = loadPersistedAppState();
     expect(state.chatPage.chatPanel.composerDraft).toBe('');
-    expect(state.tabId).not.toBe('tab-owned');
+    expect(state.tabId).toBe('22222222-2222-4222-8222-222222222222');
   });
 
   it('persists schema version and timestamp', () => {
