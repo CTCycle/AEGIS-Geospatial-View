@@ -1,7 +1,7 @@
 {
   "id": "osm_terrain",
   "name": "Terrain Context",
-  "provider": "fallback",
+  "provider": "terrain_tiles",
   "type": "tile",
   "description": "Terrain-focused OpenStreetMap basemap highlighting elevation and landform context.",
   "capabilities": [
@@ -32,7 +32,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "static tiles",
-    "constraints": "terrain semantics mapped to OSM fallback tiles",
+    "constraints": "optimized for terrain and landform interpretation",
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
@@ -62,7 +62,7 @@
     "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",
-    "rate_limit_notes": "terrain semantics mapped to OSM fallback tiles",
+    "rate_limit_notes": "best-effort public tiles; avoid excessive burst traffic",
     "retrieval_mode": "direct",
     "openlayers_compatible": true,
     "last_validated": "2026-04-27"

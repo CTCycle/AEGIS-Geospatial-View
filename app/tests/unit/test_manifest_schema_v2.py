@@ -49,14 +49,14 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
     (manifests / "runtime_profiles.json").write_text(
         '{"version": 1, "profiles": []}', encoding="utf-8"
     )
-    (basemaps / "legacy.json").write_text(
+    (basemaps / "missing_schema_v2.json").write_text(
         """
 {
-  "id": "legacy",
-  "name": "Legacy",
-  "provider": "fallback",
+  "id": "missing_schema_v2",
+  "name": "Missing Schema V2",
+  "provider": "osm_tiles",
   "type": "tile",
-  "description": "Legacy manifest without schema v2 fields.",
+  "description": "Manifest without schema v2 fields.",
   "capabilities": ["tile"],
   "coverage": "global",
   "metadata": {},
@@ -75,7 +75,7 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
         except Exception as exc:
             assert "missing fields" in str(exc)
         else:
-            raise AssertionError("Legacy manifest unexpectedly loaded.")
+            raise AssertionError("Invalid schema v2 manifest unexpectedly loaded.")
     finally:
         shutil.rmtree(manifests, ignore_errors=True)
 

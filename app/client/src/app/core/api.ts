@@ -334,12 +334,12 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   const transit = normalizeCapabilities(value.transit);
   return {
     capabilities: normalized,
-    providers: providers.length ? providers : normalized.filter((item) => item.kind === 'provider'),
-    basemaps: basemaps.length ? basemaps : normalized.filter((item) => item.kind === 'basemap'),
-    overlays: overlays.length ? overlays : normalized.filter((item) => item.kind === 'overlay' || item.kind === 'raster-overlay' || item.kind === 'vector-overlay' || item.kind === 'search-index'),
-    cameras: cameras.length ? cameras : normalized.filter((item) => item.kind === 'camera-network'),
-    transit: transit.length ? transit : normalized.filter((item) => item.kind === 'transit' || item.kind === 'dataset-ingestion'),
-    tools: tools.length ? tools : normalized.filter((item) => item.kind === 'tool'),
+    providers,
+    basemaps,
+    overlays,
+    cameras,
+    transit,
+    tools,
   };
 };
 
