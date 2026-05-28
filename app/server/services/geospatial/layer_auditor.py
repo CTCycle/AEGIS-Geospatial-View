@@ -71,6 +71,7 @@ CLIENT_RENDERING_MODES = {
 PROVIDER_SOURCE_ALIASES = {
     "gibs": "nasa_gibs",
 }
+BASEMAP_TEST_MARKERS = ("basemap", "tile")
 
 
 def _read_json(path: Path) -> JsonDict:
@@ -161,6 +162,17 @@ def _placeholder_statuses(source: str) -> list[str]:
     return sorted(status for status in PLACEHOLDER_STATUSES if status in source)
 
 
+def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
+    metadata = manifest.metadata if isinstance(manifest.metadata, dict) else {}
+    return manifest.capability_kind == CapabilityKind.BASEMAP and bool(
+        str(metadata.get("tile_url") or "").strip()
+    )
+
+
+def _basemap_unit_tested(test_source: str) -> bool:
+    return all(marker in test_source for marker in BASEMAP_TEST_MARKERS)
+
+
 def _status_for_manifest(
     manifest: CapabilityManifestV2,
     *,
@@ -174,9 +186,12 @@ def _status_for_manifest(
     placeholders = _placeholder_statuses(provider_source)
     provider_fetch_implemented = (
         bool(provider_source) and "not-implemented" not in placeholders
-    )
+    ) or _basemap_fetch_implemented(manifest)
     if manifest.capability_kind.value == "metadata-only":
         provider_fetch_implemented = True
+    unit_tested = manifest.id in test_source or manifest.provider in test_source
+    if manifest.capability_kind == CapabilityKind.BASEMAP:
+        unit_tested = unit_tested or _basemap_unit_tested(test_source)
     return CapabilityImplementationStatus(
         capability_id=manifest.id,
         provider_id=manifest.provider,
@@ -191,7 +206,7 @@ def _status_for_manifest(
         api_endpoint_covered=manifest.id in api_source or manifest.provider in api_source,
         client_renderer_covered=manifest.rendering_mode.value in CLIENT_RENDERING_MODES
         and manifest.rendering_mode.value in client_source,
-        unit_tested=manifest.id in test_source or manifest.provider in test_source,
+        unit_tested=unit_tested,
         visual_tested=manifest.id in visual_test_source
         or manifest.provider in visual_test_source
         or manifest.rendering_mode.value in visual_test_source,
