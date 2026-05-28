@@ -169,15 +169,28 @@ class ProviderRegistry:
             "transit",
             "tools",
         ):
-            items.extend(payload.get(collection_name) or [])
-        for item in items:
+            for item in payload.get(collection_name) or []:
+                if isinstance(item, dict):
+                    items.append((collection_name, item))
+        for collection_name, item in items:
             capability_kind = str(item.get("capabilityKind") or "").strip().lower()
-            if capability_kind in {"basemap", "metadata", "metadata-only"}:
+            if (
+                collection_name != "providers"
+                and capability_kind in {"basemap", "metadata", "metadata-only"}
+            ):
                 continue
-            provider_id = str(item.get("provider") or "").strip()
+            fallback_provider_id = (
+                item.get("id") if collection_name == "providers" else ""
+            )
+            provider_id = str(item.get("provider") or fallback_provider_id).strip()
             if not provider_id:
                 continue
             if provider_id.lower() in self._providers:
+                continue
+            if (
+                collection_name == "providers"
+                and provider_id.lower() not in PROVIDER_FACTORIES
+            ):
                 continue
             self.register(self._provider_for_manifest(provider_id.lower(), dict(item)))
 

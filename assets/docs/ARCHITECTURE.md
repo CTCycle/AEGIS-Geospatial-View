@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-24
+Last updated: 2026-05-28
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -376,6 +376,10 @@ Layering constraints:
 - `capability_registry.py` builds capability catalog.
 - `runtime_registry.py` applies runtime/credential availability.
 - `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
+- `provider_registry.py` binds fetchable manifests to concrete provider adapters.
+  Provider metadata manifests are registered only when a backend adapter exists;
+  basemap tile URLs remain manifest-backed and are served through the search tile
+  proxy path where applicable.
 
 ## Data Persistence
 

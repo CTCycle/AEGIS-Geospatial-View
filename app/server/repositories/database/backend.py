@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import cache
 from typing import Any, Final, Protocol
 
-from server.configurations import DatabaseSettings, get_server_settings
+from server.configurations import get_server_settings
 from server.repositories.database.initializer import validate_postgres_schema
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository

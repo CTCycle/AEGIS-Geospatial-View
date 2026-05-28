@@ -22,7 +22,7 @@ class _VectorIndexerStub:
         return {"status": "ok", "indexed_documents": 2, "vector_path": "vectors"}
 
 
-def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatch) -> None:
+def test_maintenance_service_delegates_to_provider_and_vector_indexer() -> None:
     provider_calls: list[tuple[str, str | None]] = []
 
     class _Provider:
@@ -57,12 +57,11 @@ def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatc
             provider_calls.append(("health_check", None))
             return {"ok": True, "detail": "healthy"}
 
-    monkeypatch.setattr(
-        "server.services.chat.maintenance_service.OllamaProvider", _Provider
-    )
     vectors = _VectorIndexerStub()
     service = ChatMaintenanceService(
-        get_ollama_url=lambda: "http://localhost:11434", vector_indexer=vectors
+        get_ollama_url=lambda: "http://localhost:11434",
+        vector_indexer=vectors,
+        ollama_provider_factory=lambda base_url, _cache: _Provider(base_url=base_url),
     )
 
     refresh = service.refresh_ollama_models()
