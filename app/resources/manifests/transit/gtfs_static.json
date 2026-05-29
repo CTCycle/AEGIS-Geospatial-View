@@ -23,7 +23,7 @@
       "routes",
       "stations"
     ],
-    "intent_tags": [
+    "action_tags": [
       "transit",
       "station",
       "route",
@@ -72,7 +72,7 @@
       "route",
       "near station"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "transit",
       "nearby",
       "route_context"

@@ -21,7 +21,7 @@
     "map_type_tags": [
       "street"
     ],
-    "intent_tags": [
+    "action_tags": [
       "routing",
       "traffic_monitoring"
     ],
@@ -95,7 +95,7 @@
       "street",
       "navigation"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

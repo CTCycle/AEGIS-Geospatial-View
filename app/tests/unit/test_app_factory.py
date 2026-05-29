@@ -75,3 +75,13 @@ def test_packaged_client_available_allows_opt_in_serving(monkeypatch) -> None:
     monkeypatch.setenv("AEGIS_TAURI_MODE", "false")
     monkeypatch.setenv("AEGIS_SERVE_BUILT_CLIENT", "true")
     assert app_module.packaged_client_available() is True
+
+
+def test_openapi_schema_generates() -> None:
+    created = app_module.create_app()
+    schema = created.openapi()
+    assert "paths" in schema
+    paths = schema["paths"]
+    assert "/api/maps/search" in paths
+    assert "/api/geospatial/capabilities" in paths
+    assert "/api/chat/settings" in paths

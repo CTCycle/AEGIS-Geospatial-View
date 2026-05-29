@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from dataclasses import replace
+from collections.abc import Iterable, Sequence
 from html.parser import HTMLParser
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -19,8 +20,11 @@ from server.services.llm.langchain_runtime import (
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
+    LLMToolCall,
+    LLMToolDefinition,
     ModelDescriptor,
 )
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
 
 class _OllamaLibraryParser(HTMLParser):
@@ -67,8 +71,14 @@ class _OllamaLibraryParser(HTMLParser):
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
 
-    def __init__(self, *, base_url: str) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        tool_capability_cache: OllamaToolCapabilityCache | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
         self.last_context_usage: dict[str, Any] | None = None
 
     def _build_chat_model(
@@ -135,20 +145,119 @@ class OllamaProvider(LLMProvider):
                 else f"Local Ollama model {model_name}"
             )
             models.append(
-                ModelDescriptor(
-                    name=model_name,
+                self._descriptor_from_tag_item(
+                    item=item,
+                    model_name=model_name,
                     description=description,
-                    provider="ollama",
-                    capabilities=["chat", "stream", "embeddings"],
-                    metadata={
-                        "size": item.get("size"),
-                        "family": family,
-                        "parameter_size": parameter_size,
-                        "quantization_level": quantization_level,
-                    },
+                    family=family,
+                    parameter_size=parameter_size,
+                    quantization_level=quantization_level,
                 )
             )
         return models
+
+    def _descriptor_from_tag_item(
+        self,
+        *,
+        item: dict[str, Any],
+        model_name: str,
+        description: str,
+        family: str,
+        parameter_size: str,
+        quantization_level: str,
+    ) -> ModelDescriptor:
+        capabilities = self.get_model_capabilities(model_name)
+        supports_tools = "tools" in capabilities
+        source = self._tool_support_source(model_name)
+        return ModelDescriptor(
+            name=model_name,
+            description=description,
+            provider="ollama",
+            capabilities=sorted(capabilities),
+            metadata={
+                "size": item.get("size"),
+                "family": family,
+                "parameter_size": parameter_size,
+                "quantization_level": quantization_level,
+                "supports_tools": supports_tools,
+                "tool_support_source": source,
+            },
+        )
+
+    def get_model_capabilities(self, model: str) -> set[str]:
+        capabilities = {"chat", "stream", "embeddings"}
+        show_capabilities = self._show_capabilities(model)
+        if show_capabilities is not None:
+            if "tools" in show_capabilities:
+                capabilities.add("tools")
+            self.tool_capability_cache.set(
+                self.base_url,
+                model,
+                "tools" in show_capabilities,
+                source="ollama_show",
+            )
+            return capabilities
+        if self._probe_tool_support(model):
+            capabilities.add("tools")
+        return capabilities
+
+    def supports_tools(self, model: str) -> bool:
+        return "tools" in self.get_model_capabilities(model)
+
+    def supports_structured_output(self, model: str) -> bool:
+        _ = model
+        return True
+
+    def _show_capabilities(self, model: str) -> set[str] | None:
+        try:
+            payload = self._post_json("/api/show", {"name": model})
+        except Exception:
+            return None
+        raw = payload.get("capabilities")
+        if not isinstance(raw, list):
+            return None
+        return {str(item).strip().lower() for item in raw if str(item).strip()}
+
+    def _probe_tool_support(self, model: str) -> bool:
+        cached = self.tool_capability_cache.get(self.base_url, model)
+        if cached is not None:
+            return cached
+        tool = LLMToolDefinition(
+            name="aegis_tool_probe",
+            description="Harmless capability probe.",
+            parameters_json_schema={"type": "object", "properties": {}},
+        )
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Call the aegis_tool_probe tool with empty arguments.",
+                }
+            ],
+            "stream": False,
+            "tools": [self.tool_to_ollama_schema(tool)],
+            "options": {"temperature": 0},
+        }
+        supported = False
+        try:
+            response = self._post_json("/api/chat", payload)
+            message = response.get("message") if isinstance(response, dict) else None
+            supported = bool(
+                isinstance(message, dict) and self._parse_tool_calls(message)
+            )
+        except Exception:
+            supported = False
+        self.tool_capability_cache.set(
+            self.base_url,
+            model,
+            supported,
+            source="ollama_probe",
+        )
+        return supported
+
+    def _tool_support_source(self, model: str) -> str:
+        return self.tool_capability_cache.source(self.base_url, model) or "unknown"
 
     def list_library_models(self) -> list[ModelDescriptor]:
         try:
@@ -171,9 +280,70 @@ class OllamaProvider(LLMProvider):
     def pull_model(self, *, model: str) -> dict[str, Any]:
         return self._post_json("/api/pull", {"name": model, "stream": False})
 
-    def chat(self, request: LLMRequest) -> LLMResult:
+    @staticmethod
+    def tool_to_ollama_schema(tool: LLMToolDefinition) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters_json_schema,
+            },
+        }
+
+    @staticmethod
+    def _parse_tool_calls(message: dict[str, Any]) -> list[LLMToolCall]:
+        calls: list[LLMToolCall] = []
+        for item in message.get("tool_calls", []) if isinstance(message, dict) else []:
+            if not isinstance(item, dict):
+                continue
+            function = item.get("function") if isinstance(item.get("function"), dict) else {}
+            calls.append(
+                LLMToolCall(
+                    id=item.get("id"),
+                    name=str(function.get("name") or item.get("name") or ""),
+                    arguments=function.get("arguments") if isinstance(function.get("arguments"), dict) else {},
+                )
+            )
+        return calls
+
+    def chat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
         usage = compute_ollama_context_usage(request)
         self.last_context_usage = usage.to_dict()
+        native_tools = list(tools or request.tools or [])
+        schema = response_json_schema or request.response_json_schema
+        effective_request = replace(
+            request,
+            tools=native_tools or None,
+            response_json_schema=schema,
+        )
+        self._validate_request_capabilities(effective_request)
+        if native_tools or schema:
+            payload: dict[str, Any] = {
+                "model": request.model,
+                "messages": request.messages,
+                "stream": False,
+                "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            }
+            if native_tools:
+                payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in native_tools]
+            if schema and not native_tools:
+                payload["format"] = schema
+            response = self._post_json("/api/chat", payload)
+            message = response.get("message") if isinstance(response.get("message"), dict) else {}
+            return LLMResult(
+                content=str(message.get("content") or ""),
+                raw=response,
+                tool_calls=self._parse_tool_calls(message),
+                finish_reason=str(response.get("done_reason") or "") or None,
+            )
         return invoke_chat_model(
             chat_model=self._build_chat_model(
                 model=request.model,

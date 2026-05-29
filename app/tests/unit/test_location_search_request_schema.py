@@ -15,7 +15,7 @@ def _base_payload() -> dict[str, object]:
             "city": "Rome",
             "country": "Italy",
         },
-        "intent_id": "air_quality",
+        "action_id": "air_quality",
         "time_mode": "current",
         "viewport": {
             "center_latitude": 41.9,

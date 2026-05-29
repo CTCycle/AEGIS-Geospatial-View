@@ -51,6 +51,14 @@ class ModelProviderSettingsRecord(Base):
     )
     openai_base_url: Mapped[str | None] = mapped_column(String(400))
     google_base_url: Mapped[str | None] = mapped_column(String(400))
+    capabilities_json: Mapped[str | None] = mapped_column(Text)
+    supports_tools: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    supports_structured_output: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    tool_support_source: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="unknown"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

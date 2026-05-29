@@ -19,7 +19,7 @@
       "pvgis",
       "pvgis"
     ],
-    "intent_tags": [
+    "action_tags": [
       "solar",
       "point-insight"
     ],
@@ -84,7 +84,7 @@
       "point-insight",
       "pvgis"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

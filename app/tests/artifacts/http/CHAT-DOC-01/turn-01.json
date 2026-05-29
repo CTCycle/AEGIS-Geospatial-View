@@ -1,8 +1,0 @@
-{
-  "request": {
-    "message": "Show me a map of Rome with air quality"
-  },
-  "response": {
-    "assistant": "Search executed successfully. Showing Rome with air quality overlay."
-  }
-}

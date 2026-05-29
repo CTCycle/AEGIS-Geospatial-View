@@ -11,6 +11,22 @@
 
 <p>{{ description }}</p>
 
+<div class="model-card__capabilities" aria-label="Model capabilities">
+  @if (model.supports_tools) {
+    <span>Tools</span>
+  }
+  @if (model.supports_structured_output) {
+    <span>Structured output</span>
+  }
+  @if (model.supports_vision) {
+    <span>Vision</span>
+  }
+  @if (model.supports_embeddings) {
+    <span>Embeddings</span>
+  }
+  <span>Tool support: {{ model.supports_tools ? (model.tool_support_source === 'ollama_probe' ? 'probed' : 'detected') : 'unavailable' }}</span>
+</div>
+
 <app-model-role-actions
   [model]="model"
   [settings]="settings"

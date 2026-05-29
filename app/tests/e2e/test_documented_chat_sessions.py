@@ -293,7 +293,7 @@ def test_documented_session_settings_roundtrip_and_restore(
     page.locator(".model-grid-scroll").evaluate("node => { node.scrollTop = 220; }")
     write_snapshot(page, dirs["screenshots"], "01-settings-filtered")
 
-    page.get_by_role("button", name="Back to chat").click()
+    page.get_by_role("link", name="Search").click()
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
     expect(page.get_by_text("Show me a map of Rome with air quality")).to_be_visible()
     expect(page.locator(".overlay-controls")).to_be_visible()

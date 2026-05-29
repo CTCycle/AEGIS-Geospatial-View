@@ -14,7 +14,7 @@ def test_manifest_preparation_includes_runtime_metadata() -> None:
         "capabilities": ["map"],
         "coverage": "global",
         "metadata": {
-            "intent_tags": ["map"],
+            "action_tags": ["map"],
             "task_tags": ["map"],
             "search_examples": ["show map"],
             "location_dependency": "location-specific",

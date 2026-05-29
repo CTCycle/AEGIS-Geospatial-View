@@ -42,7 +42,7 @@ class GeospatialCatalogService:
                 capability_id, "direct_text"
             ),
             "coverage": str(item.get("coverage") or "global"),
-            "intent_tags": list(metadata.get("intent_tags") or []),
+            "action_tags": list(metadata.get("action_tags") or []),
             "task_tags": list(metadata.get("task_tags") or []),
             "source_protocol": str(metadata.get("source_protocol") or ""),
             "data_format": str(metadata.get("data_format") or ""),
@@ -96,7 +96,7 @@ class GeospatialCatalogService:
             or "point-insight" in list(item.get("capabilities") or [])
             or "poi" in list(item.get("capabilities") or []),
             "coverage": str(item.get("coverage") or "global"),
-            "intent_tags": list(metadata.get("intent_tags") or []),
+            "action_tags": list(metadata.get("action_tags") or []),
             "task_tags": list(metadata.get("task_tags") or []),
             "source_protocol": str(metadata.get("source_protocol") or ""),
             "data_format": str(metadata.get("data_format") or ""),

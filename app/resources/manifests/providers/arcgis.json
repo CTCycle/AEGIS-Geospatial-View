@@ -21,7 +21,7 @@
       "map service",
       "geoportal"
     ],
-    "intent_tags": [
+    "action_tags": [
       "catalog-discovery",
       "feature-services",
       "map-services"
@@ -91,7 +91,7 @@
       "map service",
       "geoportal"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

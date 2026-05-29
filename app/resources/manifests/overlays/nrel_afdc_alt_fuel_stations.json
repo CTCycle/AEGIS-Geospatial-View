@@ -22,7 +22,7 @@
       "cng",
       "station"
     ],
-    "intent_tags": [
+    "action_tags": [
       "fuel",
       "charging",
       "infrastructure"
@@ -71,7 +71,7 @@
       "hydrogen",
       "fuel station"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "fuel",
       "charging",
       "nearby"

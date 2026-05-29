@@ -20,7 +20,7 @@
       "nuts",
       "regions"
     ],
-    "intent_tags": [
+    "action_tags": [
       "europe",
       "regional demographics",
       "nuts"
@@ -67,7 +67,7 @@
       "regional statistics",
       "europe"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "european statistics",
       "regional boundary",
       "choropleth"

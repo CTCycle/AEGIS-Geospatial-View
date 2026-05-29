@@ -20,7 +20,7 @@
       "agency",
       "feed discovery"
     ],
-    "intent_tags": [
+    "action_tags": [
       "transit",
       "dataset",
       "feed"
@@ -67,7 +67,7 @@
       "agency feed",
       "GTFS discovery"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "transit",
       "dataset"
     ],

@@ -21,7 +21,7 @@
       "electric vehicle",
       "infrastructure"
     ],
-    "intent_tags": [
+    "action_tags": [
       "ev",
       "charging",
       "infrastructure"
@@ -70,7 +70,7 @@
       "electric vehicle",
       "charging station"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "ev",
       "charging",
       "nearby"

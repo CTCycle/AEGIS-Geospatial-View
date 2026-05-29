@@ -20,7 +20,7 @@
       "commercial poi",
       "geocoding"
     ],
-    "intent_tags": [
+    "action_tags": [
       "places",
       "commercial-poi",
       "geocoding"
@@ -150,7 +150,7 @@
       "google maps",
       "commercial poi"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

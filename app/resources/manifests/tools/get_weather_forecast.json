@@ -10,7 +10,7 @@
   ],
   "coverage": "global",
   "metadata": {
-    "intent_tags": [
+    "action_tags": [
       "weather",
       "forecast",
       "precipitation"
@@ -80,7 +80,7 @@
       "direct-tool",
       "Weather Forecast"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

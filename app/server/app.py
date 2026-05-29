@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import warnings
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -24,9 +23,6 @@ from server.common.constants import (
     FASTAPI_TITLE,
     FASTAPI_VERSION,
 )
-
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 
 def build_cors_origins() -> list[str]:
     ui_host = os.getenv("UI_HOST", "127.0.0.1").strip() or "127.0.0.1"
@@ -55,11 +51,7 @@ def serve_built_client_enabled() -> bool:
 
 def get_client_dist_path() -> str:
     project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    dist_path = os.path.join(project_path, "client", "dist")
-    browser_path = os.path.join(dist_path, "browser")
-    if os.path.isdir(browser_path):
-        return browser_path
-    return dist_path
+    return os.path.join(project_path, "client", "dist", "browser")
 
 
 def packaged_client_available() -> bool:

@@ -40,7 +40,7 @@ Scope: `app/server`, `app/client`, `app/tests`
 - Keep functions small, focused, and deterministic where possible.
 - Make side effects explicit at boundaries (I/O, DB, network).
 - Prefer composition and straightforward control flow over deep indirection.
-- Use comments only where they add safety/intent clarity.
+- Use comments only where they add safety or design clarity.
 - Preserve local style conventions; avoid broad stylistic churn.
 - Keep modules below approximately 1000 LOC when practical.
 - Place imports at module top.

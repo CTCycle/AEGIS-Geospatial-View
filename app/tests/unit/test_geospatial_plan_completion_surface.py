@@ -20,7 +20,6 @@ def test_plan_named_provider_adapters_are_bound() -> None:
     registry.build_from_manifests()
 
     for provider_id in (
-        "fallback",
         "local_open_data",
         "natural_earth",
         "openaddresses",

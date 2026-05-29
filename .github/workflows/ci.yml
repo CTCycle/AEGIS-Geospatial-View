@@ -26,7 +26,7 @@ jobs:
 
       - name: Run backend unit suites
         run: |
-          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_backend_python_compile.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/services/vector app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
+          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_backend_python_compile.py app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/services/vector app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
 
   frontend-build-and-tests:
     runs-on: ubuntu-latest

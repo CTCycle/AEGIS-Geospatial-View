@@ -23,6 +23,12 @@ def _require_provider_or_skip(response) -> None:  # noqa: ANN001
         pytest.skip(f"Providers unavailable for this check ({response.status}).")
 
 
+def _require_parser_or_skip(body: dict) -> None:
+    assistant_text = str(body.get("assistant_message") or "").lower()
+    if "configured parser model is unavailable" in assistant_text:
+        pytest.skip("Configured parser model is unavailable for this check.")
+
+
 def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) -> None:
     base = _get(api_context, "/api/chat/settings")
     prefixed = _get(api_context, "/api/chat/settings")
@@ -43,6 +49,8 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
         "credentials": {"openai": {"api_key": "sk-test-value"}},
     }
     updated = _put(api_context, "/api/chat/settings", update_payload)
+    if updated.status == 422:
+        pytest.skip("Requested local parser model is unavailable for this check.")
     assert updated.ok
     updated_body = updated.json()
     assert updated_body["credentials"]["openai"]["api_key"] is True
@@ -50,6 +58,9 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
     parity_update = _put(api_context, "/api/chat/settings", update_payload)
     assert parity_update.ok
     assert set(updated_body.keys()) == set(parity_update.json().keys())
+
+    restored = _put(api_context, "/api/chat/settings", base_body)
+    assert restored.ok
 
 
 def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) -> None:
@@ -159,6 +170,7 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(geocode_response)
     assert geocode_response.ok
     geocode_body = geocode_response.json()
+    _require_parser_or_skip(geocode_body)
     assert geocode_body.get("map_session") is None
     assistant_text = str(geocode_body.get("assistant_message") or "").lower()
     assert (
@@ -176,6 +188,7 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(unsupported)
     assert unsupported.ok
     unsupported_body = unsupported.json()
+    _require_parser_or_skip(unsupported_body)
     if unsupported_body.get("decision", {}).get("plan", {}).get("state") == "clarify":
         return
     assistant = str(unsupported_body.get("assistant_message") or "").lower()

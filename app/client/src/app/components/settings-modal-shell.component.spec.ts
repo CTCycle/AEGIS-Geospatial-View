@@ -31,4 +31,13 @@ describe('SettingsModalShellComponent', () => {
     component.onBackdropClick({ target: {}, currentTarget: {} } as unknown as MouseEvent);
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('does not emit close on backdrop click when backdrop close is disabled', () => {
+    const spy = jasmine.createSpy('close');
+    component.closeOnBackdrop = false;
+    component.requestClose.subscribe(spy);
+    const target = {} as EventTarget;
+    component.onBackdropClick({ target, currentTarget: target } as unknown as MouseEvent);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });

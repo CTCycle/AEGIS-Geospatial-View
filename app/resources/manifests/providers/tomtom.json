@@ -19,7 +19,7 @@
       "tomtom",
       "tomtom"
     ],
-    "intent_tags": [
+    "action_tags": [
       "tile",
       "traffic"
     ],
@@ -145,7 +145,7 @@
       "traffic",
       "tomtom"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

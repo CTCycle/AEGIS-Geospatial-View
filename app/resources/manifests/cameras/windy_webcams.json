@@ -23,7 +23,7 @@
       "beach condition",
       "ski condition"
     ],
-    "intent_tags": [
+    "action_tags": [
       "webcam",
       "camera",
       "visual_status",
@@ -81,7 +81,7 @@
       "port view",
       "traffic camera"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "visual_status",
       "travel_condition"
     ],

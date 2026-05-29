@@ -37,13 +37,13 @@ class TemporalSignal(BaseModel):
     reference_time_iso: str | None = None
 
 ###############################################################################
-class NormalizedIntent(BaseModel):
+class NormalizedAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    intent_id: str
-    intent_label: str
+    action_id: str
+    action_label: str
     task_tags: list[str] = Field(default_factory=list)
-    intent_tags: list[str] = Field(default_factory=list)
+    action_tags: list[str] = Field(default_factory=list)
     requested_visualizations: list[str] = Field(default_factory=list)
     requires_location: bool = True
 
@@ -63,10 +63,9 @@ class TurnParseResult(BaseModel):
     conversation_context: ConversationContextSnapshot
     task_class: TaskClass
     location_signals: list[LocationSignal] = Field(default_factory=list)
-    normalized_intent: NormalizedIntent
+    normalized_action: NormalizedAction
     temporal_signal: TemporalSignal = Field(default_factory=TemporalSignal)
     ambiguities: list[str] = Field(default_factory=list)
     disallowed_patterns: list[DisallowedPattern] = Field(default_factory=list)
     parser_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-
-
+    

@@ -23,7 +23,7 @@
       "age structure",
       "demographics"
     ],
-    "intent_tags": [
+    "action_tags": [
       "demographics",
       "population density",
       "age structure"
@@ -90,7 +90,7 @@
       "age analysis",
       "eurostat"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

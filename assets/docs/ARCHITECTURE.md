@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-21
+Last updated: 2026-05-28
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -69,15 +69,14 @@ common/
 configurations/
   environment.py
   management.py
+  settings.py
   startup.py
 domain/
   chat.py
   geographics.py
   gibs.py
-  job_state.py
   jobs.py
   layers.py
-  settings.py
   updater.py
   agent/decision.py
   agent/task_scope.py
@@ -90,6 +89,7 @@ repositories/
   model_settings.py
   database/backend.py
   database/initializer.py
+  database/orm_table_operations.py
   database/postgres.py
   database/sqlite.py
   database/utils.py
@@ -99,10 +99,11 @@ repositories/
 services/
   cryptography.py
   jobs.py
+  job_state.py
   sanitization.py
   startup_validation.py
   agent/candidate_ranker.py
-  agent/capability_retriever.py
+  agent/capability_retriever.py  # non-agent search/diagnostic retrieval only
   agent/executor.py
   agent/location_memory.py
   agent/location_resolver.py
@@ -159,6 +160,7 @@ services/
   llm/google_provider.py
   llm/langchain_runtime.py
   llm/ollama.py
+  llm/ollama_capability_cache.py
   llm/openai_provider.py
   llm/prompts.py
   llm/response_serialization.py
@@ -342,6 +344,7 @@ All routers are mounted with prefix `/api` in `app/server/app.py`.
 - Service/orchestration layer: `app/server/services/**`
 - Persistence layer: `app/server/repositories/**`
 - Contracts/domain models: `app/server/domain/**`
+- Configuration models and environment-derived settings: `app/server/configurations/**`
 
 Representative path:
 - endpoint (`chat.py` / `search.py`) -> service composition (`services/*/composition.py`) -> orchestration/execution (`services/agent`, `services/search`, `services/geospatial`) -> repository/database operations (`repositories/*`)
@@ -351,17 +354,21 @@ Layering constraints:
 - API routes translate service exceptions into HTTP responses.
 - Services do not import FastAPI.
 - Repositories remain the persistence boundary.
+- `domain/` is limited to request/response and domain contract models.
+- Runtime job state is owned by `app/server/services/job_state.py`.
+- Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
+- Ollama tool capability cache ownership is composed and injected at runtime; it is not class-level mutable provider state.
 - Current geospatial account setup payload construction lives in `app/server/services/geospatial/api_service.py`; there is no separate credential-validation endpoint or provider account setup service module.
 
 ### Chat orchestration pipeline
 
 1. `AgentOrchestrator` receives chat turn.
 2. `ParserService` produces structured parse output.
-3. `PolicyEngine` resolves decision and execution plan.
-4. Execution branch:
-   - direct tool via `ToolRegistry` handlers, or
-   - map search via `RequestBuilder` + `LocationSearchOrchestrator`.
-5. Response payload persisted through repositories (chat history/session tables).
+3. `PolicyEngine` builds constraints and authorizes or validates tool activity.
+4. `AgentToolCatalogService` exposes stable catalog, describe, and execute tools for geospatial manifests.
+5. `NativeToolLoop` calls the selected provider with native tool schemas and appends provider-native tool-result messages after execution.
+6. `ToolRegistry` executes exact model-emitted tool names with schema validation and structured result envelopes.
+7. Response payload persisted through repositories (chat history/session tables).
 
 ### Geospatial capability pipeline
 
@@ -369,6 +376,10 @@ Layering constraints:
 - `capability_registry.py` builds capability catalog.
 - `runtime_registry.py` applies runtime/credential availability.
 - `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
+- `provider_registry.py` binds fetchable manifests to concrete provider adapters.
+  Provider metadata manifests are registered only when a backend adapter exists;
+  basemap tile URLs remain manifest-backed and are served through the search tile
+  proxy path where applicable.
 
 ## Data Persistence
 
@@ -390,6 +401,15 @@ Core tables (defined in constants/schema layer) include:
 
 - Vector services in `app/server/services/vector/*`
 - Index lifecycle managed by `VectorIndexer` and maintenance endpoints.
+- Agent execution does not use manifest vectorization to decide which tools are visible or selected. Agent manifest access uses catalog, describe, and execute native tools.
+
+### Model capabilities
+
+- Cloud model capabilities are declared in `services/llm/cloud_catalog.py`.
+- Ollama tool support is detected from `/api/show` capabilities when available and otherwise by a cached native-tool probe.
+- Agent model assignment requires tool support.
+- Parser model assignment requires structured-output support.
+- Frontend role controls mirror backend assignment gates and show capability chips.
 
 ### Frontend persistence
 

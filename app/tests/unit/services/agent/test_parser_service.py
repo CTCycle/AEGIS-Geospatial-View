@@ -16,10 +16,10 @@ class _ProviderStub:
         if "Colosseum" in user_message:
             return {
                 "task_class": "direct_query",
-                "intent_id": "location_lookup",
-                "intent_label": "Location lookup",
+                "action_id": "geospatial_data_retrieval",
+                "action_label": "Location lookup",
                 "task_tags": ["direct_query"],
-                "intent_tags": ["coordinates"],
+                "action_tags": ["coordinates"],
                 "requires_location": True,
                 "location_signals": [
                     {
@@ -37,10 +37,10 @@ class _ProviderStub:
         if "القاهرة" in user_message:
             return {
                 "task_class": "map_search",
-                "intent_id": "air_quality_map",
-                "intent_label": "Air quality map",
+                "action_id": "map_search",
+                "action_label": "Air quality map",
                 "task_tags": ["map"],
-                "intent_tags": ["air_quality"],
+                "action_tags": ["air_quality"],
                 "requested_visualizations": ["air_quality"],
                 "requires_location": True,
                 "location_signals": [
@@ -65,10 +65,10 @@ class _ProviderStub:
         if "No model location" in user_message:
             return {
                 "task_class": "map_search",
-                "intent_id": "general_map",
-                "intent_label": "General map request",
+                "action_id": "map_search",
+                "action_label": "General map request",
                 "task_tags": ["map"],
-                "intent_tags": ["map"],
+                "action_tags": ["map"],
                 "requires_location": True,
                 "location_signals": [],
                 "temporal_signal": {"mode": "none"},
@@ -78,10 +78,10 @@ class _ProviderStub:
             }
         return {
             "task_class": "general_question",
-            "intent_id": "general_map",
-            "intent_label": "General map request",
+            "action_id": "map_search",
+            "action_label": "General map request",
             "task_tags": ["map"],
-            "intent_tags": ["map"],
+            "action_tags": ["map"],
             "requires_location": False,
             "location_signals": [],
             "temporal_signal": {"mode": "none"},
@@ -92,12 +92,12 @@ class _ProviderStub:
 
 
 class _FactoryStub:
-    def get_parser_provider(self, provider: str):  # noqa: ARG002
+    def get_provider(self, provider: str):  # noqa: ARG002
         return _ProviderStub()
 
 
 class _ConfigErrorFactoryStub:
-    def get_parser_provider(self, provider: str):  # noqa: ARG002
+    def get_provider(self, provider: str):  # noqa: ARG002
         raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
 
 
@@ -109,7 +109,7 @@ def test_parser_service_classifies_direct_query() -> None:
         conversation_messages=[],
     )
     assert result.task_class == "direct_query"
-    assert result.normalized_intent.intent_id == "location_lookup"
+    assert result.normalized_action.action_id == "geospatial_data_retrieval"
 
 
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:

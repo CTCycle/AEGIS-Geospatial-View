@@ -21,7 +21,7 @@
       "gibs",
       "nasa gibs"
     ],
-    "intent_tags": [
+    "action_tags": [
       "imagery",
       "wms",
       "wmts"
@@ -90,7 +90,7 @@
       "gibs",
       "nasa gibs"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

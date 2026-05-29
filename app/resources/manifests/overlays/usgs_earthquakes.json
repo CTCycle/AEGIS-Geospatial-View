@@ -20,7 +20,7 @@
       "seismic",
       "hazard"
     ],
-    "intent_tags": [
+    "action_tags": [
       "earthquake",
       "hazard",
       "current"
@@ -67,7 +67,7 @@
       "hazard",
       "current"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "hazard",
       "earthquake"
     ],

@@ -9,7 +9,7 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 from server.domain.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResponse
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
-    NormalizedIntent,
+    NormalizedAction,
     TurnParseResult,
 )
 from server.services.chat.streaming import ChatStreamingService
@@ -27,9 +27,9 @@ def turn_contract() -> TurnParseResult:
         user_text="show weather",
         conversation_context=ConversationContextSnapshot(),
         task_class="direct_query",
-        normalized_intent=NormalizedIntent(
-            intent_id="weather",
-            intent_label="Weather",
+        normalized_action=NormalizedAction(
+            action_id="weather",
+            action_label="Weather",
         ),
     )
 
@@ -39,7 +39,7 @@ def policy_decision() -> PolicyDecision:
         plan=ExecutionPlan(
             state="direct_response",
             mode="direct_text",
-            intent_id="weather",
+            action_id="weather",
         ),
         trace=DecisionTrace(steps=["test"]),
     )
@@ -114,7 +114,7 @@ def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     ]
     assert events[-1].data["session_id"] == 7
     assert (
-        events[-1].data["turn_contract"]["normalized_intent"]["intent_id"] == "weather"
+        events[-1].data["turn_contract"]["normalized_action"]["action_id"] == "weather"
     )
     assert events[-1].data["decision"]["plan"]["state"] == "direct_response"
 

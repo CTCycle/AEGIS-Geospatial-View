@@ -158,7 +158,7 @@ Setup:
 Limits and restrictions:
 
 - OpenTripMap is credential-gated and quota-limited.
-- Category selection should be driven by user intent, such as tourism, attractions, heritage, viewpoints, or recreation.
+- Category selection should be driven by user action context, such as tourism, attractions, heritage, viewpoints, or recreation.
 - If the key is missing, the catalog should show the source as unavailable and the agent should prefer public alternatives where possible.
 
 ### Open Charge Map

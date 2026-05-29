@@ -17,7 +17,7 @@ describe('components/layer-catalog.component', () => {
     supports_map: true,
     supports_direct_text: false,
     coverage: 'global',
-    intent_tags: [],
+    action_tags: [],
     task_tags: [],
     rendering_mode: 'clustered-points',
     reliability: { status: 'functional' },
@@ -38,7 +38,7 @@ describe('components/layer-catalog.component', () => {
         kind: 'camera-network',
         capability_kind: 'camera-network',
         provider: 'windy_webcams',
-        intent_tags: ['webcam', 'camera'],
+        action_tags: ['webcam', 'camera'],
         rendering_mode: 'camera-points',
       }),
       layer({
@@ -47,7 +47,7 @@ describe('components/layer-catalog.component', () => {
         kind: 'raster-overlay',
         capability_kind: 'raster-overlay',
         provider: 'fema',
-        intent_tags: ['flood', 'hazard'],
+        action_tags: ['flood', 'hazard'],
         rendering_mode: 'wms',
       }),
       layer({

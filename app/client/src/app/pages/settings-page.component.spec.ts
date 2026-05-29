@@ -166,7 +166,7 @@ describe('pages/settings-page.component', () => {
 
   it('pulls a missing Ollama model before assigning it', async () => {
     fetchChatModelsMock.and.resolveTo({
-      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: [], metadata: {} }],
+      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
       local: [],
     });
     const fixture = TestBed.createComponent(SettingsPageComponent);
@@ -176,8 +176,8 @@ describe('pages/settings-page.component', () => {
     component.setProviderFilter('ollama');
 
     fetchChatModelsMock.and.resolveTo({
-      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: [], metadata: {} }],
-      local: [{ id: 'llama3.1', name: 'llama3.1', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
+      cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
+      local: [{ id: 'llama3.1', name: 'llama3.1', description: 'local', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
     });
 
     await component.applyModelSelection('parser', {
@@ -185,7 +185,9 @@ describe('pages/settings-page.component', () => {
       name: 'llama3.1',
       description: 'library',
       provider: 'ollama',
-      capabilities: [],
+      capabilities: ['structured_output', 'tools'],
+      supports_tools: true,
+      supports_structured_output: true,
       metadata: {},
     });
 
@@ -347,7 +349,8 @@ describe('pages/settings-page.component', () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelectorAll('article[appmodelcard]').length).toBeGreaterThan(0);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('article.model-card').length).toBeGreaterThan(0);
   });
 
   it('navigateBack preserves state before routing', async () => {

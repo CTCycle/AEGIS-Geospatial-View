@@ -75,9 +75,7 @@ def test_25_sequential_turns_mixed_with_new_chat_resets(
         expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
         if idx in {9, 18}:
             page.get_by_role("button", name="Start new chat").click()
-            expect(
-                page.get_by_text("Enter a location-based request to begin.")
-            ).to_be_visible()
+            expect(page.get_by_text("Map Workspace")).to_be_visible()
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 
@@ -105,7 +103,7 @@ def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> Non
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map for refresh loop")
     page.get_by_role("button", name="Send").click()
-    expect(page.locator(".chat-message--assistant, .chat-message").last).to_be_visible()
+    expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=15000)
     for _ in range(10):
         page.reload()
         expect(page.get_by_text("show map for refresh loop")).to_be_visible()
@@ -125,7 +123,7 @@ def test_route_switching_20_cycles_preserves_query_and_chat_state(
         page.get_by_role("link", name="Model Settings").click()
         expect(page).to_have_url(re.compile(r".*/settings"))
         page.get_by_placeholder("Search models").fill("gpt")
-        page.get_by_role("button", name="Back to chat").click()
+        page.get_by_role("link", name="Search").click()
         expect(page).to_have_url(re.compile(rf"{re.escape(base_url.rstrip('/'))}/?$"))
         expect(page.get_by_text("show map state before route cycles")).to_be_visible()
 
@@ -157,7 +155,7 @@ def test_overlay_toggle_and_opacity_restore_after_refresh(
     first_checkbox.uncheck()
     first_range = page.locator(".overlay-control-row input[type='range']").first
     first_range.evaluate(
-        "(node) => { node.value = '25'; node.dispatchEvent(new Event('change', { bubbles: true })); }"
+        "(node) => { node.value = '25'; node.dispatchEvent(new Event('input', { bubbles: true })); }"
     )
     page.reload()
     expect(page.locator(".overlay-controls")).to_be_visible()

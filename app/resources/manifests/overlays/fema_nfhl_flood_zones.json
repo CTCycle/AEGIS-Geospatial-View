@@ -21,7 +21,7 @@
       "hazard",
       "risk"
     ],
-    "intent_tags": [
+    "action_tags": [
       "flood",
       "hazard",
       "risk"
@@ -69,7 +69,7 @@
       "hazard",
       "risk"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "flood",
       "hazard",
       "risk"

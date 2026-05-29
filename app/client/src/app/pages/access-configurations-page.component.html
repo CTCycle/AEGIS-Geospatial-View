@@ -90,14 +90,15 @@
     </section>
   </main>
 
-  <div
-    *ngIf="isSignupModalOpen && selectedProviderAccountSetup as setup"
-    class="provider-signup-modal"
-    role="dialog"
-    aria-modal="true"
-    [attr.aria-label]="'API key setup for ' + setup.name"
-  >
-    <div class="provider-signup-modal__panel">
+  @if (isSignupModalOpen && selectedProviderAccountSetup; as setup) {
+    <app-settings-modal-shell
+      title=""
+      [ariaLabel]="'API key setup for ' + setup.name"
+      [showHeader]="false"
+      [closeOnBackdrop]="false"
+      panelClass="provider-signup-modal__panel"
+      (requestClose)="closeProviderSignup()"
+    >
       <header>
         <p class="page-kicker">{{ setup.automation.experimentalLabel }}</p>
         <h2>{{ setup.name }}</h2>
@@ -161,7 +162,7 @@
           ×
         </button>
       </div>
-    </div>
-  </div>
+    </app-settings-modal-shell>
+  }
 
 </div>

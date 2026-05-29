@@ -7,6 +7,7 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.base import LLMProvider
 from server.services.llm.errors import LLMConfigurationError
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import LLMRequest
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
@@ -20,10 +21,14 @@ class LLMFactory:
         settings_repo: ModelSettingsRepository | None = None,
         credentials_repo: CredentialRepository | None = None,
         crypto_service: CredentialEncryptionService | None = None,
+        ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
     ) -> None:
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.credentials_repo = credentials_repo or CredentialRepository()
         self.crypto_service = crypto_service or CredentialEncryptionService()
+        self.ollama_tool_capability_cache = (
+            ollama_tool_capability_cache or OllamaToolCapabilityCache()
+        )
 
     # -------------------------------------------------------------------------
     def _resolve_provider_api_key(self, provider: str) -> str:
@@ -51,7 +56,10 @@ class LLMFactory:
         normalized = provider.strip().lower()
         settings = self.settings_repo.get_or_create()
         if normalized == "ollama":
-            return OllamaProvider(base_url=settings.ollama_url)
+            return OllamaProvider(
+                base_url=settings.ollama_url,
+                tool_capability_cache=self.ollama_tool_capability_cache,
+            )
         if normalized == "openai":
             api_key = self._resolve_provider_api_key("openai")
             return OpenAIProvider(api_key=api_key, base_url=settings.openai_base_url)
@@ -61,14 +69,6 @@ class LLMFactory:
         raise ValueError(f"Unsupported model provider '{provider}'.")
 
     # -------------------------------------------------------------------------
-    def get_agent_provider(self, provider: str) -> LLMProvider:
-        return self.get_provider(provider)
-
-    # -------------------------------------------------------------------------
-    def get_parser_provider(self, provider: str) -> LLMProvider:
-        return self.get_provider(provider)
-
-    # -------------------------------------------------------------------------    # ------------------------------------------------------------------------
     def get_chat_provider(self, provider: str) -> LLMProvider:
         return _ChatOnlyProvider(self.get_provider(provider))
 

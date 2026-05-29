@@ -11,7 +11,7 @@
     "requires_key": false,
     "attribution": "Source tourism authority",
     "keywords": ["tourism", "webcam", "destination", "camera"],
-    "intent_tags": ["tourism webcam", "destination condition"],
+    "action_tags": ["tourism webcam", "destination condition"],
     "task_tags": ["tourism view", "destination status"],
     "source_protocol": "source-defined JSON/HTML",
     "data_format": "template",
@@ -41,7 +41,7 @@
     "defaultEnabled": false,
     "manualToggle": false,
     "plannerHints": ["tourism webcam", "destination view", "live view"],
-    "requiredUserIntent": ["visual_status", "tourism"],
+    "requiredUserAction": ["visual_status", "tourism"],
     "avoidWhen": ["general chat", "no geographic context", "source not configured"]
   },
   "reliability": {"status": "disabled", "lastAudited": "2026-05-14", "knownLimitations": ["Template only until official source configuration is added."]},

@@ -97,12 +97,51 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
 
     assert "gibs" in registry.list_provider_ids()
     assert "rainviewer" in registry.list_provider_ids()
+    assert "fallback" not in registry.list_provider_ids()
+    assert "osm" not in registry.list_provider_ids()
     response = asyncio.run(
         registry.fetch("gibs", ProviderRequest(capability_id="gibs_satellite"))
     )
     assert response.provider_id == "gibs"
     assert response.payload["renderingMode"] == "wms"
     assert response.attribution
+
+
+def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
+    registry = ProviderRegistry()
+
+    registry.build_from_manifests()
+
+    assert "osm_tiles" not in registry.list_provider_ids()
+
+
+def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
+    class _Loader:
+        def load_all(self) -> dict[str, list[dict[str, object]]]:
+            return {
+                "providers": [],
+                "basemaps": [],
+                "overlays": [
+                    {
+                        "id": "custom_overlay",
+                        "provider": "unknown_provider",
+                        "capabilityKind": "raster-overlay",
+                    }
+                ],
+                "cameras": [],
+                "transit": [],
+                "tools": [],
+                "runtime_profiles": [],
+            }
+
+    registry = ProviderRegistry(manifest_loader=_Loader())  # type: ignore[arg-type]
+
+    try:
+        registry.build_from_manifests()
+    except ProviderNotRegisteredError as exc:
+        assert "unknown_provider" in str(exc)
+    else:
+        raise AssertionError("Unknown fetchable provider unexpectedly registered.")
 
 
 def test_provider_registry_times_out_slow_provider() -> None:
