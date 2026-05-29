@@ -281,14 +281,8 @@
     align-self: center;
 }
 
-.provider-signup-modal {
-    position: fixed;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 1rem;
-    background: rgb(4 10 14 / 72%);
-    z-index: 50;
+.provider-signup-modal__panel {
+    width: min(36rem, calc(100vw - 2rem));
 }
 
 .provider-signup-modal__notes {

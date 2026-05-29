@@ -10,6 +10,7 @@ import { ModelStatsPanelComponent } from '../components/model-stats-panel.compon
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
+import { buildSettingsUpdateBase } from '../core/chat-settings-update';
 import {
   ModelRole,
   SelectedModelStat,
@@ -539,19 +540,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private settingsUpdateBase(): ModelSettingsUpdateRequest {
-    return {
-      active_provider_mode: this.settings.active_provider_mode,
-      chat_model_provider: this.settings.chat_model_provider,
-      chat_model_name: this.settings.chat_model_name,
-      parser_model_provider: this.settings.parser_model_provider,
-      parser_model_name: this.settings.parser_model_name,
-      agent_model_provider: this.settings.agent_model_provider,
-      agent_model_name: this.settings.agent_model_name,
-      ollama_url: this.settings.ollama_url,
-      openai_base_url: this.settings.openai_base_url,
-      google_base_url: this.settings.google_base_url,
-      credentials: {},
-    };
+    return buildSettingsUpdateBase(this.settings);
   }
 
   private roleLabel(role: ModelRole): string {
