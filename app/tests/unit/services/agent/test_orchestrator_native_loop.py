@@ -4,8 +4,6 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-import pytest
-
 from server.domain.chat import ChatTurnRequest
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
