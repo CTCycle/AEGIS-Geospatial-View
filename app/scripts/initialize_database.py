@@ -12,11 +12,7 @@ from server.common.logger import logger
 ###############################################################################
 if __name__ == "__main__":
     start = time.perf_counter()
-    logger.info("Starting database initialization")
-    logger.info(
-        "Current database configuration: %s",
-        json.dumps(asdict(get_server_settings().database), ensure_ascii=False),
-    )
+    logger.info("Starting database initialization")    
     initialize_database()
     elapsed = time.perf_counter() - start
     logger.info("Database initialization completed in %.2f seconds", elapsed)

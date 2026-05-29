@@ -11,7 +11,7 @@
     "requires_key": false,
     "attribution": "Source DOT or transport agency",
     "keywords": ["dot", "traffic camera", "road condition", "camera"],
-    "intent_tags": ["traffic camera", "road condition"],
+    "action_tags": ["traffic camera", "road condition"],
     "task_tags": ["traffic monitoring", "road condition"],
     "source_protocol": "agency-defined JSON/WMS/HTML",
     "data_format": "template",
@@ -46,7 +46,7 @@
     "defaultEnabled": false,
     "manualToggle": false,
     "plannerHints": ["traffic camera", "road condition", "DOT camera"],
-    "requiredUserIntent": ["traffic_monitoring", "travel_condition"],
+    "requiredUserAction": ["traffic_monitoring", "travel_condition"],
     "avoidWhen": ["general chat", "no geographic context", "source not configured"]
   },
   "reliability": {

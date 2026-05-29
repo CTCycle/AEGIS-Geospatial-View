@@ -22,7 +22,7 @@
       "rent",
       "regional statistics"
     ],
-    "intent_tags": [
+    "action_tags": [
       "european demographics",
       "housing market",
       "regional indicators"
@@ -100,7 +100,7 @@
       "rent",
       "regional statistics"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

@@ -66,6 +66,11 @@ class ModelCardDescriptor(BaseModel):
     description: str
     provider: str
     capabilities: list[str] = Field(default_factory=list)
+    supports_tools: bool = False
+    supports_structured_output: bool = False
+    supports_vision: bool = False
+    supports_embeddings: bool = False
+    tool_support_source: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -125,6 +130,7 @@ class OllamaRefreshResponse(BaseModel):
     status: str
     library_models: list[str] = Field(default_factory=list)
     local_models: list[str] = Field(default_factory=list)
+    local_model_capabilities: list[ModelCardDescriptor] = Field(default_factory=list)
 
 
 ###############################################################################

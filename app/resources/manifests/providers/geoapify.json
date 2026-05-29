@@ -21,7 +21,7 @@
       "geoapify",
       "geoapify"
     ],
-    "intent_tags": [
+    "action_tags": [
       "tile",
       "geojson",
       "places"
@@ -150,7 +150,7 @@
       "places",
       "geoapify"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

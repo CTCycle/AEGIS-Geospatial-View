@@ -79,7 +79,23 @@ def _setup_stub_harness(
     page.route(
         re.compile(r".*/api/maps/catalog.*"),
         lambda route: _json_ok(
-            route, {"providers": [], "basemaps": [], "overlays": []}
+            route,
+            {
+                "providers": [],
+                "basemaps": [
+                    {
+                        "id": "osm_default",
+                        "name": "OpenStreetMap",
+                        "kind": "basemap",
+                        "provider": "openstreetmap",
+                        "coverage": "global",
+                        "description": "Standard street map tiles.",
+                        "requires_credentials": False,
+                        "is_available": True,
+                    }
+                ],
+                "overlays": [],
+            },
         ),
     )
     page.route(re.compile(r".*/api/chat/turn.*"), handle_turn)
@@ -161,7 +177,7 @@ def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) 
         .first
     )
     expect(model_card).to_be_visible(timeout=15000)
-    model_card.get_by_role("button", name="Use for parser").click()
+    model_card.get_by_role("button", name="Parser").click()
 
     expect(page.get_by_text("Selected gpt-5-mini for parser")).to_be_visible(
         timeout=15000
@@ -189,11 +205,9 @@ def test_capabilities_tables_do_not_clip_desktop_columns(
 ) -> None:
     _setup_stub_harness(page)
     page.set_viewport_size({"width": 1366, "height": 768})
-    page.goto(f"{base_url.rstrip('/')}/capabilities")
+    page.goto(f"{base_url.rstrip('/')}/geodata")
 
-    expect(page.get_by_role("heading", name="Capability Overview")).to_be_visible(
-        timeout=15000
-    )
+    expect(page.get_by_role("heading", name="Map Types")).to_be_visible(timeout=15000)
 
     metrics = page.evaluate(
         """
@@ -260,7 +274,7 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
     expect(page).to_have_url(re.compile(r".*/settings\?mode=cloud$"))
 
-    page.get_by_role("button", name="Back to chat").click()
+    page.get_by_role("link", name="Search").click()
     expect(page.get_by_label("Chat message")).to_be_visible(timeout=15000)
 
     path = page.evaluate("() => window.location.pathname")

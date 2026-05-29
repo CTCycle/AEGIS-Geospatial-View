@@ -10,7 +10,7 @@
   ],
   "coverage": "global",
   "metadata": {
-    "intent_tags": [
+    "action_tags": [
       "air quality",
       "pm25",
       "pollution"
@@ -80,7 +80,7 @@
       "direct-tool",
       "Air Quality Forecast"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

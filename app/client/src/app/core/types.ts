@@ -32,7 +32,7 @@ export interface PresentationPolicy {
 
 export interface LocationSearchRequest {
   resolved_location: ResolvedLocation;
-  intent_id: string;
+  action_id: string;
   time_mode: 'current' | 'historical' | 'forecast';
   basemap_id: string;
   overlay_ids: string[];
@@ -52,7 +52,7 @@ export interface CapabilityDescriptor {
   supports_map: boolean;
   supports_direct_text: boolean;
   coverage: string;
-  intent_tags: string[];
+  action_tags: string[];
   task_tags: string[];
   source_protocol?: string;
   data_format?: string;
@@ -292,13 +292,42 @@ export interface ContextUsage {
   model: string;
 }
 
-export interface NormalizedIntent {
-  intent_id: string;
-  intent_label: string;
+export interface NormalizedAction {
+  action_id: string;
+  action_label: string;
   task_tags: string[];
-  intent_tags: string[];
+  action_tags: string[];
   requested_visualizations?: string[];
   requires_location: boolean;
+}
+
+export type AgentAction =
+  | 'map_search'
+  | 'location_render'
+  | 'geospatial_data_retrieval'
+  | 'data_layer_query'
+  | 'overlay_control'
+  | 'dataset_display'
+  | 'visible_layer_interrogation'
+  | 'map_external_source_combination'
+  | 'chat_response'
+  | 'unknown';
+
+export interface AgentToolCall {
+  id?: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface AgentMapOperation {
+  type:
+    | 'set_viewport'
+    | 'load_overlay'
+    | 'toggle_overlay'
+    | 'display_dataset'
+    | 'highlight_layer'
+    | 'show_layer_summary';
+  payload: Record<string, unknown>;
 }
 
 export interface TemporalSignal {
@@ -321,7 +350,7 @@ export interface TurnParseResult {
   user_text: string;
   task_class: 'map_search' | 'direct_query' | 'general_question' | 'unclear';
   location_signals: LocationSignal[];
-  normalized_intent: NormalizedIntent;
+  normalized_action: NormalizedAction;
   temporal_signal: TemporalSignal;
   ambiguities: string[];
   parser_confidence: number;
@@ -337,7 +366,7 @@ export interface PolicyDecision {
   plan: {
     state: 'clarify' | 'direct_tool' | 'map_search' | 'reject';
     mode?: 'direct_text' | 'map' | null;
-    intent_id: string;
+    action_id: string;
     basemap_id?: string | null;
     overlay_ids: string[];
     tool_id?: string | null;
@@ -386,6 +415,11 @@ export interface ModelCardDescriptor {
   description: string;
   provider: string;
   capabilities: string[];
+  supports_tools?: boolean;
+  supports_structured_output?: boolean;
+  supports_vision?: boolean;
+  supports_embeddings?: boolean;
+  tool_support_source?: string;
   metadata: Record<string, JsonValue>;
 }
 

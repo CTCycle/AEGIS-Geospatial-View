@@ -20,7 +20,7 @@
       "precipitation",
       "weather tiles"
     ],
-    "intent_tags": [
+    "action_tags": [
       "rain radar",
       "precipitation"
     ],
@@ -89,7 +89,7 @@
       "radar",
       "weather tiles"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

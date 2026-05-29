@@ -26,6 +26,15 @@
   background: rgb(23 50 65 / 36%);
 }
 
+.model-card__duty:disabled {
+  color: #71848d;
+  cursor: not-allowed;
+}
+
+.model-card__duty:disabled:hover {
+  background: transparent;
+}
+
 .model-card__duty:last-child {
   border-right: 0;
 }
@@ -41,7 +50,15 @@
 .model-card__duty-name {
   font-size: 1.01rem;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
+}
+
+.model-card__duty-reason {
+  max-width: 100%;
+  color: #8ea1aa;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .model-card__duty--active {

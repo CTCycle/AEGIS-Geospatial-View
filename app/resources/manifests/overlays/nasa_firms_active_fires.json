@@ -22,7 +22,7 @@
       "active fire",
       "smoke"
     ],
-    "intent_tags": [
+    "action_tags": [
       "fire",
       "hazard",
       "smoke"
@@ -72,7 +72,7 @@
       "smoke",
       "active fire"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "fire",
       "hazard",
       "freshness"

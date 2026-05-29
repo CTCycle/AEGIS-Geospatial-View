@@ -39,11 +39,28 @@ export const isModelSelectedForRole = (
   return model.provider === selectedProvider && model.name === selectedName;
 };
 
+export const roleDisabledReason = (model: ModelCardDescriptor, role: ModelRole): string | null => {
+  if (role === 'agent' && !model.supports_tools) {
+    return 'Agent role requires native tool calling.';
+  }
+  if (role === 'parser' && !model.supports_structured_output) {
+    return 'Parser role requires structured output.';
+  }
+  return null;
+};
+
+export const canAssignRole = (model: ModelCardDescriptor, role: ModelRole): boolean =>
+  roleDisabledReason(model, role) === null;
+
 export const buildModelSelectionPayload = (
   settings: ModelSettingsResponse,
   role: ModelRole,
   model: ModelCardDescriptor,
 ): ModelSettingsUpdateRequest => {
+  const disabledReason = roleDisabledReason(model, role);
+  if (disabledReason) {
+    throw new Error(disabledReason);
+  }
   const roleFields = ROLE_FIELD_MAP[role];
   const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
   return {

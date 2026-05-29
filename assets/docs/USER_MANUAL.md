@@ -5,7 +5,7 @@ Scope: End-user operation of AEGIS Geospatial View
 
 ## 1. What the Application Does
 
-AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a location and intent in plain language, and the system returns map-focused results with overlays and session context.
+AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a location and requested action in plain language, and the system returns map-focused results with overlays and session context.
 
 ## 2. Primary Screens
 
@@ -26,7 +26,7 @@ AEGIS Geospatial View is a chat-driven geospatial workspace. You describe a loca
 
 ### Journey A: Location-first search
 1. Enter a place request such as a city, region, or coordinate pair.
-2. Include desired context (imagery/overlay intent).
+2. Include desired context (imagery or overlay action).
 3. Send message.
 4. Review updated map output.
 

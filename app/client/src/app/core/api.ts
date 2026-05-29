@@ -147,8 +147,8 @@ export const normalizeCapabilities = (input: unknown): CatalogResponse['capabili
           : null,
       }
       : undefined,
-    intent_tags: Array.isArray(item.intent_tags)
-      ? item.intent_tags.filter((v): v is string => typeof v === 'string')
+    action_tags: Array.isArray(item.action_tags)
+      ? item.action_tags.filter((v): v is string => typeof v === 'string')
       : [],
     task_tags: Array.isArray(item.task_tags)
       ? item.task_tags.filter((v): v is string => typeof v === 'string')
@@ -280,14 +280,26 @@ export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
   }
   return input
     .filter((item): item is Record<string, unknown> => isRecord(item))
-    .map((item) => ({
-      id: String(item.id ?? item.name ?? ''),
-      name: String(item.name ?? item.id ?? ''),
-      description: buildModelDescription(item),
-      provider: String(item.provider ?? ''),
-      capabilities: isStringArray(item.capabilities) ? item.capabilities : [],
-      metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
-    }));
+    .map((item) => {
+      const capabilities = isStringArray(item.capabilities) ? item.capabilities : [];
+      return {
+        id: String(item.id ?? item.name ?? ''),
+        name: String(item.name ?? item.id ?? ''),
+        description: buildModelDescription(item),
+        provider: String(item.provider ?? ''),
+        capabilities,
+        supports_tools: typeof item.supports_tools === 'boolean' ? item.supports_tools : capabilities.includes('tools'),
+        supports_structured_output: typeof item.supports_structured_output === 'boolean'
+          ? item.supports_structured_output
+          : capabilities.includes('structured') || capabilities.includes('structured_output'),
+        supports_vision: typeof item.supports_vision === 'boolean' ? item.supports_vision : capabilities.includes('vision'),
+        supports_embeddings: typeof item.supports_embeddings === 'boolean'
+          ? item.supports_embeddings
+          : capabilities.includes('embeddings'),
+        tool_support_source: typeof item.tool_support_source === 'string' ? item.tool_support_source : 'unknown',
+        metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
+      };
+    });
 };
 
 export const parseSearchResponse = (value: unknown): SearchResponse => {
@@ -322,12 +334,12 @@ export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   const transit = normalizeCapabilities(value.transit);
   return {
     capabilities: normalized,
-    providers: providers.length ? providers : normalized.filter((item) => item.kind === 'provider'),
-    basemaps: basemaps.length ? basemaps : normalized.filter((item) => item.kind === 'basemap'),
-    overlays: overlays.length ? overlays : normalized.filter((item) => item.kind === 'overlay' || item.kind === 'raster-overlay' || item.kind === 'vector-overlay' || item.kind === 'search-index'),
-    cameras: cameras.length ? cameras : normalized.filter((item) => item.kind === 'camera-network'),
-    transit: transit.length ? transit : normalized.filter((item) => item.kind === 'transit' || item.kind === 'dataset-ingestion'),
-    tools: tools.length ? tools : normalized.filter((item) => item.kind === 'tool'),
+    providers,
+    basemaps,
+    overlays,
+    cameras,
+    transit,
+    tools,
   };
 };
 

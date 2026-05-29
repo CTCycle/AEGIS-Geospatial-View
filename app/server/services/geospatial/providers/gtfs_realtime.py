@@ -3,26 +3,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from google.transit import gtfs_realtime_pb2
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderError,
     ProviderRequest,
     ProviderResponse,
-    ProviderUnavailableError,
 )
 from server.services.geospatial.providers.http import (
     BytesFetcher,
     call_bytes_fetcher,
     fetch_bytes_url,
 )
-
-gtfs_realtime_pb2: Any | None
-try:
-    from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]
-except ImportError:
-    gtfs_realtime_pb2 = None
-
 
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"
@@ -93,10 +86,6 @@ class GTFSRealtimeProvider(GeospatialProvider):
     def _parse_protobuf(
         self, feed_bytes: bytes, *, request: ProviderRequest | None = None
     ) -> dict[str, Any]:
-        if gtfs_realtime_pb2 is None:
-            raise ProviderUnavailableError(
-                "GTFS Realtime protobuf parser is unavailable; install gtfs-realtime-bindings."
-            )
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(feed_bytes)
         entities: list[dict[str, Any]] = []

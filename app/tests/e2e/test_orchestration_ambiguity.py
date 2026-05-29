@@ -14,7 +14,11 @@ def _turn(api_context: APIRequestContext, message: str, session_id: int | None =
             f"Provider unavailable for orchestration check ({response.status})."
     )
     assert response.ok, f"Expected 200, got {response.status}"
-    return response.json()
+    body = response.json()
+    assistant = str(body.get("assistant_message") or "").lower()
+    if "configured parser model is unavailable" in assistant:
+        pytest.skip("Configured parser model is unavailable for orchestration check.")
+    return body
 
 
 def test_ambiguous_temporal_request_produces_clarification(

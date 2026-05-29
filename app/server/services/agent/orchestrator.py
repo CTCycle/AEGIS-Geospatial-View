@@ -7,10 +7,18 @@ from uuid import uuid4
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from server.repositories.chat_history import ChatHistoryRepository
+from server.repositories.model_settings import ModelSettingsRepository
+from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.location_memory import LocationMemoryService
+from server.services.agent.native_tool_loop import (
+    AgentExecutionContext,
+    AgentToolLoopRequest,
+    NativeToolLoop,
+)
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.llm.factory import LLMFactory
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
@@ -27,6 +35,9 @@ class AgentOrchestrator:
         policy_engine: PolicyEngine,
         tool_registry: ToolRegistry,
         request_builder: RequestBuilder,
+        native_tool_loop: NativeToolLoop | None = None,
+        agent_tool_catalog_service: AgentToolCatalogService | None = None,
+        settings_repo: ModelSettingsRepository | None = None,
         history_repo: ChatHistoryRepository | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
@@ -35,6 +46,15 @@ class AgentOrchestrator:
         self.policy_engine = policy_engine
         self.tool_registry = tool_registry
         self.request_builder = request_builder
+        self.settings_repo = settings_repo or ModelSettingsRepository()
+        self.agent_tool_catalog_service = (
+            agent_tool_catalog_service or AgentToolCatalogService()
+        )
+        self.agent_tool_catalog_service.register_with(self.tool_registry)
+        self.native_tool_loop = native_tool_loop or NativeToolLoop(
+            provider_factory=LLMFactory(settings_repo=self.settings_repo),
+            tool_registry=self.tool_registry,
+        )
         self.history_repo = history_repo or ChatHistoryRepository()
 
     async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
@@ -63,7 +83,7 @@ class AgentOrchestrator:
                 "I could not use the configured parser model because the saved API key was rejected. "
                 "Open Model Settings and replace the key before using that cloud model."
             )
-            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -99,7 +119,7 @@ class AgentOrchestrator:
                 "I could not process this request because the configured parser model is unavailable. "
                 "Open Model Settings, choose an installed model, or refresh/pull the configured Ollama model."
             )
-            decision = self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id)
+            decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -155,57 +175,120 @@ class AgentOrchestrator:
                 session_id=session.id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
-                decision=self._build_direct_reject_decision(turn_contract.normalized_intent.intent_id),
+                decision=self._build_direct_reject_decision(turn_contract.normalized_action.action_id),
                 tool_payload=None,
                 map_session=None,
                 memory_snapshot=latest_memory,
                 context_usage=context_usage,
             )
 
-        decision = await self.policy_engine.decide(
-            turn=turn_contract,
-            memory_snapshot=latest_memory,
-            runtime_registry=self.tool_registry.runtime_registry.build_snapshot(),
-            capability_registry=self.search_orchestrator.capability_registry,
+        preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
+        if preflight_decision is not None:
+            assistant_message = (
+                preflight_decision.clarification.question
+                if preflight_decision.clarification is not None
+                else "I cannot execute this request with the current policy constraints."
+            )
+            self.history_repo.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                structured_payload={
+                    "turn_contract": turn_contract.model_dump(mode="json"),
+                    "decision": preflight_decision.model_dump(mode="json"),
+                    "memory_snapshot": latest_memory,
+                    "previous_turn_contract": latest_contract,
+                    "request_id": request_id,
+                },
+                tool_payload=None,
+                map_session=None,
+            )
+            return ChatTurnResponse(
+                request_id=request_id,
+                session_id=session.id,
+                assistant_message=assistant_message,
+                turn_contract=turn_contract,
+                decision=preflight_decision,
+                tool_payload=None,
+                map_session=None,
+                memory_snapshot=latest_memory,
+                context_usage=context_usage,
+            )
+
+        settings = self.settings_repo.get_or_create()
+        constraints = self.policy_engine.build_agent_constraints(
+            turn_contract,
+            latest_memory,
         )
-
-        tool_payload: dict[str, Any] | None = None
+        native_context = AgentExecutionContext(
+            request_id=request_id,
+            session_id=str(session.id),
+            parsed_request=turn_contract.model_dump(mode="json"),
+            map_state=latest_memory if isinstance(latest_memory, dict) else {},
+            policy_constraints={
+                "requires_location": constraints.requires_location,
+                "blocked_patterns": constraints.blocked_patterns,
+                "allowed_tool_names": constraints.allowed_tool_names,
+                **constraints.metadata,
+            },
+            metadata={"previous_turn_contract": latest_contract},
+        )
+        native_tools = self.tool_registry.list_native_tools()
+        tool_loop_result = await self.native_tool_loop.run(
+            AgentToolLoopRequest(
+                provider=settings.agent_model_provider,
+                model=settings.agent_model_name,
+                messages=self._build_native_agent_messages(
+                    turn_contract=turn_contract,
+                    memory_snapshot=latest_memory,
+                    constraints=constraints,
+                ),
+                tools=native_tools,
+                temperature=0.2,
+                max_tokens=None,
+                context=native_context,
+            )
+        )
+        decision = PolicyDecision(
+            plan=ExecutionPlan(
+                state="direct_response",
+                mode="direct_text",
+                action_id=turn_contract.normalized_action.action_id,
+            ),
+            trace=DecisionTrace(
+                steps=[
+                    "1.parse_structured_request",
+                    "2.build_policy_constraints",
+                    "3.native_tool_loop",
+                    f"4.stop:{tool_loop_result.stopped_reason}",
+                ]
+            ),
+        )
+        assistant_message = tool_loop_result.final_text or "Done."
+        tool_payload = {
+            "tool_calls": [
+                {
+                    "id": call.id,
+                    "name": call.name,
+                    "arguments": call.arguments,
+                }
+                for call in tool_loop_result.tool_calls
+            ],
+            "tool_results": [
+                {
+                    "tool_call_id": result.tool_call_id,
+                    "name": result.name,
+                    "content": result.content,
+                    "is_error": result.is_error,
+                    "error": result.error,
+                }
+                for result in tool_loop_result.tool_results
+            ],
+            "iterations": tool_loop_result.iterations,
+            "stopped_reason": tool_loop_result.stopped_reason,
+        }
         map_session = None
-        assistant_message = "I need a clarification before I continue."
         memory_snapshot = latest_memory
-
-        if decision.plan.state == "direct_tool" and decision.resolved_location is not None:
-            tool_id = decision.plan.tool_id or "location_to_coordinates"
-            tool_payload = await self.tool_registry.execute(tool_id, decision.plan, decision.resolved_location)
-            assistant_message = self._compose_assistant_message(decision, tool_payload, None)
-            memory_snapshot = self.location_memory_service.update_memory_snapshot(
-                latest_memory,
-                decision.resolved_location,
-                turn_contract.normalized_intent,
-            )
-        elif decision.plan.state == "map_search" and decision.resolved_location is not None:
-            request = self.request_builder.build_location_search_request(
-                decision.plan,
-                decision.resolved_location,
-            )
-            map_session = await self.search_orchestrator.execute(request)
-            LOGGER.info(
-                "chat_turn_map_session request_id=%s basemap_id=%s overlay_ids=%s warnings=%s",
-                request_id,
-                map_session.basemap_id,
-                map_session.overlay_ids,
-                map_session.compliance_warnings,
-            )
-            assistant_message = self._compose_assistant_message(decision, None, map_session.model_dump(mode="json"))
-            memory_snapshot = self.location_memory_service.update_memory_snapshot(
-                latest_memory,
-                decision.resolved_location,
-                turn_contract.normalized_intent,
-            )
-        elif decision.clarification is not None:
-            assistant_message = decision.clarification.question
-        elif decision.plan.state == "reject":
-            assistant_message = "I cannot execute this request with the current policy constraints."
 
         self.history_repo.append_message(
             session_id=session.id,
@@ -241,9 +324,37 @@ class AgentOrchestrator:
         )
 
     @staticmethod
-    def _build_direct_reject_decision(intent_id: str):
+    def _build_native_agent_messages(
+        *,
+        turn_contract,
+        memory_snapshot: dict,
+        constraints,
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "role": "system",
+                "content": (
+                    "You are the AEGIS geospatial agent. Use native tools when geospatial "
+                    "catalog discovery, capability description, or execution is needed. "
+                    "Do not invent tool results. Call only the provided tools by exact name. "
+                    "After tool results are returned, provide a concise user-facing answer."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Parsed request:\n"
+                    f"{turn_contract.model_dump_json()}\n\n"
+                    f"Map memory:\n{memory_snapshot}\n\n"
+                    f"Policy constraints:\n{constraints}"
+                ),
+            },
+        ]
+
+    @staticmethod
+    def _build_direct_reject_decision(action_id: str):
         return PolicyDecision(
-            plan=ExecutionPlan(state="direct_response", intent_id=intent_id),
+            plan=ExecutionPlan(state="direct_response", action_id=action_id),
             trace=DecisionTrace(steps=["general_question.direct_response"]),
         )
 

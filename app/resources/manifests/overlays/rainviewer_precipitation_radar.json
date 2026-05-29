@@ -22,7 +22,7 @@
       "precipitation",
       "rain intensity"
     ],
-    "intent_tags": [
+    "action_tags": [
       "precipitation",
       "storm tracking"
     ],
@@ -104,7 +104,7 @@
       "radar",
       "rain intensity"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

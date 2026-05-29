@@ -8,7 +8,7 @@ from server.configurations.environment import (
     reset_environment_bootstrap_for_tests,
 )
 from server.configurations.management import ConfigurationManager
-from server.domain.settings import ServerSettings
+from server.configurations.settings import ServerSettings
 from server.common.constants import CONFIGURATIONS_FILE
 
 

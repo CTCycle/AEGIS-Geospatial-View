@@ -23,7 +23,7 @@
       "river",
       "flood"
     ],
-    "intent_tags": [
+    "action_tags": [
       "water",
       "flood",
       "hazard"
@@ -70,7 +70,7 @@
       "river",
       "flood"
     ],
-    "requiredUserIntent": [
+    "requiredUserAction": [
       "water",
       "flood",
       "hazard"

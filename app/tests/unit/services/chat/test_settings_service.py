@@ -78,24 +78,62 @@ class FakeCryptoService:
 
 
 class FakeModelLibraryService:
-    def __init__(self, local_model_ids: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        local_model_ids: set[str] | None = None,
+        model_overrides: dict[tuple[str, str], dict[str, object]] | None = None,
+    ) -> None:
         self.local_model_ids = local_model_ids or set()
+        self.model_overrides = model_overrides or {}
 
     def list_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
+        local = [
+            {
+                "id": model_id,
+                "name": model_id,
+                "description": model_id,
+                "provider": "ollama",
+                "capabilities": ["chat", "structured_output", "tools"],
+                "supports_tools": True,
+                "supports_structured_output": True,
+                "metadata": {},
+            }
+            | self.model_overrides.get(("ollama", model_id), {})
+            for model_id in sorted(self.local_model_ids)
+        ]
+        cloud = [
+            {
+                "id": name,
+                "name": name,
+                "description": name,
+                "provider": provider,
+                "capabilities": ["chat", "structured_output", "tools"],
+                "supports_tools": True,
+                "supports_structured_output": True,
+                "metadata": {},
+            }
+            | override
+            for (provider, name), override in self.model_overrides.items()
+            if provider != "ollama"
+        ]
         return {
-            "cloud": [],
-            "local": [
-                {
-                    "id": model_id,
-                    "name": model_id,
-                    "description": model_id,
-                    "provider": "ollama",
-                    "capabilities": [],
-                    "metadata": {},
-                }
-                for model_id in sorted(self.local_model_ids)
-            ],
+            "cloud": cloud,
+            "local": local,
         }
+
+    def find_model(
+        self,
+        *,
+        provider: str,
+        model_name: str,
+        ollama_url: str,
+    ) -> dict[str, object] | None:
+        _ = ollama_url
+        for bucket in self.list_models(ollama_url=ollama_url).values():
+            for item in bucket:
+                if item.get("provider") == provider and item.get("name") == model_name:
+                    return item
+        return None
 
 
 def build_service(
@@ -105,7 +143,7 @@ def build_service(
     credentials_repo: FakeCredentialsRepository | None = None,
 ) -> ChatSettingsService:
     return ChatSettingsService(
-        settings_repo=settings_repo,  # type: ignore[arg-type]
+        settings_repo=settings_repo or FakeSettingsRepository(),  # type: ignore[arg-type]
         credentials_repo=credentials_repo or FakeCredentialsRepository(),  # type: ignore[arg-type]
         crypto_service=FakeCryptoService(),  # type: ignore[arg-type]
         model_library_service=model_library_service or FakeModelLibraryService(),  # type: ignore[arg-type]
@@ -166,14 +204,26 @@ def test_local_chat_model_validation_rejects_unavailable_ollama_model() -> None:
         )
 
 
-def test_local_embedding_model_validation_rejects_unavailable_ollama_model() -> None:
+def test_local_parser_model_validation_rejects_unavailable_ollama_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
-    with pytest.raises(ChatSettingsValidationError, match="not available from Ollama"):
+    with pytest.raises(ChatSettingsValidationError, match="Selected parser model"):
         service.update_settings(
             ModelSettingsUpdateRequest(
                 parser_model_provider="ollama",
                 parser_model_name="missing-parser",
+            )
+        )
+
+
+def test_local_agent_model_validation_rejects_unavailable_ollama_model() -> None:
+    service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
+
+    with pytest.raises(ChatSettingsValidationError, match="Selected agent model"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider="ollama",
+                agent_model_name="missing-agent",
             )
         )
 
@@ -201,3 +251,45 @@ def test_available_local_models_allow_update() -> None:
     assert settings_repo.last_update["active_provider_mode"] == "local"
     assert settings_repo.last_update["chat_model_provider"] == "ollama"
     assert settings_repo.last_update["chat_model_name"] == "llama3.2"
+
+
+def test_agent_model_without_tools_is_rejected() -> None:
+    service = build_service(
+        model_library_service=FakeModelLibraryService(
+            model_overrides={
+                ("openai", "no-tools"): {
+                    "supports_tools": False,
+                    "supports_structured_output": True,
+                }
+            }
+        )
+    )
+
+    with pytest.raises(ChatSettingsValidationError, match="native tool calling"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                agent_model_provider="openai",
+                agent_model_name="no-tools",
+            )
+        )
+
+
+def test_parser_model_without_structured_output_is_rejected() -> None:
+    service = build_service(
+        model_library_service=FakeModelLibraryService(
+            model_overrides={
+                ("google", "no-structured"): {
+                    "supports_tools": True,
+                    "supports_structured_output": False,
+                }
+            }
+        )
+    )
+
+    with pytest.raises(ChatSettingsValidationError, match="structured output"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                parser_model_provider="google",
+                parser_model_name="no-structured",
+            )
+        )

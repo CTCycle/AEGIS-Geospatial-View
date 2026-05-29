@@ -24,7 +24,7 @@ class _ManifestLoaderStub:
                     "last_modified": "2026-04-01T00:00:00Z",
                     "metadata": {
                         "keywords": ["street", "city"],
-                        "intent_tags": ["routing"],
+                        "action_tags": ["routing"],
                         "task_tags": ["orientation"],
                         "map_type_tags": ["street"],
                         "human_summary": "Default city basemap.",
@@ -51,7 +51,7 @@ class _ManifestLoaderStub:
                     "last_modified": "2026-04-01T00:00:00Z",
                     "metadata": {
                         "keywords": ["air", "quality"],
-                        "intent_tags": ["air-quality"],
+                        "action_tags": ["air-quality"],
                         "task_tags": ["pollution checks"],
                         "map_type_tags": ["thematic"],
                         "human_summary": "Station-based air-quality layer.",
@@ -76,7 +76,7 @@ class _ManifestLoaderStub:
                     "last_modified": "2026-04-01T00:00:00Z",
                     "metadata": {
                         "keywords": ["traffic", "roads"],
-                        "intent_tags": ["traffic"],
+                        "action_tags": ["traffic"],
                         "task_tags": ["congestion monitoring"],
                         "map_type_tags": ["thematic"],
                         "human_summary": "Traffic flow overlay for congestion context.",

@@ -160,9 +160,7 @@ const ensureTabId = (): string => {
   if (existing) {
     return existing;
   }
-  const next = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const next = window.crypto.randomUUID();
   window.sessionStorage.setItem(TAB_ID_KEY, next);
   return next;
 };
@@ -175,9 +173,7 @@ const setTabId = (tabId: string): void => {
 };
 
 const rotateTabId = (): string => {
-  const next = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const next = window.crypto.randomUUID();
   setTabId(next);
   return next;
 };

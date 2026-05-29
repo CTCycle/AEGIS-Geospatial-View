@@ -24,7 +24,7 @@
       "boundaries",
       "geojson"
     ],
-    "intent_tags": [
+    "action_tags": [
       "demographics",
       "population density",
       "census tracts"
@@ -94,7 +94,7 @@
       "boundaries",
       "geojson"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

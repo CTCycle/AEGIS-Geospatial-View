@@ -9,9 +9,7 @@ class TestAppShell:
     def test_homepage_loads_chat_and_map_layout(self, page: Page, base_url: str):
         page.goto(base_url)
         expect(page.get_by_text("AEGIS", exact=True)).to_be_visible()
-        expect(
-            page.get_by_text("Enter a location-based request to begin.")
-        ).to_be_visible()
+        expect(page.get_by_text("Map Workspace")).to_be_visible()
         expect(page.get_by_label("Agent Chat")).to_be_visible()
         expect(page.locator(".map-canvas")).to_be_visible()
 
@@ -32,7 +30,7 @@ class TestChatFlow:
         page.goto(base_url)
         page.get_by_role("link", name="Model Settings").click()
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
-        expect(page.get_by_role("heading", name="Model Settings")).to_be_visible()
+        expect(page.get_by_text("Select AEGIS models")).to_be_visible()
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
         expect(page.get_by_role("button", name="Open Ollama settings")).to_be_visible()
@@ -47,7 +45,7 @@ class TestChatFlow:
         page.go_back()
         expect(page.get_by_label("Chat message")).to_be_visible()
         page.go_forward()
-        expect(page.get_by_role("heading", name="Model Settings")).to_be_visible()
+        expect(page.get_by_text("Select AEGIS models")).to_be_visible()
         expect(search).to_have_value("gpt")
 
     def test_refresh_restores_chat_draft(self, page: Page, base_url: str):

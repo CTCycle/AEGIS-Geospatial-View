@@ -8,7 +8,10 @@ from typing import Any
 
 from playwright.sync_api import ConsoleMessage, Page, Route, expect
 
-from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
+from tests.e2e.helpers.chat_stub_payloads import (
+    chat_turn_map_response,
+    model_settings_payload,
+)
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jte8AAAAASUVORK5CYII="
@@ -36,25 +39,12 @@ def _models_payload() -> dict[str, Any]:
 
 
 def _turn_payload() -> dict[str, Any]:
-    return {
-        "session_id": 7001,
-        "assistant_message": "Search executed successfully.",
-        "map_session": {
-            "center": {"latitude": 41.9028, "longitude": 12.4964},
-            "bounds": [12.4963044, 41.902725, 12.4964044, 41.902825],
-            "basemap": {
-                "id": "osm_default",
-                "label": "OpenStreetMap",
-                "provider": "osm",
-                "type": "tile",
-                "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                "requires_key": False,
-            },
-            "overlays": [],
-            "compliance_warnings": [],
-        },
-        "tool_payload": {"execution": "map_search", "selected_overlay_ids": []},
-    }
+    payload = chat_turn_map_response(7001, "Search executed successfully.")
+    payload["map_session"]["bounds"] = [12.4963044, 41.902725, 12.4964044, 41.902825]
+    payload["map_session"]["overlays"] = []
+    payload["map_session"]["overlay_ids"] = []
+    payload["tool_payload"] = {"execution": "map_search", "selected_overlay_ids": []}
+    return payload
 
 
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:

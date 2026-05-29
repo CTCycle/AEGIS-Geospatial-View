@@ -1,128 +1,120 @@
 # Agentic Search
 
-Last updated: 2026-05-14
+Last updated: 2026-05-24
 
 ## Summary
 
-The chat workflow is now contract-first and deterministic:
+The chat workflow separates structured parsing from provider-native tool calling:
 
-1. Parser emits evidence-only `TurnParseResult`.
-2. Policy engine builds a strict `PolicyDecision` + `ExecutionPlan`.
-3. Orchestrator executes only the approved plan state (`clarify`, `direct_tool`, `map_search`, `reject`).
-4. Turn payloads and location memory snapshots are persisted as structured JSON.
+1. Parser emits evidence-only `TurnParseResult` for request extraction.
+2. Policy builds constraints, authorization checks, confirmation requirements, and audit metadata.
+3. `AgentToolCatalogService` exposes stable catalog, describe, and execute tools.
+4. `NativeToolLoop` sends those tools to the selected provider through native tool-calling APIs.
+5. The model alone decides exact tool names and arguments.
+6. `ToolRegistry` executes exact emitted tool names and returns provider-native tool-result messages.
+7. The loop continues until the model returns final text or a production limit is reached.
 
 No legacy routing compatibility is preserved.
 
 ## Turn Contract
 
 Parser output is `TurnParseResult` and contains only:
+
 - user text and bounded conversation context
 - task class (`map_search | direct_query | general_question | unclear`)
 - location signals
-- normalized intent
+- normalized action
 - temporal signal
 - ambiguities
 - disallowed patterns
 - parser confidence
 
-Parser output never contains tool IDs, overlay IDs, or execution directives.
+Parser output never contains provider-specific tool schemas, concrete tool names, action IDs selected for execution, overlay execution directives, or final map operation payloads.
 
-## Policy Engine Order
+## Action Catalog
 
-Decisioning order is fixed and must not be reordered:
+The stable action catalog lives in `app/server/domain/agent/actions.py`.
 
-1. validate task class
-2. enforce location requirement
-3. resolve location
-4. validate ambiguity
-5. retrieve capabilities
-6. filter runtime availability
-7. filter coverage
-8. choose execution mode
-9. build execution plan
+Supported action values:
 
-The policy engine is the only authority that decides execution mode.
-
-## Execution Modes
-
-`ExecutionPlan.state` can be only:
-- `clarify`
-- `direct_tool`
 - `map_search`
-- `reject`
+- `location_render`
+- `geospatial_data_retrieval`
+- `data_layer_query`
+- `overlay_control`
+- `dataset_display`
+- `visible_layer_interrogation`
+- `map_external_source_combination`
+- `chat_response`
+- `unknown`
 
-### `direct_tool`
+Each action definition declares its user-facing label, description, tool groups, map-context requirement, and whether external sources are allowed. Unknown or low-confidence parser classifications are normalized to `unknown` before policy selection.
 
-- Tool is resolved from manifest-backed capability + runtime registries.
-- Tool execution is handled through `ToolRegistry` and handler bindings.
+## Native Catalog Tools
 
-### `map_search`
+Agent-visible geospatial manifests are exposed through a small stable native tool set:
 
-- `RequestBuilder` converts plan + resolved location into `LocationSearchRequest`.
-- Search orchestrator executes only explicit `basemap_id` + `overlay_ids`.
-- No inferred overlay selection from legacy semantic filters.
+- `list_geospatial_capabilities`: paginated, filterable compact catalog metadata.
+- `describe_geospatial_capability`: full descriptor and executable JSON schema for one stable capability ID.
+- `execute_geospatial_capability`: schema-validated execution by stable capability ID.
 
-## Capability Retrieval
+The catalog page size is capped at 50. Catalog and describe responses are deterministic and permission-aware.
 
-Retrieval is two-stage:
+## Provider-Native Tool Calling
 
-1. semantic retrieval against manifest embeddings
-2. deterministic reranking (`intent`, `temporal`, `runtime`, `coverage`)
+The shared LLM boundary exposes provider-neutral `LLMToolDefinition`, `LLMToolCall`, and `LLMToolResult` types. Provider adapters translate those into native schemas:
 
-Searchable kinds include basemaps, overlays, and tools from the same manifest source.
+- OpenAI function tools and structured output schema.
+- Google Gemini function declarations and tool configuration.
+- Ollama chat tools and structured output format.
 
-## Geographic Intelligence Selection
+Provider-specific schemas do not leak into parser, policy, or executor models.
 
-Geographic sources are agentic capabilities, not passive layers. The policy engine and manifest intent resolver select basemaps, overlays, camera networks, search indexes, and analysis tools only when the user request benefits from them.
+## Manifest Exposure
 
-Selection rules:
+Capability manifests remain the source of truth for overlays, layers, datasets, and geospatial operations, but manifest vectorization is not used to decide which tools the agent may see or call. The agent sees the stable catalog tools, discovers capabilities by catalog/describe calls, and executes by stable capability ID.
 
-- General factual chat does not load map capabilities.
-- Location, nearby, route, show, overlay, live, current, camera, traffic, flood, fire, weather, demographic, amenity, or visual-confirmation requests can select geospatial capabilities.
-- Webcam and camera requests select `camera-network` capabilities such as `windy_webcams`.
-- Amenity requests select POI/search-index capabilities, not every available geographic layer.
-- Missing credentials do not crash the turn; the runtime returns access-needed state and should prefer public alternatives where possible.
-- Broken or metadata-only capabilities are not exposed as normal renderable toggles.
-- `select_geospatial_capabilities(user_query, resolved_location, bbox, time_context, user_permissions)` is the explicit selector for capability gating. It returns selected, missing-credential, unhealthy, privacy-gated, needs-location, or refused decisions before execution.
-- Requests to show every possible layer are refused as indiscriminate loading and should be answered with a concise category offer.
-- Selected capabilities flow into the backend `MapSession`; manual toggles and agent-selected layers both pass the same credential, health, freshness, privacy, cost, and permission gates.
-- Map sessions are expected for map-worthy webcam, traffic, hazard, amenity, transit, weather, demographic, infrastructure, and environmental queries. General factual questions continue through normal chat with no layer load.
+## Internal Agent Services
 
-## Runtime and Coverage
+The pipeline uses internal services, not user-facing bots:
 
-Runtime availability is driven by `runtime_profiles.json` + current credentials:
-- enabled/disabled
-- mode support (`supports_map`, `supports_direct_text`)
-- health and credential status
+- `ParserService`: structured extraction only.
+- `PolicyEngine`: constraints, authorization, validation, and clarification/rejection checks.
+- `AgentToolCatalogService`: stable catalog, describe, and execute tools.
+- `NativeToolLoop`: provider-native multi-turn tool loop.
+- `ToolRegistry`: exact-name tool resolution, schema validation, and execution envelopes.
 
-Coverage filtering is explicit and supports:
-- `global`
-- `global-partial`
-- `eu-eea`
-- `global-except-poles`
+## Execution Pipeline
 
-## Location Memory
+`NativeToolLoop.run(...)` executes:
 
-Location context is stored as slot-based memory snapshot in persisted structured payloads.
+1. Send conversation, constraints, and stable native tools to the provider.
+2. If the provider returns tool calls, validate exact tool names and arguments.
+3. Execute allowed tools through `ToolRegistry`.
+4. Append assistant tool-call and tool-result messages using provider-native roles.
+5. Repeat until final text or a limit is reached.
 
-Services:
-- `build_memory_snapshot`
-- `resolve_explicit_references`
-- `update_memory_snapshot`
+Safety limits:
 
-This memory is consumed by parser/policy and returned as `memory_snapshot` in `ChatTurnResponse`.
+- maximum provider tool-calling rounds: 8
+- maximum parallel tool calls per round: 8
+- maximum tool-result payload before deterministic truncation: 12000 characters
+- tool timeout: 30 seconds
+- unknown tool names are rejected
+- tools return structured envelopes, not free text
 
 ## API Contracts
 
-`POST /api/chat/turn` returns `ChatTurnResponse` with:
-- `assistant_message`
-- `turn_contract`
-- `decision`
-- `tool_payload`
-- `map_session`
-- `memory_snapshot`
+Agent responses expose:
 
-`POST /api/maps/search` accepts strict `LocationSearchRequest` only.
+- `action`
+- `action_label`
+- `action_confidence`
+- `tool_calls`
+- `map_operations`
+- `message`
+
+Map operation payloads are frontend-actionable and may include viewport, center, bbox, zoom, layer ID, dataset ID, overlay ID, visibility, opacity, legend, and source attribution.
 
 ## Extensibility Rules
 
@@ -130,5 +122,6 @@ To add capabilities, update manifests and runtime profiles first.
 
 - Basemap/overlay: add manifest + runtime profile entry.
 - Direct tool: add tool manifest + runtime profile entry + handler module.
+- Agent-visible manifest operations are discovered through catalog, describe, and execute native tools.
 
-Core parser/policy/orchestrator code should not need edits for additive capabilities.
+Core parser, provider abstraction, and executor code should not need edits for additive capabilities unless a new stable native tool category is introduced.

@@ -1,7 +1,7 @@
 {
   "id": "osm_dark",
   "name": "Dark Basemap",
-  "provider": "fallback",
+  "provider": "cartodb_tiles",
   "type": "tile",
   "description": "Dark-themed OpenStreetMap basemap designed for high-contrast thematic overlays.",
   "capabilities": [
@@ -21,7 +21,7 @@
     "map_type_tags": [
       "dark"
     ],
-    "intent_tags": [
+    "action_tags": [
       "night_mode",
       "traffic_focus"
     ],
@@ -31,7 +31,7 @@
     ],
     "coverage_scope": "global",
     "temporal_behavior": "static tiles",
-    "constraints": "visual dark mode semantics mapped to OSM fallback tiles",
+    "constraints": "optimized for high-contrast thematic overlays",
     "last_embedded": null,
     "embedding_provider": "ollama",
     "embedding_model": "nomic-embed-text",
@@ -61,7 +61,7 @@
     "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",
-    "rate_limit_notes": "visual dark mode semantics mapped to OSM fallback tiles",
+    "rate_limit_notes": "best-effort public tiles; avoid excessive burst traffic",
     "retrieval_mode": "direct",
     "openlayers_compatible": true,
     "last_validated": "2026-04-27"
@@ -98,7 +98,7 @@
       "night",
       "contrast"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

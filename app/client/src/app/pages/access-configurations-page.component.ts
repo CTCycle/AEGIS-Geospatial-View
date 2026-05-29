@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ApiClientService } from '../core/api-client.service';
+import { buildCredentialUpdateRequest } from '../core/chat-settings-update';
 import { GeospatialProviderAccountSetup, ModelSettingsResponse } from '../core/types';
 
 type GeoProviderId = string;
@@ -18,7 +20,7 @@ interface GeoProviderAccess {
 @Component({
   selector: 'app-access-configurations-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SettingsModalShellComponent],
   templateUrl: './access-configurations-page.component.html',
   styleUrl: './access-configurations-page.component.css',
 })
@@ -38,7 +40,6 @@ export class AccessConfigurationsPageComponent implements OnInit {
 
   constructor(
     private readonly apiClient: ApiClientService,
-    private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -95,7 +96,6 @@ export class AccessConfigurationsPageComponent implements OnInit {
       this.statusText = 'Could not load guided provider setup metadata.';
     } finally {
       this.isLoadingAccountSetups = false;
-      this.changeDetector.detectChanges();
     }
   }
 
@@ -169,8 +169,6 @@ export class AccessConfigurationsPageComponent implements OnInit {
       this.statusText = 'Default workflow uses free and open providers. Optional keys are only used when configured.';
     } catch {
       this.statusText = 'Could not load access configuration.';
-    } finally {
-      this.changeDetector.detectChanges();
     }
   }
 
@@ -180,28 +178,15 @@ export class AccessConfigurationsPageComponent implements OnInit {
     }
     this.isSaving = true;
     try {
-      this.settings = await this.apiClient.updateChatSettings({
-        active_provider_mode: this.settings.active_provider_mode,
-        chat_model_provider: this.settings.chat_model_provider,
-        chat_model_name: this.settings.chat_model_name,
-        parser_model_provider: this.settings.parser_model_provider,
-        parser_model_name: this.settings.parser_model_name,
-        agent_model_provider: this.settings.agent_model_provider,
-        agent_model_name: this.settings.agent_model_name,
-        ollama_url: this.settings.ollama_url,
-        openai_base_url: this.settings.openai_base_url,
-        google_base_url: this.settings.google_base_url,
-        credentials: {
-          [provider]: { api_key: apiKey },
-        },
-      });
+      this.settings = await this.apiClient.updateChatSettings(
+        buildCredentialUpdateRequest(this.settings, provider, apiKey),
+      );
       return true;
     } catch {
       this.statusText = `Could not update ${this.providerName(provider)} access.`;
       return false;
     } finally {
       this.isSaving = false;
-      this.changeDetector.detectChanges();
     }
   }
 

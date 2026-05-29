@@ -30,7 +30,7 @@
       "eea",
       "eea noise exposure 2019"
     ],
-    "intent_tags": [
+    "action_tags": [
       "noise",
       "wms"
     ],
@@ -107,7 +107,7 @@
       "eea",
       "eea noise exposure 2019"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

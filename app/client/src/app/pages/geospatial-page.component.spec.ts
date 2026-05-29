@@ -24,12 +24,12 @@ describe('pages/geospatial-page.component', () => {
       user_text: 'x',
       task_class: 'direct_query',
       location_signals: [],
-      normalized_intent: { intent_id: 'x', intent_label: 'X', task_tags: [], intent_tags: [], requires_location: false },
+      normalized_action: { action_id: 'x', action_label: 'X', task_tags: [], action_tags: [], requires_location: false },
       temporal_signal: { mode: 'none' },
       ambiguities: [],
       parser_confidence: 0.9,
     },
-    decision: { plan: { state: 'reject', intent_id: 'x', overlay_ids: [] } },
+    decision: { plan: { state: 'reject', action_id: 'x', overlay_ids: [] } },
     memory_snapshot: {},
     ...overrides,
   });
@@ -119,7 +119,7 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Which location should I use?',
-      decision: { plan: { state: 'clarify', intent_id: 'weather', overlay_ids: [] } },
+      decision: { plan: { state: 'clarify', action_id: 'weather', overlay_ids: [] } },
       map_session: null,
       tool_payload: null,
     }));
@@ -136,7 +136,7 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Coordinates: 41.8902, 12.4922',
-      decision: { plan: { state: 'direct_tool', intent_id: 'location_lookup', overlay_ids: [], tool_id: 'location_to_coordinates' } },
+      decision: { plan: { state: 'direct_tool', action_id: 'location_lookup', overlay_ids: [], tool_id: 'location_to_coordinates' } },
       tool_payload: { tool_id: 'location_to_coordinates', result: { latitude: 41.8902, longitude: 12.4922 } },
       map_session: null,
     }));
@@ -235,9 +235,9 @@ describe('pages/geospatial-page.component', () => {
   it('answers capability questions from the catalog locally', async () => {
     fetchCatalogMock.and.resolveTo({
       capabilities: [],
-      basemaps: [{ id: 'osm_default', name: 'OpenStreetMap', kind: 'basemap', provider: 'fallback', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
-      overlays: [{ id: 'rainviewer_precipitation_radar', name: 'RainViewer Precipitation Radar', kind: 'overlay', provider: 'rainviewer', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global-partial', intent_tags: [], task_tags: [], metadata: {} }],
-      tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', intent_tags: [], task_tags: [], metadata: {} }],
+      basemaps: [{ id: 'osm_default', name: 'OpenStreetMap', kind: 'basemap', provider: 'fallback', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', action_tags: [], task_tags: [], metadata: {} }],
+      overlays: [{ id: 'rainviewer_precipitation_radar', name: 'RainViewer Precipitation Radar', kind: 'overlay', provider: 'rainviewer', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global-partial', action_tags: [], task_tags: [], metadata: {} }],
+      tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', action_tags: [], task_tags: [], metadata: {} }],
     });
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();

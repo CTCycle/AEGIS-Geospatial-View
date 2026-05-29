@@ -9,11 +9,14 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 export class SettingsModalShellComponent {
   @Input({ required: true }) title!: string;
   @Input({ required: true }) ariaLabel!: string;
+  @Input() panelClass = '';
+  @Input() closeOnBackdrop = true;
+  @Input() showHeader = true;
 
   @Output() requestClose = new EventEmitter<void>();
 
   onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
+    if (this.closeOnBackdrop && event.target === event.currentTarget) {
       this.requestClose.emit();
     }
   }

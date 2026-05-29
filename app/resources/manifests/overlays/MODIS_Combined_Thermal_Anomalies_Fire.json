@@ -20,7 +20,7 @@
       "gibs",
       "active fires (modis, daily)"
     ],
-    "intent_tags": [
+    "action_tags": [
       "imagery",
       "fires"
     ],
@@ -102,7 +102,7 @@
       "gibs",
       "active fires (modis, daily)"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

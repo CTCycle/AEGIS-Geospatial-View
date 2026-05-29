@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from sqlalchemy import select
 
 from server.common.time import utc_now_naive
@@ -16,6 +18,9 @@ from server.repositories.schemas.models import ModelProviderSettingsRecord
 class ModelSettingsRepository:
     def __init__(self) -> None:
         backend = get_database().backend
+        ensure_schema = getattr(backend, "ensure_schema", None)
+        if callable(ensure_schema):
+            ensure_schema()
         self._session_factory = backend.session
 
     def get_or_create(self) -> ModelProviderSettingsRecord:
@@ -36,6 +41,10 @@ class ModelSettingsRepository:
                 agent_model_provider=DEFAULT_MODEL_PROVIDER,
                 agent_model_name=DEFAULT_MODEL_NAME,
                 ollama_url=OLLAMA_DEFAULT_HOST,
+                capabilities_json=json.dumps([]),
+                supports_tools=False,
+                supports_structured_output=False,
+                tool_support_source="unknown",
             )
             session.add(record)
             session.commit()

@@ -22,7 +22,7 @@
       "pm10",
       "open-meteo"
     ],
-    "intent_tags": [
+    "action_tags": [
       "air-quality",
       "pollution forecast"
     ],
@@ -106,7 +106,7 @@
       "pm10",
       "open-meteo"
     ],
-    "requiredUserIntent": [],
+    "requiredUserAction": [],
     "avoidWhen": [
       "general chat",
       "no geographic context"

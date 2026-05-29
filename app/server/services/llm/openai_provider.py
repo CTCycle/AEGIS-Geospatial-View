@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from dataclasses import replace
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from openai import OpenAI
@@ -10,7 +11,7 @@ from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
 from server.services.llm.context_budget import compute_context_usage
 from server.services.llm.response_serialization import dump_response_payload
-from server.services.llm.types import LLMRequest, LLMResult, ModelDescriptor
+from server.services.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition, ModelDescriptor
 
 
 class OpenAIProvider(LLMProvider):
@@ -29,18 +30,132 @@ class OpenAIProvider(LLMProvider):
             entry for entry in get_cloud_model_catalog() if entry.provider == "openai"
         ]
 
-    def chat(self, request: LLMRequest) -> LLMResult:
+    def supports_tools(self, model: str) -> bool:
+        return "tools" in self._capabilities_for_model(model)
+
+    def supports_structured_output(self, model: str) -> bool:
+        capabilities = self._capabilities_for_model(model)
+        return "structured" in capabilities or "structured_output" in capabilities
+
+    def _capabilities_for_model(self, model: str) -> set[str]:
+        for entry in self.list_models():
+            if entry.name == model:
+                return set(entry.capabilities)
+        return {"chat", "stream", "structured", "structured_output", "tools"}
+
+    @staticmethod
+    def tool_to_openai_schema(tool: LLMToolDefinition) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters_json_schema,
+            },
+        }
+
+    @staticmethod
+    def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for message in messages:
+            role = str(message.get("role") or "")
+            if role == "assistant" and isinstance(message.get("tool_calls"), list):
+                normalized.append(
+                    {
+                        "role": "assistant",
+                        "content": message.get("content"),
+                        "tool_calls": [
+                            {
+                                "id": call.get("id"),
+                                "type": "function",
+                                "function": {
+                                    "name": call.get("name"),
+                                    "arguments": json.dumps(call.get("arguments") or {}),
+                                },
+                            }
+                            for call in message["tool_calls"]
+                            if isinstance(call, dict)
+                        ],
+                    }
+                )
+                continue
+            if role == "tool":
+                normalized.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": message.get("tool_call_id"),
+                        "content": str(message.get("content") or ""),
+                    }
+                )
+                continue
+            normalized.append(message)
+        return normalized
+
+    @staticmethod
+    def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
+        calls: list[LLMToolCall] = []
+        for item in raw.get("output", []) if isinstance(raw.get("output"), list) else []:
+            if not isinstance(item, dict) or item.get("type") != "function_call":
+                continue
+            args = item.get("arguments") or {}
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    args = {}
+            calls.append(
+                LLMToolCall(
+                    id=item.get("call_id") or item.get("id"),
+                    name=str(item.get("name") or ""),
+                    arguments=args if isinstance(args, dict) else {},
+                )
+            )
+        return calls
+
+    def chat(
+        self,
+        request: LLMRequest,
+        *,
+        tools: Sequence[LLMToolDefinition] | None = None,
+        tool_choice: str | None = "auto",
+        response_json_schema: dict[str, Any] | None = None,
+    ) -> LLMResult:
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
+        native_tools = list(tools or request.tools or [])
+        schema = response_json_schema or request.response_json_schema
+        effective_request = replace(
+            request,
+            tools=native_tools or None,
+            response_json_schema=schema,
+        )
+        self._validate_request_capabilities(effective_request)
+        kwargs: dict[str, Any] = {}
+        if native_tools:
+            kwargs["tools"] = [self.tool_to_openai_schema(tool) for tool in native_tools]
+            kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
+        if schema and not native_tools:
+            kwargs["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": "agent_response",
+                    "schema": schema,
+                    "strict": True,
+                }
+            }
         response = self._client().responses.create(
             model=request.model,
-            input=request.messages,
+            input=self.normalize_tool_messages(request.messages),
             temperature=request.temperature,
+            **kwargs,
         )
+        raw = dump_response_payload(response)
         return LLMResult(
             content=str(getattr(response, "output_text", "") or ""),
-            raw=dump_response_payload(response),
+            raw=raw,
+            tool_calls=self._parse_tool_calls(raw),
+            finish_reason=raw.get("finish_reason") if isinstance(raw, dict) else None,
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
@@ -66,6 +181,7 @@ class OpenAIProvider(LLMProvider):
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
+        self._validate_request_capabilities(request)
         response = self._client().responses.parse(
             model=request.model,
             input=request.messages,

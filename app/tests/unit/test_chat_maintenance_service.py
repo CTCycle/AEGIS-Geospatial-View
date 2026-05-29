@@ -22,7 +22,7 @@ class _VectorIndexerStub:
         return {"status": "ok", "indexed_documents": 2, "vector_path": "vectors"}
 
 
-def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatch) -> None:
+def test_maintenance_service_delegates_to_provider_and_vector_indexer() -> None:
     provider_calls: list[tuple[str, str | None]] = []
 
     class _Provider:
@@ -35,7 +35,19 @@ def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatc
 
         def list_models(self):  # noqa: ANN201
             provider_calls.append(("list_models", None))
-            return [type("Model", (), {"name": "llama3.2"})()]
+            return [
+                type(
+                    "Model",
+                    (),
+                    {
+                        "name": "llama3.2",
+                        "description": "local",
+                        "provider": "ollama",
+                        "capabilities": ["chat", "tools"],
+                        "metadata": {"tool_support_source": "ollama_probe"},
+                    },
+                )()
+            ]
 
         def pull_model(self, *, model: str):  # noqa: ANN201
             provider_calls.append(("pull_model", model))
@@ -45,12 +57,11 @@ def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatc
             provider_calls.append(("health_check", None))
             return {"ok": True, "detail": "healthy"}
 
-    monkeypatch.setattr(
-        "server.services.chat.maintenance_service.OllamaProvider", _Provider
-    )
     vectors = _VectorIndexerStub()
     service = ChatMaintenanceService(
-        get_ollama_url=lambda: "http://localhost:11434", vector_indexer=vectors
+        get_ollama_url=lambda: "http://localhost:11434",
+        vector_indexer=vectors,
+        ollama_provider_factory=lambda base_url, _cache: _Provider(base_url=base_url),
     )
 
     refresh = service.refresh_ollama_models()
@@ -60,6 +71,8 @@ def test_maintenance_service_delegates_to_provider_and_vector_indexer(monkeypatc
     rebuild = service.rebuild_vectors()
 
     assert isinstance(refresh, OllamaRefreshResponse)
+    assert refresh.local_model_capabilities[0].supports_tools is True
+    assert refresh.local_model_capabilities[0].tool_support_source == "ollama_probe"
     assert isinstance(pull, OllamaPullResponse)
     assert health.ok is True
     assert isinstance(sync, VectorizationResponse)

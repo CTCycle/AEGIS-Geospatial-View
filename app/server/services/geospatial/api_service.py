@@ -28,31 +28,35 @@ from server.services.geospatial.providers.base import (
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+CAMERA_PROVIDER_ALIASES = {
+    "windy": "windy_webcams",
+}
 
+###############################################################################
 class GeospatialApiServiceError(Exception):
     """Base exception for geospatial API service failures."""
 
-
+###############################################################################
 class GeospatialCapabilityNotFoundError(GeospatialApiServiceError):
     """Raised when a requested manifest capability does not exist."""
 
-
+###############################################################################
 class GeospatialInvalidRequestError(GeospatialApiServiceError):
     """Raised when query parameters cannot be parsed safely."""
 
-
+###############################################################################
 class GeospatialTileCredentialError(GeospatialApiServiceError):
     """Raised when a tile provider credential is missing or rejected."""
 
-
+###############################################################################
 class GeospatialTileRequestError(GeospatialApiServiceError):
     """Raised when a tile provider request fails."""
 
-
+###############################################################################
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
-
+###############################################################################
 class GeospatialApiService:
     def __init__(
         self,
@@ -67,9 +71,11 @@ class GeospatialApiService:
         self.runtime_registry = runtime_registry or RuntimeRegistry()
         self.provider_registry = provider_registry or ProviderRegistry()
 
+    # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
         return self.catalog_service.list_catalog()
 
+    # -------------------------------------------------------------------------
     def list_layers(self) -> dict[str, list[dict[str, Any]]]:
         catalog = self.catalog_service.list_catalog()
         return {
@@ -79,6 +85,7 @@ class GeospatialApiService:
             "transit": catalog.get("transit", []),
         }
 
+    # -------------------------------------------------------------------------
     def get_layer_health(self, layer_id: str) -> dict[str, Any]:
         manifest = self._manifest_by_id(layer_id)
         reliability = manifest.get("reliability")
@@ -89,6 +96,7 @@ class GeospatialApiService:
             "runtime": self.runtime_registry.provider_health(layer_id),
         }
 
+    # -------------------------------------------------------------------------
     async def get_layer_features(
         self,
         layer_id: str,
@@ -115,6 +123,7 @@ class GeospatialApiService:
         )
         return await self._fetch_provider_payload(provider_id, request)
 
+    # -------------------------------------------------------------------------
     async def fetch_tomtom_tile(self, kind: str, z: int, x: int, y: int) -> bytes:
         if kind not in {"basic", "traffic-flow"}:
             raise GeospatialUnsupportedTileError("Unsupported TomTom tile type.")
@@ -135,6 +144,7 @@ class GeospatialApiService:
         except (TimeoutError, urllib.error.URLError) as exc:
             raise GeospatialTileRequestError("TomTom tile request failed.") from exc
 
+    # -------------------------------------------------------------------------
     async def list_cameras(
         self,
         *,
@@ -153,6 +163,7 @@ class GeospatialApiService:
         )
         return await self._fetch_provider_payload(provider_id, request)
 
+    # -------------------------------------------------------------------------
     async def get_camera(self, camera_id: str) -> dict[str, Any]:
         provider_id, provider_camera_id = self._parse_camera_identifier(camera_id)
         if provider_id:
@@ -193,6 +204,7 @@ class GeospatialApiService:
             "message": "Camera detail lookup requires a configured camera provider response.",
         }
 
+    # -------------------------------------------------------------------------
     def get_credential_status(self, provider_id: str) -> dict[str, Any]:
         env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
         configured = bool(env_name and os.getenv(env_name, "").strip())
@@ -203,6 +215,7 @@ class GeospatialApiService:
             "environmentVariable": env_name,
         }
 
+    # -------------------------------------------------------------------------
     def list_provider_account_setup(self) -> dict[str, list[dict[str, Any]]]:
         records = [
             record
@@ -215,6 +228,7 @@ class GeospatialApiService:
         )
         return {"providers": providers}
 
+    # -------------------------------------------------------------------------
     def get_provider_account_setup(self, provider_id: str) -> dict[str, Any]:
         normalized = provider_id.strip()
         for record in self.list_provider_account_setup()["providers"]:
@@ -224,9 +238,11 @@ class GeospatialApiService:
             f"Geospatial provider '{provider_id}' was not found."
         )
 
+    # -------------------------------------------------------------------------
     def audit_sources(self) -> LayerAuditReport:
         return audit_all_manifests(strict=True)
 
+    # -------------------------------------------------------------------------
     def _manifest_by_id(self, capability_id: str) -> dict[str, Any]:
         payload = self.manifest_loader.load_all()
         collection_names = (
@@ -245,6 +261,7 @@ class GeospatialApiService:
             f"Geospatial capability '{capability_id}' was not found."
         )
 
+    # -------------------------------------------------------------------------
     async def _fetch_provider_payload(
         self, provider_id: str, request: ProviderRequest
     ) -> dict[str, Any]:
@@ -317,10 +334,11 @@ class GeospatialApiService:
                 provider_id, provider_camera_id = normalized.split(separator, 1)
                 provider_id = provider_id.strip()
                 provider_camera_id = provider_camera_id.strip()
-                if provider_id == "windy":
-                    provider_id = "windy_webcams"
                 if provider_id and provider_camera_id:
-                    return provider_id, provider_camera_id
+                    canonical_provider_id = CAMERA_PROVIDER_ALIASES.get(
+                        provider_id, provider_id
+                    )
+                    return canonical_provider_id, provider_camera_id
         return None, normalized
 
     def _provider_requires_credentials(self, provider_id: str) -> bool:
@@ -354,8 +372,6 @@ class GeospatialApiService:
         access_provider_id = str(
             auth.get("accessPageProviderId") or provider_key
         ).strip()
-        if access_provider_id == "nasa":
-            access_provider_id = "nasa_firms"
         account_setup = (
             payload.get("account_setup")
             if isinstance(payload.get("account_setup"), dict)

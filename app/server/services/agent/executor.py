@@ -4,23 +4,27 @@ from datetime import UTC, datetime
 from typing import Any
 
 
-def infer_datetime(intent: dict[str, Any]) -> str:
-    value = intent.get("datetime_inference")
+def infer_datetime(action_payload: dict[str, Any]) -> str:
+    value = action_payload.get("datetime_inference")
     if isinstance(value, str) and value.strip():
         return value
     return datetime.now(UTC).isoformat()
 
 
-def requires_follow_up(intent: dict[str, Any]) -> bool:
+def requires_follow_up(action_payload: dict[str, Any]) -> bool:
     planning = (
-        intent.get("planning") if isinstance(intent.get("planning"), dict) else intent
+        action_payload.get("planning")
+        if isinstance(action_payload.get("planning"), dict)
+        else action_payload
     )
     location = (
-        intent.get("location") if isinstance(intent.get("location"), dict) else {}
+        action_payload.get("location")
+        if isinstance(action_payload.get("location"), dict)
+        else {}
     )
     display_area = (
-        intent.get("display_area")
-        if isinstance(intent.get("display_area"), dict)
+        action_payload.get("display_area")
+        if isinstance(action_payload.get("display_area"), dict)
         else {}
     )
     follow_up = planning.get("follow_up_question")
