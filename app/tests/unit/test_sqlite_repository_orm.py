@@ -5,27 +5,23 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.common.constants import CHAT_SESSIONS_TABLE, GIBS_LAYERS_TABLE
 
 
-def build_test_settings(insert_batch_size: int = 2) -> DatabaseSettings:
-    return DatabaseSettings(
-        embedded_database=True,
-        engine=None,
-        host=None,
-        port=None,
-        database_name=None,
-        username=None,
-        password=None,
-        ssl=False,
-        ssl_ca=None,
-        connect_timeout=10,
-        insert_batch_size=insert_batch_size,
+def test_upsert_uses_orm_and_updates_existing_rows(tmp_path) -> None:
+    repository = SQLiteRepository(
+        DatabaseSettings(
+            database_path=str(tmp_path / "database.db"),
+            embedded_database=True,
+            engine=None,
+            host=None,
+            port=None,
+            database_name=None,
+            username=None,
+            password=None,
+            ssl=False,
+            ssl_ca=None,
+            connect_timeout=10,
+            insert_batch_size=1,
+        )
     )
-
-
-def test_upsert_uses_orm_and_updates_existing_rows(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(
-        "server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
-    )
-    repository = SQLiteRepository(build_test_settings(insert_batch_size=1))
     repository.ensure_schema()
 
     repository.upsert_into_database(
@@ -64,11 +60,23 @@ def test_upsert_uses_orm_and_updates_existing_rows(monkeypatch, tmp_path) -> Non
     assert rows[0]["title"] == "Updated"
 
 
-def test_upsert_adds_new_rows_and_updates_existing_rows(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(
-        "server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
+def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
+    repository = SQLiteRepository(
+        DatabaseSettings(
+            database_path=str(tmp_path / "database.db"),
+            embedded_database=True,
+            engine=None,
+            host=None,
+            port=None,
+            database_name=None,
+            username=None,
+            password=None,
+            ssl=False,
+            ssl_ca=None,
+            connect_timeout=10,
+            insert_batch_size=2,
+        )
     )
-    repository = SQLiteRepository(build_test_settings())
     repository.ensure_schema()
 
     repository.upsert_into_database(
@@ -107,11 +115,23 @@ def test_upsert_adds_new_rows_and_updates_existing_rows(monkeypatch, tmp_path) -
     assert by_id["layer-2"]["title"] == "Two"
 
 
-def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(
-        "server.repositories.database.sqlite.RESOURCES_PATH", str(tmp_path)
+def test_upsert_omits_null_autoincrement_primary_key(tmp_path) -> None:
+    repository = SQLiteRepository(
+        DatabaseSettings(
+            database_path=str(tmp_path / "database.db"),
+            embedded_database=True,
+            engine=None,
+            host=None,
+            port=None,
+            database_name=None,
+            username=None,
+            password=None,
+            ssl=False,
+            ssl_ca=None,
+            connect_timeout=10,
+            insert_batch_size=2,
+        )
     )
-    repository = SQLiteRepository(build_test_settings())
     repository.ensure_schema()
 
     repository.upsert_into_database(
@@ -132,3 +152,24 @@ def test_upsert_omits_null_autoincrement_primary_key(monkeypatch, tmp_path) -> N
     assert isinstance(rows[0]["id"], int)
     assert rows[0]["title"] == "Current session"
     assert rows[0]["status"] == "active"
+
+
+def test_repository_uses_database_path_from_settings(tmp_path) -> None:
+    settings = DatabaseSettings(
+        database_path=str(tmp_path / "database.db"),
+        embedded_database=True,
+        engine=None,
+        host=None,
+        port=None,
+        database_name=None,
+        username=None,
+        password=None,
+        ssl=False,
+        ssl_ca=None,
+        connect_timeout=10,
+        insert_batch_size=1000,
+    )
+
+    repository = SQLiteRepository(settings)
+
+    assert repository.db_path == settings.database_path

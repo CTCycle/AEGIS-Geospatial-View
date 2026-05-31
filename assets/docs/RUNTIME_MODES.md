@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-05-21
+Last updated: 2026-05-30
 
 ## Supported Modes
 
@@ -108,10 +108,12 @@ Defines:
 - `OPTIONAL_DEPENDENCIES=false`
 - intended for deterministic desktop packaging workflow
 
-### Database mode switch
+## Backend Persistence
 
-- `database.embedded_database=true` -> SQLite (`app/resources/database.db`)
-- `database.embedded_database=false` -> PostgreSQL backend using JSON credentials/settings
+- Backend persistence supports both local SQLite and PostgreSQL.
+- All database mode and connection settings live in `settings/configurations.json`.
+- `database.embedded_database` switches between SQLite and PostgreSQL.
+- The SQLite database path is defined by `server.common.constants.DATABASE_FILE_PATH` and resolves to `app/resources/database.db`.
 
 ## Interoperability
 
