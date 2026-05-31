@@ -10,9 +10,7 @@
     "ssl": false,
     "ssl_ca": null,
     "connect_timeout": 30,
-    "insert_batch_size": 1000,
-    "select_page_size": 2000,
-    "browse_page_size": 1000
+    "insert_batch_size": 1000
   },
   "nominatim": {
     "base_url": "https://nominatim.openstreetmap.org/search",

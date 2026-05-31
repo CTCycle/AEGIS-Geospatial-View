@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from server.configurations import DatabaseSettings
-from server.repositories.database.postgres import PostgresRepository
-from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.database.initializer import initialize_database
 
 
-def test_sqlite_runtime_does_not_create_schema(tmp_path) -> None:
+def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
+        database_path=str(tmp_path / "database.db"),
         embedded_database=True,
         engine=None,
         host=None,
@@ -21,15 +19,116 @@ def test_sqlite_runtime_does_not_create_schema(tmp_path) -> None:
         connect_timeout=10,
         insert_batch_size=100,
     )
-    with patch(
-        "server.repositories.database.sqlite.Base.metadata.create_all"
-    ) as create_all:
-        _ = SQLiteRepository(settings)
-    create_all.assert_not_called()
+    created: list[object] = []
+
+    class _Repository:
+        def __init__(self, passed_settings: DatabaseSettings) -> None:
+            self.engine = object()
+            self.db_path = passed_settings.database_path
+            created.append(self.engine)
+
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.SQLiteRepository",
+        _Repository,
+    )
+    calls: list[object] = []
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.Base.metadata.create_all",
+        lambda engine: calls.append(engine),
+    )
+
+    initialize_database(settings)
+
+    assert calls == created
 
 
-def test_postgres_runtime_does_not_create_schema() -> None:
+def test_initialize_database_uses_passed_database_settings(
+    monkeypatch, tmp_path
+) -> None:
     settings = DatabaseSettings(
+        database_path=str(tmp_path / "custom.db"),
+        embedded_database=True,
+        engine=None,
+        host=None,
+        port=None,
+        database_name=None,
+        username=None,
+        password=None,
+        ssl=False,
+        ssl_ca=None,
+        connect_timeout=10,
+        insert_batch_size=250,
+    )
+    received: list[DatabaseSettings] = []
+
+    class _Repository:
+        def __init__(self, passed_settings: DatabaseSettings) -> None:
+            received.append(passed_settings)
+            self.engine = object()
+            self.db_path = passed_settings.database_path
+
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.SQLiteRepository",
+        _Repository,
+    )
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.Base.metadata.create_all",
+        lambda engine: None,
+    )
+
+    initialize_database(settings)
+
+    assert received == [settings]
+
+
+def test_initialize_database_defaults_to_server_settings(
+    monkeypatch, tmp_path
+) -> None:
+    settings = DatabaseSettings(
+        database_path=str(tmp_path / "default.db"),
+        embedded_database=True,
+        engine=None,
+        host=None,
+        port=None,
+        database_name=None,
+        username=None,
+        password=None,
+        ssl=False,
+        ssl_ca=None,
+        connect_timeout=10,
+        insert_batch_size=400,
+    )
+    received: list[DatabaseSettings] = []
+
+    class _Repository:
+        def __init__(self, passed_settings: DatabaseSettings) -> None:
+            received.append(passed_settings)
+            self.engine = object()
+            self.db_path = passed_settings.database_path
+
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.get_server_settings",
+        lambda: type("Settings", (), {"database": settings})(),
+    )
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.SQLiteRepository",
+        _Repository,
+    )
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.Base.metadata.create_all",
+        lambda engine: None,
+    )
+
+    initialize_database()
+
+    assert received == [settings]
+
+
+def test_initialize_database_ensures_postgres_schema_when_external_mode(
+    monkeypatch, tmp_path
+) -> None:
+    settings = DatabaseSettings(
+        database_path=str(tmp_path / "database.db"),
         embedded_database=False,
         engine="postgresql+psycopg",
         host="localhost",
@@ -42,12 +141,20 @@ def test_postgres_runtime_does_not_create_schema() -> None:
         connect_timeout=10,
         insert_batch_size=100,
     )
-    with patch(
-        "server.repositories.database.postgres.sqlalchemy.create_engine"
-    ) as create_engine:
-        create_engine.return_value = object()
-        with patch(
-            "server.repositories.database.postgres.sessionmaker"
-        ) as sessionmaker:
-            _ = PostgresRepository(settings)
-    sessionmaker.assert_called_once()
+
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.PostgresRepository",
+        lambda passed_settings: type(
+            "Repository",
+            (),
+            {"engine": object(), "db_path": passed_settings.database_path},
+        )(),
+    )
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.Base.metadata.create_all",
+        lambda engine: None,
+    )
+
+    initialize_database(settings)
+
+    assert "server.repositories.database.postgres" in __import__("sys").modules

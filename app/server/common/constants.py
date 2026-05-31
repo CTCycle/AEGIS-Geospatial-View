@@ -14,6 +14,10 @@ SOURCES_PATH = join(RESOURCES_PATH, "sources")
 LOGS_PATH = join(RESOURCES_PATH, "logs")
 ENV_FILE_PATH = join(SETTING_PATH, ".env")
 DATABASE_FILENAME = "database.db"
+DATABASE_FILE_PATH = join(RESOURCES_PATH, DATABASE_FILENAME)
+CLIENT_DIST_PATH = join(APP_DIR, "client", "dist", "browser")
+CLIENT_ASSETS_PATH = join(CLIENT_DIST_PATH, "assets")
+CLIENT_INDEX_FILE_PATH = join(CLIENT_DIST_PATH, "index.html")
 
 ###############################################################################
 CONFIGURATIONS_FILE = join(SETTING_PATH, "configurations.json")
@@ -23,6 +27,11 @@ CONFIGURATIONS_FILE = join(SETTING_PATH, "configurations.json")
 ###############################################################################
 ROOT_ROUTE = "/"
 DOCS_ROUTE = "/docs"
+FASTAPI_ROOT_ENDPOINT = ROOT_ROUTE
+FASTAPI_DOCS_ENDPOINT = DOCS_ROUTE
+FASTAPI_API_PREFIX = "/api"
+FASTAPI_ASSETS_ENDPOINT = "/assets"
+FASTAPI_SPA_FALLBACK_ENDPOINT = "/{full_path:path}"
 FASTAPI_TITLE = "AEGIS Geospatial Search Backend"
 FASTAPI_DESCRIPTION = "FastAPI backend"
 FASTAPI_VERSION = "1.0.0"
