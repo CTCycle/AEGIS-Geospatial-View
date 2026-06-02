@@ -4,6 +4,7 @@ import json
 import math
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import chromadb
@@ -22,19 +23,24 @@ class VectorDocument:
 
 class ChromaVectorStore:
     def __init__(
-        self, persist_path: str | None = None, collection_name: str = "aegis_layers"
+        self,
+        persist_path: str | Path | None = None,
+        collection_name: str = "aegis_layers",
     ) -> None:
-        self.persist_path = persist_path or os.path.join(
-            PROJECT_DIR, "resources", "vectors"
+        persist_dir = (
+            Path(persist_path)
+            if persist_path is not None
+            else Path(PROJECT_DIR) / "resources" / "vectors"
         )
+        self.persist_path = str(persist_dir)
         # Keep Chroma cache/data inside the project so startup does not depend on
         # user-profile writable paths that may be unavailable in restricted runs.
-        local_cache_root = os.path.join(PROJECT_DIR, ".cache")
-        os.makedirs(local_cache_root, exist_ok=True)
-        os.environ.setdefault("XDG_CACHE_HOME", local_cache_root)
-        os.environ.setdefault("CHROMA_CACHE_DIR", os.path.join(local_cache_root, "chroma"))
+        local_cache_root = Path(PROJECT_DIR) / ".cache"
+        local_cache_root.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("XDG_CACHE_HOME", str(local_cache_root))
+        os.environ.setdefault("CHROMA_CACHE_DIR", str(local_cache_root / "chroma"))
         self.collection_name = collection_name
-        os.makedirs(self.persist_path, exist_ok=True)
+        persist_dir.mkdir(parents=True, exist_ok=True)
         self._memory_docs: list[VectorDocument] = []
         self._client = None
         self._collection = None

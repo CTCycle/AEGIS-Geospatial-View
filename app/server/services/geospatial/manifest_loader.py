@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import os
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
@@ -41,13 +41,18 @@ class GeospatialManifestLoader:
         "normalization",
     }
 
-    def __init__(self, root_path: str | None = None) -> None:
-        base = root_path or os.path.join(PROJECT_DIR, "resources", "manifests")
-        self.root_path = os.path.abspath(base)
-        self.index_path = os.path.join(self.root_path, "index.json")
+    def __init__(self, root_path: str | Path | None = None) -> None:
+        base_path = (
+            Path(root_path)
+            if root_path is not None
+            else Path(PROJECT_DIR) / "resources" / "manifests"
+        )
+        resolved_root = base_path.resolve()
+        self.root_path = str(resolved_root)
+        self.index_path = resolved_root / "index.json"
 
-    def _load_json(self, path: str) -> Any:
-        with open(path, "r", encoding="utf-8") as handle:
+    def _load_json(self, path: str | Path) -> Any:
+        with Path(path).open("r", encoding="utf-8") as handle:
             return json.load(handle)
 
     def load_index(self) -> JsonDict:
@@ -57,7 +62,7 @@ class GeospatialManifestLoader:
         return payload
 
     def _validate_entry(
-        self, entry: JsonDict, *, source: str, source_path: str | None = None
+        self, entry: JsonDict, *, source: str, source_path: str | Path | None = None
     ) -> JsonDict:
         missing = [
             field
@@ -79,30 +84,29 @@ class GeospatialManifestLoader:
         normalized["metadata"] = dict(entry.get("metadata") or {})
         normalized["source_filename"] = source
         if source_path:
-            normalized["source_path"] = os.path.abspath(source_path)
+            normalized["source_path"] = str(Path(source_path).resolve())
         return normalized
 
     def _load_directory_entries(self, relative_dir: str) -> list[JsonDict]:
-        folder = os.path.join(self.root_path, relative_dir)
-        if not os.path.isdir(folder):
+        folder = Path(self.root_path) / relative_dir
+        if not folder.is_dir():
             return []
         entries: list[JsonDict] = []
-        for filename in sorted(os.listdir(folder)):
-            if not filename.lower().endswith(".json"):
+        for path in sorted(folder.iterdir()):
+            if path.suffix.lower() != ".json":
                 continue
-            path = os.path.join(folder, filename)
             payload = self._load_json(path)
             if not isinstance(payload, dict):
                 raise ManifestValidationError(
                     f"Manifest document '{path}' must be an object."
                 )
             entries.append(
-                self._validate_entry(payload, source=filename, source_path=path)
+                self._validate_entry(payload, source=path.name, source_path=path)
             )
         return entries
 
     def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
-        path = os.path.join(self.root_path, filename)
+        path = Path(self.root_path) / filename
         payload = self._load_json(path)
         if not isinstance(payload, dict):
             raise ManifestValidationError("Runtime profiles must be an object.")

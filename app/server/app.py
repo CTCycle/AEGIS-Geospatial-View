@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -30,7 +29,7 @@ from server.services.startup_validation import run_startup_validations
 
 ###############################################################################
 def _client_build_available() -> bool:
-    return os.path.isfile(CLIENT_INDEX_FILE_PATH)
+    return Path(CLIENT_INDEX_FILE_PATH).is_file()
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -91,7 +90,7 @@ def create_app() -> FastAPI:
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
 
     if _client_build_available():
-        if os.path.isdir(CLIENT_ASSETS_PATH):
+        if Path(CLIENT_ASSETS_PATH).is_dir():
             application.mount(
                 FASTAPI_ASSETS_ENDPOINT,
                 StaticFiles(directory=CLIENT_ASSETS_PATH),

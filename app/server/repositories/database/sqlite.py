@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 import sqlalchemy
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -19,8 +19,9 @@ class SQLiteRepository(SqlAlchemyTableOperationsMixin):
 
     def __init__(self, settings: DatabaseSettings | None = None) -> None:
         self.settings = settings or get_server_settings().database
-        self.db_path = self.settings.database_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        db_path = Path(self.settings.database_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(db_path)
         self.engine: Engine = sqlalchemy.create_engine(
             f"sqlite:///{self.db_path}", echo=False, future=True
         )
