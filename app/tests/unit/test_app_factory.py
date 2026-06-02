@@ -19,12 +19,6 @@ def _settings(auto_sync: bool = False):  # noqa: ANN202
     )
 
 
-def _configuration(ui_host: str = "127.0.0.1", ui_port: int = 4512):  # noqa: ANN202
-    return SimpleNamespace(
-        configuration=SimpleNamespace(ui_host=ui_host, ui_port=ui_port)
-    )
-
-
 def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
     return SimpleNamespace(
         settings_service=SimpleNamespace(
@@ -40,7 +34,6 @@ def _mock_lifespan_dependencies(monkeypatch, *, auto_sync: bool = False) -> None
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime([])
 
-    monkeypatch.setattr(app_module, "get_configuration_manager", lambda: _configuration())
     monkeypatch.setattr(
         app_module, "get_server_settings", lambda: _settings(auto_sync=auto_sync)
     )
@@ -62,7 +55,6 @@ def test_client_build_available_uses_index_file(monkeypatch, tmp_path) -> None:
 
 
 def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "get_configuration_manager", lambda: _configuration())
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
     created = app_module.create_app()
@@ -80,7 +72,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime(call_order)
 
-    monkeypatch.setattr(app_module, "get_configuration_manager", lambda: _configuration())
     monkeypatch.setattr(app_module, "get_server_settings", lambda: _settings())
     monkeypatch.setattr(
         app_module,
@@ -125,7 +116,6 @@ def test_runtime_startup_syncs_vectors_when_enabled(monkeypatch) -> None:
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime(call_order)
 
-    monkeypatch.setattr(app_module, "get_configuration_manager", lambda: _configuration())
     monkeypatch.setattr(app_module, "get_server_settings", lambda: _settings(auto_sync=True))
     monkeypatch.setattr(
         app_module,
@@ -162,7 +152,6 @@ def test_runtime_startup_syncs_vectors_when_enabled(monkeypatch) -> None:
 
 
 def test_access_keys_router_is_not_registered(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "get_configuration_manager", lambda: _configuration())
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
     created = app_module.create_app()
     route_paths = {route.path for route in created.routes}
@@ -252,7 +241,6 @@ def test_create_app_falls_back_to_index_for_spa_routes(monkeypatch, tmp_path) ->
 
 
 def test_openapi_schema_generates(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "get_configuration_manager", lambda: _configuration())
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
     created = app_module.create_app()
