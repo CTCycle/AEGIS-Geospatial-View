@@ -6,8 +6,9 @@ for %%I in ("%script_dir%..\..") do set "repo_root=%%~fI"
 set "app_dir=%repo_root%\app"
 set "client_dir=%app_dir%\client"
 set "tauri_dir=%client_dir%\src-tauri"
-set "bundle_source_dir=%tauri_dir%\r"
+set "bundle_source_dir=%tauri_dir%\bundle-src"
 set "bundle_dir=%tauri_dir%\target\release\bundle"
+set "bundle_resource_dir=%tauri_dir%\target\release\r"
 set "release_export_dir=%repo_root%\release\windows"
 
 set "runtime_python_exe=%repo_root%\runtimes\python\python.exe"
@@ -23,10 +24,10 @@ echo [TAURI] Release build helper
 echo [CHECK] Validating bundled runtimes...
 call :require_file "%runtime_python_exe%" "embedded Python runtime" || goto build_error
 call :require_file "%runtime_uv_exe%" "embedded uv runtime" || goto build_error
-call :require_file "%runtime_uv_lock%" "backend uv lockfile" || goto build_error
 call :require_file "%node_cmd%" "embedded Node.js runtime" || goto build_error
 call :require_file "%npm_cmd%" "embedded npm runtime" || goto build_error
 call :require_file "%app_dir%\server\pyproject.toml" "backend pyproject.toml" || goto build_error
+call :require_file "%runtime_uv_lock%" "backend uv lockfile" || goto build_error
 call :require_file "%runtime_database_file%" "runtime sqlite database" || goto build_error
 
 echo [CHECK] Preparing Tauri bundle sources...
@@ -137,31 +138,22 @@ if errorlevel 1 (
   echo [FATAL] Failed to create bundle source directory "%bundle_source_dir%".
   exit /b 1
 )
-md "%bundle_source_dir%\app" >nul 2>&1
-md "%bundle_source_dir%\app\client" >nul 2>&1
 md "%bundle_source_dir%\runtimes" >nul 2>&1
 
-copy /y "%app_dir%\server\pyproject.toml" "%bundle_source_dir%\pyproject.toml" >nul
-if errorlevel 1 (
-  echo [FATAL] Failed to stage pyproject.toml for Tauri bundling.
-  exit /b 1
-)
-copy /y "%runtime_uv_lock%" "%bundle_source_dir%\uv.lock" >nul
-if errorlevel 1 (
-  echo [FATAL] Failed to stage uv.lock for Tauri bundling.
-  exit /b 1
-)
+call :copy_tree_filtered "%app_dir%\server" "%bundle_source_dir%\server"
+if errorlevel 1 exit /b 1
+call :copy_tree_filtered "%app_dir%\scripts" "%bundle_source_dir%\scripts"
+if errorlevel 1 exit /b 1
+call :copy_tree_filtered "%repo_root%\settings" "%bundle_source_dir%\settings"
+if errorlevel 1 exit /b 1
+call :copy_tree_filtered "%app_dir%\resources" "%bundle_source_dir%\resources"
+if errorlevel 1 exit /b 1
+call :copy_tree_filtered "%repo_root%\runtimes\python" "%bundle_source_dir%\runtimes\python"
+if errorlevel 1 exit /b 1
+call :copy_tree_filtered "%repo_root%\runtimes\uv" "%bundle_source_dir%\runtimes\uv"
+if errorlevel 1 exit /b 1
 
-if not exist "%client_dir%\dist" md "%client_dir%\dist" >nul 2>&1
-
-call :make_junction "%bundle_source_dir%\app\server" "%app_dir%\server" || exit /b 1
-call :make_junction "%bundle_source_dir%\app\scripts" "%app_dir%\scripts" || exit /b 1
-call :make_junction "%bundle_source_dir%\settings" "%repo_root%\settings" || exit /b 1
-call :make_junction "%bundle_source_dir%\app\client\dist" "%client_dir%\dist" || exit /b 1
-call :make_junction "%bundle_source_dir%\app\resources" "%app_dir%\resources" || exit /b 1
-call :make_junction "%bundle_source_dir%\runtimes\python" "%repo_root%\runtimes\python" || exit /b 1
-call :make_junction "%bundle_source_dir%\runtimes\uv" "%repo_root%\runtimes\uv" || exit /b 1
-call :make_junction "%bundle_source_dir%\runtimes\nodejs" "%repo_root%\runtimes\nodejs" || exit /b 1
+if exist "%bundle_resource_dir%" rd /s /q "%bundle_resource_dir%" >nul 2>&1
 exit /b 0
 
 :check_rust_toolchain
@@ -219,10 +211,16 @@ if not errorlevel 1 (
 echo [INFO] Rust active toolchain: !active_toolchain!
 exit /b 0
 
-:make_junction
-cmd /c mklink /J "%~1" "%~2" >nul
+:copy_tree_filtered
+if not exist "%~1" (
+  echo [FATAL] Missing bundle source directory "%~1".
+  exit /b 1
+)
+set "_COPY_SRC=%~1"
+set "_COPY_DST=%~2"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$src=$env:_COPY_SRC; $dst=$env:_COPY_DST; $excluded=@('.venv','__pycache__','.pytest_cache','node_modules','.angular','dist','target','bundle','incremental','.mypy_cache'); if (-not (Test-Path -LiteralPath $src)) { exit 1 }; New-Item -ItemType Directory -Force -Path $dst | Out-Null; Get-ChildItem -LiteralPath $src -Force | Where-Object { $excluded -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $dst $_.Name) -Recurse -Force -ErrorAction Stop }; Get-ChildItem -LiteralPath $dst -Recurse -Filter *.pyc -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction Stop"
 if errorlevel 1 (
-  echo [FATAL] Failed to create junction "%~1" -> "%~2".
+  echo [FATAL] Failed to stage "%~1" into "%~2".
   exit /b 1
 )
 exit /b 0
