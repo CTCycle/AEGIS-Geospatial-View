@@ -399,7 +399,7 @@ def audit_all_manifests(
     root_path: str | os.PathLike[str] | None = None,
     production: bool = False,
 ) -> LayerAuditReport:
-    root = Path(root_path or Path(PROJECT_DIR) / "resources" / "manifests")
+    root = Path(root_path or Path(PROJECT_DIR) / "resources" / "catalog")
     report = LayerAuditReport()
     _validate_index(root, report)
     manifest_items: list[tuple[Path, CapabilityManifestV2]] = []

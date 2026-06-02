@@ -1,137 +1,126 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.api.chat import router as chat_router
 from server.api.geospatial import router as geospatial_router
 from server.api.search import router as search_router
+from server.common.constants import (
+    CLIENT_ASSETS_PATH,
+    CLIENT_DIST_PATH,
+    CLIENT_INDEX_FILE_PATH,
+    FASTAPI_API_PREFIX,
+    FASTAPI_ASSETS_ENDPOINT,
+    FASTAPI_DOCS_ENDPOINT,
+    FASTAPI_ROOT_ENDPOINT,
+    FASTAPI_SPA_FALLBACK_ENDPOINT,
+)
 from server.configurations import get_server_settings
-from server.repositories.database.initializer import initialize_sqlite_database
+from server.repositories.database import get_database
+from server.repositories.database.initializer import initialize_database, seed_reference_catalog
 from server.services.chat.composition import build_chat_runtime
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
-from server.services.vector.indexer import VectorIndexer
-from server.common.constants import (
-    FASTAPI_DESCRIPTION,
-    FASTAPI_TITLE,
-    FASTAPI_VERSION,
-)
 
-def build_cors_origins() -> list[str]:
-    ui_host = os.getenv("UI_HOST", "127.0.0.1").strip() or "127.0.0.1"
-    ui_port = os.getenv("UI_PORT", "4980").strip() or "4980"
-    host_variants = {ui_host}
-    if ui_host == "127.0.0.1":
-        host_variants.add("localhost")
-    elif ui_host == "localhost":
-        host_variants.add("127.0.0.1")
-    origins: list[str] = []
-    for host in host_variants:
-        origins.append(f"http://{host}:{ui_port}")
-        origins.append(f"https://{host}:{ui_port}")
-    return origins
+###############################################################################
+def _client_build_available() -> bool:
+    return Path(CLIENT_INDEX_FILE_PATH).is_file()
 
+###############################################################################
+def _resolve_client_file(full_path: str) -> Path | None:
+    client_root = Path(CLIENT_DIST_PATH).resolve()
+    requested_path = (client_root / full_path).resolve()
 
-def tauri_mode_enabled() -> bool:
-    value = os.getenv("AEGIS_TAURI_MODE", "false").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    if not requested_path.is_relative_to(client_root):
+        return None
 
+    if requested_path.is_file():
+        return requested_path
 
-def serve_built_client_enabled() -> bool:
-    value = os.getenv("AEGIS_SERVE_BUILT_CLIENT", "false").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    return None
 
+###############################################################################
+def serve_client_root() -> FileResponse:
+    return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-def get_client_dist_path() -> str:
-    project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    return os.path.join(project_path, "client", "dist", "browser")
+###############################################################################
+def serve_client_path(full_path: str) -> FileResponse:
+    client_file = _resolve_client_file(full_path)
+    if client_file is not None:
+        return FileResponse(client_file)
+    return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-
-def packaged_client_available() -> bool:
-    return (tauri_mode_enabled() or serve_built_client_enabled()) and os.path.isdir(
-        get_client_dist_path()
-    )
-
-
-def serve_spa_root() -> FileResponse:
-    return FileResponse(os.path.join(get_client_dist_path(), "index.html"))
-
-
-def serve_spa_entrypoint(full_path: str) -> FileResponse:
-    client_dist_path = get_client_dist_path()
-    requested_path = os.path.join(client_dist_path, full_path)
-    if os.path.isfile(requested_path):
-        return FileResponse(requested_path)
-    return FileResponse(os.path.join(client_dist_path, "index.html"))
-
-
-def redirect_to_docs() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
+###############################################################################
+def redirect_root_to_docs() -> RedirectResponse:
+    return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
 
 
 @asynccontextmanager
-async def app_lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_server_settings().database
-    if settings.embedded_database:
-        initialize_sqlite_database(settings)
+async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
+    settings = get_server_settings()
+    database = get_database()
+
+    initialize_database(database.backend)
+    seed_reference_catalog(database.backend)
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
-    app.state.search_runtime = search_runtime
-    app.state.chat_runtime = chat_runtime
-    run_startup_validations()
 
-    if get_server_settings().vectors.auto_sync_on_start:
-        VectorIndexer().bootstrap_if_missing()
+    application.state.search_runtime = search_runtime
+    application.state.chat_runtime = chat_runtime
+
+    chat_runtime.settings_service.get_settings()
+
+    run_startup_validations(settings)
+
+    if settings.vectors.auto_sync_on_start:
+        chat_runtime.vector_indexer.sync()
 
     yield
 
 
-###############################################################################
 def create_app() -> FastAPI:
-    app = FastAPI(
-        title=FASTAPI_TITLE,
-        version=FASTAPI_VERSION,
-        description=FASTAPI_DESCRIPTION,
-        lifespan=app_lifespan,
-    )
+    application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=build_cors_origins(),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    application.include_router(search_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
 
-    app.include_router(search_router, prefix="/api")
-    app.include_router(chat_router, prefix="/api")
-    app.include_router(geospatial_router, prefix="/api")
-
-    if packaged_client_available():
-        client_dist_path = get_client_dist_path()
-        assets_path = os.path.join(client_dist_path, "assets")
-
-        if os.path.isdir(assets_path):
-            app.mount("/assets", StaticFiles(directory=assets_path), name="spa-assets")
-        app.add_api_route("/", serve_spa_root, methods=["GET"], include_in_schema=False)
-        app.add_api_route(
-            "/{full_path:path}",
-            serve_spa_entrypoint,
+    if _client_build_available():
+        if Path(CLIENT_ASSETS_PATH).is_dir():
+            application.mount(
+                FASTAPI_ASSETS_ENDPOINT,
+                StaticFiles(directory=CLIENT_ASSETS_PATH),
+                name="assets",
+            )
+        application.add_api_route(
+            FASTAPI_ROOT_ENDPOINT,
+            serve_client_root,
             methods=["GET"],
             include_in_schema=False,
         )
-    else:
-        app.add_api_route("/", redirect_to_docs, methods=["GET"])
+        application.add_api_route(
+            FASTAPI_SPA_FALLBACK_ENDPOINT,
+            serve_client_path,
+            methods=["GET"],
+            include_in_schema=False,
+        )
 
-    return app
+    else:
+        application.add_api_route(
+            FASTAPI_ROOT_ENDPOINT,
+            redirect_root_to_docs,
+            methods=["GET"],
+            include_in_schema=False,
+        )
+
+    return application
 
 
 app = create_app()

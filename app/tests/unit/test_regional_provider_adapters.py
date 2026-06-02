@@ -269,7 +269,7 @@ def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
 def test_fred_manifest_remains_metadata_only_without_geographic_join() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     fred = json.loads(
-        (repo_root / "resources/manifests/overlays/fred_regional_market_indicators.json").read_text(
+        (repo_root / "resources/catalog/overlays/fred_regional_market_indicators.json").read_text(
             encoding="utf-8"
         )
     )

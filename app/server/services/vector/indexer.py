@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from datetime import UTC, datetime
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -38,8 +38,8 @@ class VectorIndexer:
         payload = json.dumps(entry, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def _metadata_path(self) -> str:
-        return os.path.join(self.store.persist_path, self.METADATA_FILENAME)
+    def _metadata_path(self) -> Path:
+        return Path(self.store.persist_path) / self.METADATA_FILENAME
 
     def _manifest_summary(
         self, catalog: dict[str, list[dict[str, Any]]]
@@ -104,14 +104,14 @@ class VectorIndexer:
             "manifest_fingerprint": fingerprint,
             "manifest_summary": summary,
             "source_directories": {
-                "basemaps": os.path.abspath(
-                    os.path.join(self.manifest_loader.root_path, "basemaps")
+                "basemaps": str(
+                    Path(self.manifest_loader.root_path).joinpath("basemaps").resolve()
                 ),
-                "overlays": os.path.abspath(
-                    os.path.join(self.manifest_loader.root_path, "overlays")
+                "overlays": str(
+                    Path(self.manifest_loader.root_path).joinpath("overlays").resolve()
                 ),
-                "tools": os.path.abspath(
-                    os.path.join(self.manifest_loader.root_path, "tools")
+                "tools": str(
+                    Path(self.manifest_loader.root_path).joinpath("tools").resolve()
                 ),
             },
         }
@@ -128,8 +128,8 @@ class VectorIndexer:
         embedding_model: str,
         build_duration_ms: int | None = None,
     ) -> None:
-        os.makedirs(self.store.persist_path, exist_ok=True)
-        with open(self._metadata_path(), "w", encoding="utf-8") as handle:
+        Path(self.store.persist_path).mkdir(parents=True, exist_ok=True)
+        with self._metadata_path().open("w", encoding="utf-8") as handle:
             json.dump(
                 self._metadata_payload(
                     catalog=catalog,
@@ -144,10 +144,10 @@ class VectorIndexer:
 
     def _read_metadata(self) -> dict[str, Any] | None:
         metadata_path = self._metadata_path()
-        if not os.path.isfile(metadata_path):
+        if not metadata_path.is_file():
             return None
         try:
-            with open(metadata_path, "r", encoding="utf-8") as handle:
+            with metadata_path.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
         except OSError | json.JSONDecodeError:
             return None

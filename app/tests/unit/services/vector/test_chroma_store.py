@@ -43,3 +43,15 @@ def test_chroma_store_sets_local_cache_env_defaults(monkeypatch) -> None:
     ChromaVectorStore(persist_path=str(tmp_path / "vectors"))
     assert os.environ.get("XDG_CACHE_HOME") == str(tmp_path / ".cache")
     assert os.environ.get("CHROMA_CACHE_DIR") == str(tmp_path / ".cache" / "chroma")
+
+
+def test_chroma_store_accepts_path_persist_path(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "existing-cache"))
+    monkeypatch.setenv("CHROMA_CACHE_DIR", str(tmp_path / "existing-cache" / "chroma"))
+
+    store = ChromaVectorStore(persist_path=tmp_path / "vectors")
+    store._client = None
+    store._collection = None
+
+    assert store.persist_path == str(tmp_path / "vectors")
+    assert (tmp_path / "vectors").is_dir()

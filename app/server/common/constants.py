@@ -1,28 +1,43 @@
 from __future__ import annotations
 
-from os.path import abspath, join
+from pathlib import Path
 
 # [PATHS]
 ###############################################################################
-ROOT_DIR = abspath(join(__file__, "../../../../"))
-APP_DIR = join(ROOT_DIR, "app")
+_ROOT_DIR = Path(__file__).resolve().parents[3]
+_APP_DIR = _ROOT_DIR / "app"
+_SETTING_PATH = _ROOT_DIR / "settings"
+_RESOURCES_PATH = _APP_DIR / "resources"
+_CLIENT_DIST_PATH = _APP_DIR / "client" / "dist" / "browser"
+
+ROOT_DIR = str(_ROOT_DIR)
+APP_DIR = str(_APP_DIR)
 PROJECT_DIR = APP_DIR
-SETTING_PATH = join(ROOT_DIR, "settings")
-RESOURCES_PATH = join(APP_DIR, "resources")
-MODELS_PATH = join(RESOURCES_PATH, "models")
-SOURCES_PATH = join(RESOURCES_PATH, "sources")
-LOGS_PATH = join(RESOURCES_PATH, "logs")
-ENV_FILE_PATH = join(SETTING_PATH, ".env")
+SETTING_PATH = str(_SETTING_PATH)
+RESOURCES_PATH = str(_RESOURCES_PATH)
+MODELS_PATH = str(_RESOURCES_PATH / "models")
+SOURCES_PATH = str(_RESOURCES_PATH / "sources")
+LOGS_PATH = str(_RESOURCES_PATH / "logs")
+ENV_FILE_PATH = str(_SETTING_PATH / ".env")
 DATABASE_FILENAME = "database.db"
+DATABASE_FILE_PATH = str(_RESOURCES_PATH / DATABASE_FILENAME)
+CLIENT_DIST_PATH = str(_CLIENT_DIST_PATH)
+CLIENT_ASSETS_PATH = str(_CLIENT_DIST_PATH / "assets")
+CLIENT_INDEX_FILE_PATH = str(_CLIENT_DIST_PATH / "index.html")
 
 ###############################################################################
-CONFIGURATIONS_FILE = join(SETTING_PATH, "configurations.json")
+CONFIGURATIONS_FILE = str(_SETTING_PATH / "configurations.json")
 
 
 # [BACKEND ROUTES]
 ###############################################################################
 ROOT_ROUTE = "/"
 DOCS_ROUTE = "/docs"
+FASTAPI_ROOT_ENDPOINT = ROOT_ROUTE
+FASTAPI_DOCS_ENDPOINT = DOCS_ROUTE
+FASTAPI_API_PREFIX = "/api"
+FASTAPI_ASSETS_ENDPOINT = "/assets"
+FASTAPI_SPA_FALLBACK_ENDPOINT = "/{full_path:path}"
 FASTAPI_TITLE = "AEGIS Geospatial Search Backend"
 FASTAPI_DESCRIPTION = "FastAPI backend"
 FASTAPI_VERSION = "1.0.0"
@@ -79,32 +94,6 @@ NASA_ATTRIBUTION = (
     "(ESDIS) project."
 )
 
-# Daily/NRT GIBS layers (updated frequently)
-GIBS_NRT_LAYERS = {
-    "VIIRS_SNPP_CorrectedReflectance_TrueColor": "True Color Satellite (VIIRS, Daily)",
-    "MODIS_Terra_Aerosol": "Aerosol Optical Depth (MODIS, Daily)",
-    "MODIS_Terra_Land_Surface_Temp_Day": "Surface Temperature Day (MODIS, Daily)",
-    "MODIS_Terra_Land_Surface_Temp_Night": "Surface Temperature Night (MODIS, Daily)",
-    "MODIS_Terra_NDVI_8Day": "Vegetation Index NDVI (MODIS, 8-day)",
-    "MODIS_Terra_L3_Land_Water_Mask": "Land/Water Mask (MODIS, Daily)",
-    "IMERG_Precipitation_Rate": "Precipitation Rate (IMERG, 30min)",
-    "VIIRS_SNPP_DayNightBand_ENCC": "Nighttime Lights (VIIRS, Monthly)",
-    "MODIS_Combined_Thermal_Anomalies_Fire": "Active Fires (MODIS, Daily)",
-    "OMPS_Ozone_Total_Column": "Ozone Column (OMPS, Daily)",
-}
-
-# Annual/static GIBS layers (slow-changing data)
-GIBS_ANNUAL_LAYERS = {
-    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": "Land Cover Type (MODIS, Annual)",
-    "SRTM_Color_Index": "Elevation DEM (SRTM)",
-}
-
-# Combined layers for UI selection
-COMMON_GEOSPATIAL_LAYERS = {
-    **GIBS_NRT_LAYERS,
-    **GIBS_ANNUAL_LAYERS,
-}
-
 COMMON_FOLIUM_MAPS = {
     "OpenStreetMap": "Street Map",
     "CartoDB Positron": "Cartographic Light",
@@ -119,6 +108,13 @@ COMMON_FOLIUM_MAPS = {
 ###############################################################################
 GIBS_LAYERS_TABLE = "gibs_layers"
 CHAT_SESSIONS_TABLE = "chat_sessions"
+REFERENCE_COUNTRIES_TABLE_NAME = "reference_countries"
+REFERENCE_COUNTRY_ALIASES_TABLE_NAME = "reference_country_aliases"
+REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME = "reference_geospatial_layers"
+REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME = "reference_geospatial_layer_aliases"
+REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME = "reference_geospatial_layer_keywords"
+REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME = "reference_gibs_tile_matrix_sets"
+REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME = "reference_gibs_layer_defaults"
 
 
 # [DATABASE COLUMNS]
@@ -132,327 +128,6 @@ GIBS_LAYER_COLUMNS = [
     "tile_matrix_sets",
     "meters_per_pixel",
 ]
-
-# [COUNTRY DATA]
-###############################################################################
-COUNTRY_NAME_TO_ISO2 = {
-    "Afghanistan": "AF",
-    "Albania": "AL",
-    "Algeria": "DZ",
-    "American Samoa": "AS",
-    "Andorra": "AD",
-    "Angola": "AO",
-    "Anguilla": "AI",
-    "Antarctica": "AQ",
-    "Antigua & Barbuda": "AG",
-    "Argentina": "AR",
-    "Armenia": "AM",
-    "Aruba": "AW",
-    "Australia": "AU",
-    "Austria": "AT",
-    "Azerbaijan": "AZ",
-    "Bahamas": "BS",
-    "Bahrain": "BH",
-    "Bangladesh": "BD",
-    "Barbados": "BB",
-    "Belarus": "BY",
-    "Belgium": "BE",
-    "Belize": "BZ",
-    "Benin": "BJ",
-    "Bermuda": "BM",
-    "Bhutan": "BT",
-    "Bolivia": "BO",
-    "Bosnia & Herzegovina": "BA",
-    "Botswana": "BW",
-    "Bouvet Island": "BV",
-    "Brazil": "BR",
-    "British Indian Ocean Territory": "IO",
-    "British Virgin Islands": "VG",
-    "Brunei": "BN",
-    "Bulgaria": "BG",
-    "Burkina Faso": "BF",
-    "Burundi": "BI",
-    "Cambodia": "KH",
-    "Cameroon": "CM",
-    "Canada": "CA",
-    "Cape Verde": "CV",
-    "Caribbean Netherlands": "BQ",
-    "Cayman Islands": "KY",
-    "Central African Republic": "CF",
-    "Chad": "TD",
-    "Chile": "CL",
-    "China": "CN",
-    "Christmas Island": "CX",
-    "Cocos (Keeling) Islands": "CC",
-    "Colombia": "CO",
-    "Comoros": "KM",
-    "Congo - Brazzaville": "CG",
-    "Congo - Kinshasa": "CD",
-    "Cook Islands": "CK",
-    "Costa Rica": "CR",
-    "Croatia": "HR",
-    "Cuba": "CU",
-    "Cura\xe7ao": "CW",
-    "Cyprus": "CY",
-    "Czechia": "CZ",
-    "C\xf4te d'Ivoire": "CI",
-    "Denmark": "DK",
-    "Djibouti": "DJ",
-    "Dominica": "DM",
-    "Dominican Republic": "DO",
-    "Ecuador": "EC",
-    "Egypt": "EG",
-    "El Salvador": "SV",
-    "Equatorial Guinea": "GQ",
-    "Eritrea": "ER",
-    "Estonia": "EE",
-    "Eswatini": "SZ",
-    "Ethiopia": "ET",
-    "Falkland Islands": "FK",
-    "Faroe Islands": "FO",
-    "Fiji": "FJ",
-    "Finland": "FI",
-    "France": "FR",
-    "French Guiana": "GF",
-    "French Polynesia": "PF",
-    "French Southern Territories": "TF",
-    "Gabon": "GA",
-    "Gambia": "GM",
-    "Georgia": "GE",
-    "Germany": "DE",
-    "Ghana": "GH",
-    "Gibraltar": "GI",
-    "Greece": "GR",
-    "Greenland": "GL",
-    "Grenada": "GD",
-    "Guadeloupe": "GP",
-    "Guam": "GU",
-    "Guatemala": "GT",
-    "Guernsey": "GG",
-    "Guinea": "GN",
-    "Guinea-Bissau": "GW",
-    "Guyana": "GY",
-    "Haiti": "HT",
-    "Heard & McDonald Islands": "HM",
-    "Honduras": "HN",
-    "Hong Kong SAR China": "HK",
-    "Hungary": "HU",
-    "Iceland": "IS",
-    "India": "IN",
-    "Indonesia": "ID",
-    "Iran": "IR",
-    "Iraq": "IQ",
-    "Ireland": "IE",
-    "Isle of Man": "IM",
-    "Israel": "IL",
-    "Italy": "IT",
-    "Jamaica": "JM",
-    "Japan": "JP",
-    "Jersey": "JE",
-    "Jordan": "JO",
-    "Kazakhstan": "KZ",
-    "Kenya": "KE",
-    "Kiribati": "KI",
-    "Kuwait": "KW",
-    "Kyrgyzstan": "KG",
-    "Laos": "LA",
-    "Latvia": "LV",
-    "Lebanon": "LB",
-    "Lesotho": "LS",
-    "Liberia": "LR",
-    "Libya": "LY",
-    "Liechtenstein": "LI",
-    "Lithuania": "LT",
-    "Luxembourg": "LU",
-    "Macau SAR China": "MO",
-    "Madagascar": "MG",
-    "Malawi": "MW",
-    "Malaysia": "MY",
-    "Maldives": "MV",
-    "Mali": "ML",
-    "Malta": "MT",
-    "Marshall Islands": "MH",
-    "Martinique": "MQ",
-    "Mauritania": "MR",
-    "Mauritius": "MU",
-    "Mayotte": "YT",
-    "Mexico": "MX",
-    "Micronesia": "FM",
-    "Moldova": "MD",
-    "Monaco": "MC",
-    "Mongolia": "MN",
-    "Montenegro": "ME",
-    "Montserrat": "MS",
-    "Morocco": "MA",
-    "Mozambique": "MZ",
-    "Myanmar (Burma)": "MM",
-    "Namibia": "NA",
-    "Nauru": "NR",
-    "Nepal": "NP",
-    "Netherlands": "NL",
-    "New Caledonia": "NC",
-    "New Zealand": "NZ",
-    "Nicaragua": "NI",
-    "Niger": "NE",
-    "Nigeria": "NG",
-    "Niue": "NU",
-    "Norfolk Island": "NF",
-    "North Korea": "KP",
-    "North Macedonia": "MK",
-    "Northern Mariana Islands": "MP",
-    "Norway": "NO",
-    "Oman": "OM",
-    "Pakistan": "PK",
-    "Palau": "PW",
-    "Palestinian Territories": "PS",
-    "Panama": "PA",
-    "Papua New Guinea": "PG",
-    "Paraguay": "PY",
-    "Peru": "PE",
-    "Philippines": "PH",
-    "Pitcairn Islands": "PN",
-    "Poland": "PL",
-    "Portugal": "PT",
-    "Puerto Rico": "PR",
-    "Qatar": "QA",
-    "R\xe9union": "RE",
-    "Romania": "RO",
-    "Russia": "RU",
-    "Rwanda": "RW",
-    "Saint Barth\xe9lemy": "BL",
-    "Saint Helena": "SH",
-    "Saint Kitts & Nevis": "KN",
-    "Saint Lucia": "LC",
-    "Saint Martin": "MF",
-    "Saint Pierre & Miquelon": "PM",
-    "Saint Vincent & Grenadines": "VC",
-    "Samoa": "WS",
-    "San Marino": "SM",
-    "S\xe3o Tom\xe9 & Pr\xedncipe": "ST",
-    "Saudi Arabia": "SA",
-    "Senegal": "SN",
-    "Serbia": "RS",
-    "Seychelles": "SC",
-    "Sierra Leone": "SL",
-    "Singapore": "SG",
-    "Sint Maarten": "SX",
-    "Slovakia": "SK",
-    "Slovenia": "SI",
-    "Solomon Islands": "SB",
-    "Somalia": "SO",
-    "South Africa": "ZA",
-    "South Georgia & South Sandwich Islands": "GS",
-    "South Korea": "KR",
-    "South Sudan": "SS",
-    "Spain": "ES",
-    "Sri Lanka": "LK",
-    "Sudan": "SD",
-    "Suriname": "SR",
-    "Svalbard & Jan Mayen": "SJ",
-    "Sweden": "SE",
-    "Switzerland": "CH",
-    "Syria": "SY",
-    "Taiwan": "TW",
-    "Tajikistan": "TJ",
-    "Tanzania": "TZ",
-    "Thailand": "TH",
-    "Timor-Leste": "TL",
-    "Togo": "TG",
-    "Tokelau": "TK",
-    "Tonga": "TO",
-    "Trinidad & Tobago": "TT",
-    "Tunisia": "TN",
-    "Turkey": "TR",
-    "Turkmenistan": "TM",
-    "Turks & Caicos Islands": "TC",
-    "Tuvalu": "TV",
-    "U.S. Outlying Islands": "UM",
-    "U.S. Virgin Islands": "VI",
-    "Uganda": "UG",
-    "Ukraine": "UA",
-    "United Arab Emirates": "AE",
-    "United Kingdom": "GB",
-    "United States": "US",
-    "Uruguay": "UY",
-    "Uzbekistan": "UZ",
-    "Vanuatu": "VU",
-    "Vatican City": "VA",
-    "Venezuela": "VE",
-    "Vietnam": "VN",
-    "Wallis & Futuna": "WF",
-    "Western Sahara": "EH",
-    "Yemen": "YE",
-    "Zambia": "ZM",
-    "Zimbabwe": "ZW",
-    "\xc5land Islands": "AX",
-}
-
-COUNTRY_SYNONYMS = {
-    "Bolivia (Plurinational State of)": "Bolivia",
-    "Brunei Darussalam": "Brunei",
-    "Burma": "Myanmar (Burma)",
-    "Congo, Democratic Republic": "Congo - Kinshasa",
-    "Congo, Republic": "Congo - Brazzaville",
-    "Czech Republic": "Czechia",
-    "Democratic Republic of the Congo": "Congo - Kinshasa",
-    "Federated States of Micronesia": "Micronesia",
-    "Great Britain": "United Kingdom",
-    "Hong Kong": "Hong Kong SAR China",
-    "Hong Kong SAR": "Hong Kong SAR China",
-    "Iran, Islamic Republic": "Iran",
-    "Ivory Coast": "C\xf4te d'Ivoire",
-    "Ivory Cost": "C\xf4te d'Ivoire",
-    "Korea (South)": "South Korea",
-    "Korea, Republic of": "South Korea",
-    "Korea, South": "South Korea",
-    "Lao People's Democratic Republic": "Laos",
-    "Macao": "Macao SAR China",
-    "Macao SAR": "Macao SAR China",
-    "Macau": "Macao SAR China",
-    "Macedonia": "North Macedonia",
-    "Micronesia (Federated States of)": "Micronesia",
-    "Myanmar": "Myanmar (Burma)",
-    "Palestine": "Palestinian Territories",
-    "Palestinian Territory": "Palestinian Territories",
-    "Republic of Korea": "South Korea",
-    "Republic of Moldova": "Moldova",
-    "Republic of the Congo": "Congo - Brazzaville",
-    "Russian Federation": "Russia",
-    "Saint Barthelemy": "Saint Barth\xe9lemy",
-    "Saint Kitts and Nevis": "Saint Kitts & Nevis",
-    "Saint Lucia": "Saint Lucia",
-    "Saint Martin": "Saint Martin",
-    "Saint Pierre and Miquelon": "Saint Pierre & Miquelon",
-    "Saint Vincent and the Grenadines": "Saint Vincent & Grenadines",
-    "Sao Tome & Principe": "S\xe3o Tom\xe9 & Pr\xedncipe",
-    "Sao Tome and Principe": "S\xe3o Tom\xe9 & Pr\xedncipe",
-    "St Barthelemy": "Saint Barth\xe9lemy",
-    "St Kitts and Nevis": "Saint Kitts & Nevis",
-    "St Lucia": "Saint Lucia",
-    "St Martin": "Saint Martin",
-    "St Pierre and Miquelon": "Saint Pierre & Miquelon",
-    "St Vincent and the Grenadines": "Saint Vincent & Grenadines",
-    "Swaziland": "Eswatini",
-    "Taiwan, Province of China": "Taiwan",
-    "Timor Leste": "Timor-Leste",
-    "T\xfcrkiye": "Turkey",
-    "U A E": "United Arab Emirates",
-    "U K": "United Kingdom",
-    "U S A": "United States",
-    "U.A.E.": "United Arab Emirates",
-    "U.K.": "United Kingdom",
-    "U.S.A.": "United States",
-    "UAE": "United Arab Emirates",
-    "UK": "United Kingdom",
-    "USA": "United States",
-    "United Arab Emirates": "United Arab Emirates",
-    "United Kingdom of Great Britain and Northern Ireland": "United Kingdom",
-    "United States America": "United States",
-    "United States of America": "United States",
-    "Vatican": "Vatican City",
-    "Viet Nam": "Vietnam",
-}
-
 
 # [GEOSPATIAL CONSTANTS]
 ###############################################################################
@@ -497,152 +172,3 @@ DEFAULT_GIBS_USER_AGENT = "AEGIS-GIBS/1.0"
 DEFAULT_GIBS_LAYER_SYNC_USER_AGENT = "AEGIS-GIBS-LayerSync/1.0"
 DEFAULT_GIBS_DEFAULT_LAYER = "VIIRS_SNPP_CorrectedReflectance_TrueColor"
 
-# [GIBS FALLBACKS]
-###############################################################################
-GIBS_LAYER_NATIVE_RESOLUTION_M: dict[str, float] = {
-    "VIIRS_SNPP_CorrectedReflectance_TrueColor": 375.0,
-    "MODIS_Terra_Aerosol": 10000.0,
-    "MODIS_Terra_Land_Surface_Temp_Day": 1000.0,
-    "MODIS_Terra_Land_Surface_Temp_Night": 1000.0,
-    "MODIS_Terra_NDVI_8Day": 250.0,
-    "MODIS_Terra_L3_Land_Water_Mask": 250.0,
-    "IMERG_Precipitation_Rate": 11000.0,
-    "VIIRS_SNPP_DayNightBand_ENCC": 500.0,
-    "MODIS_Combined_Thermal_Anomalies_Fire": 1000.0,
-    "OMPS_Ozone_Total_Column": 50000.0,
-    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": 500.0,
-    "SRTM_Color_Index": 30.0,
-}
-GIBS_LAYER_DATE_FALLBACK_DAYS: dict[str, int] = {
-    "MODIS_Combined_Thermal_Anomalies_All": 3,
-    "MODIS_Combined_Thermal_Anomalies_Day": 3,
-    "MODIS_Combined_Thermal_Anomalies_Night": 3,
-    "OMPS_Ozone_Total_Column": 2,
-}
-
-GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M: dict[str, float] = {
-    "15.625m": 15.625,
-    "31.25m": 31.25,
-    "250m": 250.0,
-    "500m": 500.0,
-    "1km": 1000.0,
-    "1.5km": 1500.0,
-    "2km": 2000.0,
-    "GoogleMapsCompatible_Level6": 2445.98490512564,
-    "GoogleMapsCompatible_Level7": 1222.99245256282,
-    "GoogleMapsCompatible_Level8": 611.49622628141,
-    "GoogleMapsCompatible_Level9": 305.748113140705,
-    "GoogleMapsCompatible_Level12": 38.21851414258813,
-    "GoogleMapsCompatible_Level13": 19.109257071294063,
-}
-
-DEFAULT_LAYER_DEFINITIONS: dict[str, dict[str, object]] = {
-    "VIIRS_SNPP_CorrectedReflectance_TrueColor": {
-        "provider": "gibs",
-        "aliases": (
-            "truecolor",
-            "true color",
-            "viirs truecolor",
-            "true color satellite",
-            "satellite imagery",
-        ),
-    },
-    "MODIS_Terra_Aerosol": {
-        "provider": "gibs",
-        "aliases": (
-            "aerosol",
-            "aerosol optical depth",
-            "modis aerosol",
-            "aod",
-            "air pollution",
-        ),
-    },
-    "MODIS_Terra_Land_Surface_Temp_Day": {
-        "provider": "gibs",
-        "aliases": (
-            "surface temperature day",
-            "land surface temperature",
-            "lst day",
-            "modis lst",
-            "temperature day",
-        ),
-    },
-    "MODIS_Terra_Land_Surface_Temp_Night": {
-        "provider": "gibs",
-        "aliases": (
-            "surface temperature night",
-            "lst night",
-            "temperature night",
-            "night temperature",
-        ),
-    },
-    "MODIS_Terra_NDVI_8Day": {
-        "provider": "gibs",
-        "aliases": (
-            "ndvi",
-            "vegetation index",
-            "modis ndvi",
-            "vegetation",
-            "greenness",
-        ),
-    },
-    "MODIS_Terra_L3_Land_Water_Mask": {
-        "provider": "gibs",
-        "aliases": ("land/water mask", "water mask", "land water mask", "coastline"),
-    },
-    "IMERG_Precipitation_Rate": {
-        "provider": "gibs",
-        "aliases": (
-            "precipitation rate",
-            "imerg precipitation",
-            "imerg",
-            "rain",
-            "rainfall",
-        ),
-    },
-    "VIIRS_SNPP_DayNightBand_ENCC": {
-        "provider": "gibs",
-        "aliases": (
-            "nighttime lights",
-            "city lights",
-            "viirs lights",
-            "light pollution",
-            "night lights",
-        ),
-    },
-    "MODIS_Combined_Thermal_Anomalies_Fire": {
-        "provider": "gibs",
-        "provider_name": "MODIS_Combined_Thermal_Anomalies_All",
-        "aliases": ("active fires", "fire", "fires", "thermal anomalies", "wildfire"),
-    },
-    "OMPS_Ozone_Total_Column": {
-        "provider": "gibs",
-        "aliases": (
-            "ozone",
-            "ozone column",
-            "total ozone",
-            "omps ozone",
-            "atmospheric ozone",
-        ),
-    },
-    "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual": {
-        "provider": "gibs",
-        "aliases": (
-            "land cover",
-            "land cover type",
-            "modis igbp land cover",
-            "igbp land cover",
-            "land use",
-        ),
-    },
-    "SRTM_Color_Index": {
-        "provider": "gibs",
-        "aliases": (
-            "elevation",
-            "dem",
-            "digital elevation model",
-            "terrain",
-            "topography",
-        ),
-    },
-}

@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "layers": [
+    {
+      "layerId": "IMERG_Precipitation_Rate",
+      "displayName": "Precipitation Rate (IMERG, 30min)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "precipitation rate",
+        "imerg precipitation",
+        "imerg",
+        "rain",
+        "rainfall"
+      ],
+      "keywords": [
+        "precipitation rate",
+        "imerg precipitation",
+        "imerg",
+        "rain",
+        "rainfall"
+      ]
+    },
+    {
+      "layerId": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+      "displayName": "Land Cover Type (MODIS, Annual)",
+      "group": "gibs_annual",
+      "provider": "gibs",
+      "aliases": [
+        "land cover",
+        "land cover type",
+        "modis igbp land cover",
+        "igbp land cover",
+        "land use"
+      ],
+      "keywords": [
+        "land cover",
+        "land cover type",
+        "modis igbp land cover",
+        "igbp land cover",
+        "land use"
+      ]
+    },
+    {
+      "layerId": "MODIS_Combined_Thermal_Anomalies_Fire",
+      "displayName": "Active Fires (MODIS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "active fires",
+        "fire",
+        "fires",
+        "thermal anomalies",
+        "wildfire"
+      ],
+      "keywords": [
+        "active fires",
+        "fire",
+        "fires",
+        "thermal anomalies",
+        "wildfire"
+      ]
+    },
+    {
+      "layerId": "MODIS_Terra_Aerosol",
+      "displayName": "Aerosol Optical Depth (MODIS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "aerosol",
+        "aerosol optical depth",
+        "modis aerosol",
+        "aod",
+        "air pollution"
+      ],
+      "keywords": [
+        "aerosol",
+        "aerosol optical depth",
+        "modis aerosol",
+        "aod",
+        "air pollution"
+      ]
+    },
+    {
+      "layerId": "MODIS_Terra_L3_Land_Water_Mask",
+      "displayName": "Land/Water Mask (MODIS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "land/water mask",
+        "water mask",
+        "land water mask",
+        "coastline"
+      ],
+      "keywords": [
+        "land/water mask",
+        "water mask",
+        "land water mask",
+        "coastline"
+      ]
+    },
+    {
+      "layerId": "MODIS_Terra_Land_Surface_Temp_Day",
+      "displayName": "Surface Temperature Day (MODIS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "surface temperature day",
+        "land surface temperature",
+        "lst day",
+        "modis lst",
+        "temperature day"
+      ],
+      "keywords": [
+        "surface temperature day",
+        "land surface temperature",
+        "lst day",
+        "modis lst",
+        "temperature day"
+      ]
+    },
+    {
+      "layerId": "MODIS_Terra_Land_Surface_Temp_Night",
+      "displayName": "Surface Temperature Night (MODIS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "surface temperature night",
+        "lst night",
+        "temperature night",
+        "night temperature"
+      ],
+      "keywords": [
+        "surface temperature night",
+        "lst night",
+        "temperature night",
+        "night temperature"
+      ]
+    },
+    {
+      "layerId": "MODIS_Terra_NDVI_8Day",
+      "displayName": "Vegetation Index NDVI (MODIS, 8-day)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "ndvi",
+        "vegetation index",
+        "modis ndvi",
+        "vegetation",
+        "greenness"
+      ],
+      "keywords": [
+        "ndvi",
+        "vegetation index",
+        "modis ndvi",
+        "vegetation",
+        "greenness"
+      ]
+    },
+    {
+      "layerId": "OMPS_Ozone_Total_Column",
+      "displayName": "Ozone Column (OMPS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "ozone",
+        "ozone column",
+        "total ozone",
+        "omps ozone",
+        "atmospheric ozone"
+      ],
+      "keywords": [
+        "ozone",
+        "ozone column",
+        "total ozone",
+        "omps ozone",
+        "atmospheric ozone"
+      ]
+    },
+    {
+      "layerId": "SRTM_Color_Index",
+      "displayName": "Elevation DEM (SRTM)",
+      "group": "gibs_annual",
+      "provider": "gibs",
+      "aliases": [
+        "elevation",
+        "dem",
+        "digital elevation model",
+        "terrain",
+        "topography"
+      ],
+      "keywords": [
+        "elevation",
+        "dem",
+        "digital elevation model",
+        "terrain",
+        "topography"
+      ]
+    },
+    {
+      "layerId": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+      "displayName": "True Color Satellite (VIIRS, Daily)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "truecolor",
+        "true color",
+        "viirs truecolor",
+        "true color satellite",
+        "satellite imagery"
+      ],
+      "keywords": [
+        "truecolor",
+        "true color",
+        "viirs truecolor",
+        "true color satellite",
+        "satellite imagery"
+      ]
+    },
+    {
+      "layerId": "VIIRS_SNPP_DayNightBand_ENCC",
+      "displayName": "Nighttime Lights (VIIRS, Monthly)",
+      "group": "gibs_nrt",
+      "provider": "gibs",
+      "aliases": [
+        "nighttime lights",
+        "city lights",
+        "viirs lights",
+        "light pollution",
+        "night lights"
+      ],
+      "keywords": [
+        "nighttime lights",
+        "city lights",
+        "viirs lights",
+        "light pollution",
+        "night lights"
+      ]
+    }
+  ]
+}

@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import logging
 import logging.config
-import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from server.common.constants import LOGS_PATH
 
 # Generate timestamp for the log filename
 ###############################################################################
-os.makedirs(LOGS_PATH, exist_ok=True)
+logs_path = Path(LOGS_PATH)
+logs_path.mkdir(parents=True, exist_ok=True)
 current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(LOGS_PATH, f"AEGIS_{current_timestamp}.log")
+log_filename = logs_path / f"AEGIS_{current_timestamp}.log"
 
 # Define logger configuration
 ###############################################################################
@@ -38,7 +39,7 @@ LOG_CONFIG: dict[str, Any] = {
             "class": "logging.FileHandler",
             "level": "DEBUG",
             "formatter": "default",
-            "filename": log_filename,
+            "filename": str(log_filename),
             "mode": "a",
         },
     },

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "layerDefaults": [
+    {
+      "layerId": "IMERG_Precipitation_Rate",
+      "nativeResolutionM": 11000.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual",
+      "nativeResolutionM": 500.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Combined_Thermal_Anomalies_All",
+      "nativeResolutionM": null,
+      "dateFallbackDays": 3
+    },
+    {
+      "layerId": "MODIS_Combined_Thermal_Anomalies_Day",
+      "nativeResolutionM": null,
+      "dateFallbackDays": 3
+    },
+    {
+      "layerId": "MODIS_Combined_Thermal_Anomalies_Fire",
+      "nativeResolutionM": 1000.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Combined_Thermal_Anomalies_Night",
+      "nativeResolutionM": null,
+      "dateFallbackDays": 3
+    },
+    {
+      "layerId": "MODIS_Terra_Aerosol",
+      "nativeResolutionM": 10000.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Terra_L3_Land_Water_Mask",
+      "nativeResolutionM": 250.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Terra_Land_Surface_Temp_Day",
+      "nativeResolutionM": 1000.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Terra_Land_Surface_Temp_Night",
+      "nativeResolutionM": 1000.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "MODIS_Terra_NDVI_8Day",
+      "nativeResolutionM": 250.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "OMPS_Ozone_Total_Column",
+      "nativeResolutionM": 50000.0,
+      "dateFallbackDays": 2
+    },
+    {
+      "layerId": "SRTM_Color_Index",
+      "nativeResolutionM": 30.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+      "nativeResolutionM": 375.0,
+      "dateFallbackDays": null
+    },
+    {
+      "layerId": "VIIRS_SNPP_DayNightBand_ENCC",
+      "nativeResolutionM": 500.0,
+      "dateFallbackDays": null
+    }
+  ]
+}

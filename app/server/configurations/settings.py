@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.common.constants import (
+    DATABASE_FILE_PATH,
     DEFAULT_DB_CONNECT_TIMEOUT,
     DEFAULT_DB_INSERT_BATCH_SIZE,
     DEFAULT_GIBS_DEFAULT_LAYER,
@@ -26,6 +27,7 @@ from server.common.constants import (
 ###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
+    database_path: str
     embedded_database: bool
     engine: str | None
     host: str | None
@@ -472,8 +474,8 @@ class AppSettings(BaseSettings):
 # -----------------------------------------------------------------------------
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     if db.embedded_database:
-        # Keep AEGIS behavior: external fields are ignored and timeout falls back.
         return DatabaseSettings(
+            database_path=DATABASE_FILE_PATH,
             embedded_database=True,
             engine=None,
             host=None,
@@ -488,6 +490,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         )
 
     return DatabaseSettings(
+        database_path=DATABASE_FILE_PATH,
         embedded_database=False,
         engine=db.engine.strip().lower(),
         host=db.host,
