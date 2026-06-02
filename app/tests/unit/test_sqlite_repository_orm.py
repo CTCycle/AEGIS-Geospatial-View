@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from server.configurations import DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
 from server.common.constants import CHAT_SESSIONS_TABLE, GIBS_LAYERS_TABLE
@@ -173,3 +175,25 @@ def test_repository_uses_database_path_from_settings(tmp_path) -> None:
     repository = SQLiteRepository(settings)
 
     assert repository.db_path == settings.database_path
+
+
+def test_repository_creates_parent_directory_for_database_path(tmp_path) -> None:
+    database_path = tmp_path / "nested" / "data" / "database.db"
+    settings = DatabaseSettings(
+        database_path=str(database_path),
+        embedded_database=True,
+        engine=None,
+        host=None,
+        port=None,
+        database_name=None,
+        username=None,
+        password=None,
+        ssl=False,
+        ssl_ca=None,
+        connect_timeout=10,
+        insert_batch_size=1000,
+    )
+
+    SQLiteRepository(settings)
+
+    assert Path(database_path.parent).is_dir()

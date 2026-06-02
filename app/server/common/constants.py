@@ -1,26 +1,32 @@
 from __future__ import annotations
 
-from os.path import abspath, join
+from pathlib import Path
 
 # [PATHS]
 ###############################################################################
-ROOT_DIR = abspath(join(__file__, "../../../../"))
-APP_DIR = join(ROOT_DIR, "app")
+_ROOT_DIR = Path(__file__).resolve().parents[3]
+_APP_DIR = _ROOT_DIR / "app"
+_SETTING_PATH = _ROOT_DIR / "settings"
+_RESOURCES_PATH = _APP_DIR / "resources"
+_CLIENT_DIST_PATH = _APP_DIR / "client" / "dist" / "browser"
+
+ROOT_DIR = str(_ROOT_DIR)
+APP_DIR = str(_APP_DIR)
 PROJECT_DIR = APP_DIR
-SETTING_PATH = join(ROOT_DIR, "settings")
-RESOURCES_PATH = join(APP_DIR, "resources")
-MODELS_PATH = join(RESOURCES_PATH, "models")
-SOURCES_PATH = join(RESOURCES_PATH, "sources")
-LOGS_PATH = join(RESOURCES_PATH, "logs")
-ENV_FILE_PATH = join(SETTING_PATH, ".env")
+SETTING_PATH = str(_SETTING_PATH)
+RESOURCES_PATH = str(_RESOURCES_PATH)
+MODELS_PATH = str(_RESOURCES_PATH / "models")
+SOURCES_PATH = str(_RESOURCES_PATH / "sources")
+LOGS_PATH = str(_RESOURCES_PATH / "logs")
+ENV_FILE_PATH = str(_SETTING_PATH / ".env")
 DATABASE_FILENAME = "database.db"
-DATABASE_FILE_PATH = join(RESOURCES_PATH, DATABASE_FILENAME)
-CLIENT_DIST_PATH = join(APP_DIR, "client", "dist", "browser")
-CLIENT_ASSETS_PATH = join(CLIENT_DIST_PATH, "assets")
-CLIENT_INDEX_FILE_PATH = join(CLIENT_DIST_PATH, "index.html")
+DATABASE_FILE_PATH = str(_RESOURCES_PATH / DATABASE_FILENAME)
+CLIENT_DIST_PATH = str(_CLIENT_DIST_PATH)
+CLIENT_ASSETS_PATH = str(_CLIENT_DIST_PATH / "assets")
+CLIENT_INDEX_FILE_PATH = str(_CLIENT_DIST_PATH / "index.html")
 
 ###############################################################################
-CONFIGURATIONS_FILE = join(SETTING_PATH, "configurations.json")
+CONFIGURATIONS_FILE = str(_SETTING_PATH / "configurations.json")
 
 
 # [BACKEND ROUTES]
