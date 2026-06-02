@@ -1,17 +1,4 @@
-{  
-  "database": {
-    "embedded_database": true,
-    "engine": "postgresql+psycopg",
-    "host": "localhost",
-    "port": 5432,
-    "database_name": "AEGIS",
-    "username": "postgres",
-    "password": null,
-    "ssl": false,
-    "ssl_ca": null,
-    "connect_timeout": 30,
-    "insert_batch_size": 1000
-  },
+{
   "nominatim": {
     "base_url": "https://nominatim.openstreetmap.org/search",
     "user_agent": "AEGIS-Geographics/1.0 (contact: support@aegis-geographics.local)",
