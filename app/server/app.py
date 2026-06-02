@@ -22,7 +22,8 @@ from server.common.constants import (
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
 from server.configurations import get_server_settings
-from server.repositories.database.initializer import initialize_database
+from server.repositories.database import get_database
+from server.repositories.database.initializer import initialize_database, seed_reference_catalog
 from server.services.chat.composition import build_chat_runtime
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
@@ -63,8 +64,10 @@ def redirect_root_to_docs() -> RedirectResponse:
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
+    database = get_database()
 
-    initialize_database(settings.database)
+    initialize_database(database.backend)
+    seed_reference_catalog(database.backend)
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "tileMatrixSets": [
+    {
+      "tileMatrixSetId": "1.5km",
+      "metersPerPixel": 1500.0
+    },
+    {
+      "tileMatrixSetId": "15.625m",
+      "metersPerPixel": 15.625
+    },
+    {
+      "tileMatrixSetId": "1km",
+      "metersPerPixel": 1000.0
+    },
+    {
+      "tileMatrixSetId": "250m",
+      "metersPerPixel": 250.0
+    },
+    {
+      "tileMatrixSetId": "2km",
+      "metersPerPixel": 2000.0
+    },
+    {
+      "tileMatrixSetId": "31.25m",
+      "metersPerPixel": 31.25
+    },
+    {
+      "tileMatrixSetId": "500m",
+      "metersPerPixel": 500.0
+    },
+    {
+      "tileMatrixSetId": "GoogleMapsCompatible_Level12",
+      "metersPerPixel": 38.21851414258813
+    },
+    {
+      "tileMatrixSetId": "GoogleMapsCompatible_Level13",
+      "metersPerPixel": 19.109257071294063
+    },
+    {
+      "tileMatrixSetId": "GoogleMapsCompatible_Level6",
+      "metersPerPixel": 2445.98490512564
+    },
+    {
+      "tileMatrixSetId": "GoogleMapsCompatible_Level7",
+      "metersPerPixel": 1222.99245256282
+    },
+    {
+      "tileMatrixSetId": "GoogleMapsCompatible_Level8",
+      "metersPerPixel": 611.49622628141
+    },
+    {
+      "tileMatrixSetId": "GoogleMapsCompatible_Level9",
+      "metersPerPixel": 305.748113140705
+    }
+  ]
+}

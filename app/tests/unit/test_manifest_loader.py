@@ -29,7 +29,7 @@ def test_priority_provider_manifests_include_temporal_metadata() -> None:
 
 
 def test_manifest_loader_accepts_path_root_argument() -> None:
-    root_path = Path("app/resources/manifests")
+    root_path = Path("app/resources/catalog")
 
     payload = GeospatialManifestLoader(root_path=root_path).load_all()
 

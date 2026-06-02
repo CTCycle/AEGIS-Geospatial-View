@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from server.domain.catalog import GeospatialLayerReferenceEntry
 from server.services.geospatial.gibs import (
     GIBSRequestError,
     GIBSService,
@@ -12,7 +13,18 @@ from server.services.geospatial.maps import MapService, MapValidationError
 
 
 def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
-    service = LayerProviderService()
+    service = LayerProviderService(
+        layer_catalog=(
+            GeospatialLayerReferenceEntry(
+                layer_id="MODIS_Combined_Thermal_Anomalies_Fire",
+                display_name="Active Fires (MODIS, Daily)",
+                group="gibs_nrt",
+                provider="gibs",
+                aliases=("active fires", "fire", "fires"),
+                keywords=("active fires", "fire", "fires"),
+            ),
+        )
+    )
 
     entry = service.resolve("MODIS_Combined_Thermal_Anomalies_Fire")
 
@@ -43,7 +55,14 @@ def test_map_service_rejects_removed_thunderforest_map() -> None:
 
 
 def test_gibs_service_retries_previous_date_for_known_layer(monkeypatch) -> None:
-    service = GIBSService()
+    class _ReferenceRepository:
+        def load_gibs_layer_native_resolution_map(self) -> dict[str, float]:
+            return {}
+
+        def load_gibs_layer_date_fallback_days_map(self) -> dict[str, int]:
+            return {"MODIS_Combined_Thermal_Anomalies_All": 3}
+
+    service = GIBSService(reference_repository=_ReferenceRepository())
 
     monkeypatch.setattr(
         service,

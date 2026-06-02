@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from server.configurations import DatabaseSettings
 from server.repositories.database.initializer import initialize_database
+from server.repositories.schemas import (
+    ReferenceCountryAliasRecord,
+    ReferenceCountryRecord,
+    ReferenceGeospatialLayerAliasRecord,
+    ReferenceGeospatialLayerKeywordRecord,
+    ReferenceGeospatialLayerRecord,
+    ReferenceGibsLayerDefaultRecord,
+    ReferenceGibsTileMatrixSetRecord,
+)
 
 
 def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> None:
@@ -158,3 +167,90 @@ def test_initialize_database_ensures_postgres_schema_when_external_mode(
     initialize_database(settings)
 
     assert "server.repositories.database.postgres" in __import__("sys").modules
+
+
+def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
+    created_tables: list[str] = []
+
+    class _Engine:
+        pass
+
+    class _Database:
+        engine = _Engine()
+
+    def _capture_create_all(engine: object) -> None:
+        del engine
+        created_tables.extend(
+            sorted(
+                [
+                    ReferenceCountryRecord.__tablename__,
+                    ReferenceCountryAliasRecord.__tablename__,
+                    ReferenceGeospatialLayerRecord.__tablename__,
+                    ReferenceGeospatialLayerAliasRecord.__tablename__,
+                    ReferenceGeospatialLayerKeywordRecord.__tablename__,
+                    ReferenceGibsTileMatrixSetRecord.__tablename__,
+                    ReferenceGibsLayerDefaultRecord.__tablename__,
+                ]
+            )
+        )
+
+    monkeypatch.setattr(
+        "server.repositories.database.initializer.Base.metadata.create_all",
+        _capture_create_all,
+    )
+
+    initialize_database(_Database())
+
+    assert created_tables == sorted(created_tables)
+
+
+def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch) -> None:
+    call_order: list[str] = []
+
+    class _Backend:
+        engine = object()
+
+    class _Database:
+        backend = _Backend()
+
+    monkeypatch.setattr(
+        "server.app.get_server_settings",
+        lambda: type("Settings", (), {"database": object(), "vectors": type("Vectors", (), {"auto_sync_on_start": False})()})(),
+    )
+    monkeypatch.setattr("server.app.get_database", lambda: _Database())
+    monkeypatch.setattr(
+        "server.app.initialize_database",
+        lambda database: call_order.append("initialize"),
+    )
+    monkeypatch.setattr(
+        "server.app.seed_reference_catalog",
+        lambda database: call_order.append("seed"),
+    )
+    monkeypatch.setattr(
+        "server.app.build_search_runtime",
+        lambda: type("SearchRuntime", (), {"search_orchestrator": object()})(),
+    )
+    monkeypatch.setattr(
+        "server.app.build_chat_runtime",
+        lambda _search_orchestrator: type(
+            "ChatRuntime",
+            (),
+            {
+                "settings_service": type(
+                    "SettingsService", (), {"get_settings": staticmethod(lambda: None)}
+                )(),
+                "vector_indexer": type("VectorIndexer", (), {"sync": staticmethod(lambda: None)})(),
+            },
+        )(),
+    )
+    monkeypatch.setattr("server.app.run_startup_validations", lambda settings: None)
+
+    app_module = __import__("server.app", fromlist=["app_lifespan"])
+
+    async def _exercise() -> None:
+        async with app_module.app_lifespan(type("Application", (), {"state": type("State", (), {})()})()):
+            pass
+
+    __import__("asyncio").run(_exercise())
+
+    assert call_order[:2] == ["initialize", "seed"]

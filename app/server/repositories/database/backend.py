@@ -5,6 +5,7 @@ from typing import Any, Protocol
 
 from server.configurations import get_server_settings
 from server.repositories.database.initializer import validate_postgres_schema
+from server.repositories.schemas import Base
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
 
@@ -25,6 +26,9 @@ class DatabaseBackend(Protocol):
 
     # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int: ...
+
+    # -------------------------------------------------------------------------
+    def count_records(self, model: type[Base]) -> int: ...
 
     # -------------------------------------------------------------------------
     def list_columns(self, table_name: str) -> list[str]: ...
@@ -64,6 +68,10 @@ class AEGISDatabase:
     # -------------------------------------------------------------------------
     def list_columns(self, table_name: str) -> list[str]:
         return self.backend.list_columns(table_name)
+
+    # -------------------------------------------------------------------------
+    def count_records(self, model: type[Base]) -> int:
+        return self.backend.count_records(model)
 
 
 @cache

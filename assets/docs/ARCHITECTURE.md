@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-30
+Last updated: 2026-06-02
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -26,7 +26,7 @@ AEGIS Geospatial View/
       package.json
       proxy.conf.cjs
     resources/
-      manifests/
+      catalog/
       database.db
     scripts/
     server/
@@ -212,7 +212,7 @@ app/
     settings-page.component.*
 ```
 
-### Manifest files (`app/resources/manifests`)
+### Catalog files (`app/resources/catalog`)
 
 - `index.json`
 - `runtime_profiles.json`
@@ -220,6 +220,7 @@ app/
 - `basemaps/*.json`
 - `overlays/*.json`
 - `tools/*.json`
+- `reference/*.json`
 
 ### Tests
 
@@ -376,7 +377,7 @@ Layering constraints:
 
 ### Geospatial capability pipeline
 
-- `manifest_loader.py` reads manifests.
+- `manifest_loader.py` reads manifests from `app/resources/catalog`.
 - `capability_registry.py` builds capability catalog.
 - `runtime_registry.py` applies runtime/credential availability.
 - `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
@@ -396,12 +397,18 @@ Layering constraints:
 - SQLite path is provided by `server.common.constants.DATABASE_FILE_PATH`.
 - Database mode and connection settings come from `settings/configurations.json`.
 - Schema initialization is handled by `app/server/repositories/database/initializer.py`.
+- Startup then loads `app/resources/catalog/reference/*.json` and seeds empty reference tables exactly once per table group.
 
 Core tables (defined in constants/schema layer) include:
 - chat sessions/messages
 - model provider settings
 - encrypted model credentials
 - GIBS layer metadata and manifest embedding records
+- reference countries, country aliases, geospatial layers, geospatial layer aliases/keywords, and GIBS reference defaults
+
+Reference catalog policy:
+- Static reference/catalog data belongs under `app/resources/catalog/reference`.
+- New catalog/reference constants should not be hardcoded in `app/server/common/constants.py`.
 
 ### Vector persistence
 

@@ -1,10 +1,10 @@
 # Geospatial Source Catalog
 
-Last updated: 2026-05-14
+Last updated: 2026-06-02
 
 ## Purpose
 
-AEGIS treats geographic data sources as manifest-backed capabilities. The single source of truth is `app/resources/manifests`; this document summarizes the current integration status.
+AEGIS treats geographic data sources as manifest-backed capabilities. The single source of truth is `app/resources/catalog`; this document summarizes the current integration status.
 
 ## Implemented Capability Classes
 

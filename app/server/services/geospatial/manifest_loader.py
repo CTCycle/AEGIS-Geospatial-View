@@ -45,7 +45,7 @@ class GeospatialManifestLoader:
         base_path = (
             Path(root_path)
             if root_path is not None
-            else Path(PROJECT_DIR) / "resources" / "manifests"
+            else Path(PROJECT_DIR) / "resources" / "catalog"
         )
         resolved_root = base_path.resolve()
         self.root_path = str(resolved_root)
