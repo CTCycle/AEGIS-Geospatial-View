@@ -1,31 +1,19 @@
 from __future__ import annotations
 
 import re
-import unicodedata
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
-from server.common.constants import COUNTRY_NAME_TO_ISO2, COUNTRY_SYNONYMS
+from server.services.catalog.reference_repository import ReferenceCatalogRepository
+
+if TYPE_CHECKING:
+    from server.repositories.database.backend import DatabaseBackend
 
 
 ###############################################################################
 class LocationSanitizationService:
-    COUNTRY_NAME_TO_ISO2 = COUNTRY_NAME_TO_ISO2
-
-    def __init__(self) -> None:
-        self.country_lookup = self.build_country_lookup()
-
-    # -----------------------------------------------------------------------------
-    def build_country_lookup(self) -> dict[str, str]:
-        lookup: dict[str, str] = {}
-        for name, code in self.COUNTRY_NAME_TO_ISO2.items():
-            normalized = self.normalize_country_key(name)
-            if normalized:
-                lookup[normalized] = code
-        for alias, target in COUNTRY_SYNONYMS.items():
-            normalized_alias = self.normalize_country_key(alias)
-            normalized_target = self.normalize_country_key(target)
-            if normalized_alias and normalized_target and normalized_target in lookup:
-                lookup.setdefault(normalized_alias, lookup[normalized_target])
-        return lookup
+    def __init__(self, country_alias_to_iso2: Mapping[str, str]) -> None:
+        self._country_alias_to_iso2 = dict(country_alias_to_iso2)
 
     # -----------------------------------------------------------------------------
     def normalize_whitespace(self, value: str | None) -> str | None:
@@ -40,22 +28,7 @@ class LocationSanitizationService:
     def normalize_country_key(self, value: str | None) -> str:
         if value is None:
             return ""
-        normalized = unicodedata.normalize("NFKD", value)
-        normalized = normalized.encode("ascii", "ignore").decode("ascii")
-        normalized = normalized.lower()
-        normalized = normalized.replace("&", "and")
-        normalized = normalized.replace("'", " ")
-        normalized = normalized.replace("’", " ")
-        normalized = normalized.replace(".", " ")
-        normalized = normalized.replace(",", " ")
-        normalized = normalized.replace("-", " ")
-        normalized = normalized.replace("saint", "st")
-        normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
-        normalized = re.sub(r"\s+", " ", normalized)
-        normalized = normalized.strip()
-        if normalized.startswith("the "):
-            normalized = normalized[4:]
-        return normalized
+        return " ".join(value.strip().casefold().split())
 
     # -----------------------------------------------------------------------------
     def normalize_country(self, value: str | None) -> str | None:
@@ -67,8 +40,8 @@ class LocationSanitizationService:
         key = self.normalize_country_key(normalized)
         if not key:
             return None
-        if key in self.country_lookup:
-            return self.country_lookup[key]
+        if key in self._country_alias_to_iso2:
+            return self._country_alias_to_iso2[key]
         return None
 
     # -----------------------------------------------------------------------------
@@ -103,3 +76,10 @@ class LocationSanitizationService:
             "classification": classification,
             "query": query,
         }
+
+
+def build_location_sanitization_service(
+    database: DatabaseBackend,
+) -> LocationSanitizationService:
+    repository = ReferenceCatalogRepository(database)
+    return LocationSanitizationService(repository.load_country_alias_to_iso2())

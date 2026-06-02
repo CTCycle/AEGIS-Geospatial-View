@@ -8,6 +8,13 @@ from server.repositories.schemas.models import (
     ManifestEmbeddingRecord,
     ModelCredentialRecord,
     ModelProviderSettingsRecord,
+    ReferenceCountryAliasRecord,
+    ReferenceCountryRecord,
+    ReferenceGeospatialLayerAliasRecord,
+    ReferenceGeospatialLayerKeywordRecord,
+    ReferenceGeospatialLayerRecord,
+    ReferenceGibsLayerDefaultRecord,
+    ReferenceGibsTileMatrixSetRecord,
 )
 
 __all__ = [
@@ -18,4 +25,11 @@ __all__ = [
     "ManifestEmbeddingRecord",
     "ModelCredentialRecord",
     "ModelProviderSettingsRecord",
+    "ReferenceCountryAliasRecord",
+    "ReferenceCountryRecord",
+    "ReferenceGeospatialLayerAliasRecord",
+    "ReferenceGeospatialLayerKeywordRecord",
+    "ReferenceGeospatialLayerRecord",
+    "ReferenceGibsLayerDefaultRecord",
+    "ReferenceGibsTileMatrixSetRecord",
 ]

@@ -1,6 +1,6 @@
 # Coding Rules
 
-Last updated: 2026-05-02
+Last updated: 2026-06-02
 Scope: `app/server`, `app/client`, `app/tests`
 
 ## Python Rules
@@ -94,3 +94,4 @@ Scope: `app/server`, `app/client`, `app/tests`
 - Remove dead code and obsolete artifacts when identified.
 - Avoid duplicate logic across layers when a shared contract can serve.
 - Keep docs in `assets/docs` updated in the same change when behavior or conventions change.
+- New static catalog/reference data must be added under `app/resources/catalog/reference`, not hardcoded in Python constants.

@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-05-24
+Last updated: 2026-06-02
 
 ## FILES INDEX
 
@@ -17,7 +17,7 @@ Last updated: 2026-05-24
   In-process background job lifecycle, API contract, cancellation model, and operational constraints.
 
 - CAPABILITY_MANIFESTS.md  
-  Manifest schema and runtime-profile rules for basemaps, overlays, and tools under `app/resources/manifests`.
+  Manifest schema and runtime-profile rules for basemaps, overlays, and tools under `app/resources/catalog`.
 
 - GEOSPATIAL_SOURCE_CATALOG.md
   Source catalog for geographic intelligence providers, capability kinds, access modes, rendering modes, provider contract coverage, and integration status.

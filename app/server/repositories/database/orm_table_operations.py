@@ -107,3 +107,8 @@ class SqlAlchemyTableOperationsMixin:
         with self.session_factory() as session:
             value = session.scalar(select(func.count()).select_from(table_cls)) or 0
         return int(value)
+
+    def count_records(self, model: type[Base]) -> int:
+        with self.session_factory() as session:
+            value = session.scalar(select(func.count()).select_from(model)) or 0
+        return int(value)

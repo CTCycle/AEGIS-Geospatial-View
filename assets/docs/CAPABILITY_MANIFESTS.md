@@ -1,10 +1,10 @@
 # Capability Manifests
 
-Last updated: 2026-05-24
+Last updated: 2026-06-02
 
 ## Purpose
 
-This document is the maintained technical inventory of geospatial capabilities exposed by AEGIS. The source of truth remains `app/resources/manifests`; this document mirrors the manifest catalog in a reviewable form for operators, maintainers, and UI authors.
+This document is the maintained technical inventory of geospatial capabilities exposed by AEGIS. The source of truth remains `app/resources/catalog`; this document mirrors the manifest catalog in a reviewable form for operators, maintainers, and UI authors.
 
 Default capability selection prioritizes free and openly accessible providers. Geoapify and TomTom capabilities are optional and remain unavailable until users configure their own provider keys in the Access configurations page.
 
@@ -118,7 +118,7 @@ Default capability selection prioritizes free and openly accessible providers. G
 
 ## Schema V2 Required Fields
 
-Every manifest under `app/resources/manifests` must define:
+Every manifest under `app/resources/catalog` must define:
 
 - `capabilityKind`: one of `basemap`, `raster-overlay`, `vector-overlay`, `search-index`, `camera-network`, `dataset-ingestion`, `analysis-tool`, or `metadata-only`.
 - `renderingMode`: one of `xyz`, `wmts`, `wms`, `geojson`, `vector-tile`, `raster-tile`, `clustered-points`, `choropleth`, `camera-points`, or `metadata-only`.
@@ -177,6 +177,22 @@ Run the strict audit before merging manifest changes:
 cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.layer_auditor --strict
 ```
+
+## Reference Catalog
+
+`app/resources/catalog/reference` stores seedable static reference data that should not live in Python constants:
+
+- `countries.json`
+- `geospatial_layers.json`
+- `gibs_tile_matrix_sets.json`
+- `gibs_layer_defaults.json`
+
+Startup behavior:
+
+- The app creates relational schema first.
+- It then loads the reference catalog files.
+- It seeds only empty target reference tables.
+- Populated target tables are not reseeded or upserted during startup.
 
 ## Agent Catalog Contract
 

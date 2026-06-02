@@ -5,7 +5,9 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -13,6 +15,16 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from server.common.constants import (
+    REFERENCE_COUNTRIES_TABLE_NAME,
+    REFERENCE_COUNTRY_ALIASES_TABLE_NAME,
+    REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME,
+    REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME,
+    REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME,
+    REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME,
+    REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME,
+)
 
 
 ###############################################################################
@@ -33,6 +45,88 @@ class GibsLayerRecord(Base):
     meters_per_pixel: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (UniqueConstraint("layer_id"),)
+
+
+class ReferenceCountryRecord(Base):
+    __tablename__ = REFERENCE_COUNTRIES_TABLE_NAME
+
+    iso2: Mapped[str] = mapped_column(String(2), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+
+
+class ReferenceCountryAliasRecord(Base):
+    __tablename__ = REFERENCE_COUNTRY_ALIASES_TABLE_NAME
+
+    alias_key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    alias: Mapped[str] = mapped_column(String(160), nullable=False)
+    iso2: Mapped[str] = mapped_column(
+        String(2),
+        ForeignKey(f"{REFERENCE_COUNTRIES_TABLE_NAME}.iso2", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    __table_args__ = (Index("ix_reference_country_aliases_iso2", "iso2"),)
+
+
+class ReferenceGeospatialLayerRecord(Base):
+    __tablename__ = REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
+
+    layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    group: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(64))
+
+
+class ReferenceGeospatialLayerAliasRecord(Base):
+    __tablename__ = REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME
+
+    alias_key: Mapped[str] = mapped_column(String(256), primary_key=True)
+    alias: Mapped[str] = mapped_column(String(256), nullable=False)
+    layer_id: Mapped[str] = mapped_column(
+        String(256),
+        ForeignKey(
+            f"{REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME}.layer_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    __table_args__ = (Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),)
+
+
+class ReferenceGeospatialLayerKeywordRecord(Base):
+    __tablename__ = REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    keyword_key: Mapped[str] = mapped_column(String(256), nullable=False)
+    keyword: Mapped[str] = mapped_column(String(256), nullable=False)
+    layer_id: Mapped[str] = mapped_column(
+        String(256),
+        ForeignKey(
+            f"{REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME}.layer_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("layer_id", "keyword_key", name="ux_reference_layer_keyword"),
+    )
+
+
+class ReferenceGibsTileMatrixSetRecord(Base):
+    __tablename__ = REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME
+
+    tile_matrix_set_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    meters_per_pixel: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class ReferenceGibsLayerDefaultRecord(Base):
+    __tablename__ = REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME
+
+    layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    native_resolution_m: Mapped[float | None] = mapped_column(Float)
+    date_fallback_days: Mapped[int | None] = mapped_column(Integer)
 
 
 class ModelProviderSettingsRecord(Base):
