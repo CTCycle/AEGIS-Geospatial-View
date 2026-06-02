@@ -21,6 +21,16 @@ struct BackendChildState {
     child: Arc<Mutex<Option<Child>>>,
 }
 
+#[derive(Clone)]
+struct WorkspaceLayout {
+    workspace_root: PathBuf,
+    python_path_root: PathBuf,
+    project_dir: PathBuf,
+    settings_dir: PathBuf,
+    resources_dir: PathBuf,
+    runtimes_dir: PathBuf,
+}
+
 struct BackendLaunchConfig {
     host: String,
     port: u16,
@@ -160,15 +170,43 @@ fn render_startup_error(app_handle: &tauri::AppHandle, message: &str) {
     );
 }
 
-fn is_workspace_root(candidate: &Path) -> bool {
-    candidate.join("app").join("server").join("pyproject.toml").is_file()
-        && candidate.join("app").join("server").join("app.py").is_file()
+fn resolve_workspace_layout(candidate: &Path) -> Option<WorkspaceLayout> {
+    let source_app_dir = candidate.join("app");
+    let source_server_dir = source_app_dir.join("server");
+    if source_server_dir.join("pyproject.toml").is_file()
+        && source_server_dir.join("app.py").is_file()
+    {
+        return Some(WorkspaceLayout {
+            workspace_root: candidate.to_path_buf(),
+            python_path_root: source_app_dir.clone(),
+            project_dir: source_server_dir,
+            settings_dir: candidate.join("settings"),
+            resources_dir: source_app_dir.join("resources"),
+            runtimes_dir: candidate.join("runtimes"),
+        });
+    }
+
+    let packaged_root = candidate.join("r");
+    let packaged_server_dir = packaged_root.join("server");
+    if packaged_server_dir.join("pyproject.toml").is_file()
+        && packaged_server_dir.join("app.py").is_file()
+    {
+        return Some(WorkspaceLayout {
+            workspace_root: candidate.to_path_buf(),
+            python_path_root: packaged_root.clone(),
+            project_dir: packaged_server_dir,
+            settings_dir: packaged_root.join("settings"),
+            resources_dir: packaged_root.join("resources"),
+            runtimes_dir: packaged_root.join("runtimes"),
+        });
+    }
+
+    None
 }
 
-fn has_workspace_venv(candidate: &Path) -> bool {
-    candidate
-        .join("app")
-        .join("server")
+fn has_workspace_venv(layout: &WorkspaceLayout) -> bool {
+    layout
+        .project_dir
         .join(".venv")
         .join("Scripts")
         .join("python.exe")
@@ -187,7 +225,7 @@ fn push_with_ancestors(base: &Path, candidates: &mut Vec<PathBuf>) {
     }
 }
 
-fn find_workspace_root(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
+fn find_workspace_layout(app_handle: &tauri::AppHandle) -> Option<WorkspaceLayout> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
@@ -206,16 +244,19 @@ fn find_workspace_root(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     }
 
     let mut seen: HashSet<PathBuf> = HashSet::new();
-    let mut workspace_candidates: Vec<PathBuf> = Vec::new();
+    let mut workspace_candidates: Vec<WorkspaceLayout> = Vec::new();
     for candidate in candidates {
-        if seen.insert(candidate.clone()) && is_workspace_root(&candidate) {
-            workspace_candidates.push(candidate);
+        if !seen.insert(candidate.clone()) {
+            continue;
+        }
+        if let Some(layout) = resolve_workspace_layout(&candidate) {
+            workspace_candidates.push(layout);
         }
     }
 
     if let Some(with_venv) = workspace_candidates
         .iter()
-        .find(|candidate| has_workspace_venv(candidate))
+        .find(|layout| has_workspace_venv(layout))
     {
         return Some(with_venv.clone());
     }
@@ -236,14 +277,14 @@ fn directory_is_writable(path: &Path) -> bool {
 
 fn resolve_runtime_root(
     app_handle: &tauri::AppHandle,
-    workspace_root: &Path,
+    workspace_layout: &WorkspaceLayout,
 ) -> Result<PathBuf, String> {
-    if has_workspace_venv(workspace_root) {
-        return Ok(workspace_root.to_path_buf());
+    if has_workspace_venv(workspace_layout) {
+        return Ok(workspace_layout.workspace_root.clone());
     }
 
-    if directory_is_writable(workspace_root) {
-        return Ok(workspace_root.to_path_buf());
+    if directory_is_writable(&workspace_layout.workspace_root) {
+        return Ok(workspace_layout.workspace_root.clone());
     }
 
     let app_data_dir = app_handle.path().app_local_data_dir().map_err(|error| {
@@ -311,29 +352,28 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
 
     #[cfg(target_os = "windows")]
     {
-        let workspace_root = find_workspace_root(app_handle).ok_or_else(|| {
+        let workspace_layout = find_workspace_layout(app_handle).ok_or_else(|| {
             String::from(
-                "Cannot resolve packaged backend workspace (missing app/server).",
+                "Cannot resolve packaged backend workspace (missing bundled server resources).",
             )
         })?;
-        let runtime_root = resolve_runtime_root(app_handle, &workspace_root)?;
-        let app_dir = workspace_root.join("app");
-        let project_dir = app_dir.join("server");
-        let env_path = workspace_root.join("settings").join(".env");
+        let runtime_root = resolve_runtime_root(app_handle, &workspace_layout)?;
+        let project_dir = workspace_layout.project_dir.clone();
+        let env_path = workspace_layout.settings_dir.join(".env");
         let backend_config = resolve_backend_launch_config(&env_path);
-        let bundled_runtimes_dir = workspace_root.join("runtimes");
+        let bundled_runtimes_dir = workspace_layout.runtimes_dir.clone();
         let uv_candidates = vec![
             bundled_runtimes_dir.join("uv").join("uv.exe"),
-            app_dir
-                .join("resources")
+            workspace_layout
+                .resources_dir
                 .join("runtimes")
                 .join("uv")
                 .join("uv.exe"),
         ];
         let python_candidates = vec![
             bundled_runtimes_dir.join("python").join("python.exe"),
-            app_dir
-                .join("resources")
+            workspace_layout
+                .resources_dir
                 .join("runtimes")
                 .join("python")
                 .join("python.exe"),
@@ -444,7 +484,7 @@ fn spawn_backend(app_handle: &tauri::AppHandle, state: &BackendChildState) -> Re
         let child = child_command
             .current_dir(&project_dir)
             .env("AEGIS_TAURI_MODE", "true")
-            .env("PYTHONPATH", workspace_root.join("app"))
+            .env("PYTHONPATH", &workspace_layout.python_path_root)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())

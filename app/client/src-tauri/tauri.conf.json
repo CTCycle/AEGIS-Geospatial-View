@@ -33,13 +33,12 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../../../app/server/pyproject.toml": "r/pyproject.toml",
-      "../../../app/server/uv.lock": "r/uv.lock",
-      "../../server": "r/server",
-      "../../scripts": "r/scripts",
-      "../../../settings": "r/settings",
-      "../../../runtimes/python": "r/runtimes/python",
-      "../../../runtimes/uv": "r/runtimes/uv"
+      "bundle-src/server": "r/server",
+      "bundle-src/scripts": "r/scripts",
+      "bundle-src/settings": "r/settings",
+      "bundle-src/resources": "r/resources",
+      "bundle-src/runtimes/python": "r/runtimes/python",
+      "bundle-src/runtimes/uv": "r/runtimes/uv"
     }
   }
 }
