@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -23,17 +22,17 @@ from server.common.constants import (
     FASTAPI_ROOT_ENDPOINT,
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
-from server.configurations import get_configuration_manager, get_server_settings
+from server.configurations import get_server_settings
 from server.repositories.database.initializer import initialize_database
 from server.services.chat.composition import build_chat_runtime
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
-
+###############################################################################
 def _client_build_available() -> bool:
     return os.path.isfile(CLIENT_INDEX_FILE_PATH)
 
-
+###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
     client_root = Path(CLIENT_DIST_PATH).resolve()
     requested_path = (client_root / full_path).resolve()
@@ -46,32 +45,18 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
-
-def _build_cors_origins() -> list[str]:
-    configuration = get_configuration_manager().configuration
-    ui_host = configuration.ui_host
-    ui_port = configuration.ui_port
-
-    hosts = {ui_host}
-    if ui_host == "127.0.0.1":
-        hosts.add("localhost")
-    if ui_host == "localhost":
-        hosts.add("127.0.0.1")
-
-    return sorted(f"http://{host}:{ui_port}" for host in hosts)
-
-
+###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-
+###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
     client_file = _resolve_client_file(full_path)
     if client_file is not None:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-
+###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
 
@@ -100,14 +85,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
-
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origins=_build_cors_origins(),
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
 
     application.include_router(search_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
