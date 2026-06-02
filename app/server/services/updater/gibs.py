@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import time
+from typing import TYPE_CHECKING
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
@@ -11,9 +12,12 @@ from tqdm import tqdm
 
 from server.configurations import get_server_settings
 from server.domain.updater import LayerAggregate
-from server.common.constants import GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M
 from server.common.logger import logger
 from server.repositories.serialization import DataSerializer
+from server.services.catalog.reference_repository import ReferenceCatalogRepository
+
+if TYPE_CHECKING:
+    from server.repositories.database.backend import DatabaseBackend
 
 
 type LayerPayload = dict[str, str | None | list[str] | list[float]]
@@ -34,6 +38,8 @@ class GIBSLayersUpdater:
         request_timeout: float | None = None,
         retry_backoff_s: float | None = None,
         max_attempts: int | None = None,
+        database: DatabaseBackend | None = None,
+        reference_repository: ReferenceCatalogRepository | None = None,
     ) -> None:
         self.serializer = serializer or DataSerializer()
         settings = get_server_settings().gibs
@@ -43,6 +49,17 @@ class GIBSLayersUpdater:
         self.request_timeout = request_timeout or settings.layer_sync_timeout
         self.retry_backoff_s = (
             retry_backoff_s if retry_backoff_s is not None else settings.retry_backoff_s
+        )
+        if database is None:
+            from server.repositories.database.backend import get_database
+
+            database = get_database().backend
+        resolved_database = database
+        self.reference_repository = (
+            reference_repository or ReferenceCatalogRepository(resolved_database)
+        )
+        self.tile_matrix_resolution_map = (
+            self.reference_repository.load_gibs_tile_matrix_resolution_map()
         )
         attempts = max_attempts if max_attempts is not None else 3
         self.max_attempts = attempts if attempts > 0 else 1
@@ -103,7 +120,7 @@ class GIBSLayersUpdater:
     def resolve_meters_per_pixel(self, tile_matrix_sets: set[str]) -> list[float]:
         resolutions: list[float] = []
         for tile_matrix in sorted(tile_matrix_sets):
-            resolved = GIBS_TILE_MATRIX_SET_TO_RESOLUTION_M.get(tile_matrix)
+            resolved = self.tile_matrix_resolution_map.get(tile_matrix)
             if resolved is not None:
                 resolutions.append(resolved)
         return resolutions

@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import cache
-from typing import Any, Final, Protocol
+from typing import Any, Protocol
 
 from server.configurations import get_server_settings
 from server.repositories.database.initializer import validate_postgres_schema
+from server.repositories.schemas import Base
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
-from server.common.logger import logger
 
 
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
     engine: Any
-    session: Callable[[], Any]
+    session: Any
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...
@@ -29,33 +28,22 @@ class DatabaseBackend(Protocol):
     def count_rows(self, table_name: str) -> int: ...
 
     # -------------------------------------------------------------------------
+    def count_records(self, model: type[Base]) -> int: ...
+
+    # -------------------------------------------------------------------------
     def list_columns(self, table_name: str) -> list[str]: ...
 
-
-BACKEND_FACTORIES: Final[dict[str, type[DatabaseBackend]]] = {
-    "sqlite": SQLiteRepository,
-    "postgresql+psycopg": PostgresRepository,
-}
-
-
-# [DATABASE]
-###############################################################################
 class AEGISDatabase:
     def __init__(self) -> None:
         self.settings = get_server_settings().database
-        self.backend = self._build_backend(self.settings.embedded_database)
+        self.backend = self._build_backend()
 
-    # -------------------------------------------------------------------------
-    def _build_backend(self, is_embedded: bool) -> DatabaseBackend:
-        backend_name = "sqlite" if is_embedded else (self.settings.engine or "")
-        normalized_name = backend_name.lower()
-        logger.info("Initializing %s database backend", backend_name)
-        if normalized_name not in BACKEND_FACTORIES:
-            raise ValueError(f"Unsupported database engine: {backend_name}")
-        backend_type = BACKEND_FACTORIES[normalized_name]
-        backend = backend_type(self.settings)
-        if normalized_name != "sqlite":
-            validate_postgres_schema(self.settings)
+    def _build_backend(self) -> DatabaseBackend:
+        if self.settings.embedded_database:
+            return SQLiteRepository(self.settings)
+
+        backend = PostgresRepository(self.settings)
+        validate_postgres_schema(self.settings)
         return backend
 
     # -------------------------------------------------------------------------
@@ -80,6 +68,10 @@ class AEGISDatabase:
     # -------------------------------------------------------------------------
     def list_columns(self, table_name: str) -> list[str]:
         return self.backend.list_columns(table_name)
+
+    # -------------------------------------------------------------------------
+    def count_records(self, model: type[Base]) -> int:
+        return self.backend.count_records(model)
 
 
 @cache

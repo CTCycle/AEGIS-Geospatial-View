@@ -45,7 +45,6 @@ yarn.lock
 .angular/**
 
 # IDE / OS
-.vscode/
 !.vscode/extensions.json
 .idea/
 .DS_Store

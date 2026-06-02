@@ -5,18 +5,18 @@ import threading
 import time
 from collections import OrderedDict
 from typing import Any
+from typing import TYPE_CHECKING
 
 from server.configurations import get_server_settings
 from server.domain.gibs import Capabilities, LayerCatalogEntry
-from server.common.constants import (
-    GIBS_LAYER_DATE_FALLBACK_DAYS,
-    GIBS_LAYER_NATIVE_RESOLUTION_M,
-    GIBS_LAYERS_TABLE,
-)
+from server.common.constants import GIBS_LAYERS_TABLE
 from server.common.logger import logger
-from server.repositories.database import get_database
+from server.services.catalog.reference_repository import ReferenceCatalogRepository
 from server.services.geospatial.gibs_errors import GIBSRequestError
 from server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
+
+if TYPE_CHECKING:
+    from server.repositories.database.backend import DatabaseBackend
 
 type BBox = list[float]
 type LayerStore = dict[str, object]
@@ -82,6 +82,8 @@ class GIBSService(GIBSRuntimeMixin):
         retry_backoff_s: float | None = None,
         bbox_precision: int | None = None,
         min_visual_radius_m: float | None = None,
+        database: DatabaseBackend | None = None,
+        reference_repository: ReferenceCatalogRepository | None = None,
     ) -> None:
         settings = get_server_settings().gibs
         self.user_agent = user_agent or settings.user_agent
@@ -107,16 +109,32 @@ class GIBSService(GIBSRuntimeMixin):
             if min_visual_radius_m is not None
             else settings.min_visual_radius_m
         )
+        if database is None:
+            from server.repositories.database.backend import get_database
+
+            database = get_database().backend
+        self.database = database
+        self.reference_repository = (
+            reference_repository or ReferenceCatalogRepository(self.database)
+        )
         self.layer_catalog = self.load_layer_catalog()
-        self.layer_native_resolution_m = dict(GIBS_LAYER_NATIVE_RESOLUTION_M)
-        self.layer_date_fallback_days = dict(GIBS_LAYER_DATE_FALLBACK_DAYS)
+        try:
+            self.layer_native_resolution_m = (
+                self.reference_repository.load_gibs_layer_native_resolution_map()
+            )
+            self.layer_date_fallback_days = (
+                self.reference_repository.load_gibs_layer_date_fallback_days_map()
+            )
+        except Exception:  # pragma: no cover - uninitialized database
+            self.layer_native_resolution_m = {}
+            self.layer_date_fallback_days = {}
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
     # -------------------------------------------------------------------------
     def load_layer_catalog(self) -> dict[str, LayerCatalogEntry]:
         try:
-            rows = get_database().load_from_database(GIBS_LAYERS_TABLE)
+            rows = self.database.load_from_database(GIBS_LAYERS_TABLE)
         except Exception as exc:  # pragma: no cover - database access failures
             logger.warning("Unable to load GIBS layer metadata: %s", exc)
             return {}

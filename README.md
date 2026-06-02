@@ -59,4 +59,4 @@ uv run pytest -q ../tests/unit
 Run `setup_and_maintenance.bat`.
 
 ## License
-MIT. See `LICENSE`.
+This project is licensed under the **MIT License**. See `LICENSE` for full terms.

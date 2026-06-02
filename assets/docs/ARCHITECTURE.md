@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-05-28
+Last updated: 2026-06-02
 Scope: `app/`, `settings/`, `release/`
 
 ## System Overview
@@ -26,7 +26,7 @@ AEGIS Geospatial View/
       package.json
       proxy.conf.cjs
     resources/
-      manifests/
+      catalog/
       database.db
     scripts/
     server/
@@ -212,7 +212,7 @@ app/
     settings-page.component.*
 ```
 
-### Manifest files (`app/resources/manifests`)
+### Catalog files (`app/resources/catalog`)
 
 - `index.json`
 - `runtime_profiles.json`
@@ -220,6 +220,7 @@ app/
 - `basemaps/*.json`
 - `overlays/*.json`
 - `tools/*.json`
+- `reference/*.json`
 
 ### Tests
 
@@ -233,6 +234,10 @@ app/
 
 - Import/runtime entry: `app/server/app.py`
 - ASGI app object: `app = create_app()`
+- Startup path:
+  - `app_lifespan` loads server settings, ensures the configured relational schema, composes search/chat runtimes, seeds settings through `chat_runtime.settings_service.get_settings()`, runs startup validation, and optionally syncs vectors.
+  - `create_app()` always mounts API routers under `/api`, serves the packaged SPA only when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
+  - Entry-point paths are centralized in `server.common.constants` via `DATABASE_FILE_PATH`, `CLIENT_DIST_PATH`, `CLIENT_ASSETS_PATH`, and `CLIENT_INDEX_FILE_PATH`.
 - Standard startup invocation:
   - PowerShell: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059`
   - CMD: `uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059`
@@ -372,7 +377,7 @@ Layering constraints:
 
 ### Geospatial capability pipeline
 
-- `manifest_loader.py` reads manifests.
+- `manifest_loader.py` reads manifests from `app/resources/catalog`.
 - `capability_registry.py` builds capability catalog.
 - `runtime_registry.py` applies runtime/credential availability.
 - `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
@@ -388,14 +393,22 @@ Layering constraints:
 - Runtime selector: `app/server/repositories/database/backend.py`
 - Modes:
   - SQLite (`database.embedded_database: true`) via `sqlite.py`
-  - PostgreSQL (`embedded_database: false`) via `postgres.py`
-- Settings source: `settings/configurations.json`
+  - PostgreSQL (`database.embedded_database: false`) via `postgres.py`
+- SQLite path is provided by `server.common.constants.DATABASE_FILE_PATH`.
+- Database mode and connection settings come from `settings/configurations.json`.
+- Schema initialization is handled by `app/server/repositories/database/initializer.py`.
+- Startup then loads `app/resources/catalog/reference/*.json` and seeds empty reference tables exactly once per table group.
 
 Core tables (defined in constants/schema layer) include:
 - chat sessions/messages
 - model provider settings
 - encrypted model credentials
 - GIBS layer metadata and manifest embedding records
+- reference countries, country aliases, geospatial layers, geospatial layer aliases/keywords, and GIBS reference defaults
+
+Reference catalog policy:
+- Static reference/catalog data belongs under `app/resources/catalog/reference`.
+- New catalog/reference constants should not be hardcoded in `app/server/common/constants.py`.
 
 ### Vector persistence
 

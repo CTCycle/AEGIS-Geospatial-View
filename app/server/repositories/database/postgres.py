@@ -12,7 +12,6 @@ from server.configurations import DatabaseSettings
 from server.repositories.database.orm_table_operations import SqlAlchemyTableOperationsMixin
 
 
-###############################################################################
 class PostgresRepository(SqlAlchemyTableOperationsMixin):
     warn_on_missing_table = False
 
@@ -51,6 +50,9 @@ class PostgresRepository(SqlAlchemyTableOperationsMixin):
         self.session = self.session_factory
         self.insert_batch_size = settings.insert_batch_size
 
-    # -------------------------------------------------------------------------
-    def _insert_statement(self, table_cls: type[Any], records: list[dict[str, object]]) -> Any:
+    def _insert_statement(
+        self,
+        table_cls: type[Any],
+        records: list[dict[str, object]],
+    ) -> Any:
         return postgres_insert(table_cls).values(records)
