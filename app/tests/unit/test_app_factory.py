@@ -137,6 +137,11 @@ def test_runtime_startup_syncs_vectors_when_enabled(monkeypatch) -> None:
         "run_startup_validations",
         lambda settings: call_order.append("run_startup_validations"),
     )
+    monkeypatch.setattr(
+        app_module,
+        "_start_vector_sync_thread",
+        lambda application: call_order.append("_start_vector_sync_thread"),
+    )
 
     with TestClient(app_module.create_app()):
         pass
@@ -147,7 +152,7 @@ def test_runtime_startup_syncs_vectors_when_enabled(monkeypatch) -> None:
         "build_chat_runtime",
         "settings_service.get_settings",
         "run_startup_validations",
-        "vector_indexer.sync",
+        "_start_vector_sync_thread",
     ]
 
 

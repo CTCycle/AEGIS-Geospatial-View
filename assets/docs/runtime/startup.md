@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Local Development Via Launcher
 
@@ -10,6 +10,8 @@ start_on_windows.bat
 ```
 
 The launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds when needed, and starts backend and frontend services.
+
+Backend readiness does not wait for vector index synchronization. When `vectors.auto_sync_on_start` is enabled, vector sync runs in the background after startup; vector retrieval still bootstraps the index lazily if needed.
 
 ## Local Development Manual
 
