@@ -17,8 +17,6 @@ from server.common.constants import (
     CHAT_SETTINGS_ROUTE,
     CHAT_STREAM_ROUTE,
     CHAT_TURN_ROUTE,
-    CHAT_VECTORS_REBUILD_ROUTE,
-    CHAT_VECTORS_SYNC_ROUTE,
 )
 from server.domain.chat import (
     ChatStreamEvent,
@@ -31,7 +29,6 @@ from server.domain.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,
-    VectorizationResponse,
 )
 from server.services.chat.composition import ChatRuntime
 from server.services.chat.settings_service import ChatSettingsValidationError
@@ -187,30 +184,6 @@ def pull_ollama_model(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc) or "Ollama pull failed",
         ) from exc
-
-
-###############################################################################
-@router.post(
-    CHAT_VECTORS_REBUILD_ROUTE,
-    response_model=VectorizationResponse,
-    status_code=status.HTTP_200_OK,
-)
-def rebuild_vectors(
-    runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> VectorizationResponse:
-    return runtime.maintenance_service.rebuild_vectors()
-
-
-###############################################################################
-@router.post(
-    CHAT_VECTORS_SYNC_ROUTE,
-    response_model=VectorizationResponse,
-    status_code=status.HTTP_200_OK,
-)
-def sync_vectors(
-    runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> VectorizationResponse:
-    return runtime.maintenance_service.sync_vectors()
 
 
 ###############################################################################

@@ -84,15 +84,6 @@ class ChatRuntimeSettings:
 
 ###############################################################################
 @dataclass(frozen=True)
-class VectorRuntimeSettings:
-    auto_sync_on_start: bool
-    default_ollama_embedding_model: str
-    default_openai_embedding_model: str
-    default_google_embedding_model: str
-
-
-###############################################################################
-@dataclass(frozen=True)
 class OpenMeteoSettings:
     weather_base_url: str
     air_quality_base_url: str
@@ -157,7 +148,6 @@ class ServerSettings:
     map: MapSettings
     jobs: JobsSettings
     chat: ChatRuntimeSettings
-    vectors: VectorRuntimeSettings
     openmeteo: OpenMeteoSettings
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
@@ -231,14 +221,6 @@ class JsonChatRuntimeSettings(BaseModel):
     max_history_messages: int = Field(default=12, ge=1, le=100)
     parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     parser_max_retries: int = Field(default=2, ge=0, le=5)
-
-
-###############################################################################
-class JsonVectorRuntimeSettings(BaseModel):
-    auto_sync_on_start: bool = True
-    default_ollama_embedding_model: str = "nomic-embed-text"
-    default_openai_embedding_model: str = "text-embedding-3-small"
-    default_google_embedding_model: str = "text-embedding-004"
 
 
 ###############################################################################
@@ -346,9 +328,6 @@ class AppSettings(BaseSettings):
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
     jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
     chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
-    vectors: JsonVectorRuntimeSettings = Field(
-        default_factory=JsonVectorRuntimeSettings
-    )
     openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
     overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
     rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)
@@ -414,12 +393,6 @@ class AppSettings(BaseSettings):
                 max_history_messages=self.chat.max_history_messages,
                 parser_certainty_threshold=self.chat.parser_certainty_threshold,
                 parser_max_retries=self.chat.parser_max_retries,
-            ),
-            vectors=VectorRuntimeSettings(
-                auto_sync_on_start=self.vectors.auto_sync_on_start,
-                default_ollama_embedding_model=self.vectors.default_ollama_embedding_model,
-                default_openai_embedding_model=self.vectors.default_openai_embedding_model,
-                default_google_embedding_model=self.vectors.default_google_embedding_model,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,

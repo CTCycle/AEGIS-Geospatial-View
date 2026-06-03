@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from playwright.sync_api import APIRequestContext, Error as PlaywrightError
+from playwright.sync_api import APIRequestContext
 
 
 def _post(api_context: APIRequestContext, path: str, payload: dict):
@@ -75,7 +75,7 @@ def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) 
         assert "active_provider_mode" in body
 
 
-def test_chat_models_and_vectors_sync_rebuild_with_prefix_parity(
+def test_chat_models_with_prefix_parity(
     api_context: APIRequestContext,
 ) -> None:
     models_base = _get(api_context, "/api/chat/models")
@@ -86,24 +86,6 @@ def test_chat_models_and_vectors_sync_rebuild_with_prefix_parity(
     assert isinstance(base_body.get("cloud"), list)
     assert isinstance(base_body.get("local"), list)
     assert set(base_body.keys()) == set(prefixed_body.keys())
-
-    try:
-        sync_base = _post(api_context, "/api/chat/vectors/sync", {})
-        sync_prefixed = _post(api_context, "/api/chat/vectors/sync", {})
-    except PlaywrightError as exc:
-        pytest.skip(f"Vector sync unavailable or timed out ({exc})")
-    assert sync_base.ok and sync_prefixed.ok
-    assert "indexed_documents" in sync_base.json()
-    assert set(sync_base.json().keys()) == set(sync_prefixed.json().keys())
-
-    try:
-        rebuild_base = _post(api_context, "/api/chat/vectors/rebuild", {})
-        rebuild_prefixed = _post(api_context, "/api/chat/vectors/rebuild", {})
-    except PlaywrightError as exc:
-        pytest.skip(f"Vector rebuild unavailable or timed out ({exc})")
-    assert rebuild_base.ok and rebuild_prefixed.ok
-    assert rebuild_base.json().get("indexed_documents", 0) >= 0
-    assert set(rebuild_base.json().keys()) == set(rebuild_prefixed.json().keys())
 
 
 def test_chat_turn_stream_event_order_and_contract_parity(

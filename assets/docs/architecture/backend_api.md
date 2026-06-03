@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Mounting
 
@@ -70,7 +70,3 @@ Defined in `app/server/api/chat.py`:
   Pulls an Ollama model.
 - `GET /api/chat/models/ollama/health`
   Checks Ollama availability.
-- `POST /api/chat/vectors/rebuild`
-  Rebuilds the vector index.
-- `POST /api/chat/vectors/sync`
-  Syncs vectors with manifests.

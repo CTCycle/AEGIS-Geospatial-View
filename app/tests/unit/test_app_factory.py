@@ -10,10 +10,9 @@ import server.app as app_module
 from server.common.constants import FASTAPI_API_PREFIX
 
 
-def _settings(auto_sync: bool = False):  # noqa: ANN202
+def _settings():  # noqa: ANN202
     return SimpleNamespace(
         database=SimpleNamespace(database_path="test.db", insert_batch_size=1000),
-        vectors=SimpleNamespace(auto_sync_on_start=auto_sync),
         credential_master_key="dev-key",
         credential_key_version="v1",
     )
@@ -24,19 +23,15 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
         settings_service=SimpleNamespace(
             get_settings=lambda: call_order.append("settings_service.get_settings")
         ),
-        vector_indexer=SimpleNamespace(
-            sync=lambda: call_order.append("vector_indexer.sync")
-        ),
+        maintenance_service=SimpleNamespace(),
     )
 
 
-def _mock_lifespan_dependencies(monkeypatch, *, auto_sync: bool = False) -> None:
+def _mock_lifespan_dependencies(monkeypatch) -> None:
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime([])
 
-    monkeypatch.setattr(
-        app_module, "get_server_settings", lambda: _settings(auto_sync=auto_sync)
-    )
+    monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(app_module, "initialize_database", lambda settings: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
     monkeypatch.setattr(
@@ -72,7 +67,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime(call_order)
 
-    monkeypatch.setattr(app_module, "get_server_settings", lambda: _settings())
+    monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(
         app_module,
         "initialize_database",
@@ -108,51 +103,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "build_chat_runtime",
         "settings_service.get_settings",
         "run_startup_validations",
-    ]
-
-
-def test_runtime_startup_syncs_vectors_when_enabled(monkeypatch) -> None:
-    call_order: list[str] = []
-    search_runtime = SimpleNamespace(search_orchestrator=object())
-    chat_runtime = _build_chat_runtime(call_order)
-
-    monkeypatch.setattr(app_module, "get_server_settings", lambda: _settings(auto_sync=True))
-    monkeypatch.setattr(
-        app_module,
-        "initialize_database",
-        lambda settings: call_order.append("initialize_database"),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "build_search_runtime",
-        lambda: call_order.append("build_search_runtime") or search_runtime,
-    )
-    monkeypatch.setattr(
-        app_module,
-        "build_chat_runtime",
-        lambda orchestrator: call_order.append("build_chat_runtime") or chat_runtime,
-    )
-    monkeypatch.setattr(
-        app_module,
-        "run_startup_validations",
-        lambda settings: call_order.append("run_startup_validations"),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "_start_vector_sync_thread",
-        lambda application: call_order.append("_start_vector_sync_thread"),
-    )
-
-    with TestClient(app_module.create_app()):
-        pass
-
-    assert call_order == [
-        "initialize_database",
-        "build_search_runtime",
-        "build_chat_runtime",
-        "settings_service.get_settings",
-        "run_startup_validations",
-        "_start_vector_sync_thread",
     ]
 
 

@@ -58,7 +58,6 @@ export interface CapabilityDescriptor {
   data_format?: string;
   geometry_type?: string;
   queryable?: boolean;
-  vectorizable?: boolean;
   endpoint_health?: string;
   auth_mode?: string;
   official_docs_url?: string;
@@ -460,10 +459,4 @@ export interface OllamaHealthResponse {
 
 export interface GenericObjectResponse {
   [key: string]: unknown;
-}
-
-export interface VectorizationResponse {
-  status: string;
-  indexed_documents: number;
-  vector_path: string;
 }

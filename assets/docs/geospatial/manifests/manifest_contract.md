@@ -1,6 +1,6 @@
 # Manifest Contract
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Loader Contract
 
@@ -26,7 +26,6 @@ Every metadata object must expose:
 - `data_format`
 - `geometry_type`
 - `queryable`
-- `vectorizable`
 - `endpoint_health`
 - `auth_mode`
 - `rate_limit_notes`
@@ -35,7 +34,7 @@ Every metadata object must expose:
 
 - Schema v2 is the only accepted manifest contract.
 - Credential-backed providers use encrypted credential storage with environment fallback.
-- Queryable and vectorizable claims are reserved for structured machine-readable sources.
+- Queryable claims are reserved for structured machine-readable sources.
 - `metadata-only` capabilities must not claim renderable geometry.
 - Disabled or broken layers must remain unavailable until manifest, runtime, credentials, and health allow rendering.
 - OpenLayers-compatible source protocols are the manifest standard even though the current UI renderer is MapLibre.

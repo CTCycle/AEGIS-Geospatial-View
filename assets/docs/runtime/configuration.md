@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Environment File
 
@@ -22,7 +22,7 @@ Common keys include:
 - database mode and connection settings
 - job polling interval
 - geospatial bounds and service tuning
-- chat and vector defaults
+- chat defaults
 - provider-specific request tuning
 
 ## Profile Differences

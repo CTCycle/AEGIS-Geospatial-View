@@ -32,19 +32,6 @@ def test_all_manifest_entries_expose_source_traits() -> None:
                     missing.append(f"{collection_name}:{item['id']}:metadata.{field}")
     assert not missing
 
-
-def test_queryable_vector_claims_are_consistent() -> None:
-    payload = GeospatialManifestLoader().load_all()
-    invalid: list[str] = []
-    for item in payload["overlays"]:
-        metadata = dict(item.get("metadata") or {})
-        if metadata.get("vectorizable") and not metadata.get("queryable"):
-            invalid.append(str(item["id"]))
-        if metadata.get("vectorizable") and "json" not in str(metadata.get("data_format", "")).lower():
-            invalid.append(str(item["id"]))
-    assert not invalid
-
-
 def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypatch) -> None:
     monkeypatch.delenv("OPENAQ_API_KEY", raising=False)
     monkeypatch.delenv("FRED_API_KEY", raising=False)
