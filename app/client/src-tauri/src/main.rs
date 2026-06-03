@@ -186,19 +186,21 @@ fn resolve_workspace_layout(candidate: &Path) -> Option<WorkspaceLayout> {
         });
     }
 
-    let packaged_root = candidate.join("r");
-    let packaged_server_dir = packaged_root.join("server");
-    if packaged_server_dir.join("pyproject.toml").is_file()
-        && packaged_server_dir.join("app.py").is_file()
-    {
-        return Some(WorkspaceLayout {
-            workspace_root: candidate.to_path_buf(),
-            python_path_root: packaged_root.clone(),
-            project_dir: packaged_server_dir,
-            settings_dir: packaged_root.join("settings"),
-            resources_dir: packaged_root.join("resources"),
-            runtimes_dir: packaged_root.join("runtimes"),
-        });
+    for packaged_dir_name in ["r", "runtime"] {
+        let packaged_root = candidate.join(packaged_dir_name);
+        let packaged_server_dir = packaged_root.join("server");
+        if packaged_server_dir.join("pyproject.toml").is_file()
+            && packaged_server_dir.join("app.py").is_file()
+        {
+            return Some(WorkspaceLayout {
+                workspace_root: candidate.to_path_buf(),
+                python_path_root: packaged_root.clone(),
+                project_dir: packaged_server_dir,
+                settings_dir: packaged_root.join("settings"),
+                resources_dir: packaged_root.join("resources"),
+                runtimes_dir: packaged_root.join("runtimes"),
+            });
+        }
     }
 
     None
