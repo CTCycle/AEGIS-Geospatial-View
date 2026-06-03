@@ -3,7 +3,7 @@ from __future__ import annotations
 from server.domain.agent.decision import ResolvedLocation
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
+###############################################################################
 class CoverageService:
     def __init__(self, *, runtime_registry: RuntimeRegistry) -> None:
         self.runtime_registry = runtime_registry

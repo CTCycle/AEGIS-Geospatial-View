@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-
+###############################################################################
 @dataclass(frozen=True)
 class EndpointValidationResult:
     capability_id: str
@@ -15,7 +15,7 @@ class EndpointValidationResult:
     data_format: str
     message: str
 
-
+###############################################################################
 class EndpointValidationService:
     """Performs sampled, read-only health checks for manifest endpoints."""
 

@@ -36,11 +36,11 @@ type BBox = list[float]
 
 type LayerStore = dict[str, LayerMetadata]
 
-
+###############################################################################
 def clamp(value: float, lower: float, upper: float) -> float:
     return max(min(value, upper), lower)
 
-
+###############################################################################
 class GIBSRuntimeMixin:
     def normalize_bbox(
         self,

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 type BBox = list[float]
 type LayerStore = dict[str, object]
 
-
+###############################################################################
 class CapabilitiesCache:
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
@@ -258,6 +258,4 @@ class GIBSService(GIBSRuntimeMixin):
             raise last_error
         raise GIBSRequestError("GIBS GetMap failed without a usable fallback date.")
 
-    # -------------------------------------------------------------------------
-
-
+    

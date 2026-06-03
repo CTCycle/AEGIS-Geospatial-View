@@ -5,7 +5,7 @@ from typing import Any
 
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
+###############################################################################
 @dataclass(frozen=True)
 class CapabilityRegistrySnapshot:
     providers: list[dict[str, Any]]
@@ -15,7 +15,7 @@ class CapabilityRegistrySnapshot:
     transit: list[dict[str, Any]]
     tools: list[dict[str, Any]]
 
-
+###############################################################################
 class CapabilityRegistry:
     def __init__(self, *, manifest_loader: GeospatialManifestLoader | None = None) -> None:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
