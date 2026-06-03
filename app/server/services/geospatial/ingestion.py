@@ -8,18 +8,18 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 from urllib.parse import urlparse
 
-
+###############################################################################
 class IngestionManifestError(ValueError):
     """Raised when a downloadable dataset manifest is incomplete."""
 
-
+###############################################################################
 class IngestionExecutionError(RuntimeError):
     """Raised when an ingestion plan cannot be executed."""
 
-
+###############################################################################
 @dataclass(frozen=True)
 class DatasetIngestionPlan:
     capability_id: str
@@ -40,7 +40,7 @@ class DatasetIngestionPlan:
     field_map: dict[str, str] | None = None
     validation: dict[str, Any] | None = None
 
-
+###############################################################################
 @dataclass(frozen=True)
 class DatasetIngestionResult:
     capability_id: str
@@ -65,7 +65,7 @@ REQUIRED_DOWNLOAD_FIELDS = {
 
 REQUIRED_STORAGE_FIELDS = {"rawPath", "normalizedPath", "tilePath"}
 
-
+###############################################################################
 def build_ingestion_plan(manifest: dict[str, Any]) -> DatasetIngestionPlan:
     if manifest.get("capabilityKind") != "dataset-ingestion":
         raise IngestionManifestError("Manifest is not a dataset-ingestion capability.")
@@ -98,7 +98,7 @@ def build_ingestion_plan(manifest: dict[str, Any]) -> DatasetIngestionPlan:
         validation=dict(manifest.get("validation") or {}),
     )
 
-
+###############################################################################
 def validate_ingestion_manifest(manifest: dict[str, Any]) -> list[str]:
     try:
         build_ingestion_plan(manifest)
@@ -106,7 +106,7 @@ def validate_ingestion_manifest(manifest: dict[str, Any]) -> list[str]:
         return [str(exc)]
     return []
 
-
+###############################################################################
 def execute_ingestion_plan(
     plan: DatasetIngestionPlan,
     *,
@@ -199,14 +199,14 @@ def execute_ingestion_plan(
         warnings=warnings,
     )
 
-
+###############################################################################
 def _required_dict(manifest: dict[str, Any], field_name: str) -> dict[str, Any]:
     value = manifest.get(field_name)
     if not isinstance(value, dict):
         raise IngestionManifestError(f"{field_name} must be an object.")
     return value
 
-
+###############################################################################
 def _require_fields(payload: dict[str, Any], fields: set[str], prefix: str) -> None:
     missing = sorted(field for field in fields if field not in payload)
     if missing:
@@ -214,14 +214,14 @@ def _require_fields(payload: dict[str, Any], fields: set[str], prefix: str) -> N
             f"{prefix} is missing required fields: {', '.join(missing)}"
         )
 
-
+###############################################################################
 def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
     return text or None
 
-
+###############################################################################
 def _safe_output_dir(root: Path, configured_path: str) -> Path:
     path = Path(configured_path)
     if path.is_absolute():
@@ -232,7 +232,7 @@ def _safe_output_dir(root: Path, configured_path: str) -> Path:
         raise IngestionExecutionError("Ingestion storage path escapes the workspace root.")
     return resolved
 
-
+###############################################################################
 def _materialize_source(plan: DatasetIngestionPlan, raw_dir: Path) -> Path:
     direct_source = Path(plan.source_url)
     if direct_source.exists():
@@ -256,7 +256,7 @@ def _materialize_source(plan: DatasetIngestionPlan, raw_dir: Path) -> Path:
         return destination
     raise IngestionExecutionError(f"Unsupported source URL scheme: {parsed.scheme}")
 
-
+###############################################################################
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -264,7 +264,7 @@ def _sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-
+###############################################################################
 def _resolve_checksum_url(plan: DatasetIngestionPlan) -> str | None:
     if not plan.checksum_url:
         return None
@@ -285,7 +285,7 @@ def _resolve_checksum_url(plan: DatasetIngestionPlan) -> str | None:
             return candidate
     raise IngestionExecutionError(f"Checksum URL did not contain a SHA-256 digest for {plan.capability_id}.")
 
-
+###############################################################################
 def _normalize_csv(
     plan: DatasetIngestionPlan, raw_file: Path, normalized_dir: Path
 ) -> tuple[Path, int]:
@@ -321,7 +321,7 @@ def _normalize_csv(
     _write_json(output, {"type": "FeatureCollection", "features": features})
     return output, len(features)
 
-
+###############################################################################
 def _normalize_geojson(
     plan: DatasetIngestionPlan, raw_file: Path, normalized_dir: Path
 ) -> tuple[Path, int, int]:
@@ -339,7 +339,7 @@ def _normalize_geojson(
     _write_json(output, {"type": "FeatureCollection", "features": valid_features})
     return output, len(valid_features), invalid_count
 
-
+###############################################################################
 def _first_float(row: dict[str, str], field_names: tuple[str, ...]) -> float | None:
     lowered = {key.lower(): value for key, value in row.items()}
     for field_name in field_names:
@@ -357,7 +357,7 @@ def _first_float(row: dict[str, str], field_names: tuple[str, ...]) -> float | N
         return parsed
     return None
 
-
+###############################################################################
 def _validate_feature_count(plan: DatasetIngestionPlan, feature_count: int) -> None:
     validation = plan.validation or {}
     minimum = validation.get("minFeatureCount")
@@ -366,7 +366,7 @@ def _validate_feature_count(plan: DatasetIngestionPlan, feature_count: int) -> N
             f"{plan.capability_id} produced {feature_count} features; expected at least {minimum}."
         )
 
-
+###############################################################################
 def _validate_bbox_intersection(plan: DatasetIngestionPlan, normalized_file: Path | None) -> None:
     validation = plan.validation or {}
     expected_bbox = validation.get("bboxMustIntersect")
@@ -388,7 +388,7 @@ def _validate_bbox_intersection(plan: DatasetIngestionPlan, normalized_file: Pat
             f"required bbox {expected_bbox}."
         )
 
-
+###############################################################################
 def _write_spatial_index(normalized_file: Path, normalized_dir: Path) -> Path:
     payload = json.loads(normalized_file.read_text(encoding="utf-8"))
     bounds = _feature_collection_bounds(payload)
@@ -398,7 +398,7 @@ def _write_spatial_index(normalized_file: Path, normalized_dir: Path) -> Path:
     _write_json(output, {"bbox": bounds, "indexType": "bbox-summary"})
     return output
 
-
+###############################################################################
 def _feature_collection_bounds(payload: dict[str, Any]) -> list[float] | None:
     bounds = [180.0, 90.0, -180.0, -90.0]
     for feature in payload.get("features", []):
@@ -414,7 +414,7 @@ def _feature_collection_bounds(payload: dict[str, Any]) -> list[float] | None:
         return None
     return bounds
 
-
+###############################################################################
 def _bboxes_intersect(left: list[float], right: list[float]) -> bool:
     return not (
         left[2] < right[0]
@@ -423,7 +423,7 @@ def _bboxes_intersect(left: list[float], right: list[float]) -> bool:
         or right[3] < left[1]
     )
 
-
+###############################################################################
 def _write_text_index(normalized_file: Path, normalized_dir: Path) -> Path:
     payload = json.loads(normalized_file.read_text(encoding="utf-8"))
     terms: dict[str, list[str]] = {}
@@ -439,7 +439,7 @@ def _write_text_index(normalized_file: Path, normalized_dir: Path) -> Path:
     _write_json(output, {"indexType": "term-to-feature", "terms": terms})
     return output
 
-
+###############################################################################
 def _write_tile_manifest(
     plan: DatasetIngestionPlan, normalized_file: Path | None, tile_dir: Path, feature_count: int
 ) -> Path:
@@ -456,13 +456,13 @@ def _write_tile_manifest(
     )
     return output
 
-
+###############################################################################
 def _is_point(value: Any) -> bool:
     return isinstance(value, list) and len(value) >= 2 and all(
         isinstance(item, int | float) for item in value[:2]
     )
 
-
+###############################################################################
 def _valid_geometry(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
@@ -499,8 +499,8 @@ def _valid_geometry(value: Any) -> bool:
         )
     return False
 
-
-def _iter_coordinate_pairs(value: Any):
+###############################################################################
+def _iter_coordinate_pairs(value: Any) -> Generator[tuple[float, float] | Any, Any, None]:
     if _is_coordinate_pair(value):
         yield float(value[0]), float(value[1])
         return
@@ -509,13 +509,13 @@ def _iter_coordinate_pairs(value: Any):
     for item in value:
         yield from _iter_coordinate_pairs(item)
 
-
+###############################################################################
 def _is_coordinate_pair(value: Any) -> bool:
     if not _is_point(value):
         return False
     lon, lat = float(value[0]), float(value[1])
     return -180 <= lon <= 180 and -90 <= lat <= 90
 
-
+###############################################################################
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
