@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Relational Storage
 
@@ -21,7 +21,6 @@ Core relational storage covers:
 - chat sessions and messages
 - model provider settings
 - encrypted model credentials
-- GIBS metadata
 - manifest embedding records
 - seeded geospatial reference data
 

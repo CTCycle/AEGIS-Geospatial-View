@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import threading
 import time
 from collections import OrderedDict
@@ -8,9 +7,7 @@ from typing import Any
 from typing import TYPE_CHECKING
 
 from server.configurations import get_server_settings
-from server.domain.gibs import Capabilities, LayerCatalogEntry
-from server.common.constants import GIBS_LAYERS_TABLE
-from server.common.logger import logger
+from server.domain.gibs import Capabilities
 from server.services.catalog.reference_repository import ReferenceCatalogRepository
 from server.services.geospatial.gibs_errors import GIBSRequestError
 from server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
@@ -117,7 +114,6 @@ class GIBSService(GIBSRuntimeMixin):
         self.reference_repository = (
             reference_repository or ReferenceCatalogRepository(self.database)
         )
-        self.layer_catalog = self.load_layer_catalog()
         try:
             self.layer_native_resolution_m = (
                 self.reference_repository.load_gibs_layer_native_resolution_map()
@@ -132,76 +128,7 @@ class GIBSService(GIBSRuntimeMixin):
         self.nasa_attribution = settings.nasa_attribution
 
     # -------------------------------------------------------------------------
-    def load_layer_catalog(self) -> dict[str, LayerCatalogEntry]:
-        try:
-            rows = self.database.load_from_database(GIBS_LAYERS_TABLE)
-        except Exception as exc:  # pragma: no cover - database access failures
-            logger.warning("Unable to load GIBS layer metadata: %s", exc)
-            return {}
-        if not rows:
-            return {}
-        catalog: dict[str, LayerCatalogEntry] = {}
-        for row in rows:
-            layer_id = str(row.get("layer_id") or "").strip()
-            if not layer_id:
-                continue
-            projections = self.parse_projection_entries(row.get("projections"))
-            meters_per_pixel = self.parse_meters_per_pixel(row.get("meters_per_pixel"))
-            catalog[layer_id] = LayerCatalogEntry(
-                name=layer_id,
-                projections=frozenset(projections),
-                meters_per_pixel=tuple(meters_per_pixel),
-            )
-        return catalog
-
-    # -------------------------------------------------------------------------
-    def parse_projection_entries(self, payload: Any) -> list[str]:
-        entries = self.parse_sequence(payload)
-        projections: list[str] = []
-        for value in entries:
-            normalized = str(value).strip().upper()
-            if normalized:
-                projections.append(normalized)
-        return projections
-
-    # -------------------------------------------------------------------------
-    def parse_meters_per_pixel(self, payload: Any) -> list[float]:
-        entries = self.parse_sequence(payload)
-        resolutions: list[float] = []
-        for value in entries:
-            try:
-                parsed = float(value)
-            except (TypeError, ValueError):
-                continue
-            if parsed > 0:
-                resolutions.append(parsed)
-        return resolutions
-
-    # -------------------------------------------------------------------------
-    def parse_sequence(self, payload: Any) -> list[Any]:
-        if payload is None:
-            return []
-        if isinstance(payload, str):
-            try:
-                parsed = json.loads(payload)
-            except json.JSONDecodeError:
-                return []
-            if isinstance(parsed, list):
-                return list(parsed)
-            return []
-        if isinstance(payload, (list, tuple)):
-            return list(payload)
-        return []
-
-    # -------------------------------------------------------------------------
-    def get_layer_metadata(self, layer: str) -> LayerCatalogEntry | None:
-        return self.layer_catalog.get(layer)
-
-    # -------------------------------------------------------------------------
     def resolve_layer_meters_per_pixel(self, layer: str) -> tuple[float, ...]:
-        metadata = self.get_layer_metadata(layer)
-        if metadata and metadata.meters_per_pixel:
-            return metadata.meters_per_pixel
         fallback = self.layer_native_resolution_m.get(layer)
         return (fallback,) if fallback else tuple()
 
