@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
@@ -10,9 +9,6 @@ from server.services.geospatial.osm_tiles import OsmTileProxyService
 from server.services.jobs import JobManager
 from server.services.search.execution import MapSearchExecutionService
 from server.services.search.orchestrator import LocationSearchOrchestrator
-
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
 
 
 @dataclass(frozen=True)
@@ -24,7 +20,6 @@ class SearchRuntime:
 
 
 def build_search_runtime(
-    database: DatabaseBackend | None = None,
     job_manager: JobManager | None = None,
 ) -> SearchRuntime:
     capability_registry = CapabilityRegistry()

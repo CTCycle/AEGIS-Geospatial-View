@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Layering
 
@@ -17,9 +17,11 @@ AEGIS uses these main backend layers:
 - API routes translate service exceptions into HTTP responses.
 - Services do not import FastAPI.
 - Repositories remain the persistence boundary.
+- `app/server/repositories/database/contracts.py` defines the shared database backend contract.
 - `domain/` holds request, response, and domain contracts.
 - Runtime job state is owned by `app/server/services/job_state.py`.
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
+- Static reference catalog loading, lookup, and seeding live under `app/server/repositories/catalog/`.
 
 ## Representative Request Flow
 
@@ -34,6 +36,8 @@ Geospatial routes typically flow:
 - `GeospatialApiService`
 - provider/runtime services
 - manifest or database repositories when required
+
+Geospatial API services are composed during application startup and accessed through `app.state.geospatial_runtime`.
 
 ## Chat Orchestration Pipeline
 

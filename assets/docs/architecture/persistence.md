@@ -27,6 +27,7 @@ Core relational storage covers:
 ## Reference Catalog Policy
 
 - Static reference data belongs under `app/resources/catalog/reference`.
+- Reference catalog loading, lookup, and startup seeding belong under `app/server/repositories/catalog/`.
 - New catalog/reference constants should not be hardcoded in `app/server/common/constants.py`.
 - Startup seeds empty reference tables from catalog files exactly once per table group.
 

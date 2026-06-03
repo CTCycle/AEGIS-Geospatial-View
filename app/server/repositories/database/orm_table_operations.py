@@ -14,7 +14,9 @@ class SqlAlchemyTableOperationsMixin:
     insert_batch_size: int
     warn_on_missing_table: bool = False
 
-    def _insert_statement(self, table_cls: type[Any], records: list[dict[str, object]]) -> Any:
+    def _insert_statement(
+        self, table_cls: type[Any], records: list[dict[str, object]]
+    ) -> Any:
         raise NotImplementedError
 
     def get_table_class(self, table_name: str) -> Any:
@@ -33,7 +35,9 @@ class SqlAlchemyTableOperationsMixin:
                 return list(constraint.columns.keys())
         raise ValueError(f"No unique constraint found for {table_cls.__name__}")
 
-    def _normalize_record(self, table_cls: Any, record: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_record(
+        self, table_cls: Any, record: dict[str, Any]
+    ) -> dict[str, Any]:
         column_payload: dict[str, Any] = {}
         for column in table_cls.__table__.columns:
             if column.name not in record:
@@ -54,7 +58,9 @@ class SqlAlchemyTableOperationsMixin:
         table_cls = self.get_table_class(table_name)
         return [column.name for column in table_cls.__table__.columns]
 
-    def upsert_into_database(self, records: list[dict[str, Any]], table_name: str) -> None:
+    def upsert_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None:
         if not records:
             return
         table_cls = self.get_table_class(table_name)

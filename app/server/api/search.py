@@ -63,9 +63,7 @@ def get_search_execution(request: Request) -> MapSearchExecutionService:
 async def get_catalog(
     search_execution: MapSearchExecutionService = Depends(get_search_execution),
 ) -> GeospatialCatalogResponse:
-    return GeospatialCatalogResponse.model_validate(
-        await search_execution.get_catalog()
-    )
+    return await search_execution.get_catalog()
 
 
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)

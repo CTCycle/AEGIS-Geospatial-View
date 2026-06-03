@@ -4,19 +4,18 @@ import threading
 import time
 from collections import OrderedDict
 from typing import Any
-from typing import TYPE_CHECKING
 
 from server.configurations import get_server_settings
 from server.domain.gibs import Capabilities
-from server.services.catalog.reference_repository import ReferenceCatalogRepository
+from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
+from server.repositories.database import get_database
+from server.repositories.database.contracts import DatabaseBackend
 from server.services.geospatial.gibs_errors import GIBSRequestError
 from server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
 
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
-
 type BBox = list[float]
 type LayerStore = dict[str, object]
+
 
 ###############################################################################
 class CapabilitiesCache:
@@ -106,24 +105,17 @@ class GIBSService(GIBSRuntimeMixin):
             if min_visual_radius_m is not None
             else settings.min_visual_radius_m
         )
-        if database is None:
-            from server.repositories.database.backend import get_database
-
-            database = get_database().backend
-        self.database = database
-        self.reference_repository = (
-            reference_repository or ReferenceCatalogRepository(self.database)
+        resolved_database = database or get_database().backend
+        self.database = resolved_database
+        self.reference_repository = reference_repository or ReferenceCatalogRepository(
+            resolved_database
         )
-        try:
-            self.layer_native_resolution_m = (
-                self.reference_repository.load_gibs_layer_native_resolution_map()
-            )
-            self.layer_date_fallback_days = (
-                self.reference_repository.load_gibs_layer_date_fallback_days_map()
-            )
-        except Exception:  # pragma: no cover - uninitialized database
-            self.layer_native_resolution_m = {}
-            self.layer_date_fallback_days = {}
+        self.layer_native_resolution_m = (
+            self.reference_repository.load_gibs_layer_native_resolution_map()
+        )
+        self.layer_date_fallback_days = (
+            self.reference_repository.load_gibs_layer_date_fallback_days_map()
+        )
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
@@ -257,5 +249,3 @@ class GIBSService(GIBSRuntimeMixin):
         if last_error is not None:
             raise last_error
         raise GIBSRequestError("GIBS GetMap failed without a usable fallback date.")
-
-    

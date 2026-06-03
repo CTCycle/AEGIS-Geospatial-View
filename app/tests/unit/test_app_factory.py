@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -27,15 +26,23 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
     )
 
 
+def _build_geospatial_runtime() -> SimpleNamespace:
+    return SimpleNamespace(api_service=object())
+
+
 def _mock_lifespan_dependencies(monkeypatch) -> None:
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime([])
+    geospatial_runtime = _build_geospatial_runtime()
 
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(app_module, "initialize_database", lambda settings: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
     monkeypatch.setattr(
         app_module, "build_chat_runtime", lambda orchestrator: chat_runtime
+    )
+    monkeypatch.setattr(
+        app_module, "build_geospatial_runtime", lambda: geospatial_runtime
     )
     monkeypatch.setattr(app_module, "run_startup_validations", lambda settings: None)
 
@@ -66,6 +73,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
     search_runtime = SimpleNamespace(search_orchestrator=object())
     chat_runtime = _build_chat_runtime(call_order)
+    geospatial_runtime = _build_geospatial_runtime()
 
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(
@@ -85,6 +93,11 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         app_module,
+        "build_geospatial_runtime",
+        lambda: call_order.append("build_geospatial_runtime") or geospatial_runtime,
+    )
+    monkeypatch.setattr(
+        app_module,
         "run_startup_validations",
         lambda settings: call_order.append("run_startup_validations"),
     )
@@ -92,15 +105,18 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     created = app_module.create_app()
     assert not hasattr(created.state, "search_runtime")
     assert not hasattr(created.state, "chat_runtime")
+    assert not hasattr(created.state, "geospatial_runtime")
 
     with TestClient(created):
         assert created.state.search_runtime is search_runtime
         assert created.state.chat_runtime is chat_runtime
+        assert created.state.geospatial_runtime is geospatial_runtime
 
     assert call_order == [
         "initialize_database",
         "build_search_runtime",
         "build_chat_runtime",
+        "build_geospatial_runtime",
         "settings_service.get_settings",
         "run_startup_validations",
     ]
@@ -125,7 +141,9 @@ def test_create_app_redirects_root_to_docs_without_client_build(monkeypatch) -> 
     assert response.headers["location"] == "/docs"
 
 
-def test_create_app_serves_index_when_client_build_exists(monkeypatch, tmp_path) -> None:
+def test_create_app_serves_index_when_client_build_exists(
+    monkeypatch, tmp_path
+) -> None:
     index_path = tmp_path / "index.html"
     index_path.write_text("<html>spa</html>", encoding="utf-8")
 

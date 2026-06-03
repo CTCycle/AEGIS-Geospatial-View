@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from server.domain.catalog import ReferenceCatalog
+from server.repositories.catalog.reference_loader import load_reference_catalog
+from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.schemas import (
     ReferenceCountryAliasRecord,
     ReferenceCountryRecord,
@@ -14,10 +15,6 @@ from server.repositories.schemas import (
     ReferenceGibsLayerDefaultRecord,
     ReferenceGibsTileMatrixSetRecord,
 )
-from server.services.catalog.reference_loader import load_reference_catalog
-
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
 
 
 @dataclass(frozen=True)
@@ -29,7 +26,9 @@ class ReferenceSeedResult:
 
 
 class ReferenceCatalogSeeder:
-    def __init__(self, database: DatabaseBackend, catalog_root: Path | None = None) -> None:
+    def __init__(
+        self, database: DatabaseBackend, catalog_root: Path | None = None
+    ) -> None:
         self.database = database
         self.catalog_root = catalog_root
 
@@ -38,7 +37,9 @@ class ReferenceCatalogSeeder:
         return ReferenceSeedResult(
             countries_seeded=self._seed_countries_if_empty(catalog),
             geospatial_layers_seeded=self._seed_geospatial_layers_if_empty(catalog),
-            gibs_tile_matrix_sets_seeded=self._seed_gibs_tile_matrix_sets_if_empty(catalog),
+            gibs_tile_matrix_sets_seeded=self._seed_gibs_tile_matrix_sets_if_empty(
+                catalog
+            ),
             gibs_layer_defaults_seeded=self._seed_gibs_layer_defaults_if_empty(catalog),
         )
 

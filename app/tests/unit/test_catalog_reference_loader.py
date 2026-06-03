@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from server.services.catalog.reference_loader import get_catalog_root, load_reference_catalog
+from server.repositories.catalog.reference_loader import (
+    get_catalog_root,
+    load_reference_catalog,
+)
 
 
 def _write_json(path: Path, payload: dict) -> None:

@@ -8,7 +8,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from server.configurations import DatabaseSettings, get_server_settings
-from server.repositories.database.orm_table_operations import SqlAlchemyTableOperationsMixin
+from server.repositories.database.orm_table_operations import (
+    SqlAlchemyTableOperationsMixin,
+)
 from server.repositories.schemas import Base
 
 
@@ -34,5 +36,7 @@ class SQLiteRepository(SqlAlchemyTableOperationsMixin):
         Base.metadata.create_all(self.engine)
 
     # -------------------------------------------------------------------------
-    def _insert_statement(self, table_cls: type[object], records: list[dict[str, object]]):
+    def _insert_statement(
+        self, table_cls: type[object], records: list[dict[str, object]]
+    ):
         return sqlite_insert(table_cls).values(records)

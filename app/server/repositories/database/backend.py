@@ -1,37 +1,15 @@
 from __future__ import annotations
 
 from functools import cache
-from typing import Any, Protocol
+from typing import Any
 
 from server.configurations import get_server_settings
+from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.initializer import validate_postgres_schema
-from server.repositories.schemas import Base
 from server.repositories.database.postgres import PostgresRepository
+from server.repositories.schemas import Base
 from server.repositories.database.sqlite import SQLiteRepository
 
-
-###############################################################################
-class DatabaseBackend(Protocol):
-    db_path: str | None
-    engine: Any
-    session: Any
-
-    # -------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...
-
-    # -------------------------------------------------------------------------
-    def upsert_into_database(
-        self, records: list[dict[str, Any]], table_name: str
-    ) -> None: ...
-
-    # -------------------------------------------------------------------------
-    def count_rows(self, table_name: str) -> int: ...
-
-    # -------------------------------------------------------------------------
-    def count_records(self, model: type[Base]) -> int: ...
-
-    # -------------------------------------------------------------------------
-    def list_columns(self, table_name: str) -> list[str]: ...
 
 class AEGISDatabase:
     def __init__(self) -> None:
@@ -77,5 +55,3 @@ class AEGISDatabase:
 @cache
 def get_database() -> AEGISDatabase:
     return AEGISDatabase()
-
-

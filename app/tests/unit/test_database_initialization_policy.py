@@ -90,9 +90,7 @@ def test_initialize_database_uses_passed_database_settings(
     assert received == [settings]
 
 
-def test_initialize_database_defaults_to_server_settings(
-    monkeypatch, tmp_path
-) -> None:
+def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "default.db"),
         embedded_database=True,
@@ -204,7 +202,9 @@ def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
     assert created_tables == sorted(created_tables)
 
 
-def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch) -> None:
+def test_startup_path_seeds_reference_catalog_after_schema_creation(
+    monkeypatch,
+) -> None:
     call_order: list[str] = []
 
     class _Backend:
@@ -243,12 +243,22 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch)
             },
         )(),
     )
+    monkeypatch.setattr(
+        "server.app.build_geospatial_runtime",
+        lambda: type(
+            "GeospatialRuntime",
+            (),
+            {"api_service": object()},
+        )(),
+    )
     monkeypatch.setattr("server.app.run_startup_validations", lambda settings: None)
 
     app_module = __import__("server.app", fromlist=["app_lifespan"])
 
     async def _exercise() -> None:
-        async with app_module.app_lifespan(type("Application", (), {"state": type("State", (), {})()})()):
+        async with app_module.app_lifespan(
+            type("Application", (), {"state": type("State", (), {})()})()
+        ):
             pass
 
     __import__("asyncio").run(_exercise())

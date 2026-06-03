@@ -2,12 +2,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
 
-from server.services.catalog.reference_repository import ReferenceCatalogRepository
-
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
+from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
+from server.repositories.database.contracts import DatabaseBackend
 
 
 ###############################################################################
