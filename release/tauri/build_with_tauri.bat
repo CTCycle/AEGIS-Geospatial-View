@@ -142,11 +142,9 @@ md "%bundle_source_dir%\runtimes" >nul 2>&1
 
 call :copy_tree_filtered "%app_dir%\server" "%bundle_source_dir%\server"
 if errorlevel 1 exit /b 1
-call :copy_tree_filtered "%app_dir%\scripts" "%bundle_source_dir%\scripts"
+call :copy_runtime_settings "%repo_root%\settings" "%bundle_source_dir%\settings"
 if errorlevel 1 exit /b 1
-call :copy_tree_filtered "%repo_root%\settings" "%bundle_source_dir%\settings"
-if errorlevel 1 exit /b 1
-call :copy_tree_filtered "%app_dir%\resources" "%bundle_source_dir%\resources"
+call :copy_runtime_resources "%app_dir%\resources" "%bundle_source_dir%\resources"
 if errorlevel 1 exit /b 1
 call :copy_tree_filtered "%repo_root%\runtimes\python" "%bundle_source_dir%\runtimes\python"
 if errorlevel 1 exit /b 1
@@ -221,6 +219,50 @@ set "_COPY_DST=%~2"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$src=$env:_COPY_SRC; $dst=$env:_COPY_DST; $excluded=@('.venv','__pycache__','.pytest_cache','node_modules','.angular','dist','target','bundle','incremental','.mypy_cache'); if (-not (Test-Path -LiteralPath $src)) { exit 1 }; New-Item -ItemType Directory -Force -Path $dst | Out-Null; Get-ChildItem -LiteralPath $src -Force | Where-Object { $excluded -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $dst $_.Name) -Recurse -Force -ErrorAction Stop }; Get-ChildItem -LiteralPath $dst -Recurse -Filter *.pyc -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction Stop"
 if errorlevel 1 (
   echo [FATAL] Failed to stage "%~1" into "%~2".
+  exit /b 1
+)
+exit /b 0
+
+:copy_runtime_settings
+if not exist "%~1" (
+  echo [FATAL] Missing settings directory "%~1".
+  exit /b 1
+)
+md "%~2" >nul 2>&1
+if errorlevel 1 (
+  echo [FATAL] Failed to create settings bundle directory "%~2".
+  exit /b 1
+)
+call :copy_file "%~1\.env" "%~2\.env" "runtime environment file"
+if errorlevel 1 exit /b 1
+call :copy_file "%~1\configurations.json" "%~2\configurations.json" "runtime configurations"
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:copy_runtime_resources
+if not exist "%~1" (
+  echo [FATAL] Missing resources directory "%~1".
+  exit /b 1
+)
+md "%~2" >nul 2>&1
+if errorlevel 1 (
+  echo [FATAL] Failed to create resources bundle directory "%~2".
+  exit /b 1
+)
+call :copy_tree_filtered "%~1\catalog" "%~2\catalog"
+if errorlevel 1 exit /b 1
+call :copy_file "%~1\database.db" "%~2\database.db" "runtime sqlite database"
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:copy_file
+if not exist "%~1" (
+  echo [FATAL] Missing %~3 at "%~1".
+  exit /b 1
+)
+copy /Y "%~1" "%~2" >nul
+if errorlevel 1 (
+  echo [FATAL] Failed to copy %~3 to "%~2".
   exit /b 1
 )
 exit /b 0

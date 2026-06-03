@@ -34,7 +34,6 @@
     ],
     "resources": {
       "bundle-src/server": "r/server",
-      "bundle-src/scripts": "r/scripts",
       "bundle-src/settings": "r/settings",
       "bundle-src/resources": "r/resources",
       "bundle-src/runtimes/python": "r/runtimes/python",

@@ -36,3 +36,8 @@ Artifacts are exported to:
 
 - `release/windows/installers`
 - `release/windows/portable`
+
+Portable exports contain:
+
+- `aegis-desktop.exe`
+- `runtime/` with the bundled backend, settings, database seed, catalog, and embedded runtimes required at startup
