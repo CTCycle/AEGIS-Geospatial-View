@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -27,6 +29,8 @@ from server.repositories.database.initializer import initialize_database, seed_r
 from server.services.chat.composition import build_chat_runtime
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 def _client_build_available() -> bool:
@@ -61,6 +65,22 @@ def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
 
 
+def _start_vector_sync_thread(application: FastAPI) -> threading.Thread:
+    def _run_sync() -> None:
+        try:
+            application.state.chat_runtime.vector_indexer.sync()
+        except Exception:
+            LOGGER.exception("Background vector sync failed during application startup.")
+
+    thread = threading.Thread(
+        target=_run_sync,
+        name="aegis-vector-sync",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
@@ -80,7 +100,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     run_startup_validations(settings)
 
     if settings.vectors.auto_sync_on_start:
-        chat_runtime.vector_indexer.sync()
+        application.state.vector_sync_thread = _start_vector_sync_thread(application)
 
     yield
 
