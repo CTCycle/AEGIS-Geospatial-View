@@ -215,7 +215,7 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch)
 
     monkeypatch.setattr(
         "server.app.get_server_settings",
-        lambda: type("Settings", (), {"database": object(), "vectors": type("Vectors", (), {"auto_sync_on_start": False})()})(),
+        lambda: type("Settings", (), {"database": object()})(),
     )
     monkeypatch.setattr("server.app.get_database", lambda: _Database())
     monkeypatch.setattr(
@@ -239,7 +239,7 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch)
                 "settings_service": type(
                     "SettingsService", (), {"get_settings": staticmethod(lambda: None)}
                 )(),
-                "vector_indexer": type("VectorIndexer", (), {"sync": staticmethod(lambda: None)})(),
+                "maintenance_service": object(),
             },
         )(),
     )

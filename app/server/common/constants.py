@@ -54,8 +54,6 @@ CHAT_MODELS_ROUTE = "/models"
 CHAT_SETTINGS_ROUTE = "/settings"
 CHAT_OLLAMA_REFRESH_ROUTE = "/models/ollama/refresh"
 CHAT_OLLAMA_PULL_ROUTE = "/models/ollama/pull"
-CHAT_VECTORS_REBUILD_ROUTE = "/vectors/rebuild"
-CHAT_VECTORS_SYNC_ROUTE = "/vectors/sync"
 CHAT_OLLAMA_HEALTH_ROUTE = "/models/ollama/health"
 
 # [SERVER URLS]

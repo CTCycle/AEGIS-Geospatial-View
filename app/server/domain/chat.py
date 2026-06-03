@@ -149,10 +149,3 @@ class OllamaHealthResponse(BaseModel):
 
     ok: bool | None = None
     detail: str | None = None
-
-
-###############################################################################
-class VectorizationResponse(BaseModel):
-    status: str
-    indexed_documents: int
-    vector_path: str

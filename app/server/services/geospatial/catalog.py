@@ -48,7 +48,6 @@ class GeospatialCatalogService:
             "data_format": str(metadata.get("data_format") or ""),
             "geometry_type": str(metadata.get("geometry_type") or ""),
             "queryable": bool(metadata.get("queryable", False)),
-            "vectorizable": bool(metadata.get("vectorizable", False)),
             "endpoint_health": str(reliability.get("status") or "unknown"),
             "auth_mode": str(auth.get("type") or "none"),
             "official_docs_url": "; ".join(
@@ -102,7 +101,6 @@ class GeospatialCatalogService:
             "data_format": str(metadata.get("data_format") or ""),
             "geometry_type": str(metadata.get("geometry_type") or ""),
             "queryable": bool(metadata.get("queryable", False)),
-            "vectorizable": bool(metadata.get("vectorizable", False)),
             "endpoint_health": str(reliability.get("status") or "unknown"),
             "auth_mode": str(auth.get("type") or "none"),
             "official_docs_url": "; ".join(

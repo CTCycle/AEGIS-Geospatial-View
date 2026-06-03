@@ -33,8 +33,6 @@ Core relational storage covers:
 
 ## Vector Persistence
 
-- Vector services live under `app/server/services/vector/*`.
-- `VectorIndexer` owns index lifecycle and maintenance flows.
 - Agent tool visibility does not depend on embeddings or vector ranking.
 
 ## Model Capability Persistence

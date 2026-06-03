@@ -13,7 +13,6 @@ import {
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
   API_OLLAMA_REFRESH_PATH,
-  API_VECTOR_REBUILD_PATH,
 } from './constants';
 import {
   CatalogResponse,
@@ -32,7 +31,6 @@ import {
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
   SearchResponse,
-  VectorizationResponse,
 } from './types';
 
 export class ApiRequestError extends Error {
@@ -116,7 +114,6 @@ export const normalizeCapabilities = (input: unknown): CatalogResponse['capabili
     data_format: typeof item.data_format === 'string' ? item.data_format : undefined,
     geometry_type: typeof item.geometry_type === 'string' ? item.geometry_type : undefined,
     queryable: typeof item.queryable === 'boolean' ? item.queryable : undefined,
-    vectorizable: typeof item.vectorizable === 'boolean' ? item.vectorizable : undefined,
     endpoint_health: typeof item.endpoint_health === 'string' ? item.endpoint_health : undefined,
     auth_mode: typeof item.auth_mode === 'string' ? item.auth_mode : undefined,
     official_docs_url: typeof item.official_docs_url === 'string' ? item.official_docs_url : undefined,
@@ -653,18 +650,6 @@ export const pullOllamaModel = async (model: string): Promise<GenericObjectRespo
     body: JSON.stringify({ model }),
   });
   return isRecord(data) ? data : {};
-};
-
-export const rebuildVectors = async (): Promise<VectorizationResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_VECTOR_REBUILD_PATH}`, { method: 'POST' });
-  if (!isRecord(data)) {
-    throw new Error('Unexpected vectorization response format');
-  }
-  return {
-    status: String(data.status ?? 'ok'),
-    indexed_documents: Number(data.indexed_documents ?? 0),
-    vector_path: String(data.vector_path ?? ''),
-  };
 };
 
 export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {

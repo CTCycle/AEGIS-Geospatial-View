@@ -216,26 +216,3 @@ class ChatMessageRecord(Base):
         DateTime, nullable=False, server_default=func.now()
     )
 
-
-###############################################################################
-class ManifestEmbeddingRecord(Base):
-    __tablename__ = "manifest_embeddings"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    manifest_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    manifest_kind: Mapped[str] = mapped_column(String(50), nullable=False)
-    manifest_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    content_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    embedding_provider: Mapped[str] = mapped_column(String(64), nullable=False)
-    embedding_model: Mapped[str] = mapped_column(String(200), nullable=False)
-    last_embedded_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    vector_collection: Mapped[str] = mapped_column(String(120), nullable=False)
-    vector_document_id: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "manifest_id", "manifest_kind", name="ux_manifest_embeddings_manifest"
-        ),
-    )
