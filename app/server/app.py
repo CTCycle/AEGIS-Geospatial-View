@@ -23,14 +23,20 @@ from server.common.constants import (
 )
 from server.configurations import get_server_settings
 from server.repositories.database import get_database
-from server.repositories.database.initializer import initialize_database, seed_reference_catalog
+from server.repositories.database.initializer import (
+    initialize_database,
+    seed_reference_catalog,
+)
 from server.services.chat.composition import build_chat_runtime
+from server.services.geospatial.composition import build_geospatial_runtime
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
+
 
 ###############################################################################
 def _client_build_available() -> bool:
     return Path(CLIENT_INDEX_FILE_PATH).is_file()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -45,9 +51,11 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
+
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
+
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -55,6 +63,7 @@ def serve_client_path(full_path: str) -> FileResponse:
     if client_file is not None:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
+
 
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
@@ -71,9 +80,11 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
+    geospatial_runtime = build_geospatial_runtime()
 
     application.state.search_runtime = search_runtime
     application.state.chat_runtime = chat_runtime
+    application.state.geospatial_runtime = geospatial_runtime
 
     chat_runtime.settings_service.get_settings()
 

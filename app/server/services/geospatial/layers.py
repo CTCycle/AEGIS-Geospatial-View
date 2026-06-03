@@ -2,14 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
-from typing import TYPE_CHECKING
 
 from server.domain.catalog import GeospatialLayerReferenceEntry
 from server.domain.layers import LayerProviderEntry
-from server.services.catalog.reference_repository import ReferenceCatalogRepository
-
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
+from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
+from server.repositories.database.contracts import DatabaseBackend
 
 type LayerDefinition = dict[str, Any]
 type ResolutionProvider = Callable[[str], tuple[float, ...] | list[float]]
@@ -41,18 +38,9 @@ class LayerProviderService:
         metadata_provider: ResolutionProvider | None = None,
     ) -> None:
         self.metadata_provider = metadata_provider
-        resolved_catalog = layer_catalog
-        if resolved_catalog is None and layer_definitions is None:
-            try:
-                from server.repositories.database.backend import get_database
-
-                repository = ReferenceCatalogRepository(get_database().backend)
-                resolved_catalog = repository.load_geospatial_layer_catalog()
-            except Exception:
-                resolved_catalog = tuple()
         self.layer_definitions = self._build_entries(
             layer_definitions=layer_definitions,
-            layer_catalog=resolved_catalog or tuple(),
+            layer_catalog=layer_catalog or tuple(),
         )
         self.alias_lookup = self._build_alias_index(self.layer_definitions)
 
@@ -81,7 +69,9 @@ class LayerProviderService:
                     provider=provider,
                     label=label,
                     aliases=aliases,
-                    provider_name=str(specification.get("provider_name") or name).strip()
+                    provider_name=str(
+                        specification.get("provider_name") or name
+                    ).strip()
                     or name,
                     resolution_m=resolution_value,
                 )
@@ -117,7 +107,7 @@ class LayerProviderService:
         for value in values:
             try:
                 numeric = float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if numeric > 0:
                 normalized.append(numeric)
@@ -165,5 +155,6 @@ class LayerProviderService:
 
 def build_geospatial_layer_catalog(database: DatabaseBackend) -> LayerProviderService:
     repository = ReferenceCatalogRepository(database)
-    return LayerProviderService(layer_catalog=repository.load_geospatial_layer_catalog())
-
+    return LayerProviderService(
+        layer_catalog=repository.load_geospatial_layer_catalog()
+    )

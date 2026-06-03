@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from server.repositories.database.backend import AEGISDatabase, DatabaseBackend, get_database
+from server.repositories.database.backend import AEGISDatabase, get_database
+from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.initializer import (
     initialize_database,
     initialize_sqlite_database,

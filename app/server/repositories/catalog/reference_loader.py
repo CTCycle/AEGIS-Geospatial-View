@@ -29,8 +29,12 @@ def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog
     root = (catalog_root or get_catalog_root()) / REFERENCE_CATALOG_DIR_NAME
     countries_payload = _load_json_file(root / COUNTRIES_REFERENCE_FILE_NAME)
     layers_payload = _load_json_file(root / GEOSPATIAL_LAYERS_REFERENCE_FILE_NAME)
-    tile_matrix_payload = _load_json_file(root / GIBS_TILE_MATRIX_SETS_REFERENCE_FILE_NAME)
-    layer_defaults_payload = _load_json_file(root / GIBS_LAYER_DEFAULTS_REFERENCE_FILE_NAME)
+    tile_matrix_payload = _load_json_file(
+        root / GIBS_TILE_MATRIX_SETS_REFERENCE_FILE_NAME
+    )
+    layer_defaults_payload = _load_json_file(
+        root / GIBS_LAYER_DEFAULTS_REFERENCE_FILE_NAME
+    )
 
     countries = _parse_countries(countries_payload)
     country_aliases = _parse_country_aliases(countries_payload, countries)
@@ -119,7 +123,9 @@ def _parse_country_aliases(
     return aliases
 
 
-def _parse_geospatial_layers(payload: dict[str, Any]) -> list[GeospatialLayerReferenceEntry]:
+def _parse_geospatial_layers(
+    payload: dict[str, Any],
+) -> list[GeospatialLayerReferenceEntry]:
     entries = payload.get("layers")
     if not isinstance(entries, list):
         raise ValueError("geospatial_layers.json must contain a layers list.")
@@ -159,7 +165,9 @@ def _parse_gibs_tile_matrix_sets(
 ) -> list[GibsTileMatrixSetReferenceEntry]:
     entries = payload.get("tileMatrixSets")
     if not isinstance(entries, list):
-        raise ValueError("gibs_tile_matrix_sets.json must contain a tileMatrixSets list.")
+        raise ValueError(
+            "gibs_tile_matrix_sets.json must contain a tileMatrixSets list."
+        )
     seen_ids: set[str] = set()
     tile_matrix_sets: list[GibsTileMatrixSetReferenceEntry] = []
     for item in entries:
@@ -202,13 +210,17 @@ def _parse_gibs_layer_defaults(
     for item in entries:
         if not isinstance(item, dict):
             raise ValueError("GIBS layer default entries must be objects.")
-        layer_id = _require_string(item.get("layerId"), field_name="layerDefault.layerId")
+        layer_id = _require_string(
+            item.get("layerId"), field_name="layerDefault.layerId"
+        )
         if layer_id in seen_layer_ids:
             raise ValueError(f"Duplicate GIBS layer default for layer '{layer_id}'.")
         native_resolution_value = item.get("nativeResolutionM")
         date_fallback_value = item.get("dateFallbackDays")
         native_resolution_m = (
-            float(native_resolution_value) if native_resolution_value is not None else None
+            float(native_resolution_value)
+            if native_resolution_value is not None
+            else None
         )
         date_fallback_days = (
             int(date_fallback_value) if date_fallback_value is not None else None

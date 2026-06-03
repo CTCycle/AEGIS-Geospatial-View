@@ -9,7 +9,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from server.configurations import DatabaseSettings
-from server.repositories.database.orm_table_operations import SqlAlchemyTableOperationsMixin
+from server.repositories.database.orm_table_operations import (
+    SqlAlchemyTableOperationsMixin,
+)
 
 
 class PostgresRepository(SqlAlchemyTableOperationsMixin):
