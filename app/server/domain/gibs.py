@@ -12,13 +12,6 @@ class LayerMetadata:
 
 
 @dataclass(frozen=True)
-class LayerCatalogEntry:
-    name: str
-    projections: frozenset[str]
-    meters_per_pixel: tuple[float, ...]
-
-
-@dataclass(frozen=True)
 class Capabilities:
     layers: dict[str, LayerMetadata]
     supported_formats: frozenset[str]

@@ -33,20 +33,6 @@ class Base(DeclarativeBase):
 
 
 ###############################################################################
-class GibsLayerRecord(Base):
-    __tablename__ = "gibs_layers"
-
-    layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
-    title: Mapped[str | None] = mapped_column(String(512))
-    abstract: Mapped[str | None] = mapped_column(Text)
-    projections: Mapped[str | None] = mapped_column(Text)
-    source_urls: Mapped[str | None] = mapped_column(Text)
-    tile_matrix_sets: Mapped[str | None] = mapped_column(Text)
-    meters_per_pixel: Mapped[str | None] = mapped_column(Text)
-
-    __table_args__ = (UniqueConstraint("layer_id"),)
-
-
 class ReferenceCountryRecord(Base):
     __tablename__ = REFERENCE_COUNTRIES_TABLE_NAME
 

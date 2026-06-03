@@ -104,7 +104,6 @@ COMMON_FOLIUM_MAPS = {
 
 # [DATABASE TABLES]
 ###############################################################################
-GIBS_LAYERS_TABLE = "gibs_layers"
 CHAT_SESSIONS_TABLE = "chat_sessions"
 REFERENCE_COUNTRIES_TABLE_NAME = "reference_countries"
 REFERENCE_COUNTRY_ALIASES_TABLE_NAME = "reference_country_aliases"
@@ -113,19 +112,6 @@ REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME = "reference_geospatial_layer_alia
 REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME = "reference_geospatial_layer_keywords"
 REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME = "reference_gibs_tile_matrix_sets"
 REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME = "reference_gibs_layer_defaults"
-
-
-# [DATABASE COLUMNS]
-###############################################################################
-GIBS_LAYER_COLUMNS = [
-    "layer_id",
-    "title",
-    "abstract",
-    "projections",
-    "source_urls",
-    "tile_matrix_sets",
-    "meters_per_pixel",
-]
 
 # [GEOSPATIAL CONSTANTS]
 ###############################################################################

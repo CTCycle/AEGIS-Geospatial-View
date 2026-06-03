@@ -1,6 +1,6 @@
 # Reference Catalog
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Purpose
 
@@ -19,3 +19,8 @@ Last updated: 2026-06-02
 2. It loads reference catalog files.
 3. It seeds only empty target reference tables.
 4. Populated target tables are not reseeded or upserted during startup.
+
+## GIBS Notes
+
+- GIBS layer defaults and tile-matrix resolutions are maintained here as reviewable reference data.
+- Runtime GIBS layer capabilities are resolved live from NASA endpoints rather than synchronized into a local relational table.
