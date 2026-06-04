@@ -1,3 +1,4 @@
+import { APP_STATE_STORAGE_KEY } from './app-state';
 import { AppStateStoreService } from './app-state-store.service';
 
 describe('core/app-state-store.service', () => {
@@ -50,6 +51,26 @@ describe('core/app-state-store.service', () => {
     chat.chatPanel.composerDraft = 'pending';
     service.updateChatPage(chat);
     window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    expect(service.getChatPage().chatPanel.composerDraft).toBe('');
+    service.ngOnDestroy();
+  });
+
+  it('storage event for unrelated key does not reset state', () => {
+    const service = new AppStateStoreService();
+    const chat = service.getChatPage();
+    chat.chatPanel.composerDraft = 'pending';
+    service.updateChatPage(chat);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'other:key' }));
+    expect(service.getChatPage().chatPanel.composerDraft).toBe('pending');
+    service.ngOnDestroy();
+  });
+
+  it('storage event for app state key resets state', () => {
+    const service = new AppStateStoreService();
+    const chat = service.getChatPage();
+    chat.chatPanel.composerDraft = 'pending';
+    service.updateChatPage(chat);
+    window.dispatchEvent(new StorageEvent('storage', { key: APP_STATE_STORAGE_KEY }));
     expect(service.getChatPage().chatPanel.composerDraft).toBe('');
     service.ngOnDestroy();
   });

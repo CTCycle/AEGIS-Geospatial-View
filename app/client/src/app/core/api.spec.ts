@@ -5,16 +5,18 @@ import {
 import {
   ApiRequestError,
   buildApiError,
+  fetchGeospatialCameraDetail,
+  fetchGeospatialLayerFeatures,
+  sendChatTurn,
+  streamChatTurn,
+} from './api';
+import {
+  buildModelDescription,
   parseCatalogResponse,
   parseChatTurnResponse,
   parseModelSettingsResponse,
   parseSearchResponse,
-  fetchGeospatialCameraDetail,
-  fetchGeospatialLayerFeatures,
-  buildModelDescription,
-  sendChatTurn,
-  streamChatTurn,
-} from './api';
+} from './api-parsers';
 
 describe('core/api', () => {
   afterEach(() => {
