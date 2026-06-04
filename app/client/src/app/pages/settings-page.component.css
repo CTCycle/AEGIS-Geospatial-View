@@ -1,3 +1,10 @@
+:host {
+    display: block;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .settings-page {
     display: flex;
     flex-direction: column;
@@ -37,17 +44,37 @@
 
 .settings-page__warning {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid #8f4350;
-    border-radius: 0.35rem;
-    background: #281820;
-    color: #f1d7dc;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.8rem 0.95rem;
+    border: 1px solid #31424b;
+    border-radius: 0.5rem;
+    background: linear-gradient(180deg, rgb(19 33 41 / 88%) 0%, rgb(14 25 32 / 96%) 100%);
+    color: #bfd0d7;
 }
 
-.settings-page__warning strong {
-    white-space: nowrap;
+.settings-page__warning-badge {
+    flex: 0 0 auto;
+    margin-top: 0.05rem;
+    border: 1px solid #3a5563;
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    color: #9fc9df;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.settings-page__warning-copy {
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: #aebfc7;
+}
+
+.settings-page__warning-copy strong {
+    margin-right: 0.35rem;
+    color: #e4f1f5;
 }
 
 .settings-page__layout {
@@ -164,6 +191,15 @@
 .settings-page__refresh:hover {
     border-color: #2f9bd7;
     background: #1b3340;
+}
+
+.settings-page__refresh:disabled {
+    opacity: 0.72;
+    cursor: progress;
+}
+
+.settings-page__refresh:disabled svg {
+    animation: settings-page__refresh-spin 1s linear infinite;
 }
 
 .model-search-bar {
@@ -342,6 +378,11 @@
 
 .settings-modal__footer--spread { justify-content: space-between; }
 
+@keyframes settings-page__refresh-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 @media (max-width: 1024px) {
     .settings-page__layout { grid-template-columns: minmax(0, 1fr); }
     .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -352,6 +393,11 @@
 }
 
 @media (max-width: 760px) {
+    .settings-page {
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
     .settings-page__header {
         position: static;
         display: grid;
@@ -375,12 +421,19 @@
     }
 
     .settings-page__content { padding-top: 1.15rem; }
+    .settings-page__content { overflow: visible; }
+
+    .settings-page__warning {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 
     .settings-page__layout {
         display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: var(--space-3);
+        overflow: visible;
     }
 
     .settings-page__left-column,

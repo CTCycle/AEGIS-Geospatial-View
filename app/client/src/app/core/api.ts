@@ -615,7 +615,10 @@ export const streamChatTurn = async (
 };
 
 export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}`, { method: 'GET' });
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
   const value = isRecord(data) ? data : {};
 
   return {
@@ -625,7 +628,10 @@ export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[];
 };
 
 export const fetchChatSettings = async (): Promise<ModelSettingsResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_SETTINGS_PATH}`, { method: 'GET' });
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_SETTINGS_PATH}`, {
+    method: 'GET',
+    cache: 'no-store',
+  });
   return parseModelSettingsResponse(data);
 };
 
