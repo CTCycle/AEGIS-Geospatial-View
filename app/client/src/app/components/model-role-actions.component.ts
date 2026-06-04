@@ -43,6 +43,11 @@ export class ModelRoleActionsComponent {
     return 'agent';
   }
 
+  roleTitle(role: ModelRole): string {
+    const reason = this.disabledReason(role);
+    return reason ? `${this.roleName(role)} unavailable. ${reason}` : this.roleName(role);
+  }
+
   disabledReason(role: ModelRole): string | null {
     if (this.requiresPull) {
       return 'Pull this model before assigning a role.';

@@ -323,6 +323,27 @@ describe('pages/settings-page.component', () => {
     expect(component.statusText).toContain('Pulled');
   });
 
+  it('prevents overlapping refresh requests', async () => {
+    let releaseRefresh: (() => void) | undefined;
+    refreshOllamaModelsMock.and.returnValue(new Promise((resolve) => {
+      releaseRefresh = () => resolve({});
+    }));
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    const firstRefresh = component.refreshOllamaLibrary();
+    const secondRefresh = component.refreshOllamaLibrary();
+
+    expect(refreshOllamaModelsMock).toHaveBeenCalledTimes(1);
+    expect(component.isRefreshingOllama).toBeTrue();
+
+    releaseRefresh?.();
+    await Promise.all([firstRefresh, secondRefresh]);
+    expect(component.isRefreshingOllama).toBeFalse();
+  });
+
   it('syncQueryState and persistence update URL and store', async () => {
     window.history.replaceState({}, '', '/settings');
     const fixture = TestBed.createComponent(SettingsPageComponent);

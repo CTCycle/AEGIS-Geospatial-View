@@ -9,7 +9,7 @@
   }
 </header>
 
-<p>{{ description }}</p>
+<p [attr.title]="description">{{ description }}</p>
 
 <div class="model-card__capabilities" aria-label="Model capabilities">
   @if (model.supports_tools) {

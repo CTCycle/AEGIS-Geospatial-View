@@ -66,6 +66,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   searchText: string;
   statusText: string;
   isLoadingModels = false;
+  isRefreshingOllama = false;
 
   isKeysModalOpen = false;
   isOllamaModalOpen = false;
@@ -101,6 +102,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.viewStateSync.restoreWindowScroll(this.state.scrollY);
+    if (this.providerFilter === 'all') {
+      this.resetModelGridScroll();
+      return;
+    }
     this.viewStateSync.restoreElementScroll(this.modelGridRef?.nativeElement, this.state.modelGridScrollTop);
   }
 
@@ -205,6 +210,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google'): void {
     this.providerFilter = filter;
+    this.resetModelGridScroll();
     this.syncState();
   }
 
@@ -278,6 +284,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async refreshOllamaLibrary(): Promise<void> {
+    if (this.isRefreshingOllama) {
+      return;
+    }
+    this.isRefreshingOllama = true;
+    this.statusText = 'Refreshing Ollama library';
+    this.syncState();
     try {
       await this.apiClient.refreshOllamaModels();
       await this.loadData();
@@ -288,6 +300,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaModalStatusText = detail;
+    } finally {
+      this.isRefreshingOllama = false;
     }
   }
 
@@ -551,6 +565,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       return 'chat';
     }
     return 'agent';
+  }
+
+  private resetModelGridScroll(): void {
+    this.state.modelGridScrollTop = 0;
+    this.modelGridRef?.nativeElement.scrollTo({ top: 0 });
   }
 
   private syncState(): void {
