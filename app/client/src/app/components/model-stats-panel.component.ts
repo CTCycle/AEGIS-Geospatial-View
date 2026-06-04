@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
-import { ModelRole, SelectedModelStat } from '../core/model-selection';
+import { ModelRole, SelectedModelStat, modelRoleLabel } from '../core/model-selection';
 
 @Component({
   selector: 'app-model-stats-panel',
@@ -23,13 +23,7 @@ export class ModelStatsPanelComponent {
   }
 
   dutyLabel(duty: ModelRole): string {
-    if (duty === 'parser') {
-      return 'Parser';
-    }
-    if (duty === 'chat') {
-      return 'Chat';
-    }
-    return 'Agent';
+    return modelRoleLabel(duty);
   }
 
   statusText(row: SelectedModelStat | null): string {

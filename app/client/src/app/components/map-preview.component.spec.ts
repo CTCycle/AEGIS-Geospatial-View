@@ -139,6 +139,21 @@ describe('components/map-preview.component', () => {
     expect(emitted.at(-1)?.overlayOpacity['ov1']).toBeCloseTo(0.25, 2);
   });
 
+  it('clamps and ignores invalid overlay opacity values', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'ov1', label: 'Overlay', type: 'tile', provider: 'x', url: 'https://x/{z}/{x}/{y}.png' }],
+      }) as never,
+    };
+    fixture.detectChanges();
+
+    component.setOverlayOpacity('ov1', '250');
+    expect(component.overlayOpacity['ov1']).toBe(1);
+
+    component.setOverlayOpacity('ov1', 'not-a-number');
+    expect(component.overlayOpacity['ov1']).toBe(1);
+  });
+
   it('exposes lightweight zoom controls', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();

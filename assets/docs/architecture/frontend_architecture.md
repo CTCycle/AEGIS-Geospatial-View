@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-02
+Last updated: 2026-06-04
 
 ## Route-Level Pages
 
@@ -15,11 +15,14 @@ Last updated: 2026-06-02
 
 ## Core Frontend Boundaries
 
-- API client and response normalization: `app/client/src/app/core/api.ts`
+- API client request execution: `app/client/src/app/core/api.ts`
+- API response normalization and parsing: `app/client/src/app/core/api-parsers.ts`
 - Persisted app/view state: `core/app-state.ts` and store service
+- Shared runtime guards: `core/type-guards.ts`
 - Shared contracts: `core/types.ts`
 - Error presentation: `core/user-facing-error.service.ts`
-- Map rendering surface: `components/map-preview.component.*`
+- Model selection and model list utilities: `core/model-selection.ts`
+- Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
 
 ## Component Patterns
 
