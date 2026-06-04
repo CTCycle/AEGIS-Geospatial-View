@@ -4,9 +4,11 @@ setlocal enableextensions enabledelayedexpansion
 REM ============================================================================
 REM == Configuration
 REM ============================================================================
-set "root_folder=%~dp0"
-set "runtimes_dir=%root_folder%runtimes"
-set "settings_dir=%root_folder%settings"
+for %%I in ("%~dp0.") do set "root_folder=%%~fI"
+set "app_dir=%root_folder%\app"
+set "server_dir=%app_dir%\server"
+set "runtimes_dir=%root_folder%\runtimes"
+set "settings_dir=%root_folder%\settings"
 set "python_dir=%runtimes_dir%\python"
 set "python_exe=%python_dir%\python.exe"
 set "python_pth_file=%python_dir%\python314._pth"
@@ -16,7 +18,7 @@ set "uv_dir=%runtimes_dir%\uv"
 set "uv_exe=%uv_dir%\uv.exe"
 set "uv_zip_path=%uv_dir%\uv.zip"
 set "UV_CACHE_DIR=%runtimes_dir%\.uv-cache"
-set "venv_dir=%root_folder%app\server\.venv"
+set "venv_dir=%server_dir%\.venv"
 set "UV_PROJECT_ENVIRONMENT=%venv_dir%"
 
 set "py_version=3.14.2"
@@ -37,12 +39,14 @@ set "node_exe=%nodejs_dir%\node.exe"
 set "npm_cmd=%nodejs_dir%\npm.cmd"
 set "env_marker_node=%nodejs_dir%\.is_installed"
 
-set "pyproject=%root_folder%app\server\pyproject.toml"
-set "UVICORN_MODULE=server.app:app"
-set "FRONTEND_DIR=%root_folder%app\client"
+set "pyproject=%server_dir%\pyproject.toml"
+set "UVICORN_MODULE=app.server.app:app"
+set "FRONTEND_DIR=%app_dir%\client"
 set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
 set "FRONTEND_LOCKFILE=%FRONTEND_DIR%\package-lock.json"
 set "FRONTEND_STRICT_PORT="
+set "BACKEND_WORKDIR=%root_folder%"
+set "BACKEND_PYTHONPATH=%root_folder%;%app_dir%"
 
 set "DOTENV=%settings_dir%\.env"
 set "TMPDL=%TEMP%\app_dl.ps1"
@@ -196,6 +200,13 @@ echo [INFO] FASTAPI_HOST=!FASTAPI_HOST! FASTAPI_PORT=!FASTAPI_PORT! UI_HOST=!UI_
 set "UI_URL=http://!UI_HOST!:!UI_PORT!"
 set "RELOAD_FLAG="
 if /i "!RELOAD!"=="true" set "RELOAD_FLAG=--reload"
+set "BROWSER_FASTAPI_HOST=!FASTAPI_HOST!"
+set "BROWSER_UI_HOST=!UI_HOST!"
+if /i "!BROWSER_FASTAPI_HOST!"=="0.0.0.0" set "BROWSER_FASTAPI_HOST=127.0.0.1"
+if /i "!BROWSER_FASTAPI_HOST!"=="::" set "BROWSER_FASTAPI_HOST=127.0.0.1"
+if /i "!BROWSER_UI_HOST!"=="0.0.0.0" set "BROWSER_UI_HOST=127.0.0.1"
+if /i "!BROWSER_UI_HOST!"=="::" set "BROWSER_UI_HOST=127.0.0.1"
+set "UI_URL=http://!BROWSER_UI_HOST!:!UI_PORT!"
 
 REM Ensure the embeddable runtime is used (avoid picking up Conda/other Python DLLs)
 set "PYTHONHOME="
@@ -211,15 +222,29 @@ if not exist "%pyproject%" (
   goto error
 )
 
-pushd "%root_folder%app\server" >nul
+pushd "%server_dir%" >nul
 set "uv_extras_flag="
 if /i "%INSTALL_EXTRAS%"=="true" set "uv_extras_flag=--all-extras"
-"%uv_exe%" sync %uv_extras_flag%
-set "sync_ec=%ERRORLEVEL%"
+"%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
+set "sync_ec=!ERRORLEVEL!"
+if not "!sync_ec!"=="0" (
+  "%uv_exe%" sync --python "%python_exe%" %uv_extras_flag%
+  set "sync_ec=!ERRORLEVEL!"
+)
+if not "!sync_ec!"=="0" (
+  set "PYTHONPATH=%app_dir%"
+  "%venv_dir%\Scripts\python.exe" -c "import importlib; import fastapi, sqlalchemy, uvicorn; importlib.import_module('server.app')" >nul 2>&1
+  set "venv_check_ec=!ERRORLEVEL!"
+  set "PYTHONPATH="
+)
 popd >nul
-if not "%sync_ec%"=="0" (
-  echo [FATAL] uv sync failed with code %sync_ec%.
-  goto error
+if not "!sync_ec!"=="0" (
+  if "!venv_check_ec!"=="0" (
+    echo [WARN] uv sync failed with code !sync_ec!, but the existing backend virtual environment is still usable.
+  ) else (
+    echo [FATAL] uv sync failed with code !sync_ec!.
+    goto error
+  )
 )
 
 > "%env_marker%" echo setup_completed
@@ -229,7 +254,7 @@ REM ============================================================================
 REM == Step 5: Prune uv cache
 REM ============================================================================
 echo [STEP 5/5] Pruning uv cache
-if exist "%UV_CACHE_DIR%" rd /s /q "%UV_CACHE_DIR%" || echo [WARN] Could not delete cache dir quickly.
+if exist "%UV_CACHE_DIR%" rd /s /q "%UV_CACHE_DIR%" >nul 2>&1 || echo [WARN] Could not delete cache dir quickly.
 
 if not exist "%FRONTEND_DIR%\node_modules" (
   echo [STEP] Installing frontend dependencies...
@@ -267,49 +292,67 @@ REM ============================================================================
 set "PYTHONHOME="
 set "PYTHONPATH="
 set "PYTHONNOUSERSITE="
+set "BACKEND_BASE_URL=http://!BROWSER_FASTAPI_HOST!:!FASTAPI_PORT!"
 if not exist "%python_exe%" (
   echo [FATAL] python.exe not found at "%python_exe%"
   goto error
 )
 
-echo [RUN] Launching backend via uvicorn (!UVICORN_MODULE!)
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":!FASTAPI_PORT! .*LISTENING"') do (
-  echo [INFO] Releasing backend port !FASTAPI_PORT! from PID %%P.
-  taskkill /PID %%P /F >nul 2>&1
+set "reuse_backend="
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
+if !errorlevel! equ 0 (
+  set "reuse_backend=1"
+  echo [INFO] Reusing existing backend at !BACKEND_BASE_URL!.
 )
-set "backend_port_free="
-for /L %%i in (1,1,20) do (
-  netstat -ano | findstr /R /C:":!FASTAPI_PORT! .*LISTENING" >nul
-  if !errorlevel! neq 0 (
-    set "backend_port_free=1"
-    goto :backend_port_released
-  )
-  timeout /t 1 /nobreak >nul 2>&1
-)
-:backend_port_released
-if not defined backend_port_free (
-  echo [FATAL] backend port !FASTAPI_PORT! is still occupied after 20 seconds.
+if defined reuse_backend goto backend_wait
+if not defined reuse_backend (
+  echo [RUN] Launching backend via uvicorn (!UVICORN_MODULE!)
   for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":!FASTAPI_PORT! .*LISTENING"') do (
-    set "pid_path="
-    for /f "delims=" %%K in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPPIDPATH%" %%P') do set "pid_path=%%K"
-    if defined pid_path (
-      echo [INFO] Port !FASTAPI_PORT! listener PID %%P path: !pid_path!
-    ) else (
-      echo [INFO] Port !FASTAPI_PORT! listener PID %%P path: [unknown]
-    )
+    echo [INFO] Releasing backend port !FASTAPI_PORT! from PID %%P.
+    taskkill /PID %%P /F >nul 2>&1
   )
-  goto error
+  set "backend_port_free="
+  for /L %%i in (1,1,20) do (
+    netstat -ano | findstr /R /C:":!FASTAPI_PORT! .*LISTENING" >nul
+    if !errorlevel! neq 0 (
+      set "backend_port_free=1"
+      goto :backend_port_released
+    )
+    timeout /t 1 /nobreak >nul 2>&1
+  )
+  :backend_port_released
+  if not defined backend_port_free (
+    echo [FATAL] backend port !FASTAPI_PORT! is still occupied after 20 seconds.
+    for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":!FASTAPI_PORT! .*LISTENING"') do (
+      set "pid_path="
+      for /f "delims=" %%K in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%TMPPIDPATH%" %%P') do set "pid_path=%%K"
+      if defined pid_path (
+        echo [INFO] Port !FASTAPI_PORT! listener PID %%P path: !pid_path!
+      ) else (
+        echo [INFO] Port !FASTAPI_PORT! listener PID %%P path: [unknown]
+      )
+    )
+    goto error
+  )
+  if not exist "%venv_dir%\Scripts\python.exe" (
+    echo [FATAL] virtual environment python not found at "%venv_dir%\Scripts\python.exe"
+    goto error
+  )
+  set "PYTHONPATH=!BACKEND_PYTHONPATH!"
+  "%venv_dir%\Scripts\python.exe" -c "import importlib; importlib.import_module('app.server.app')" >nul 2>&1
+  if errorlevel 1 (
+    set "UVICORN_MODULE=server.app:app"
+    set "BACKEND_WORKDIR=%server_dir%"
+    set "PYTHONPATH=%app_dir%"
+  )
+  start "" /b /d "!BACKEND_WORKDIR!" "%venv_dir%\Scripts\python.exe" -m uvicorn !UVICORN_MODULE! --host !FASTAPI_HOST! --port !FASTAPI_PORT! !RELOAD_FLAG! --log-level info
+  set "PYTHONPATH="
 )
-if not exist "%venv_dir%\Scripts\python.exe" (
-  echo [FATAL] virtual environment python not found at "%venv_dir%\Scripts\python.exe"
-  goto error
-)
-start "" /b "%venv_dir%\Scripts\python.exe" -m uvicorn %UVICORN_MODULE% --app-dir "%root_folder%app" --host !FASTAPI_HOST! --port !FASTAPI_PORT! !RELOAD_FLAG! --log-level info
 
 REM ============================================================================
 REM Wait for backend
 REM ============================================================================
-set "BACKEND_BASE_URL=http://!FASTAPI_HOST!:!FASTAPI_PORT!"
+:backend_wait
 echo [WAIT] Waiting for backend readiness at !BACKEND_BASE_URL!...
 for /L %%i in (1,1,60) do (
   powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
@@ -320,30 +363,37 @@ echo [FATAL] Backend did not become ready at !BACKEND_BASE_URL! (checked /api/he
 goto error
 :backend_ready_check
 
-echo [RUN] Launching frontend
-pushd "%FRONTEND_DIR%" >nul
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":!UI_PORT! .*LISTENING"') do (
-  echo [INFO] Releasing frontend port !UI_PORT! from PID %%P.
-  taskkill /PID %%P /F >nul 2>&1
+set "reuse_frontend="
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '!UI_URL!' -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {}; exit 1" >nul 2>&1
+if !errorlevel! equ 0 (
+  set "reuse_frontend=1"
+  echo [INFO] Reusing existing frontend at !UI_URL!.
 )
-set "frontend_port_free="
-for /L %%i in (1,1,20) do (
-  netstat -ano | findstr /R /C:":!UI_PORT! .*LISTENING" >nul
-  if !errorlevel! neq 0 (
-    set "frontend_port_free=1"
-    goto :frontend_port_released
+if defined reuse_frontend goto frontend_open
+if not defined reuse_frontend (
+  echo [RUN] Launching frontend
+  for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":!UI_PORT! .*LISTENING"') do (
+    echo [INFO] Releasing frontend port !UI_PORT! from PID %%P.
+    taskkill /PID %%P /F >nul 2>&1
   )
-  timeout /t 1 /nobreak >nul 2>&1
+  set "frontend_port_free="
+  for /L %%i in (1,1,20) do (
+    netstat -ano | findstr /R /C:":!UI_PORT! .*LISTENING" >nul
+    if !errorlevel! neq 0 (
+      set "frontend_port_free=1"
+      goto :frontend_port_released
+    )
+    timeout /t 1 /nobreak >nul 2>&1
+  )
+  :frontend_port_released
+  if not defined frontend_port_free (
+    echo [FATAL] frontend port !UI_PORT! is still occupied after 20 seconds.
+    goto error
+  )
+  start "" /b /d "%FRONTEND_DIR%" "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT! !FRONTEND_STRICT_PORT!
 )
-:frontend_port_released
-if not defined frontend_port_free (
-  echo [FATAL] frontend port !UI_PORT! is still occupied after 20 seconds.
-  goto error
-)
-start "" /b "%NPM_CMD%" run preview -- --host !UI_HOST! --port !UI_PORT! !FRONTEND_STRICT_PORT!
-popd >nul
-
-start "" "%UI_URL%"
+:frontend_open
+start "" "!UI_URL!"
 echo [SUCCESS] Backend and frontend correctly launched
 goto cleanup
 
