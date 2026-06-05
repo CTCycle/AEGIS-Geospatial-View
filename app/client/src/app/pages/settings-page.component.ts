@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -90,6 +90,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
     private readonly router: Router,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
@@ -445,6 +446,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.isLoadingModels = false;
+      this.changeDetectorRef.detectChanges();
     }
   }
 

@@ -1,5 +1,5 @@
 <header>
-  <h3>{{ model.name }}</h3>
+  <h3 class="model-card__title">{{ model.name }}</h3>
   @if (model.provider === 'ollama' && requiresPull) {
     <button type="button" class="model-card__pull" (click)="onPullRequested()" [attr.aria-label]="'Pull ' + model.name" title="Pull model">
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
@@ -9,7 +9,7 @@
   }
 </header>
 
-<p [attr.title]="description">{{ description }}</p>
+<p class="model-card__description" [attr.title]="description">{{ description }}</p>
 
 <div class="model-card__capabilities" aria-label="Model capabilities">
   @if (model.supports_tools) {

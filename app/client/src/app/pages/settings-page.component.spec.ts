@@ -112,6 +112,22 @@ describe('pages/settings-page.component', () => {
     expect(component.displayedModels.length).toBe(1);
   });
 
+  it('keeps the All provider filter active after the initial model load', async () => {
+    window.history.replaceState({}, '', '/settings');
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const buttons = Array.from(
+      fixture.nativeElement.querySelectorAll('.provider-filter-toggle button'),
+    ) as HTMLButtonElement[];
+    const activeButton = buttons.find((button) => button.classList.contains('active'));
+
+    expect(activeButton?.textContent?.trim()).toBe('All');
+    expect(fixture.componentInstance.displayedModels.length).toBeGreaterThan(0);
+  });
+
   it('keeps richer Ollama library descriptions for installed models', async () => {
     window.history.replaceState({}, '', '/settings');
     fetchChatModelsMock.and.resolveTo({
