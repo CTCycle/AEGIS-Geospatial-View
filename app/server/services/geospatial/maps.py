@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
     del default_tiles
     return {name: label for name, label in COMMON_FOLIUM_MAPS.items() if name.strip()}

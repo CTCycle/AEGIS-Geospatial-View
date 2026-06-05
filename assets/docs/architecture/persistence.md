@@ -1,16 +1,18 @@
 # Persistence
 
-Last updated: 2026-06-03
+Last updated: 2026-06-05
 
 ## Relational Storage
 
 - Runtime selector: `app/server/repositories/database/backend.py`
-- SQLite mode: `database.embedded_database: true`
-- PostgreSQL mode: `database.embedded_database: false`
+- SQLite mode: `EMBEDDED_DATABASE=true`
+- PostgreSQL mode: `EMBEDDED_DATABASE=false`
 - SQLite implementation: `sqlite.py`
 - PostgreSQL implementation: `postgres.py`
 
-Database mode and connection settings come from `settings/configurations.json`. SQLite resolves through `server.common.constants.DATABASE_FILE_PATH`.
+Database mode and connection settings come from `settings/.env` or runtime
+environment variables. SQLite resolves through
+`server.common.constants.DATABASE_FILE_PATH`.
 
 Schema initialization is handled by `app/server/repositories/database/initializer.py`.
 

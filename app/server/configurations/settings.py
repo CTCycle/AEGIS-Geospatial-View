@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import urllib.parse
 from dataclasses import dataclass
 from typing import Any
 
@@ -305,16 +307,107 @@ class JsonGIBSSettings(BaseModel):
 
 
 ###############################################################################
-def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
-    if not isinstance(payload, dict):
-        payload = {}
+def _read_env_text(name: str) -> str | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    text = value.strip()
+    return text or None
+
+###############################################################################
+def _read_env_int(name: str) -> int | None:
+    value = _read_env_text(name)
+    if value is None:
+        return None
     try:
-        db = JsonDatabaseSettings.model_validate(payload)
+        return int(value)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
+
+###############################################################################
+def _read_env_bool(name: str) -> bool | None:
+    value = _read_env_text(name)
+    if value is None:
+        return None
+
+    normalized = value.lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"Invalid boolean value for {name}: {value}")
+
+###############################################################################
+def _database_payload_from_url(database_url: str) -> dict[str, Any]:
+    parsed = urllib.parse.urlparse(database_url)
+    scheme = (parsed.scheme or "").strip().lower()
+    if not scheme:
+        raise RuntimeError("DATABASE_URL must include a URL scheme.")
+    if not scheme.startswith("postgresql"):
+        raise RuntimeError(
+            f"Unsupported DATABASE_URL scheme: {parsed.scheme}. Expected PostgreSQL."
+        )
+
+    database_name = parsed.path.lstrip("/") or None
+    return {
+        "engine": "postgresql+psycopg",
+        "host": parsed.hostname,
+        "port": parsed.port,
+        "database_name": database_name,
+        "username": urllib.parse.unquote(parsed.username)
+        if parsed.username is not None
+        else None,
+        "password": urllib.parse.unquote(parsed.password)
+        if parsed.password is not None
+        else None,
+    }
+
+###############################################################################
+def build_database_payload_from_env() -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+
+    database_url = _read_env_text("DATABASE_URL")
+    if database_url is not None:
+        payload.update(_database_payload_from_url(database_url))
+
+    explicit_values: tuple[tuple[str, str, Any], ...] = (
+        ("EMBEDDED_DATABASE", "embedded_database", _read_env_bool("EMBEDDED_DATABASE")),
+        ("DATABASE_ENGINE", "engine", _read_env_text("DATABASE_ENGINE")),
+        ("DATABASE_HOST", "host", _read_env_text("DATABASE_HOST")),
+        ("DATABASE_PORT", "port", _read_env_int("DATABASE_PORT")),
+        ("DATABASE_NAME", "database_name", _read_env_text("DATABASE_NAME")),
+        ("DATABASE_USERNAME", "username", _read_env_text("DATABASE_USERNAME")),
+        ("DATABASE_PASSWORD", "password", _read_env_text("DATABASE_PASSWORD")),
+        ("DATABASE_SSL", "ssl", _read_env_bool("DATABASE_SSL")),
+        ("DATABASE_SSL_CA", "ssl_ca", _read_env_text("DATABASE_SSL_CA")),
+        (
+            "DATABASE_CONNECT_TIMEOUT",
+            "connect_timeout",
+            _read_env_int("DATABASE_CONNECT_TIMEOUT"),
+        ),
+        (
+            "DATABASE_INSERT_BATCH_SIZE",
+            "insert_batch_size",
+            _read_env_int("DATABASE_INSERT_BATCH_SIZE"),
+        ),
+    )
+
+    for _env_name, key, value in explicit_values:
+        if value is not None:
+            payload[key] = value
+
+    return payload
+
+
+###############################################################################
+def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
+    try:
+        db = JsonDatabaseSettings.model_validate(build_database_payload_from_env())
     except ValidationError as exc:
         raise RuntimeError(f"Invalid database settings: {exc}") from exc
     return _to_database_settings(db)
 
-
+###############################################################################
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
@@ -342,18 +435,21 @@ class AppSettings(BaseSettings):
     credential_master_key: str = "dev-insecure-master-key-change-me"
     credential_key_version: str = "v1"
 
+    # -------------------------------------------------------------------------
     @field_validator("fastapi_host", "ui_host", mode="before")
     @classmethod
     def normalize_required_strings(cls, value: Any) -> str:
         text = str(value).strip() if value is not None else ""
         return text or "127.0.0.1"
 
+    # -------------------------------------------------------------------------
     @field_validator("credential_master_key", "credential_key_version", mode="before")
     @classmethod
     def normalize_secret_strings(cls, value: Any) -> str:
         text = str(value).strip() if value is not None else ""
         return text
 
+    # -------------------------------------------------------------------------
     def to_server_settings(self) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
             self.gibs.wms_base_endpoints,
@@ -444,7 +540,7 @@ class AppSettings(BaseSettings):
         )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     if db.embedded_database:
         return DatabaseSettings(
@@ -478,7 +574,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     )
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _normalize_upper_key_mapping(
     mapping: dict[str, str],
     *,
@@ -493,7 +589,7 @@ def _normalize_upper_key_mapping(
     return normalized or dict(fallback)
 
 
-# -----------------------------------------------------------------------------
+###############################################################################
 def _normalize_key_mapping(
     mapping: dict[str, str],
     *,
