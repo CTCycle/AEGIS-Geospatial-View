@@ -33,20 +33,23 @@ from server.common.constants import (
 
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 
+MAP_SEARCH_ERROR_STATUS = {
+    MapSearchJobNotFoundError: status.HTTP_404_NOT_FOUND,
+    MapSearchJobInitializationError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
+
 
 def raise_map_search_http_error(error: MapSearchExecutionError) -> NoReturn:
-    if isinstance(error, MapSearchJobNotFoundError):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-    if isinstance(error, MapSearchJobInitializationError):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        ) from error
+    status_code = next(
+        (
+            mapped_status
+            for error_type, mapped_status in MAP_SEARCH_ERROR_STATUS.items()
+            if isinstance(error, error_type)
+        ),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
     raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=status_code,
         detail=str(error),
     ) from error
 

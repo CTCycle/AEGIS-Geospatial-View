@@ -38,7 +38,6 @@ from server.services.llm.errors import LLMConfigurationError
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 
 
-###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
 
@@ -63,7 +62,6 @@ async def _serialize_chat_event_stream(
         yield _stream_event(event)
 
 
-###############################################################################
 @router.post(
     CHAT_TURN_ROUTE,
     response_model=ChatTurnResponse,
@@ -82,7 +80,6 @@ async def chat_turn(
         ) from exc
 
 
-###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
     status_code=status.HTTP_200_OK,
@@ -98,7 +95,6 @@ async def chat_stream(
     )
 
 
-###############################################################################
 @router.get(
     CHAT_MODELS_ROUTE,
     response_model=ModelLibraryResponse,
@@ -113,7 +109,6 @@ def get_models(
     return ModelLibraryResponse.model_validate(response)
 
 
-###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
@@ -125,7 +120,6 @@ def get_settings(
     return runtime.settings_service.get_settings()
 
 
-###############################################################################
 @router.put(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
@@ -146,7 +140,6 @@ def update_settings(
         ) from exc
 
 
-###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
     response_model=OllamaRefreshResponse,
@@ -158,7 +151,6 @@ def refresh_ollama_models(
     return runtime.maintenance_service.refresh_ollama_models()
 
 
-###############################################################################
 @router.post(
     CHAT_OLLAMA_PULL_ROUTE,
     response_model=OllamaPullResponse,
@@ -186,7 +178,6 @@ def pull_ollama_model(
         ) from exc
 
 
-###############################################################################
 @router.get(
     CHAT_OLLAMA_HEALTH_ROUTE,
     response_model=OllamaHealthResponse,

@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from server.api import geospatial
+from server.api.geospatial import raise_service_http_error
 from server.app import create_app
-from server.services.geospatial.api_service import GeospatialApiService
-from server.services.geospatial.providers.base import ProviderRateLimitError, ProviderTimeoutError
+from server.services.geospatial.api_service import (
+    GeospatialApiService,
+    GeospatialApiServiceError,
+    GeospatialCapabilityNotFoundError,
+    GeospatialInvalidRequestError,
+    GeospatialTileCredentialError,
+    GeospatialTileRequestError,
+    GeospatialUnsupportedTileError,
+)
+from server.services.geospatial.providers.base import (
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+)
 
 
 def test_geospatial_capabilities_include_camera_network() -> None:
@@ -46,7 +59,9 @@ def test_geospatial_transit_features_return_metadata_until_feed_configured() -> 
 def test_geospatial_layer_health_returns_manifest_reliability() -> None:
     client = TestClient(create_app())
 
-    response = client.get("/api/geospatial/layers/rainviewer_precipitation_radar/health")
+    response = client.get(
+        "/api/geospatial/layers/rainviewer_precipitation_radar/health"
+    )
 
     assert response.status_code == 200
     payload = response.json()
@@ -94,8 +109,8 @@ def test_geospatial_features_map_provider_failures_without_500(
             raise provider_error
 
     client = TestClient(create_app())
-    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = (
-        lambda: GeospatialApiService(provider_registry=FailingRegistry())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        GeospatialApiService(provider_registry=FailingRegistry())
     )
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")
@@ -192,8 +207,6 @@ def test_phase8_credential_status_uses_provider_environment(
     assert configured.json()["configured"] is True
 
 
-
-
 def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
     client = TestClient(create_app())
 
@@ -237,10 +250,14 @@ def test_google_maps_is_manual_only_and_billing_aware() -> None:
 
     assert response.status_code == 200
     google_maps = next(
-        item for item in response.json()["providers"] if item["provider_id"] == "google_maps"
+        item
+        for item in response.json()["providers"]
+        if item["provider_id"] == "google_maps"
     )
     assert google_maps["automation"]["support"] == "manual_only"
-    assert any("billing" in note.lower() for note in google_maps["automation"]["safety_notes"])
+    assert any(
+        "billing" in note.lower() for note in google_maps["automation"]["safety_notes"]
+    )
 
 
 def test_opentripmap_is_unsupported() -> None:
@@ -250,7 +267,9 @@ def test_opentripmap_is_unsupported() -> None:
 
     assert response.status_code == 200
     opentripmap = next(
-        item for item in response.json()["providers"] if item["provider_id"] == "opentripmap"
+        item
+        for item in response.json()["providers"]
+        if item["provider_id"] == "opentripmap"
     )
     assert opentripmap["automation"]["support"] == "unsupported"
 
@@ -272,3 +291,53 @@ def test_geospatial_audit_endpoint_passes() -> None:
 
     assert response.status_code == 200
     assert response.json()["error_count"] == 0
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status", "expected_detail"),
+    [
+        (
+            GeospatialCapabilityNotFoundError("missing capability"),
+            404,
+            "missing capability",
+        ),
+        (
+            GeospatialInvalidRequestError("invalid request"),
+            400,
+            "invalid request",
+        ),
+        (
+            GeospatialUnsupportedTileError("unsupported tile"),
+            404,
+            "unsupported tile",
+        ),
+        (
+            GeospatialTileCredentialError("missing credential"),
+            401,
+            "missing credential",
+        ),
+        (
+            GeospatialTileRequestError("provider failed"),
+            502,
+            "provider failed",
+        ),
+    ],
+)
+def test_raise_service_http_error_maps_expected_statuses(
+    error: GeospatialApiServiceError,
+    expected_status: int,
+    expected_detail: str,
+) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        raise_service_http_error(error)
+
+    assert exc_info.value.status_code == expected_status
+    assert exc_info.value.detail == expected_detail
+
+
+def test_raise_service_http_error_uses_generic_fallback_for_unknown_error() -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        raise_service_http_error(GeospatialApiServiceError("internal failure"))
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Geospatial service request failed."

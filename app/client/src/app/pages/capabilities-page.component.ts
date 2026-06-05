@@ -6,6 +6,16 @@ import { CapabilityDescriptor, CatalogResponse } from '../core/types';
 
 type CapabilityGroup = 'providers' | 'basemaps' | 'overlays' | 'cameras' | 'transit' | 'tools';
 
+const EMPTY_CATALOG: CatalogResponse = {
+  capabilities: [],
+  providers: [],
+  basemaps: [],
+  overlays: [],
+  cameras: [],
+  transit: [],
+  tools: [],
+};
+
 @Component({
   selector: 'app-capabilities-page',
   standalone: true,
@@ -14,7 +24,7 @@ type CapabilityGroup = 'providers' | 'basemaps' | 'overlays' | 'cameras' | 'tran
   styleUrl: './capabilities-page.component.css',
 })
 export class CapabilitiesPageComponent implements OnInit {
-  catalog: CatalogResponse = { capabilities: [], providers: [], basemaps: [], overlays: [], cameras: [], transit: [], tools: [] };
+  catalog: CatalogResponse = { ...EMPTY_CATALOG };
   statusText = 'Loading capabilities';
   isLoading = true;
 
@@ -34,7 +44,7 @@ export class CapabilitiesPageComponent implements OnInit {
       this.catalog = await this.apiClient.fetchCatalog();
       this.statusText = 'Capability catalog loaded';
     } catch {
-      this.catalog = { capabilities: [], providers: [], basemaps: [], overlays: [], cameras: [], transit: [], tools: [] };
+      this.catalog = { ...EMPTY_CATALOG };
       this.statusText = 'Capability catalog unavailable.';
     } finally {
       this.isLoading = false;

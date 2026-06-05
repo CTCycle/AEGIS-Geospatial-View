@@ -19,14 +19,12 @@ from server.common.constants import (
 from server.common.logger import logger
 
 
-###############################################################################
 class JobManager:
     def __init__(self) -> None:
         self.jobs: dict[str, JobState] = {}
         self.threads: dict[str, threading.Thread] = {}
         self.lock = threading.Lock()
 
-    # -------------------------------------------------------------------------
     def start_job(
         self,
         job_type: str,
@@ -59,7 +57,6 @@ class JobManager:
         logger.info("Started job %s (type=%s)", job_id, job_type)
         return job_id
 
-    # -------------------------------------------------------------------------
     def get_job_status(self, job_id: str) -> dict[str, Any] | None:
         with self.lock:
             state = self.jobs.get(job_id)
@@ -67,7 +64,6 @@ class JobManager:
             return None
         return state.snapshot()
 
-    # -------------------------------------------------------------------------
     def cancel_job(self, job_id: str) -> bool:
         with self.lock:
             state = self.jobs.get(job_id)
@@ -83,52 +79,6 @@ class JobManager:
         logger.info("Cancelled job %s", job_id)
         return True
 
-    # -------------------------------------------------------------------------
-    def is_job_running(self, job_type: str | None = None) -> bool:
-        with self.lock:
-            for state in self.jobs.values():
-                if state.status in (JOB_STATUS_PENDING, JOB_STATUS_RUNNING):
-                    if job_type is None or state.job_type == job_type:
-                        return True
-        return False
-
-    # -------------------------------------------------------------------------
-    def list_jobs(self, job_type: str | None = None) -> list[dict[str, Any]]:
-        with self.lock:
-            states = list(self.jobs.values())
-        results: list[dict[str, Any]] = []
-        for state in states:
-            if job_type is None or state.job_type == job_type:
-                results.append(state.snapshot())
-        return results
-
-    # -------------------------------------------------------------------------
-    def should_stop(self, job_id: str) -> bool:
-        with self.lock:
-            state = self.jobs.get(job_id)
-        if state is None:
-            return True
-        return state.stop_requested
-
-    # -------------------------------------------------------------------------
-    def update_progress(self, job_id: str, progress: float) -> None:
-        with self.lock:
-            state = self.jobs.get(job_id)
-        if state:
-            state.update(progress=min(100.0, max(0.0, progress)))
-
-    # -------------------------------------------------------------------------
-    def update_result(self, job_id: str, patch: dict[str, Any]) -> None:
-        with self.lock:
-            state = self.jobs.get(job_id)
-        if state is None:
-            return
-        with state.lock:
-            existing = state.result or {}
-            merged = {**existing, **patch}
-            state.result = merged
-
-    # -------------------------------------------------------------------------
     def run_job(
         self,
         job_id: str,
@@ -170,16 +120,12 @@ class JobManager:
             logger.error("Job %s failed: %s", job_id, error_msg)
             logger.debug("Job %s error details", job_id, exc_info=True)
 
-    # -------------------------------------------------------------------------
     def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         for param in signature.parameters.values():
             if param.kind == param.VAR_KEYWORD:
                 return True
         return "job_id" in signature.parameters
-
-
-

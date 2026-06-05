@@ -29,6 +29,14 @@ from server.services.geospatial.api_service import (
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
+GEOSPATIAL_ERROR_STATUS = {
+    GeospatialCapabilityNotFoundError: status.HTTP_404_NOT_FOUND,
+    GeospatialInvalidRequestError: status.HTTP_400_BAD_REQUEST,
+    GeospatialUnsupportedTileError: status.HTTP_404_NOT_FOUND,
+    GeospatialTileCredentialError: status.HTTP_401_UNAUTHORIZED,
+    GeospatialTileRequestError: status.HTTP_502_BAD_GATEWAY,
+}
+
 
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
     runtime = getattr(request.app.state, "geospatial_runtime", None)
@@ -39,29 +47,17 @@ def get_geospatial_api_service(request: Request) -> GeospatialApiService:
 
 
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
-    if isinstance(error, GeospatialCapabilityNotFoundError):
+    status_code = next(
+        (
+            mapped_status
+            for error_type, mapped_status in GEOSPATIAL_ERROR_STATUS.items()
+            if isinstance(error, error_type)
+        ),
+        None,
+    )
+    if status_code is not None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialInvalidRequestError):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialUnsupportedTileError):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialTileCredentialError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialTileRequestError):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=status_code,
             detail=str(error),
         ) from error
     raise HTTPException(

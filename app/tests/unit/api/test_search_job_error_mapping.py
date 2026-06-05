@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import pytest
+from fastapi import HTTPException
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from server.api.search import router
+from server.api.search import raise_map_search_http_error, router
 from server.common.constants import MAP_SEARCH_JOB_INIT_ERROR
 from server.services.search.errors import (
+    MapSearchExecutionError,
     MapSearchJobInitializationError,
     MapSearchJobNotFoundError,
 )
@@ -86,3 +89,35 @@ def test_post_map_jobs_endpoint_maps_initialization_error_to_http_500() -> None:
 
     assert response.status_code == 500
     assert response.json()["detail"] == MAP_SEARCH_JOB_INIT_ERROR
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status", "expected_detail"),
+    [
+        (
+            MapSearchJobNotFoundError("Job not found: missing"),
+            404,
+            "Job not found: missing",
+        ),
+        (
+            MapSearchJobInitializationError(MAP_SEARCH_JOB_INIT_ERROR),
+            500,
+            MAP_SEARCH_JOB_INIT_ERROR,
+        ),
+        (
+            MapSearchExecutionError("generic failure"),
+            500,
+            "generic failure",
+        ),
+    ],
+)
+def test_raise_map_search_http_error_maps_expected_statuses(
+    error: MapSearchExecutionError,
+    expected_status: int,
+    expected_detail: str,
+) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        raise_map_search_http_error(error)
+
+    assert exc_info.value.status_code == expected_status
+    assert exc_info.value.detail == expected_detail
