@@ -8,6 +8,8 @@ import {
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
+  API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
+  API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
   API_MAPS_CATALOG_PATH,
   API_MAPS_SEARCH_PATH,
   API_OLLAMA_HEALTH_PATH,
@@ -56,6 +58,21 @@ export class ApiRequestError extends Error {
 }
 
 export const CHAT_STREAM_TIMEOUT_MS = 120_000;
+
+const buildQuerySuffix = (params: Record<string, string | number | boolean | undefined>): string => {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === false || value === '') {
+      return;
+    }
+    query.set(key, value === true ? 'true' : String(value));
+  });
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : '';
+};
+
+const asProviderPayload = (data: unknown): GeospatialProviderPayload =>
+  isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
 
 export const executeApiRequest = async (url: string, init: RequestInit): Promise<unknown> => {
   let response: Response;
@@ -130,61 +147,33 @@ export const fetchGeospatialLayerFeatures = async (
   layerId: string,
   params: { bbox?: string; zoom?: number; time?: string; live?: boolean; incidents?: boolean } = {},
 ): Promise<GeospatialProviderPayload> => {
-  const query = new URLSearchParams();
-  if (params.bbox) {
-    query.set('bbox', params.bbox);
-  }
-  if (typeof params.zoom === 'number') {
-    query.set('zoom', String(params.zoom));
-  }
-  if (params.time) {
-    query.set('time', params.time);
-  }
-  if (params.live) {
-    query.set('live', 'true');
-  }
-  if (params.incidents) {
-    query.set('incidents', 'true');
-  }
-  const suffix = query.toString() ? `?${query}` : '';
+  const suffix = buildQuerySuffix(params);
   const data = await executeApiRequest(
     `${API_BASE_URL}${API_GEOSPATIAL_LAYERS_PATH}/${encodeURIComponent(layerId)}/features${suffix}`,
     { method: 'GET' },
   );
-  return isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
+  return asProviderPayload(data);
 };
 
 export const fetchGeospatialCameras = async (
   params: { bbox?: string; provider?: string; camera_type?: string } = {},
 ): Promise<GeospatialProviderPayload> => {
-  const query = new URLSearchParams();
-  if (params.bbox) {
-    query.set('bbox', params.bbox);
-  }
-  if (params.provider) {
-    query.set('provider', params.provider);
-  }
-  if (params.camera_type) {
-    query.set('camera_type', params.camera_type);
-  }
-  const suffix = query.toString() ? `?${query}` : '';
+  const suffix = buildQuerySuffix(params);
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}${suffix}`, {
     method: 'GET',
   });
-  return isRecord(data) ? data as unknown as GeospatialProviderPayload : { status: 'unavailable', provider: 'unknown' };
+  return asProviderPayload(data);
 };
 
 export const fetchGeospatialCameraDetail = async (cameraId: string): Promise<GeospatialProviderPayload> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}/${encodeURIComponent(cameraId)}`, {
     method: 'GET',
   });
-  return isRecord(data)
-    ? data as unknown as GeospatialProviderPayload
-    : { status: 'unavailable', provider: 'unknown' };
+  return asProviderPayload(data);
 };
 
 export const fetchGeospatialCredentialStatus = async (providerId: string): Promise<GeospatialCredentialStatus> => {
-  const data = await executeApiRequest(`${API_BASE_URL}/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`, {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH(providerId)}`, {
     method: 'GET',
   });
   if (!isRecord(data)) {
@@ -199,7 +188,7 @@ export const fetchGeospatialCredentialStatus = async (providerId: string): Promi
 };
 
 export const fetchGeospatialProviderAccountSetups = async (): Promise<GeospatialProviderAccountSetupListResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}/geospatial/providers/account-setup`, { method: 'GET' });
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH}`, { method: 'GET' });
   return parseGeospatialProviderAccountSetups(data);
 };
 

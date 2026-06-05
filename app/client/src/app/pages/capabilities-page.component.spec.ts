@@ -4,8 +4,10 @@ import { ApiClientService } from '../core/api-client.service';
 import { CapabilitiesPageComponent } from './capabilities-page.component';
 
 describe('pages/capabilities-page.component', () => {
+  let apiClient: jasmine.SpyObj<ApiClientService>;
+
   beforeEach(async () => {
-    const apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['fetchCatalog']);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['fetchCatalog']);
     const fetchCatalogMock = jasmine.createSpy('fetchCatalog').and.resolveTo({
       capabilities: [],
       providers: [{ id: 'gibs', name: 'NASA GIBS', kind: 'provider', provider: 'gibs', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', action_tags: [], task_tags: [], metadata: { docs_url: 'https://earthdata.nasa.gov/' } }],
@@ -37,5 +39,25 @@ describe('pages/capabilities-page.component', () => {
     expect(text).toContain('TomTom Traffic Flow');
     expect(text).toContain('Optional provider key required before use.');
     expect(text).not.toContain('Ask agent');
+  });
+
+  it('falls back to an empty catalog and unavailable status text on fetch failure', async () => {
+    apiClient.fetchCatalog.and.rejectWith(new Error('network failed'));
+
+    const fixture = TestBed.createComponent(CapabilitiesPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const component = fixture.componentInstance;
+    expect(component.statusText).toBe('Capability catalog unavailable.');
+    expect(component.catalog).toEqual({
+      capabilities: [],
+      providers: [],
+      basemaps: [],
+      overlays: [],
+      cameras: [],
+      transit: [],
+      tools: [],
+    });
   });
 });

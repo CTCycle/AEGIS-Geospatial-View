@@ -37,7 +37,7 @@ def test_database_settings_uses_constants_database_path(
     ):
         monkeypatch.delenv(key, raising=False)
 
-    settings = build_database_settings({})
+    settings = build_database_settings()
     assert settings.database_path == DATABASE_FILE_PATH
     assert settings.embedded_database is True
 
@@ -46,13 +46,19 @@ def test_database_settings_reads_insert_batch_size_from_env_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_INSERT_BATCH_SIZE", "777")
-    settings = build_database_settings({"insert_batch_size": 123})
+    settings = build_database_settings()
     assert settings.insert_batch_size == 777
 
 
 def test_database_settings_reads_external_database_keys_from_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    for key in (
+        "DATABASE_ENGINE",
+        "DATABASE_HOST",
+        "DATABASE_NAME",
+    ):
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("EMBEDDED_DATABASE", "false")
     monkeypatch.setenv(
         "DATABASE_URL", "postgresql://url-user:url-pass@url-host:6543/url-db"
@@ -65,7 +71,7 @@ def test_database_settings_reads_external_database_keys_from_env(
     monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "55")
     monkeypatch.setenv("DATABASE_INSERT_BATCH_SIZE", "2200")
 
-    settings = build_database_settings({})
+    settings = build_database_settings()
 
     assert settings.embedded_database is False
     assert settings.engine == "postgresql+psycopg"
@@ -80,11 +86,12 @@ def test_database_settings_reads_external_database_keys_from_env(
     assert settings.insert_batch_size == 2200
 
 
-def test_database_settings_ignores_payload_database_keys(
+def test_database_settings_ignores_json_database_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for key in (
         "EMBEDDED_DATABASE",
+        "DATABASE_URL",
         "DATABASE_ENGINE",
         "DATABASE_HOST",
         "DATABASE_PORT",
@@ -98,21 +105,7 @@ def test_database_settings_ignores_payload_database_keys(
     ):
         monkeypatch.delenv(key, raising=False)
 
-    settings = build_database_settings(
-        {
-            "embedded_database": False,
-            "engine": "postgresql+psycopg",
-            "host": "db-host",
-            "port": 6432,
-            "database_name": "db-name",
-            "username": "db-user",
-            "password": "db-pass",
-            "ssl": True,
-            "ssl_ca": "/db/ca.pem",
-            "connect_timeout": 45,
-            "insert_batch_size": 1500,
-        }
-    )
+    settings = build_database_settings()
 
     assert settings.database_path == DATABASE_FILE_PATH
     assert settings.embedded_database is True
@@ -164,6 +157,9 @@ def test_configuration_manager_reads_database_settings_from_env_only(
     for key in (
         "EMBEDDED_DATABASE",
         "DATABASE_URL",
+        "DATABASE_ENGINE",
+        "DATABASE_HOST",
+        "DATABASE_NAME",
         "DATABASE_USERNAME",
         "DATABASE_PASSWORD",
         "DATABASE_PORT",
