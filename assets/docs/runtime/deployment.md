@@ -1,12 +1,12 @@
 # Deployment
 
-Last updated: 2026-06-02
+Last updated: 2026-06-05
 
 ## Backend Persistence
 
 - SQLite and PostgreSQL are both supported.
-- Database mode is controlled by `settings/configurations.json`.
-- `database.embedded_database` switches between SQLite and PostgreSQL.
+- Database mode is controlled by `settings/.env` or runtime environment variables.
+- `EMBEDDED_DATABASE` switches between SQLite and PostgreSQL.
 - SQLite resolves to `app/resources/database.db`.
 
 ## Interoperability
