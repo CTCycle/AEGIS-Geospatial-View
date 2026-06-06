@@ -1,7 +1,7 @@
 <div class="overlay-controls">
   @for (overlay of overlays; track trackOverlay($index, overlay)) {
     <div class="overlay-control-row">
-      <label>
+      <label [attr.data-render-status]="getRenderStatus(overlay.id)">
         <input
           type="checkbox"
           [checked]="overlayVisibility[overlay.id]"
@@ -15,8 +15,17 @@
         min="0"
         max="100"
         [value]="getOpacityPercent(overlay)"
+        [disabled]="isOpacityDisabled(overlay.id)"
         (input)="onOpacityChange(overlay.id, opacityInput.value)"
       />
+      @if (getRenderStatus(overlay.id) !== 'loaded') {
+        <p class="overlay-render-note">
+          {{ getRenderStatus(overlay.id) }}
+          @if (getRenderMessage(overlay.id)) {
+            : {{ getRenderMessage(overlay.id) }}
+          }
+        </p>
+      }
     </div>
   }
 </div>

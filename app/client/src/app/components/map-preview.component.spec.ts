@@ -227,6 +227,12 @@ describe('components/map-preview.component', () => {
     const style = (maplibregl.Map as unknown as jasmine.Spy).calls.mostRecent().args[0].style;
     expect(style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
     expect(fakeMap.addSource.calls.allArgs().length).toBe(0);
+    expect(component.failedOverlayStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'broken_overlay',
+        status: 'failed',
+      }),
+    ]);
   });
 
   it('renders GeoJSON overlay sources as vector layers', () => {
@@ -322,6 +328,61 @@ describe('components/map-preview.component', () => {
     expect(vectorLayer?.['source-layer']).toBe('admin_boundaries');
     expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
     expect(component.attributionEntries).toContain('Natural Earth');
+  });
+
+  it('surfaces a layer-specific failure when vector source_layer metadata is missing', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'broken_vector',
+            label: 'Broken vector',
+            type: 'vector-tile',
+            rendering_mode: 'vector-tile',
+            provider: 'fixture',
+            url: 'https://example.test/tiles/{z}/{x}/{y}.pbf',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(maplibregl.Map).toHaveBeenCalled();
+    expect(component.failedOverlayStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'broken_vector',
+        status: 'failed',
+        message: 'Vector tile overlay is missing source_layer metadata.',
+      }),
+    ]);
+  });
+
+  it('disables opacity controls for metadata-only overlays', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'metadata_only',
+            label: 'Metadata only',
+            type: 'metadata-only',
+            rendering_mode: 'metadata-only',
+            provider: 'fixture',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    const opacityInput = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement | null;
+    expect(component.overlayRenderStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'metadata_only',
+        status: 'metadata-only',
+      }),
+    ]);
+    expect(opacityInput?.disabled).toBeTrue();
   });
 
   it('does not crash when map session is absent', () => {

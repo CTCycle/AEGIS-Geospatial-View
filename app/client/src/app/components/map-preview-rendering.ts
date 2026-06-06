@@ -12,12 +12,21 @@ import {
   DEFAULT_WMTS_FORMAT,
   DEFAULT_WMTS_MATRIX_SET,
 } from '../core/constants';
-import { MapSession } from '../core/types';
+import { MapSession, OverlayRenderStatus } from '../core/types';
 import { isFiniteNumber } from '../core/type-guards';
 
 export type OverlayEntry = NonNullable<MapSession['overlays']>[number];
-
 type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
+
+const toMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+  return 'Overlay rendering failed.';
+};
 
 export const recordBooleanEqual = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
   const aKeys = Object.keys(a);
@@ -161,67 +170,95 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
   };
 };
 
-export const addOverlayLayers = (map: Map, mapSession?: MapSession): void => {
+export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRenderStatus[] => {
   const overlays = mapSession?.overlays || [];
+  const statuses: OverlayRenderStatus[] = [];
+
   overlays.forEach((overlay, index) => {
     const sourceId = `overlay-source-${overlay.id}`;
     const layerId = `overlay-layer-${overlay.id}`;
     const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
     const sourceBounds = normalizeOverlayBounds(overlay.bounds);
     const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
-    if (
-      ['xyz', 'raster-tile', 'wmts', 'wms', 'tile'].includes(renderingMode)
-      && addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)
-    ) {
-      return;
-    }
-
-    if (
-      ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
-      && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)
-    ) {
-      return;
-    }
-
-    if (renderingMode === 'vector-tile' && addVectorTileOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
-      return;
-    }
-
-    if (overlay.type === 'point-insight') {
-      const center = mapSession?.center;
-      if (typeof center?.longitude !== 'number' || typeof center?.latitude !== 'number') {
+    try {
+      if (renderingMode === 'metadata-only' || overlay.type === 'metadata-only') {
+        statuses.push({
+          overlayId: overlay.id,
+          status: 'metadata-only',
+          message: 'This layer is available as metadata or setup context only.',
+        });
         return;
       }
-      map.addSource(sourceId, {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              properties: { label: overlay.label },
-              geometry: {
-                type: 'Point',
-                coordinates: [center.longitude, center.latitude],
+
+      if (
+        ['xyz', 'raster-tile', 'wmts', 'wms', 'tile'].includes(renderingMode)
+        && addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)
+      ) {
+        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        return;
+      }
+
+      if (
+        ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
+        && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)
+      ) {
+        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        return;
+      }
+
+      if (renderingMode === 'vector-tile' && addVectorTileOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
+        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        return;
+      }
+
+      if (overlay.type === 'point-insight') {
+        const center = mapSession?.center;
+        if (typeof center?.longitude !== 'number' || typeof center?.latitude !== 'number') {
+          throw new Error('Map center unavailable for point insight rendering.');
+        }
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: { label: overlay.label },
+                geometry: {
+                  type: 'Point',
+                  coordinates: [center.longitude, center.latitude],
+                },
               },
-            },
-          ],
-        },
-      });
-      map.addLayer({
-        id: layerId,
-        source: sourceId,
-        type: 'circle',
-        paint: {
-          'circle-radius': 8 + index,
-          'circle-color': '#ef4444',
-          'circle-opacity': opacity,
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#111827',
-        },
+            ],
+          },
+        });
+        map.addLayer({
+          id: layerId,
+          source: sourceId,
+          type: 'circle',
+          paint: {
+            'circle-radius': 8 + index,
+            'circle-color': '#ef4444',
+            'circle-opacity': opacity,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#111827',
+          },
+        });
+        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        return;
+      }
+
+      throw new Error('Unsupported overlay render descriptor.');
+    } catch (error) {
+      statuses.push({
+        overlayId: overlay.id,
+        status: 'failed',
+        message: toMessage(error),
       });
     }
   });
+
+  return statuses;
 };
 
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
@@ -316,17 +353,22 @@ const addVectorTileOverlayLayer = (
   layerId: string,
   opacity: number,
 ): boolean => {
-  if (!overlay.url) {
+  const tilesUrl = overlay.tile_url_template || overlay.url;
+  const sourceLayer = overlay.source_layer || overlay.layer_id;
+  if (!tilesUrl) {
     return false;
+  }
+  if (!sourceLayer) {
+    throw new Error('Vector tile overlay is missing source_layer metadata.');
   }
   map.addSource(sourceId, {
     type: 'vector',
-    tiles: [overlay.tile_url_template || overlay.url],
+    tiles: [tilesUrl],
   });
   map.addLayer({
     id: layerId,
     source: sourceId,
-    'source-layer': overlay.source_layer || overlay.layer_id || overlay.id,
+    'source-layer': sourceLayer,
     type: 'fill',
     paint: {
       'fill-color': '#22c55e',

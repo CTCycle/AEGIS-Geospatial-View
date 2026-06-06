@@ -38,4 +38,22 @@ describe('OverlayControlsComponent', () => {
     component.onOpacityChange('ov1', 'abc');
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('disables opacity controls for metadata-only overlays and exposes status text', () => {
+    component.overlayRenderStatuses = [
+      {
+        overlayId: 'ov1',
+        status: 'metadata-only',
+        message: 'Metadata only.',
+      },
+    ];
+
+    fixture.detectChanges();
+
+    const range = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement | null;
+    const note = fixture.nativeElement.querySelector('.overlay-render-note') as HTMLParagraphElement | null;
+
+    expect(range?.disabled).toBeTrue();
+    expect(note?.textContent).toContain('metadata-only');
+  });
 });

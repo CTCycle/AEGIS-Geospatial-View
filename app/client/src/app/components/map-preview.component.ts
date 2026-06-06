@@ -18,6 +18,7 @@ import maplibregl, { Map } from 'maplibre-gl';
 import { DEFAULT_MAP_FIT_MAX_ZOOM, DEFAULT_OVERLAY_OPACITY } from '../core/constants';
 import {
   MapSession,
+  OverlayRenderStatus,
   OverlayOpacityChange,
   OverlayStateChange,
   OverlayVisibilityChange,
@@ -60,6 +61,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   mapSession?: MapSession;
   overlayVisibility: Record<string, boolean> = {};
   overlayOpacity: Record<string, number> = {};
+  overlayRenderStatuses: OverlayRenderStatus[] = [];
   restoreNotice = '';
 
   private mapRef: Map | null = null;
@@ -85,10 +87,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get metadataOnlyOverlays(): OverlayEntry[] {
-    return this.overlays.filter((overlay) => {
-      const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
-      return renderingMode === 'metadata-only' || !overlay.url;
-    });
+    const metadataOnlyIds = new Set(
+      this.overlayRenderStatuses
+        .filter((status) => status.status === 'metadata-only')
+        .map((status) => status.overlayId),
+    );
+    return this.overlays.filter((overlay) => metadataOnlyIds.has(overlay.id));
   }
 
   get attributionEntries(): string[] {
@@ -104,6 +108,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       label: overlay.label,
       mode: String(overlay.rendering_mode || overlay.type || 'overlay'),
     }));
+  }
+
+  get failedOverlayStatuses(): OverlayRenderStatus[] {
+    return this.overlayRenderStatuses.filter((status) => status.status === 'failed');
   }
 
   get embeddedMapHtml(): string | null {
@@ -183,6 +191,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const next = this.payload?.map_session;
     if (!next) {
       this.mapSession = undefined;
+      this.overlayRenderStatuses = [];
       return;
     }
     const overlayIds = next.overlay_ids ?? [];
@@ -207,6 +216,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       },
       overlays,
     };
+    this.overlayRenderStatuses = overlays.map((overlay) => ({
+      overlayId: overlay.id,
+      status: 'pending',
+    }));
   }
 
   private rebuildOverlayStateFromSession(): void {
@@ -273,12 +286,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     map.on('load', () => {
       map.resize();
-      addOverlayLayers(map, this.mapSession);
+      this.overlayRenderStatuses = addOverlayLayers(map, this.mapSession);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
         map.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
       }
       this.applyOverlayStateToMap();
+      this.changeDetector.detectChanges();
     });
 
     this.mapRef = map;
