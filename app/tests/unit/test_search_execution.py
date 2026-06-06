@@ -6,6 +6,7 @@ import inspect
 from server.domain.geographics import LocationSearchRequest, SearchByLocationResponse
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.jobs import JobStartResponse
+from server.services.geospatial.rainviewer import RainViewerRequestError
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.composition import build_search_runtime
 
@@ -105,15 +106,16 @@ def test_search_and_job_paths_share_normalized_payload(monkeypatch) -> None:
     assert job_kwargs["kwargs"] == {"service": service, "job_payload": payload}
 
 
-def test_location_search_orchestrator_includes_render_descriptors(monkeypatch) -> None:
-    monkeypatch.setattr(
-        LocationSearchOrchestrator,
-        "_resolve_rainviewer_tile_url",
-        staticmethod(
-            lambda: "https://tilecache.rainviewer.com/v2/radar/123/256/{z}/{x}/{y}/2/1_1.png"
-        ),
+def test_location_search_orchestrator_includes_render_descriptors() -> None:
+    class _RainViewerService:
+        async def get_latest_radar_metadata(self) -> dict[str, object]:
+            return {
+                "tile_url_template": "https://tilecache.rainviewer.com/v2/radar/123/256/{z}/{x}/{y}/2/1_1.png"
+            }
+
+    orchestrator = LocationSearchOrchestrator(
+        rainviewer_service=_RainViewerService(),  # type: ignore[arg-type]
     )
-    orchestrator = LocationSearchOrchestrator()
     payload = LocationSearchRequest(
         resolved_location=ResolvedLocation(
             label="Tokyo",
@@ -313,13 +315,14 @@ def test_location_search_orchestrator_emits_backend_final_wms_wmts_and_metadata_
     assert "vector tile render metadata is incomplete" in " ".join(session.compliance_warnings)
 
 
-def test_location_search_orchestrator_warns_on_rainviewer_fallback(monkeypatch) -> None:
-    monkeypatch.setattr(
-        LocationSearchOrchestrator,
-        "_resolve_rainviewer_tile_url",
-        staticmethod(lambda: None),
+def test_location_search_orchestrator_warns_on_rainviewer_fallback() -> None:
+    class _FailingRainViewerService:
+        async def get_latest_radar_metadata(self) -> dict[str, object]:
+            raise RainViewerRequestError("offline")
+
+    orchestrator = LocationSearchOrchestrator(
+        rainviewer_service=_FailingRainViewerService(),  # type: ignore[arg-type]
     )
-    orchestrator = LocationSearchOrchestrator()
     payload = LocationSearchRequest(
         resolved_location=ResolvedLocation(
             label="Tokyo",

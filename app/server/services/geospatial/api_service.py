@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import os
-import urllib.error
-import urllib.request
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
@@ -26,6 +23,7 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from server.services.geospatial.providers.http import fetch_bytes_url
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -178,15 +176,11 @@ class GeospatialApiService:
         url = build_tomtom_tile_url(kind, z, x, y, api_key)
         try:
             return await self._fetch_binary_url(url)
-        except urllib.error.HTTPError as exc:
-            if exc.code in {401, 403}:
-                raise GeospatialTileCredentialError(
-                    "TomTom rejected the configured API key."
-                ) from exc
-            raise GeospatialTileRequestError(
-                f"TomTom tile request failed with HTTP {exc.code}."
+        except ProviderAuthError as exc:
+            raise GeospatialTileCredentialError(
+                "TomTom rejected the configured API key."
             ) from exc
-        except (TimeoutError, urllib.error.URLError) as exc:
+        except (ProviderTimeoutError, ProviderUnavailableError) as exc:
             raise GeospatialTileRequestError("TomTom tile request failed.") from exc
 
     # -------------------------------------------------------------------------
@@ -219,15 +213,11 @@ class GeospatialApiService:
         )
         try:
             return await self._fetch_binary_url(upstream_url)
-        except urllib.error.HTTPError as exc:
-            if exc.code in {401, 403}:
-                raise GeospatialTileCredentialError(
-                    f"{self._humanize_provider(provider)} rejected the configured credentials."
-                ) from exc
-            raise GeospatialTileRequestError(
-                f"{self._humanize_provider(provider)} tile request failed with HTTP {exc.code}."
+        except ProviderAuthError as exc:
+            raise GeospatialTileCredentialError(
+                f"{self._humanize_provider(provider)} rejected the configured credentials."
             ) from exc
-        except (TimeoutError, urllib.error.URLError) as exc:
+        except (ProviderTimeoutError, ProviderUnavailableError) as exc:
             raise GeospatialTileRequestError(
                 f"{self._humanize_provider(provider)} tile request failed."
             ) from exc
@@ -758,9 +748,4 @@ class GeospatialApiService:
         return lookup.get(provider, provider or "Provider")
 
     async def _fetch_binary_url(self, url: str) -> bytes:
-        return await asyncio.to_thread(self._fetch_binary_url_sync, url)
-
-    def _fetch_binary_url_sync(self, url: str) -> bytes:
-        request = urllib.request.Request(url, headers={"User-Agent": "AEGIS/1.0"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return response.read()
+        return await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})
