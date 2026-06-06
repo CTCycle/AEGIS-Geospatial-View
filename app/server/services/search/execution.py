@@ -11,7 +11,7 @@ from server.domain.geographics import (
 from server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.osm_tiles import OsmTileProxyError, OsmTileProxyService
-from server.services.jobs import JobManager
+from server.services.jobs import JobBackend
 from server.services.search.errors import (
     MapSearchJobInitializationError,
     MapSearchJobNotFoundError,
@@ -34,7 +34,7 @@ class MapSearchExecutionService:
         orchestrator: LocationSearchOrchestrator,
         catalog_service: GeospatialCatalogService,
         osm_tile_proxy_service: OsmTileProxyService,
-        job_manager: JobManager,
+        job_manager: JobBackend,
     ) -> None:
         self.orchestrator = orchestrator
         self.catalog_service = catalog_service

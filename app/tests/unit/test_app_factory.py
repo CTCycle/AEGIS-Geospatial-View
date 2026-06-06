@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import pytest
 
 import server.app as app_module
 from server.common.constants import FASTAPI_API_PREFIX
@@ -12,6 +13,10 @@ from server.common.constants import FASTAPI_API_PREFIX
 def _settings():  # noqa: ANN202
     return SimpleNamespace(
         database=SimpleNamespace(database_path="test.db", insert_batch_size=1000),
+        jobs=SimpleNamespace(
+            backend="in_process",
+            require_durable_backend=False,
+        ),
         credential_master_key="dev-key",
         credential_key_version="v1",
     )
@@ -31,7 +36,10 @@ def _build_geospatial_runtime() -> SimpleNamespace:
 
 
 def _mock_lifespan_dependencies(monkeypatch) -> None:
-    search_runtime = SimpleNamespace(search_orchestrator=object())
+    search_runtime = SimpleNamespace(
+        search_orchestrator=object(),
+        job_manager=app_module.InProcessJobBackend(),
+    )
     chat_runtime = _build_chat_runtime([])
     geospatial_runtime = _build_geospatial_runtime()
 
@@ -71,7 +79,10 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
 
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
-    search_runtime = SimpleNamespace(search_orchestrator=object())
+    search_runtime = SimpleNamespace(
+        search_orchestrator=object(),
+        job_manager=app_module.InProcessJobBackend(),
+    )
     chat_runtime = _build_chat_runtime(call_order)
     geospatial_runtime = _build_geospatial_runtime()
 
@@ -224,3 +235,63 @@ def test_openapi_schema_generates(monkeypatch) -> None:
     assert f"{FASTAPI_API_PREFIX}/maps/search" in paths
     assert f"{FASTAPI_API_PREFIX}/geospatial/capabilities" in paths
     assert f"{FASTAPI_API_PREFIX}/chat/settings" in paths
+
+
+def test_startup_warns_when_using_in_process_job_backend(monkeypatch) -> None:
+    call_order: list[str] = []
+    search_runtime = SimpleNamespace(
+        search_orchestrator=object(),
+        job_manager=app_module.InProcessJobBackend(),
+    )
+    chat_runtime = _build_chat_runtime(call_order)
+    geospatial_runtime = _build_geospatial_runtime()
+    warnings: list[str] = []
+
+    monkeypatch.setattr(app_module, "get_server_settings", _settings)
+    monkeypatch.setattr(app_module, "initialize_database", lambda settings: None)
+    monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
+    monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
+    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator: chat_runtime)
+    monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda: geospatial_runtime)
+    monkeypatch.setattr(app_module, "run_startup_validations", lambda settings: None)
+    monkeypatch.setattr(app_module.logger, "warning", lambda message: warnings.append(message))
+
+    with TestClient(app_module.create_app()):
+        pass
+
+    assert warnings == [
+        "Using in_process job backend. Jobs are memory-backed, process-local, and not durable."
+    ]
+
+
+def test_startup_rejects_in_process_job_backend_when_durable_jobs_required(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module,
+        "get_server_settings",
+        lambda: SimpleNamespace(
+            database=SimpleNamespace(database_path="test.db", insert_batch_size=1000),
+            jobs=SimpleNamespace(
+                backend="in_process",
+                require_durable_backend=True,
+            ),
+            credential_master_key="dev-key",
+            credential_key_version="v1",
+        ),
+    )
+    monkeypatch.setattr(app_module, "initialize_database", lambda settings: None)
+    monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
+    monkeypatch.setattr(
+        app_module,
+        "build_search_runtime",
+        lambda: SimpleNamespace(
+            search_orchestrator=object(),
+            job_manager=app_module.InProcessJobBackend(),
+        ),
+    )
+    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator: _build_chat_runtime([]))
+    monkeypatch.setattr(app_module, "build_geospatial_runtime", _build_geospatial_runtime)
+    monkeypatch.setattr(app_module, "run_startup_validations", lambda settings: None)
+
+    with pytest.raises(RuntimeError, match="Durable jobs are required by configuration"):
+        with TestClient(app_module.create_app()):
+            pass

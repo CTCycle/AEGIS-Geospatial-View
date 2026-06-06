@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from server.api.chat import router as chat_router
 from server.api.geospatial import router as geospatial_router
 from server.api.search import router as search_router
+from server.common.logger import logger
 from server.common.constants import (
     CLIENT_ASSETS_PATH,
     CLIENT_DIST_PATH,
@@ -29,6 +30,7 @@ from server.repositories.database.initializer import (
 )
 from server.services.chat.composition import build_chat_runtime
 from server.services.geospatial.composition import build_geospatial_runtime
+from server.services.jobs import InProcessJobBackend
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
@@ -82,6 +84,21 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.geospatial_runtime = geospatial_runtime
 
     chat_runtime.settings_service.get_settings()
+
+    jobs_settings = getattr(settings, "jobs", None)
+    require_durable_backend = bool(
+        getattr(jobs_settings, "require_durable_backend", False)
+    )
+    if require_durable_backend and isinstance(
+        search_runtime.job_manager, InProcessJobBackend
+    ):
+        raise RuntimeError(
+            "Durable jobs are required by configuration, but only the in_process job backend is configured."
+        )
+    if isinstance(search_runtime.job_manager, InProcessJobBackend):
+        logger.warning(
+            "Using in_process job backend. Jobs are memory-backed, process-local, and not durable."
+        )
 
     run_startup_validations(settings)
 

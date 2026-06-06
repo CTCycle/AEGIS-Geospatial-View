@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-03
+Last updated: 2026-06-06
 
 ## Layering
 
@@ -69,12 +69,13 @@ Provider metadata manifests are registered only when a backend adapter exists. B
 
 ### Threaded
 
-- Long-running map jobs use in-process `threading.Thread`.
+- Long-running map jobs currently use `InProcessJobBackend`, which wraps in-process `threading.Thread`.
 - `MapSearchExecutionService.start_search_job` bridges async work inside job threads with `asyncio.run(...)`.
 - Cancellation is cooperative through `stop_requested`.
 
 ## Runtime Constraints
 
 - Job state is process-local and memory-backed.
+- `app/server/services/jobs.py` defines the `JobBackend` boundary for future durable backends.
 - Distributed or high-concurrency workloads would require an external queue/worker model.
 - Async endpoints must avoid blocking CPU-heavy work on the event loop.

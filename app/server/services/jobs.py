@@ -3,12 +3,11 @@ from __future__ import annotations
 import inspect
 import threading
 import uuid
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from time import monotonic
 from typing import Any
 
-from collections.abc import Callable
-
-from server.services.job_state import JobState
 from server.common.constants import (
     JOB_STATUS_CANCELLED,
     JOB_STATUS_COMPLETED,
@@ -17,9 +16,30 @@ from server.common.constants import (
     JOB_STATUS_RUNNING,
 )
 from server.common.logger import logger
+from server.services.job_state import JobState
 
 
-class JobManager:
+class JobBackend(ABC):
+    @abstractmethod
+    def start_job(
+        self,
+        job_type: str,
+        runner: Callable[..., dict[str, Any]],
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+    ) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_job_status(self, job_id: str) -> dict[str, Any] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def cancel_job(self, job_id: str) -> bool:
+        raise NotImplementedError
+
+
+class InProcessJobBackend(JobBackend):
     def __init__(self) -> None:
         self.jobs: dict[str, JobState] = {}
         self.threads: dict[str, threading.Thread] = {}
@@ -54,7 +74,7 @@ class JobManager:
         state.update(status=JOB_STATUS_RUNNING)
         thread.start()
 
-        logger.info("Started job %s (type=%s)", job_id, job_type)
+        logger.info("Started job %s (type=%s) with in-process backend", job_id, job_type)
         return job_id
 
     def get_job_status(self, job_id: str) -> dict[str, Any] | None:
@@ -76,7 +96,7 @@ class JobManager:
             status=JOB_STATUS_CANCELLED,
             completed_at=monotonic(),
         )
-        logger.info("Cancelled job %s", job_id)
+        logger.info("Cancelled in-process job %s", job_id)
         return True
 
     def run_job(
@@ -105,11 +125,11 @@ class JobManager:
                     progress=100.0,
                     completed_at=monotonic(),
                 )
-                logger.info("Job %s completed successfully", job_id)
+                logger.info("In-process job %s completed successfully", job_id)
         except Exception as exc:  # noqa: BLE001
             if state.stop_requested:
                 state.update(status=JOB_STATUS_CANCELLED, completed_at=monotonic())
-                logger.info("Job %s cancelled during execution", job_id)
+                logger.info("In-process job %s cancelled during execution", job_id)
                 return
             error_msg = str(exc).split("\n")[0][:200]
             state.update(
@@ -117,15 +137,52 @@ class JobManager:
                 error=error_msg,
                 completed_at=monotonic(),
             )
-            logger.error("Job %s failed: %s", job_id, error_msg)
-            logger.debug("Job %s error details", job_id, exc_info=True)
+            logger.error("In-process job %s failed: %s", job_id, error_msg)
+            logger.debug("In-process job %s error details", job_id, exc_info=True)
 
-    def runner_accepts_job_id(self, runner: Callable[..., dict[str, Any]]) -> bool:
+    @staticmethod
+    def runner_accepts_job_id(runner: Callable[..., dict[str, Any]]) -> bool:
         try:
             signature = inspect.signature(runner)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
         for param in signature.parameters.values():
             if param.kind == param.VAR_KEYWORD:
                 return True
         return "job_id" in signature.parameters
+
+
+class UnsupportedJobBackend(JobBackend):
+    def __init__(self, backend_name: str) -> None:
+        self.backend_name = backend_name
+
+    def start_job(
+        self,
+        job_type: str,
+        runner: Callable[..., dict[str, Any]],
+        args: tuple[Any, ...] = (),
+        kwargs: dict[str, Any] | None = None,
+    ) -> str:
+        _ = job_type, runner, args, kwargs
+        raise RuntimeError(
+            f"Job backend '{self.backend_name}' is not implemented yet. "
+            "Use 'in_process' or add a durable backend implementation."
+        )
+
+    def get_job_status(self, job_id: str) -> dict[str, Any] | None:
+        _ = job_id
+        return None
+
+    def cancel_job(self, job_id: str) -> bool:
+        _ = job_id
+        return False
+
+
+def build_job_backend(backend_name: str) -> JobBackend:
+    normalized = str(backend_name).strip().lower() or "in_process"
+    if normalized == "in_process":
+        return InProcessJobBackend()
+    return UnsupportedJobBackend(normalized)
+
+
+JobManager = InProcessJobBackend

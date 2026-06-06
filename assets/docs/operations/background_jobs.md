@@ -1,15 +1,17 @@
 # Background Jobs
 
-Last updated: 2026-06-02
+Last updated: 2026-06-06
 
 ## Scope
 
-AEGIS uses an in-process, thread-based job manager for asynchronous map-search execution.
+AEGIS uses a pluggable job backend contract for asynchronous map-search execution.
+The default implementation remains an in-process, thread-based backend.
 
 ## Components
 
 - `JobState`
-- `JobManager`
+- `JobBackend`
+- `InProcessJobBackend`
 - `SearchRuntime.job_manager`
 
 ## Lifecycle
@@ -43,6 +45,7 @@ Important fields include:
 ## Execution Model
 
 - Each job runs in a dedicated daemon thread.
+- `InProcessJobBackend` is the current concrete implementation.
 - Map-search jobs execute through `app/server/services/search/execution.py::run_search_job(...)`.
 - Missing-job and initialization failures are translated into HTTP errors by the API layer.
 - Failures are surfaced through status polling.
@@ -54,3 +57,11 @@ Important fields include:
 - Running logic must check `job_manager.should_stop(job_id)`.
 - There is no force-kill mechanism for active threads.
 - Jobs are process-local and memory-backed.
+- Future durable backends such as Redis/RQ, Celery, or Arq are not implemented yet.
+
+## Configuration
+
+- `jobs.backend`
+  Current supported value: `in_process`
+- `jobs.require_durable_backend`
+  When `true`, startup rejects the `in_process` backend.

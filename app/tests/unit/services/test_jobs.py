@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from server.common.constants import JOB_STATUS_PENDING
-from server.services.jobs import JobManager
+from server.services.jobs import InProcessJobBackend, JobManager, build_job_backend
 
 
 def test_start_job_returns_job_id_and_initial_status() -> None:
@@ -61,3 +63,16 @@ def test_runner_accepts_job_id_rejects_runner_without_job_id_support() -> None:
         return {}
 
     assert manager.runner_accepts_job_id(runner) is False
+
+
+def test_build_job_backend_returns_in_process_backend() -> None:
+    backend = build_job_backend("in_process")
+
+    assert isinstance(backend, InProcessJobBackend)
+
+
+def test_unsupported_job_backend_raises_when_starting_job() -> None:
+    backend = build_job_backend("redis")
+
+    with pytest.raises(RuntimeError, match="not implemented yet"):
+        backend.start_job("map_search", lambda: {})
