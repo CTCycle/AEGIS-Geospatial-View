@@ -41,12 +41,30 @@ class ContextUsageResponse(BaseModel):
 
 
 ###############################################################################
+class ChatOperationResult(BaseModel):
+    kind: Literal[
+        "map_session",
+        "direct_answer",
+        "capability_catalog",
+        "clarification",
+        "rejection",
+        "error",
+    ]
+    status: Literal["success", "partial", "failed"]
+    message: str
+    warnings: list[str] = Field(default_factory=list)
+    map_session: MapSession | None = None
+    direct_result: dict[str, Any] | None = None
+
+
+###############################################################################
 class ChatTurnResponse(BaseModel):
     request_id: str
     session_id: int
     assistant_message: str
     turn_contract: TurnParseResult
     decision: PolicyDecision
+    operation: ChatOperationResult | None = None
     tool_payload: dict[str, Any] | None = None
     map_session: MapSession | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
@@ -55,7 +73,17 @@ class ChatTurnResponse(BaseModel):
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
-    event: Literal["status", "assistant_delta", "tool_status", "final", "error"]
+    event: Literal[
+        "status",
+        "parsed",
+        "policy",
+        "tool_call_started",
+        "tool_call_completed",
+        "map_session_created",
+        "assistant_delta",
+        "final",
+        "error",
+    ]
     data: dict[str, Any]
 
 

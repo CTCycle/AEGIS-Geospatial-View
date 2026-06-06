@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-03
+Last updated: 2026-06-06
 
 ## Mounting
 
@@ -70,3 +70,59 @@ Defined in `app/server/api/chat.py`:
   Pulls an Ollama model.
 - `GET /api/chat/models/ollama/health`
   Checks Ollama availability.
+
+### Chat Turn Response
+
+`POST /api/chat/turn` returns `ChatTurnResponse`.
+
+High-level fields:
+
+- `request_id`
+- `session_id`
+- `assistant_message`
+- `turn_contract`
+- `decision`
+- `operation`
+- `tool_payload`
+- `map_session`
+- `memory_snapshot`
+- `context_usage`
+
+`operation` is the stable frontend-facing summary of verified backend outcome.
+
+Supported `operation.kind` values:
+
+- `map_session`
+- `direct_answer`
+- `capability_catalog`
+- `clarification`
+- `rejection`
+- `error`
+
+Supported `operation.status` values:
+
+- `success`
+- `partial`
+- `failed`
+
+### Chat Stream Events
+
+`POST /api/chat/stream` emits NDJSON `ChatStreamEvent` objects.
+
+Current event sequence is lifecycle-oriented rather than token-oriented.
+
+Supported event names:
+
+- `status`
+- `parsed`
+- `policy`
+- `tool_call_started`
+- `tool_call_completed`
+- `map_session_created`
+- `final`
+- `error`
+
+Notes:
+
+- `assistant_delta` remains in the schema for forward compatibility, but current backend behavior does not emit fake token deltas.
+- `final` carries the full serialized `ChatTurnResponse`, including `operation`.

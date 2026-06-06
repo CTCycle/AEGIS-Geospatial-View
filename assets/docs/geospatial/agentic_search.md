@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-06-02
+Last updated: 2026-06-06
 
 ## Summary
 
@@ -68,11 +68,42 @@ Provider-specific schemas do not leak into parser, policy, or executor models.
 
 ## Response Contract
 
-Agent responses expose:
+`POST /api/chat/turn` returns a structured `ChatTurnResponse`.
 
-- `action`
-- `action_label`
-- `action_confidence`
-- `tool_calls`
-- `map_operations`
-- `message`
+Stable high-level fields:
+
+- `assistant_message`
+- `turn_contract`
+- `decision`
+- `operation`
+- `tool_payload`
+- `map_session`
+- `memory_snapshot`
+- `context_usage`
+
+`operation` is the frontend-facing summary of verified backend outcome. It exists so clients do not need to infer success mode by inspecting `decision`, `tool_payload`, or `map_session`.
+
+`operation.kind` values:
+
+- `map_session`
+- `direct_answer`
+- `capability_catalog`
+- `clarification`
+- `rejection`
+- `error`
+
+`operation.status` values:
+
+- `success`
+- `partial`
+- `failed`
+
+Current behavior:
+
+- successful map requests return `operation.kind = "map_session"` and a non-null `map_session`
+- verified direct tool responses return `operation.kind = "direct_answer"` and may include `operation.direct_result`
+- preflight clarification returns `operation.kind = "clarification"`
+- policy denial returns `operation.kind = "rejection"`
+- parser, provider, validation, and timeout failures return `operation.kind = "error"`
+
+`tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.

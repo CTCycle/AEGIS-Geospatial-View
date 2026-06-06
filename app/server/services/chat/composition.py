@@ -46,11 +46,14 @@ def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatR
     location_resolver = LocationResolver()
     policy_engine = PolicyEngine(
         location_resolver=location_resolver,
+        capability_registry=search_orchestrator.capability_registry,
+        runtime_registry=runtime_registry,
     )
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
     agent_tool_catalog_service = AgentToolCatalogService(
         capability_registry=search_orchestrator.capability_registry,
         runtime_registry=runtime_registry,
+        policy_engine=policy_engine,
     )
     native_tool_loop = NativeToolLoop(
         provider_factory=LLMFactory(

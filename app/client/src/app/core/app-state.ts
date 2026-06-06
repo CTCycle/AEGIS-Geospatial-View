@@ -1,4 +1,5 @@
 import {
+  ChatOperationResult,
   ChatMessage,
   ChatRole,
   ContextUsage,
@@ -22,6 +23,7 @@ export interface PersistedChatPanelState {
   conversationNonce: number;
   messages: ChatMessage[];
   lastDecision?: PolicyDecision;
+  lastOperation?: ChatOperationResult;
   memorySnapshot?: Record<string, unknown>;
   mapSession?: MapSession;
   contextUsage?: ContextUsage;
@@ -127,6 +129,7 @@ export const defaultAppState = (): PersistedAppState => ({
       conversationNonce: 1,
       messages: [],
       lastDecision: undefined,
+      lastOperation: undefined,
       memorySnapshot: {},
         mapSession: undefined,
         contextUsage: undefined,
@@ -269,6 +272,9 @@ export const loadPersistedAppState = (): PersistedAppState => {
           messages: parsePersistedMessages(parsed.chatPage.chatPanel.messages),
           lastDecision: isRecord(parsed.chatPage.chatPanel.lastDecision)
             ? parsed.chatPage.chatPanel.lastDecision as unknown as PolicyDecision
+            : undefined,
+          lastOperation: isRecord(parsed.chatPage.chatPanel.lastOperation)
+            ? parsed.chatPage.chatPanel.lastOperation as unknown as ChatOperationResult
             : undefined,
           memorySnapshot: isRecord(parsed.chatPage.chatPanel.memorySnapshot)
             ? parsed.chatPage.chatPanel.memorySnapshot as Record<string, unknown>
