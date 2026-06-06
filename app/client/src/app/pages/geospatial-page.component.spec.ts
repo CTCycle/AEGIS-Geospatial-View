@@ -160,6 +160,47 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('Coordinates: 41.8902, 12.4922');
   });
 
+  it('prefers operation.map_session over the top-level response map_session', async () => {
+    sendChatTurnMock.and.resolveTo(makeTurnResponse({
+      assistant_message: 'Map ready.',
+      operation: {
+        kind: 'map_session',
+        status: 'success',
+        message: 'Map ready.',
+        warnings: [],
+        map_session: {
+          session_id: 'operation-map',
+          resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+          basemap_id: 'osm_default',
+          overlay_ids: ['safe_overlay'],
+          viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+          center: { latitude: 41.9, longitude: 12.5 },
+          overlays: [{ id: 'safe_overlay', label: 'Safe overlay', provider: 'fixture', type: 'geojson', url: '/api/geospatial/layers/safe_overlay/features' }],
+        },
+      },
+      map_session: {
+        session_id: 'fallback-map',
+        resolved_location: { label: 'Leaky Rome', latitude: 41.9, longitude: 12.5 },
+        basemap_id: 'osm_default',
+        overlay_ids: ['leaky_overlay'],
+        viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+        center: { latitude: 41.9, longitude: 12.5 },
+        overlays: [{ id: 'leaky_overlay', label: 'Leaky overlay', provider: 'fixture', type: 'tile', url: 'https://tiles.example/{z}/{x}/{y}.png?api_key=forbidden-secret' }],
+      },
+    }));
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show Rome';
+
+    await component.sendMessage();
+
+    expect(component.mapSession?.session_id).toBe('operation-map');
+    expect(component.mapSession?.overlay_ids).toEqual(['safe_overlay']);
+    expect(JSON.stringify(component.payload)).not.toContain('forbidden-secret');
+    expect(JSON.stringify(component.payload)).not.toContain('api_key=');
+  });
+
   it('operation-driven failures set Failed status even without reject plan state', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,

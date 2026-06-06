@@ -111,6 +111,18 @@ describe('components/map-preview.component', () => {
     expect(fakeMap.fitBounds).not.toHaveBeenCalled();
   });
 
+  it('creates a MapLibre map only when center coordinates are finite numbers', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        center: { latitude: Number.NaN, longitude: 12.4964 },
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(maplibregl.Map).not.toHaveBeenCalled();
+  });
+
   it('rebuilds overlay state from session and emits notice for stale ids', () => {
     component.initialOverlayVisibility = { stale_overlay: true };
     component.initialOverlayOpacity = { stale_overlay: 0.2 };
@@ -181,6 +193,23 @@ describe('components/map-preview.component', () => {
     expect(sourceTiles.some((url) => url.includes('tiles/{z}/{x}/{y}.png'))).toBeTrue();
     expect(sourceTiles.some((url) => url.includes('service=WMS'))).toBeTrue();
     expect(sourceTiles.some((url) => url.includes('service=WMTS'))).toBeTrue();
+  });
+
+  it('ignores malformed overlays without preventing the base map from rendering', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          { id: 'broken_overlay', label: 'Broken overlay', provider: 'fixture', type: 'mystery' },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(maplibregl.Map).toHaveBeenCalled();
+    const style = (maplibregl.Map as unknown as jasmine.Spy).calls.mostRecent().args[0].style;
+    expect(style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
+    expect(fakeMap.addSource.calls.allArgs().length).toBe(0);
   });
 
   it('renders GeoJSON overlay sources as vector layers', () => {
@@ -287,6 +316,31 @@ describe('components/map-preview.component', () => {
     expect(iframe).not.toBeNull();
     expect(iframe?.getAttribute('srcdoc')).toContain('<h1>Map</h1>');
     expect(iframe?.getAttribute('srcdoc')).not.toContain('SafeValue must use [property]=');
+  });
+
+  it('does not materialize credential-bearing URLs into chosen map session state or source definitions', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'safe_overlay',
+            label: 'Safe overlay',
+            type: 'geojson',
+            provider: 'fixture',
+            url: '/api/geospatial/layers/safe_overlay/features',
+            data_format: 'GeoJSON',
+            geometry_type: 'Point',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(JSON.stringify(component.mapSession)).not.toContain('api_key=');
+    expect(JSON.stringify(component.mapSession)).not.toContain('sk_live');
+    expect(JSON.stringify(fakeMap.addSource.calls.allArgs())).not.toContain('api_key=');
+    expect(fixture.nativeElement.outerHTML).not.toContain('api_key=');
   });
 
   it('maps overlay ids directly when overlay descriptors are absent', () => {
