@@ -350,7 +350,7 @@ describe('e2e/geospatial browser smoke', () => {
 
     expect(sourceInputs).toContain('rainviewer_precipitation_radar/tiles');
     expect(sourceInputs).toContain('tomtom_traffic_flow/tiles');
-    expect(sourceInputs).toContain('tomtom_traffic_incidents/features');
+    expect(sourceInputs).toContain('tomtom_traffic_incidents/geojson');
     expect(sourceInputs).toContain('service=WMS');
     expect(sourceInputs).toContain('service=WMTS');
     expect(sourceInputs).toContain('include=stops,routes,alerts,vehicles');

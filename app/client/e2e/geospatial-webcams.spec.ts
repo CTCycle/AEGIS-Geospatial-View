@@ -5,6 +5,7 @@ export interface GeospatialWebcamScenario {
 }
 
 export const geospatialWebcamScenarios: GeospatialWebcamScenario[] = [
+  { id: 'workflow_show_webcams_times_square', description: 'Show webcams around Times Square returns camera overlays or a missing-credential warning', expectedState: 'missing-credential' },
   { id: 'windy_webcams_missing_key', description: 'Windy Webcams reports missing credential without map failure', expectedState: 'missing-credential' },
   { id: 'windy_webcams_points', description: 'Windy webcam dots render from mocked metadata', expectedState: 'renders' },
   { id: 'windy_webcams_popup', description: 'Popup shows name, provider, preview when allowed, and official link', expectedState: 'renders' },
