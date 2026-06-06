@@ -293,21 +293,12 @@ class AgentOrchestrator:
                 context=native_context,
             )
         )
-        decision = PolicyDecision(
-            plan=ExecutionPlan(
-                state="map_search" if self._has_verified_map_result(tool_loop_result.tool_results) else "direct_response",
-                mode="map" if self._has_verified_map_result(tool_loop_result.tool_results) else "direct_text",
-                action_id=turn_contract.normalized_action.action_id,
-            ),
-            trace=DecisionTrace(
-                steps=[
-                    "1.parse_structured_request",
-                    "2.build_policy_constraints",
-                    "3.native_tool_loop",
-                    f"4.stop:{tool_loop_result.stopped_reason}",
-                ]
-            ),
-        )
+        decision_trace_steps = [
+            "1.parse_structured_request",
+            "2.build_policy_constraints",
+            "3.native_tool_loop",
+            f"4.stop:{tool_loop_result.stopped_reason}",
+        ]
         assistant_message = tool_loop_result.final_text or "Done."
         tool_payload = {
             "tool_calls": [
@@ -377,6 +368,11 @@ class AgentOrchestrator:
             tool_payload=tool_payload,
             user_text=turn_contract.user_text,
             is_capability_question=self._is_capability_question(turn_contract.user_text),
+        )
+        decision = AgentResponseBuilder.build_final_decision(
+            action_id=turn_contract.normalized_action.action_id,
+            operation=operation,
+            trace_steps=decision_trace_steps,
         )
 
         self.history_repo.append_message(
