@@ -261,6 +261,12 @@ export interface OverlayStateChange {
   overlayOpacity: Record<string, number>;
 }
 
+export interface OverlayRenderStatus {
+  overlayId: string;
+  status: 'pending' | 'loaded' | 'failed' | 'metadata-only';
+  message?: string;
+}
+
 export interface OverlayVisibilityChange {
   overlayId: string;
   checked: boolean;

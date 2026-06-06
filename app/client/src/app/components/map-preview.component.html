@@ -43,6 +43,7 @@
             [overlays]="overlays"
             [overlayVisibility]="overlayVisibility"
             [overlayOpacity]="overlayOpacity"
+            [overlayRenderStatuses]="overlayRenderStatuses"
             (overlayVisibilityChange)="onOverlayVisibilityChange($event)"
             (overlayOpacityChange)="onOverlayOpacityChange($event)"
           ></app-overlay-controls>
@@ -60,6 +61,14 @@
           <div class="metadata-panel" aria-label="Metadata-only layers">
             @for (overlay of metadataOnlyOverlays; track overlay.id) {
               <p><strong>{{ overlay.label }}</strong> is available as metadata or setup context only.</p>
+            }
+          </div>
+        }
+
+        @if (failedOverlayStatuses.length) {
+          <div class="metadata-panel metadata-panel--errors" aria-label="Failed layers">
+            @for (status of failedOverlayStatuses; track status.overlayId) {
+              <p><strong>{{ status.overlayId }}</strong>: {{ status.message || 'Layer failed to render.' }}</p>
             }
           </div>
         }
