@@ -556,6 +556,57 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
     asyncio.run(_run())
 
 
+def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="I found Rome.",
+                tool_calls=[
+                    LLMToolCall(
+                        id="1",
+                        name="list_geospatial_capabilities",
+                        arguments={},
+                    )
+                ],
+                tool_results=[
+                    LLMToolResult(
+                        tool_call_id="1",
+                        name="list_geospatial_capabilities",
+                        content={"ok": True, "data": {"items": []}, "error": None, "metadata": {}},
+                    )
+                ],
+                iterations=1,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(ChatTurnRequest(message="show Rome with traffic"))
+
+        assert response.map_session is not None
+        assert "tomtom_traffic_flow" in response.map_session.overlay_ids
+        assert search_orchestrator.requests[0].overlay_ids == ["tomtom_traffic_flow"]
+
+    asyncio.run(_run())
+
+
 def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
     class _MultiOverlayCatalog:
         def register_with(self, registry: ToolRegistry) -> None:
