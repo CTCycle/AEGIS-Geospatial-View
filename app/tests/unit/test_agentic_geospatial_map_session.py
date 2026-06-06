@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
+
+import pytest
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.search.orchestrator import LocationSearchOrchestrator
@@ -51,3 +54,30 @@ def test_agentic_geospatial_map_session_keeps_credential_warnings() -> None:
 
     assert session.basemap_id == "osm_default"
     assert any("provider API key is required" in item for item in session.compliance_warnings)
+
+
+@pytest.mark.xfail(
+    reason="TODO(stage-2): credentialed provider URLs are still materialized into map_session payloads.",
+    strict=True,
+)
+def test_agentic_geospatial_map_session_never_serializes_provider_api_keys(monkeypatch) -> None:
+    monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9,
+        longitude=12.5,
+        confidence=1.0,
+    )
+    plan = ExecutionPlan(
+        state="map_search",
+        action_id="traffic",
+        basemap_id="osm_default",
+        overlay_ids=["tomtom_traffic_flow"],
+    )
+    request = RequestBuilder().build_location_search_request(plan, location)
+
+    session = asyncio.run(LocationSearchOrchestrator().execute(request))
+
+    serialized = json.dumps(session.model_dump(mode="json"))
+    assert "tomtom-secret-forbidden" not in serialized
+    assert "api_key=" not in serialized

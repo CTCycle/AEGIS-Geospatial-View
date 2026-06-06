@@ -78,6 +78,21 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     assert response.json()["status"] in {"missing-credential", "ok"}
 
 
+@pytest.mark.xfail(
+    reason="TODO(stage-1): add raw GeoJSON render endpoints; /features still returns a provider envelope.",
+    strict=True,
+)
+def test_geospatial_features_render_contract_should_be_raw_geojson_feature_collection() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "FeatureCollection"
+    assert isinstance(payload["features"], list)
+
+
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
     client = TestClient(create_app())
 

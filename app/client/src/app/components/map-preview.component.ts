@@ -72,8 +72,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   ) {}
 
   get hasCenter(): boolean {
-    return typeof this.mapSession?.center?.latitude === 'number'
-      && typeof this.mapSession?.center?.longitude === 'number';
+    return Number.isFinite(this.mapSession?.center?.latitude)
+      && Number.isFinite(this.mapSession?.center?.longitude);
   }
 
   get overlays(): OverlayEntry[] {
@@ -252,10 +252,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (!this.viewInitialized) {
       return;
     }
-    if (typeof center?.longitude !== 'number' || typeof center.latitude !== 'number') {
+    if (!Number.isFinite(center?.longitude) || !Number.isFinite(center?.latitude)) {
       this.destroyMap();
       return;
     }
+    const longitude = Number(center?.longitude);
+    const latitude = Number(center?.latitude);
     if (!this.mapContainerRef?.nativeElement) {
       return;
     }
@@ -265,7 +267,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const map = new maplibregl.Map({
       container: this.mapContainerRef.nativeElement,
       style: buildStyle(this.mapSession),
-      center: [center.longitude, center.latitude],
+      center: [longitude, latitude],
       zoom: 12,
     });
 
