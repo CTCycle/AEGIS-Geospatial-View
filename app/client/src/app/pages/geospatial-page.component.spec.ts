@@ -204,6 +204,22 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toBe('fallback error');
   });
 
+  it('operation-aware alerts include structured failure message', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.status = 'Failed';
+    component.lastOperation = {
+      kind: 'error',
+      status: 'failed',
+      message: 'Tool timed out.',
+      warnings: [],
+    };
+    component.messages = [{ role: 'assistant', content: 'Tool timed out.' }];
+
+    expect(component.activeAlertItems).toContain('Tool timed out.');
+  });
+
   it('startNewChat clears session and map/chat state', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();

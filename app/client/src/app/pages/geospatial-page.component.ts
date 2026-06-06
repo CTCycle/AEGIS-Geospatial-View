@@ -117,8 +117,12 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   get activeAlertItems(): string[] {
     const alerts: string[] = [];
     const latestAssistantMessage = [...this.messages].reverse().find((entry) => entry.role === 'assistant')?.content?.trim() ?? '';
+    const operationMessage = this.lastOperation?.message?.trim() ?? '';
     if (this.status === 'Failed') {
       alerts.push('The last request failed before the map session updated.');
+    }
+    if (operationMessage && (this.lastOperation?.kind === 'error' || this.lastOperation?.kind === 'rejection')) {
+      alerts.push(operationMessage);
     }
     if (latestAssistantMessage && this.looksLikeRuntimeFailure(latestAssistantMessage)) {
       alerts.push(latestAssistantMessage);
