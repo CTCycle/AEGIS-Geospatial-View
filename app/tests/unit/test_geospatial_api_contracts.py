@@ -78,19 +78,172 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     assert response.json()["status"] in {"missing-credential", "ok"}
 
 
-@pytest.mark.xfail(
-    reason="TODO(stage-1): add raw GeoJSON render endpoints; /features still returns a provider envelope.",
-    strict=True,
-)
-def test_geospatial_features_render_contract_should_be_raw_geojson_feature_collection() -> None:
+def test_geospatial_features_render_contract_still_uses_provider_envelope() -> None:
     client = TestClient(create_app())
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["status"] in {"ok", "unavailable"}
+    assert "payload" in payload
+
+
+def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> None:
+    class GeoJsonRegistry:
+        def build_from_manifests(self) -> None:
+            return None
+
+        async def fetch(self, provider_id, request):
+            del provider_id, request
+            return type(
+                "Response",
+                (),
+                {
+                    "payload": {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "id": "quake-1",
+                                "properties": {"mag": 2.4},
+                                "geometry": {
+                                    "type": "Point",
+                                    "coordinates": [12.5, 41.9],
+                                },
+                            }
+                        ],
+                    },
+                    "attribution": ["USGS"],
+                    "warnings": [],
+                    "stale": False,
+                },
+            )()
+
+    client = TestClient(create_app())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        GeospatialApiService(provider_registry=GeoJsonRegistry())
+    )
+
+    response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
+
+    assert response.status_code == 200
+    payload = response.json()
     assert payload["type"] == "FeatureCollection"
-    assert isinstance(payload["features"], list)
+    assert payload["features"][0]["id"] == "quake-1"
+
+
+def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
+    class SingleFeatureRegistry:
+        def build_from_manifests(self) -> None:
+            return None
+
+        async def fetch(self, provider_id, request):
+            del provider_id, request
+            return type(
+                "Response",
+                (),
+                {
+                    "payload": {
+                        "type": "Feature",
+                        "id": "quake-1",
+                        "properties": {"mag": 2.4},
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [12.5, 41.9],
+                        },
+                    },
+                    "attribution": ["USGS"],
+                    "warnings": [],
+                    "stale": False,
+                },
+            )()
+
+    client = TestClient(create_app())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        GeospatialApiService(provider_registry=SingleFeatureRegistry())
+    )
+
+    response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "FeatureCollection"
+    assert len(payload["features"]) == 1
+    assert payload["features"][0]["id"] == "quake-1"
+
+
+def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collection() -> None:
+    class CameraRegistry:
+        def build_from_manifests(self) -> None:
+            return None
+
+        async def fetch(self, provider_id, request):
+            del provider_id, request
+            return type(
+                "Response",
+                (),
+                {
+                    "payload": {
+                        "renderingMode": "camera-points",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "id": "cam-1",
+                                "properties": {"name": "Camera 1"},
+                                "geometry": {
+                                    "type": "Point",
+                                    "coordinates": [12.5, 41.9],
+                                },
+                            }
+                        ],
+                    },
+                    "attribution": ["Windy Webcams"],
+                    "warnings": [],
+                    "stale": False,
+                },
+            )()
+
+    client = TestClient(create_app())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        GeospatialApiService(provider_registry=CameraRegistry())
+    )
+
+    response = client.get("/api/geospatial/cameras.geojson?bbox=12,41,13,42")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "FeatureCollection"
+    assert payload["features"][0]["id"] == "cam-1"
+
+
+def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_collection() -> None:
+    class MalformedRegistry:
+        def build_from_manifests(self) -> None:
+            return None
+
+        async def fetch(self, provider_id, request):
+            del provider_id, request
+            return type(
+                "Response",
+                (),
+                {
+                    "payload": {"status": "not-geojson", "items": [1, 2, 3]},
+                    "attribution": ["USGS"],
+                    "warnings": ["malformed upstream payload"],
+                    "stale": False,
+                },
+            )()
+
+    client = TestClient(create_app())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        GeospatialApiService(provider_registry=MalformedRegistry())
+    )
+
+    response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
+
+    assert response.status_code == 200
+    assert response.json() == {"type": "FeatureCollection", "features": []}
 
 
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:

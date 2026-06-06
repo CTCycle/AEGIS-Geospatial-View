@@ -263,10 +263,10 @@ def test_location_search_orchestrator_adds_bbox_to_live_feature_endpoints() -> N
 
     openaq = next(overlay for overlay in session.overlays if overlay["id"] == "openaq_air_quality")
     webcams = next(overlay for overlay in session.overlays if overlay["id"] == "windy_webcams")
-    assert str(openaq["url"]).startswith("/api/geospatial/layers/openaq_air_quality/features?")
+    assert str(openaq["url"]).startswith("/api/geospatial/layers/openaq_air_quality/geojson?")
     assert "live=true" in str(openaq["url"])
     assert "bbox=" in str(openaq["url"])
-    assert str(webcams["url"]).startswith("/api/geospatial/cameras?")
+    assert str(webcams["url"]).startswith("/api/geospatial/cameras.geojson?")
     assert "provider=windy_webcams" in str(webcams["url"])
     assert "bbox=" in str(webcams["url"])
     assert any("WINDY_WEBCAMS_API_KEY" in warning for warning in session.compliance_warnings)

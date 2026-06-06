@@ -88,7 +88,7 @@ def _turn_payload() -> dict[str, Any]:
                     "rendering_mode": "clustered-points",
                     "data_format": "GeoJSON",
                     "geometry_type": "Point",
-                    "url": "/api/geospatial/layers/visual_fixture_points/features",
+                    "url": "/api/geospatial/layers/visual_fixture_points/geojson",
                     "attribution": "AEGIS fixture",
                     "default_opacity": 0.8,
                 }
@@ -129,7 +129,7 @@ def _setup_stubs(page: Page) -> None:
         ),
     )
     page.route(
-        re.compile(r".*/api/geospatial/layers/visual_fixture_points/features$"),
+        re.compile(r".*/api/geospatial/layers/visual_fixture_points/geojson$"),
         lambda route: _json_ok(
             route,
             {

@@ -135,6 +135,32 @@ async def get_layer_features(
 
 
 @router.get(
+    "/layers/{layer_id}/geojson",
+    status_code=status.HTTP_200_OK,
+)
+async def get_layer_geojson(
+    layer_id: str,
+    bbox: str | None = Query(default=None),
+    zoom: int | None = Query(default=None),
+    time: str | None = Query(default=None),
+    live: bool = Query(default=False),
+    incidents: bool = Query(default=False),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> dict:
+    try:
+        return await service.get_layer_geojson(
+            layer_id,
+            bbox=bbox,
+            zoom=zoom,
+            time=time,
+            live=live,
+            incidents=incidents,
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+
+
+@router.get(
     "/proxy/tomtom/{kind}/{z}/{x}/{y}.png",
     status_code=status.HTTP_200_OK,
 )
@@ -174,6 +200,26 @@ async def get_geospatial_cameras(
                 provider=provider,
                 camera_type=camera_type,
             )
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+
+
+@router.get(
+    "/cameras.geojson",
+    status_code=status.HTTP_200_OK,
+)
+async def get_geospatial_cameras_geojson(
+    bbox: str | None = Query(default=None),
+    provider: str | None = Query(default=None),
+    camera_type: str | None = Query(default=None),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> dict:
+    try:
+        return await service.list_cameras_geojson(
+            bbox=bbox,
+            provider=provider,
+            camera_type=camera_type,
         )
     except GeospatialApiServiceError as exc:
         raise_service_http_error(exc)

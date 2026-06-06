@@ -121,7 +121,7 @@ class LocationSearchOrchestrator:
                 "provider": str(capability.get("provider") or "unknown"),
                 "type": "camera-points",
                 "rendering_mode": "camera-points",
-                "url": f"/api/geospatial/cameras?{urlencode(camera_params)}",
+                "url": f"/api/geospatial/cameras.geojson?{urlencode(camera_params)}",
                 "attribution": str(metadata.get("attribution") or ""),
                 "source_protocol": metadata.get("source_protocol"),
                 "data_format": metadata.get("data_format"),
@@ -215,7 +215,7 @@ class LocationSearchOrchestrator:
             "bbox": self._bbox_query_value(payload),
             "live": "true",
         }
-        return f"/api/geospatial/layers/{overlay_id}/features?{urlencode(params)}"
+        return f"/api/geospatial/layers/{overlay_id}/geojson?{urlencode(params)}"
 
     def _bbox_query_value(self, payload: LocationSearchRequest) -> str:
         bounds = payload.viewport.bbox or self._bounds_from_viewport(payload.viewport) or []
