@@ -493,6 +493,8 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
         assert response.operation is not None
         assert response.operation.kind == "map_session"
         assert response.operation.status == "success"
+        assert response.decision.plan.state == "map_search"
+        assert response.decision.plan.mode == "map"
         assert response.map_session.resolved_location.label == "Rome"
         assert response.assistant_message.startswith("Map ready for Rome")
         assert response.tool_payload is not None
@@ -549,6 +551,8 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
         assert response.map_session is not None
         assert response.operation is not None
         assert response.operation.kind == "map_session"
+        assert response.decision.plan.state == "map_search"
+        assert response.decision.plan.mode == "map"
         assert response.map_session.resolved_location.label == "Rome"
         assert search_orchestrator.requests
         assert response.assistant_message.startswith("Map ready for Rome")
@@ -848,6 +852,10 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
 
         assert response.map_session is not None
         assert response.map_session.basemap_id == "osm_dark"
+        assert response.operation is not None
+        assert response.operation.kind == "map_session"
+        assert response.decision.plan.state == "map_search"
+        assert response.decision.plan.mode == "map"
         assert response.map_session.overlay_ids == [
             "traffic_overlay",
             "shared_overlay",
@@ -919,6 +927,8 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
         assert response.operation is not None
         assert response.operation.kind == "direct_answer"
         assert response.operation.status == "success"
+        assert response.decision.plan.state == "direct_response"
+        assert response.decision.plan.mode == "direct_text"
         assert response.turn_contract.location_signals
         assert response.turn_contract.location_signals[0].source == "memory"
         assert "missing_location" not in response.turn_contract.ambiguities
@@ -986,6 +996,8 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
         assert response.map_session is not None
         assert response.operation is not None
         assert response.operation.kind == "map_session"
+        assert response.decision.plan.state == "map_search"
+        assert response.decision.plan.mode == "map"
         assert response.map_session.resolved_location.label == "Paris"
         assert response.memory_snapshot["active_location"]["label"] == "Paris"
         assert response.memory_snapshot["location_slots"][0]["label"] == "Paris"
@@ -1062,6 +1074,8 @@ def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
         assert response.operation is not None
         assert response.operation.kind == "error"
         assert response.operation.status == "failed"
+        assert response.decision.plan.state == "direct_response"
+        assert response.decision.plan.mode is None
         assert response.memory_snapshot == starting_memory
         assert history.messages[-1]["structured_payload"]["memory_snapshot"] == starting_memory
 
@@ -1195,6 +1209,8 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
         assert response.operation is not None
         assert response.operation.kind == "direct_answer"
         assert response.operation.status == "success"
+        assert response.decision.plan.state == "direct_tool"
+        assert response.decision.plan.mode == "direct_text"
         assert response.operation.direct_result is not None
         assert response.operation.direct_result["tool_id"] == "location_to_coordinates"
         assert "Coordinates for Rome" in response.assistant_message
@@ -1258,6 +1274,8 @@ def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
         assert response.operation is not None
         assert response.operation.kind == "error"
         assert response.operation.status == "failed"
+        assert response.decision.plan.state == "direct_response"
+        assert response.decision.plan.mode is None
         assert "timed out" in response.operation.message
         assert response.map_session is None
         assert response.memory_snapshot == {}

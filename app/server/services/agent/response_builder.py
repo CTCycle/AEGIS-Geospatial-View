@@ -2,11 +2,43 @@ from __future__ import annotations
 
 from typing import Any
 
+from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.chat import ChatOperationResult
 from server.domain.geographics import MapSession
 
 
 class AgentResponseBuilder:
+    @staticmethod
+    def build_final_decision(
+        *,
+        action_id: str,
+        operation: ChatOperationResult,
+        trace_steps: list[str],
+    ) -> PolicyDecision:
+        if operation.kind == "map_session":
+            state = "map_search"
+            mode = "map"
+        elif operation.kind == "clarification":
+            state = "clarify"
+            mode = None
+        elif operation.kind == "rejection":
+            state = "reject"
+            mode = None
+        elif operation.kind == "error":
+            state = "direct_response"
+            mode = None
+        else:
+            state = "direct_tool" if operation.direct_result is not None else "direct_response"
+            mode = "direct_text"
+        return PolicyDecision(
+            plan=ExecutionPlan(
+                state=state,
+                mode=mode,
+                action_id=action_id,
+            ),
+            trace=DecisionTrace(steps=trace_steps),
+        )
+
     @classmethod
     def should_build_fallback_map(
         cls,
