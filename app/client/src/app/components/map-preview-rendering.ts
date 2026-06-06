@@ -58,6 +58,9 @@ const normalizeOverlayBounds = (
 };
 
 const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
+  if (overlay.tile_url_template) {
+    return overlay.tile_url_template;
+  }
   if (!overlay.url) {
     return null;
   }
@@ -82,6 +85,9 @@ const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
 };
 
 const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
+  if (overlay.tile_url_template) {
+    return overlay.tile_url_template;
+  }
   if (!overlay.url) {
     return null;
   }
@@ -315,12 +321,12 @@ const addVectorTileOverlayLayer = (
   }
   map.addSource(sourceId, {
     type: 'vector',
-    tiles: [overlay.url],
+    tiles: [overlay.tile_url_template || overlay.url],
   });
   map.addLayer({
     id: layerId,
     source: sourceId,
-    'source-layer': overlay.layer_id || overlay.id,
+    'source-layer': overlay.source_layer || overlay.layer_id || overlay.id,
     type: 'fill',
     paint: {
       'fill-color': '#22c55e',
@@ -333,8 +339,8 @@ const addVectorTileOverlayLayer = (
 
 const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
   const overlayType = String(overlay.rendering_mode || overlay.type) as RasterOverlayKind | 'raster-tile' | 'xyz';
-  if ((overlayType === 'tile' || overlayType === 'raster-tile' || overlayType === 'xyz') && overlay.url) {
-    return [overlay.url];
+  if ((overlayType === 'tile' || overlayType === 'raster-tile' || overlayType === 'xyz') && (overlay.tile_url_template || overlay.url)) {
+    return [overlay.tile_url_template || overlay.url as string];
   }
   if (overlayType === 'wms' && overlay.url) {
     const wmsTiles = buildWmsTileUrl(overlay);
@@ -368,8 +374,11 @@ const addRasterOverlayLayer = (
   } = {
     type: 'raster',
     tiles,
-    tileSize: 256,
+    tileSize: overlay.tile_size || 256,
   };
+  if (typeof overlay.minzoom === 'number') {
+    (rasterSource as { minzoom?: number }).minzoom = overlay.minzoom;
+  }
   if (typeof overlay.maxzoom === 'number') {
     rasterSource.maxzoom = overlay.maxzoom;
   }
