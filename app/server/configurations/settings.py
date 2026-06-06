@@ -69,6 +69,8 @@ class MapSettings:
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
+    backend: str
+    require_durable_backend: bool
 
 
 @dataclass(frozen=True)
@@ -200,6 +202,8 @@ class JsonMapSettings(BaseModel):
 
 class JsonJobsSettings(BaseModel):
     polling_interval: float = 1.0
+    backend: str = "in_process"
+    require_durable_backend: bool = False
 
 
 class JsonChatRuntimeSettings(BaseModel):
@@ -458,7 +462,11 @@ class AppSettings(BaseSettings):
                 render_delay_s=self.map.render_delay_s,
                 tiles=self.map.tiles,
             ),
-            jobs=JobsSettings(polling_interval=self.jobs.polling_interval),
+            jobs=JobsSettings(
+                polling_interval=self.jobs.polling_interval,
+                backend=self.jobs.backend,
+                require_durable_backend=self.jobs.require_durable_backend,
+            ),
             chat=ChatRuntimeSettings(
                 max_history_messages=self.chat.max_history_messages,
                 parser_certainty_threshold=self.chat.parser_certainty_threshold,

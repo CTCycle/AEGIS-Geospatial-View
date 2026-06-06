@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-06-05
+Last updated: 2026-06-06
 
 ## Environment File
 
@@ -32,6 +32,8 @@ Common keys include:
 `settings/configurations.json` defines:
 
 - job polling interval
+- job backend selection
+- durable-job requirement flag
 - geospatial bounds and service tuning
 - chat defaults
 - provider-specific request tuning

@@ -215,7 +215,21 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
 
     monkeypatch.setattr(
         "server.app.get_server_settings",
-        lambda: type("Settings", (), {"database": object()})(),
+        lambda: type(
+            "Settings",
+            (),
+            {
+                "database": object(),
+                "jobs": type(
+                    "JobsSettings",
+                    (),
+                    {
+                        "backend": "in_process",
+                        "require_durable_backend": False,
+                    },
+                )(),
+            },
+        )(),
     )
     monkeypatch.setattr("server.app.get_database", lambda: _Database())
     monkeypatch.setattr(
@@ -228,7 +242,17 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
     )
     monkeypatch.setattr(
         "server.app.build_search_runtime",
-        lambda: type("SearchRuntime", (), {"search_orchestrator": object()})(),
+        lambda: type(
+            "SearchRuntime",
+            (),
+            {
+                "search_orchestrator": object(),
+                "job_manager": __import__(
+                    "server.services.jobs",
+                    fromlist=["InProcessJobBackend"],
+                ).InProcessJobBackend(),
+            },
+        )(),
     )
     monkeypatch.setattr(
         "server.app.build_chat_runtime",
