@@ -4,8 +4,6 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-import pytest
-
 from server.domain.agent.decision import (
     ClarificationRequest,
     DecisionTrace,
@@ -558,11 +556,7 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
     asyncio.run(_run())
 
 
-@pytest.mark.xfail(
-    reason="TODO(stage-3): combine multiple successful map-capable tool results into one merged map session.",
-    strict=True,
-)
-def test_orchestrator_does_not_yet_merge_multiple_successful_overlay_results() -> None:
+def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
     class _MultiOverlayCatalog:
         def register_with(self, registry: ToolRegistry) -> None:
             registry.register_native_tool(
@@ -685,6 +679,134 @@ def test_orchestrator_does_not_yet_merge_multiple_successful_overlay_results() -
 
         assert response.map_session is not None
         assert response.map_session.overlay_ids == ["traffic_overlay", "rain_overlay"]
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_order() -> None:
+    class _SelectionCatalog:
+        def register_with(self, registry: ToolRegistry) -> None:
+            registry.register_native_tool(
+                LLMToolDefinition(
+                    name="execute_geospatial_capability",
+                    description="Execute",
+                    parameters_json_schema={
+                        "type": "object",
+                        "properties": {
+                            "capability_id": {"type": "string"},
+                            "arguments": {"type": "object"},
+                        },
+                        "required": ["capability_id", "arguments"],
+                    },
+                ),
+                self._handler,
+            )
+
+        async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
+            capability_id = str(arguments.get("capability_id") or "")
+            selection_by_id = {
+                "traffic_overlay": {
+                    "basemap_id": "osm_dark",
+                    "overlay_ids": ["traffic_overlay", "shared_overlay"],
+                },
+                "rain_overlay": {
+                    "basemap_id": "osm_default",
+                    "overlay_ids": ["shared_overlay", "rain_overlay"],
+                },
+            }
+            return {
+                "ok": True,
+                "operation": "capability_selection_created",
+                "capability_id": capability_id,
+                "arguments": dict(arguments.get("arguments") or {}),
+                "map_session": None,
+                "direct_result": None,
+                "capability_selection": selection_by_id[capability_id],
+                "observations": [],
+                "warnings": [],
+                "error": None,
+                "metadata": {},
+            }
+
+    async def _run() -> None:
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="Traffic and rain selected.",
+                tool_calls=[
+                    LLMToolCall(
+                        id="1",
+                        name="execute_geospatial_capability",
+                        arguments={"capability_id": "traffic_overlay", "arguments": {}},
+                    ),
+                    LLMToolCall(
+                        id="2",
+                        name="execute_geospatial_capability",
+                        arguments={"capability_id": "rain_overlay", "arguments": {}},
+                    ),
+                ],
+                tool_results=[
+                    LLMToolResult(
+                        tool_call_id="1",
+                        name="execute_geospatial_capability",
+                        content={
+                            "ok": True,
+                            "data": await _SelectionCatalog()._handler(
+                                {"capability_id": "traffic_overlay", "arguments": {}},
+                                None,
+                            ),
+                            "error": None,
+                            "metadata": {},
+                        },
+                    ),
+                    LLMToolResult(
+                        tool_call_id="2",
+                        name="execute_geospatial_capability",
+                        content={
+                            "ok": True,
+                            "data": await _SelectionCatalog()._handler(
+                                {"capability_id": "rain_overlay", "arguments": {}},
+                                None,
+                            ),
+                            "error": None,
+                            "metadata": {},
+                        },
+                    ),
+                ],
+                iterations=1,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=_Policy(),  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_SelectionCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=_HistoryRepo(),  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(ChatTurnRequest(message="show Rome with traffic and rain"))
+
+        assert response.map_session is not None
+        assert response.map_session.basemap_id == "osm_dark"
+        assert response.map_session.overlay_ids == [
+            "traffic_overlay",
+            "shared_overlay",
+            "rain_overlay",
+        ]
+        assert search_orchestrator.requests[0].overlay_ids == [
+            "traffic_overlay",
+            "shared_overlay",
+            "rain_overlay",
+        ]
 
     asyncio.run(_run())
 
