@@ -7,8 +7,7 @@ app/client/dist/
 app/client/dist-ssr/
 app/client/logs/
 app/client/.angular/
-app/client/src-tauri/r/
-app/client/src-tauri/target/
+app/src-tauri/**
 release/windows/
 
 

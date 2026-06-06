@@ -176,7 +176,8 @@ For other platforms and for packaging details, use the startup and maintenance s
 The repository is split into a few broad areas:
 
 - `app/server` for the backend
-- `app/client` for the frontend and desktop host
+- `app/client` for the frontend webapp
+- `app/src-tauri` for the desktop shell and packaging config
 - `app/resources` for local data and supporting files
 - `app/tests` for automated checks
 - `settings` for environment-specific configuration

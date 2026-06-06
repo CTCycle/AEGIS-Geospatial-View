@@ -22,7 +22,7 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 - Frontend bootstrap: `app/client/src/main.ts`
 - Frontend root component: `app/client/src/app/app.component.ts`
 - Frontend routes: `app/client/src/app/app.routes.ts`
-- Desktop packaging config: `app/client/src-tauri/tauri.conf.json`
+- Desktop packaging config: `app/src-tauri/tauri.conf.json`
 - Windows packaging script: `release/tauri/build_with_tauri.bat`
 
 ## Backend Startup Behavior

@@ -13,12 +13,16 @@ AEGIS Geospatial View/
   app/
     client/
       src/
-      src-tauri/
       package.json
       proxy.conf.cjs
     resources/
       catalog/
       database.db
+    src-tauri/
+      gen/
+      icons/
+      src/
+      target/
     scripts/
     server/
       api/
