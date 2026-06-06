@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from server.domain.agent.decision import ExecutionPlan
+from server.domain.extraction.models import LocationSignal
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
 from server.services.agent.location_resolver import LocationResolver
@@ -497,9 +498,9 @@ class AgentToolCatalogService:
             tool_id=capability_id,
         )
 
-    def _build_argument_location_signals(self, arguments: dict[str, Any]):
-        from server.domain.extraction.models import LocationSignal
-
+    def _build_argument_location_signals(
+        self, arguments: dict[str, Any]
+    ) -> list[LocationSignal]:
         signals: list[LocationSignal] = []
         location_text = arguments.get("location") or arguments.get("location_text") or arguments.get("query")
         if isinstance(location_text, str) and location_text.strip():

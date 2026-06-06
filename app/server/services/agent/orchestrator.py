@@ -19,6 +19,7 @@ from server.services.agent.native_tool_loop import (
 )
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
+from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.factory import LLMFactory
 from server.services.search.orchestrator import LocationSearchOrchestrator
@@ -223,8 +224,8 @@ class AgentOrchestrator:
                 if preflight_decision.clarification is not None
                 else "I cannot execute this request with the current policy constraints."
             )
-            operation = self._build_preflight_operation_result(
-                decision=preflight_decision,
+            operation = AgentResponseBuilder.build_preflight_operation_result(
+                decision_state=preflight_decision.plan.state,
                 assistant_message=assistant_message,
             )
             self.history_repo.append_message(
@@ -327,11 +328,17 @@ class AgentOrchestrator:
             "iterations": tool_loop_result.iterations,
             "stopped_reason": tool_loop_result.stopped_reason,
         }
-        map_session = await self._extract_map_session_from_tool_results(
+        map_session = await self._build_combined_map_session_from_tool_results(
             tool_payload=tool_payload,
             turn_contract=turn_contract,
             latest_memory=latest_memory,
         )
+        if map_session is None:
+            map_session = await self._extract_map_session_from_tool_results(
+                tool_payload=tool_payload,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+            )
         direct_result = self._extract_direct_result_from_tool_results(tool_payload)
         capability_selection = self._extract_capability_selection_from_tool_results(tool_payload)
         if map_session is None and capability_selection is not None:
@@ -340,7 +347,12 @@ class AgentOrchestrator:
                 turn_contract=turn_contract,
                 latest_memory=latest_memory,
             )
-        if map_session is None and self._should_build_fallback_map(turn_contract, tool_payload):
+        if map_session is None and AgentResponseBuilder.should_build_fallback_map(
+            task_class=turn_contract.task_class,
+            requires_location=turn_contract.normalized_action.requires_location,
+            location_signals=turn_contract.location_signals,
+            tool_payload=tool_payload,
+        ):
             map_session = await self._build_map_session_from_turn_contract(turn_contract, latest_memory)
         memory_snapshot = await self._build_updated_memory_snapshot(
             turn_contract=turn_contract,
@@ -349,18 +361,19 @@ class AgentOrchestrator:
             direct_result=direct_result,
             tool_payload=tool_payload,
         )
-        assistant_message = self._build_verified_assistant_message(
+        assistant_message = AgentResponseBuilder.build_verified_assistant_message(
             tool_loop_result.final_text,
             map_session=map_session,
             direct_result=direct_result,
             tool_payload=tool_payload,
         )
-        operation = self._build_verified_operation_result(
+        operation = AgentResponseBuilder.build_verified_operation_result(
             assistant_message=assistant_message,
             map_session=map_session,
             direct_result=direct_result,
             tool_payload=tool_payload,
-            turn_contract=turn_contract,
+            user_text=turn_contract.user_text,
+            is_capability_question=self._is_capability_question(turn_contract.user_text),
         )
 
         self.history_repo.append_message(
@@ -547,147 +560,6 @@ class AgentOrchestrator:
     def _has_parser_authentication_failure(turn_contract) -> bool:
         return "parser_authentication_failed" in set(turn_contract.ambiguities or [])
 
-    def _compose_assistant_message(
-        self,
-        decision,
-        tool_payload: dict[str, Any] | None,
-        map_payload: dict[str, Any] | None,
-    ) -> str:
-        if decision.plan.state == "direct_tool":
-            return self._compose_direct_tool_message(decision.plan.tool_id, tool_payload)
-        if decision.plan.state == "map_search" and isinstance(map_payload, dict):
-            return self._compose_map_session_message(map_payload)
-        if isinstance(tool_payload, dict) and tool_payload.get("error"):
-            return str(tool_payload["error"])
-        return "Done."
-
-    @classmethod
-    def _compose_direct_tool_message(
-        cls,
-        tool_id: object,
-        tool_payload: dict[str, Any] | None,
-    ) -> str:
-        if isinstance(tool_payload, dict) and tool_payload.get("error"):
-            return str(tool_payload["error"])
-        result = tool_payload.get("result") if isinstance(tool_payload, dict) else None
-        if not isinstance(result, dict):
-            return f"Completed {cls._humanize_identifier(tool_id)}."
-
-        nested_result = result.get("result")
-        if tool_id == "location_to_coordinates":
-            coordinates = result.get("coordinates")
-            location = result.get("location") or cls._extract_label(tool_payload.get("location"))
-            if isinstance(coordinates, dict):
-                latitude = coordinates.get("latitude")
-                longitude = coordinates.get("longitude")
-                if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
-                    return f"Coordinates for {location}: {latitude:.6f}, {longitude:.6f}."
-        if tool_id == "get_weather_forecast" and isinstance(nested_result, dict):
-            current = nested_result.get("selected_forecast") or nested_result.get("current")
-            location = result.get("location") or cls._extract_label(tool_payload.get("location"))
-            if isinstance(current, dict):
-                temperature = current.get("temperature_2m")
-                precipitation = current.get("precipitation")
-                weather_time = current.get("time")
-                details: list[str] = []
-                if isinstance(temperature, (int, float)):
-                    details.append(f"temperature {temperature:g} C")
-                if isinstance(precipitation, (int, float)):
-                    details.append(f"precipitation {precipitation:g} mm")
-                if details:
-                    suffix = f" at {weather_time}" if isinstance(weather_time, str) and weather_time else ""
-                    return f"Weather for {location}{suffix}: {', '.join(details)}."
-        return f"Completed {cls._humanize_identifier(tool_id)}."
-
-    @classmethod
-    def _compose_map_session_message(cls, map_payload: dict[str, Any]) -> str:
-        location = cls._extract_label(map_payload.get("resolved_location")) or "the requested location"
-        basemap = cls._extract_label(map_payload.get("basemap")) or cls._humanize_identifier(
-            map_payload.get("basemap_id"),
-        )
-        overlay_labels = cls._extract_overlay_labels(map_payload)
-        warnings = [
-            cls._humanize_warning(warning)
-            for warning in map_payload.get("compliance_warnings") or []
-            if isinstance(warning, str) and warning.strip()
-        ]
-
-        parts = [f"Map ready for {location} using {basemap}."]
-        if overlay_labels:
-            parts.append(f"I added {cls._format_label_list(overlay_labels)}.")
-        else:
-            parts.append("No overlays were added.")
-        if warnings:
-            parts.append(f"Some requested map data needs attention: {' '.join(warnings)}")
-        return " ".join(parts)
-
-    @classmethod
-    def _extract_overlay_labels(cls, map_payload: dict[str, Any]) -> list[str]:
-        overlays = map_payload.get("overlays")
-        if isinstance(overlays, list):
-            labels = [cls._extract_label(overlay) for overlay in overlays]
-            human_labels = [label for label in labels if label]
-            if human_labels:
-                return human_labels
-
-        overlay_ids = map_payload.get("overlay_ids")
-        if not isinstance(overlay_ids, list):
-            return []
-        return [cls._humanize_identifier(overlay_id) for overlay_id in overlay_ids if overlay_id]
-
-    @staticmethod
-    def _extract_label(value: object) -> str | None:
-        if isinstance(value, dict):
-            label = value.get("label") or value.get("name") or value.get("id")
-            if isinstance(label, str) and label.strip():
-                return label.strip()
-        return None
-
-    @staticmethod
-    def _format_label_list(labels: list[str]) -> str:
-        if len(labels) == 1:
-            return f"the {labels[0]} overlay"
-        if len(labels) == 2:
-            return f"the {labels[0]} and {labels[1]} overlays"
-        return f"the {', '.join(labels[:-1])}, and {labels[-1]} overlays"
-
-    @classmethod
-    def _humanize_warning(cls, warning: str) -> str:
-        message = warning.strip()
-        if ":" in message:
-            capability_id, detail = message.split(":", 1)
-            message = f"{cls._humanize_identifier(capability_id)}: {detail.strip()}"
-
-        replacements = {
-            "TOMTOM_API_KEY": "TomTom API key",
-            "GEOAPIFY_API_KEY": "Geoapify API key",
-            "WINDY_WEBCAMS_API_KEY": "Windy Webcams API key",
-            "osm_default": "OpenStreetMap",
-            "tomtom_basic": "TomTom Basic",
-            "tomtom_traffic_flow": "TomTom Traffic Flow",
-            "windy_webcams": "Windy Webcams",
-        }
-        for raw, readable in replacements.items():
-            message = message.replace(raw, readable)
-        if not message.endswith("."):
-            message += "."
-        return message
-
-    @staticmethod
-    def _humanize_identifier(value: object) -> str:
-        if not isinstance(value, str) or not value.strip():
-            return "the default basemap"
-        known_names = {
-            "osm_default": "OpenStreetMap",
-            "tomtom_basic": "TomTom Basic",
-            "tomtom_traffic_flow": "TomTom Traffic Flow",
-        }
-        if value in known_names:
-            return known_names[value]
-        words = value.replace("-", "_").split("_")
-        acronyms = {"osm": "OpenStreetMap", "modis": "MODIS", "viirs": "VIIRS"}
-        return " ".join(acronyms.get(word.lower(), word.capitalize()) for word in words if word)
-
     async def _extract_map_session_from_tool_results(
         self,
         *,
@@ -831,7 +703,7 @@ class AgentOrchestrator:
             return map_session.resolved_location
         if direct_result is None:
             return None
-        if self._tool_payload_has_error(tool_payload):
+        if AgentResponseBuilder.tool_payload_has_error(tool_payload):
             return None
         resolved = await self.policy_engine.location_resolver.resolve_location_signals(
             turn_contract.location_signals,
@@ -841,185 +713,70 @@ class AgentOrchestrator:
             return None
         return resolved
 
-    @staticmethod
-    def _tool_payload_has_error(tool_payload: dict[str, Any] | None) -> bool:
-        if not isinstance(tool_payload, dict):
-            return False
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
-                continue
-            content = result.get("content")
-            if isinstance(content, dict) and content.get("ok") is False:
-                return True
-        return False
-
-    @staticmethod
-    def _should_build_fallback_map(
-        turn_contract,
-        tool_payload: dict[str, Any] | None,
-    ) -> bool:
-        if turn_contract.task_class != "map_search":
-            return False
-        if not turn_contract.normalized_action.requires_location and not turn_contract.location_signals:
-            return False
-        if not isinstance(tool_payload, dict):
-            return True
-        if AgentOrchestrator._tool_payload_has_error(tool_payload):
-            return False
-        catalog_only_tools = {
-            "list_geospatial_capabilities",
-            "describe_geospatial_capability",
-        }
-        for tool_call in tool_payload.get("tool_calls") or []:
-            if not isinstance(tool_call, dict):
-                continue
-            tool_name = tool_call.get("name")
-            if isinstance(tool_name, str) and tool_name not in catalog_only_tools:
-                return False
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
-                continue
-            content = result.get("content")
-            if not isinstance(content, dict):
-                continue
-            data = content.get("data")
-            if not isinstance(data, dict):
-                continue
-            if data.get("map_session") or data.get("direct_result") or data.get("capability_selection"):
-                return False
-        return True
-
-    def _build_verified_assistant_message(
-        self,
-        fallback_text: str,
-        *,
-        map_session: MapSession | None,
-        direct_result: dict[str, Any] | None,
-        tool_payload: dict[str, Any] | None,
-    ) -> str:
-        if map_session is not None:
-            return self._compose_map_session_message(map_session.model_dump(mode="json"))
-        if direct_result is not None:
-            tool_id = direct_result.get("tool_id") or direct_result.get("tool")
-            return self._compose_direct_tool_message(tool_id, {"result": direct_result})
-        if isinstance(tool_payload, dict):
-            for result in tool_payload.get("tool_results") or []:
-                if not isinstance(result, dict):
-                    continue
-                content = result.get("content")
-                if not isinstance(content, dict) or bool(content.get("ok", True)):
-                    continue
-                error = content.get("error")
-                if isinstance(error, dict) and isinstance(error.get("message"), str):
-                    return error["message"]
-        return fallback_text or "Done."
-
-    @staticmethod
-    def _build_preflight_operation_result(
-        *,
-        decision: PolicyDecision,
-        assistant_message: str,
-    ) -> ChatOperationResult:
-        if decision.plan.state == "clarify":
-            return ChatOperationResult(
-                kind="clarification",
-                status="partial",
-                message=assistant_message,
-            )
-        return ChatOperationResult(
-            kind="rejection",
-            status="failed",
-            message=assistant_message,
-        )
-
-    def _build_verified_operation_result(
+    async def _build_combined_map_session_from_tool_results(
         self,
         *,
-        assistant_message: str,
-        map_session: MapSession | None,
-        direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
         turn_contract,
-    ) -> ChatOperationResult:
-        warnings = self._collect_operation_warnings(map_session=map_session, tool_payload=tool_payload)
-        if map_session is not None:
-            return ChatOperationResult(
-                kind="map_session",
-                status="success",
-                message=assistant_message,
-                warnings=warnings,
-                map_session=map_session,
-            )
-        if direct_result is not None:
-            return ChatOperationResult(
-                kind="direct_answer",
-                status="success",
-                message=assistant_message,
-                warnings=warnings,
-                direct_result=direct_result,
-            )
-        tool_error = self._extract_tool_error_message(tool_payload)
-        if tool_error is not None:
-            return ChatOperationResult(
-                kind="error",
-                status="failed",
-                message=assistant_message or tool_error,
-                warnings=warnings,
-            )
-        if self._is_capability_question(turn_contract.user_text):
-            return ChatOperationResult(
-                kind="capability_catalog",
-                status="success",
-                message=assistant_message,
-                warnings=warnings,
-            )
-        return ChatOperationResult(
-            kind="direct_answer",
-            status="success",
-            message=assistant_message,
-            warnings=warnings,
-        )
-
-    @staticmethod
-    def _extract_tool_error_message(tool_payload: dict[str, Any] | None) -> str | None:
+        latest_memory: dict[str, Any] | None,
+    ) -> MapSession | None:
         if not isinstance(tool_payload, dict):
             return None
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
-                continue
-            content = result.get("content")
-            if not isinstance(content, dict) or bool(content.get("ok", True)):
-                continue
-            error = content.get("error")
-            if isinstance(error, dict) and isinstance(error.get("message"), str):
-                return error["message"]
-        return None
+        successful_entries: list[dict[str, Any]] = []
+        overlay_ids: list[str] = []
+        basemap_id: str | None = None
 
-    @staticmethod
-    def _collect_operation_warnings(
-        *,
-        map_session: MapSession | None,
-        tool_payload: dict[str, Any] | None,
-    ) -> list[str]:
-        warnings: list[str] = []
-        if map_session is not None:
-            warnings.extend(
-                warning
-                for warning in map_session.compliance_warnings
-                if isinstance(warning, str) and warning.strip()
-            )
-        if not isinstance(tool_payload, dict):
-            return warnings
         for result in tool_payload.get("tool_results") or []:
             if not isinstance(result, dict):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict):
+            if not isinstance(content, dict) or content.get("ok") is False:
                 continue
             data = content.get("data")
             if not isinstance(data, dict):
                 continue
-            for warning in data.get("warnings") or []:
-                if isinstance(warning, str) and warning.strip() and warning not in warnings:
-                    warnings.append(warning)
-        return warnings
+            entry: dict[str, Any] = {"data": data}
+            map_payload = data.get("map_session")
+            if isinstance(map_payload, dict):
+                entry["map_session"] = map_payload
+                candidate_basemap = map_payload.get("basemap_id")
+                if isinstance(candidate_basemap, str) and candidate_basemap.strip() and basemap_id is None:
+                    basemap_id = candidate_basemap
+                for overlay_id in map_payload.get("overlay_ids") or []:
+                    if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
+                        overlay_ids.append(overlay_id)
+            selection = data.get("capability_selection")
+            if isinstance(selection, dict):
+                entry["capability_selection"] = selection
+                candidate_basemap = selection.get("basemap_id")
+                if isinstance(candidate_basemap, str) and candidate_basemap.strip() and basemap_id is None:
+                    basemap_id = candidate_basemap
+                for overlay_id in selection.get("overlay_ids") or []:
+                    if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
+                        overlay_ids.append(overlay_id)
+            capability_id = data.get("capability_id")
+            if isinstance(capability_id, str) and capability_id and capability_id not in overlay_ids:
+                if "map_session" in entry or "capability_selection" in entry:
+                    overlay_ids.append(capability_id)
+            if entry.keys() != {"data"}:
+                successful_entries.append(entry)
+
+        if len(overlay_ids) <= 1:
+            return None
+
+        resolved_location = await self.policy_engine.location_resolver.resolve_location_signals(
+            turn_contract.location_signals,
+            latest_memory or {},
+        )
+        if hasattr(resolved_location, "missing_fields"):
+            return None
+
+        plan = ExecutionPlan(
+            state="map_search",
+            mode="map",
+            action_id=turn_contract.normalized_action.action_id,
+            basemap_id=basemap_id,
+            overlay_ids=overlay_ids,
+        )
+        request = self.request_builder.build_location_search_request(plan, resolved_location)
+        return await self.search_orchestrator.execute(request)
