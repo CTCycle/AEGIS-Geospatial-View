@@ -7,6 +7,7 @@ import urllib.request
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from server.domain.geographics import LayerAuditReport
 from server.services.geospatial.catalog import GeospatialCatalogService
@@ -187,6 +188,49 @@ class GeospatialApiService:
             ) from exc
         except (TimeoutError, urllib.error.URLError) as exc:
             raise GeospatialTileRequestError("TomTom tile request failed.") from exc
+
+    # -------------------------------------------------------------------------
+    async def fetch_capability_tile(
+        self,
+        capability_id: str,
+        z: int,
+        x: int,
+        y: int,
+    ) -> bytes:
+        manifest = self._manifest_by_id(capability_id)
+        metadata = manifest.get("metadata") if isinstance(manifest.get("metadata"), dict) else {}
+        template = str(
+            metadata.get("tile_url_template")
+            or metadata.get("url_template")
+            or metadata.get("tile_url")
+            or metadata.get("url")
+            or ""
+        ).strip()
+        if not template:
+            raise GeospatialUnsupportedTileError("Tile URL is missing from provider metadata.")
+        provider = str(manifest.get("provider") or "").strip().lower()
+        upstream_url = self._resolve_credentialed_tile_template(
+            template=template,
+            provider=provider,
+            capability_id=capability_id,
+            z=z,
+            x=x,
+            y=y,
+        )
+        try:
+            return await self._fetch_binary_url(upstream_url)
+        except urllib.error.HTTPError as exc:
+            if exc.code in {401, 403}:
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} rejected the configured credentials."
+                ) from exc
+            raise GeospatialTileRequestError(
+                f"{self._humanize_provider(provider)} tile request failed with HTTP {exc.code}."
+            ) from exc
+        except (TimeoutError, urllib.error.URLError) as exc:
+            raise GeospatialTileRequestError(
+                f"{self._humanize_provider(provider)} tile request failed."
+            ) from exc
 
     # -------------------------------------------------------------------------
     async def list_cameras(
@@ -668,6 +712,50 @@ class GeospatialApiService:
             )
         instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
+
+    def _resolve_credentialed_tile_template(
+        self,
+        *,
+        template: str,
+        provider: str,
+        capability_id: str,
+        z: int,
+        x: int,
+        y: int,
+    ) -> str:
+        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
+        if "{api_key}" in template:
+            if not env_name:
+                raise GeospatialUnsupportedTileError(
+                    f"No credential mapping is configured for provider '{provider}'."
+                )
+            api_key = os.getenv(env_name, "").strip()
+            if not api_key:
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} credentials are required."
+                )
+            template = template.replace("{api_key}", quote(api_key, safe=""))
+        resolved = (
+            template.replace("{z}", str(z))
+            .replace("{x}", str(x))
+            .replace("{y}", str(y))
+        )
+        if resolved == template and all(token not in template for token in ("{z}", "{x}", "{y}")):
+            raise GeospatialUnsupportedTileError(
+                f"Capability '{capability_id}' does not expose a tile template."
+            )
+        return resolved
+
+    @staticmethod
+    def _humanize_provider(provider: str) -> str:
+        lookup = {
+            "tomtom": "TomTom",
+            "geoapify": "Geoapify",
+            "google_maps": "Google Maps",
+            "openaq": "OpenAQ",
+            "arcgis": "ArcGIS",
+        }
+        return lookup.get(provider, provider or "Provider")
 
     async def _fetch_binary_url(self, url: str) -> bytes:
         return await asyncio.to_thread(self._fetch_binary_url_sync, url)

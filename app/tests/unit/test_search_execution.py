@@ -339,9 +339,11 @@ def test_location_search_orchestrator_resolves_provider_tile_templates(monkeypat
     assert session.basemap is not None
     assert session.basemap_id == "tomtom_basic"
     assert session.basemap["id"] == "tomtom_basic"
-    assert "tomtom-test-key" in str(session.basemap["tile_url"])
+    assert str(session.basemap["tile_url"]).startswith("/api/geospatial/tiles/tomtom_basic/")
     assert session.overlays[0]["id"] == "tomtom_traffic_flow"
-    assert "tomtom-test-key" in str(session.overlays[0]["url"])
+    assert str(session.overlays[0]["url"]).startswith("/api/geospatial/tiles/tomtom_traffic_flow/")
+    assert "tomtom-test-key" not in str(session.basemap["tile_url"])
+    assert "tomtom-test-key" not in str(session.overlays[0]["url"])
     assert session.compliance_warnings == []
 
 

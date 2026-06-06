@@ -288,6 +288,7 @@ class LocationSearchOrchestrator:
         if "{api_key}" not in template:
             return template, None
         provider = str((capability or {}).get("provider") or "").strip().lower()
+        capability_id = str((capability or {}).get("id") or "").strip()
         env_by_provider = {
             "arcgis": "ARCGIS_API_KEY",
             "census": "CENSUS_API_KEY",
@@ -303,7 +304,9 @@ class LocationSearchOrchestrator:
         api_key = os.getenv(env_name, "").strip()
         if not api_key:
             return template, f"{env_name} is required to render this provider tile layer."
-        return template.replace("{api_key}", api_key), None
+        if capability_id:
+            return f"/api/geospatial/tiles/{capability_id}/{{z}}/{{x}}/{{y}}.png", None
+        return template, f"Credentialed tile capability for provider '{provider}' is missing a stable id."
 
     @staticmethod
     def _credential_env_for_provider(provider: str) -> str | None:
