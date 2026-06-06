@@ -8,6 +8,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
 import { PersistedChatPageState } from '../core/app-state';
 import {
+  ChatOperationResult,
   MapSession,
   OverlayStateChange,
   SearchResponsePayload,
@@ -39,6 +40,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   conversationNonce = 1;
   messages: ChatMessage[] = [];
   lastDecision?: ChatTurnResponse['decision'];
+  lastOperation?: ChatOperationResult | null;
   memorySnapshot: Record<string, unknown> = {};
   contextUsage?: ContextUsage;
   mapSession?: MapSession;
@@ -77,6 +79,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.conversationNonce = this.chatPageState.chatPanel.conversationNonce;
     this.messages = this.chatPageState.chatPanel.messages;
     this.lastDecision = this.chatPageState.chatPanel.lastDecision;
+    this.lastOperation = this.chatPageState.chatPanel.lastOperation;
     this.memorySnapshot = this.chatPageState.chatPanel.memorySnapshot ?? {};
     this.contextUsage = this.chatPageState.chatPanel.contextUsage;
     this.mapSession = this.chatPageState.chatPanel.mapSession;
@@ -173,6 +176,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.conversationNonce += 1;
     this.messages = [];
     this.lastDecision = undefined;
+    this.lastOperation = undefined;
     this.memorySnapshot = {};
     this.contextUsage = undefined;
     this.mapSession = undefined;
@@ -297,16 +301,17 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
-    const mapSession = result.map_session;
+    const operation = result.operation;
+    const mapSession = operation?.map_session ?? result.map_session;
     if (typeof mapSession === 'object' && mapSession !== null) {
       this.handleMapSession(mapSession as MapSession);
     }
     this.lastDecision = result.decision;
+    this.lastOperation = operation;
     this.memorySnapshot = result.memory_snapshot ?? {};
     this.contextUsage = result.context_usage ?? undefined;
     this.assistantDraft = '';
-    const planState = result.decision?.plan?.state;
-    this.status = planState === 'clarify' ? 'Need more detail' : 'Complete';
+    this.status = this.deriveStatusLabel(result);
     this.progressPercent = 100;
     this.syncState();
     queueMicrotask(() => this.scrollTranscriptToBottom());
@@ -354,6 +359,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         conversationNonce: this.conversationNonce,
         messages: this.messages,
         lastDecision: this.lastDecision,
+        lastOperation: this.lastOperation ?? undefined,
         memorySnapshot: this.memorySnapshot,
         contextUsage: this.contextUsage,
         mapSession: this.mapSession,
@@ -403,5 +409,27 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       || normalized.includes('cannot process this request')
       || normalized.includes('failed')
       || normalized.includes('error');
+  }
+
+  private deriveStatusLabel(result: ChatTurnResponse): string {
+    const operation = result.operation;
+    if (operation) {
+      if (operation.kind === 'clarification' || operation.status === 'partial') {
+        return 'Need more detail';
+      }
+      if (operation.kind === 'error' || operation.kind === 'rejection' || operation.status === 'failed') {
+        return 'Failed';
+      }
+      return 'Complete';
+    }
+
+    const planState = result.decision?.plan?.state;
+    if (planState === 'clarify') {
+      return 'Need more detail';
+    }
+    if (planState === 'reject') {
+      return 'Failed';
+    }
+    return 'Complete';
   }
 }

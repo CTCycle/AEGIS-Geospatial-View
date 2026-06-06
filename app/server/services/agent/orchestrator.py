@@ -5,7 +5,9 @@ from typing import Any
 from uuid import uuid4
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
-from server.domain.chat import ChatTurnRequest, ChatTurnResponse
+from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
+from server.domain.geographics import MapSession
+from server.domain.extraction.models import LocationSignal
 from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -48,7 +50,14 @@ class AgentOrchestrator:
         self.request_builder = request_builder
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.agent_tool_catalog_service = (
-            agent_tool_catalog_service or AgentToolCatalogService()
+            agent_tool_catalog_service
+            or AgentToolCatalogService(
+                search_orchestrator=self.search_orchestrator,
+                request_builder=self.request_builder,
+                location_resolver=self.policy_engine.location_resolver,
+                tool_registry=self.tool_registry,
+                policy_engine=self.policy_engine,
+            )
         )
         self.agent_tool_catalog_service.register_with(self.tool_registry)
         self.native_tool_loop = native_tool_loop or NativeToolLoop(
@@ -77,6 +86,10 @@ class AgentOrchestrator:
             memory_snapshot=latest_memory,
             conversation_messages=recent_messages,
         )
+        turn_contract = self._merge_memory_location_signals(
+            turn_contract=turn_contract,
+            latest_memory=latest_memory,
+        )
         context_usage = self.parser_service.last_context_usage
         if self._has_parser_authentication_failure(turn_contract):
             assistant_message = (
@@ -84,6 +97,11 @@ class AgentOrchestrator:
                 "Open Model Settings and replace the key before using that cloud model."
             )
             decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
+            operation = ChatOperationResult(
+                kind="error",
+                status="failed",
+                message=assistant_message,
+            )
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -91,6 +109,7 @@ class AgentOrchestrator:
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": decision.model_dump(mode="json"),
+                    "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
                     "previous_turn_contract": latest_contract,
                     "request_id": request_id,
@@ -109,6 +128,7 @@ class AgentOrchestrator:
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=decision,
+                operation=operation,
                 tool_payload=None,
                 map_session=None,
                 memory_snapshot=latest_memory,
@@ -120,6 +140,11 @@ class AgentOrchestrator:
                 "Open Model Settings, choose an installed model, or refresh/pull the configured Ollama model."
             )
             decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
+            operation = ChatOperationResult(
+                kind="error",
+                status="failed",
+                message=assistant_message,
+            )
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -127,6 +152,7 @@ class AgentOrchestrator:
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": decision.model_dump(mode="json"),
+                    "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
                     "previous_turn_contract": latest_contract,
                     "request_id": request_id,
@@ -145,6 +171,7 @@ class AgentOrchestrator:
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=decision,
+                operation=operation,
                 tool_payload=None,
                 map_session=None,
                 memory_snapshot=latest_memory,
@@ -156,6 +183,11 @@ class AgentOrchestrator:
                 turn_contract.user_text,
                 recent_messages,
             )
+            operation = ChatOperationResult(
+                kind="capability_catalog" if self._is_capability_question(turn_contract.user_text) else "direct_answer",
+                status="success",
+                message=assistant_message,
+            )
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -163,6 +195,7 @@ class AgentOrchestrator:
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": None,
+                    "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
                     "previous_turn_contract": latest_contract,
                     "request_id": request_id,
@@ -176,6 +209,7 @@ class AgentOrchestrator:
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=self._build_direct_reject_decision(turn_contract.normalized_action.action_id),
+                operation=operation,
                 tool_payload=None,
                 map_session=None,
                 memory_snapshot=latest_memory,
@@ -189,6 +223,10 @@ class AgentOrchestrator:
                 if preflight_decision.clarification is not None
                 else "I cannot execute this request with the current policy constraints."
             )
+            operation = self._build_preflight_operation_result(
+                decision=preflight_decision,
+                assistant_message=assistant_message,
+            )
             self.history_repo.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -196,6 +234,7 @@ class AgentOrchestrator:
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": preflight_decision.model_dump(mode="json"),
+                    "operation": operation.model_dump(mode="json"),
                     "memory_snapshot": latest_memory,
                     "previous_turn_contract": latest_contract,
                     "request_id": request_id,
@@ -209,6 +248,7 @@ class AgentOrchestrator:
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=preflight_decision,
+                operation=operation,
                 tool_payload=None,
                 map_session=None,
                 memory_snapshot=latest_memory,
@@ -251,8 +291,8 @@ class AgentOrchestrator:
         )
         decision = PolicyDecision(
             plan=ExecutionPlan(
-                state="direct_response",
-                mode="direct_text",
+                state="map_search" if self._has_verified_map_result(tool_loop_result.tool_results) else "direct_response",
+                mode="map" if self._has_verified_map_result(tool_loop_result.tool_results) else "direct_text",
                 action_id=turn_contract.normalized_action.action_id,
             ),
             trace=DecisionTrace(
@@ -287,8 +327,41 @@ class AgentOrchestrator:
             "iterations": tool_loop_result.iterations,
             "stopped_reason": tool_loop_result.stopped_reason,
         }
-        map_session = None
-        memory_snapshot = latest_memory
+        map_session = await self._extract_map_session_from_tool_results(
+            tool_payload=tool_payload,
+            turn_contract=turn_contract,
+            latest_memory=latest_memory,
+        )
+        direct_result = self._extract_direct_result_from_tool_results(tool_payload)
+        capability_selection = self._extract_capability_selection_from_tool_results(tool_payload)
+        if map_session is None and capability_selection is not None:
+            map_session = await self._build_map_session_from_capability_selection(
+                capability_selection=capability_selection,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+            )
+        if map_session is None and self._should_build_fallback_map(turn_contract, tool_payload):
+            map_session = await self._build_map_session_from_turn_contract(turn_contract, latest_memory)
+        memory_snapshot = await self._build_updated_memory_snapshot(
+            turn_contract=turn_contract,
+            latest_memory=latest_memory,
+            map_session=map_session,
+            direct_result=direct_result,
+            tool_payload=tool_payload,
+        )
+        assistant_message = self._build_verified_assistant_message(
+            tool_loop_result.final_text,
+            map_session=map_session,
+            direct_result=direct_result,
+            tool_payload=tool_payload,
+        )
+        operation = self._build_verified_operation_result(
+            assistant_message=assistant_message,
+            map_session=map_session,
+            direct_result=direct_result,
+            tool_payload=tool_payload,
+            turn_contract=turn_contract,
+        )
 
         self.history_repo.append_message(
             session_id=session.id,
@@ -297,6 +370,7 @@ class AgentOrchestrator:
             structured_payload={
                 "turn_contract": turn_contract.model_dump(mode="json"),
                 "decision": decision.model_dump(mode="json"),
+                "operation": operation.model_dump(mode="json"),
                 "memory_snapshot": memory_snapshot,
                 "previous_turn_contract": latest_contract,
                 "request_id": request_id,
@@ -317,11 +391,69 @@ class AgentOrchestrator:
             assistant_message=assistant_message,
             turn_contract=turn_contract,
             decision=decision,
+            operation=operation,
             tool_payload=tool_payload,
             map_session=map_session,
             memory_snapshot=memory_snapshot,
             context_usage=context_usage,
         )
+
+    def _merge_memory_location_signals(
+        self,
+        *,
+        turn_contract,
+        latest_memory: dict[str, Any] | None,
+    ):
+        latest_memory = latest_memory if isinstance(latest_memory, dict) else {}
+        memory_signals = self.location_memory_service.resolve_explicit_references(
+            turn_contract.user_text,
+            latest_memory,
+        )
+        if not memory_signals:
+            return turn_contract
+        merged_signals = self._dedupe_location_signals([
+            *memory_signals,
+            *list(turn_contract.location_signals),
+        ])
+        ambiguities = [
+            item
+            for item in turn_contract.ambiguities
+            if item not in {"missing_location", "deictic_without_memory"}
+        ]
+        return turn_contract.model_copy(
+            update={
+                "location_signals": merged_signals,
+                "ambiguities": ambiguities,
+            }
+        )
+
+    @staticmethod
+    def _dedupe_location_signals(signals: list[LocationSignal]) -> list[LocationSignal]:
+        unique: list[LocationSignal] = []
+        seen: set[tuple[str, str, float | None, float | None, str]] = set()
+        for signal in signals:
+            key = (
+                signal.signal_type,
+                signal.normalized_value or signal.raw_value,
+                signal.latitude,
+                signal.longitude,
+                signal.source,
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(signal)
+        return unique
+
+    @staticmethod
+    def _has_verified_map_result(tool_results: list[Any]) -> bool:
+        for result in tool_results:
+            if not isinstance(getattr(result, "content", None), dict):
+                continue
+            data = result.content.get("data")
+            if isinstance(data, dict) and data.get("map_session"):
+                return True
+        return False
 
     @staticmethod
     def _build_native_agent_messages(
@@ -555,3 +687,339 @@ class AgentOrchestrator:
         words = value.replace("-", "_").split("_")
         acronyms = {"osm": "OpenStreetMap", "modis": "MODIS", "viirs": "VIIRS"}
         return " ".join(acronyms.get(word.lower(), word.capitalize()) for word in words if word)
+
+    async def _extract_map_session_from_tool_results(
+        self,
+        *,
+        tool_payload: dict[str, Any] | None,
+        turn_contract,
+        latest_memory: dict[str, Any] | None,
+    ) -> MapSession | None:
+        if not isinstance(tool_payload, dict):
+            return None
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if not isinstance(content, dict):
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            map_payload = data.get("map_session")
+            if isinstance(map_payload, dict):
+                return MapSession.model_validate(map_payload)
+        return None
+
+    def _extract_direct_result_from_tool_results(
+        self,
+        tool_payload: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not isinstance(tool_payload, dict):
+            return None
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if not isinstance(content, dict):
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            direct_result = data.get("direct_result")
+            if isinstance(direct_result, dict):
+                return direct_result
+        return None
+
+    def _extract_capability_selection_from_tool_results(
+        self,
+        tool_payload: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not isinstance(tool_payload, dict):
+            return None
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if not isinstance(content, dict):
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            selection = data.get("capability_selection")
+            if isinstance(selection, dict):
+                return selection
+        return None
+
+    async def _build_map_session_from_capability_selection(
+        self,
+        *,
+        capability_selection: dict[str, Any],
+        turn_contract,
+        latest_memory: dict[str, Any] | None,
+    ) -> MapSession | None:
+        resolved_location = await self.policy_engine.location_resolver.resolve_location_signals(
+            turn_contract.location_signals,
+            latest_memory or {},
+        )
+        if not hasattr(resolved_location, "model_dump"):
+            return None
+        plan = ExecutionPlan(
+            state="map_search",
+            mode="map",
+            action_id=turn_contract.normalized_action.action_id,
+            basemap_id=capability_selection.get("basemap_id"),
+            overlay_ids=list(capability_selection.get("overlay_ids") or []),
+        )
+        request = self.request_builder.build_location_search_request(plan, resolved_location)
+        return await self.search_orchestrator.execute(request)
+
+    async def _build_map_session_from_turn_contract(
+        self,
+        turn_contract,
+        latest_memory: dict[str, Any] | None,
+    ) -> MapSession | None:
+        resolved_location = await self.policy_engine.location_resolver.resolve_location_signals(
+            turn_contract.location_signals,
+            latest_memory or {},
+        )
+        if not hasattr(resolved_location, "model_dump"):
+            return None
+        plan = ExecutionPlan(
+            state="map_search",
+            mode="map",
+            action_id=turn_contract.normalized_action.action_id,
+        )
+        request = self.request_builder.build_location_search_request(plan, resolved_location)
+        return await self.search_orchestrator.execute(request)
+
+    async def _build_updated_memory_snapshot(
+        self,
+        *,
+        turn_contract,
+        latest_memory: dict[str, Any] | None,
+        map_session: MapSession | None,
+        direct_result: dict[str, Any] | None,
+        tool_payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        base_snapshot = latest_memory if isinstance(latest_memory, dict) else {}
+        resolved_location = await self._resolve_verified_location_for_memory(
+            turn_contract=turn_contract,
+            latest_memory=base_snapshot,
+            map_session=map_session,
+            direct_result=direct_result,
+            tool_payload=tool_payload,
+        )
+        if resolved_location is None:
+            return base_snapshot
+        return self.location_memory_service.update_memory_snapshot(
+            base_snapshot,
+            resolved_location,
+            turn_contract.normalized_action,
+        )
+
+    async def _resolve_verified_location_for_memory(
+        self,
+        *,
+        turn_contract,
+        latest_memory: dict[str, Any],
+        map_session: MapSession | None,
+        direct_result: dict[str, Any] | None,
+        tool_payload: dict[str, Any] | None,
+    ):
+        if map_session is not None:
+            return map_session.resolved_location
+        if direct_result is None:
+            return None
+        if self._tool_payload_has_error(tool_payload):
+            return None
+        resolved = await self.policy_engine.location_resolver.resolve_location_signals(
+            turn_contract.location_signals,
+            latest_memory,
+        )
+        if hasattr(resolved, "missing_fields"):
+            return None
+        return resolved
+
+    @staticmethod
+    def _tool_payload_has_error(tool_payload: dict[str, Any] | None) -> bool:
+        if not isinstance(tool_payload, dict):
+            return False
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if isinstance(content, dict) and content.get("ok") is False:
+                return True
+        return False
+
+    @staticmethod
+    def _should_build_fallback_map(
+        turn_contract,
+        tool_payload: dict[str, Any] | None,
+    ) -> bool:
+        if turn_contract.task_class != "map_search":
+            return False
+        if not turn_contract.normalized_action.requires_location and not turn_contract.location_signals:
+            return False
+        if not isinstance(tool_payload, dict):
+            return True
+        if AgentOrchestrator._tool_payload_has_error(tool_payload):
+            return False
+        catalog_only_tools = {
+            "list_geospatial_capabilities",
+            "describe_geospatial_capability",
+        }
+        for tool_call in tool_payload.get("tool_calls") or []:
+            if not isinstance(tool_call, dict):
+                continue
+            tool_name = tool_call.get("name")
+            if isinstance(tool_name, str) and tool_name not in catalog_only_tools:
+                return False
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if not isinstance(content, dict):
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            if data.get("map_session") or data.get("direct_result") or data.get("capability_selection"):
+                return False
+        return True
+
+    def _build_verified_assistant_message(
+        self,
+        fallback_text: str,
+        *,
+        map_session: MapSession | None,
+        direct_result: dict[str, Any] | None,
+        tool_payload: dict[str, Any] | None,
+    ) -> str:
+        if map_session is not None:
+            return self._compose_map_session_message(map_session.model_dump(mode="json"))
+        if direct_result is not None:
+            tool_id = direct_result.get("tool_id") or direct_result.get("tool")
+            return self._compose_direct_tool_message(tool_id, {"result": direct_result})
+        if isinstance(tool_payload, dict):
+            for result in tool_payload.get("tool_results") or []:
+                if not isinstance(result, dict):
+                    continue
+                content = result.get("content")
+                if not isinstance(content, dict) or bool(content.get("ok", True)):
+                    continue
+                error = content.get("error")
+                if isinstance(error, dict) and isinstance(error.get("message"), str):
+                    return error["message"]
+        return fallback_text or "Done."
+
+    @staticmethod
+    def _build_preflight_operation_result(
+        *,
+        decision: PolicyDecision,
+        assistant_message: str,
+    ) -> ChatOperationResult:
+        if decision.plan.state == "clarify":
+            return ChatOperationResult(
+                kind="clarification",
+                status="partial",
+                message=assistant_message,
+            )
+        return ChatOperationResult(
+            kind="rejection",
+            status="failed",
+            message=assistant_message,
+        )
+
+    def _build_verified_operation_result(
+        self,
+        *,
+        assistant_message: str,
+        map_session: MapSession | None,
+        direct_result: dict[str, Any] | None,
+        tool_payload: dict[str, Any] | None,
+        turn_contract,
+    ) -> ChatOperationResult:
+        warnings = self._collect_operation_warnings(map_session=map_session, tool_payload=tool_payload)
+        if map_session is not None:
+            return ChatOperationResult(
+                kind="map_session",
+                status="success",
+                message=assistant_message,
+                warnings=warnings,
+                map_session=map_session,
+            )
+        if direct_result is not None:
+            return ChatOperationResult(
+                kind="direct_answer",
+                status="success",
+                message=assistant_message,
+                warnings=warnings,
+                direct_result=direct_result,
+            )
+        tool_error = self._extract_tool_error_message(tool_payload)
+        if tool_error is not None:
+            return ChatOperationResult(
+                kind="error",
+                status="failed",
+                message=assistant_message or tool_error,
+                warnings=warnings,
+            )
+        if self._is_capability_question(turn_contract.user_text):
+            return ChatOperationResult(
+                kind="capability_catalog",
+                status="success",
+                message=assistant_message,
+                warnings=warnings,
+            )
+        return ChatOperationResult(
+            kind="direct_answer",
+            status="success",
+            message=assistant_message,
+            warnings=warnings,
+        )
+
+    @staticmethod
+    def _extract_tool_error_message(tool_payload: dict[str, Any] | None) -> str | None:
+        if not isinstance(tool_payload, dict):
+            return None
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if not isinstance(content, dict) or bool(content.get("ok", True)):
+                continue
+            error = content.get("error")
+            if isinstance(error, dict) and isinstance(error.get("message"), str):
+                return error["message"]
+        return None
+
+    @staticmethod
+    def _collect_operation_warnings(
+        *,
+        map_session: MapSession | None,
+        tool_payload: dict[str, Any] | None,
+    ) -> list[str]:
+        warnings: list[str] = []
+        if map_session is not None:
+            warnings.extend(
+                warning
+                for warning in map_session.compliance_warnings
+                if isinstance(warning, str) and warning.strip()
+            )
+        if not isinstance(tool_payload, dict):
+            return warnings
+        for result in tool_payload.get("tool_results") or []:
+            if not isinstance(result, dict):
+                continue
+            content = result.get("content")
+            if not isinstance(content, dict):
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            for warning in data.get("warnings") or []:
+                if isinstance(warning, str) and warning.strip() and warning not in warnings:
+                    warnings.append(warning)
+        return warnings

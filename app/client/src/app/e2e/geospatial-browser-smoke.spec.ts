@@ -72,6 +72,12 @@ describe('e2e/geospatial browser smoke', () => {
         ],
       },
     },
+    operation: {
+      kind: 'map_session',
+      status: 'success',
+      message: 'Rendered a mocked geospatial session.',
+      warnings: [],
+    },
     memory_snapshot: { provider_secret_sample: forbiddenSecret },
     map_session: {
       session_id: 'mock-map-session',

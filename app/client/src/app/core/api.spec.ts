@@ -119,6 +119,12 @@ describe('core/api', () => {
       decision: {
         plan: { state: 'direct_tool', mode: 'direct_text', action_id: 'weather', overlay_ids: [] },
       },
+      operation: {
+        kind: 'direct_answer',
+        status: 'success',
+        message: 'done',
+        warnings: [],
+      },
       context_usage: {
         estimated_input_tokens: 100,
         selected_context_window: 2048,
@@ -131,6 +137,7 @@ describe('core/api', () => {
     expect(parsed.request_id).toBe('chat-abc');
     expect(parsed.session_id).toBe(12);
     expect(parsed.assistant_message).toBe('done');
+    expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
   });
 
@@ -177,7 +184,7 @@ describe('core/api', () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode('{"event":"status","data":{"message":"received"}}\n'));
-        controller.enqueue(new TextEncoder().encode('{"event":"assistant_delta","data":{"delta":"hi "}}\n{"event":"final","data":{}}\n{bad'));
+        controller.enqueue(new TextEncoder().encode('{"event":"parsed","data":{"task_class":"map_search"}}\n{"event":"final","data":{}}\n{bad'));
         controller.close();
       },
     });
@@ -187,7 +194,7 @@ describe('core/api', () => {
     (window.fetch as unknown) = fetchSpy;
     const events: string[] = [];
     await streamChatTurn({ message: 'x' }, (event) => events.push(event.event));
-    expect(events).toEqual(['status', 'assistant_delta', 'final']);
+    expect(events).toEqual(['status', 'parsed', 'final']);
   });
 
   it('streamChatTurn emits error event behavior as ApiRequestError', async () => {
@@ -235,6 +242,7 @@ describe('core/api', () => {
         assistant_message: 'ok',
         turn_contract: {},
         decision: {},
+        operation: { kind: 'direct_answer', status: 'success', message: 'ok' },
         memory_snapshot: {},
       }), {
         status: 200,

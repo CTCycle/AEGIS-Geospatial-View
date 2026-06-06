@@ -387,19 +387,38 @@ export interface ToolPayload {
   error?: string;
 }
 
+export interface ChatOperationResult {
+  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error';
+  status: 'success' | 'partial' | 'failed';
+  message: string;
+  warnings?: string[];
+  map_session?: MapSession | null;
+  direct_result?: Record<string, JsonValue> | null;
+}
+
 export interface ChatTurnResponse {
   request_id: string;
   session_id: number;
   assistant_message: string;
   turn_contract: TurnParseResult;
   decision: PolicyDecision;
+  operation?: ChatOperationResult | null;
   tool_payload?: ToolPayload | null;
   map_session?: MapSession | null;
   memory_snapshot: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
 }
 
-export type ChatStreamEventType = 'status' | 'assistant_delta' | 'tool_status' | 'final' | 'error';
+export type ChatStreamEventType =
+  | 'status'
+  | 'parsed'
+  | 'policy'
+  | 'tool_call_started'
+  | 'tool_call_completed'
+  | 'map_session_created'
+  | 'assistant_delta'
+  | 'final'
+  | 'error';
 
 export interface ChatStreamEvent {
   event: ChatStreamEventType;

@@ -344,6 +344,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     assistant_message: requireString(value.assistant_message, 'assistant_message'),
     turn_contract: requireRecord(value.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
     decision: requireRecord(value.decision, 'decision') as unknown as ChatTurnResponse['decision'],
+    operation: isRecord(value.operation) ? value.operation as unknown as ChatTurnResponse['operation'] : undefined,
     tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
     map_session: isRecord(value.map_session) ? value.map_session as unknown as ChatTurnResponse['map_session'] : undefined,
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
