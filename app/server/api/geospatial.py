@@ -161,6 +161,28 @@ async def get_layer_geojson(
 
 
 @router.get(
+    "/tiles/{capability_id}/{z}/{x}/{y}.png",
+    status_code=status.HTTP_200_OK,
+)
+async def proxy_capability_tile(
+    capability_id: str,
+    z: int,
+    x: int,
+    y: int,
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> Response:
+    try:
+        body = await service.fetch_capability_tile(capability_id, z, x, y)
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+    return Response(
+        content=body,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=60"},
+    )
+
+
+@router.get(
     "/proxy/tomtom/{kind}/{z}/{x}/{y}.png",
     status_code=status.HTTP_200_OK,
 )

@@ -246,6 +246,37 @@ def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_
     assert response.json() == {"type": "FeatureCollection", "features": []}
 
 
+def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secret(monkeypatch) -> None:
+    monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
+    client = TestClient(create_app())
+
+    response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/1/2/3.png")
+
+    assert response.status_code == 401
+    assert "TOMTOM_API_KEY" not in response.text
+
+
+def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_fetch_binary_url(url: str) -> bytes:
+        captured["url"] = url
+        return b"tile-binary"
+
+    monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
+    service = GeospatialApiService()
+    service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
+    client = TestClient(create_app())
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: service
+
+    response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/4/5/6.png")
+
+    assert response.status_code == 200
+    assert response.content == b"tile-binary"
+    assert "tomtom-secret-forbidden" in captured["url"]
+    assert "tomtom-secret-forbidden" not in response.text
+
+
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
     client = TestClient(create_app())
 
