@@ -17,6 +17,7 @@ from server.services.agent.native_tool_loop import (
     AgentToolLoopRequest,
     NativeToolLoop,
 )
+from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
@@ -40,6 +41,7 @@ class AgentOrchestrator:
         request_builder: RequestBuilder,
         native_tool_loop: NativeToolLoop | None = None,
         agent_tool_catalog_service: AgentToolCatalogService | None = None,
+        overlay_inference_service: OverlayInferenceService | None = None,
         settings_repo: ModelSettingsRepository | None = None,
         history_repo: ChatHistoryRepository | None = None,
     ) -> None:
@@ -61,6 +63,7 @@ class AgentOrchestrator:
             )
         )
         self.agent_tool_catalog_service.register_with(self.tool_registry)
+        self.overlay_inference_service = overlay_inference_service or OverlayInferenceService()
         self.native_tool_loop = native_tool_loop or NativeToolLoop(
             provider_factory=LLMFactory(settings_repo=self.settings_repo),
             tool_registry=self.tool_registry,
@@ -636,12 +639,17 @@ class AgentOrchestrator:
         )
         if not hasattr(resolved_location, "model_dump"):
             return None
+        inferred_overlay_ids = self._infer_overlay_ids(
+            turn_contract=turn_contract,
+            resolved_location=resolved_location,
+            existing_overlay_ids=list(capability_selection.get("overlay_ids") or []),
+        )
         plan = ExecutionPlan(
             state="map_search",
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
             basemap_id=capability_selection.get("basemap_id"),
-            overlay_ids=list(capability_selection.get("overlay_ids") or []),
+            overlay_ids=inferred_overlay_ids,
         )
         request = self.request_builder.build_location_search_request(plan, resolved_location)
         return await self.search_orchestrator.execute(request)
@@ -657,10 +665,17 @@ class AgentOrchestrator:
         )
         if not hasattr(resolved_location, "model_dump"):
             return None
+        inferred_overlay_ids = self._infer_overlay_ids(
+            turn_contract=turn_contract,
+            resolved_location=resolved_location,
+            existing_overlay_ids=[],
+        )
         plan = ExecutionPlan(
             state="map_search",
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
+            basemap_id=self._infer_basemap_id(turn_contract),
+            overlay_ids=inferred_overlay_ids,
         )
         request = self.request_builder.build_location_search_request(plan, resolved_location)
         return await self.search_orchestrator.execute(request)
@@ -775,8 +790,46 @@ class AgentOrchestrator:
             state="map_search",
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
-            basemap_id=basemap_id,
-            overlay_ids=overlay_ids,
+            basemap_id=basemap_id or self._infer_basemap_id(turn_contract),
+            overlay_ids=self._infer_overlay_ids(
+                turn_contract=turn_contract,
+                resolved_location=resolved_location,
+                existing_overlay_ids=overlay_ids,
+            ),
         )
         request = self.request_builder.build_location_search_request(plan, resolved_location)
         return await self.search_orchestrator.execute(request)
+
+    def _infer_overlay_ids(
+        self,
+        *,
+        turn_contract,
+        resolved_location,
+        existing_overlay_ids: list[str],
+    ) -> list[str]:
+        inferred = self.overlay_inference_service.infer_overlays(
+            turn_contract=turn_contract,
+            location=resolved_location,
+            existing_overlay_ids=existing_overlay_ids,
+        )
+        merged = list(existing_overlay_ids)
+        for overlay_id in inferred.overlay_ids:
+            if overlay_id not in merged:
+                merged.append(overlay_id)
+        return merged
+
+    @staticmethod
+    def _infer_basemap_id(turn_contract) -> str | None:
+        haystack = " ".join(
+            [
+                turn_contract.user_text.lower(),
+                turn_contract.normalized_action.action_id.lower(),
+                *[item.lower() for item in turn_contract.normalized_action.task_tags],
+                *[item.lower() for item in turn_contract.normalized_action.action_tags],
+            ]
+        )
+        if any(marker in haystack for marker in ("satellite", "imagery", "true color")):
+            return "gibs_satellite"
+        if any(marker in haystack for marker in ("terrain", "elevation", "topography")):
+            return "osm_terrain"
+        return None
