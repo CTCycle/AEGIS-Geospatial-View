@@ -5,6 +5,14 @@ export interface GeospatialLayerScenario {
 }
 
 export const geospatialLayerScenarios: GeospatialLayerScenario[] = [
+  { id: 'workflow_show_rome_italy', description: 'Show Rome, Italy returns an OSM-backed map session with center coordinates', expectedState: 'renders' },
+  { id: 'workflow_show_rome_with_traffic', description: 'Show Rome with traffic returns one map session with traffic overlay or warning', expectedState: 'missing-credential' },
+  { id: 'workflow_show_zurich_with_precipitation_radar', description: 'Show Zurich with precipitation radar returns a radar overlay or warning', expectedState: 'stale-fallback' },
+  { id: 'workflow_show_paris_with_air_quality', description: 'Show Paris with air quality returns an air-quality overlay or warning', expectedState: 'missing-credential' },
+  { id: 'workflow_show_previous_location_with_traffic', description: 'Follow-up traffic request reuses the active location from memory', expectedState: 'missing-credential' },
+  { id: 'workflow_show_traffic_and_rain_coordinates', description: 'Direct coordinate requests render traffic and rain overlays without clarification', expectedState: 'renders' },
+  { id: 'workflow_missing_api_keys', description: 'Missing provider credentials surface warnings without leaking browser-visible keys', expectedState: 'missing-credential' },
+  { id: 'workflow_broken_provider_response', description: 'Broken provider payload leaves the basemap visible and isolates layer diagnostics', expectedState: 'renders' },
   { id: 'osm_default', description: 'Default OSM basemap renders', expectedState: 'renders' },
   { id: 'osm_dark', description: 'Dark OSM basemap renders', expectedState: 'renders' },
   { id: 'osm_terrain', description: 'Terrain basemap renders', expectedState: 'renders' },

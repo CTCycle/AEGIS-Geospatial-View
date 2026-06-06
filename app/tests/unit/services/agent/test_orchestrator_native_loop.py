@@ -158,6 +158,145 @@ class _ParisParser(_Parser):
         )
 
 
+class _ZurichParser(_Parser):
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+    ) -> TurnParseResult:
+        return TurnParseResult(
+            user_text=user_message,
+            conversation_context=ConversationContextSnapshot(
+                recent_messages=[],
+                memory_snapshot=memory_snapshot,
+            ),
+            task_class="map_search",
+            location_signals=[
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Zurich",
+                    normalized_value="Zurich",
+                    latitude=47.3769,
+                    longitude=8.5417,
+                    confidence=0.9,
+                )
+            ],
+            normalized_action=NormalizedAction(
+                action_id="map_search",
+                action_label="Map Search",
+                task_tags=["map"],
+                action_tags=["catalog"],
+                requires_location=True,
+            ),
+            parser_confidence=0.9,
+        )
+
+
+class _TimesSquareParser(_Parser):
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+    ) -> TurnParseResult:
+        return TurnParseResult(
+            user_text=user_message,
+            conversation_context=ConversationContextSnapshot(
+                recent_messages=[],
+                memory_snapshot=memory_snapshot,
+            ),
+            task_class="map_search",
+            location_signals=[
+                LocationSignal(
+                    signal_type="city",
+                    raw_value="Times Square",
+                    normalized_value="Times Square",
+                    latitude=40.758,
+                    longitude=-73.9855,
+                    confidence=0.9,
+                )
+            ],
+            normalized_action=NormalizedAction(
+                action_id="map_search",
+                action_label="Map Search",
+                task_tags=["map"],
+                action_tags=["catalog"],
+                requires_location=True,
+            ),
+            parser_confidence=0.9,
+        )
+
+
+class _CoordinateParser(_Parser):
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+    ) -> TurnParseResult:
+        return TurnParseResult(
+            user_text=user_message,
+            conversation_context=ConversationContextSnapshot(
+                recent_messages=[],
+                memory_snapshot=memory_snapshot,
+            ),
+            task_class="map_search",
+            location_signals=[
+                LocationSignal(
+                    signal_type="coordinates",
+                    raw_value="47.3769, 8.5417",
+                    normalized_value="47.3769, 8.5417",
+                    latitude=47.3769,
+                    longitude=8.5417,
+                    confidence=1.0,
+                )
+            ],
+            normalized_action=NormalizedAction(
+                action_id="map_search",
+                action_label="Map Search",
+                task_tags=["map"],
+                action_tags=["catalog"],
+                requires_location=True,
+            ),
+            parser_confidence=0.95,
+        )
+
+
+class _MemoryMapParser(_Parser):
+    def parse_turn(
+        self,
+        user_message: str,
+        memory_snapshot: dict,
+        conversation_messages: list[dict],
+    ) -> TurnParseResult:
+        return TurnParseResult(
+            user_text=user_message,
+            conversation_context=ConversationContextSnapshot(
+                recent_messages=[],
+                memory_snapshot=memory_snapshot,
+            ),
+            task_class="map_search",
+            location_signals=[
+                LocationSignal(
+                    signal_type="deictic",
+                    raw_value="previous location",
+                    normalized_value="previous location",
+                    confidence=0.9,
+                )
+            ],
+            normalized_action=NormalizedAction(
+                action_id="map_search",
+                action_label="Map Search",
+                task_tags=["map"],
+                action_tags=["catalog"],
+                requires_location=True,
+            ),
+            ambiguities=["missing_location", "deictic_without_memory"],
+            parser_confidence=0.9,
+        )
+
+
 class _DirectToolParser(_Parser):
     def parse_turn(
         self,
@@ -195,7 +334,25 @@ class _DirectToolParser(_Parser):
 
 class _LocationResolver:
     async def resolve_location_signals(self, location_signals, memory_snapshot):  # noqa: ANN001
+        if not location_signals and memory_snapshot.get("active_location"):
+            active = memory_snapshot["active_location"]
+            return ResolvedLocation(
+                label=str(active.get("label") or "remembered location"),
+                latitude=float(active.get("latitude") or 41.9028),
+                longitude=float(active.get("longitude") or 12.4964),
+                source="memory",
+                confidence=0.9,
+            )
         signal = location_signals[0]
+        if signal.signal_type == "deictic" and memory_snapshot.get("active_location"):
+            active = memory_snapshot["active_location"]
+            return ResolvedLocation(
+                label=str(active.get("label") or signal.normalized_value or signal.raw_value),
+                latitude=float(active.get("latitude") or 41.9028),
+                longitude=float(active.get("longitude") or 12.4964),
+                source="memory",
+                confidence=signal.confidence,
+            )
         return ResolvedLocation(
             label=signal.normalized_value or signal.raw_value,
             latitude=float(signal.latitude or 41.9028),
@@ -364,6 +521,23 @@ class _SearchOrchestrator:
             },
             bounds=[12.0, 41.0, 13.0, 42.0],
         )
+
+
+class _WarningSearchOrchestrator(_SearchOrchestrator):
+    async def execute(self, payload):  # noqa: ANN001
+        session = await super().execute(payload)
+        warnings: list[str] = []
+        if "windy_webcams" in payload.overlay_ids:
+            warnings.append(
+                "windy_webcams: Missing credential. Configure provider access before live camera previews."
+            )
+        if "tomtom_traffic_flow" in payload.overlay_ids:
+            warnings.append(
+                "tomtom_traffic_flow: Missing credential. Showing basemap without live traffic tiles."
+            )
+        if warnings:
+            session.compliance_warnings = warnings
+        return session
 
 
 class _FailingCatalog:
@@ -607,6 +781,215 @@ def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> 
         assert response.map_session is not None
         assert "tomtom_traffic_flow" in response.map_session.overlay_ids
         assert search_orchestrator.requests[0].overlay_ids == ["tomtom_traffic_flow"]
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="I found Rome, Italy.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(ChatTurnRequest(message="Show Rome, Italy"))
+
+        assert response.map_session is not None
+        assert response.operation is not None
+        assert response.operation.kind == "map_session"
+        assert response.map_session.basemap_id == "osm_default"
+        assert response.map_session.center == {"latitude": 41.9028, "longitude": 12.4964}
+        assert response.map_session.resolved_location.label == "Rome"
+        assert response.map_session.overlay_ids == []
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _WarningSearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="I found Rome with traffic.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(ChatTurnRequest(message="Show Rome with traffic"))
+
+        assert response.map_session is not None
+        assert response.operation is not None
+        assert response.operation.kind == "map_session"
+        assert response.map_session.overlay_ids == ["tomtom_traffic_flow"]
+        assert response.map_session.compliance_warnings
+        assert "Missing credential" in response.map_session.compliance_warnings[0]
+        assert len(search_orchestrator.requests) == 1
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainviewer() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="I found Zurich precipitation radar.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_ZurichParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(message="Show Zurich with precipitation radar")
+        )
+
+        assert response.map_session is not None
+        assert response.map_session.resolved_location.label == "Zurich"
+        assert response.map_session.overlay_ids == ["rainviewer_precipitation_radar"]
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="I found Paris air quality.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_ParisParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(ChatTurnRequest(message="Show Paris with air quality"))
+
+        assert response.map_session is not None
+        assert response.map_session.resolved_location.label == "Paris"
+        assert response.map_session.overlay_ids == ["openaq_air_quality"]
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _WarningSearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="I found webcams around Times Square.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_TimesSquareParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(message="Show webcams around Times Square")
+        )
+
+        assert response.map_session is not None
+        assert response.map_session.resolved_location.label == "Times Square"
+        assert response.map_session.overlay_ids == ["windy_webcams"]
+        assert response.map_session.compliance_warnings
+        assert "Missing credential" in response.map_session.compliance_warnings[0]
 
     asyncio.run(_run())
 
@@ -938,6 +1321,65 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
     asyncio.run(_run())
 
 
+def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() -> None:
+    async def _run() -> None:
+        history = _HistoryRepo(
+            latest_memory={
+                "location_slots": [
+                    {
+                        "label": "Rome",
+                        "latitude": 41.9028,
+                        "longitude": 12.4964,
+                        "action_id": "map_search",
+                    }
+                ],
+                "active_location": {
+                    "label": "Rome",
+                    "latitude": 41.9028,
+                    "longitude": 12.4964,
+                    "action_id": "map_search",
+                },
+            }
+        )
+        policy = _Policy()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="Traffic ready.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_MemoryMapParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(message="Show the previous location with traffic")
+        )
+
+        assert response.map_session is not None
+        assert response.decision.plan.state == "map_search"
+        assert response.map_session.resolved_location.label == "Rome"
+        assert response.map_session.overlay_ids == ["tomtom_traffic_flow"]
+
+    asyncio.run(_run())
+
+
 def test_orchestrator_updates_active_location_when_user_switches_places() -> None:
     async def _run() -> None:
         history = _HistoryRepo(
@@ -1001,6 +1443,55 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
         assert response.map_session.resolved_location.label == "Paris"
         assert response.memory_snapshot["active_location"]["label"] == "Paris"
         assert response.memory_snapshot["location_slots"][0]["label"] == "Paris"
+
+    asyncio.run(_run())
+
+
+def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_without_clarification() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _SearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="Traffic and rain ready.",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_CoordinateParser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(message="Show traffic and rain around 47.3769, 8.5417")
+        )
+
+        assert response.operation is not None
+        assert response.operation.kind == "map_session"
+        assert response.decision.plan.state == "map_search"
+        assert response.map_session is not None
+        assert response.map_session.resolved_location.latitude == 47.3769
+        assert response.map_session.resolved_location.longitude == 8.5417
+        assert response.map_session.overlay_ids == [
+            "tomtom_traffic_flow",
+            "rainviewer_precipitation_radar",
+        ]
+        assert response.decision.plan.state != "clarify"
 
     asyncio.run(_run())
 
