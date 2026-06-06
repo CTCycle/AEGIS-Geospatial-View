@@ -180,8 +180,25 @@ describe('components/map-preview.component', () => {
       map_session: makeMapSession({
         overlays: [
           { id: 'tile_1', label: 'Tile', type: 'tile', provider: 'x', url: 'https://tiles/{z}/{x}/{y}.png' },
-          { id: 'wms_1', label: 'WMS', type: 'wms', provider: 'x', url: 'https://wms.example', layers: 'abc' },
-          { id: 'wmts_1', label: 'WMTS', type: 'wmts', provider: 'x', url: 'https://wmts.example', layer_id: 'layer', tile_matrix_set: 'EPSG:3857' },
+          {
+            id: 'wms_1',
+            label: 'WMS',
+            type: 'wms',
+            provider: 'x',
+            url: 'https://wms.example',
+            tile_url_template: 'https://wms.example?service=WMS&request=GetMap&layers=abc',
+            layers: 'abc',
+          },
+          {
+            id: 'wmts_1',
+            label: 'WMTS',
+            type: 'wmts',
+            provider: 'x',
+            url: 'https://wmts.example',
+            tile_url_template: 'https://wmts.example?service=WMTS&request=GetTile&layer=layer',
+            layer_id: 'layer',
+            tile_matrix_set: 'EPSG:3857',
+          },
         ],
       }) as never,
     };
@@ -191,8 +208,8 @@ describe('components/map-preview.component', () => {
       .map((entry) => (entry as { tiles?: string[] }).tiles?.[0])
       .filter((entry): entry is string => typeof entry === 'string');
     expect(sourceTiles.some((url) => url.includes('tiles/{z}/{x}/{y}.png'))).toBeTrue();
-    expect(sourceTiles.some((url) => url.includes('service=WMS'))).toBeTrue();
-    expect(sourceTiles.some((url) => url.includes('service=WMTS'))).toBeTrue();
+    expect(sourceTiles).toContain('https://wms.example?service=WMS&request=GetMap&layers=abc');
+    expect(sourceTiles).toContain('https://wmts.example?service=WMTS&request=GetTile&layer=layer');
   });
 
   it('ignores malformed overlays without preventing the base map from rendering', () => {
@@ -279,7 +296,9 @@ describe('components/map-preview.component', () => {
             rendering_mode: 'vector-tile',
             provider: 'natural_earth',
             url: 'https://example.test/tiles/{z}/{x}/{y}.pbf',
+            tile_url_template: 'https://proxy.test/tiles/natural_earth/{z}/{x}/{y}.pbf',
             layer_id: 'admin',
+            source_layer: 'admin_boundaries',
             attribution: 'Natural Earth',
           },
           {
@@ -296,7 +315,11 @@ describe('components/map-preview.component', () => {
     const vectorSource = fakeMap.addSource.calls.allArgs()
       .map((args) => args[1] as { type?: string; tiles?: string[] })
       .find((source) => source.type === 'vector');
-    expect(vectorSource?.tiles?.[0]).toContain('.pbf');
+    expect(vectorSource?.tiles?.[0]).toBe('https://proxy.test/tiles/natural_earth/{z}/{x}/{y}.pbf');
+    const vectorLayer = fakeMap.addLayer.calls.allArgs()
+      .map((args) => args[0] as { id?: string; ['source-layer']?: string })
+      .find((layer) => layer.id === 'overlay-layer-natural_earth');
+    expect(vectorLayer?.['source-layer']).toBe('admin_boundaries');
     expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
     expect(component.attributionEntries).toContain('Natural Earth');
   });

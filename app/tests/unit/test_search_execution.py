@@ -272,6 +272,47 @@ def test_location_search_orchestrator_adds_bbox_to_live_feature_endpoints() -> N
     assert any("WINDY_WEBCAMS_API_KEY" in warning for warning in session.compliance_warnings)
 
 
+def test_location_search_orchestrator_emits_backend_final_wms_wmts_and_metadata_only_vector_fallback() -> None:
+    orchestrator = LocationSearchOrchestrator()
+    payload = LocationSearchRequest(
+        resolved_location=ResolvedLocation(
+            label="Rome",
+            latitude=41.9,
+            longitude=12.5,
+        ),
+        action_id="map_layers",
+        time_mode="current",
+        basemap_id="osm_default",
+        overlay_ids=["eea_noise_2019", "esa_worldcover", "natural_earth_admin_boundaries"],
+        viewport={
+            "center_latitude": 41.9,
+            "center_longitude": 12.5,
+            "radius_m": 2500.0,
+        },
+        presentation={
+            "emphasize_overlays": True,
+            "high_contrast": False,
+            "show_legend": True,
+        },
+    )
+
+    session = asyncio.run(orchestrator.execute(payload))
+
+    eea = next(overlay for overlay in session.overlays if overlay["id"] == "eea_noise_2019")
+    esa = next(overlay for overlay in session.overlays if overlay["id"] == "esa_worldcover")
+    natural_earth = next(
+        overlay for overlay in session.overlays if overlay["id"] == "natural_earth_admin_boundaries"
+    )
+    assert "service=WMS" in str(eea.get("tile_url_template") or "")
+    assert eea.get("wms_version")
+    assert "service=WMTS" in str(esa.get("tile_url_template") or "")
+    assert esa.get("tile_matrix_set")
+    assert natural_earth.get("rendering_mode") == "metadata-only"
+    assert natural_earth.get("type") == "metadata-only"
+    assert natural_earth.get("url") is None
+    assert "vector tile render metadata is incomplete" in " ".join(session.compliance_warnings)
+
+
 def test_location_search_orchestrator_warns_on_rainviewer_fallback(monkeypatch) -> None:
     monkeypatch.setattr(
         LocationSearchOrchestrator,

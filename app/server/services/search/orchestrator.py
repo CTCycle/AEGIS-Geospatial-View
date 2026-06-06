@@ -127,10 +127,28 @@ class LocationSearchOrchestrator:
                 "data_format": metadata.get("data_format"),
                 "geometry_type": metadata.get("geometry_type"),
             }, warnings
+        if (
+            capability_kind in {"dataset-ingestion", "vector-overlay"}
+            and rendering_mode == "vector-tile"
+            and raw_url is None
+        ):
+            warnings.append(
+                f"{overlay_id}: vector tile render metadata is incomplete; exposing metadata only."
+            )
+            return {
+                "id": str(capability.get("id") or overlay_id),
+                "label": str(metadata.get("label") or capability.get("name") or overlay_id),
+                "provider": str(capability.get("provider") or "unknown"),
+                "type": "metadata-only",
+                "rendering_mode": "metadata-only",
+                "attribution": str(metadata.get("attribution") or ""),
+                "source_protocol": metadata.get("source_protocol"),
+                "data_format": metadata.get("data_format"),
+                "geometry_type": metadata.get("geometry_type"),
+            }, warnings
         if capability_kind in {"dataset-ingestion", "vector-overlay"} and rendering_mode in {
             "clustered-points",
             "geojson",
-            "vector-tile",
             "choropleth",
         } and raw_url is None:
             return {
@@ -166,10 +184,17 @@ class LocationSearchOrchestrator:
             "type": "point-insight" if is_point_insight else str(capability.get("type") or "tile"),
             "rendering_mode": rendering_mode or ("metadata-only" if is_point_insight else ""),
         }
+        tile_url_template = self._build_backend_render_tile_template(
+            rendering_mode=rendering_mode,
+            resolved_url=resolved_url,
+            metadata=metadata,
+        )
         optional_fields = {
             "url": resolved_url,
+            "tile_url_template": tile_url_template,
             "layers": metadata.get("layers"),
             "layer_id": metadata.get("layer_id"),
+            "source_layer": metadata.get("source_layer") or metadata.get("layer_id"),
             "tile_matrix_set": metadata.get("tile_matrix_set"),
             "wmts_format": metadata.get("wmts_format"),
             "wmts_style": metadata.get("wmts_style"),
@@ -186,11 +211,74 @@ class LocationSearchOrchestrator:
                 descriptor[key] = normalized
         if isinstance(metadata.get("default_opacity"), int | float):
             descriptor["default_opacity"] = float(metadata["default_opacity"])
+        if isinstance(metadata.get("tile_size"), int | float):
+            descriptor["tile_size"] = int(metadata["tile_size"])
+        if isinstance(metadata.get("minzoom"), int | float):
+            descriptor["minzoom"] = int(metadata["minzoom"])
         if descriptor["provider"] == "rainviewer":
             descriptor["maxzoom"] = 10
         if self._is_bounds(metadata.get("bounds")):
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings
+
+    @staticmethod
+    def _build_backend_render_tile_template(
+        *,
+        rendering_mode: str,
+        resolved_url: str | None,
+        metadata: dict[str, Any],
+    ) -> str | None:
+        normalized_mode = rendering_mode.lower()
+        if not resolved_url:
+            return None
+        if normalized_mode in {"tile", "raster-tile", "xyz"}:
+            return resolved_url
+        if normalized_mode == "wms":
+            layers = str(metadata.get("layers") or "0")
+            version = str(metadata.get("wms_version") or "1.1.1")
+            exceptions = str(metadata.get("wms_exceptions") or "application/vnd.ogc.se_inimage")
+            separator = "&" if "?" in resolved_url else "?"
+            query = "&".join(
+                [
+                    "service=WMS",
+                    "request=GetMap",
+                    f"layers={layers}",
+                    "styles=",
+                    "format=image/png",
+                    "transparent=true",
+                    f"version={version}",
+                    "srs=EPSG:3857",
+                    f"exceptions={exceptions}",
+                    "bbox={bbox-epsg-3857}",
+                    "width=256",
+                    "height=256",
+                ]
+            )
+            return f"{resolved_url}{separator}{query}"
+        if normalized_mode == "wmts":
+            layer_id = str(metadata.get("layer_id") or metadata.get("layers") or "layer")
+            matrix_set = str(metadata.get("tile_matrix_set") or "EPSG:3857")
+            fmt = str(metadata.get("wmts_format") or "image/png")
+            style = str(metadata.get("wmts_style") or "")
+            separator = "&" if "?" in resolved_url else "?"
+            query = "&".join(
+                [
+                    "service=WMTS",
+                    "request=GetTile",
+                    "version=1.0.0",
+                    f"layer={layer_id}",
+                    f"style={style}",
+                    f"tilematrixset={matrix_set}",
+                    f"tilematrix={matrix_set}:{{z}}",
+                    "tilerow={y}",
+                    "tilecol={x}",
+                    f"format={fmt}",
+                ]
+            )
+            return f"{resolved_url}{separator}{query}"
+        if normalized_mode == "vector-tile":
+            return resolved_url
+        return None
 
     def _apply_spatial_placeholders(
         self, value: object, *, payload: LocationSearchRequest

@@ -223,20 +223,25 @@ export interface MapSession {
     rendering_mode?: RenderingMode | string;
     default_opacity?: number;
     url?: string | null;
+    tile_url_template?: string;
     layers?: string;
     layer_id?: string;
+    source_layer?: string;
     tile_matrix_set?: string;
+    tile_size?: number;
+    minzoom?: number;
     wmts_format?: string;
     wmts_style?: string;
     wms_version?: string;
     wms_exceptions?: string;
-      bounds?: [number, number, number, number];
-      attribution?: string;
-      maxzoom?: number;
-      source_protocol?: string;
-      data_format?: string;
-      geometry_type?: string;
-    }>;
+    render_params?: Record<string, JsonValue>;
+    bounds?: [number, number, number, number];
+    attribution?: string;
+    maxzoom?: number;
+    source_protocol?: string;
+    data_format?: string;
+    geometry_type?: string;
+  }>;
   compliance_warnings?: string[];
 }
 
