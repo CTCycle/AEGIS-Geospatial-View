@@ -35,10 +35,14 @@ Defined in `app/server/api/geospatial.py`:
   Returns `GeospatialLayerHealthResponse`.
 - `GET /api/geospatial/layers/{layer_id}/features`
   Returns `GeospatialProviderPayloadResponse`.
+- `GET /api/geospatial/layers/{layer_id}/geojson`
+  Returns raw GeoJSON `FeatureCollection` for map rendering.
 - `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`
   Proxies TomTom tiles.
 - `GET /api/geospatial/cameras`
   Returns camera-network payloads.
+- `GET /api/geospatial/cameras.geojson`
+  Returns raw GeoJSON `FeatureCollection` for camera-point rendering.
 - `GET /api/geospatial/cameras/{camera_id}`
   Returns `GeospatialCameraDetailResponse`.
 - `GET /api/geospatial/sources/{provider_id}/credential-status`

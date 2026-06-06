@@ -56,6 +56,27 @@ class GeospatialTileRequestError(GeospatialApiServiceError):
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
+
+def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get("type") == "FeatureCollection":
+        features = value.get("features")
+        return {
+            "type": "FeatureCollection",
+            "features": features if isinstance(features, list) else [],
+        }
+    if isinstance(value, dict) and value.get("type") == "Feature":
+        return {
+            "type": "FeatureCollection",
+            "features": [value],
+        }
+    if isinstance(value, dict) and isinstance(value.get("features"), list):
+        return {
+            "type": "FeatureCollection",
+            "features": value["features"],
+        }
+    return {"type": "FeatureCollection", "features": []}
+
+
 ###############################################################################
 class GeospatialApiService:
     def __init__(
@@ -124,6 +145,29 @@ class GeospatialApiService:
         return await self._fetch_provider_payload(provider_id, request)
 
     # -------------------------------------------------------------------------
+    async def get_layer_geojson(
+        self,
+        layer_id: str,
+        *,
+        bbox: str | None,
+        zoom: int | None,
+        time: str | None,
+        live: bool,
+        incidents: bool,
+    ) -> dict[str, Any]:
+        payload = await self.get_layer_features(
+            layer_id,
+            bbox=bbox,
+            zoom=zoom,
+            time=time,
+            live=live,
+            incidents=incidents,
+        )
+        if payload.get("status") != "ok":
+            return {"type": "FeatureCollection", "features": []}
+        return normalize_geojson_feature_collection(payload.get("payload"))
+
+    # -------------------------------------------------------------------------
     async def fetch_tomtom_tile(self, kind: str, z: int, x: int, y: int) -> bytes:
         if kind not in {"basic", "traffic-flow"}:
             raise GeospatialUnsupportedTileError("Unsupported TomTom tile type.")
@@ -162,6 +206,23 @@ class GeospatialApiService:
             },
         )
         return await self._fetch_provider_payload(provider_id, request)
+
+    # -------------------------------------------------------------------------
+    async def list_cameras_geojson(
+        self,
+        *,
+        bbox: str | None,
+        provider: str | None,
+        camera_type: str | None,
+    ) -> dict[str, Any]:
+        payload = await self.list_cameras(
+            bbox=bbox,
+            provider=provider,
+            camera_type=camera_type,
+        )
+        if payload.get("status") != "ok":
+            return {"type": "FeatureCollection", "features": []}
+        return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
     async def get_camera(self, camera_id: str) -> dict[str, Any]:
