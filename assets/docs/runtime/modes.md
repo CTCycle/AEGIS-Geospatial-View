@@ -13,7 +13,7 @@ Last updated: 2026-06-02
 
 ### Desktop Runtime And Packaging
 
-- Tauri config: `app/client/src-tauri/tauri.conf.json`
+- Tauri config: `app/src-tauri/tauri.conf.json`
 - Build pipeline: `release/tauri/build_with_tauri.bat`
 - Output folders:
   - `release/windows/installers`
