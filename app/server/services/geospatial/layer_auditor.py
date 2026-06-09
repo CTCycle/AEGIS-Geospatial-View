@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from server.common.constants import PROJECT_DIR
+from server.common.paths import PROJECT_DIR
 from server.domain.geographics import (
     CapabilityImplementationStatus,
     CapabilityKind,
@@ -50,12 +50,12 @@ PLACEHOLDER_STATUSES = {
     "requires-local-source",
 }
 PROVIDER_SOURCE_DIR = (
-    Path(PROJECT_DIR) / "server" / "services" / "geospatial" / "providers"
+    PROJECT_DIR / "server" / "services" / "geospatial" / "providers"
 )
-API_SOURCE_PATH = Path(PROJECT_DIR) / "server" / "api" / "geospatial.py"
-CLIENT_SOURCE_DIR = Path(PROJECT_DIR) / "client" / "src" / "app"
-TEST_SOURCE_DIR = Path(PROJECT_DIR) / "tests" / "unit"
-VISUAL_TEST_SOURCE_DIR = Path(PROJECT_DIR) / "client" / "e2e"
+API_SOURCE_PATH = PROJECT_DIR / "server" / "api" / "geospatial.py"
+CLIENT_SOURCE_DIR = PROJECT_DIR / "client" / "src" / "app"
+TEST_SOURCE_DIR = PROJECT_DIR / "tests" / "unit"
+VISUAL_TEST_SOURCE_DIR = PROJECT_DIR / "client" / "e2e"
 CLIENT_RENDERING_MODES = {
     "camera-points",
     "choropleth",
@@ -399,7 +399,7 @@ def audit_all_manifests(
     root_path: str | os.PathLike[str] | None = None,
     production: bool = False,
 ) -> LayerAuditReport:
-    root = Path(root_path or Path(PROJECT_DIR) / "resources" / "catalog")
+    root = Path(root_path) if root_path is not None else PROJECT_DIR / "resources" / "catalog"
     report = LayerAuditReport()
     _validate_index(root, report)
     manifest_items: list[tuple[Path, CapabilityManifestV2]] = []

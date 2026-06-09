@@ -220,14 +220,7 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
             (),
             {
                 "database": object(),
-                "jobs": type(
-                    "JobsSettings",
-                    (),
-                    {
-                        "backend": "in_process",
-                        "require_durable_backend": False,
-                    },
-                )(),
+                "jobs": type("JobsSettings", (), {"polling_interval": 1.0})(),
             },
         )(),
     )
@@ -247,10 +240,11 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
             (),
             {
                 "search_orchestrator": object(),
-                "job_manager": __import__(
-                    "server.services.jobs",
-                    fromlist=["InProcessJobBackend"],
-                ).InProcessJobBackend(),
+                "search_execution": type(
+                    "SearchExecution",
+                    (),
+                    {"orchestrator": type("Orchestrator", (), {"execute": staticmethod(lambda payload: payload)})()},
+                )(),
             },
         )(),
     )
@@ -260,6 +254,7 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
             "ChatRuntime",
             (),
             {
+                "agent_orchestrator": object(),
                 "settings_service": type(
                     "SettingsService", (), {"get_settings": staticmethod(lambda: None)}
                 )(),
@@ -275,6 +270,15 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
             {"api_service": object()},
         )(),
     )
+    monkeypatch.setattr(
+        "server.app.BackgroundJobService",
+        lambda **kwargs: type(
+            "JobService",
+            (),
+            {"start": staticmethod(lambda: None), "stop": staticmethod(lambda: None)},
+        )(),
+    )
+    monkeypatch.setattr("server.app.ChatStreamingService", lambda orchestrator: object())
     monkeypatch.setattr("server.app.run_startup_validations", lambda settings: None)
 
     app_module = __import__("server.app", fromlist=["app_lifespan"])

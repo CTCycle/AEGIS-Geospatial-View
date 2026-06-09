@@ -9,7 +9,7 @@ from server.configurations.environment import (
 )
 from server.configurations.management import ConfigurationManager
 from server.configurations.settings import ServerSettings
-from server.common.constants import CONFIGURATIONS_FILE
+from server.common.paths import CONFIGURATIONS_FILE
 
 
 def _resolve_config_path(config_path: str | Path | None = None) -> str:

@@ -92,6 +92,7 @@ class ChatHistoryRepository:
         session_id: int,
         role: str,
         content: str,
+        request_id: str | None = None,
         structured_payload: Any = None,
         tool_payload: Any = None,
         map_session: Any = None,
@@ -108,7 +109,9 @@ class ChatHistoryRepository:
                 turn_index=turn_index,
                 role=role,
                 content=content,
-                structured_payload_json=_to_json_payload(structured_payload),
+                structured_payload_json=_to_json_payload(
+                    self._with_request_id(structured_payload, request_id)
+                ),
                 tool_payload_json=_to_json_payload(tool_payload),
                 map_session_json=_to_json_payload(map_session),
             )
@@ -121,6 +124,18 @@ class ChatHistoryRepository:
             session.commit()
             session.refresh(message)
             return message
+
+    @staticmethod
+    def _with_request_id(structured_payload: Any, request_id: str | None) -> Any:
+        if request_id is None:
+            return structured_payload
+        if structured_payload is None:
+            return {"request_id": request_id}
+        if isinstance(structured_payload, dict):
+            payload = dict(structured_payload)
+            payload.setdefault("request_id", request_id)
+            return payload
+        return structured_payload
 
     def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
         with self._session_factory() as session:
@@ -191,3 +206,26 @@ class ChatHistoryRepository:
             )
             rows = session.execute(statement).scalars().all()
             return [self._to_message_dict(row) for row in rows]
+
+    def find_message_by_request_id(
+        self,
+        *,
+        session_id: int,
+        role: str,
+        request_id: str,
+    ) -> dict[str, Any] | None:
+        with self._session_factory() as session:
+            statement = (
+                select(ChatMessageRecord)
+                .where(
+                    ChatMessageRecord.session_id == session_id,
+                    ChatMessageRecord.role == role,
+                )
+                .order_by(ChatMessageRecord.turn_index.asc())
+            )
+            rows = session.execute(statement).scalars().all()
+        for row in rows:
+            payload = _from_json_payload(row.structured_payload_json)
+            if isinstance(payload, dict) and payload.get("request_id") == request_id:
+                return self._to_message_dict(row)
+        return None

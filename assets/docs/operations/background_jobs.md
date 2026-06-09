@@ -1,26 +1,25 @@
 # Background Jobs
 
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 ## Scope
 
-AEGIS uses a pluggable job backend contract for asynchronous map-search execution.
-The default implementation remains an in-process, thread-based backend.
+AEGIS uses one internal in-memory background job system for asynchronous chat and map work.
 
 ## Components
 
-- `JobState`
-- `JobBackend`
-- `InProcessJobBackend`
-- `SearchRuntime.job_manager`
+- `BackgroundJobService`
+- `BackgroundJobWorker`
+- `chat_turn` jobs
+- `map_fetch` jobs
 
 ## Lifecycle
 
 States:
 
-- `pending`
+- `queued`
 - `running`
-- `completed`
+- `succeeded`
 - `failed`
 - `cancelled`
 
@@ -29,39 +28,40 @@ Important fields include:
 - `job_id`
 - `job_type`
 - `status`
-- `progress`
-- `result`
-- `error`
+- `progress_percent`
+- `result_json`
+- `error_json`
 - `created_at`
+- `started_at`
 - `completed_at`
-- `stop_requested`
+- `cancel_requested_at`
 
 ## API Surface
 
+- `POST /api/chat/jobs`
+- `GET /api/jobs/{job_id}`
+- `GET /api/jobs/{job_id}/events`
+- `POST /api/jobs/{job_id}/cancel`
 - `POST /api/maps/jobs`
 - `GET /api/maps/jobs/{job_id}`
 - `DELETE /api/maps/jobs/{job_id}`
 
 ## Execution Model
 
-- Each job runs in a dedicated daemon thread.
-- `InProcessJobBackend` is the current concrete implementation.
-- Map-search jobs execute through `app/server/services/search/execution.py::run_search_job(...)`.
-- Missing-job and initialization failures are translated into HTTP errors by the API layer.
-- Failures are surfaced through status polling.
+- One worker thread claims queued jobs and dispatches by `job_type`.
+- Chat jobs stream lifecycle events from the orchestrator into a shared event model.
+- Map jobs execute the same location-search pipeline used by synchronous map requests.
+- Missing-job failures are translated into HTTP 404 by the API layer.
 
 ## Cancellation And Constraints
 
 - Cancellation is cooperative.
-- `cancel_job` sets `stop_requested=True`.
-- Running logic must check `job_manager.should_stop(job_id)`.
-- There is no force-kill mechanism for active threads.
+- `cancel_requested_at` is the single cancellation flag.
+- Running handlers check cancellation between major execution phases.
+- There is no force-kill mechanism for active work.
 - Jobs are process-local and memory-backed.
-- Future durable backends such as Redis/RQ, Celery, or Arq are not implemented yet.
 
 ## Configuration
 
-- `jobs.backend`
-  Current supported value: `in_process`
-- `jobs.require_durable_backend`
-  When `true`, startup rejects the `in_process` backend.
+- `jobs.polling_interval`
+  Default poll interval returned to job clients.

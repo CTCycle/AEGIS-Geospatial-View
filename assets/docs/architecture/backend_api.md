@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 ## Mounting
 
@@ -17,10 +17,21 @@ Defined in `app/server/api/search.py`:
 - `POST /api/maps/search`
   Runs synchronous location search from `LocationSearchRequest` to `SearchByLocationResponse`.
 - `POST /api/maps/jobs`
-  Starts asynchronous search and returns `JobStartResponse` with HTTP 202.
+  Starts asynchronous map fetch and returns `JobStartResponse` with HTTP 202.
 - `GET /api/maps/jobs/{job_id}`
-  Returns `JobStatusResponse`.
+  Wrapper around the canonical job status response.
 - `DELETE /api/maps/jobs/{job_id}`
+  Wrapper around the canonical cancel operation.
+
+## Job Routes
+
+Defined in `app/server/api/jobs.py`:
+
+- `GET /api/jobs/{job_id}`
+  Returns `BackgroundJobStatusResponse`.
+- `GET /api/jobs/{job_id}/events`
+  Returns `BackgroundJobEventsResponse`.
+- `POST /api/jobs/{job_id}/cancel`
   Returns `JobCancelResponse`.
 
 ## Geospatial Routes
@@ -60,6 +71,8 @@ Defined in `app/server/api/chat.py`:
 
 - `POST /api/chat/turn`
   Executes a chat turn and returns the structured result.
+- `POST /api/chat/jobs`
+  Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`.
 - `POST /api/chat/stream`
   Streams NDJSON chat events.
 - `GET /api/chat/models`

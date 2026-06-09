@@ -28,11 +28,7 @@ def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
         config_file,
         {
             "maps": {"tiles": "CartoDB Positron"},
-            "jobs": {
-                "polling_interval": 2.5,
-                "backend": "in_process",
-                "require_durable_backend": False,
-            },
+            "jobs": {"polling_interval": 2.5},
         },
     )
 
@@ -41,13 +37,8 @@ def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
     app_settings = manager.configuration
 
     assert app_settings.map.tiles == "CartoDB Positron"
-    assert manager.get_block("jobs") == {
-        "polling_interval": 2.5,
-        "backend": "in_process",
-        "require_durable_backend": False,
-    }
+    assert manager.get_block("jobs") == {"polling_interval": 2.5}
     assert manager.get_value("jobs", "polling_interval") == 2.5
-    assert app_settings.jobs.backend == "in_process"
     assert manager.get_value("jobs", "missing", 99) == 99
 
 
@@ -55,21 +46,20 @@ def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
     _write_json(
         config_file,
-        {"jobs": {"polling_interval": 1.0, "backend": "in_process"}},
+        {"jobs": {"polling_interval": 1.0}},
     )
     manager = ConfigurationManager(config_path=config_file)
     manager.load()
 
     _write_json(
         config_file,
-        {"jobs": {"polling_interval": 3.0, "backend": "in_process"}},
+        {"jobs": {"polling_interval": 3.0}},
     )
     manager.reload()
     app_settings = manager.configuration
 
     assert app_settings.jobs.polling_interval == 3.0
     assert manager.server_settings.jobs.polling_interval == 3.0
-    assert manager.server_settings.jobs.backend == "in_process"
 
 
 def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -> None:
@@ -80,14 +70,13 @@ def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -
     manager.update(
         {
             "database": {"embedded_database": False, "host": "should-not-persist"},
-            "jobs": {"polling_interval": 1.5, "backend": "in_process"},
+            "jobs": {"polling_interval": 1.5},
         }
     )
 
     persisted = json.loads(config_file.read_text(encoding="utf-8"))
     assert "database" not in persisted
     assert persisted["jobs"]["polling_interval"] == 1.5
-    assert persisted["jobs"]["backend"] == "in_process"
 
 
 def test_configuration_manager_fails_on_missing_file(tmp_path: Path) -> None:
@@ -146,11 +135,7 @@ def test_get_server_settings_returns_runtime_settings(
     _write_json(
         config_file,
         {
-            "jobs": {
-                "polling_interval": 4.0,
-                "backend": "in_process",
-                "require_durable_backend": True,
-            }
+            "jobs": {"polling_interval": 4.0}
         },
     )
     reset_environment_bootstrap_for_tests()
@@ -159,5 +144,3 @@ def test_get_server_settings_returns_runtime_settings(
     )
 
     assert get_server_settings(config_file).jobs.polling_interval == 4.0
-    assert get_server_settings(config_file).jobs.backend == "in_process"
-    assert get_server_settings(config_file).jobs.require_durable_backend is True

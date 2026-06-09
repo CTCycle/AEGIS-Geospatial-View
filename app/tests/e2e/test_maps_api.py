@@ -191,7 +191,7 @@ def test_job_status_poll_until_terminal_or_timeout(
     assert start.status == 202
     job_id = start.json()["job_id"]
 
-    terminal = {"completed", "failed", "cancelled"}
+    terminal = {"succeeded", "failed", "cancelled"}
     latest = None
     for _ in range(30):
         status_resp = _get(api_context, f"/api/maps/jobs/{job_id}")

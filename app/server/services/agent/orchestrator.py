@@ -79,7 +79,20 @@ class AgentOrchestrator:
             len(payload.message),
         )
         session = self.history_repo.upsert_session(payload.session_id, title=payload.title)
-        self.history_repo.append_message(session_id=session.id, role="user", content=payload.message)
+        existing_response = self._load_existing_response(session.id, request_id)
+        if existing_response is not None:
+            return existing_response
+        if self.history_repo.find_message_by_request_id(
+            session_id=session.id,
+            role="user",
+            request_id=request_id,
+        ) is None:
+            self.history_repo.append_message(
+                session_id=session.id,
+                role="user",
+                content=payload.message,
+                request_id=request_id,
+            )
 
         recent_messages = self.history_repo.list_recent_messages(session.id, limit=12)
         latest_contract = self.history_repo.get_latest_turn_contract(session.id)
@@ -110,6 +123,7 @@ class AgentOrchestrator:
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
+                request_id=request_id,
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": decision.model_dump(mode="json"),
@@ -153,6 +167,7 @@ class AgentOrchestrator:
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
+                request_id=request_id,
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": decision.model_dump(mode="json"),
@@ -196,6 +211,7 @@ class AgentOrchestrator:
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
+                request_id=request_id,
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": None,
@@ -235,6 +251,7 @@ class AgentOrchestrator:
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
+                request_id=request_id,
                 structured_payload={
                     "turn_contract": turn_contract.model_dump(mode="json"),
                     "decision": preflight_decision.model_dump(mode="json"),
@@ -379,6 +396,7 @@ class AgentOrchestrator:
             session_id=session.id,
             role="assistant",
             content=assistant_message,
+            request_id=request_id,
             structured_payload={
                 "turn_contract": turn_contract.model_dump(mode="json"),
                 "decision": decision.model_dump(mode="json"),
@@ -409,6 +427,35 @@ class AgentOrchestrator:
             memory_snapshot=memory_snapshot,
             context_usage=context_usage,
         )
+
+    def _load_existing_response(
+        self,
+        session_id: int,
+        request_id: str,
+    ) -> ChatTurnResponse | None:
+        existing = self.history_repo.find_message_by_request_id(
+            session_id=session_id,
+            role="assistant",
+            request_id=request_id,
+        )
+        if existing is None:
+            return None
+        payload = existing.get("structured_payload")
+        if not isinstance(payload, dict):
+            return None
+        response_payload = {
+            "request_id": request_id,
+            "session_id": session_id,
+            "assistant_message": existing.get("content") or "",
+            "turn_contract": payload.get("turn_contract"),
+            "decision": payload.get("decision"),
+            "operation": payload.get("operation"),
+            "tool_payload": existing.get("tool_payload"),
+            "map_session": existing.get("map_session"),
+            "memory_snapshot": payload.get("memory_snapshot") or {},
+            "context_usage": payload.get("context_usage"),
+        }
+        return ChatTurnResponse.model_validate(response_payload)
 
     def _merge_memory_location_signals(
         self,

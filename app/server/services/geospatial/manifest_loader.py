@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from server.common.constants import PROJECT_DIR
+from server.common.paths import PROJECT_DIR
 from server.domain.geographics import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
@@ -45,7 +45,7 @@ class GeospatialManifestLoader:
         base_path = (
             Path(root_path)
             if root_path is not None
-            else Path(PROJECT_DIR) / "resources" / "catalog"
+            else PROJECT_DIR / "resources" / "catalog"
         )
         resolved_root = base_path.resolve()
         self.root_path = str(resolved_root)
