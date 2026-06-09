@@ -29,7 +29,7 @@ Last updated: 2026-06-02
 
 - Use async only when dependencies are non-blocking.
 - Keep CPU-heavy work out of async handlers.
-- Use the existing `JobManager` pattern for long-running map operations.
+- Use the shared `BackgroundJobService` for long-running chat or map operations.
 - Long-running APIs must support start, poll, and cancel flows.
 
 ## Code Structure

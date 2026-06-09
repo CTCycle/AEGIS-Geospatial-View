@@ -46,7 +46,7 @@ def test_start_poll_cancel_and_idempotence(api_context: APIRequestContext) -> No
         status_resp = api_context.get(f"/api/maps/jobs/{job_id}")
         assert status_resp.ok
         latest = status_resp.json()
-        if latest["status"] in {"completed", "failed", "cancelled"}:
+        if latest["status"] in {"succeeded", "failed", "cancelled"}:
             break
         time.sleep(0.1)
     assert latest is not None
@@ -73,5 +73,5 @@ def test_memory_backed_non_durable_semantics_shape(
     if start.status != 202:
         return
     body = start.json()
-    assert body["job_type"] == "map_search"
+    assert body["job_type"] == "map_fetch"
     assert "poll_interval" in body

@@ -11,7 +11,7 @@ from server.configurations.settings import (
     ServerSettings,
     build_database_payload_from_env,
 )
-from server.common.constants import CONFIGURATIONS_FILE
+from server.common.paths import CONFIGURATIONS_FILE
 
 
 def _ensure_mapping(value: Any) -> dict[str, Any]:

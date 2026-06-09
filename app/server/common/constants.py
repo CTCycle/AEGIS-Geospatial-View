@@ -1,53 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-_ROOT_DIR = Path(__file__).resolve().parents[3]
-_APP_DIR = _ROOT_DIR / "app"
-_SETTING_PATH = _ROOT_DIR / "settings"
-_RESOURCES_PATH = _APP_DIR / "resources"
-_CLIENT_DIST_PATH = _APP_DIR / "client" / "dist" / "browser"
-
-ROOT_DIR = str(_ROOT_DIR)
-APP_DIR = str(_APP_DIR)
-PROJECT_DIR = APP_DIR
-SETTING_PATH = str(_SETTING_PATH)
-RESOURCES_PATH = str(_RESOURCES_PATH)
-MODELS_PATH = str(_RESOURCES_PATH / "models")
-SOURCES_PATH = str(_RESOURCES_PATH / "sources")
-LOGS_PATH = str(_RESOURCES_PATH / "logs")
-ENV_FILE_PATH = str(_SETTING_PATH / ".env")
-DATABASE_FILENAME = "database.db"
-DATABASE_FILE_PATH = str(_RESOURCES_PATH / DATABASE_FILENAME)
-CLIENT_DIST_PATH = str(_CLIENT_DIST_PATH)
-CLIENT_ASSETS_PATH = str(_CLIENT_DIST_PATH / "assets")
-CLIENT_INDEX_FILE_PATH = str(_CLIENT_DIST_PATH / "index.html")
-
-CONFIGURATIONS_FILE = str(_SETTING_PATH / "configurations.json")
-
-
-ROOT_ROUTE = "/"
-DOCS_ROUTE = "/docs"
-FASTAPI_ROOT_ENDPOINT = ROOT_ROUTE
-FASTAPI_DOCS_ENDPOINT = DOCS_ROUTE
-FASTAPI_API_PREFIX = "/api"
-FASTAPI_ASSETS_ENDPOINT = "/assets"
-FASTAPI_SPA_FALLBACK_ENDPOINT = "/{full_path:path}"
-MAPS_ROUTER_PREFIX = "/maps"
-MAPS_SEARCH_ROUTE = "/search"
-MAPS_CATALOG_ROUTE = "/catalog"
-MAPS_OSM_BASEMAP_TILE_ROUTE = "/basemaps/osm/{z}/{x}/{y}.png"
-MAPS_JOBS_ROUTE = "/jobs"
-MAPS_JOB_ROUTE = "/jobs/{job_id}"
-CHAT_ROUTER_PREFIX = "/chat"
-CHAT_TURN_ROUTE = "/turn"
-CHAT_STREAM_ROUTE = "/stream"
-CHAT_MODELS_ROUTE = "/models"
-CHAT_SETTINGS_ROUTE = "/settings"
-CHAT_OLLAMA_REFRESH_ROUTE = "/models/ollama/refresh"
-CHAT_OLLAMA_PULL_ROUTE = "/models/ollama/pull"
-CHAT_OLLAMA_HEALTH_ROUTE = "/models/ollama/health"
-
 NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org"
 NOMINATIM_SEARCH_PATH = "/search"
 NOMINATIM_REVERSE_PATH = "/reverse"
@@ -110,9 +62,9 @@ CAPABILITIES_QUERY = {"SERVICE": "WMS", "REQUEST": "GetCapabilities"}
 GIBS_MIN_IMAGE_DIMENSION = 512
 GIBS_MAX_IMAGE_DIMENSION = 2048
 
-JOB_STATUS_PENDING = "pending"
+JOB_STATUS_QUEUED = "queued"
 JOB_STATUS_RUNNING = "running"
-JOB_STATUS_COMPLETED = "completed"
+JOB_STATUS_SUCCEEDED = "succeeded"
 JOB_STATUS_FAILED = "failed"
 JOB_STATUS_CANCELLED = "cancelled"
 

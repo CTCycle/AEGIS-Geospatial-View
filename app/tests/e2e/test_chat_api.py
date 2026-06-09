@@ -125,9 +125,14 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     event_names = [entry.get("event") for entry in events]
     assert event_names[0] == "status"
     assert event_names[-1] in {"final", "error"}
-    assert "assistant_delta" in event_names or event_names[-1] == "error"
-    if "tool_status" in event_names:
-        assert event_names.index("tool_status") < event_names.index("final")
+    if event_names[-1] == "final":
+        assert "parsed" in event_names
+        assert "policy" in event_names
+        if "tool_call_started" in event_names:
+            assert "tool_call_completed" in event_names
+            assert event_names.index("tool_call_started") < event_names.index("tool_call_completed")
+        if "map_session_created" in event_names:
+            assert event_names.index("map_session_created") < event_names.index("final")
 
     prefixed_stream = _post(
         api_context,

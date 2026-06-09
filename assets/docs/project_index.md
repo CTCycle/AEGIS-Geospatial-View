@@ -18,7 +18,7 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 
 ### Root
 
-- `project_overview.md`
+- `project_index.md`
   Root index, reading rules, and documentation governance.
 
 ### Architecture

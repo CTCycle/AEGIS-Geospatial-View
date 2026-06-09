@@ -22,7 +22,8 @@ from server.services.search.errors import (
     MapSearchTileProxyError,
 )
 from server.services.search.execution import MapSearchExecutionService
-from server.common.constants import (
+from server.services.jobs import BackgroundJobService
+from server.common.paths import (
     MAPS_CATALOG_ROUTE,
     MAPS_JOB_ROUTE,
     MAPS_JOBS_ROUTE,
@@ -56,6 +57,10 @@ def raise_map_search_http_error(error: MapSearchExecutionError) -> NoReturn:
 
 def get_search_execution(request: Request) -> MapSearchExecutionService:
     return request.app.state.search_runtime.search_execution
+
+
+def get_job_service(request: Request) -> BackgroundJobService:
+    return request.app.state.job_service
 
 
 @router.get(
@@ -114,12 +119,9 @@ async def search_by_location(
 )
 async def start_search_job(
     payload: LocationSearchRequest,
-    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+    job_service: BackgroundJobService = Depends(get_job_service),
 ) -> JobStartResponse:
-    try:
-        return await search_execution.start_search_job(payload)
-    except MapSearchExecutionError as error:
-        raise_map_search_http_error(error)
+    return job_service.create_map_job(payload)
 
 
 @router.get(
@@ -127,12 +129,12 @@ async def start_search_job(
 )
 async def get_search_job_status(
     job_id: str,
-    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+    job_service: BackgroundJobService = Depends(get_job_service),
 ) -> JobStatusResponse:
-    try:
-        return await search_execution.get_search_job_status(job_id)
-    except MapSearchExecutionError as error:
-        raise_map_search_http_error(error)
+    response = job_service.get_job(job_id)
+    if response is None:
+        raise_map_search_http_error(MapSearchJobNotFoundError(f"Job not found: {job_id}"))
+    return response
 
 
 @router.delete(
@@ -140,9 +142,9 @@ async def get_search_job_status(
 )
 async def cancel_search_job(
     job_id: str,
-    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+    job_service: BackgroundJobService = Depends(get_job_service),
 ) -> JobCancelResponse:
-    try:
-        return await search_execution.cancel_search_job(job_id)
-    except MapSearchExecutionError as error:
-        raise_map_search_http_error(error)
+    response = job_service.cancel_job(job_id)
+    if response is None:
+        raise_map_search_http_error(MapSearchJobNotFoundError(f"Job not found: {job_id}"))
+    return response

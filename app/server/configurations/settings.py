@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.common.constants import (
-    DATABASE_FILE_PATH,
     DEFAULT_DB_CONNECT_TIMEOUT,
     DEFAULT_DB_INSERT_BATCH_SIZE,
     DEFAULT_GIBS_DEFAULT_LAYER,
@@ -24,6 +23,7 @@ from server.common.constants import (
     NASA_ATTRIBUTION,
     NOMINATIM_SEARCH_URL,
 )
+from server.common.paths import DATABASE_FILE_PATH
 
 
 @dataclass(frozen=True)
@@ -69,8 +69,6 @@ class MapSettings:
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
-    backend: str
-    require_durable_backend: bool
 
 
 @dataclass(frozen=True)
@@ -202,8 +200,6 @@ class JsonMapSettings(BaseModel):
 
 class JsonJobsSettings(BaseModel):
     polling_interval: float = 1.0
-    backend: str = "in_process"
-    require_durable_backend: bool = False
 
 
 class JsonChatRuntimeSettings(BaseModel):
@@ -464,8 +460,6 @@ class AppSettings(BaseSettings):
             ),
             jobs=JobsSettings(
                 polling_interval=self.jobs.polling_interval,
-                backend=self.jobs.backend,
-                require_durable_backend=self.jobs.require_durable_backend,
             ),
             chat=ChatRuntimeSettings(
                 max_history_messages=self.chat.max_history_messages,
@@ -526,7 +520,7 @@ class AppSettings(BaseSettings):
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     if db.embedded_database:
         return DatabaseSettings(
-            database_path=DATABASE_FILE_PATH,
+            database_path=str(DATABASE_FILE_PATH),
             embedded_database=True,
             engine=None,
             host=None,
@@ -541,7 +535,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         )
 
     return DatabaseSettings(
-        database_path=DATABASE_FILE_PATH,
+        database_path=str(DATABASE_FILE_PATH),
         embedded_database=False,
         engine=db.engine.strip().lower(),
         host=db.host,

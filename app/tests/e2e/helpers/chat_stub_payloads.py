@@ -192,26 +192,81 @@ def chat_stream_events(
     events: list[dict[str, Any]] = [
         {"event": "status", "data": {"message": "received"}}
     ]
-    for token in assistant_message.split():
-        events.append({"event": "assistant_delta", "data": {"delta": f"{token} "}})
+    events.append(
+        {
+            "event": "parsed",
+            "data": {
+                "request_id": f"chat-stub-{session_id}",
+                "session_id": session_id,
+                "task_class": "map_search",
+                "action_id": "stub",
+                "requires_location": False,
+                "location_signal_count": 0,
+                "ambiguities": [],
+            },
+        }
+    )
+    events.append(
+        {
+            "event": "policy",
+            "data": {
+                "request_id": f"chat-stub-{session_id}",
+                "session_id": session_id,
+                "state": "map_search",
+                "mode": "map",
+                "action_id": "stub",
+                "trace_steps": ["stub"],
+                "has_clarification": False,
+            },
+        }
+    )
     if include_tool_status:
         events.append(
             {
-                "event": "tool_status",
+                "event": "tool_call_started",
                 "data": {
-                    "available": True,
-                    "execution": "map_search",
-                    "has_satellite_imagery": False,
-                    "has_map_session": True,
-                    "overlay_count": 1,
+                    "request_id": f"chat-stub-{session_id}",
+                    "session_id": session_id,
+                    "tool_call_id": "tool-1",
+                    "name": "execute_geospatial_capability",
+                    "arguments": {"capability_id": "openaq_air_quality"},
+                },
+            }
+        )
+        events.append(
+            {
+                "event": "tool_call_completed",
+                "data": {
+                    "request_id": f"chat-stub-{session_id}",
+                    "session_id": session_id,
+                    "tool_call_id": "tool-1",
+                    "name": "execute_geospatial_capability",
+                    "ok": True,
+                    "error": None,
+                    "content": {
+                        "ok": True,
+                        "data": {"map_session": ROME_MAP_SESSION},
+                        "error": None,
+                    },
                 },
             }
         )
     events.append(
         {
+            "event": "map_session_created",
+            "data": {
+                "request_id": f"chat-stub-{session_id}",
+                "session_id": session_id,
+                "map_session": ROME_MAP_SESSION,
+            },
+        }
+    )
+    events.append(
+        {
             "event": "final",
             "data": {
                 "session_id": session_id,
+                "request_id": f"chat-stub-{session_id}",
                 "assistant_message": assistant_message,
                 "map_session": ROME_MAP_SESSION,
             },

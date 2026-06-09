@@ -19,7 +19,6 @@ def test_execution_wraps_osm_proxy_failures() -> None:
         orchestrator=object(),  # type: ignore[arg-type]
         catalog_service=object(),  # type: ignore[arg-type]
         osm_tile_proxy_service=_FailingProxyService(),  # type: ignore[arg-type]
-        job_manager=object(),  # type: ignore[arg-type]
     )
     try:
         service.fetch_osm_basemap_tile(1, 1, 1)

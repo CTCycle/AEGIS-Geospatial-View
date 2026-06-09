@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from server.common.constants import DATABASE_FILE_PATH
+from server.common.paths import DATABASE_FILE_PATH
 from server.configurations import build_database_settings
 from server.configurations.environment import (
     ensure_environment_loaded,
@@ -38,7 +38,7 @@ def test_database_settings_uses_constants_database_path(
         monkeypatch.delenv(key, raising=False)
 
     settings = build_database_settings()
-    assert settings.database_path == DATABASE_FILE_PATH
+    assert settings.database_path == str(DATABASE_FILE_PATH)
     assert settings.embedded_database is True
 
 
@@ -107,7 +107,7 @@ def test_database_settings_ignores_json_database_keys(
 
     settings = build_database_settings()
 
-    assert settings.database_path == DATABASE_FILE_PATH
+    assert settings.database_path == str(DATABASE_FILE_PATH)
     assert settings.embedded_database is True
     assert settings.engine is None
     assert settings.host is None
