@@ -250,6 +250,23 @@ class AgentToolCatalogService:
                 )
 
         if self._is_basemap_capability(manifest):
+            if self.search_orchestrator is not None:
+                resolved_location = await self._resolve_location(arguments, context)
+                if not (isinstance(resolved_location, dict) and resolved_location.get("error")):
+                    plan = self._build_map_execution_plan(
+                        capability_id=capability_id,
+                        manifest=manifest,
+                        context=context,
+                    )
+                    request = self.request_builder.build_location_search_request(
+                        plan, resolved_location
+                    )
+                    map_session = await self.search_orchestrator.execute(request)
+                    return self._map_result(
+                        capability_id=capability_id,
+                        arguments=arguments,
+                        map_session=map_session,
+                    )
             return self._capability_selection_result(
                 capability_id=capability_id,
                 arguments=arguments,

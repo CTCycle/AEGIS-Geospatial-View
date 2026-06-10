@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from server.domain.geographics import MapSession
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.factory import LLMFactory
 from server.services.llm.types import (
@@ -47,6 +48,7 @@ class AgentToolLoopResult:
     tool_results: list[LLMToolResult]
     iterations: int
     stopped_reason: Literal["final", "max_iterations", "provider_error", "tool_error"]
+    map_session: MapSession | None = None
 
 
 class NativeToolLoop:
@@ -102,6 +104,7 @@ class NativeToolLoop:
                     tool_results=all_results,
                     iterations=iteration,
                     stopped_reason="provider_error",
+                    map_session=self._extract_map_session(all_results),
                 )
 
             if not response.tool_calls:
@@ -111,6 +114,7 @@ class NativeToolLoop:
                     tool_results=all_results,
                     iterations=iteration,
                     stopped_reason="final",
+                    map_session=self._extract_map_session(all_results),
                 )
 
             tool_calls = response.tool_calls[: self.max_parallel_tool_calls]
@@ -152,7 +156,30 @@ class NativeToolLoop:
             tool_results=all_results,
             iterations=self.max_iterations,
             stopped_reason="max_iterations",
+            map_session=self._extract_map_session(all_results),
         )
+
+    @staticmethod
+    def _extract_map_session(
+        results: list[LLMToolResult],
+    ) -> MapSession | None:
+        for result in results:
+            content = result.content if isinstance(result.content, dict) else None
+            if content is None:
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            operation = data.get("operation")
+            if operation != "map_session_created":
+                continue
+            ms_raw = data.get("map_session")
+            if isinstance(ms_raw, dict):
+                try:
+                    return MapSession.model_validate(ms_raw)
+                except Exception:
+                    LOGGER.warning("Failed to validate MapSession from tool result", exc_info=True)
+        return None
 
     async def _execute_tool_call(
         self,
