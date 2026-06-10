@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from server.domain.geographics import LocationSearchRequest
 
 
+###############################################################################
 def _base_payload() -> dict[str, object]:
     return {
         "resolved_location": {
@@ -25,6 +26,7 @@ def _base_payload() -> dict[str, object]:
     }
 
 
+###############################################################################
 def test_accepts_canonical_request_fields() -> None:
     request = LocationSearchRequest.model_validate(
         {
@@ -43,6 +45,7 @@ def test_accepts_canonical_request_fields() -> None:
     assert request.resolved_location.city == "Rome"
 
 
+###############################################################################
 @pytest.mark.parametrize(
     "removed_field,value",
     [

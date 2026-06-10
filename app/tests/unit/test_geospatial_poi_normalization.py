@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.geoapify import GeoapifyProvider
 
 
+###############################################################################
 def test_geoapify_poi_normalization_keeps_popup_metadata() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         return {

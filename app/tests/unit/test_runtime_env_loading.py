@@ -9,6 +9,7 @@ from server.configurations.environment import (
 )
 
 
+###############################################################################
 def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(

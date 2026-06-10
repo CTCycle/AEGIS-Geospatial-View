@@ -6,9 +6,10 @@ from typing import Any
 from server.configurations import get_server_settings
 from server.repositories.chat_history import ChatHistoryRepository
 
-
 ###############################################################################
 class ChatHistoryBuffer:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

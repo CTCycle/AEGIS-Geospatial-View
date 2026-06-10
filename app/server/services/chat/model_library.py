@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.ollama import OllamaProvider
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import ModelDescriptor
 
 
+###############################################################################
 class ChatModelLibraryService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -16,6 +19,7 @@ class ChatModelLibraryService:
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def model_payload(item: ModelDescriptor) -> dict[str, object]:
         capabilities = list(item.capabilities)
@@ -46,6 +50,7 @@ class ChatModelLibraryService:
             "metadata": metadata,
         }
 
+    # -------------------------------------------------------------------------
     def list_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
         cloud: list[dict[str, object]] = [
             self.model_payload(item) for item in get_cloud_model_catalog()
@@ -63,6 +68,7 @@ class ChatModelLibraryService:
         local = [self.model_payload(model) for model in ollama.list_models()]
         return {"cloud": list(deduped_cloud.values()), "local": local}
 
+    # -------------------------------------------------------------------------
     def find_model(
         self,
         *,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
 from server.domain.agent.decision import (
@@ -9,41 +8,34 @@ from server.domain.agent.decision import (
     ExecutionPlan,
     PolicyDecision,
 )
+from server.domain.agent.policies import (
+    AgentPolicyConstraints,
+    ToolAuthorizationResult,
+    ToolValidationResult,
+)
 from server.domain.extraction.models import TurnParseResult
 from server.services.agent.location_resolver import LocationResolver
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
-@dataclass(frozen=True)
-class AgentPolicyConstraints:
-    requires_location: bool
-    blocked_patterns: list[str] = field(default_factory=list)
-    allowed_tool_names: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ToolAuthorizationResult:
-    allowed: bool
-    reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ToolValidationResult:
-    valid: bool
-    reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
+###############################################################################
 class PolicyEngine:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         location_resolver: LocationResolver,
+        capability_registry: CapabilityRegistry | None = None,
+        runtime_registry: RuntimeRegistry | None = None,
         **_: Any,
     ) -> None:
         self.location_resolver = location_resolver
+        self.capability_registry = capability_registry
+        self.runtime_registry = runtime_registry
 
+    # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn: TurnParseResult) -> PolicyDecision | None:
         trace = DecisionTrace(steps=["1.validate_task_class"])
         task_validation = self._validate_task_class(turn)
@@ -80,6 +72,7 @@ class PolicyEngine:
             )
         return None
 
+    # -------------------------------------------------------------------------
     def build_agent_constraints(
         self,
         parsed_request: TurnParseResult,
@@ -97,6 +90,7 @@ class PolicyEngine:
             metadata={"map_state": map_state or {}},
         )
 
+    # -------------------------------------------------------------------------
     def authorize_tool_call(
         self,
         tool_name: str,
@@ -119,6 +113,7 @@ class PolicyEngine:
             )
         return ToolAuthorizationResult(allowed=True)
 
+    # -------------------------------------------------------------------------
     def validate_tool_result(
         self,
         tool_name: str,
@@ -132,6 +127,85 @@ class PolicyEngine:
             return ToolValidationResult(valid=False, reason=str(reason))
         return ToolValidationResult(valid=True)
 
+    # -------------------------------------------------------------------------
+    def authorize_capability_execution(
+        self,
+        capability_id: str,
+        arguments: dict[str, Any],
+        parsed_request: TurnParseResult,
+        context: Any,
+    ) -> ToolAuthorizationResult:
+        constraints = getattr(context, "policy_constraints", {}) or {}
+        blocked_patterns = constraints.get("blocked_patterns")
+        if blocked_patterns:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Request contains blocked policy patterns.",
+                metadata={"code": "tool_rejected"},
+            )
+
+        capability = (
+            self.capability_registry.get_capability(capability_id)
+            if self.capability_registry is not None
+            else None
+        )
+        if capability is None:
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=f"Unknown geospatial capability '{capability_id}'.",
+                metadata={"code": "unsupported_capability"},
+            )
+
+        runtime_registry = self.runtime_registry
+        if runtime_registry is None:
+            return ToolAuthorizationResult(allowed=True)
+
+        provider_health = runtime_registry.provider_health(capability_id)
+        if provider_health == "disabled":
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=f"Capability '{capability_id}' is disabled.",
+                metadata={"code": "unsupported_capability", "provider_health": provider_health},
+            )
+        if provider_health == "missing_credentials":
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=f"Capability '{capability_id}' requires provider credentials.",
+                metadata={"code": "missing_credentials", "provider_health": provider_health},
+            )
+
+        requested_mode = self._requested_capability_mode(parsed_request)
+        if requested_mode is not None and not runtime_registry.supports_mode(capability_id, requested_mode):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=(
+                    f"Capability '{capability_id}' does not support the requested "
+                    f"{'map' if requested_mode == 'map' else 'direct text'} mode."
+                ),
+                metadata={"code": "unsupported_capability", "requested_mode": requested_mode},
+            )
+
+        if self._requires_location_for_capability(parsed_request, capability) and not self._has_location_context(
+            arguments=arguments,
+            parsed_request=parsed_request,
+        ):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Location is required for this capability execution.",
+                metadata={"code": "invalid_arguments", "missing_fields": ["location"]},
+            )
+
+        bbox = arguments.get("bbox")
+        if bbox is not None and not self._is_sane_bbox(bbox):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason="Bounding box must contain four numeric values in valid longitude/latitude ranges.",
+                metadata={"code": "invalid_arguments", "field": "bbox"},
+            )
+
+        return ToolAuthorizationResult(allowed=True)
+
+    # -------------------------------------------------------------------------
     def _validate_task_class(self, turn: TurnParseResult) -> ClarificationRequest | None:
         if turn.task_class in {"map_search", "direct_query", "general_question"}:
             return None
@@ -141,6 +215,7 @@ class PolicyEngine:
             missing_fields=["task"],
         )
 
+    # -------------------------------------------------------------------------
     def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
         if "deictic_without_memory" in turn.ambiguities:
             return ClarificationRequest(
@@ -169,6 +244,7 @@ class PolicyEngine:
             )
         return None
 
+    # -------------------------------------------------------------------------
     def _enforce_safety_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
         actionable_patterns = self._actionable_disallowed_patterns(turn)
         if not actionable_patterns:
@@ -179,6 +255,55 @@ class PolicyEngine:
             missing_fields=[],
         )
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _requested_capability_mode(parsed_request: TurnParseResult) -> str | None:
+        if parsed_request.task_class == "map_search":
+            return "map"
+        if parsed_request.task_class == "direct_query":
+            return "direct_text"
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _requires_location_for_capability(parsed_request: TurnParseResult, capability: dict[str, Any]) -> bool:
+        if parsed_request.normalized_action.requires_location:
+            return True
+        geometry_type = str((capability.get("metadata") or {}).get("geometry_type") or "").strip().lower()
+        return geometry_type not in {"", "not-applicable", "global"}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _has_location_context(
+        *,
+        arguments: dict[str, Any],
+        parsed_request: TurnParseResult,
+    ) -> bool:
+        if any(key in arguments for key in ("location", "latitude", "longitude", "bbox")):
+            return True
+        if parsed_request.location_signals:
+            return True
+        active_location = parsed_request.conversation_context.memory_snapshot.get("active_location")
+        return isinstance(active_location, dict) and bool(active_location.get("label"))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_sane_bbox(value: Any) -> bool:
+        if not isinstance(value, list) or len(value) != 4:
+            return False
+        if not all(isinstance(item, (int, float)) for item in value):
+            return False
+        min_lon, min_lat, max_lon, max_lat = [float(item) for item in value]
+        return (
+            -180.0 <= min_lon <= 180.0
+            and -180.0 <= max_lon <= 180.0
+            and -90.0 <= min_lat <= 90.0
+            and -90.0 <= max_lat <= 90.0
+            and min_lon < max_lon
+            and min_lat < max_lat
+        )
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _actionable_disallowed_patterns(turn: TurnParseResult):
         return [

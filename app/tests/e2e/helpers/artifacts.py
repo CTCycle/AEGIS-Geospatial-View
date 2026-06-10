@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 
+###############################################################################
 def ensure_test_artifact_dirs(artifact_root: Path, test_id: str) -> dict[str, Path]:
     screenshot_dir = artifact_root / "screenshots" / test_id
     http_dir = artifact_root / "http" / test_id
@@ -20,6 +21,7 @@ def ensure_test_artifact_dirs(artifact_root: Path, test_id: str) -> dict[str, Pa
     }
 
 
+###############################################################################
 def write_snapshot(page: Any, screenshot_dir: Path, name: str) -> Path:
     filename = name if name.lower().endswith(".png") else f"{name}.png"
     target = screenshot_dir / filename
@@ -27,6 +29,7 @@ def write_snapshot(page: Any, screenshot_dir: Path, name: str) -> Path:
     return target
 
 
+###############################################################################
 def write_http_capture(
     http_dir: Path, name: str, request_body: Any, response_body: Any
 ) -> Path:
@@ -46,12 +49,14 @@ def write_http_capture(
     return target
 
 
+###############################################################################
 def write_log_tail(logs_dir: Path, test_id: str, log_tail: str) -> Path:
     target = logs_dir / f"{test_id}.backend.tail.log"
     target.write_text(log_tail or "", encoding="utf-8")
     return target
 
 
+###############################################################################
 def write_report(
     reports_dir: Path,
     test_id: str,

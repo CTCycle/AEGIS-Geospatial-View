@@ -10,15 +10,19 @@ from server.domain.chat import (
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
-from server.services.cryptography import CredentialEncryptionService
 from server.services.chat.model_library import ChatModelLibraryService
+from server.services.cryptography import CredentialEncryptionService
 
 
+###############################################################################
 class ChatSettingsValidationError(ValueError):
     pass
 
 
+###############################################################################
 class ChatSettingsService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -32,6 +36,7 @@ class ChatSettingsService:
         self.crypto_service = crypto_service or CredentialEncryptionService()
         self.model_library_service = model_library_service or ChatModelLibraryService()
 
+    # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
         record = self.settings_repo.get_or_create()
         active_provider_mode: ModelProviderMode = (
@@ -69,10 +74,12 @@ class ChatSettingsService:
             credential_health=credential_health,
         )
 
+    # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
         record = self.settings_repo.get_or_create()
         return record.ollama_url
 
+    # -------------------------------------------------------------------------
     def update_settings(
         self, payload: ModelSettingsUpdateRequest
     ) -> ModelSettingsResponse:
@@ -149,6 +156,7 @@ class ChatSettingsService:
         )
         return self.get_settings()
 
+    # -------------------------------------------------------------------------
     def _validate_local_model_selection(
         self,
         *,
@@ -193,6 +201,7 @@ class ChatSettingsService:
                 "Selected agent model is not available from Ollama."
             )
 
+    # -------------------------------------------------------------------------
     def _validate_role_capabilities(
         self,
         *,

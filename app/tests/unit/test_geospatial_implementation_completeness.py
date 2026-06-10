@@ -6,6 +6,7 @@ from server.services.geospatial.layer_auditor import (
 )
 
 
+###############################################################################
 def test_geospatial_implementation_audit_reports_all_capabilities() -> None:
     report = audit_all_manifests(strict=True)
 
@@ -24,6 +25,7 @@ def test_geospatial_implementation_audit_reports_all_capabilities() -> None:
     }.issubset(report.implementation_statuses[0].model_dump())
 
 
+###############################################################################
 def test_functional_capabilities_do_not_use_placeholder_provider_statuses() -> None:
     report = audit_all_manifests(strict=True)
 

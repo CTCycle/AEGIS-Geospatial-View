@@ -17,9 +17,11 @@ from server.services.geospatial.providers.base import (
 )
 
 
+###############################################################################
 class _Provider:
     provider_id = "example"
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -28,9 +30,11 @@ class _Provider:
         )
 
 
+###############################################################################
 class _TimeoutProvider:
     provider_id = "slow"
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         await asyncio.sleep(1.0)
         return ProviderResponse(
@@ -40,12 +44,15 @@ class _TimeoutProvider:
         )
 
 
+###############################################################################
 class _FlakyProvider:
     provider_id = "flaky"
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls = 0
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         self.calls += 1
         if self.calls == 1:
@@ -57,17 +64,21 @@ class _FlakyProvider:
         )
 
 
+###############################################################################
 class _AuthProvider:
     provider_id = "auth"
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls = 0
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         self.calls += 1
         raise ProviderAuthError("missing key")
 
 
+###############################################################################
 def test_provider_registry_registers_and_fetches_provider() -> None:
     registry = ProviderRegistry(providers=[_Provider()])
 
@@ -79,6 +90,7 @@ def test_provider_registry_registers_and_fetches_provider() -> None:
     assert response.payload == {"ok": True}
 
 
+###############################################################################
 def test_provider_registry_errors_for_missing_provider() -> None:
     registry = ProviderRegistry()
 
@@ -90,6 +102,7 @@ def test_provider_registry_errors_for_missing_provider() -> None:
         raise AssertionError("Missing provider unexpectedly resolved.")
 
 
+###############################################################################
 def test_provider_registry_builds_manifest_backed_providers() -> None:
     registry = ProviderRegistry()
 
@@ -107,6 +120,7 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
     assert response.attribution
 
 
+###############################################################################
 def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
     registry = ProviderRegistry()
 
@@ -115,8 +129,13 @@ def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
     assert "osm_tiles" not in registry.list_provider_ids()
 
 
+###############################################################################
 def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
+
+    ###############################################################################
     class _Loader:
+
+        # -------------------------------------------------------------------------
         def load_all(self) -> dict[str, list[dict[str, object]]]:
             return {
                 "providers": [],
@@ -144,6 +163,7 @@ def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
         raise AssertionError("Unknown fetchable provider unexpectedly registered.")
 
 
+###############################################################################
 def test_provider_registry_times_out_slow_provider() -> None:
     registry = ProviderRegistry(
         providers=[_TimeoutProvider()],
@@ -158,6 +178,7 @@ def test_provider_registry_times_out_slow_provider() -> None:
         raise AssertionError("Slow provider unexpectedly succeeded.")
 
 
+###############################################################################
 def test_provider_registry_retries_transient_provider_failure() -> None:
     provider = _FlakyProvider()
     registry = ProviderRegistry(
@@ -172,6 +193,7 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
     assert response.payload == {"attempts": 2}
 
 
+###############################################################################
 def test_provider_registry_does_not_retry_auth_errors() -> None:
     provider = _AuthProvider()
     registry = ProviderRegistry(
@@ -188,6 +210,7 @@ def test_provider_registry_does_not_retry_auth_errors() -> None:
     assert provider.calls == 1
 
 
+###############################################################################
 def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
     registry = ProviderRegistry(
         providers=[_TimeoutProvider()],

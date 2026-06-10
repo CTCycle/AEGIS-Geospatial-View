@@ -10,12 +10,18 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.http import JsonFetcher, call_json_fetcher, fetch_json_url
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
+)
 
 
+###############################################################################
 class NASAGIBSProvider(GeospatialProvider):
     provider_id = "gibs"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -29,6 +35,7 @@ class NASAGIBSProvider(GeospatialProvider):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         crs = str(request.params.get("crs") or "EPSG:3857")
         endpoint = GIBS_WMS_BASE_ENDPOINTS.get(crs, GIBS_WMS_BASE_ENDPOINTS["EPSG:3857"])
@@ -46,6 +53,7 @@ class NASAGIBSProvider(GeospatialProvider):
             return await self._validated_response(request, payload)
         return self._response(request, payload)
 
+    # -------------------------------------------------------------------------
     async def _validated_response(
         self, request: ProviderRequest, payload: dict[str, Any]
     ) -> ProviderResponse:
@@ -84,6 +92,7 @@ class NASAGIBSProvider(GeospatialProvider):
         )
         return self._response(request, {**payload, "liveValidation": validation})
 
+    # -------------------------------------------------------------------------
     def _response(
         self,
         request: ProviderRequest,

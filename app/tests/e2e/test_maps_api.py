@@ -9,6 +9,7 @@ from playwright.sync_api import APIRequestContext
 DEFAULT_COORDINATES = {"latitude": 41.9028, "longitude": 12.4964}
 
 
+###############################################################################
 def _payload(**overrides: object) -> dict[str, object]:
     base: dict[str, object] = {
         "resolved_location": {
@@ -40,18 +41,22 @@ def _payload(**overrides: object) -> dict[str, object]:
     return base
 
 
+###############################################################################
 def _post(api_context: APIRequestContext, path: str, payload: dict[str, object]):
     return api_context.post(path, data=payload)
 
 
+###############################################################################
 def _get(api_context: APIRequestContext, path: str):
     return api_context.get(path)
 
 
+###############################################################################
 def _delete(api_context: APIRequestContext, path: str):
     return api_context.delete(path)
 
 
+###############################################################################
 def _assert_degraded_or_ok(response) -> None:  # noqa: ANN001
     if response.status in {502, 503, 504}:
         detail = str(response.json().get("detail", ""))
@@ -59,6 +64,7 @@ def _assert_degraded_or_ok(response) -> None:  # noqa: ANN001
         pytest.skip(f"External provider degraded: {response.status}")
 
 
+###############################################################################
 def test_search_coordinates_and_prefix_parity(api_context: APIRequestContext) -> None:
     base = _post(api_context, "/api/maps/search", _payload())
     prefixed = _post(api_context, "/api/maps/search", _payload())
@@ -71,6 +77,7 @@ def test_search_coordinates_and_prefix_parity(api_context: APIRequestContext) ->
     assert set(base_body.keys()) == set(prefixed_body.keys())
 
 
+###############################################################################
 def test_catalog_success_and_prefix_parity(api_context: APIRequestContext) -> None:
     base = _get(api_context, "/api/maps/catalog")
     prefixed = _get(api_context, "/api/maps/catalog")
@@ -82,6 +89,7 @@ def test_catalog_success_and_prefix_parity(api_context: APIRequestContext) -> No
     assert set(body.keys()) == set(prefixed.json().keys())
 
 
+###############################################################################
 def test_osm_basemap_tile_proxy_returns_png_and_prefix_parity(
     api_context: APIRequestContext,
 ) -> None:
@@ -96,6 +104,7 @@ def test_osm_basemap_tile_proxy_returns_png_and_prefix_parity(
     assert int(prefixed.headers.get("content-length", "1")) > 0
 
 
+###############################################################################
 def test_malformed_search_payload_returns_422(api_context: APIRequestContext) -> None:
     response = _post(
         api_context,
@@ -105,6 +114,7 @@ def test_malformed_search_payload_returns_422(api_context: APIRequestContext) ->
     assert response.status == 422
 
 
+###############################################################################
 def test_jobs_start_status_cancel_and_idempotence(
     api_context: APIRequestContext,
 ) -> None:
@@ -129,6 +139,7 @@ def test_jobs_start_status_cancel_and_idempotence(
     assert cancel_again.json()["job_id"] == job_id
 
 
+###############################################################################
 def test_jobs_prefix_parity_and_unknown_job(api_context: APIRequestContext) -> None:
     start_base = _post(api_context, "/api/maps/jobs", _payload())
     _assert_degraded_or_ok(start_base)
@@ -148,6 +159,7 @@ def test_jobs_prefix_parity_and_unknown_job(api_context: APIRequestContext) -> N
     assert missing.status == 404
 
 
+###############################################################################
 def test_search_graceful_behavior_when_provider_degrades(
     api_context: APIRequestContext,
 ) -> None:
@@ -164,6 +176,7 @@ def test_search_graceful_behavior_when_provider_degrades(
     assert detail
 
 
+###############################################################################
 def test_search_with_overlay_ids_includes_overlays(
     api_context: APIRequestContext,
 ) -> None:
@@ -183,6 +196,7 @@ def test_search_with_overlay_ids_includes_overlays(
     assert isinstance(overlays, list)
 
 
+###############################################################################
 def test_job_status_poll_until_terminal_or_timeout(
     api_context: APIRequestContext,
 ) -> None:
@@ -191,7 +205,7 @@ def test_job_status_poll_until_terminal_or_timeout(
     assert start.status == 202
     job_id = start.json()["job_id"]
 
-    terminal = {"completed", "failed", "cancelled"}
+    terminal = {"succeeded", "failed", "cancelled"}
     latest = None
     for _ in range(30):
         status_resp = _get(api_context, f"/api/maps/jobs/{job_id}")

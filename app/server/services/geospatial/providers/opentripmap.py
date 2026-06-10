@@ -5,14 +5,17 @@ from urllib.parse import urlencode
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.normalizers import normalize_poi_category
-from server.services.geospatial.providers._request import request_center, request_radius_m
+from server.services.geospatial.providers._request import (
+    request_center,
+    request_radius_m,
+)
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,
     ProviderError,
-    ProviderUnavailableError,
     ProviderRequest,
     ProviderResponse,
+    ProviderUnavailableError,
 )
 from server.services.geospatial.providers.http import (
     JsonFetcher,
@@ -21,9 +24,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class OpenTripMapProvider(GeospatialProvider):
     provider_id = "opentripmap"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -35,6 +40,7 @@ class OpenTripMapProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         api_key = (self.api_key or os.getenv("OPENTRIPMAP_API_KEY") or "").strip()
         if not api_key:
@@ -94,6 +100,7 @@ class OpenTripMapProvider(GeospatialProvider):
                 raise
             raise ProviderUnavailableError(str(exc)) from exc
 
+    # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
         if not isinstance(payload, dict):
             raise ValueError("OpenTripMap payload must be an object.")

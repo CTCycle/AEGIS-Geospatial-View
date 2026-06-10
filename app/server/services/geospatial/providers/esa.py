@@ -9,12 +9,18 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.http import JsonFetcher, call_json_fetcher, fetch_json_url
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
+)
 
 
+###############################################################################
 class ESAProvider(GeospatialProvider):
     provider_id = "esa"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -28,6 +34,7 @@ class ESAProvider(GeospatialProvider):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         metadata = _metadata(request)
         payload = self._descriptor_payload(request, metadata)
@@ -35,6 +42,7 @@ class ESAProvider(GeospatialProvider):
             return await self._validated_response(request, metadata, payload)
         return self._response(request, metadata, payload)
 
+    # -------------------------------------------------------------------------
     def _descriptor_payload(
         self, request: ProviderRequest, metadata: dict[str, Any]
     ) -> dict[str, Any]:
@@ -52,6 +60,7 @@ class ESAProvider(GeospatialProvider):
             "freshnessLabel": "WorldCover 2021 static source layer",
         }
 
+    # -------------------------------------------------------------------------
     async def _validated_response(
         self,
         request: ProviderRequest,
@@ -95,6 +104,7 @@ class ESAProvider(GeospatialProvider):
         )
         return self._response(request, metadata, {**payload, "liveValidation": validation})
 
+    # -------------------------------------------------------------------------
     def _response(
         self,
         request: ProviderRequest,
@@ -114,6 +124,7 @@ class ESAProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
     return dict(value) if isinstance(value, dict) else {}

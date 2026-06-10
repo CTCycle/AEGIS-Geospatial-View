@@ -4,52 +4,30 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
+from server.domain.geographics import MapSession
+
+from server.domain.agent.execution import (
+    AgentExecutionContext,
+    AgentToolLoopRequest,
+    AgentToolLoopResult,
+)
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.factory import LLMFactory
 from server.services.llm.types import (
     LLMRequest,
     LLMToolCall,
-    LLMToolDefinition,
     LLMToolResult,
 )
 
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class AgentExecutionContext:
-    request_id: str | None = None
-    session_id: str | None = None
-    parsed_request: Any | None = None
-    map_state: dict[str, Any] = field(default_factory=dict)
-    policy_constraints: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class AgentToolLoopRequest:
-    provider: str
-    model: str
-    messages: list[dict[str, Any]]
-    tools: list[LLMToolDefinition]
-    temperature: float
-    max_tokens: int | None = None
-    context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
-
-
-@dataclass(frozen=True)
-class AgentToolLoopResult:
-    final_text: str
-    tool_calls: list[LLMToolCall]
-    tool_results: list[LLMToolResult]
-    iterations: int
-    stopped_reason: Literal["final", "max_iterations", "provider_error", "tool_error"]
-
-
+###############################################################################
 class NativeToolLoop:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -67,6 +45,7 @@ class NativeToolLoop:
         self.max_tool_result_chars = max_tool_result_chars
         self.tool_timeout_seconds = tool_timeout_seconds
 
+    # -------------------------------------------------------------------------
     async def run(self, request: AgentToolLoopRequest) -> AgentToolLoopResult:
         provider = self.provider_factory.get_provider(request.provider)
         messages = list(request.messages)
@@ -102,6 +81,7 @@ class NativeToolLoop:
                     tool_results=all_results,
                     iterations=iteration,
                     stopped_reason="provider_error",
+                    map_session=self._extract_map_session(all_results),
                 )
 
             if not response.tool_calls:
@@ -111,6 +91,7 @@ class NativeToolLoop:
                     tool_results=all_results,
                     iterations=iteration,
                     stopped_reason="final",
+                    map_session=self._extract_map_session(all_results),
                 )
 
             tool_calls = response.tool_calls[: self.max_parallel_tool_calls]
@@ -152,8 +133,33 @@ class NativeToolLoop:
             tool_results=all_results,
             iterations=self.max_iterations,
             stopped_reason="max_iterations",
+            map_session=self._extract_map_session(all_results),
         )
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _extract_map_session(
+        results: list[LLMToolResult],
+    ) -> MapSession | None:
+        for result in results:
+            content = result.content if isinstance(result.content, dict) else None
+            if content is None:
+                continue
+            data = content.get("data")
+            if not isinstance(data, dict):
+                continue
+            operation = data.get("operation")
+            if operation != "map_session_created":
+                continue
+            ms_raw = data.get("map_session")
+            if isinstance(ms_raw, dict):
+                try:
+                    return MapSession.model_validate(ms_raw)
+                except Exception:
+                    LOGGER.warning("Failed to validate MapSession from tool result", exc_info=True)
+        return None
+
+    # -------------------------------------------------------------------------
     async def _execute_tool_call(
         self,
         call: LLMToolCall,
@@ -220,6 +226,7 @@ class NativeToolLoop:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def _truncate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         serialized = json.dumps(payload, ensure_ascii=True, default=str)
         if len(serialized) <= self.max_tool_result_chars:
@@ -236,6 +243,7 @@ class NativeToolLoop:
             "metadata": payload.get("metadata", {}),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_next_cursor(payload: dict[str, Any]) -> Any | None:
         data = payload.get("data")
@@ -243,12 +251,14 @@ class NativeToolLoop:
             return data.get("next_cursor") or data.get("cursor")
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _stringify_tool_result(result: LLMToolResult) -> str:
         if isinstance(result.content, str):
             return result.content
         return json.dumps(result.content, ensure_ascii=True, default=str)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _policy_rejection(
         call: LLMToolCall,

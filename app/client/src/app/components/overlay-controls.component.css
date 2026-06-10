@@ -31,3 +31,11 @@
 .overlay-control-row input[type="range"] {
     width: 100%;
 }
+
+.overlay-render-note {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 0.66rem;
+    line-height: 1.35;
+    color: #9cc2d1;
+}

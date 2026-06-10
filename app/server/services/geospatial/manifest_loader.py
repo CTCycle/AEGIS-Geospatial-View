@@ -6,16 +6,18 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from server.common.constants import PROJECT_DIR
+from server.common.paths import PROJECT_DIR
 from server.domain.geographics import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
 
 
+###############################################################################
 class ManifestValidationError(ValueError):
     pass
 
 
+###############################################################################
 class GeospatialManifestLoader:
     REQUIRED_FIELDS = {
         "id",
@@ -41,26 +43,30 @@ class GeospatialManifestLoader:
         "normalization",
     }
 
+    # -------------------------------------------------------------------------
     def __init__(self, root_path: str | Path | None = None) -> None:
         base_path = (
             Path(root_path)
             if root_path is not None
-            else Path(PROJECT_DIR) / "resources" / "catalog"
+            else PROJECT_DIR / "resources" / "catalog"
         )
         resolved_root = base_path.resolve()
         self.root_path = str(resolved_root)
         self.index_path = resolved_root / "index.json"
 
+    # -------------------------------------------------------------------------
     def _load_json(self, path: str | Path) -> Any:
         with Path(path).open("r", encoding="utf-8") as handle:
             return json.load(handle)
 
+    # -------------------------------------------------------------------------
     def load_index(self) -> JsonDict:
         payload = self._load_json(self.index_path)
         if not isinstance(payload, dict):
             raise ManifestValidationError("Manifest index must be an object.")
         return payload
 
+    # -------------------------------------------------------------------------
     def _validate_entry(
         self, entry: JsonDict, *, source: str, source_path: str | Path | None = None
     ) -> JsonDict:
@@ -87,6 +93,7 @@ class GeospatialManifestLoader:
             normalized["source_path"] = str(Path(source_path).resolve())
         return normalized
 
+    # -------------------------------------------------------------------------
     def _load_directory_entries(self, relative_dir: str) -> list[JsonDict]:
         folder = Path(self.root_path) / relative_dir
         if not folder.is_dir():
@@ -105,6 +112,7 @@ class GeospatialManifestLoader:
             )
         return entries
 
+    # -------------------------------------------------------------------------
     def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
         path = Path(self.root_path) / filename
         payload = self._load_json(path)
@@ -123,6 +131,7 @@ class GeospatialManifestLoader:
             normalized.append(dict(item))
         return normalized
 
+    # -------------------------------------------------------------------------
     def load_all(self) -> JsonDict:
         index = self.load_index()
         providers = self._load_directory_entries(

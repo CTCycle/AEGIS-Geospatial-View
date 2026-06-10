@@ -5,6 +5,14 @@ from typing import NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 
+from server.common.paths import (
+    MAPS_CATALOG_ROUTE,
+    MAPS_JOB_ROUTE,
+    MAPS_JOBS_ROUTE,
+    MAPS_OSM_BASEMAP_TILE_ROUTE,
+    MAPS_ROUTER_PREFIX,
+    MAPS_SEARCH_ROUTE,
+)
 from server.domain.geographics import (
     GeospatialCatalogResponse,
     LocationSearchRequest,
@@ -15,6 +23,7 @@ from server.domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
+from server.services.jobs import BackgroundJobService
 from server.services.search.errors import (
     MapSearchExecutionError,
     MapSearchJobInitializationError,
@@ -22,39 +31,42 @@ from server.services.search.errors import (
     MapSearchTileProxyError,
 )
 from server.services.search.execution import MapSearchExecutionService
-from server.common.constants import (
-    MAPS_CATALOG_ROUTE,
-    MAPS_JOB_ROUTE,
-    MAPS_JOBS_ROUTE,
-    MAPS_OSM_BASEMAP_TILE_ROUTE,
-    MAPS_ROUTER_PREFIX,
-    MAPS_SEARCH_ROUTE,
-)
 
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 
+MAP_SEARCH_ERROR_STATUS = {
+    MapSearchJobNotFoundError: status.HTTP_404_NOT_FOUND,
+    MapSearchJobInitializationError: status.HTTP_500_INTERNAL_SERVER_ERROR,
+}
 
+
+###############################################################################
 def raise_map_search_http_error(error: MapSearchExecutionError) -> NoReturn:
-    if isinstance(error, MapSearchJobNotFoundError):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-    if isinstance(error, MapSearchJobInitializationError):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(error),
-        ) from error
+    status_code = next(
+        (
+            mapped_status
+            for error_type, mapped_status in MAP_SEARCH_ERROR_STATUS.items()
+            if isinstance(error, error_type)
+        ),
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
     raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=status_code,
         detail=str(error),
     ) from error
 
 
+###############################################################################
 def get_search_execution(request: Request) -> MapSearchExecutionService:
     return request.app.state.search_runtime.search_execution
 
 
+###############################################################################
+def get_job_service(request: Request) -> BackgroundJobService:
+    return request.app.state.job_service
+
+
+###############################################################################
 @router.get(
     MAPS_CATALOG_ROUTE,
     response_model=GeospatialCatalogResponse,
@@ -63,11 +75,10 @@ def get_search_execution(request: Request) -> MapSearchExecutionService:
 async def get_catalog(
     search_execution: MapSearchExecutionService = Depends(get_search_execution),
 ) -> GeospatialCatalogResponse:
-    return GeospatialCatalogResponse.model_validate(
-        await search_execution.get_catalog()
-    )
+    return await search_execution.get_catalog()
 
 
+###############################################################################
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
 def proxy_osm_basemap_tile(
     z: int,
@@ -94,6 +105,7 @@ def proxy_osm_basemap_tile(
         )
 
 
+###############################################################################
 @router.post(
     MAPS_SEARCH_ROUTE,
     response_model=SearchByLocationResponse,
@@ -106,6 +118,7 @@ async def search_by_location(
     return await search_execution.search_by_location(payload)
 
 
+###############################################################################
 @router.post(
     MAPS_JOBS_ROUTE,
     response_model=JobStartResponse,
@@ -113,35 +126,34 @@ async def search_by_location(
 )
 async def start_search_job(
     payload: LocationSearchRequest,
-    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+    job_service: BackgroundJobService = Depends(get_job_service),
 ) -> JobStartResponse:
-    try:
-        return await search_execution.start_search_job(payload)
-    except MapSearchExecutionError as error:
-        raise_map_search_http_error(error)
+    return job_service.create_map_job(payload)
 
 
+###############################################################################
 @router.get(
     MAPS_JOB_ROUTE, response_model=JobStatusResponse, status_code=status.HTTP_200_OK
 )
 async def get_search_job_status(
     job_id: str,
-    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+    job_service: BackgroundJobService = Depends(get_job_service),
 ) -> JobStatusResponse:
-    try:
-        return await search_execution.get_search_job_status(job_id)
-    except MapSearchExecutionError as error:
-        raise_map_search_http_error(error)
+    response = job_service.get_job(job_id)
+    if response is None:
+        raise_map_search_http_error(MapSearchJobNotFoundError(f"Job not found: {job_id}"))
+    return response
 
 
+###############################################################################
 @router.delete(
     MAPS_JOB_ROUTE, response_model=JobCancelResponse, status_code=status.HTTP_200_OK
 )
 async def cancel_search_job(
     job_id: str,
-    search_execution: MapSearchExecutionService = Depends(get_search_execution),
+    job_service: BackgroundJobService = Depends(get_job_service),
 ) -> JobCancelResponse:
-    try:
-        return await search_execution.cancel_search_job(job_id)
-    except MapSearchExecutionError as error:
-        raise_map_search_http_error(error)
+    response = job_service.cancel_job(job_id)
+    if response is None:
+        raise_map_search_http_error(MapSearchJobNotFoundError(f"Job not found: {job_id}"))
+    return response

@@ -5,7 +5,7 @@ set "script_dir=%~dp0"
 for %%I in ("%script_dir%..\..") do set "repo_root=%%~fI"
 set "app_dir=%repo_root%\app"
 set "client_dir=%app_dir%\client"
-set "tauri_dir=%client_dir%\src-tauri"
+set "tauri_dir=%app_dir%\src-tauri"
 set "bundle_source_dir=%tauri_dir%\bundle-src"
 set "bundle_dir=%tauri_dir%\target\release\bundle"
 set "bundle_resource_dir=%tauri_dir%\target\release\r"
@@ -75,12 +75,16 @@ set "CARGO_TERM_PROGRESS_WHEN=auto"
 
 echo [STEP 1/2] Installing frontend dependencies
 pushd "%client_dir%" >nul
-if exist "package-lock.json" (
-  echo [CMD] "%npm_cmd%" ci --foreground-scripts
-  call "%npm_cmd%" ci --foreground-scripts
+if exist "node_modules" (
+  echo [INFO] Frontend dependencies already present at "%client_dir%\node_modules".
 ) else (
-  echo [CMD] "%npm_cmd%" install --foreground-scripts
-  call "%npm_cmd%" install --foreground-scripts
+  if exist "package-lock.json" (
+    echo [CMD] "%npm_cmd%" install --foreground-scripts
+    call "%npm_cmd%" install --foreground-scripts
+  ) else (
+    echo [CMD] "%npm_cmd%" install --foreground-scripts
+    call "%npm_cmd%" install --foreground-scripts
+  )
 )
 if errorlevel 1 (
   popd >nul
@@ -93,16 +97,38 @@ call :prepare_bundle_sources || (
   popd >nul
   goto build_error
 )
+popd >nul
+
+set "tauri_cmd="
+if exist "%client_dir%\node_modules\.bin\tauri.cmd" set "tauri_cmd=%client_dir%\node_modules\.bin\tauri.cmd"
+if not defined tauri_cmd (
+  tauri --version >nul 2>&1
+  if not errorlevel 1 set "tauri_cmd=tauri"
+)
+if not defined tauri_cmd (
+  echo [FATAL] Tauri CLI not found. Run the frontend dependency install step first.
+  goto build_error
+)
 
 echo [STEP 2/2] Building Tauri application
-echo [CMD] "%npm_cmd%" run tauri:build:release
-call "%npm_cmd%" run tauri:build:release
-if errorlevel 1 (
-  popd >nul
+pushd "%app_dir%" >nul
+echo [CMD] "%tauri_cmd%" build --config src-tauri\tauri.conf.json
+call "%tauri_cmd%" build --config src-tauri\tauri.conf.json
+set "tauri_build_ec=%ERRORLEVEL%"
+popd >nul
+if not "%tauri_build_ec%"=="0" (
   echo [FATAL] Tauri build failed.
   goto build_error
 )
-popd >nul
+
+echo [STEP 3/3] Exporting Windows artifacts
+set "export_script=%repo_root%\release\tauri\scripts\export-windows-artifacts.ps1"
+echo [CMD] powershell -NoProfile -ExecutionPolicy Bypass -File "%export_script%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%export_script%"
+if errorlevel 1 (
+  echo [FATAL] Windows artifact export failed.
+  goto build_error
+)
 
 call :cleanup_bundle_sources
 
@@ -133,20 +159,22 @@ exit /b 1
 :prepare_bundle_sources
 call :cleanup_bundle_sources
 
-md "%bundle_source_dir%" >nul 2>&1
-if errorlevel 1 (
+if not exist "%bundle_source_dir%" md "%bundle_source_dir%" >nul 2>&1
+if not exist "%bundle_source_dir%" (
   echo [FATAL] Failed to create bundle source directory "%bundle_source_dir%".
   exit /b 1
 )
-md "%bundle_source_dir%\runtimes" >nul 2>&1
+if not exist "%bundle_source_dir%\runtimes" md "%bundle_source_dir%\runtimes" >nul 2>&1
+if not exist "%bundle_source_dir%\runtimes" (
+  echo [FATAL] Failed to create bundle runtime directory "%bundle_source_dir%\runtimes".
+  exit /b 1
+)
 
 call :copy_tree_filtered "%app_dir%\server" "%bundle_source_dir%\server"
 if errorlevel 1 exit /b 1
-call :copy_tree_filtered "%app_dir%\scripts" "%bundle_source_dir%\scripts"
+call :copy_runtime_settings "%repo_root%\settings" "%bundle_source_dir%\settings"
 if errorlevel 1 exit /b 1
-call :copy_tree_filtered "%repo_root%\settings" "%bundle_source_dir%\settings"
-if errorlevel 1 exit /b 1
-call :copy_tree_filtered "%app_dir%\resources" "%bundle_source_dir%\resources"
+call :copy_runtime_resources "%app_dir%\resources" "%bundle_source_dir%\resources"
 if errorlevel 1 exit /b 1
 call :copy_tree_filtered "%repo_root%\runtimes\python" "%bundle_source_dir%\runtimes\python"
 if errorlevel 1 exit /b 1
@@ -216,11 +244,55 @@ if not exist "%~1" (
   echo [FATAL] Missing bundle source directory "%~1".
   exit /b 1
 )
-set "_COPY_SRC=%~1"
-set "_COPY_DST=%~2"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$src=$env:_COPY_SRC; $dst=$env:_COPY_DST; $excluded=@('.venv','__pycache__','.pytest_cache','node_modules','.angular','dist','target','bundle','incremental','.mypy_cache'); if (-not (Test-Path -LiteralPath $src)) { exit 1 }; New-Item -ItemType Directory -Force -Path $dst | Out-Null; Get-ChildItem -LiteralPath $src -Force | Where-Object { $excluded -notcontains $_.Name } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $dst $_.Name) -Recurse -Force -ErrorAction Stop }; Get-ChildItem -LiteralPath $dst -Recurse -Filter *.pyc -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction Stop"
+if exist "%~2" rd /s /q "%~2" >nul 2>&1
+robocopy "%~1" "%~2" /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NC /NS /XF *.pyc *.pyo /XD .venv __pycache__ .pytest_cache node_modules .angular dist target bundle incremental .mypy_cache >nul
+set "copy_ec=%ERRORLEVEL%"
+if %copy_ec% geq 8 (
+  echo [FATAL] Failed to stage "%~1" into "%~2". Robocopy exit code: %copy_ec%
+  exit /b 1
+)
+exit /b 0
+
+:copy_runtime_settings
+if not exist "%~1" (
+  echo [FATAL] Missing settings directory "%~1".
+  exit /b 1
+)
+if not exist "%~2" md "%~2" >nul 2>&1
+if not exist "%~2" (
+  echo [FATAL] Failed to create settings bundle directory "%~2".
+  exit /b 1
+)
+call :copy_file "%~1\.env" "%~2\.env" "runtime environment file"
+if errorlevel 1 exit /b 1
+call :copy_file "%~1\configurations.json" "%~2\configurations.json" "runtime configurations"
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:copy_runtime_resources
+if not exist "%~1" (
+  echo [FATAL] Missing resources directory "%~1".
+  exit /b 1
+)
+if not exist "%~2" md "%~2" >nul 2>&1
+if not exist "%~2" (
+  echo [FATAL] Failed to create resources bundle directory "%~2".
+  exit /b 1
+)
+call :copy_tree_filtered "%~1\catalog" "%~2\catalog"
+if errorlevel 1 exit /b 1
+call :copy_file "%~1\database.db" "%~2\database.db" "runtime sqlite database"
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:copy_file
+if not exist "%~1" (
+  echo [FATAL] Missing %~3 at "%~1".
+  exit /b 1
+)
+copy /Y "%~1" "%~2" >nul
 if errorlevel 1 (
-  echo [FATAL] Failed to stage "%~1" into "%~2".
+  echo [FATAL] Failed to copy %~3 to "%~2".
   exit /b 1
 )
 exit /b 0

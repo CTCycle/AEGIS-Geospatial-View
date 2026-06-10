@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from server.domain.geospatial.registry import AttributionEntry
 
 
-@dataclass(frozen=True)
-class AttributionEntry:
-    capability_id: str
-    provider_id: str
-    label: str
-    url: str
-    required: bool
-
-
+###############################################################################
 class AttributionService:
+
+    # -------------------------------------------------------------------------
     def from_manifest(self, manifest: dict[str, object]) -> AttributionEntry:
         license_payload = manifest.get("license")
         license_data = license_payload if isinstance(license_payload, dict) else {}
@@ -24,6 +18,7 @@ class AttributionService:
             required=bool(license_data.get("attributionRequired", False)),
         )
 
+    # -------------------------------------------------------------------------
     def merge_labels(self, manifests: list[dict[str, object]]) -> list[str]:
         labels: list[str] = []
         seen: set[str] = set()

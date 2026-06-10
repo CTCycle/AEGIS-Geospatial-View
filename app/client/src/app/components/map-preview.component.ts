@@ -13,405 +13,27 @@ import {
   ViewChild,
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import maplibregl, { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
+import maplibregl, { Map } from 'maplibre-gl';
 
-import { OverlayControlsComponent } from './overlay-controls.component';
-import {
-  DEFAULT_BASE_ATTRIBUTION,
-  DEFAULT_BASE_TILE_MAX_ZOOM,
-  DEFAULT_BASE_TILE_PROXY_URL,
-  DEFAULT_BASE_TILE_URL,
-  DEFAULT_MAP_FIT_MAX_ZOOM,
-  DEFAULT_OVERLAY_OPACITY,
-  DEFAULT_WMS_EXCEPTIONS,
-  DEFAULT_WMS_LAYER_ID,
-  DEFAULT_WMS_VERSION,
-  DEFAULT_WMTS_FORMAT,
-  DEFAULT_WMTS_MATRIX_SET,
-} from '../core/constants';
+import { DEFAULT_MAP_FIT_MAX_ZOOM, DEFAULT_OVERLAY_OPACITY } from '../core/constants';
 import {
   MapSession,
+  OverlayRenderStatus,
   OverlayOpacityChange,
   OverlayStateChange,
   OverlayVisibilityChange,
   SearchResponsePayload,
 } from '../core/types';
-
-type OverlayEntry = NonNullable<MapSession['overlays']>[number];
-type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
-
-const recordBooleanEqual = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) {
-    return false;
-  }
-  return aKeys.every((key) => a[key] === b[key]);
-};
-
-const recordNumberEqual = (a: Record<string, number>, b: Record<string, number>): boolean => {
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) {
-    return false;
-  }
-  return aKeys.every((key) => a[key] === b[key]);
-};
-
-const appendQuery = (baseUrl: string, query: string): string => {
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}${query}`;
-};
-
-const normalizeOverlayBounds = (
-  bounds?: [number, number, number, number],
-): [number, number, number, number] | undefined => {
-  if (!isFiniteBoundsTuple(bounds)) {
-    return undefined;
-  }
-  return bounds;
-};
-
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-
-const isFiniteBoundsTuple = (value: unknown): value is [number, number, number, number] => (
-  Array.isArray(value)
-  && value.length === 4
-  && value.every(isFiniteNumber)
-);
-
-const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
-  if (!overlay.url) {
-    return null;
-  }
-  const layers = overlay.layers || DEFAULT_WMS_LAYER_ID;
-  const version = overlay.wms_version || DEFAULT_WMS_VERSION;
-  const exceptions = overlay.wms_exceptions || DEFAULT_WMS_EXCEPTIONS;
-  const query = [
-    'service=WMS',
-    'request=GetMap',
-    `layers=${encodeURIComponent(layers)}`,
-    'styles=',
-    'format=image/png',
-    'transparent=true',
-    `version=${encodeURIComponent(version)}`,
-    'srs=EPSG:3857',
-    `exceptions=${encodeURIComponent(exceptions)}`,
-    'bbox={bbox-epsg-3857}',
-    'width=256',
-    'height=256',
-  ].join('&');
-  return appendQuery(overlay.url, query);
-};
-
-const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
-  if (!overlay.url) {
-    return null;
-  }
-  const layerId = overlay.layer_id || overlay.layers || DEFAULT_WMS_LAYER_ID;
-  const matrixSet = overlay.tile_matrix_set || DEFAULT_WMTS_MATRIX_SET;
-  const format = overlay.wmts_format || DEFAULT_WMTS_FORMAT;
-  const style = overlay.wmts_style ?? '';
-  const query = [
-    'service=WMTS',
-    'request=GetTile',
-    'version=1.0.0',
-    `layer=${encodeURIComponent(layerId)}`,
-    `style=${encodeURIComponent(style)}`,
-    `tilematrixset=${encodeURIComponent(matrixSet)}`,
-    `tilematrix=${matrixSet}:{z}`,
-    'tilerow={y}',
-    'tilecol={x}',
-    `format=${encodeURIComponent(format)}`,
-  ].join('&');
-  return appendQuery(overlay.url, query);
-};
-
-const buildBasemapTileUrl = (mapSession?: MapSession): string => {
-  const basemap = mapSession?.basemap;
-  const tileUrl = basemap?.tile_url || DEFAULT_BASE_TILE_URL;
-  if (tileUrl === DEFAULT_BASE_TILE_URL) {
-    return DEFAULT_BASE_TILE_PROXY_URL;
-  }
-  try {
-    const parsed = new URL(tileUrl);
-    if (parsed.hostname === 'tile.openstreetmap.org') {
-      return DEFAULT_BASE_TILE_PROXY_URL;
-    }
-  } catch {
-    return tileUrl;
-  }
-  return tileUrl;
-};
-
-const buildStyle = (mapSession?: MapSession): StyleSpecification => {
-  const basemap = mapSession?.basemap;
-  const baseTileUrl = buildBasemapTileUrl(mapSession);
-  const basemapPaint = mapSession?.basemap_id === 'osm_dark'
-    ? {
-      'raster-brightness-max': 0.45,
-      'raster-contrast': 0.35,
-      'raster-saturation': -0.8,
-    }
-    : {};
-  return {
-    version: 8,
-    sources: {
-      basemap: {
-        type: 'raster',
-        tiles: [baseTileUrl],
-        tileSize: 256,
-        maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
-        attribution: basemap?.attribution || DEFAULT_BASE_ATTRIBUTION,
-      },
-    },
-    layers: [
-      {
-        id: 'basemap',
-        type: 'raster',
-        source: 'basemap',
-        minzoom: 0,
-        maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
-        paint: basemapPaint,
-      },
-    ],
-  };
-};
-
-const addOverlayLayers = (map: Map, mapSession?: MapSession) => {
-  const overlays = mapSession?.overlays || [];
-  overlays.forEach((overlay, index) => {
-    const sourceId = `overlay-source-${overlay.id}`;
-    const layerId = `overlay-layer-${overlay.id}`;
-    const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
-    const sourceBounds = normalizeOverlayBounds(overlay.bounds);
-    const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
-    if (['xyz', 'raster-tile', 'wmts', 'wms', 'tile'].includes(renderingMode)
-      && addRasterOverlayLayer(map, overlay, sourceId, layerId, opacity, sourceBounds)) {
-      return;
-    }
-
-    if (['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)
-      && addGeoJsonOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
-      return;
-    }
-
-    if (renderingMode === 'vector-tile' && addVectorTileOverlayLayer(map, overlay, sourceId, layerId, opacity)) {
-      return;
-    }
-
-    if (overlay.type === 'point-insight') {
-      const center = mapSession?.center;
-      if (typeof center?.longitude !== 'number' || typeof center?.latitude !== 'number') {
-        return;
-      }
-      map.addSource(sourceId, {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              properties: { label: overlay.label },
-              geometry: {
-                type: 'Point',
-                coordinates: [center.longitude, center.latitude],
-              },
-            },
-          ],
-        },
-      });
-      map.addLayer({
-        id: layerId,
-        source: sourceId,
-        type: 'circle',
-        paint: {
-          'circle-radius': 8 + index,
-          'circle-color': '#ef4444',
-          'circle-opacity': opacity,
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#111827',
-        },
-      });
-    }
-  });
-};
-
-const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
-  const overlayType = overlay.type.toLowerCase();
-  const format = overlay.data_format?.toLowerCase() || '';
-  const protocol = overlay.source_protocol?.toLowerCase() || '';
-  return Boolean(
-    overlay.url
-    && (overlayType === 'geojson'
-      || overlayType === 'arcgis-geojson'
-      || format.includes('geojson')
-      || protocol.includes('geojson')),
-  );
-};
-
-const addGeoJsonOverlayLayer = (
-  map: Map,
-  overlay: OverlayEntry,
-  sourceId: string,
-  layerId: string,
-  opacity: number,
-): boolean => {
-  if (!isGeoJsonOverlay(overlay) || !overlay.url) {
-    return false;
-  }
-  map.addSource(sourceId, {
-    type: 'geojson',
-    data: overlay.url,
-  });
-  const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
-  const geometryType = overlay.geometry_type?.toLowerCase() || '';
-  if (renderingMode === 'camera-points') {
-    map.addLayer({
-      id: layerId,
-      source: sourceId,
-      type: 'circle',
-      paint: {
-        'circle-radius': 7,
-        'circle-color': '#f97316',
-        'circle-opacity': opacity,
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#7c2d12',
-      },
-    });
-    return true;
-  }
-  if (geometryType.includes('point') || renderingMode === 'clustered-points') {
-    map.addLayer({
-      id: layerId,
-      source: sourceId,
-      type: 'circle',
-      paint: {
-        'circle-radius': 5,
-        'circle-color': '#0ea5e9',
-        'circle-opacity': opacity,
-        'circle-stroke-width': 1,
-        'circle-stroke-color': '#082f49',
-      },
-    });
-    return true;
-  }
-  if (renderingMode === 'choropleth' || geometryType.includes('polygon')) {
-    map.addLayer({
-      id: layerId,
-      source: sourceId,
-      type: 'fill',
-      paint: {
-        'fill-color': '#2563eb',
-        'fill-opacity': Math.min(opacity, 0.55),
-        'fill-outline-color': '#1e3a8a',
-      },
-    });
-    return true;
-  }
-  map.addLayer({
-    id: layerId,
-    source: sourceId,
-    type: 'line',
-    paint: {
-      'line-color': '#38bdf8',
-      'line-width': 2,
-      'line-opacity': opacity,
-    },
-  });
-  return true;
-};
-
-const addVectorTileOverlayLayer = (
-  map: Map,
-  overlay: OverlayEntry,
-  sourceId: string,
-  layerId: string,
-  opacity: number,
-): boolean => {
-  if (!overlay.url) {
-    return false;
-  }
-  map.addSource(sourceId, {
-    type: 'vector',
-    tiles: [overlay.url],
-  });
-  map.addLayer({
-    id: layerId,
-    source: sourceId,
-    'source-layer': overlay.layer_id || overlay.id,
-    type: 'fill',
-    paint: {
-      'fill-color': '#22c55e',
-      'fill-opacity': Math.min(opacity, 0.45),
-      'fill-outline-color': '#14532d',
-    },
-  });
-  return true;
-};
-
-const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
-  const overlayType = String(overlay.rendering_mode || overlay.type) as RasterOverlayKind | 'raster-tile' | 'xyz';
-  if ((overlayType === 'tile' || overlayType === 'raster-tile' || overlayType === 'xyz') && overlay.url) {
-    return [overlay.url];
-  }
-  if (overlayType === 'wms' && overlay.url) {
-    const wmsTiles = buildWmsTileUrl(overlay);
-    return wmsTiles ? [wmsTiles] : null;
-  }
-  if (overlayType === 'wmts' && overlay.url) {
-    const wmtsTiles = buildWmtsTileUrl(overlay);
-    return wmtsTiles ? [wmtsTiles] : null;
-  }
-  return null;
-};
-
-const addRasterOverlayLayer = (
-  map: Map,
-  overlay: OverlayEntry,
-  sourceId: string,
-  layerId: string,
-  opacity: number,
-  sourceBounds?: [number, number, number, number],
-): boolean => {
-  const tiles = buildRasterOverlayTiles(overlay);
-  if (!tiles) {
-    return false;
-  }
-  const rasterSource: {
-    type: 'raster';
-    tiles: string[];
-    tileSize: number;
-    bounds?: [number, number, number, number];
-    maxzoom?: number;
-  } = {
-    type: 'raster',
-    tiles,
-    tileSize: 256,
-  };
-  if (typeof overlay.maxzoom === 'number') {
-    rasterSource.maxzoom = overlay.maxzoom;
-  }
-  if (sourceBounds) {
-    rasterSource.bounds = sourceBounds;
-  }
-  map.addSource(sourceId, rasterSource);
-  map.addLayer({
-    id: layerId,
-    source: sourceId,
-    type: 'raster',
-    paint: { 'raster-opacity': opacity },
-  });
-  return true;
-};
-
-const normalizeBounds = (bounds: unknown): LngLatBoundsLike | null => {
-  if (!isFiniteBoundsTuple(bounds)) {
-    return null;
-  }
-  const [minx, miny, maxx, maxy] = bounds;
-  return [[minx, miny], [maxx, maxy]];
-};
+import { OverlayControlsComponent } from './overlay-controls.component';
+import {
+  OverlayEntry,
+  addOverlayLayers,
+  buildStyle,
+  isGeoJsonOverlay,
+  normalizeBounds,
+  recordBooleanEqual,
+  recordNumberEqual,
+} from './map-preview-rendering';
 
 @Component({
   selector: 'app-map-preview',
@@ -439,6 +61,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   mapSession?: MapSession;
   overlayVisibility: Record<string, boolean> = {};
   overlayOpacity: Record<string, number> = {};
+  overlayRenderStatuses: OverlayRenderStatus[] = [];
   restoreNotice = '';
 
   private mapRef: Map | null = null;
@@ -451,8 +74,8 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   ) {}
 
   get hasCenter(): boolean {
-    return typeof this.mapSession?.center?.latitude === 'number'
-      && typeof this.mapSession?.center?.longitude === 'number';
+    return Number.isFinite(this.mapSession?.center?.latitude)
+      && Number.isFinite(this.mapSession?.center?.longitude);
   }
 
   get overlays(): OverlayEntry[] {
@@ -464,10 +87,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get metadataOnlyOverlays(): OverlayEntry[] {
-    return this.overlays.filter((overlay) => {
-      const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
-      return renderingMode === 'metadata-only' || !overlay.url;
-    });
+    const metadataOnlyIds = new Set(
+      this.overlayRenderStatuses
+        .filter((status) => status.status === 'metadata-only')
+        .map((status) => status.overlayId),
+    );
+    return this.overlays.filter((overlay) => metadataOnlyIds.has(overlay.id));
   }
 
   get attributionEntries(): string[] {
@@ -485,13 +110,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     }));
   }
 
+  get failedOverlayStatuses(): OverlayRenderStatus[] {
+    return this.overlayRenderStatuses.filter((status) => status.status === 'failed');
+  }
+
   get embeddedMapHtml(): string | null {
     const mapHtml = this.mapSession?.payload?.embedded_map_html ?? this.payload?.satellite_imagery?.map_html;
     if (typeof mapHtml !== 'string' || mapHtml.trim().length === 0) {
       return null;
     }
-    const trusted = this.sanitizer.bypassSecurityTrustHtml(mapHtml);
-    return this.sanitizer.sanitize(SecurityContext.HTML, trusted);
+    return this.sanitizer.sanitize(SecurityContext.HTML, mapHtml);
   }
 
   ngAfterViewInit(): void {
@@ -525,7 +153,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   setOverlayOpacity(overlayId: string, percentValue: string): void {
-    const value = Number(percentValue) / 100;
+    const parsed = Number(percentValue);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    const value = Math.min(1, Math.max(0, parsed / 100));
     this.overlayOpacity = { ...this.overlayOpacity, [overlayId]: value };
     this.emitOverlayState();
     this.applyOverlayStateToMap();
@@ -559,6 +191,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const next = this.payload?.map_session;
     if (!next) {
       this.mapSession = undefined;
+      this.overlayRenderStatuses = [];
       return;
     }
     const overlayIds = next.overlay_ids ?? [];
@@ -583,6 +216,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       },
       overlays,
     };
+    this.overlayRenderStatuses = overlays.map((overlay) => ({
+      overlayId: overlay.id,
+      status: 'pending',
+    }));
   }
 
   private rebuildOverlayStateFromSession(): void {
@@ -628,10 +265,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (!this.viewInitialized) {
       return;
     }
-    if (typeof center?.longitude !== 'number' || typeof center.latitude !== 'number') {
+    if (!Number.isFinite(center?.longitude) || !Number.isFinite(center?.latitude)) {
       this.destroyMap();
       return;
     }
+    const longitude = Number(center?.longitude);
+    const latitude = Number(center?.latitude);
     if (!this.mapContainerRef?.nativeElement) {
       return;
     }
@@ -641,18 +280,19 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const map = new maplibregl.Map({
       container: this.mapContainerRef.nativeElement,
       style: buildStyle(this.mapSession),
-      center: [center.longitude, center.latitude],
+      center: [longitude, latitude],
       zoom: 12,
     });
 
     map.on('load', () => {
       map.resize();
-      addOverlayLayers(map, this.mapSession);
+      this.overlayRenderStatuses = addOverlayLayers(map, this.mapSession);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
         map.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
       }
       this.applyOverlayStateToMap();
+      this.changeDetector.detectChanges();
     });
 
     this.mapRef = map;

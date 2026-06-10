@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 
 import {
+  APP_STATE_STORAGE_KEY,
   PersistedAppState,
   PersistedChatPageState,
   PersistedSettingsPageState,
@@ -18,12 +19,16 @@ export class AppStateStoreService implements OnDestroy {
 
   constructor() {
     this.heartbeatDisposer = startTabHeartbeat(this.state.tabId);
-    window.addEventListener('storage', this.onStorage);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', this.onStorage);
+    }
   }
 
   ngOnDestroy(): void {
     this.heartbeatDisposer?.();
-    window.removeEventListener('storage', this.onStorage);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', this.onStorage);
+    }
   }
 
   getChatPage(): PersistedChatPageState {
@@ -60,7 +65,7 @@ export class AppStateStoreService implements OnDestroy {
   }
 
   private readonly onStorage = (event: StorageEvent): void => {
-    if (event.key !== null) {
+    if (event.key !== null && event.key !== APP_STATE_STORAGE_KEY) {
       return;
     }
     this.resetState();

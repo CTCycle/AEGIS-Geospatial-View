@@ -34,6 +34,11 @@ describe('core/app-state', () => {
         chatPanel: {
           ...defaultAppState().chatPage.chatPanel,
           composerDraft: 'persisted draft',
+          lastOperation: {
+            kind: 'direct_answer',
+            status: 'success',
+            message: 'Persisted operation',
+          },
           contextUsage: {
             estimated_input_tokens: 200,
             selected_context_window: 2048,
@@ -47,6 +52,7 @@ describe('core/app-state', () => {
     }));
     const state = loadPersistedAppState();
     expect(state.chatPage.chatPanel.composerDraft).toBe('persisted draft');
+    expect(state.chatPage.chatPanel.lastOperation?.kind).toBe('direct_answer');
     expect(state.chatPage.chatPanel.contextUsage?.usage_percent).toBe(9.8);
     expect(state.tabId).toBe('tab-1');
   });

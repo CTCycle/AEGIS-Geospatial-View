@@ -7,8 +7,13 @@ from server.app import create_app
 from server.services.geospatial.api_service import GeospatialApiService
 
 
+###############################################################################
 def test_camera_detail_uses_provider_backed_lookup() -> None:
+
+    ###############################################################################
     class CameraService(GeospatialApiService):
+
+        # -------------------------------------------------------------------------
         async def _fetch_provider_payload(self, provider_id, request):
             assert provider_id == "windy_webcams"
             assert request.params["camera_id"] == "camera-1"
@@ -44,8 +49,13 @@ def test_camera_detail_uses_provider_backed_lookup() -> None:
     assert payload["camera"]["official_url"] == "https://example.test/camera-1"
 
 
+###############################################################################
 def test_camera_detail_preserves_safe_fallback_without_provider_data() -> None:
+
+    ###############################################################################
     class MissingCredentialService(GeospatialApiService):
+
+        # -------------------------------------------------------------------------
         async def _fetch_provider_payload(self, provider_id, request):
             del request
             return {

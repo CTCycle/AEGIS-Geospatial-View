@@ -9,10 +9,11 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
-
+###############################################################################
 class ArcGISRestProvider(GeospatialProvider):
     provider_id = "arcgis"
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         service_url = str(request.params.get("service_url") or "").strip()
         if not service_url:

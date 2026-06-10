@@ -8,6 +8,7 @@ from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 
 
+###############################################################################
 def test_hazard_providers_include_freshness_labels() -> None:
     responses = [
         asyncio.run(USGSProvider().fetch(ProviderRequest(capability_id="usgs_water_gauges"))),

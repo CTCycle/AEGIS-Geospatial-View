@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
 from server.domain.geographics import (
@@ -28,35 +28,33 @@ from server.services.geospatial.api_service import (
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
+GEOSPATIAL_ERROR_STATUS = {
+    GeospatialCapabilityNotFoundError: status.HTTP_404_NOT_FOUND,
+    GeospatialInvalidRequestError: status.HTTP_400_BAD_REQUEST,
+    GeospatialUnsupportedTileError: status.HTTP_404_NOT_FOUND,
+    GeospatialTileCredentialError: status.HTTP_401_UNAUTHORIZED,
+    GeospatialTileRequestError: status.HTTP_502_BAD_GATEWAY,
+}
 
-def get_geospatial_api_service() -> GeospatialApiService:
-    return GeospatialApiService()
+
+###############################################################################
+def get_geospatial_api_service(request: Request) -> GeospatialApiService:
+    return request.app.state.geospatial_runtime.api_service
 
 
+###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
-    if isinstance(error, GeospatialCapabilityNotFoundError):
+    status_code = next(
+        (
+            mapped_status
+            for error_type, mapped_status in GEOSPATIAL_ERROR_STATUS.items()
+            if isinstance(error, error_type)
+        ),
+        None,
+    )
+    if status_code is not None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialInvalidRequestError):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialUnsupportedTileError):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialTileCredentialError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(error),
-        ) from error
-    if isinstance(error, GeospatialTileRequestError):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=status_code,
             detail=str(error),
         ) from error
     raise HTTPException(
@@ -65,6 +63,7 @@ def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
     ) from error
 
 
+###############################################################################
 @router.get(
     "/capabilities",
     response_model=GeospatialCatalogResponse,
@@ -76,6 +75,7 @@ async def get_geospatial_capabilities(
     return GeospatialCatalogResponse.model_validate(service.list_capabilities())
 
 
+###############################################################################
 @router.get(
     "/layers",
     response_model=GeospatialLayersResponse,
@@ -87,6 +87,7 @@ async def get_geospatial_layers(
     return GeospatialLayersResponse.model_validate(service.list_layers())
 
 
+###############################################################################
 @router.get(
     "/layers/{layer_id}/health",
     response_model=GeospatialLayerHealthResponse,
@@ -104,6 +105,7 @@ async def get_layer_health(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.get(
     "/layers/{layer_id}/features",
     response_model=GeospatialProviderPayloadResponse,
@@ -133,6 +135,57 @@ async def get_layer_features(
         raise_service_http_error(exc)
 
 
+###############################################################################
+@router.get(
+    "/layers/{layer_id}/geojson",
+    status_code=status.HTTP_200_OK,
+)
+async def get_layer_geojson(
+    layer_id: str,
+    bbox: str | None = Query(default=None),
+    zoom: int | None = Query(default=None),
+    time: str | None = Query(default=None),
+    live: bool = Query(default=False),
+    incidents: bool = Query(default=False),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> dict:
+    try:
+        return await service.get_layer_geojson(
+            layer_id,
+            bbox=bbox,
+            zoom=zoom,
+            time=time,
+            live=live,
+            incidents=incidents,
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+
+
+###############################################################################
+@router.get(
+    "/tiles/{capability_id}/{z}/{x}/{y}.png",
+    status_code=status.HTTP_200_OK,
+)
+async def proxy_capability_tile(
+    capability_id: str,
+    z: int,
+    x: int,
+    y: int,
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> Response:
+    try:
+        body = await service.fetch_capability_tile(capability_id, z, x, y)
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+    return Response(
+        content=body,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=60"},
+    )
+
+
+###############################################################################
 @router.get(
     "/proxy/tomtom/{kind}/{z}/{x}/{y}.png",
     status_code=status.HTTP_200_OK,
@@ -155,6 +208,7 @@ async def proxy_tomtom_tile(
     )
 
 
+###############################################################################
 @router.get(
     "/cameras",
     response_model=GeospatialProviderPayloadResponse,
@@ -178,6 +232,28 @@ async def get_geospatial_cameras(
         raise_service_http_error(exc)
 
 
+###############################################################################
+@router.get(
+    "/cameras.geojson",
+    status_code=status.HTTP_200_OK,
+)
+async def get_geospatial_cameras_geojson(
+    bbox: str | None = Query(default=None),
+    provider: str | None = Query(default=None),
+    camera_type: str | None = Query(default=None),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> dict:
+    try:
+        return await service.list_cameras_geojson(
+            bbox=bbox,
+            provider=provider,
+            camera_type=camera_type,
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+
+
+###############################################################################
 @router.get(
     "/cameras/{camera_id:path}",
     response_model=GeospatialCameraDetailResponse,
@@ -192,6 +268,7 @@ async def get_geospatial_camera(
     )
 
 
+###############################################################################
 @router.get(
     "/sources/{provider_id}/credential-status",
     response_model=GeospatialCredentialStatusResponse,
@@ -206,6 +283,7 @@ async def get_credential_status(
     )
 
 
+###############################################################################
 @router.get(
     "/providers/account-setup",
     response_model=GeospatialProviderAccountSetupListResponse,
@@ -219,6 +297,7 @@ async def get_provider_account_setups(
     )
 
 
+###############################################################################
 @router.get(
     "/providers/{provider_id}/account-setup",
     response_model=GeospatialProviderAccountSetupResponse,
@@ -236,6 +315,7 @@ async def get_provider_account_setup(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.post(
     "/audit",
     response_model=LayerAuditReport,

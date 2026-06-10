@@ -2,30 +2,24 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from time import monotonic
 from typing import Any
+
+from server.domain.jobs import BackgroundJobState
 
 
 ###############################################################################
 @dataclass
-class JobState:
-    job_id: str
-    job_type: str
-    status: str
-    progress: float = 0.0
-    result: dict[str, Any] | None = None
-    error: str | None = None
-    created_at: float = field(default_factory=monotonic)
-    completed_at: float | None = None
-    stop_requested: bool = False
+class JobState(BackgroundJobState):
     lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
+    # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> None:
         with self.lock:
             for key, value in kwargs.items():
                 if hasattr(self, key):
                     setattr(self, key, value)
 
+    # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return {

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -255,6 +254,7 @@ class LayerAuditReport(BaseModel):
         default_factory=list
     )
 
+    # -------------------------------------------------------------------------
     @property
     def ok(self) -> bool:
         return self.error_count == 0
@@ -357,7 +357,6 @@ class PoiFeature(BaseModel):
     phone: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-
 ###############################################################################
 class ViewportPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -367,7 +366,6 @@ class ViewportPolicy(BaseModel):
     radius_m: float = Field(default=2500.0, gt=0)
     bbox: list[float] | None = None
 
-
 ###############################################################################
 class PresentationPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -375,7 +373,6 @@ class PresentationPolicy(BaseModel):
     emphasize_overlays: bool = False
     high_contrast: bool = False
     show_legend: bool = True
-
 
 ###############################################################################
 class LocationSearchRequest(BaseModel):
@@ -388,7 +385,6 @@ class LocationSearchRequest(BaseModel):
     overlay_ids: list[str] = Field(default_factory=list)
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
-
 
 ###############################################################################
 class MapSession(BaseModel):
@@ -408,12 +404,12 @@ class MapSession(BaseModel):
     compliance_warnings: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class SearchByLocationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status_message: str
     map_session: MapSession
-
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):

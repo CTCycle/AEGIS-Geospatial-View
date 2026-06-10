@@ -3,25 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-import json
 
 from server.common.constants import OPEN_ELEVATION_API_BASE_URL
 from server.common.logger import logger
-
 
 __all__ = [
     "OpenElevationService",
     "OpenElevationError",
 ]
 
-
 ###############################################################################
 class OpenElevationError(Exception):
     """Exception for Open-Elevation service failures."""
-
 
 ###############################################################################
 class OpenElevationService:
@@ -35,6 +32,7 @@ class OpenElevationService:
 
     BASE_URL = OPEN_ELEVATION_API_BASE_URL
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

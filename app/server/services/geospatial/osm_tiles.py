@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from urllib.error import HTTPError, URLError
-from urllib.request import Request as UrlRequest, urlopen
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
 ###############################################################################
 class OsmTileProxyError(RuntimeError):
     """Raised when OSM tile proxy retrieval fails."""
 
-
 ###############################################################################
 class OsmTileProxyService:
+
+    # -------------------------------------------------------------------------
     def fetch_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:
         tile_url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         request = UrlRequest(

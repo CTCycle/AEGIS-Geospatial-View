@@ -1,26 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
+from server.domain.geospatial.registry import CapabilityRegistrySnapshot
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
-@dataclass(frozen=True)
-class CapabilityRegistrySnapshot:
-    providers: list[dict[str, Any]]
-    basemaps: list[dict[str, Any]]
-    overlays: list[dict[str, Any]]
-    cameras: list[dict[str, Any]]
-    transit: list[dict[str, Any]]
-    tools: list[dict[str, Any]]
-
-
+###############################################################################
 class CapabilityRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, manifest_loader: GeospatialManifestLoader | None = None) -> None:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
         self._snapshot: CapabilityRegistrySnapshot | None = None
 
+    # -------------------------------------------------------------------------
     def load_capabilities(self) -> CapabilityRegistrySnapshot:
         manifest = self.manifest_loader.load_all()
         self._snapshot = CapabilityRegistrySnapshot(
@@ -33,24 +26,31 @@ class CapabilityRegistry:
         )
         return self._snapshot
 
+    # -------------------------------------------------------------------------
     def _ensure_snapshot(self) -> CapabilityRegistrySnapshot:
         return self._snapshot or self.load_capabilities()
 
+    # -------------------------------------------------------------------------
     def list_basemaps(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().basemaps)
 
+    # -------------------------------------------------------------------------
     def list_overlays(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().overlays)
 
+    # -------------------------------------------------------------------------
     def list_cameras(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().cameras)
 
+    # -------------------------------------------------------------------------
     def list_transit(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().transit)
 
+    # -------------------------------------------------------------------------
     def list_tools(self) -> list[dict[str, Any]]:
         return list(self._ensure_snapshot().tools)
 
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict[str, Any] | None:
         normalized = str(capability_id).strip()
         if not normalized:

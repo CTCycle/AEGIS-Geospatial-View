@@ -1,28 +1,25 @@
 from __future__ import annotations
 
-import json
 import threading
 import time
 from collections import OrderedDict
 from typing import Any
-from typing import TYPE_CHECKING
 
 from server.configurations import get_server_settings
-from server.domain.gibs import Capabilities, LayerCatalogEntry
-from server.common.constants import GIBS_LAYERS_TABLE
-from server.common.logger import logger
-from server.services.catalog.reference_repository import ReferenceCatalogRepository
+from server.domain.gibs import Capabilities
+from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
+from server.repositories.database import get_database
+from server.repositories.database.contracts import DatabaseBackend
 from server.services.geospatial.gibs_errors import GIBSRequestError
 from server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
-
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
 
 type BBox = list[float]
 type LayerStore = dict[str, object]
 
-
+###############################################################################
 class CapabilitiesCache:
+
+    # -------------------------------------------------------------------------
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
         self.store: dict[str, Capabilities] = {}
@@ -44,9 +41,10 @@ class CapabilitiesCache:
         with self.lock:
             self.store[key] = value
 
-
 ###############################################################################
 class ResponseCache:
+
+    # -------------------------------------------------------------------------
     def __init__(self, max_entries: int) -> None:
         self.max_entries = max_entries
         self.cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -69,9 +67,10 @@ class ResponseCache:
             while len(self.cache) > self.max_entries:
                 self.cache.popitem(last=False)
 
-
 ###############################################################################
 class GIBSService(GIBSRuntimeMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -109,99 +108,22 @@ class GIBSService(GIBSRuntimeMixin):
             if min_visual_radius_m is not None
             else settings.min_visual_radius_m
         )
-        if database is None:
-            from server.repositories.database.backend import get_database
-
-            database = get_database().backend
-        self.database = database
-        self.reference_repository = (
-            reference_repository or ReferenceCatalogRepository(self.database)
+        resolved_database = database or get_database().backend
+        self.database = resolved_database
+        self.reference_repository = reference_repository or ReferenceCatalogRepository(
+            resolved_database
         )
-        self.layer_catalog = self.load_layer_catalog()
-        try:
-            self.layer_native_resolution_m = (
-                self.reference_repository.load_gibs_layer_native_resolution_map()
-            )
-            self.layer_date_fallback_days = (
-                self.reference_repository.load_gibs_layer_date_fallback_days_map()
-            )
-        except Exception:  # pragma: no cover - uninitialized database
-            self.layer_native_resolution_m = {}
-            self.layer_date_fallback_days = {}
+        self.layer_native_resolution_m = (
+            self.reference_repository.load_gibs_layer_native_resolution_map()
+        )
+        self.layer_date_fallback_days = (
+            self.reference_repository.load_gibs_layer_date_fallback_days_map()
+        )
         self.wms_base_endpoints = dict(settings.wms_base_endpoints)
         self.nasa_attribution = settings.nasa_attribution
 
     # -------------------------------------------------------------------------
-    def load_layer_catalog(self) -> dict[str, LayerCatalogEntry]:
-        try:
-            rows = self.database.load_from_database(GIBS_LAYERS_TABLE)
-        except Exception as exc:  # pragma: no cover - database access failures
-            logger.warning("Unable to load GIBS layer metadata: %s", exc)
-            return {}
-        if not rows:
-            return {}
-        catalog: dict[str, LayerCatalogEntry] = {}
-        for row in rows:
-            layer_id = str(row.get("layer_id") or "").strip()
-            if not layer_id:
-                continue
-            projections = self.parse_projection_entries(row.get("projections"))
-            meters_per_pixel = self.parse_meters_per_pixel(row.get("meters_per_pixel"))
-            catalog[layer_id] = LayerCatalogEntry(
-                name=layer_id,
-                projections=frozenset(projections),
-                meters_per_pixel=tuple(meters_per_pixel),
-            )
-        return catalog
-
-    # -------------------------------------------------------------------------
-    def parse_projection_entries(self, payload: Any) -> list[str]:
-        entries = self.parse_sequence(payload)
-        projections: list[str] = []
-        for value in entries:
-            normalized = str(value).strip().upper()
-            if normalized:
-                projections.append(normalized)
-        return projections
-
-    # -------------------------------------------------------------------------
-    def parse_meters_per_pixel(self, payload: Any) -> list[float]:
-        entries = self.parse_sequence(payload)
-        resolutions: list[float] = []
-        for value in entries:
-            try:
-                parsed = float(value)
-            except (TypeError, ValueError):
-                continue
-            if parsed > 0:
-                resolutions.append(parsed)
-        return resolutions
-
-    # -------------------------------------------------------------------------
-    def parse_sequence(self, payload: Any) -> list[Any]:
-        if payload is None:
-            return []
-        if isinstance(payload, str):
-            try:
-                parsed = json.loads(payload)
-            except json.JSONDecodeError:
-                return []
-            if isinstance(parsed, list):
-                return list(parsed)
-            return []
-        if isinstance(payload, (list, tuple)):
-            return list(payload)
-        return []
-
-    # -------------------------------------------------------------------------
-    def get_layer_metadata(self, layer: str) -> LayerCatalogEntry | None:
-        return self.layer_catalog.get(layer)
-
-    # -------------------------------------------------------------------------
     def resolve_layer_meters_per_pixel(self, layer: str) -> tuple[float, ...]:
-        metadata = self.get_layer_metadata(layer)
-        if metadata and metadata.meters_per_pixel:
-            return metadata.meters_per_pixel
         fallback = self.layer_native_resolution_m.get(layer)
         return (fallback,) if fallback else tuple()
 
@@ -330,7 +252,3 @@ class GIBSService(GIBSRuntimeMixin):
         if last_error is not None:
             raise last_error
         raise GIBSRequestError("GIBS GetMap failed without a usable fallback date.")
-
-    # -------------------------------------------------------------------------
-
-

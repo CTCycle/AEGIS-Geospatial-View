@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-import json
 
 from server.common.constants import OPENAQ_API_BASE_URL
 from server.common.logger import logger
-
 
 __all__ = [
     "OpenAQService",
@@ -19,16 +18,13 @@ __all__ = [
     "OpenAQRequestError",
 ]
 
-
 ###############################################################################
 class OpenAQServiceError(Exception):
     """Base exception for OpenAQ service failures."""
 
-
 ###############################################################################
 class OpenAQRequestError(OpenAQServiceError):
     """Raised when OpenAQ API cannot fulfill the request."""
-
 
 ###############################################################################
 class OpenAQService:
@@ -56,6 +52,7 @@ class OpenAQService:
         "bc": "Black Carbon (BC)",
     }
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

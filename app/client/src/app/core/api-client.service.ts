@@ -40,7 +40,7 @@ export class ApiClientService {
     return fetchGeospatialCapabilities();
   }
 
-  fetchGeospatialLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras'>> {
+  fetchGeospatialLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'>> {
     return fetchGeospatialLayers();
   }
 

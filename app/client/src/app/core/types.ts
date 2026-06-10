@@ -58,7 +58,6 @@ export interface CapabilityDescriptor {
   data_format?: string;
   geometry_type?: string;
   queryable?: boolean;
-  vectorizable?: boolean;
   endpoint_health?: string;
   auth_mode?: string;
   official_docs_url?: string;
@@ -224,20 +223,25 @@ export interface MapSession {
     rendering_mode?: RenderingMode | string;
     default_opacity?: number;
     url?: string | null;
+    tile_url_template?: string;
     layers?: string;
     layer_id?: string;
+    source_layer?: string;
     tile_matrix_set?: string;
+    tile_size?: number;
+    minzoom?: number;
     wmts_format?: string;
     wmts_style?: string;
     wms_version?: string;
     wms_exceptions?: string;
-      bounds?: [number, number, number, number];
-      attribution?: string;
-      maxzoom?: number;
-      source_protocol?: string;
-      data_format?: string;
-      geometry_type?: string;
-    }>;
+    render_params?: Record<string, JsonValue>;
+    bounds?: [number, number, number, number];
+    attribution?: string;
+    maxzoom?: number;
+    source_protocol?: string;
+    data_format?: string;
+    geometry_type?: string;
+  }>;
   compliance_warnings?: string[];
 }
 
@@ -255,6 +259,12 @@ export interface SearchResponsePayload {
 export interface OverlayStateChange {
   overlayVisibility: Record<string, boolean>;
   overlayOpacity: Record<string, number>;
+}
+
+export interface OverlayRenderStatus {
+  overlayId: string;
+  status: 'pending' | 'loaded' | 'failed' | 'metadata-only';
+  message?: string;
 }
 
 export interface OverlayVisibilityChange {
@@ -388,19 +398,38 @@ export interface ToolPayload {
   error?: string;
 }
 
+export interface ChatOperationResult {
+  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error';
+  status: 'success' | 'partial' | 'failed';
+  message: string;
+  warnings?: string[];
+  map_session?: MapSession | null;
+  direct_result?: Record<string, JsonValue> | null;
+}
+
 export interface ChatTurnResponse {
   request_id: string;
   session_id: number;
   assistant_message: string;
   turn_contract: TurnParseResult;
   decision: PolicyDecision;
+  operation?: ChatOperationResult | null;
   tool_payload?: ToolPayload | null;
   map_session?: MapSession | null;
   memory_snapshot: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
 }
 
-export type ChatStreamEventType = 'status' | 'assistant_delta' | 'tool_status' | 'final' | 'error';
+export type ChatStreamEventType =
+  | 'status'
+  | 'parsed'
+  | 'policy'
+  | 'tool_call_started'
+  | 'tool_call_completed'
+  | 'map_session_created'
+  | 'assistant_delta'
+  | 'final'
+  | 'error';
 
 export interface ChatStreamEvent {
   event: ChatStreamEventType;
@@ -460,10 +489,4 @@ export interface OllamaHealthResponse {
 
 export interface GenericObjectResponse {
   [key: string]: unknown;
-}
-
-export interface VectorizationResponse {
-  status: string;
-  indexed_documents: number;
-  vector_path: string;
 }

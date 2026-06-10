@@ -4,6 +4,7 @@ from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.openmeteo import OpenMeteoService
 
 
+###############################################################################
 async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, object]:
     _ = plan
     service = OpenMeteoService()

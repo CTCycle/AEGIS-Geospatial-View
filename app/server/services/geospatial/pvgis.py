@@ -12,11 +12,15 @@ from server.common.logger import logger
 PVGIS_BASE_URL = "https://re.jrc.ec.europa.eu/api/v5_3"
 
 
+###############################################################################
 class PVGISError(Exception):
     """Exception for PVGIS API failures."""
 
 
+###############################################################################
 class PVGISService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

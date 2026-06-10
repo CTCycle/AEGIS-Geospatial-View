@@ -6,6 +6,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.source_health import SourceHealthMonitor
 
 
+###############################################################################
 def test_source_health_prefers_recorded_provider_status() -> None:
     monitor = SourceHealthMonitor()
     manifest = {
@@ -18,6 +19,7 @@ def test_source_health_prefers_recorded_provider_status() -> None:
     assert monitor.status_for_manifest(manifest) == LayerHealthStatus.FUNCTIONAL
 
 
+###############################################################################
 def test_source_health_uses_manifest_status_without_probe_record() -> None:
     monitor = SourceHealthMonitor()
 
@@ -28,6 +30,7 @@ def test_source_health_uses_manifest_status_without_probe_record() -> None:
     assert status == LayerHealthStatus.PARTIAL
 
 
+###############################################################################
 def test_attribution_service_deduplicates_manifest_labels() -> None:
     manifests = GeospatialManifestLoader().load_all()
     service = AttributionService()

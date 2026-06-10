@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from server.domain.chat import ModelSettingsUpdateRequest
 
 
+###############################################################################
 def test_model_settings_update_request_forbids_unknown_fields() -> None:
     try:
         ModelSettingsUpdateRequest(unknown_field="x")
@@ -14,6 +15,7 @@ def test_model_settings_update_request_forbids_unknown_fields() -> None:
         raise AssertionError("Expected ValidationError for unknown field")
 
 
+###############################################################################
 def test_model_settings_update_request_requires_string_credentials() -> None:
     try:
         ModelSettingsUpdateRequest(credentials={"openai": {"api_key": 123}})
@@ -23,6 +25,7 @@ def test_model_settings_update_request_requires_string_credentials() -> None:
         raise AssertionError("Expected ValidationError for non-string credential value")
 
 
+###############################################################################
 def test_model_settings_update_request_accepts_valid_payload() -> None:
     payload = ModelSettingsUpdateRequest(
         active_provider_mode="cloud",
@@ -35,6 +38,7 @@ def test_model_settings_update_request_accepts_valid_payload() -> None:
     assert payload.credentials["openai"]["api_key"] == "secret"
 
 
+###############################################################################
 def test_model_settings_update_request_rejects_invalid_base_urls() -> None:
     try:
         ModelSettingsUpdateRequest(ollama_url="not-a-url")

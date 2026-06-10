@@ -1,7 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
-import { MODEL_ROLES, ModelRole, isModelSelectedForRole, roleDisabledReason } from '../core/model-selection';
+import {
+  MODEL_ROLES,
+  ModelRole,
+  isModelSelectedForRole,
+  modelRoleLabel,
+  roleDisabledReason,
+} from '../core/model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from '../core/types';
 
 @Component({
@@ -24,13 +30,7 @@ export class ModelRoleActionsComponent {
   }
 
   roleName(role: ModelRole): string {
-    if (role === 'parser') {
-      return 'Parser';
-    }
-    if (role === 'chat') {
-      return 'Chat';
-    }
-    return 'Agent';
+    return modelRoleLabel(role);
   }
 
   roleIcon(role: ModelRole): string {
@@ -41,6 +41,11 @@ export class ModelRoleActionsComponent {
       return 'chat';
     }
     return 'agent';
+  }
+
+  roleTitle(role: ModelRole): string {
+    const reason = this.disabledReason(role);
+    return reason ? `${this.roleName(role)} unavailable. ${reason}` : this.roleName(role);
   }
 
   disabledReason(role: ModelRole): string | null {

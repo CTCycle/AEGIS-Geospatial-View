@@ -14,6 +14,7 @@ from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
 
 
+###############################################################################
 def test_eea_provider_returns_wms_descriptor() -> None:
     response = asyncio.run(
         EEAProvider().fetch(
@@ -36,6 +37,7 @@ def test_eea_provider_returns_wms_descriptor() -> None:
     assert response.attribution == ["EEA"]
 
 
+###############################################################################
 def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
     clock = 0.0
 
@@ -70,6 +72,7 @@ def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
     assert stale.warnings
 
 
+###############################################################################
 def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
         return ["not", "metadata"]
@@ -85,6 +88,7 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
         )
 
 
+###############################################################################
 def test_esa_provider_returns_wmts_descriptor() -> None:
     response = asyncio.run(
         ESAProvider().fetch(
@@ -107,6 +111,7 @@ def test_esa_provider_returns_wmts_descriptor() -> None:
     assert response.attribution == ["ESA"]
 
 
+###############################################################################
 def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     clock = 0.0
 
@@ -139,6 +144,7 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     assert stale.payload["liveValidation"]["service"] == "WMTS"
 
 
+###############################################################################
 def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None:
     response = asyncio.run(
         EurostatProvider().fetch(
@@ -154,6 +160,7 @@ def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None
     assert response.payload["joinKey"] == "NUTS_ID"
 
 
+###############################################################################
 def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None:
     clock = 0.0
 
@@ -193,6 +200,7 @@ def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None
     assert stale.payload["jsonStatMetadata"]["label"] == "Population density"
 
 
+###############################################################################
 def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
         return {"value": []}
@@ -208,6 +216,7 @@ def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
         )
 
 
+###############################################################################
 def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
     response = asyncio.run(
         EurostatProvider().fetch(
@@ -251,6 +260,7 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
     assert feature["properties"]["marginOfError"] == 1.5
 
 
+###############################################################################
 def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     response = asyncio.run(
         EurostatProvider().fetch(
@@ -266,6 +276,7 @@ def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     assert response.payload["joinKey"] == "NUTS_ID"
 
 
+###############################################################################
 def test_fred_manifest_remains_metadata_only_without_geographic_join() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     fred = json.loads(
@@ -278,6 +289,7 @@ def test_fred_manifest_remains_metadata_only_without_geographic_join() -> None:
     assert fred["agenticUse"]["manualToggle"] is False
 
 
+###############################################################################
 def test_registry_binds_regional_providers() -> None:
     registry = ProviderRegistry()
 

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 
+###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:
     for value in values:
         if value is None:
@@ -19,6 +20,7 @@ def _pick_first_non_empty(*values: str | None) -> str | None:
     return None
 
 
+###############################################################################
 def _normalize_host(raw_host: str | None, default_host: str) -> str:
     host = (raw_host or default_host).strip() or default_host
     if host in {"0.0.0.0", "::", "[::]"}:
@@ -26,6 +28,7 @@ def _normalize_host(raw_host: str | None, default_host: str) -> str:
     return host
 
 
+###############################################################################
 def _build_base_url(
     host_env: str,
     port_env: str,
@@ -56,18 +59,21 @@ API_BASE_URL = _pick_first_non_empty(
 )
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     """Returns the base URL of the API."""
     return API_BASE_URL
 
 
+###############################################################################
 @pytest.fixture
 def api_context(playwright):
     """
@@ -79,6 +85,7 @@ def api_context(playwright):
     context.dispose()
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def artifact_root() -> Path:
     root = Path(__file__).parent / "artifacts"
@@ -88,16 +95,19 @@ def artifact_root() -> Path:
     return root
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def backend_log_path(artifact_root: Path) -> Path:
     return artifact_root / "logs" / "backend.log"
 
 
+###############################################################################
 @pytest.fixture(scope="session")
 def frontend_log_path(artifact_root: Path) -> Path:
     return artifact_root / "logs" / "frontend.log"
 
 
+###############################################################################
 @pytest.fixture
 def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
     test_file = request.node.nodeid.split("::", 1)[0].replace("\\", "/").split("/")[-1]
@@ -107,6 +117,7 @@ def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
     return target
 
 
+###############################################################################
 @pytest.fixture
 def save_snapshot(snapshot_dir: Path):
     def _save(page, name: str) -> Path:  # noqa: ANN001
@@ -118,6 +129,7 @@ def save_snapshot(snapshot_dir: Path):
     return _save
 
 
+###############################################################################
 @pytest.fixture
 def read_backend_log_tail(backend_log_path: Path):
     def _read(lines: int = 200) -> str:

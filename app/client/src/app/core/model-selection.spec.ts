@@ -1,4 +1,15 @@
-import { buildSelectedModelStats, canAssignRole, MODEL_ROLES, roleDisabledReason } from './model-selection';
+import {
+  buildModelSelectionPayload,
+  buildSelectedModelStats,
+  canAssignRole,
+  enrichInstalledOllamaModel,
+  mergeModelCard,
+  mergeModelCards,
+  MODEL_ROLES,
+  modelRoleLabel,
+  modelRoleStatusLabel,
+  roleDisabledReason,
+} from './model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from './types';
 
 const baseSettings = (): ModelSettingsResponse => ({
@@ -35,6 +46,11 @@ describe('model-selection', () => {
     expect(MODEL_ROLES).toEqual(['parser', 'chat', 'agent']);
   });
 
+  it('returns stable role labels', () => {
+    expect(modelRoleLabel('parser')).toBe('Parser');
+    expect(modelRoleStatusLabel('parser')).toBe('parser');
+  });
+
   it('returns assigned roles as model role values', () => {
     const rows = buildSelectedModelStats(baseSettings(), new Set<string>(['gpt-4.1-mini']));
     expect(rows[0].assignedRoles).toEqual(['parser']);
@@ -54,6 +70,55 @@ describe('model-selection', () => {
     expect(rows[1]).toEqual(jasmine.objectContaining({ model: 'shared-model', assignedRoles: ['chat'] }));
   });
 
+  it('merges model card groups by provider and id', () => {
+    const merged = mergeModelCards(
+      [model({ id: 'same', provider: 'openai', description: 'short', capabilities: [] })],
+      [model({ id: 'same', provider: 'openai', description: 'much richer description', capabilities: ['tools'] })],
+    );
+    expect(merged.length).toBe(1);
+    expect(merged[0].description).toBe('much richer description');
+    expect(merged[0].capabilities).toEqual(['tools']);
+  });
+
+  it('prefers the richer model description when merging a card', () => {
+    const merged = mergeModelCard(
+      model({ description: 'brief', metadata: { family: 'qwen2' } }),
+      model({ description: 'A provider-authored model summary.', metadata: { details: '7B' } }),
+    );
+    const metadata = merged.metadata as Record<string, unknown>;
+    expect(merged.description).toBe('A provider-authored model summary.');
+    expect(metadata['family']).toBe('qwen2');
+    expect(metadata['details']).toBe('7B');
+  });
+
+  it('enriches installed ollama models from matching library entries', () => {
+    const installed = model({
+      id: 'qwen2.5:7b',
+      name: 'qwen2.5:7b',
+      provider: 'ollama',
+      description: 'local',
+      capabilities: [],
+      metadata: { family: 'qwen2.5' },
+    });
+    const library = [
+      model({
+        id: 'qwen2.5',
+        name: 'qwen2.5:7b-instruct',
+        provider: 'ollama',
+        description: 'Optimized for qwen2.5 7B.',
+        capabilities: ['tools'],
+        metadata: { details: '7B instruct' },
+      }),
+    ];
+
+    const enriched = enrichInstalledOllamaModel(installed, library);
+    const metadata = enriched.metadata as Record<string, unknown>;
+    expect(enriched.description).toBe('Optimized for qwen2.5 7B.');
+    expect(enriched.capabilities).toEqual(['tools']);
+    expect(metadata['details']).toBe('7B instruct');
+    expect(metadata['family']).toBe('qwen2.5');
+  });
+
   it('blocks agent assignment without tools', () => {
     expect(canAssignRole(model({ supports_tools: false }), 'agent')).toBeFalse();
     expect(roleDisabledReason(model({ supports_tools: false }), 'agent')).toBe('Agent role requires native tool calling.');
@@ -68,5 +133,11 @@ describe('model-selection', () => {
 
   it('allows chat assignment for normal chat models', () => {
     expect(canAssignRole(model(), 'chat')).toBeTrue();
+  });
+
+  it('rejects invalid role assignments when building payloads', () => {
+    expect(() => buildModelSelectionPayload(baseSettings(), 'agent', model({ supports_tools: false }))).toThrowError(
+      'Agent role requires native tool calling.',
+    );
   });
 });

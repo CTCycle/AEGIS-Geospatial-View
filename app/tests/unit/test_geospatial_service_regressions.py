@@ -12,6 +12,7 @@ from server.services.geospatial.layers import LayerProviderService
 from server.services.geospatial.maps import MapService, MapValidationError
 
 
+###############################################################################
 def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
     service = LayerProviderService(
         layer_catalog=(
@@ -32,6 +33,7 @@ def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
     assert entry.provider_name == "MODIS_Combined_Thermal_Anomalies_All"
 
 
+###############################################################################
 def test_map_service_rejects_removed_jawg_map() -> None:
     service = MapService()
 
@@ -43,6 +45,7 @@ def test_map_service_rejects_removed_jawg_map() -> None:
         raise AssertionError("Expected removed Jawg map to be rejected")
 
 
+###############################################################################
 def test_map_service_rejects_removed_thunderforest_map() -> None:
     service = MapService()
 
@@ -54,11 +57,17 @@ def test_map_service_rejects_removed_thunderforest_map() -> None:
         raise AssertionError("Expected removed Thunderforest map to be rejected")
 
 
+###############################################################################
 def test_gibs_service_retries_previous_date_for_known_layer(monkeypatch) -> None:
+
+    ###############################################################################
     class _ReferenceRepository:
+
+        # -------------------------------------------------------------------------
         def load_gibs_layer_native_resolution_map(self) -> dict[str, float]:
             return {}
 
+        # -------------------------------------------------------------------------
         def load_gibs_layer_date_fallback_days_map(self) -> dict[str, int]:
             return {"MODIS_Combined_Thermal_Anomalies_All": 3}
 

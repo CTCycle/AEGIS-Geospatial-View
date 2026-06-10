@@ -19,34 +19,18 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from server.common.constants import (
     REFERENCE_COUNTRIES_TABLE_NAME,
     REFERENCE_COUNTRY_ALIASES_TABLE_NAME,
-    REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME,
     REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME,
     REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME,
+    REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME,
     REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME,
     REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME,
 )
-
 
 ###############################################################################
 class Base(DeclarativeBase):
     pass
 
-
 ###############################################################################
-class GibsLayerRecord(Base):
-    __tablename__ = "gibs_layers"
-
-    layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
-    title: Mapped[str | None] = mapped_column(String(512))
-    abstract: Mapped[str | None] = mapped_column(Text)
-    projections: Mapped[str | None] = mapped_column(Text)
-    source_urls: Mapped[str | None] = mapped_column(Text)
-    tile_matrix_sets: Mapped[str | None] = mapped_column(Text)
-    meters_per_pixel: Mapped[str | None] = mapped_column(Text)
-
-    __table_args__ = (UniqueConstraint("layer_id"),)
-
-
 class ReferenceCountryRecord(Base):
     __tablename__ = REFERENCE_COUNTRIES_TABLE_NAME
 
@@ -54,6 +38,7 @@ class ReferenceCountryRecord(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
 
 
+###############################################################################
 class ReferenceCountryAliasRecord(Base):
     __tablename__ = REFERENCE_COUNTRY_ALIASES_TABLE_NAME
 
@@ -68,6 +53,7 @@ class ReferenceCountryAliasRecord(Base):
     __table_args__ = (Index("ix_reference_country_aliases_iso2", "iso2"),)
 
 
+###############################################################################
 class ReferenceGeospatialLayerRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
 
@@ -77,6 +63,7 @@ class ReferenceGeospatialLayerRecord(Base):
     provider: Mapped[str | None] = mapped_column(String(64))
 
 
+###############################################################################
 class ReferenceGeospatialLayerAliasRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME
 
@@ -94,6 +81,7 @@ class ReferenceGeospatialLayerAliasRecord(Base):
     __table_args__ = (Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),)
 
 
+###############################################################################
 class ReferenceGeospatialLayerKeywordRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME
 
@@ -114,6 +102,7 @@ class ReferenceGeospatialLayerKeywordRecord(Base):
     )
 
 
+###############################################################################
 class ReferenceGibsTileMatrixSetRecord(Base):
     __tablename__ = REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME
 
@@ -121,6 +110,7 @@ class ReferenceGibsTileMatrixSetRecord(Base):
     meters_per_pixel: Mapped[float] = mapped_column(Float, nullable=False)
 
 
+###############################################################################
 class ReferenceGibsLayerDefaultRecord(Base):
     __tablename__ = REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME
 
@@ -129,6 +119,7 @@ class ReferenceGibsLayerDefaultRecord(Base):
     date_fallback_days: Mapped[int | None] = mapped_column(Integer)
 
 
+###############################################################################
 class ModelProviderSettingsRecord(Base):
     __tablename__ = "model_provider_settings"
 
@@ -160,6 +151,20 @@ class ModelProviderSettingsRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+###############################################################################
+class CredentialEncryptionMaterial(Base):
+    __tablename__ = "credential_encryption_materials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key_purpose: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    key_material: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    seeded_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 ###############################################################################
 class ModelCredentialRecord(Base):
@@ -169,7 +174,7 @@ class ModelCredentialRecord(Base):
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
-    key_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
@@ -178,7 +183,6 @@ class ModelCredentialRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
-
 
 ###############################################################################
 class ChatSessionRecord(Base):
@@ -194,7 +198,6 @@ class ChatSessionRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
     last_map_session_json: Mapped[str | None] = mapped_column(Text)
-
 
 ###############################################################################
 class ChatMessageRecord(Base):
@@ -216,26 +219,3 @@ class ChatMessageRecord(Base):
         DateTime, nullable=False, server_default=func.now()
     )
 
-
-###############################################################################
-class ManifestEmbeddingRecord(Base):
-    __tablename__ = "manifest_embeddings"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    manifest_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    manifest_kind: Mapped[str] = mapped_column(String(50), nullable=False)
-    manifest_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    content_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    embedding_provider: Mapped[str] = mapped_column(String(64), nullable=False)
-    embedding_model: Mapped[str] = mapped_column(String(200), nullable=False)
-    last_embedded_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    vector_collection: Mapped[str] = mapped_column(String(120), nullable=False)
-    vector_document_id: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "manifest_id", "manifest_kind", name="ux_manifest_embeddings_manifest"
-        ),
-    )

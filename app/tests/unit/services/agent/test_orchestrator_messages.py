@@ -1,6 +1,7 @@
 from server.services.agent.orchestrator import AgentOrchestrator
 
 
+###############################################################################
 def test_map_session_message_uses_human_readable_labels() -> None:
     message = AgentOrchestrator._compose_map_session_message(
         {
@@ -21,6 +22,7 @@ def test_map_session_message_uses_human_readable_labels() -> None:
     assert "tomtom_traffic_flow" not in message
 
 
+###############################################################################
 def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
     message = AgentOrchestrator._compose_map_session_message(
         {
@@ -38,6 +40,7 @@ def test_map_session_message_humanizes_missing_label_fallbacks() -> None:
     assert "rainviewer_precipitation_radar" not in message
 
 
+###############################################################################
 def test_map_session_message_includes_readable_warnings() -> None:
     message = AgentOrchestrator._compose_map_session_message(
         {
@@ -60,6 +63,7 @@ def test_map_session_message_includes_readable_warnings() -> None:
     assert "TOMTOM_API_KEY" not in message
 
 
+###############################################################################
 def test_direct_coordinate_message_includes_coordinates() -> None:
     message = AgentOrchestrator._compose_direct_tool_message(
         "location_to_coordinates",
@@ -84,6 +88,7 @@ def test_direct_coordinate_message_includes_coordinates() -> None:
     assert "Executed direct tool" not in message
 
 
+###############################################################################
 def test_direct_weather_message_summarizes_current_conditions() -> None:
     message = AgentOrchestrator._compose_direct_tool_message(
         "get_weather_forecast",
@@ -107,13 +112,17 @@ def test_direct_weather_message_summarizes_current_conditions() -> None:
     assert "Executed direct tool" not in message
 
 
+###############################################################################
 def test_parser_runtime_failure_message_is_actionable() -> None:
+
+    ###############################################################################
     class _TurnContract:
         ambiguities = ["parser_unavailable"]
 
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
 
 
+###############################################################################
 def test_general_question_can_answer_previous_user_request() -> None:
     message = AgentOrchestrator._compose_general_question_message(
         "What did I just ask?",

@@ -8,7 +8,8 @@ from uuid import uuid4
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
-from server.common.constants import (
+from server.common.paths import (
+    CHAT_JOBS_ROUTE,
     CHAT_MODELS_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
     CHAT_OLLAMA_PULL_ROUTE,
@@ -17,8 +18,6 @@ from server.common.constants import (
     CHAT_SETTINGS_ROUTE,
     CHAT_STREAM_ROUTE,
     CHAT_TURN_ROUTE,
-    CHAT_VECTORS_REBUILD_ROUTE,
-    CHAT_VECTORS_SYNC_ROUTE,
 )
 from server.domain.chat import (
     ChatStreamEvent,
@@ -31,11 +30,12 @@ from server.domain.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,
-    VectorizationResponse,
 )
+from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
 from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
+from server.services.jobs import BackgroundJobService
 from server.services.llm.errors import LLMConfigurationError
 
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
@@ -47,16 +47,27 @@ def get_chat_runtime(request: Request) -> ChatRuntime:
 
 
 ###############################################################################
+def get_job_service(request: Request) -> BackgroundJobService:
+    return request.app.state.job_service
+
+
+###############################################################################
+def get_chat_streaming_service(request: Request) -> ChatStreamingService:
+    return request.app.state.chat_streaming_service
+
+###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
 
 
+###############################################################################
 def _ensure_request_id(payload: ChatTurnRequest) -> ChatTurnRequest:
     if payload.request_id:
         return payload
     return payload.model_copy(update={"request_id": f"chat-{uuid4().hex[:12]}"})
 
 
+###############################################################################
 async def _serialize_chat_event_stream(
     streaming_service: ChatStreamingService,
     payload: ChatTurnRequest,
@@ -64,6 +75,20 @@ async def _serialize_chat_event_stream(
     payload = _ensure_request_id(payload)
     async for event in streaming_service.stream_turn(payload):
         yield _stream_event(event)
+
+
+###############################################################################
+@router.post(
+    CHAT_JOBS_ROUTE,
+    response_model=BackgroundJobCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_chat_job(
+    payload: ChatTurnRequest,
+    job_service: BackgroundJobService = Depends(get_job_service),
+) -> BackgroundJobCreateResponse:
+    payload = _ensure_request_id(payload)
+    return job_service.create_chat_job(payload)
 
 
 ###############################################################################
@@ -92,9 +117,8 @@ async def chat_turn(
 )
 async def chat_stream(
     payload: ChatTurnRequest,
-    runtime: ChatRuntime = Depends(get_chat_runtime),
+    streaming_service: ChatStreamingService = Depends(get_chat_streaming_service),
 ) -> StreamingResponse:
-    streaming_service = ChatStreamingService(runtime.agent_orchestrator)
     return StreamingResponse(
         _serialize_chat_event_stream(streaming_service, payload),
         media_type="application/x-ndjson",
@@ -187,30 +211,6 @@ def pull_ollama_model(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc) or "Ollama pull failed",
         ) from exc
-
-
-###############################################################################
-@router.post(
-    CHAT_VECTORS_REBUILD_ROUTE,
-    response_model=VectorizationResponse,
-    status_code=status.HTTP_200_OK,
-)
-def rebuild_vectors(
-    runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> VectorizationResponse:
-    return runtime.maintenance_service.rebuild_vectors()
-
-
-###############################################################################
-@router.post(
-    CHAT_VECTORS_SYNC_ROUTE,
-    response_model=VectorizationResponse,
-    status_code=status.HTTP_200_OK,
-)
-def sync_vectors(
-    runtime: ChatRuntime = Depends(get_chat_runtime),
-) -> VectorizationResponse:
-    return runtime.maintenance_service.sync_vectors()
 
 
 ###############################################################################

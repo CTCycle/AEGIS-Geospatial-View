@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -16,6 +16,10 @@ import {
   SelectedModelStat,
   buildModelSelectionPayload,
   buildSelectedModelStats,
+  enrichInstalledOllamaModel,
+  mergeModelCards,
+  modelDisplayDescription,
+  modelRoleStatusLabel,
 } from '../core/model-selection';
 import {
   ModelCardDescriptor,
@@ -66,6 +70,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   searchText: string;
   statusText: string;
   isLoadingModels = false;
+  isRefreshingOllama = false;
 
   isKeysModalOpen = false;
   isOllamaModalOpen = false;
@@ -85,6 +90,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
     private readonly router: Router,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     this.state = this.appStateStore.getSettingsPage();
     const query = new URLSearchParams(window.location.search);
@@ -101,6 +107,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.viewStateSync.restoreWindowScroll(this.state.scrollY);
+    if (this.providerFilter === 'all') {
+      this.resetModelGridScroll();
+      return;
+    }
     this.viewStateSync.restoreElementScroll(this.modelGridRef?.nativeElement, this.state.modelGridScrollTop);
   }
 
@@ -112,10 +122,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   get displayedModels(): ModelCardDescriptor[] {
     const source = (() => {
       if (this.providerFilter === 'all') {
-        return this.mergeModelLists(this.localModels, this.cloudModels);
+        return mergeModelCards(this.localModels, this.cloudModels);
       }
       if (this.providerFilter === 'ollama') {
-        return this.mergeModelLists(
+        return mergeModelCards(
           this.localModels,
           this.cloudModels.filter((model) => model.provider === 'ollama'),
         );
@@ -205,6 +215,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google'): void {
     this.providerFilter = filter;
+    this.resetModelGridScroll();
     this.syncState();
   }
 
@@ -223,7 +234,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.settings = updated;
       this.providerMode = updated.active_provider_mode;
-      this.statusText = `Selected ${model.name} for ${this.roleLabel(role)}`;
+      this.statusText = `Selected ${model.name} for ${modelRoleStatusLabel(role)}`;
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
@@ -278,6 +289,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async refreshOllamaLibrary(): Promise<void> {
+    if (this.isRefreshingOllama) {
+      return;
+    }
+    this.isRefreshingOllama = true;
+    this.statusText = 'Refreshing Ollama library';
+    this.syncState();
     try {
       await this.apiClient.refreshOllamaModels();
       await this.loadData();
@@ -288,6 +305,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaModalStatusText = detail;
+    } finally {
+      this.isRefreshingOllama = false;
     }
   }
 
@@ -367,14 +386,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   modelDescription(model: ModelCardDescriptor): string {
-    const description = model.description.trim();
-    if (description && description.toLowerCase() !== 'local') {
-      return description;
-    }
-    if (model.provider === 'ollama') {
-      return `Installed Ollama model available for parser, chat, and agent duties. ${this.modelDetails(model)}`;
-    }
-    return description || 'Model available for assignment.';
+    return modelDisplayDescription(model);
   }
 
   private credentialHealth(provider: 'openai' | 'google'): string | null {
@@ -419,7 +431,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.cloudModels = modelLibrary.cloud;
-      this.localModels = modelLibrary.local.map((model) => this.enrichInstalledOllamaModel(model, modelLibrary.cloud));
+      this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
       this.statusText = 'Ready';
       this.syncQueryState();
       this.syncState();
@@ -434,6 +446,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.isLoadingModels = false;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -469,88 +482,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.apiClient.updateChatSettings(payload);
   }
 
-  private mergeModelLists(...groups: ModelCardDescriptor[][]): ModelCardDescriptor[] {
-    const models = new Map<string, ModelCardDescriptor>();
-    groups.flat().forEach((model) => {
-      const key = `${model.provider}:${model.id}`;
-      const current = models.get(key);
-      models.set(key, current ? this.mergeModelCard(current, model) : model);
-    });
-    return [...models.values()];
-  }
-
-  private mergeModelCard(current: ModelCardDescriptor, next: ModelCardDescriptor): ModelCardDescriptor {
-    const currentDescription = current.description.trim();
-    const nextDescription = next.description.trim();
-    const richerDescription = nextDescription.length > currentDescription.length ? nextDescription : currentDescription;
-    return {
-      ...current,
-      ...next,
-      description: richerDescription || current.description || next.description,
-      capabilities: next.capabilities.length ? next.capabilities : current.capabilities,
-      metadata: { ...current.metadata, ...next.metadata },
-    };
-  }
-
-  private enrichInstalledOllamaModel(model: ModelCardDescriptor, library: ModelCardDescriptor[]): ModelCardDescriptor {
-    if (model.provider !== 'ollama') {
-      return model;
-    }
-    const libraryMatch = this.findOllamaLibraryMatch(model, library);
-    if (!libraryMatch) {
-      return model;
-    }
-    return {
-      ...model,
-      description: libraryMatch.description,
-      metadata: { ...libraryMatch.metadata, ...model.metadata },
-      capabilities: model.capabilities.length ? model.capabilities : libraryMatch.capabilities,
-    };
-  }
-
-  private findOllamaLibraryMatch(model: ModelCardDescriptor, library: ModelCardDescriptor[]): ModelCardDescriptor | undefined {
-    const modelKeys = new Set([
-      model.id.toLowerCase(),
-      model.name.toLowerCase(),
-      this.baseModelName(model.id),
-      this.baseModelName(model.name),
-      String(model.metadata['family'] ?? '').toLowerCase(),
-    ].filter(Boolean));
-    return library.find((candidate) => (
-      candidate.provider === 'ollama'
-      && (
-        modelKeys.has(candidate.id.toLowerCase())
-        || modelKeys.has(candidate.name.toLowerCase())
-        || modelKeys.has(this.baseModelName(candidate.id))
-        || modelKeys.has(this.baseModelName(candidate.name))
-      )
-    ));
-  }
-
-  private baseModelName(value: string): string {
-    return value.toLowerCase().split('/').pop()?.split(':')[0] ?? '';
-  }
-
-  private modelDetails(model: ModelCardDescriptor): string {
-    const details = String(model.metadata['details'] ?? '').trim();
-    if (details) {
-      return details;
-    }
-    return model.name;
-  }
-
   private settingsUpdateBase(): ModelSettingsUpdateRequest {
     return buildSettingsUpdateBase(this.settings);
   }
 
-  private roleLabel(role: ModelRole): string {
-    if (role === 'parser') {
-      return 'parser';
-    }
-    if (role === 'chat') {
-      return 'chat';
-    }
-    return 'agent';
+  private resetModelGridScroll(): void {
+    this.state.modelGridScrollTop = 0;
+    this.modelGridRef?.nativeElement.scrollTo({ top: 0 });
   }
 
   private syncState(): void {

@@ -1,19 +1,14 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Any
 
+from server.domain.geospatial.registry import RuntimeRegistrySnapshot
 from server.repositories.credentials import CredentialRepository
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 
-@dataclass(frozen=True)
-class RuntimeRegistrySnapshot:
-    profiles: dict[str, dict[str, Any]]
-    manifests: dict[str, dict[str, Any]]
-
-
+###############################################################################
 class RuntimeRegistry:
     CREDENTIAL_ENV_BY_PROVIDER = {
         "arcgis": "ARCGIS_API_KEY",
@@ -36,6 +31,7 @@ class RuntimeRegistry:
         "windy_webcams": "WINDY_WEBCAMS_API_KEY",
     }
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -46,12 +42,14 @@ class RuntimeRegistry:
         self._credentials_repo = credentials_repo
         self._snapshot: RuntimeRegistrySnapshot | None = None
 
+    # -------------------------------------------------------------------------
     @property
     def credentials_repo(self) -> CredentialRepository:
         if self._credentials_repo is None:
             self._credentials_repo = CredentialRepository()
         return self._credentials_repo
 
+    # -------------------------------------------------------------------------
     def build_snapshot(self) -> RuntimeRegistrySnapshot:
         manifest = self.manifest_loader.load_all()
         profiles = {
@@ -68,18 +66,22 @@ class RuntimeRegistry:
         self._snapshot = RuntimeRegistrySnapshot(profiles=profiles, manifests=manifests)
         return self._snapshot
 
+    # -------------------------------------------------------------------------
     def _ensure(self) -> RuntimeRegistrySnapshot:
         return self._snapshot or self.build_snapshot()
 
+    # -------------------------------------------------------------------------
     def _profile(self, capability_id: str) -> dict[str, Any] | None:
         return self._ensure().profiles.get(str(capability_id))
 
+    # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):
             return False
         return bool(profile.get("enabled_by_default", False))
 
+    # -------------------------------------------------------------------------
     def credentials_present(self, capability_id: str) -> bool:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):
@@ -102,6 +104,7 @@ class RuntimeRegistry:
         except Exception:
             return False
 
+    # -------------------------------------------------------------------------
     def supports_mode(self, capability_id: str, mode: str) -> bool:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):
@@ -113,6 +116,7 @@ class RuntimeRegistry:
             return bool(profile.get("supports_direct_text", False))
         return False
 
+    # -------------------------------------------------------------------------
     def provider_health(self, capability_id: str) -> str:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):
@@ -123,6 +127,7 @@ class RuntimeRegistry:
             return "missing_credentials"
         return "healthy"
 
+    # -------------------------------------------------------------------------
     def handler_name(self, capability_id: str) -> str | None:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):
@@ -132,6 +137,7 @@ class RuntimeRegistry:
             return None
         return value.strip() or None
 
+    # -------------------------------------------------------------------------
     def coverage_policy(self, capability_id: str) -> str:
         profile = self._profile(capability_id)
         if not isinstance(profile, dict):

@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import sqlalchemy
-from typing import TYPE_CHECKING
 
 from server.common.logger import logger
 from server.configurations import DatabaseSettings, get_server_settings
+from server.repositories.catalog.reference_seeder import (
+    ReferenceCatalogSeeder,
+    ReferenceSeedResult,
+)
+from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
-from server.services.catalog.reference_seeder import ReferenceCatalogSeeder, ReferenceSeedResult
-
-if TYPE_CHECKING:
-    from server.repositories.database.backend import DatabaseBackend
+from server.services.catalog.loader import load_reference_catalog
 
 
+###############################################################################
 def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings().database
     repository = SQLiteRepository(resolved_settings)
@@ -21,6 +23,7 @@ def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None
     logger.info("Ensured local SQLite schema at %s", repository.db_path)
 
 
+###############################################################################
 def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings().database
     repository = PostgresRepository(resolved_settings)
@@ -34,7 +37,10 @@ def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
         )
 
 
-def initialize_database(database: DatabaseBackend | DatabaseSettings | None = None) -> None:
+###############################################################################
+def initialize_database(
+    database: DatabaseBackend | DatabaseSettings | None = None,
+) -> None:
     if database is None or isinstance(database, DatabaseSettings):
         resolved_settings = database or get_server_settings().database
         if resolved_settings.embedded_database:
@@ -52,5 +58,7 @@ def initialize_database(database: DatabaseBackend | DatabaseSettings | None = No
     logger.info("Ensured relational schema using active database backend.")
 
 
+###############################################################################
 def seed_reference_catalog(database: DatabaseBackend) -> ReferenceSeedResult:
-    return ReferenceCatalogSeeder(database).seed_if_needed()
+    catalog = load_reference_catalog()
+    return ReferenceCatalogSeeder(database).seed_if_needed(catalog)

@@ -10,6 +10,8 @@ from server.services.llm.errors import LLMConfigurationError
 
 ###############################################################################
 class ChatStreamingService:
+
+    # -------------------------------------------------------------------------
     def __init__(self, agent_orchestrator: AgentOrchestrator) -> None:
         self.agent_orchestrator = agent_orchestrator
 
@@ -22,12 +24,18 @@ class ChatStreamingService:
         )
         try:
             result = await self.agent_orchestrator.run_turn(payload)
-            for token in result.assistant_message.split():
-                yield ChatStreamEvent(event="assistant_delta", data={"delta": f"{token} "})
-            if result.tool_payload is not None:
+            yield ChatStreamEvent(event="parsed", data=self._build_parsed_payload(result))
+            yield ChatStreamEvent(event="policy", data=self._build_policy_payload(result))
+            for event in self._build_tool_lifecycle_events(result):
+                yield event
+            if result.map_session is not None:
                 yield ChatStreamEvent(
-                    event="tool_status",
-                    data=self._build_tool_status_payload(result),
+                    event="map_session_created",
+                    data={
+                        "request_id": result.request_id,
+                        "session_id": result.session_id,
+                        "map_session": result.map_session.model_dump(mode="json"),
+                    },
                 )
             yield ChatStreamEvent(
                 event="final",
@@ -60,27 +68,91 @@ class ChatStreamingService:
                     "request_id": request_id,
                 },
             )
-    
+
     # -------------------------------------------------------------------------
-    def _build_tool_status_payload(self, response: ChatTurnResponse) -> dict[str, Any]:
-        tool_payload = response.tool_payload
-        if not isinstance(tool_payload, dict):
-            return {"available": False}
-        satellite_imagery = tool_payload.get("satellite_imagery")
-        map_session = tool_payload.get("map_session")
-        overlay_count = 0
-        if isinstance(map_session, dict):
-            overlays = map_session.get("overlays")
-            if isinstance(overlays, list):
-                overlay_count = len(overlays)
+    @staticmethod
+    def _build_parsed_payload(response: ChatTurnResponse) -> dict[str, Any]:
         return {
-            "available": True,
-            "execution": tool_payload.get("execution"),
-            "has_satellite_imagery": isinstance(satellite_imagery, dict),
-            "has_map_session": isinstance(map_session, dict),
-            "overlay_count": overlay_count,
+            "request_id": response.request_id,
+            "session_id": response.session_id,
+            "task_class": response.turn_contract.task_class,
+            "action_id": response.turn_contract.normalized_action.action_id,
+            "requires_location": response.turn_contract.normalized_action.requires_location,
+            "location_signal_count": len(response.turn_contract.location_signals),
+            "ambiguities": list(response.turn_contract.ambiguities),
         }
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_policy_payload(response: ChatTurnResponse) -> dict[str, Any]:
+        return {
+            "request_id": response.request_id,
+            "session_id": response.session_id,
+            "state": response.decision.plan.state,
+            "mode": response.decision.plan.mode,
+            "action_id": response.decision.plan.action_id,
+            "trace_steps": list(response.decision.trace.steps),
+            "has_clarification": response.decision.clarification is not None,
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_tool_lifecycle_events(response: ChatTurnResponse) -> list[ChatStreamEvent]:
+        tool_payload = response.tool_payload
+        if not isinstance(tool_payload, dict):
+            return []
+        tool_calls = tool_payload.get("tool_calls")
+        tool_results = tool_payload.get("tool_results")
+        if not isinstance(tool_calls, list) or not isinstance(tool_results, list):
+            return []
+
+        result_by_call_id: dict[str, dict[str, Any]] = {}
+        for result in tool_results:
+            if not isinstance(result, dict):
+                continue
+            tool_call_id = result.get("tool_call_id")
+            if isinstance(tool_call_id, str):
+                result_by_call_id[tool_call_id] = result
+
+        events: list[ChatStreamEvent] = []
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, dict):
+                continue
+            tool_call_id = tool_call.get("id")
+            if not isinstance(tool_call_id, str):
+                continue
+            events.append(
+                ChatStreamEvent(
+                    event="tool_call_started",
+                    data={
+                        "request_id": response.request_id,
+                        "session_id": response.session_id,
+                        "tool_call_id": tool_call_id,
+                        "name": tool_call.get("name"),
+                        "arguments": tool_call.get("arguments"),
+                    },
+                )
+            )
+            tool_result = result_by_call_id.get(tool_call_id)
+            if tool_result is None:
+                continue
+            events.append(
+                ChatStreamEvent(
+                    event="tool_call_completed",
+                    data={
+                        "request_id": response.request_id,
+                        "session_id": response.session_id,
+                        "tool_call_id": tool_call_id,
+                        "name": tool_result.get("name") or tool_call.get("name"),
+                        "ok": bool(not tool_result.get("is_error")),
+                        "error": tool_result.get("error"),
+                        "content": tool_result.get("content"),
+                    },
+                )
+            )
+        return events
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _serialize_chat_turn_response(response: ChatTurnResponse) -> dict[str, Any]:
         return {
@@ -89,6 +161,9 @@ class ChatStreamingService:
             "assistant_message": response.assistant_message,
             "turn_contract": response.turn_contract.model_dump(mode="json"),
             "decision": response.decision.model_dump(mode="json"),
+            "operation": response.operation.model_dump(mode="json")
+            if response.operation is not None
+            else None,
             "map_session": response.map_session.model_dump(mode="json")
             if response.map_session is not None
             else None,

@@ -20,10 +20,12 @@ from tests.e2e.helpers.chat_stub_payloads import (
 )
 
 
+###############################################################################
 def _json_ok(route: Route, payload: dict) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
 
+###############################################################################
 def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
     state: dict[str, object] = {"turn_count": 0, "last_session_id": session_id}
 
@@ -102,10 +104,12 @@ def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
     return state
 
 
+###############################################################################
 def _prepare_test_dirs(artifact_root: Path, test_id: str) -> dict[str, Path]:
     return ensure_test_artifact_dirs(artifact_root, test_id)
 
 
+###############################################################################
 def test_documented_session_map_search_happy_path(
     page: Page, base_url: str, artifact_root: Path
 ) -> None:
@@ -164,6 +168,7 @@ def test_documented_session_map_search_happy_path(
     )
 
 
+###############################################################################
 def test_documented_session_follow_up_reuses_session(
     page: Page, base_url: str, artifact_root: Path
 ) -> None:
@@ -208,6 +213,7 @@ def test_documented_session_follow_up_reuses_session(
     )
 
 
+###############################################################################
 def test_documented_session_ambiguity_requires_clarification(
     page: Page, base_url: str, artifact_root: Path
 ) -> None:
@@ -237,6 +243,7 @@ def test_documented_session_ambiguity_requires_clarification(
     )
 
 
+###############################################################################
 def test_documented_session_direct_coordinates_no_map_session(
     page: Page, base_url: str, artifact_root: Path
 ) -> None:
@@ -271,6 +278,7 @@ def test_documented_session_direct_coordinates_no_map_session(
     )
 
 
+###############################################################################
 def test_documented_session_settings_roundtrip_and_restore(
     page: Page, base_url: str, artifact_root: Path
 ) -> None:

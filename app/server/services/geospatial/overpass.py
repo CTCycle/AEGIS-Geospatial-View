@@ -14,18 +14,22 @@ from urllib.request import Request, urlopen
 from server.configurations import get_server_settings
 
 
+###############################################################################
 class OverpassServiceError(Exception):
     """Base exception for Overpass failures."""
 
 
+###############################################################################
 class OverpassRequestError(OverpassServiceError):
     """Raised when Overpass cannot fulfill a request."""
 
 
+###############################################################################
 class OverpassRateLimitError(OverpassServiceError):
     """Raised when Overpass rejects a request due to rate limits."""
 
 
+###############################################################################
 class OverpassService:
     DEFAULT_AMENITIES = (
         "cafe",
@@ -39,6 +43,7 @@ class OverpassService:
         "supermarket",
     )
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -76,6 +81,7 @@ class OverpassService:
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._last_request_at = 0.0
 
+    # -------------------------------------------------------------------------
     async def get_nearby_poi(
         self,
         *,
@@ -153,6 +159,7 @@ class OverpassService:
             "attribution": "© OpenStreetMap contributors (ODbL)",
         }
 
+    # -------------------------------------------------------------------------
     def _query_overpass(
         self,
         *,
@@ -203,6 +210,7 @@ class OverpassService:
         self._cache_set(cache_key, data)
         return data
 
+    # -------------------------------------------------------------------------
     def _cache_get(self, cache_key: str) -> dict[str, Any] | None:
         with self._lock:
             cached = self._cache.get(cache_key)
@@ -214,10 +222,12 @@ class OverpassService:
                 return None
             return dict(payload)
 
+    # -------------------------------------------------------------------------
     def _cache_set(self, cache_key: str, payload: dict[str, Any]) -> None:
         with self._lock:
             self._cache[cache_key] = (time.time(), payload)
 
+    # -------------------------------------------------------------------------
     def _wait_for_rate_limit_slot(self) -> None:
         with self._lock:
             now = time.time()
@@ -227,6 +237,7 @@ class OverpassService:
         with self._lock:
             self._last_request_at = time.time()
 
+    # -------------------------------------------------------------------------
     def _haversine_distance_m(
         self, lat1: float, lon1: float, lat2: float, lon2: float
     ) -> float:

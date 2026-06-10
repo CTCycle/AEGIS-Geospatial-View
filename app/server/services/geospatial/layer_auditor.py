@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from server.common.constants import PROJECT_DIR
+from server.common.paths import PROJECT_DIR
 from server.domain.geographics import (
     CapabilityImplementationStatus,
     CapabilityKind,
@@ -50,12 +50,12 @@ PLACEHOLDER_STATUSES = {
     "requires-local-source",
 }
 PROVIDER_SOURCE_DIR = (
-    Path(PROJECT_DIR) / "server" / "services" / "geospatial" / "providers"
+    PROJECT_DIR / "server" / "services" / "geospatial" / "providers"
 )
-API_SOURCE_PATH = Path(PROJECT_DIR) / "server" / "api" / "geospatial.py"
-CLIENT_SOURCE_DIR = Path(PROJECT_DIR) / "client" / "src" / "app"
-TEST_SOURCE_DIR = Path(PROJECT_DIR) / "tests" / "unit"
-VISUAL_TEST_SOURCE_DIR = Path(PROJECT_DIR) / "client" / "e2e"
+API_SOURCE_PATH = PROJECT_DIR / "server" / "api" / "geospatial.py"
+CLIENT_SOURCE_DIR = PROJECT_DIR / "client" / "src" / "app"
+TEST_SOURCE_DIR = PROJECT_DIR / "tests" / "unit"
+VISUAL_TEST_SOURCE_DIR = PROJECT_DIR / "client" / "e2e"
 CLIENT_RENDERING_MODES = {
     "camera-points",
     "choropleth",
@@ -74,6 +74,7 @@ PROVIDER_SOURCE_ALIASES = {
 BASEMAP_TEST_MARKERS = ("basemap", "tile")
 
 
+###############################################################################
 def _read_json(path: Path) -> JsonDict:
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -82,6 +83,7 @@ def _read_json(path: Path) -> JsonDict:
     return payload
 
 
+###############################################################################
 def _add_issue(
     report: LayerAuditReport,
     *,
@@ -104,6 +106,7 @@ def _add_issue(
         report.warning_count += 1
 
 
+###############################################################################
 def _manifest_paths(root_path: Path) -> list[Path]:
     paths: list[Path] = []
     for directory in MANIFEST_DIRECTORIES:
@@ -114,12 +117,14 @@ def _manifest_paths(root_path: Path) -> list[Path]:
     return paths
 
 
+###############################################################################
 def _read_text_if_exists(path: Path) -> str:
     if not path.is_file():
         return ""
     return path.read_text(encoding="utf-8")
 
 
+###############################################################################
 def _combined_text(paths: list[Path]) -> str:
     chunks: list[str] = []
     for path in paths:
@@ -127,6 +132,7 @@ def _combined_text(paths: list[Path]) -> str:
     return "\n".join(chunks)
 
 
+###############################################################################
 def _python_files(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
@@ -138,6 +144,7 @@ def _python_files(root: Path) -> list[Path]:
     ]
 
 
+###############################################################################
 def _client_files(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
@@ -150,6 +157,7 @@ def _client_files(root: Path) -> list[Path]:
     ]
 
 
+###############################################################################
 def _provider_source(provider_id: str) -> str:
     provider_filename = PROVIDER_SOURCE_ALIASES.get(
         provider_id,
@@ -158,10 +166,12 @@ def _provider_source(provider_id: str) -> str:
     return _read_text_if_exists(PROVIDER_SOURCE_DIR / f"{provider_filename}.py")
 
 
+###############################################################################
 def _placeholder_statuses(source: str) -> list[str]:
     return sorted(status for status in PLACEHOLDER_STATUSES if status in source)
 
 
+###############################################################################
 def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
     metadata = manifest.metadata if isinstance(manifest.metadata, dict) else {}
     return manifest.capability_kind == CapabilityKind.BASEMAP and bool(
@@ -169,10 +179,12 @@ def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
     )
 
 
+###############################################################################
 def _basemap_unit_tested(test_source: str) -> bool:
     return all(marker in test_source for marker in BASEMAP_TEST_MARKERS)
 
 
+###############################################################################
 def _status_for_manifest(
     manifest: CapabilityManifestV2,
     *,
@@ -214,6 +226,7 @@ def _status_for_manifest(
     )
 
 
+###############################################################################
 def _contains_secret_value(value: Any) -> bool:
     if isinstance(value, dict):
         for key, nested in value.items():
@@ -231,10 +244,12 @@ def _contains_secret_value(value: Any) -> bool:
     return False
 
 
+###############################################################################
 def _increment(counter: dict[str, int], key: str) -> None:
     counter[key] = counter.get(key, 0) + 1
 
 
+###############################################################################
 def _record_coverage(manifest: CapabilityManifestV2, report: LayerAuditReport) -> None:
     _increment(report.schema_coverage, f"schema_v{manifest.version}")
     _increment(report.provider_coverage, manifest.provider)
@@ -246,6 +261,7 @@ def _record_coverage(manifest: CapabilityManifestV2, report: LayerAuditReport) -
     )
 
 
+###############################################################################
 def _validate_index(root_path: Path, report: LayerAuditReport) -> None:
     path = root_path / "index.json"
     try:
@@ -263,6 +279,7 @@ def _validate_index(root_path: Path, report: LayerAuditReport) -> None:
         )
 
 
+###############################################################################
 def _validate_auth_policy(
     path: Path, manifest: CapabilityManifestV2, report: LayerAuditReport
 ) -> None:
@@ -285,6 +302,7 @@ def _validate_auth_policy(
         )
 
 
+###############################################################################
 def _validate_renderability(
     path: Path, manifest: CapabilityManifestV2, report: LayerAuditReport
 ) -> None:
@@ -346,6 +364,7 @@ def _validate_renderability(
         )
 
 
+###############################################################################
 def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
     try:
         payload = _read_json(path)
@@ -394,12 +413,13 @@ def _validate_manifest(path: Path, report: LayerAuditReport) -> None:
     _validate_renderability(path, manifest, report)
 
 
+###############################################################################
 def audit_all_manifests(
     strict: bool = False,
     root_path: str | os.PathLike[str] | None = None,
     production: bool = False,
 ) -> LayerAuditReport:
-    root = Path(root_path or Path(PROJECT_DIR) / "resources" / "catalog")
+    root = Path(root_path) if root_path is not None else PROJECT_DIR / "resources" / "catalog"
     report = LayerAuditReport()
     _validate_index(root, report)
     manifest_items: list[tuple[Path, CapabilityManifestV2]] = []
@@ -509,11 +529,13 @@ def audit_all_manifests(
     return report
 
 
+###############################################################################
 def _format_report(report: LayerAuditReport) -> str:
     payload = report.model_dump()
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
+###############################################################################
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Audit geospatial manifest schema v2.")
     parser.add_argument("--strict", action="store_true", help="Fail on any audit issue.")

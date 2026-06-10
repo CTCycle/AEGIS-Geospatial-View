@@ -12,6 +12,7 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 
 
+###############################################################################
 def _tool(name: str = "lookup") -> LLMToolDefinition:
     return LLMToolDefinition(
         name=name,
@@ -24,24 +25,33 @@ def _tool(name: str = "lookup") -> LLMToolDefinition:
     )
 
 
+###############################################################################
 class _Provider:
+
+    # -------------------------------------------------------------------------
     def __init__(self, responses: list[LLMResult]) -> None:
         self.responses = responses
         self.requests: list[Any] = []
 
+    # -------------------------------------------------------------------------
     def chat(self, request):
         self.requests.append(request)
         return self.responses.pop(0)
 
 
+###############################################################################
 class _Factory:
+
+    # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> _Provider:
         return self.provider
 
 
+###############################################################################
 def test_native_tool_loop_executes_single_tool_call() -> None:
     async def _run() -> None:
         provider = _Provider(
@@ -77,6 +87,7 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
     async def _run() -> None:
         provider = _Provider(
@@ -110,6 +121,7 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_native_tool_loop_stops_at_max_iterations() -> None:
     async def _run() -> None:
         provider = _Provider(
@@ -147,6 +159,7 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> None:
     async def _run() -> None:
         provider = _Provider(

@@ -9,12 +9,18 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.http import JsonFetcher, call_json_fetcher, fetch_json_url
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
+)
 
 
+###############################################################################
 class EurostatProvider(GeospatialProvider):
     provider_id = "eurostat"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -28,6 +34,7 @@ class EurostatProvider(GeospatialProvider):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         metadata = _metadata(request)
         if request.capability_id == "eurostat_nuts_regions":
@@ -65,6 +72,7 @@ class EurostatProvider(GeospatialProvider):
             attribution=[str(metadata.get("attribution") or "Eurostat")],
         )
 
+    # -------------------------------------------------------------------------
     async def _validated_response(
         self,
         request: ProviderRequest,
@@ -110,11 +118,13 @@ class EurostatProvider(GeospatialProvider):
         return _response(request, metadata, {**payload, "jsonStatMetadata": normalized})
 
 
+###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
     return dict(value) if isinstance(value, dict) else {}
 
 
+###############################################################################
 def _response(
     request: ProviderRequest,
     metadata: dict[str, Any],
@@ -133,6 +143,7 @@ def _response(
     )
 
 
+###############################################################################
 def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
@@ -150,6 +161,7 @@ def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
     }
 
 
+###############################################################################
 def _build_choropleth_payload(
     request: ProviderRequest, metadata: dict[str, Any]
 ) -> dict[str, Any]:
@@ -188,6 +200,7 @@ def _build_choropleth_payload(
     }
 
 
+###############################################################################
 def _legend_bins(values: list[float]) -> list[dict[str, float]]:
     if not values:
         return []

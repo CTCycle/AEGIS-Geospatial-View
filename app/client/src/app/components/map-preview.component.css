@@ -133,6 +133,14 @@
     font-size: 0.72rem;
 }
 
+.metadata-panel--errors {
+    top: auto;
+    bottom: 7.25rem;
+    background: rgb(58 18 26 / 90%);
+    border-color: rgb(248 113 113 / 28%);
+    color: #fee2e2;
+}
+
 .metadata-panel p,
 .legend-panel p {
     margin: 0;

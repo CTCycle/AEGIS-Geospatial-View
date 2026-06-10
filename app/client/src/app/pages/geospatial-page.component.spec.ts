@@ -30,6 +30,7 @@ describe('pages/geospatial-page.component', () => {
       parser_confidence: 0.9,
     },
     decision: { plan: { state: 'reject', action_id: 'x', overlay_ids: [] } },
+    operation: { kind: 'rejection', status: 'failed', message: 'ok', warnings: [] },
     memory_snapshot: {},
     ...overrides,
   });
@@ -73,6 +74,7 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Search executed successfully.',
+      operation: { kind: 'direct_answer', status: 'success', message: 'Search executed successfully.', warnings: [] },
       map_session: null,
       context_usage: {
         estimated_input_tokens: 120,
@@ -119,6 +121,7 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Which location should I use?',
+      operation: { kind: 'clarification', status: 'partial', message: 'Which location should I use?', warnings: [] },
       decision: { plan: { state: 'clarify', action_id: 'weather', overlay_ids: [] } },
       map_session: null,
       tool_payload: null,
@@ -136,6 +139,13 @@ describe('pages/geospatial-page.component', () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Coordinates: 41.8902, 12.4922',
+      operation: {
+        kind: 'direct_answer',
+        status: 'success',
+        message: 'Coordinates: 41.8902, 12.4922',
+        direct_result: { latitude: 41.8902, longitude: 12.4922 },
+        warnings: [],
+      },
       decision: { plan: { state: 'direct_tool', action_id: 'location_lookup', overlay_ids: [], tool_id: 'location_to_coordinates' } },
       tool_payload: { tool_id: 'location_to_coordinates', result: { latitude: 41.8902, longitude: 12.4922 } },
       map_session: null,
@@ -148,6 +158,65 @@ describe('pages/geospatial-page.component', () => {
     expect(component.status).toBe('Complete');
     expect(component.mapSession).toBeUndefined();
     expect(component.messages.at(-1)?.content).toContain('Coordinates: 41.8902, 12.4922');
+  });
+
+  it('prefers operation.map_session over the top-level response map_session', async () => {
+    sendChatTurnMock.and.resolveTo(makeTurnResponse({
+      assistant_message: 'Map ready.',
+      operation: {
+        kind: 'map_session',
+        status: 'success',
+        message: 'Map ready.',
+        warnings: [],
+        map_session: {
+          session_id: 'operation-map',
+          resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+          basemap_id: 'osm_default',
+          overlay_ids: ['safe_overlay'],
+          viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+          center: { latitude: 41.9, longitude: 12.5 },
+          overlays: [{ id: 'safe_overlay', label: 'Safe overlay', provider: 'fixture', type: 'geojson', url: '/api/geospatial/layers/safe_overlay/features' }],
+        },
+      },
+      map_session: {
+        session_id: 'fallback-map',
+        resolved_location: { label: 'Leaky Rome', latitude: 41.9, longitude: 12.5 },
+        basemap_id: 'osm_default',
+        overlay_ids: ['leaky_overlay'],
+        viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+        center: { latitude: 41.9, longitude: 12.5 },
+        overlays: [{ id: 'leaky_overlay', label: 'Leaky overlay', provider: 'fixture', type: 'tile', url: 'https://tiles.example/{z}/{x}/{y}.png?api_key=forbidden-secret' }],
+      },
+    }));
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show Rome';
+
+    await component.sendMessage();
+
+    expect(component.mapSession?.session_id).toBe('operation-map');
+    expect(component.mapSession?.overlay_ids).toEqual(['safe_overlay']);
+    expect(JSON.stringify(component.payload)).not.toContain('forbidden-secret');
+    expect(JSON.stringify(component.payload)).not.toContain('api_key=');
+  });
+
+  it('operation-driven failures set Failed status even without reject plan state', async () => {
+    sendChatTurnMock.and.resolveTo(makeTurnResponse({
+      session_id: 42,
+      assistant_message: 'Tool timed out.',
+      operation: { kind: 'error', status: 'failed', message: 'Tool timed out.', warnings: [] },
+      decision: { plan: { state: 'direct_response', action_id: 'weather', overlay_ids: [] } },
+      map_session: null,
+      tool_payload: null,
+    }));
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'show weather';
+    await component.sendMessage();
+    expect(component.status).toBe('Failed');
+    expect(component.messages.at(-1)?.content).toContain('Tool timed out.');
   });
 
   it('request nonce blocks stale response overwrite', async () => {
@@ -174,6 +243,22 @@ describe('pages/geospatial-page.component', () => {
     await component.sendMessage();
     expect(component.status).toBe('Failed');
     expect(component.messages.at(-1)?.content).toBe('fallback error');
+  });
+
+  it('operation-aware alerts include structured failure message', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.status = 'Failed';
+    component.lastOperation = {
+      kind: 'error',
+      status: 'failed',
+      message: 'Tool timed out.',
+      warnings: [],
+    };
+    component.messages = [{ role: 'assistant', content: 'Tool timed out.' }];
+
+    expect(component.activeAlertItems).toContain('Tool timed out.');
   });
 
   it('startNewChat clears session and map/chat state', () => {

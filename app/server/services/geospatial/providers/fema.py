@@ -7,9 +7,11 @@ from server.services.geospatial.providers.base import (
 )
 
 
+###############################################################################
 class FEMAProvider(GeospatialProvider):
     provider_id = "fema"
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         return ProviderResponse(
             capability_id=request.capability_id,

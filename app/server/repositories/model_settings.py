@@ -4,18 +4,21 @@ import json
 
 from sqlalchemy import select
 
-from server.common.time import utc_now_naive
 from server.common.constants import (
     DEFAULT_MODEL_NAME,
     DEFAULT_MODEL_PROVIDER,
     DEFAULT_MODEL_PROVIDER_MODE,
     OLLAMA_DEFAULT_HOST,
 )
+from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
 
+###############################################################################
 class ModelSettingsRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend
         ensure_schema = getattr(backend, "ensure_schema", None)
@@ -23,6 +26,7 @@ class ModelSettingsRepository:
             ensure_schema()
         self._session_factory = backend.session
 
+    # -------------------------------------------------------------------------
     def get_or_create(self) -> ModelProviderSettingsRecord:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
@@ -51,6 +55,7 @@ class ModelSettingsRepository:
             session.refresh(record)
             return record
 
+    # -------------------------------------------------------------------------
     def update(
         self,
         *,

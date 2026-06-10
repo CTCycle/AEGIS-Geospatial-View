@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.services.cryptography import CredentialEncryptionService
 
 
+###############################################################################
 def test_credential_crypto_roundtrip() -> None:
     service = CredentialEncryptionService(
         master_key="unit-test-master-key", key_version="v1"

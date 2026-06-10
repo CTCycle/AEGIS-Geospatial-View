@@ -1,26 +1,34 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import threading
 import time
 from datetime import UTC, datetime
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
+from server.services.geospatial.providers.base import ProviderUnavailableError
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
+)
 
 
+###############################################################################
 class RainViewerServiceError(Exception):
     """Base exception for RainViewer failures."""
 
 
+###############################################################################
 class RainViewerRequestError(RainViewerServiceError):
     """Raised when RainViewer metadata cannot be fetched."""
 
 
+###############################################################################
 class RainViewerService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -32,6 +40,7 @@ class RainViewerService:
         tile_color_scheme: int | None = None,
         tile_smooth: int | None = None,
         tile_snow: int | None = None,
+        fetcher: JsonFetcher | None = None,
     ) -> None:
         settings = get_server_settings().rainviewer
         self.metadata_url = metadata_url or settings.metadata_url
@@ -55,12 +64,14 @@ class RainViewerService:
             tile_smooth if tile_smooth is not None else settings.tile_smooth
         )
         self.tile_snow = tile_snow if tile_snow is not None else settings.tile_snow
+        self.fetcher = fetcher or fetch_json_url
         self._lock = threading.Lock()
         self._last_call = 0.0
         self._cache: tuple[float, dict[str, Any]] | None = None
 
+    # -------------------------------------------------------------------------
     async def get_latest_radar_metadata(self) -> dict[str, Any]:
-        payload = await asyncio.to_thread(self._fetch_metadata_payload)
+        payload = await self._fetch_metadata_payload()
         radar = payload.get("radar") if isinstance(payload.get("radar"), dict) else {}
         past = radar.get("past") if isinstance(radar.get("past"), list) else []
         nowcast = radar.get("nowcast") if isinstance(radar.get("nowcast"), list) else []
@@ -87,28 +98,26 @@ class RainViewerService:
             "attribution": "© RainViewer",
         }
 
-    def _fetch_metadata_payload(self) -> dict[str, Any]:
+    # -------------------------------------------------------------------------
+    async def _fetch_metadata_payload(self) -> dict[str, Any]:
         cached = self._cache_get()
         if cached is not None:
             return cached
-        self._wait_for_rate_limit_slot()
-        request = Request(self.metadata_url, headers={"User-Agent": self.user_agent})
+        await self._wait_for_rate_limit_slot()
         try:
-            with urlopen(request, timeout=self.timeout_s) as response:
-                payload = response.read().decode("utf-8")
-        except (HTTPError, URLError, TimeoutError) as exc:
+            data = await call_json_fetcher(
+                self.fetcher,
+                self.metadata_url,
+                {"User-Agent": self.user_agent},
+            )
+        except ProviderUnavailableError as exc:
             raise RainViewerRequestError(f"RainViewer request failed: {exc}") from exc
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError as exc:
-            raise RainViewerRequestError(
-                "RainViewer response was not valid JSON."
-            ) from exc
         if not isinstance(data, dict):
             raise RainViewerRequestError("RainViewer response payload is malformed.")
         self._cache_set(data)
         return data
 
+    # -------------------------------------------------------------------------
     def _cache_get(self) -> dict[str, Any] | None:
         with self._lock:
             if self._cache is None:
@@ -119,15 +128,17 @@ class RainViewerService:
                 return None
             return dict(payload)
 
+    # -------------------------------------------------------------------------
     def _cache_set(self, payload: dict[str, Any]) -> None:
         with self._lock:
             self._cache = (time.time(), payload)
 
-    def _wait_for_rate_limit_slot(self) -> None:
+    # -------------------------------------------------------------------------
+    async def _wait_for_rate_limit_slot(self) -> None:
         with self._lock:
             now = time.time()
             delay = self.min_call_interval_s - (now - self._last_call)
         if delay > 0:
-            time.sleep(delay)
+            await asyncio.sleep(delay)
         with self._lock:
             self._last_call = time.time()
