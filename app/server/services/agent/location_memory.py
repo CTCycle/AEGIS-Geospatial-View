@@ -5,6 +5,7 @@ import re
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.extraction.models import LocationSignal, NormalizedAction
 
+
 ###############################################################################
 class LocationMemoryService:
     REFERENCE_PATTERN = re.compile(r"\b(there|that place|same place|same area|there now)\b", re.IGNORECASE)

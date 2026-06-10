@@ -102,7 +102,7 @@ class BackgroundJobState:
     stop_requested: bool = False
 
 
-from datetime import UTC, datetime  # noqa: E402
+from datetime import UTC  # noqa: E402
 
 
 @dataclass

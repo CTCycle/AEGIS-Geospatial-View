@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 AGENT_EXTRACTION_PROMPT = """
 Role:
 You are the parser model. You extract only the Stage-A structured routing action.

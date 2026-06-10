@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Literal
 
+from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
-    LLMDisallowedPattern,
     LLMLocationSignal,
     LLMParserExtraction,
-    LLMTemporalSignal,
 )
 from server.domain.extraction.models import (
     ConversationContextSnapshot,

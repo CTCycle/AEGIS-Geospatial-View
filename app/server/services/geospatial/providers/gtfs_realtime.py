@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from google.transit import gtfs_realtime_pb2
+
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -16,6 +17,7 @@ from server.services.geospatial.providers.http import (
     call_bytes_fetcher,
     fetch_bytes_url,
 )
+
 
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"

@@ -6,6 +6,8 @@ import logging
 import time
 from typing import Any
 
+from server.domain.geographics import MapSession
+
 from server.domain.agent.execution import (
     AgentExecutionContext,
     AgentToolLoopRequest,
@@ -16,7 +18,6 @@ from server.services.llm.factory import LLMFactory
 from server.services.llm.types import (
     LLMRequest,
     LLMToolCall,
-    LLMToolDefinition,
     LLMToolResult,
 )
 

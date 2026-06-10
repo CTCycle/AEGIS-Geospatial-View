@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from collections.abc import Iterable, Iterator, Sequence
+from dataclasses import replace
 from html.parser import HTMLParser
 from typing import Any, TextIO
 from urllib.error import HTTPError, URLError
@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.context_budget import compute_ollama_context_usage
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -17,7 +18,6 @@ from server.services.llm.types import (
     LLMToolDefinition,
     ModelDescriptor,
 )
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
 
 class _OllamaLibraryParser(HTMLParser):

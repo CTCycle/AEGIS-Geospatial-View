@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Callable
-from dataclasses import dataclass
 from time import monotonic
 from typing import Any
 
@@ -50,7 +49,6 @@ from server.services.geospatial.providers.tomtom import TomTomProvider
 from server.services.geospatial.providers.transitland import TransitlandProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
-
 
 ProviderFactory = Callable[[], GeospatialProvider]
 

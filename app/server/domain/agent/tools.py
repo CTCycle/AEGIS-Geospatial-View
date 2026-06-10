@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.agent.actions import AgentAction
 from server.domain.llm.types import LLMToolDefinition
 
+
 ###############################################################################
 class AgentToolName(str, Enum):
     SEARCH_MAPS = "search_maps"

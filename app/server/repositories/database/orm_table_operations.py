@@ -4,8 +4,8 @@ from typing import Any
 
 from sqlalchemy import UniqueConstraint, func, inspect, select
 
-from server.repositories.schemas import Base
 from server.common.logger import logger
+from server.repositories.schemas import Base
 
 
 class SqlAlchemyTableOperationsMixin:

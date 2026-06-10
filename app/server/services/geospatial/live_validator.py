@@ -5,7 +5,6 @@ import asyncio
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from typing import Any, Callable
 
 from server.domain.geospatial.providers import ProviderRequest
@@ -22,7 +21,6 @@ from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderError,
 )
-
 
 PUBLIC_LIVE_CHECKS = (
     LiveCheck(

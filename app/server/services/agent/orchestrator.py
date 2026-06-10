@@ -6,9 +6,8 @@ from uuid import uuid4
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
-from server.domain.geographics import MapSession
 from server.domain.extraction.models import LocationSignal
-from server.services.chat.history_service import ChatHistoryService
+from server.domain.geographics import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.location_memory import LocationMemoryService
@@ -22,6 +21,7 @@ from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.chat.history_service import ChatHistoryService
 from server.services.llm.factory import LLMFactory
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder

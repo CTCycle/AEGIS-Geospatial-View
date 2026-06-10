@@ -6,8 +6,8 @@ from typing import Any
 from server.configurations import get_server_settings
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.postgres import PostgresRepository
-from server.repositories.schemas import Base
 from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.schemas import Base
 
 
 class AEGISDatabase:

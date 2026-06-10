@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 from server.domain.catalog import ReferenceCatalog
 from server.repositories.database.contracts import DatabaseBackend

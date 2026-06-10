@@ -10,9 +10,8 @@ from server.domain.chat import (
     OllamaRefreshResponse,
 )
 from server.services.chat.model_library import ChatModelLibraryService
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.ollama import OllamaProvider
-
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
 OllamaProviderFactory = Callable[[str, OllamaToolCapabilityCache], OllamaProvider]
 

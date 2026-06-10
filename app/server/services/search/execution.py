@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.common.constants import MAP_SEARCH_STATUS_MESSAGE
 from server.domain.geographics import (
     GeospatialCatalogResponse,
     LocationSearchRequest,
@@ -9,7 +10,6 @@ from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.osm_tiles import OsmTileProxyError, OsmTileProxyService
 from server.services.search.errors import MapSearchTileProxyError
 from server.services.search.orchestrator import LocationSearchOrchestrator
-from server.common.constants import MAP_SEARCH_STATUS_MESSAGE
 
 
 class MapSearchExecutionService:

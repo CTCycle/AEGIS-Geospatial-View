@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from server.domain.gibs import Capabilities, LayerMetadata
 from server.common.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
@@ -25,6 +24,7 @@ from server.common.constants import (
     ORIGIN_SHIFT,
 )
 from server.common.logger import logger
+from server.domain.gibs import Capabilities, LayerMetadata
 from server.services.geospatial.gibs_errors import (
     GIBSPayloadIntegrityError,
     GIBSRequestError,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.location_resolver import LocationResolver
@@ -14,7 +15,6 @@ from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.chat.settings_service import ChatSettingsService
 from server.services.geospatial.runtime_registry import RuntimeRegistry
-from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.search.orchestrator import LocationSearchOrchestrator

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from server.domain.extraction.models import TurnParseResult
 from server.domain.agent.decision import ResolvedLocation
+from server.domain.extraction.models import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 

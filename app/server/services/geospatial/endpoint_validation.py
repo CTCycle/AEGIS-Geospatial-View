@@ -7,6 +7,7 @@ from urllib.request import Request, urlopen
 
 from server.domain.geospatial.validation import EndpointValidationResult
 
+
 ###############################################################################
 class EndpointValidationService:
     """Performs sampled, read-only health checks for manifest endpoints."""

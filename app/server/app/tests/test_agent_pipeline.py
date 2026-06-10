@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from server.domain.agent.decision import (
-    ExecutionPlan,
     PolicyDecision,
     ResolvedLocation,
 )
@@ -18,12 +16,10 @@ from server.domain.extraction.models import NormalizedAction, TurnParseResult
 from server.domain.geographics import MapSession, ViewportPolicy
 from server.services.agent.native_tool_loop import (
     AgentToolLoopResult,
-    LLMToolCall,
     LLMToolResult,
     NativeToolLoop,
 )
 from server.services.agent.orchestrator import AgentOrchestrator
-
 
 ###############################################################################
 # Helpers

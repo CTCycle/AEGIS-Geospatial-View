@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 
 from cryptography.fernet import Fernet
-from sqlalchemy import select, update as sqlalchemy_update
+from sqlalchemy import select
+from sqlalchemy import update as sqlalchemy_update
 
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import CredentialEncryptionMaterial

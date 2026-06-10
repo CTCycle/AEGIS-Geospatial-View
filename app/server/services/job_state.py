@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from time import monotonic
 from typing import Any
 
 from server.domain.jobs import BackgroundJobState

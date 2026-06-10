@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-import json
 
 from server.common.constants import OPENAQ_API_BASE_URL
 from server.common.logger import logger
-
 
 __all__ = [
     "OpenAQService",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.ollama import OllamaProvider
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import ModelDescriptor
 
 

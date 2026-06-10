@@ -4,13 +4,13 @@ import json
 
 from sqlalchemy import select
 
-from server.common.time import utc_now_naive
 from server.common.constants import (
     DEFAULT_MODEL_NAME,
     DEFAULT_MODEL_PROVIDER,
     DEFAULT_MODEL_PROVIDER_MODE,
     OLLAMA_DEFAULT_HOST,
 )
+from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 

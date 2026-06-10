@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -18,6 +17,7 @@ from server.common.constants import (
 from server.domain.chat import ChatTurnRequest
 from server.domain.geographics import LocationSearchRequest
 from server.domain.jobs import (
+    BackgroundJob,
     BackgroundJobCreateResponse,
     BackgroundJobEvent,
     BackgroundJobEventsResponse,
@@ -27,7 +27,8 @@ from server.domain.jobs import (
 from server.services.chat.streaming import ChatStreamingService
 
 
-from server.domain.jobs import BackgroundJob
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class BackgroundJobService:

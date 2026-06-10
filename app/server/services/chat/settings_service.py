@@ -10,8 +10,8 @@ from server.domain.chat import (
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
-from server.services.cryptography import CredentialEncryptionService
 from server.services.chat.model_library import ChatModelLibraryService
+from server.services.cryptography import CredentialEncryptionService
 
 
 class ChatSettingsValidationError(ValueError):
