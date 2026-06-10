@@ -14,12 +14,14 @@ from server.repositories.schemas.models import (
 )
 
 
+###############################################################################
 def _to_json_payload(value: Any) -> str | None:
     if value is None:
         return None
     return json.dumps(value, default=str)
 
 
+###############################################################################
 def _from_json_payload(value: str | None) -> Any:
     if not value:
         return None
@@ -30,11 +32,14 @@ def _from_json_payload(value: str | None) -> Any:
 
 ###############################################################################
 class ChatHistoryRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend
         Base.metadata.create_all(backend.engine)
         self._session_factory = backend.session
 
+    # -------------------------------------------------------------------------
     def _to_message_dict(self, row: ChatMessageRecord) -> dict[str, Any]:
         return {
             "id": row.id,
@@ -48,6 +53,7 @@ class ChatHistoryRepository:
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
 
+    # -------------------------------------------------------------------------
     def create_session(self, *, title: str | None = None) -> ChatSessionRecord:
         with self._session_factory() as session:
             record = ChatSessionRecord(title=title, status="active")
@@ -56,6 +62,7 @@ class ChatHistoryRepository:
             session.refresh(record)
             return record
 
+    # -------------------------------------------------------------------------
     def get_session(self, session_id: int) -> ChatSessionRecord | None:
         with self._session_factory() as session:
             statement = select(ChatSessionRecord).where(
@@ -63,6 +70,7 @@ class ChatHistoryRepository:
             )
             return session.execute(statement).scalars().first()
 
+    # -------------------------------------------------------------------------
     def upsert_session(
         self, session_id: int | None, *, title: str | None = None
     ) -> ChatSessionRecord:
@@ -86,12 +94,14 @@ class ChatHistoryRepository:
             session.refresh(record)
             return record
 
+    # -------------------------------------------------------------------------
     def append_message(
         self,
         *,
         session_id: int,
         role: str,
         content: str,
+        request_id: str | None = None,
         structured_payload: Any = None,
         tool_payload: Any = None,
         map_session: Any = None,
@@ -108,7 +118,9 @@ class ChatHistoryRepository:
                 turn_index=turn_index,
                 role=role,
                 content=content,
-                structured_payload_json=_to_json_payload(structured_payload),
+                structured_payload_json=_to_json_payload(
+                    self._with_request_id(structured_payload, request_id)
+                ),
                 tool_payload_json=_to_json_payload(tool_payload),
                 map_session_json=_to_json_payload(map_session),
             )
@@ -122,17 +134,20 @@ class ChatHistoryRepository:
             session.refresh(message)
             return message
 
-    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
-        with self._session_factory() as session:
-            statement = (
-                select(ChatMessageRecord)
-                .where(ChatMessageRecord.session_id == session_id)
-                .order_by(ChatMessageRecord.turn_index.desc())
-                .limit(max(1, limit))
-            )
-            rows = list(reversed(session.execute(statement).scalars().all()))
-        return [self._to_message_dict(row) for row in rows]
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _with_request_id(structured_payload: Any, request_id: str | None) -> Any:
+        if request_id is None:
+            return structured_payload
+        if structured_payload is None:
+            return {"request_id": request_id}
+        if isinstance(structured_payload, dict):
+            payload = dict(structured_payload)
+            payload.setdefault("request_id", request_id)
+            return payload
+        return structured_payload
 
+    # -------------------------------------------------------------------------
     def _last_assistant_payload(self, session_id: int) -> dict[str, Any] | None:
         with self._session_factory() as session:
             statement = (
@@ -150,22 +165,19 @@ class ChatHistoryRepository:
         payload = _from_json_payload(row.structured_payload_json)
         return payload if isinstance(payload, dict) else None
 
-    def get_latest_turn_contract(self, session_id: int) -> dict[str, Any] | None:
-        payload = self._last_assistant_payload(session_id)
-        if not isinstance(payload, dict):
-            return None
-        contract = payload.get("turn_contract")
-        return contract if isinstance(contract, dict) else None
+    # -------------------------------------------------------------------------
+    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
+        with self._session_factory() as session:
+            statement = (
+                select(ChatMessageRecord)
+                .where(ChatMessageRecord.session_id == session_id)
+                .order_by(ChatMessageRecord.turn_index.desc())
+                .limit(max(1, limit))
+            )
+            rows = list(reversed(session.execute(statement).scalars().all()))
+        return [self._to_message_dict(row) for row in rows]
 
-    def get_latest_memory_snapshot(self, session_id: int) -> dict[str, Any]:
-        payload = self._last_assistant_payload(session_id)
-        if not isinstance(payload, dict):
-            return {"location_slots": [], "active_location": None}
-        snapshot = payload.get("memory_snapshot")
-        if not isinstance(snapshot, dict):
-            return {"location_slots": [], "active_location": None}
-        return snapshot
-
+    # -------------------------------------------------------------------------
     def get_last_assistant_message(self, session_id: int) -> dict[str, Any] | None:
         with self._session_factory() as session:
             statement = (
@@ -182,6 +194,7 @@ class ChatHistoryRepository:
             return None
         return self._to_message_dict(row)
 
+    # -------------------------------------------------------------------------
     def list_messages(self, *, session_id: int) -> list[dict[str, Any]]:
         with self._session_factory() as session:
             statement = (
@@ -191,3 +204,5 @@ class ChatHistoryRepository:
             )
             rows = session.execute(statement).scalars().all()
             return [self._to_message_dict(row) for row in rows]
+
+

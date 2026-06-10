@@ -111,6 +111,18 @@ describe('components/map-preview.component', () => {
     expect(fakeMap.fitBounds).not.toHaveBeenCalled();
   });
 
+  it('creates a MapLibre map only when center coordinates are finite numbers', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        center: { latitude: Number.NaN, longitude: 12.4964 },
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(maplibregl.Map).not.toHaveBeenCalled();
+  });
+
   it('rebuilds overlay state from session and emits notice for stale ids', () => {
     component.initialOverlayVisibility = { stale_overlay: true };
     component.initialOverlayOpacity = { stale_overlay: 0.2 };
@@ -139,6 +151,21 @@ describe('components/map-preview.component', () => {
     expect(emitted.at(-1)?.overlayOpacity['ov1']).toBeCloseTo(0.25, 2);
   });
 
+  it('clamps and ignores invalid overlay opacity values', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'ov1', label: 'Overlay', type: 'tile', provider: 'x', url: 'https://x/{z}/{x}/{y}.png' }],
+      }) as never,
+    };
+    fixture.detectChanges();
+
+    component.setOverlayOpacity('ov1', '250');
+    expect(component.overlayOpacity['ov1']).toBe(1);
+
+    component.setOverlayOpacity('ov1', 'not-a-number');
+    expect(component.overlayOpacity['ov1']).toBe(1);
+  });
+
   it('exposes lightweight zoom controls', () => {
     component.payload = { map_session: makeMapSession() as never };
     fixture.detectChanges();
@@ -153,8 +180,25 @@ describe('components/map-preview.component', () => {
       map_session: makeMapSession({
         overlays: [
           { id: 'tile_1', label: 'Tile', type: 'tile', provider: 'x', url: 'https://tiles/{z}/{x}/{y}.png' },
-          { id: 'wms_1', label: 'WMS', type: 'wms', provider: 'x', url: 'https://wms.example', layers: 'abc' },
-          { id: 'wmts_1', label: 'WMTS', type: 'wmts', provider: 'x', url: 'https://wmts.example', layer_id: 'layer', tile_matrix_set: 'EPSG:3857' },
+          {
+            id: 'wms_1',
+            label: 'WMS',
+            type: 'wms',
+            provider: 'x',
+            url: 'https://wms.example',
+            tile_url_template: 'https://wms.example?service=WMS&request=GetMap&layers=abc',
+            layers: 'abc',
+          },
+          {
+            id: 'wmts_1',
+            label: 'WMTS',
+            type: 'wmts',
+            provider: 'x',
+            url: 'https://wmts.example',
+            tile_url_template: 'https://wmts.example?service=WMTS&request=GetTile&layer=layer',
+            layer_id: 'layer',
+            tile_matrix_set: 'EPSG:3857',
+          },
         ],
       }) as never,
     };
@@ -164,8 +208,31 @@ describe('components/map-preview.component', () => {
       .map((entry) => (entry as { tiles?: string[] }).tiles?.[0])
       .filter((entry): entry is string => typeof entry === 'string');
     expect(sourceTiles.some((url) => url.includes('tiles/{z}/{x}/{y}.png'))).toBeTrue();
-    expect(sourceTiles.some((url) => url.includes('service=WMS'))).toBeTrue();
-    expect(sourceTiles.some((url) => url.includes('service=WMTS'))).toBeTrue();
+    expect(sourceTiles).toContain('https://wms.example?service=WMS&request=GetMap&layers=abc');
+    expect(sourceTiles).toContain('https://wmts.example?service=WMTS&request=GetTile&layer=layer');
+  });
+
+  it('ignores malformed overlays without preventing the base map from rendering', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          { id: 'broken_overlay', label: 'Broken overlay', provider: 'fixture', type: 'mystery' },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(maplibregl.Map).toHaveBeenCalled();
+    const style = (maplibregl.Map as unknown as jasmine.Spy).calls.mostRecent().args[0].style;
+    expect(style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
+    expect(fakeMap.addSource.calls.allArgs().length).toBe(0);
+    expect(component.failedOverlayStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'broken_overlay',
+        status: 'failed',
+      }),
+    ]);
   });
 
   it('renders GeoJSON overlay sources as vector layers', () => {
@@ -235,7 +302,9 @@ describe('components/map-preview.component', () => {
             rendering_mode: 'vector-tile',
             provider: 'natural_earth',
             url: 'https://example.test/tiles/{z}/{x}/{y}.pbf',
+            tile_url_template: 'https://proxy.test/tiles/natural_earth/{z}/{x}/{y}.pbf',
             layer_id: 'admin',
+            source_layer: 'admin_boundaries',
             attribution: 'Natural Earth',
           },
           {
@@ -252,9 +321,68 @@ describe('components/map-preview.component', () => {
     const vectorSource = fakeMap.addSource.calls.allArgs()
       .map((args) => args[1] as { type?: string; tiles?: string[] })
       .find((source) => source.type === 'vector');
-    expect(vectorSource?.tiles?.[0]).toContain('.pbf');
+    expect(vectorSource?.tiles?.[0]).toBe('https://proxy.test/tiles/natural_earth/{z}/{x}/{y}.pbf');
+    const vectorLayer = fakeMap.addLayer.calls.allArgs()
+      .map((args) => args[0] as { id?: string; ['source-layer']?: string })
+      .find((layer) => layer.id === 'overlay-layer-natural_earth');
+    expect(vectorLayer?.['source-layer']).toBe('admin_boundaries');
     expect(component.metadataOnlyOverlays.map((overlay) => overlay.id)).toContain('parcel_template');
     expect(component.attributionEntries).toContain('Natural Earth');
+  });
+
+  it('surfaces a layer-specific failure when vector source_layer metadata is missing', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'broken_vector',
+            label: 'Broken vector',
+            type: 'vector-tile',
+            rendering_mode: 'vector-tile',
+            provider: 'fixture',
+            url: 'https://example.test/tiles/{z}/{x}/{y}.pbf',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(maplibregl.Map).toHaveBeenCalled();
+    expect(component.failedOverlayStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'broken_vector',
+        status: 'failed',
+        message: 'Vector tile overlay is missing source_layer metadata.',
+      }),
+    ]);
+  });
+
+  it('disables opacity controls for metadata-only overlays', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'metadata_only',
+            label: 'Metadata only',
+            type: 'metadata-only',
+            rendering_mode: 'metadata-only',
+            provider: 'fixture',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    const opacityInput = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement | null;
+    expect(component.overlayRenderStatuses).toEqual([
+      jasmine.objectContaining({
+        overlayId: 'metadata_only',
+        status: 'metadata-only',
+      }),
+    ]);
+    expect(opacityInput?.disabled).toBeTrue();
   });
 
   it('does not crash when map session is absent', () => {
@@ -272,6 +400,31 @@ describe('components/map-preview.component', () => {
     expect(iframe).not.toBeNull();
     expect(iframe?.getAttribute('srcdoc')).toContain('<h1>Map</h1>');
     expect(iframe?.getAttribute('srcdoc')).not.toContain('SafeValue must use [property]=');
+  });
+
+  it('does not materialize credential-bearing URLs into chosen map session state or source definitions', () => {
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [
+          {
+            id: 'safe_overlay',
+            label: 'Safe overlay',
+            type: 'geojson',
+            provider: 'fixture',
+            url: '/api/geospatial/layers/safe_overlay/features',
+            data_format: 'GeoJSON',
+            geometry_type: 'Point',
+          },
+        ],
+      }) as never,
+    };
+
+    fixture.detectChanges();
+
+    expect(JSON.stringify(component.mapSession)).not.toContain('api_key=');
+    expect(JSON.stringify(component.mapSession)).not.toContain('sk_live');
+    expect(JSON.stringify(fakeMap.addSource.calls.allArgs())).not.toContain('api_key=');
+    expect(fixture.nativeElement.outerHTML).not.toContain('api_key=');
   });
 
   it('maps overlay ids directly when overlay descriptors are absent', () => {

@@ -59,5 +59,10 @@ describe('ModelRoleActionsComponent', () => {
     component.onSelect('chat');
     expect(spy).toHaveBeenCalledWith('chat');
   });
+
+  it('includes the disabled reason in the accessible title', () => {
+    expect(component.roleTitle('parser')).toContain('Parser unavailable.');
+    expect(component.roleTitle('parser')).toContain('structured output');
+  });
 });
 

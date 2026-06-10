@@ -1,4 +1,5 @@
 import {
+  ChatOperationResult,
   ChatMessage,
   ChatRole,
   ContextUsage,
@@ -8,8 +9,9 @@ import {
   PolicyDecision,
   SearchResponsePayload,
 } from './types';
+import { isRecord } from './type-guards';
 
-const STORAGE_KEY = 'aegis:webapp-state:v3';
+export const APP_STATE_STORAGE_KEY = 'aegis:webapp-state:v3';
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
@@ -21,6 +23,7 @@ export interface PersistedChatPanelState {
   conversationNonce: number;
   messages: ChatMessage[];
   lastDecision?: PolicyDecision;
+  lastOperation?: ChatOperationResult;
   memorySnapshot?: Record<string, unknown>;
   mapSession?: MapSession;
   contextUsage?: ContextUsage;
@@ -56,9 +59,6 @@ export interface PersistedAppState {
   chatPage: PersistedChatPageState;
   settingsPage: PersistedSettingsPageState;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
 
 const isProviderMode = (value: unknown): value is ModelProviderMode =>
   value === 'local' || value === 'cloud';
@@ -129,6 +129,7 @@ export const defaultAppState = (): PersistedAppState => ({
       conversationNonce: 1,
       messages: [],
       lastDecision: undefined,
+      lastOperation: undefined,
       memorySnapshot: {},
         mapSession: undefined,
         contextUsage: undefined,
@@ -200,11 +201,11 @@ export const loadPersistedAppState = (): PersistedAppState => {
   if (typeof window === 'undefined') {
     return defaultAppState();
   }
-  const raw = window.sessionStorage.getItem(STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(APP_STATE_STORAGE_KEY);
   let currentTabId = ensureTabId();
   if (hasActiveOwner(currentTabId)) {
     currentTabId = rotateTabId();
-    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(APP_STATE_STORAGE_KEY);
   }
   touchHeartbeat(currentTabId);
   if (!raw) {
@@ -223,7 +224,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
     }
     const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : 0;
     if (!savedAt || Date.now() - savedAt > STATE_TTL_MS) {
-      window.sessionStorage.removeItem(STORAGE_KEY);
+      window.sessionStorage.removeItem(APP_STATE_STORAGE_KEY);
       return {
         ...defaultAppState(),
         tabId: currentTabId,
@@ -231,7 +232,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
     }
 
     if (typeof parsed.tabId !== 'string' || parsed.tabId !== currentTabId) {
-      window.sessionStorage.removeItem(STORAGE_KEY);
+      window.sessionStorage.removeItem(APP_STATE_STORAGE_KEY);
       return {
         ...defaultAppState(),
         tabId: currentTabId,
@@ -271,6 +272,9 @@ export const loadPersistedAppState = (): PersistedAppState => {
           messages: parsePersistedMessages(parsed.chatPage.chatPanel.messages),
           lastDecision: isRecord(parsed.chatPage.chatPanel.lastDecision)
             ? parsed.chatPage.chatPanel.lastDecision as unknown as PolicyDecision
+            : undefined,
+          lastOperation: isRecord(parsed.chatPage.chatPanel.lastOperation)
+            ? parsed.chatPage.chatPanel.lastOperation as unknown as ChatOperationResult
             : undefined,
           memorySnapshot: isRecord(parsed.chatPage.chatPanel.memorySnapshot)
             ? parsed.chatPage.chatPanel.memorySnapshot as Record<string, unknown>
@@ -314,7 +318,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
     }
     return next;
   } catch {
-    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(APP_STATE_STORAGE_KEY);
     return {
       ...defaultAppState(),
       tabId: currentTabId,
@@ -331,7 +335,7 @@ export const persistAppState = (state: PersistedAppState): void => {
     tabId: ensureTabId(),
     savedAt: Date.now(),
   };
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(withTimestamp));
+  window.sessionStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(withTimestamp));
 };
 
 export const startTabHeartbeat = (tabId: string): (() => void) => {
@@ -357,5 +361,5 @@ export const clearPersistedAppState = (): void => {
   if (typeof window === 'undefined') {
     return;
   }
-  window.sessionStorage.removeItem(STORAGE_KEY);
+  window.sessionStorage.removeItem(APP_STATE_STORAGE_KEY);
 };

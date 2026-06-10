@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 
 from server.api.chat import router as chat_router
 from server.api.geospatial import router as geospatial_router
+from server.api.jobs import router as jobs_router
 from server.api.search import router as search_router
-from server.common.constants import (
+from server.common.paths import (
     CLIENT_ASSETS_PATH,
     CLIENT_DIST_PATH,
     CLIENT_INDEX_FILE_PATH,
@@ -22,19 +23,28 @@ from server.common.constants import (
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
 from server.configurations import get_server_settings
+from server.repositories.credential_material import seed_credential_encryption_material
 from server.repositories.database import get_database
-from server.repositories.database.initializer import initialize_database, seed_reference_catalog
+from server.repositories.database.initializer import (
+    initialize_database,
+    seed_reference_catalog,
+)
 from server.services.chat.composition import build_chat_runtime
+from server.services.chat.streaming import ChatStreamingService
+from server.services.geospatial.composition import build_geospatial_runtime
+from server.services.jobs import BackgroundJobService
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
+
 ###############################################################################
 def _client_build_available() -> bool:
-    return Path(CLIENT_INDEX_FILE_PATH).is_file()
+    return CLIENT_INDEX_FILE_PATH.is_file()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
-    client_root = Path(CLIENT_DIST_PATH).resolve()
+    client_root = CLIENT_DIST_PATH.resolve()
     requested_path = (client_root / full_path).resolve()
 
     if not requested_path.is_relative_to(client_root):
@@ -45,9 +55,11 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
+
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
+
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -56,44 +68,58 @@ def serve_client_path(full_path: str) -> FileResponse:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
+
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
 
 
+###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
     database = get_database()
 
     initialize_database(database.backend)
+    seed_credential_encryption_material()
     seed_reference_catalog(database.backend)
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
+    geospatial_runtime = build_geospatial_runtime()
+    chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
+    job_service = BackgroundJobService(
+        chat_streaming_service=chat_streaming_service,
+        map_search_runner=search_runtime.search_execution.orchestrator.execute,
+        polling_interval=settings.jobs.polling_interval,
+    )
+    job_service.start()
 
     application.state.search_runtime = search_runtime
     application.state.chat_runtime = chat_runtime
+    application.state.geospatial_runtime = geospatial_runtime
+    application.state.chat_streaming_service = chat_streaming_service
+    application.state.job_service = job_service
 
     chat_runtime.settings_service.get_settings()
 
-    run_startup_validations(settings)
-
-    if settings.vectors.auto_sync_on_start:
-        chat_runtime.vector_indexer.sync()
+    run_startup_validations()
 
     yield
+    job_service.stop()
 
 
+###############################################################################
 def create_app() -> FastAPI:
     application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
 
     application.include_router(search_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
 
     if _client_build_available():
-        if Path(CLIENT_ASSETS_PATH).is_dir():
+        if CLIENT_ASSETS_PATH.is_dir():
             application.mount(
                 FASTAPI_ASSETS_ENDPOINT,
                 StaticFiles(directory=CLIENT_ASSETS_PATH),

@@ -5,12 +5,16 @@ from server.services.llm.prompts import get_agent_response_prompt
 from server.services.llm.types import LLMRequest
 
 
+###############################################################################
 class PlainResponder:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, llm_factory: LLMFactory, provider: str, model: str) -> None:
         self.llm_factory = llm_factory
         self.provider = provider
         self.model = model
 
+    # -------------------------------------------------------------------------
     def respond(self, user_text: str) -> str:
         provider = self.llm_factory.get_chat_provider(self.provider)
         result = provider.chat(

@@ -18,12 +18,13 @@ from server.common.constants import (
     NOMINATIM_REVERSE_PATH,
     NOMINATIM_SEARCH_PATH,
 )
-from server.configurations import get_server_settings
 from server.common.logger import logger
-
+from server.configurations import get_server_settings
 
 ###############################################################################
 class NominatimService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self, user_agent: str | None = None, timeout: float | None = None
     ) -> None:
@@ -39,7 +40,7 @@ class NominatimService:
         self._reverse_cache: OrderedDict[str, dict[str, Any] | None] = OrderedDict()
         self._max_cache_entries = 128
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def extract_coordinates(
         self,
         address: str | None,
@@ -77,7 +78,7 @@ class NominatimService:
             return None
         return ranked[0]
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     async def extract_bbox_from_coordinates(
         self,
         latitude: float,
@@ -106,7 +107,7 @@ class NominatimService:
             return None
         return [west, south, east, north]
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compose_query(
         self, address: str | None, city: str | None, country_name: str | None
     ) -> str:
@@ -120,7 +121,7 @@ class NominatimService:
                 components.append(country_name)
         return ", ".join(component for component in components if component)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def perform_request(self, params: dict[str, str]) -> list[dict[str, Any]]:
         cache_key = urlencode(sorted(params.items()))
         cached = self._cache_get(self._search_cache, cache_key)
@@ -136,7 +137,7 @@ class NominatimService:
             return []
         return [item for item in data if isinstance(item, dict)]
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def perform_reverse_request(self, params: dict[str, str]) -> dict[str, Any] | None:
         reverse_url = self.resolve_reverse_url()
         cache_key = urlencode(sorted(params.items()))
@@ -153,7 +154,7 @@ class NominatimService:
             return data
         return None
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def _perform_json_request(
         self,
         *,
@@ -180,7 +181,7 @@ class NominatimService:
         self._cache_set(cache, cache_key, data)
         return data
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def _wait_for_rate_limit_slot(self) -> None:
         with self._request_lock:
             now = time.monotonic()
@@ -191,7 +192,7 @@ class NominatimService:
                 time.sleep(remaining)
             self._last_request_started_at = time.monotonic()
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def _cache_get(self, cache: OrderedDict[str, Any], key: str) -> Any:
         with self._request_lock:
             if key not in cache:
@@ -199,7 +200,7 @@ class NominatimService:
             cache.move_to_end(key)
             return cache[key]
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def _cache_set(self, cache: OrderedDict[str, Any], key: str, value: Any) -> None:
         with self._request_lock:
             cache[key] = value
@@ -207,7 +208,7 @@ class NominatimService:
             while len(cache) > self._max_cache_entries:
                 cache.popitem(last=False)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def format_result(
         self,
         data: dict[str, Any],
@@ -254,7 +255,7 @@ class NominatimService:
             result["confidence"] = confidence
         return result
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def _location_type_matches(
         self, *, expected_location_type: str | None, data: dict[str, Any]
     ) -> float:
@@ -286,7 +287,7 @@ class NominatimService:
             return 0.2
         return 0.0
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def rank_candidates(
         self,
         candidates: list[dict[str, Any]],
@@ -326,7 +327,7 @@ class NominatimService:
         scored.sort(key=lambda item: item[0], reverse=True)
         return [item[1] for item in scored]
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compute_confidence(
         self,
         *,
@@ -374,7 +375,7 @@ class NominatimService:
             return 1.0
         return round(combined, 4)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def derive_importance_score(self, importance: Any) -> float:
         try:
             value = float(importance)
@@ -386,7 +387,7 @@ class NominatimService:
             return 1.0
         return max(0.05, min(1.0, value**0.3))
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def derive_text_match_score(
         self,
         data: dict[str, Any],
@@ -446,7 +447,7 @@ class NominatimService:
             )
         return score / total_weight
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def derive_granularity_score(self, place_class: Any, place_type: Any) -> float:
         class_name = str(place_class or "").lower()
         type_name = str(place_type or "").lower()
@@ -481,7 +482,7 @@ class NominatimService:
             return 0.4
         return 0.55
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def derive_bbox_score(self, bounding_box: Any) -> float:
         if not isinstance(bounding_box, list) or len(bounding_box) != 4:
             return 0.5
@@ -509,7 +510,7 @@ class NominatimService:
             return 0.5
         return 0.35
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def tokenize(self, value: str | None) -> list[str]:
         if not value:
             return []
@@ -518,7 +519,7 @@ class NominatimService:
             return []
         return [token for token in normalized_value.split() if token]
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def collect_address_tokens(self, data: dict[str, Any]) -> list[str]:
         address_data = data.get("address")
         if not isinstance(address_data, dict):
@@ -543,7 +544,7 @@ class NominatimService:
                 tokens.extend(self.tokenize(str(value)))
         return tokens
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compute_token_overlap(
         self,
         tokens: list[str],
@@ -589,7 +590,7 @@ class NominatimService:
             return 1.0
         return max(0.2, score)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def derive_structured_alignment_score(
         self,
         address: str | None,
@@ -603,7 +604,7 @@ class NominatimService:
             return 0.0
         return self.compute_token_overlap(address_tokens, structured_tokens)
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def derive_house_number_score(
         self, address: str | None, data: dict[str, Any]
     ) -> float:
@@ -627,7 +628,7 @@ class NominatimService:
                 return 1.0
         return 0.2
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def apply_quality_boosts(
         self,
         combined: float,
@@ -654,7 +655,7 @@ class NominatimService:
             adjusted = max(adjusted, 0.88)
         return adjusted
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compute_city_alignment(
         self,
         city_tokens: list[str],
@@ -697,7 +698,7 @@ class NominatimService:
             return 0.2
         return max(0.2, min(1.0, overlap))
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compute_country_alignment(
         self,
         country_name: str | None,
@@ -738,13 +739,13 @@ class NominatimService:
             return max(0.2, min(1.0, overlap))
         return 0.5
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def normalize_component(self, value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)
         ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
         return " ".join(ascii_text.lower().split())
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compute_similarity_ratio(self, source: str, target: str) -> float:
         normalized_source = self.normalize_component(source)
         normalized_target = self.normalize_component(target)
@@ -754,7 +755,7 @@ class NominatimService:
             return 1.0
         return SequenceMatcher(a=normalized_source, b=normalized_target).ratio()
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def compute_overlap_ratio(self, source: str, target: str) -> float:
         normalized_source = self.normalize_component(source)
         normalized_target = self.normalize_component(target)
@@ -766,7 +767,7 @@ class NominatimService:
             return len(normalized_target) / len(normalized_source)
         return 0.0
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def resolve_reverse_url(self) -> str:
         normalized = self.base_url.rstrip("/")
         if normalized.endswith(NOMINATIM_SEARCH_PATH):

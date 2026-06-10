@@ -1,24 +1,36 @@
 from __future__ import annotations
 
-import json
 import math
 import os
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
-from urllib.request import urlopen
 
 from server.domain.geographics import LocationSearchRequest, MapSession
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 
 
+###############################################################################
 class LocationSearchOrchestrator:
-    def __init__(self, *, capability_registry: CapabilityRegistry | None = None) -> None:
-        self.capability_registry = capability_registry or CapabilityRegistry()
 
+    # -------------------------------------------------------------------------
+    def __init__(
+        self,
+        *,
+        capability_registry: CapabilityRegistry | None = None,
+        rainviewer_service: RainViewerService | None = None,
+    ) -> None:
+        self.capability_registry = capability_registry or CapabilityRegistry()
+        self.rainviewer_service = rainviewer_service or RainViewerService()
+
+    # -------------------------------------------------------------------------
     async def execute(self, payload: LocationSearchRequest) -> MapSession:
         self.capability_registry.load_capabilities()
-        basemap = self._build_basemap_descriptor(payload.basemap_id)
+        basemap = await self._build_basemap_descriptor(payload.basemap_id)
         overlays: list[dict[str, object]] = []
         warnings: list[str] = []
         if (
@@ -29,14 +41,14 @@ class LocationSearchOrchestrator:
             warnings.append(
                 f"{payload.basemap_id}: provider API key is required; falling back to osm_default."
             )
-            basemap = self._build_basemap_descriptor("osm_default")
+            basemap = await self._build_basemap_descriptor("osm_default")
         effective_basemap_id = (
             str(basemap.get("id"))
             if isinstance(basemap, dict) and basemap.get("id")
             else payload.basemap_id
         )
         for overlay_id in payload.overlay_ids:
-            overlay_result = self._build_overlay_descriptor(overlay_id, payload=payload)
+            overlay_result = await self._build_overlay_descriptor(overlay_id, payload=payload)
             if overlay_result is None:
                 warnings.append(f"Overlay '{overlay_id}' is not available in the capability catalog.")
                 continue
@@ -64,12 +76,13 @@ class LocationSearchOrchestrator:
             },
         )
 
-    def _build_basemap_descriptor(self, basemap_id: str) -> dict[str, object] | None:
+    # -------------------------------------------------------------------------
+    async def _build_basemap_descriptor(self, basemap_id: str) -> dict[str, object] | None:
         capability = self.capability_registry.get_capability(basemap_id)
         if capability is None:
             return None
         metadata = self._metadata(capability)
-        tile_url, _ = self._resolve_runtime_tile_url(
+        tile_url, _ = await self._resolve_runtime_tile_url(
             metadata.get("tile_url")
             or metadata.get("tile_url_template")
             or metadata.get("url_template")
@@ -84,7 +97,8 @@ class LocationSearchOrchestrator:
             "attribution": str(metadata.get("attribution") or ""),
         }
 
-    def _build_overlay_descriptor(
+    # -------------------------------------------------------------------------
+    async def _build_overlay_descriptor(
         self, overlay_id: str, *, payload: LocationSearchRequest
     ) -> tuple[dict[str, object], list[str]] | None:
         capability = self.capability_registry.get_capability(overlay_id)
@@ -121,7 +135,26 @@ class LocationSearchOrchestrator:
                 "provider": str(capability.get("provider") or "unknown"),
                 "type": "camera-points",
                 "rendering_mode": "camera-points",
-                "url": f"/api/geospatial/cameras?{urlencode(camera_params)}",
+                "url": f"/api/geospatial/cameras.geojson?{urlencode(camera_params)}",
+                "attribution": str(metadata.get("attribution") or ""),
+                "source_protocol": metadata.get("source_protocol"),
+                "data_format": metadata.get("data_format"),
+                "geometry_type": metadata.get("geometry_type"),
+            }, warnings
+        if (
+            capability_kind in {"dataset-ingestion", "vector-overlay"}
+            and rendering_mode == "vector-tile"
+            and raw_url is None
+        ):
+            warnings.append(
+                f"{overlay_id}: vector tile render metadata is incomplete; exposing metadata only."
+            )
+            return {
+                "id": str(capability.get("id") or overlay_id),
+                "label": str(metadata.get("label") or capability.get("name") or overlay_id),
+                "provider": str(capability.get("provider") or "unknown"),
+                "type": "metadata-only",
+                "rendering_mode": "metadata-only",
                 "attribution": str(metadata.get("attribution") or ""),
                 "source_protocol": metadata.get("source_protocol"),
                 "data_format": metadata.get("data_format"),
@@ -130,7 +163,6 @@ class LocationSearchOrchestrator:
         if capability_kind in {"dataset-ingestion", "vector-overlay"} and rendering_mode in {
             "clustered-points",
             "geojson",
-            "vector-tile",
             "choropleth",
         } and raw_url is None:
             return {
@@ -153,7 +185,7 @@ class LocationSearchOrchestrator:
         if is_point_insight:
             resolved_url, url_warning = None, None
         else:
-            resolved_url, url_warning = self._resolve_runtime_tile_url(
+            resolved_url, url_warning = await self._resolve_runtime_tile_url(
                 raw_url,
                 capability=capability,
             )
@@ -166,10 +198,17 @@ class LocationSearchOrchestrator:
             "type": "point-insight" if is_point_insight else str(capability.get("type") or "tile"),
             "rendering_mode": rendering_mode or ("metadata-only" if is_point_insight else ""),
         }
+        tile_url_template = self._build_backend_render_tile_template(
+            rendering_mode=rendering_mode,
+            resolved_url=resolved_url,
+            metadata=metadata,
+        )
         optional_fields = {
             "url": resolved_url,
+            "tile_url_template": tile_url_template,
             "layers": metadata.get("layers"),
             "layer_id": metadata.get("layer_id"),
+            "source_layer": metadata.get("source_layer") or metadata.get("layer_id"),
             "tile_matrix_set": metadata.get("tile_matrix_set"),
             "wmts_format": metadata.get("wmts_format"),
             "wmts_style": metadata.get("wmts_style"),
@@ -186,12 +225,77 @@ class LocationSearchOrchestrator:
                 descriptor[key] = normalized
         if isinstance(metadata.get("default_opacity"), int | float):
             descriptor["default_opacity"] = float(metadata["default_opacity"])
+        if isinstance(metadata.get("tile_size"), int | float):
+            descriptor["tile_size"] = int(metadata["tile_size"])
+        if isinstance(metadata.get("minzoom"), int | float):
+            descriptor["minzoom"] = int(metadata["minzoom"])
         if descriptor["provider"] == "rainviewer":
             descriptor["maxzoom"] = 10
         if self._is_bounds(metadata.get("bounds")):
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings
 
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_backend_render_tile_template(
+        *,
+        rendering_mode: str,
+        resolved_url: str | None,
+        metadata: dict[str, Any],
+    ) -> str | None:
+        normalized_mode = rendering_mode.lower()
+        if not resolved_url:
+            return None
+        if normalized_mode in {"tile", "raster-tile", "xyz"}:
+            return resolved_url
+        if normalized_mode == "wms":
+            layers = str(metadata.get("layers") or "0")
+            version = str(metadata.get("wms_version") or "1.1.1")
+            exceptions = str(metadata.get("wms_exceptions") or "application/vnd.ogc.se_inimage")
+            separator = "&" if "?" in resolved_url else "?"
+            query = "&".join(
+                [
+                    "service=WMS",
+                    "request=GetMap",
+                    f"layers={layers}",
+                    "styles=",
+                    "format=image/png",
+                    "transparent=true",
+                    f"version={version}",
+                    "srs=EPSG:3857",
+                    f"exceptions={exceptions}",
+                    "bbox={bbox-epsg-3857}",
+                    "width=256",
+                    "height=256",
+                ]
+            )
+            return f"{resolved_url}{separator}{query}"
+        if normalized_mode == "wmts":
+            layer_id = str(metadata.get("layer_id") or metadata.get("layers") or "layer")
+            matrix_set = str(metadata.get("tile_matrix_set") or "EPSG:3857")
+            fmt = str(metadata.get("wmts_format") or "image/png")
+            style = str(metadata.get("wmts_style") or "")
+            separator = "&" if "?" in resolved_url else "?"
+            query = "&".join(
+                [
+                    "service=WMTS",
+                    "request=GetTile",
+                    "version=1.0.0",
+                    f"layer={layer_id}",
+                    f"style={style}",
+                    f"tilematrixset={matrix_set}",
+                    f"tilematrix={matrix_set}:{{z}}",
+                    "tilerow={y}",
+                    "tilecol={x}",
+                    f"format={fmt}",
+                ]
+            )
+            return f"{resolved_url}{separator}{query}"
+        if normalized_mode == "vector-tile":
+            return resolved_url
+        return None
+
+    # -------------------------------------------------------------------------
     def _apply_spatial_placeholders(
         self, value: object, *, payload: LocationSearchRequest
     ) -> object:
@@ -208,6 +312,7 @@ class LocationSearchOrchestrator:
             template = template.replace("{lon}", str(payload.viewport.center_longitude))
         return template
 
+    # -------------------------------------------------------------------------
     def _feature_endpoint_url(
         self, overlay_id: str, *, payload: LocationSearchRequest
     ) -> str:
@@ -215,17 +320,20 @@ class LocationSearchOrchestrator:
             "bbox": self._bbox_query_value(payload),
             "live": "true",
         }
-        return f"/api/geospatial/layers/{overlay_id}/features?{urlencode(params)}"
+        return f"/api/geospatial/layers/{overlay_id}/geojson?{urlencode(params)}"
 
+    # -------------------------------------------------------------------------
     def _bbox_query_value(self, payload: LocationSearchRequest) -> str:
         bounds = payload.viewport.bbox or self._bounds_from_viewport(payload.viewport) or []
         return ",".join(str(round(float(item), 6)) for item in bounds)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = capability.get("metadata")
         return dict(metadata) if isinstance(metadata, dict) else {}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _optional_string(value: object) -> str | None:
         if not isinstance(value, str):
@@ -233,6 +341,7 @@ class LocationSearchOrchestrator:
         stripped = value.strip()
         return stripped or None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _bounds_from_viewport(viewport: Any) -> list[float] | None:
         latitude = getattr(viewport, "center_latitude", None)
@@ -252,24 +361,24 @@ class LocationSearchOrchestrator:
             min(90.0, float(latitude) + lat_delta),
         ]
 
-    @classmethod
-    def _resolve_runtime_tile_url(
-        cls,
+    # -------------------------------------------------------------------------
+    async def _resolve_runtime_tile_url(
+        self,
         value: object,
         *,
         capability: dict[str, Any] | None = None,
     ) -> tuple[str | None, str | None]:
-        template = cls._optional_string(value)
+        template = self._optional_string(value)
         if template is None:
             return None, "Tile URL is missing from provider metadata."
-        template, credential_warning = cls._resolve_credential_placeholders(
+        template, credential_warning = self._resolve_credential_placeholders(
             template, capability
         )
         if credential_warning is not None:
             return None, credential_warning
         if "{time}" not in template:
             return template, None
-        rainviewer_url = cls._resolve_rainviewer_tile_url()
+        rainviewer_url = await self._resolve_rainviewer_tile_url()
         if rainviewer_url is not None:
             return rainviewer_url, None
         timestamp = int(datetime.now(UTC).timestamp())
@@ -279,6 +388,7 @@ class LocationSearchOrchestrator:
             "RainViewer metadata could not be fetched; using a timestamp fallback.",
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _resolve_credential_placeholders(
         cls,
@@ -288,6 +398,7 @@ class LocationSearchOrchestrator:
         if "{api_key}" not in template:
             return template, None
         provider = str((capability or {}).get("provider") or "").strip().lower()
+        capability_id = str((capability or {}).get("id") or "").strip()
         env_by_provider = {
             "arcgis": "ARCGIS_API_KEY",
             "census": "CENSUS_API_KEY",
@@ -303,37 +414,29 @@ class LocationSearchOrchestrator:
         api_key = os.getenv(env_name, "").strip()
         if not api_key:
             return template, f"{env_name} is required to render this provider tile layer."
-        return template.replace("{api_key}", api_key), None
+        if capability_id:
+            return f"/api/geospatial/tiles/{capability_id}/{{z}}/{{x}}/{{y}}.png", None
+        return template, f"Credentialed tile capability for provider '{provider}' is missing a stable id."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _credential_env_for_provider(provider: str) -> str | None:
         return {
             "windy_webcams": "WINDY_WEBCAMS_API_KEY",
         }.get(provider.strip().lower())
 
-    @staticmethod
-    def _resolve_rainviewer_tile_url() -> str | None:
+    # -------------------------------------------------------------------------
+    async def _resolve_rainviewer_tile_url(self) -> str | None:
         try:
-            with urlopen(  # noqa: S310
-                "https://api.rainviewer.com/public/weather-maps.json",
-                timeout=2,
-            ) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except Exception:
+            metadata = await self.rainviewer_service.get_latest_radar_metadata()
+        except RainViewerRequestError:
             return None
-        radar = payload.get("radar") if isinstance(payload, dict) else None
-        past = radar.get("past") if isinstance(radar, dict) else None
-        if not isinstance(past, list) or not past:
+        tile_url = metadata.get("tile_url_template")
+        if not isinstance(tile_url, str) or not tile_url.strip():
             return None
-        latest = past[-1]
-        if not isinstance(latest, dict):
-            return None
-        path = latest.get("path")
-        host = payload.get("host")
-        if not isinstance(path, str) or not isinstance(host, str):
-            return None
-        return f"{host.rstrip('/')}{path}/256/{{z}}/{{x}}/{{y}}/2/1_1.png"
+        return tile_url
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_bounds(value: object) -> bool:
         return (

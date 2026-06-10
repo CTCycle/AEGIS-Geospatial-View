@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import urllib.parse
 from dataclasses import dataclass
 from typing import Any
 
@@ -7,7 +9,6 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.common.constants import (
-    DATABASE_FILE_PATH,
     DEFAULT_DB_CONNECT_TIMEOUT,
     DEFAULT_DB_INSERT_BATCH_SIZE,
     DEFAULT_GIBS_DEFAULT_LAYER,
@@ -22,6 +23,7 @@ from server.common.constants import (
     NASA_ATTRIBUTION,
     NOMINATIM_SEARCH_URL,
 )
+from server.common.paths import DATABASE_FILE_PATH
 
 
 ###############################################################################
@@ -80,15 +82,6 @@ class ChatRuntimeSettings:
     max_history_messages: int
     parser_certainty_threshold: float
     parser_max_retries: int
-
-
-###############################################################################
-@dataclass(frozen=True)
-class VectorRuntimeSettings:
-    auto_sync_on_start: bool
-    default_ollama_embedding_model: str
-    default_openai_embedding_model: str
-    default_google_embedding_model: str
 
 
 ###############################################################################
@@ -157,14 +150,10 @@ class ServerSettings:
     map: MapSettings
     jobs: JobsSettings
     chat: ChatRuntimeSettings
-    vectors: VectorRuntimeSettings
     openmeteo: OpenMeteoSettings
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
-    credential_master_key: str
-    credential_key_version: str
-
 
 ###############################################################################
 class JsonDatabaseSettings(BaseModel):
@@ -180,6 +169,7 @@ class JsonDatabaseSettings(BaseModel):
     connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
     insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "host", "database_name", "username", "password", "ssl_ca", mode="before"
     )
@@ -190,6 +180,7 @@ class JsonDatabaseSettings(BaseModel):
         text = str(value).strip()
         return text or None
 
+    # -------------------------------------------------------------------------
     @field_validator("engine", mode="before")
     @classmethod
     def normalize_engine(cls, value: Any) -> str:
@@ -231,14 +222,6 @@ class JsonChatRuntimeSettings(BaseModel):
     max_history_messages: int = Field(default=12, ge=1, le=100)
     parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     parser_max_retries: int = Field(default=2, ge=0, le=5)
-
-
-###############################################################################
-class JsonVectorRuntimeSettings(BaseModel):
-    auto_sync_on_start: bool = True
-    default_ollama_embedding_model: str = "nomic-embed-text"
-    default_openai_embedding_model: str = "text-embedding-3-small"
-    default_google_embedding_model: str = "text-embedding-004"
 
 
 ###############################################################################
@@ -306,6 +289,7 @@ class JsonGIBSSettings(BaseModel):
     layer_sync_user_agent: str = DEFAULT_GIBS_LAYER_SYNC_USER_AGENT
     layer_sync_timeout: float = Field(default=30.0, ge=1.0)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before"
     )
@@ -323,16 +307,112 @@ class JsonGIBSSettings(BaseModel):
 
 
 ###############################################################################
-def build_database_settings(payload: dict[str, Any] | Any) -> DatabaseSettings:
-    if not isinstance(payload, dict):
-        payload = {}
+def _read_env_text(name: str) -> str | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    text = value.strip()
+    return text or None
+
+
+###############################################################################
+def _read_env_int(name: str) -> int | None:
+    value = _read_env_text(name)
+    if value is None:
+        return None
     try:
-        db = JsonDatabaseSettings.model_validate(payload)
+        return int(value)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
+
+
+###############################################################################
+def _read_env_bool(name: str) -> bool | None:
+    value = _read_env_text(name)
+    if value is None:
+        return None
+
+    normalized = value.lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"Invalid boolean value for {name}: {value}")
+
+
+###############################################################################
+def _database_payload_from_url(database_url: str) -> dict[str, Any]:
+    parsed = urllib.parse.urlparse(database_url)
+    scheme = (parsed.scheme or "").strip().lower()
+    if not scheme:
+        raise RuntimeError("DATABASE_URL must include a URL scheme.")
+    if not scheme.startswith("postgresql"):
+        raise RuntimeError(
+            f"Unsupported DATABASE_URL scheme: {parsed.scheme}. Expected PostgreSQL."
+        )
+
+    database_name = parsed.path.lstrip("/") or None
+    return {
+        "engine": "postgresql+psycopg",
+        "host": parsed.hostname,
+        "port": parsed.port,
+        "database_name": database_name,
+        "username": urllib.parse.unquote(parsed.username)
+        if parsed.username is not None
+        else None,
+        "password": urllib.parse.unquote(parsed.password)
+        if parsed.password is not None
+        else None,
+    }
+
+
+###############################################################################
+def build_database_payload_from_env() -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+
+    database_url = _read_env_text("DATABASE_URL")
+    if database_url is not None:
+        payload.update(_database_payload_from_url(database_url))
+
+    explicit_values: tuple[tuple[str, str, Any], ...] = (
+        ("EMBEDDED_DATABASE", "embedded_database", _read_env_bool("EMBEDDED_DATABASE")),
+        ("DATABASE_ENGINE", "engine", _read_env_text("DATABASE_ENGINE")),
+        ("DATABASE_HOST", "host", _read_env_text("DATABASE_HOST")),
+        ("DATABASE_PORT", "port", _read_env_int("DATABASE_PORT")),
+        ("DATABASE_NAME", "database_name", _read_env_text("DATABASE_NAME")),
+        ("DATABASE_USERNAME", "username", _read_env_text("DATABASE_USERNAME")),
+        ("DATABASE_PASSWORD", "password", _read_env_text("DATABASE_PASSWORD")),
+        ("DATABASE_SSL", "ssl", _read_env_bool("DATABASE_SSL")),
+        ("DATABASE_SSL_CA", "ssl_ca", _read_env_text("DATABASE_SSL_CA")),
+        (
+            "DATABASE_CONNECT_TIMEOUT",
+            "connect_timeout",
+            _read_env_int("DATABASE_CONNECT_TIMEOUT"),
+        ),
+        (
+            "DATABASE_INSERT_BATCH_SIZE",
+            "insert_batch_size",
+            _read_env_int("DATABASE_INSERT_BATCH_SIZE"),
+        ),
+    )
+
+    for _env_name, key, value in explicit_values:
+        if value is not None:
+            payload[key] = value
+
+    return payload
+
+
+###############################################################################
+def build_database_settings() -> DatabaseSettings:
+    try:
+        db = JsonDatabaseSettings.model_validate(build_database_payload_from_env())
     except ValidationError as exc:
         raise RuntimeError(f"Invalid database settings: {exc}") from exc
     return _to_database_settings(db)
 
 
+###############################################################################
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
@@ -346,9 +426,6 @@ class AppSettings(BaseSettings):
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
     jobs: JsonJobsSettings = Field(default_factory=JsonJobsSettings)
     chat: JsonChatRuntimeSettings = Field(default_factory=JsonChatRuntimeSettings)
-    vectors: JsonVectorRuntimeSettings = Field(
-        default_factory=JsonVectorRuntimeSettings
-    )
     openmeteo: JsonOpenMeteoSettings = Field(default_factory=JsonOpenMeteoSettings)
     overpass: JsonOverpassSettings = Field(default_factory=JsonOverpassSettings)
     rainviewer: JsonRainViewerSettings = Field(default_factory=JsonRainViewerSettings)
@@ -360,21 +437,15 @@ class AppSettings(BaseSettings):
     ui_port: int = Field(default=8001, ge=1, le=65535)
     reload: bool = True
     optional_dependencies: bool = True
-    credential_master_key: str = "dev-insecure-master-key-change-me"
-    credential_key_version: str = "v1"
 
+    # -------------------------------------------------------------------------
     @field_validator("fastapi_host", "ui_host", mode="before")
     @classmethod
     def normalize_required_strings(cls, value: Any) -> str:
         text = str(value).strip() if value is not None else ""
         return text or "127.0.0.1"
 
-    @field_validator("credential_master_key", "credential_key_version", mode="before")
-    @classmethod
-    def normalize_secret_strings(cls, value: Any) -> str:
-        text = str(value).strip() if value is not None else ""
-        return text
-
+    # -------------------------------------------------------------------------
     def to_server_settings(self) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
             self.gibs.wms_base_endpoints,
@@ -409,17 +480,13 @@ class AppSettings(BaseSettings):
                 render_delay_s=self.map.render_delay_s,
                 tiles=self.map.tiles,
             ),
-            jobs=JobsSettings(polling_interval=self.jobs.polling_interval),
+            jobs=JobsSettings(
+                polling_interval=self.jobs.polling_interval,
+            ),
             chat=ChatRuntimeSettings(
                 max_history_messages=self.chat.max_history_messages,
                 parser_certainty_threshold=self.chat.parser_certainty_threshold,
                 parser_max_retries=self.chat.parser_max_retries,
-            ),
-            vectors=VectorRuntimeSettings(
-                auto_sync_on_start=self.vectors.auto_sync_on_start,
-                default_ollama_embedding_model=self.vectors.default_ollama_embedding_model,
-                default_openai_embedding_model=self.vectors.default_openai_embedding_model,
-                default_google_embedding_model=self.vectors.default_google_embedding_model,
             ),
             openmeteo=OpenMeteoSettings(
                 weather_base_url=self.openmeteo.weather_base_url,
@@ -466,16 +533,13 @@ class AppSettings(BaseSettings):
                 layer_sync_user_agent=self.gibs.layer_sync_user_agent,
                 layer_sync_timeout=self.gibs.layer_sync_timeout,
             ),
-            credential_master_key=self.credential_master_key,
-            credential_key_version=self.credential_key_version,
         )
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     if db.embedded_database:
         return DatabaseSettings(
-            database_path=DATABASE_FILE_PATH,
+            database_path=str(DATABASE_FILE_PATH),
             embedded_database=True,
             engine=None,
             host=None,
@@ -490,7 +554,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         )
 
     return DatabaseSettings(
-        database_path=DATABASE_FILE_PATH,
+        database_path=str(DATABASE_FILE_PATH),
         embedded_database=False,
         engine=db.engine.strip().lower(),
         host=db.host,
@@ -504,8 +568,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         insert_batch_size=db.insert_batch_size,
     )
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def _normalize_upper_key_mapping(
     mapping: dict[str, str],
     *,
@@ -519,8 +582,7 @@ def _normalize_upper_key_mapping(
             normalized[k] = v
     return normalized or dict(fallback)
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def _normalize_key_mapping(
     mapping: dict[str, str],
     *,

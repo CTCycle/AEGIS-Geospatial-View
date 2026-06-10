@@ -1,54 +1,32 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
 from typing import Any
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.services.llm.types import LLMToolDefinition
+from server.domain.agent.tools import (
+    RegisteredNativeTool,
+    ToolError,
+    ToolExecutionEnvelope,
+)
 from server.services.agent.tool_handlers import air_quality, coordinates, poi, weather
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.llm.types import LLMToolDefinition
 
 ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
 NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
 
 
-@dataclass(frozen=True)
-class ToolError:
-    code: str
-    message: str
-
-
-@dataclass(frozen=True)
-class ToolExecutionEnvelope:
-    ok: bool
-    data: Any | None = None
-    error: ToolError | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "ok": self.ok,
-            "data": self.data,
-            "error": None
-            if self.error is None
-            else {"code": self.error.code, "message": self.error.message},
-            "metadata": self.metadata,
-        }
-
-
-@dataclass(frozen=True)
-class RegisteredNativeTool:
-    definition: LLMToolDefinition
-    handler: NativeToolHandler
-
-
+###############################################################################
 class ToolRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, runtime_registry: RuntimeRegistry | None = None) -> None:
         self.runtime_registry = runtime_registry or RuntimeRegistry()
         self._handlers: dict[str, ToolHandler] = {}
         self._native_tools: dict[str, RegisteredNativeTool] = {}
 
+    # -------------------------------------------------------------------------
     def register_native_tool(
         self,
         definition: LLMToolDefinition,
@@ -59,12 +37,15 @@ class ToolRegistry:
             handler=handler,
         )
 
+    # -------------------------------------------------------------------------
     def list_native_tools(self) -> list[LLMToolDefinition]:
         return [item.definition for item in self._native_tools.values()]
 
+    # -------------------------------------------------------------------------
     def has_native_tool(self, name: str) -> bool:
         return name in self._native_tools
 
+    # -------------------------------------------------------------------------
     async def execute_native_tool(
         self,
         name: str,
@@ -98,6 +79,7 @@ class ToolRegistry:
             )
         return ToolExecutionEnvelope(ok=True, data=result)
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_arguments(
         cls,
@@ -106,23 +88,144 @@ class ToolRegistry:
     ) -> str | None:
         if not isinstance(arguments, dict):
             return "Tool arguments must be an object."
+        return cls._validate_schema_node(schema, arguments, path="")
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validate_schema_node(
+        cls,
+        schema: dict[str, Any],
+        value: Any,
+        *,
+        path: str,
+    ) -> str | None:
+        expected_type = schema.get("type")
+        if expected_type and not cls._matches_json_type(value, expected_type):
+            return f"{cls._label_for_path(path)} must be {cls._format_expected_type(expected_type)}."
+
+        enum_values = schema.get("enum")
+        if isinstance(enum_values, list) and value not in enum_values:
+            return f"{cls._label_for_path(path)} must be one of {enum_values!r}."
+
+        if isinstance(value, dict):
+            object_error = cls._validate_object_schema(schema, value, path=path)
+            if object_error is not None:
+                return object_error
+        if isinstance(value, list):
+            array_error = cls._validate_array_schema(schema, value, path=path)
+            if array_error is not None:
+                return array_error
+
+        numeric_error = cls._validate_numeric_schema(schema, value, path=path)
+        if numeric_error is not None:
+            return numeric_error
+        return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validate_object_schema(
+        cls,
+        schema: dict[str, Any],
+        value: dict[str, Any],
+        *,
+        path: str,
+    ) -> str | None:
         required = schema.get("required")
         if isinstance(required, list):
             for field_name in required:
-                if isinstance(field_name, str) and field_name not in arguments:
-                    return f"Missing required argument '{field_name}'."
+                if isinstance(field_name, str) and field_name not in value:
+                    missing_path = cls._child_path(path, field_name)
+                    return f"Missing required argument '{missing_path}'."
+
         properties = schema.get("properties")
         if not isinstance(properties, dict):
             return None
-        for field_name, value in arguments.items():
+
+        if schema.get("additionalProperties") is False:
+            for field_name in value:
+                if field_name not in properties:
+                    unknown_path = cls._child_path(path, field_name)
+                    return f"Unknown argument '{unknown_path}'."
+
+        for field_name, field_value in value.items():
             field_schema = properties.get(field_name)
             if not isinstance(field_schema, dict):
                 continue
-            expected_type = field_schema.get("type")
-            if expected_type and not cls._matches_json_type(value, expected_type):
-                return f"Argument '{field_name}' must be {expected_type}."
+            field_path = cls._child_path(path, field_name)
+            field_error = cls._validate_schema_node(field_schema, field_value, path=field_path)
+            if field_error is not None:
+                return field_error
         return None
 
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validate_array_schema(
+        cls,
+        schema: dict[str, Any],
+        value: list[Any],
+        *,
+        path: str,
+    ) -> str | None:
+        min_items = schema.get("minItems")
+        if isinstance(min_items, int) and len(value) < min_items:
+            return f"{cls._label_for_path(path)} must contain at least {min_items} items."
+        max_items = schema.get("maxItems")
+        if isinstance(max_items, int) and len(value) > max_items:
+            return f"{cls._label_for_path(path)} must contain at most {max_items} items."
+
+        item_schema = schema.get("items")
+        if not isinstance(item_schema, dict):
+            return None
+        for index, item in enumerate(value):
+            item_path = cls._child_path(path, str(index))
+            item_error = cls._validate_schema_node(item_schema, item, path=item_path)
+            if item_error is not None:
+                return item_error
+        return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _validate_numeric_schema(
+        cls,
+        schema: dict[str, Any],
+        value: Any,
+        *,
+        path: str,
+    ) -> str | None:
+        if not isinstance(value, int | float) or isinstance(value, bool):
+            return None
+        minimum = schema.get("minimum")
+        if isinstance(minimum, int | float) and value < minimum:
+            return f"{cls._label_for_path(path)} must be >= {minimum}."
+        maximum = schema.get("maximum")
+        if isinstance(maximum, int | float) and value > maximum:
+            return f"{cls._label_for_path(path)} must be <= {maximum}."
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _child_path(path: str, child: str) -> str:
+        if not path:
+            return child
+        if child.isdigit():
+            return f"{path}[{child}]"
+        return f"{path}.{child}"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _label_for_path(path: str) -> str:
+        return f"Argument '{path}'" if path else "Tool arguments"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _format_expected_type(expected_type: Any) -> str:
+        if isinstance(expected_type, str):
+            return expected_type
+        if isinstance(expected_type, list):
+            return " or ".join(str(item) for item in expected_type)
+        return str(expected_type)
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def _matches_json_type(value: Any, expected_type: Any) -> bool:
         expected = {expected_type} if isinstance(expected_type, str) else set(expected_type)
@@ -136,6 +239,7 @@ class ToolRegistry:
             or ("null" in expected and value is None)
         )
 
+    # -------------------------------------------------------------------------
     def load_tool_bindings(self) -> dict[str, ToolHandler]:
         self.runtime_registry.build_snapshot()
         handler_lookup: dict[str, ToolHandler] = {
@@ -156,11 +260,13 @@ class ToolRegistry:
         self._handlers = bindings
         return bindings
 
+    # -------------------------------------------------------------------------
     def get_handler(self, tool_id: str) -> ToolHandler | None:
         if not self._handlers:
             self.load_tool_bindings()
         return self._handlers.get(tool_id)
 
+    # -------------------------------------------------------------------------
     async def execute(
         self,
         tool_id: str,

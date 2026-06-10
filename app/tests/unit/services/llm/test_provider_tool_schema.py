@@ -6,6 +6,7 @@ from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMToolDefinition
 
 
+###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
         name="resolve_location",
@@ -14,6 +15,7 @@ def _tool() -> LLMToolDefinition:
     )
 
 
+###############################################################################
 def test_provider_tool_schema_conversion() -> None:
     tool = _tool()
     openai_schema = OpenAIProvider.tool_to_openai_schema(tool)
@@ -23,6 +25,7 @@ def test_provider_tool_schema_conversion() -> None:
     assert OllamaProvider.tool_to_ollama_schema(tool)["function"]["name"] == "resolve_location"
 
 
+###############################################################################
 def test_tool_call_parsing() -> None:
     openai_calls = OpenAIProvider._parse_tool_calls(
         {"output": [{"type": "function_call", "call_id": "1", "name": "resolve_location", "arguments": "{\"q\":\"Rome\"}"}]}

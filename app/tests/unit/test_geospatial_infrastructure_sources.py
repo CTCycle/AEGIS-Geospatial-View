@@ -8,6 +8,7 @@ from server.services.geospatial.providers.openchargemap import OpenChargeMapProv
 from server.services.geospatial.providers.overture import OvertureProvider
 
 
+###############################################################################
 def test_geospatial_infrastructure_providers_are_registered() -> None:
     registry = ProviderRegistry()
 
@@ -17,6 +18,7 @@ def test_geospatial_infrastructure_providers_are_registered() -> None:
         assert provider_id in registry.list_provider_ids()
 
 
+###############################################################################
 def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     async def fetcher(url, headers):
         del url, headers
@@ -45,6 +47,7 @@ def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     assert response.payload["features"][0]["source"] == "openchargemap"
 
 
+###############################################################################
 def test_overture_maps_exposes_ingestion_source_descriptor() -> None:
     response = asyncio.run(
         OvertureProvider().fetch(ProviderRequest(capability_id="overture_maps_places"))

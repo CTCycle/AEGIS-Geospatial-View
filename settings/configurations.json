@@ -18,7 +18,9 @@
     "tiles": "OpenStreetMap"
   },
   "jobs": {
-    "polling_interval": 1.0
+    "polling_interval": 1.0,
+    "backend": "in_process",
+    "require_durable_backend": false
   },
   "chat": {
     "max_history_messages": 12,

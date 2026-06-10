@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import os
-import urllib.error
-import urllib.request
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from server.domain.geographics import LayerAuditReport
 from server.services.geospatial.catalog import GeospatialCatalogService
@@ -25,6 +23,7 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from server.services.geospatial.providers.http import fetch_bytes_url
 from server.services.geospatial.providers.tomtom import build_tomtom_tile_url
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -56,8 +55,31 @@ class GeospatialTileRequestError(GeospatialApiServiceError):
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
+
+###############################################################################
+def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get("type") == "FeatureCollection":
+        features = value.get("features")
+        return {
+            "type": "FeatureCollection",
+            "features": features if isinstance(features, list) else [],
+        }
+    if isinstance(value, dict) and value.get("type") == "Feature":
+        return {
+            "type": "FeatureCollection",
+            "features": [value],
+        }
+    if isinstance(value, dict) and isinstance(value.get("features"), list):
+        return {
+            "type": "FeatureCollection",
+            "features": value["features"],
+        }
+    return {"type": "FeatureCollection", "features": []}
+
 ###############################################################################
 class GeospatialApiService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -124,6 +146,29 @@ class GeospatialApiService:
         return await self._fetch_provider_payload(provider_id, request)
 
     # -------------------------------------------------------------------------
+    async def get_layer_geojson(
+        self,
+        layer_id: str,
+        *,
+        bbox: str | None,
+        zoom: int | None,
+        time: str | None,
+        live: bool,
+        incidents: bool,
+    ) -> dict[str, Any]:
+        payload = await self.get_layer_features(
+            layer_id,
+            bbox=bbox,
+            zoom=zoom,
+            time=time,
+            live=live,
+            incidents=incidents,
+        )
+        if payload.get("status") != "ok":
+            return {"type": "FeatureCollection", "features": []}
+        return normalize_geojson_feature_collection(payload.get("payload"))
+
+    # -------------------------------------------------------------------------
     async def fetch_tomtom_tile(self, kind: str, z: int, x: int, y: int) -> bytes:
         if kind not in {"basic", "traffic-flow"}:
             raise GeospatialUnsupportedTileError("Unsupported TomTom tile type.")
@@ -133,16 +178,51 @@ class GeospatialApiService:
         url = build_tomtom_tile_url(kind, z, x, y, api_key)
         try:
             return await self._fetch_binary_url(url)
-        except urllib.error.HTTPError as exc:
-            if exc.code in {401, 403}:
-                raise GeospatialTileCredentialError(
-                    "TomTom rejected the configured API key."
-                ) from exc
-            raise GeospatialTileRequestError(
-                f"TomTom tile request failed with HTTP {exc.code}."
+        except ProviderAuthError as exc:
+            raise GeospatialTileCredentialError(
+                "TomTom rejected the configured API key."
             ) from exc
-        except (TimeoutError, urllib.error.URLError) as exc:
+        except (ProviderTimeoutError, ProviderUnavailableError) as exc:
             raise GeospatialTileRequestError("TomTom tile request failed.") from exc
+
+    # -------------------------------------------------------------------------
+    async def fetch_capability_tile(
+        self,
+        capability_id: str,
+        z: int,
+        x: int,
+        y: int,
+    ) -> bytes:
+        manifest = self._manifest_by_id(capability_id)
+        metadata = manifest.get("metadata") if isinstance(manifest.get("metadata"), dict) else {}
+        template = str(
+            metadata.get("tile_url_template")
+            or metadata.get("url_template")
+            or metadata.get("tile_url")
+            or metadata.get("url")
+            or ""
+        ).strip()
+        if not template:
+            raise GeospatialUnsupportedTileError("Tile URL is missing from provider metadata.")
+        provider = str(manifest.get("provider") or "").strip().lower()
+        upstream_url = self._resolve_credentialed_tile_template(
+            template=template,
+            provider=provider,
+            capability_id=capability_id,
+            z=z,
+            x=x,
+            y=y,
+        )
+        try:
+            return await self._fetch_binary_url(upstream_url)
+        except ProviderAuthError as exc:
+            raise GeospatialTileCredentialError(
+                f"{self._humanize_provider(provider)} rejected the configured credentials."
+            ) from exc
+        except (ProviderTimeoutError, ProviderUnavailableError) as exc:
+            raise GeospatialTileRequestError(
+                f"{self._humanize_provider(provider)} tile request failed."
+            ) from exc
 
     # -------------------------------------------------------------------------
     async def list_cameras(
@@ -162,6 +242,23 @@ class GeospatialApiService:
             },
         )
         return await self._fetch_provider_payload(provider_id, request)
+
+    # -------------------------------------------------------------------------
+    async def list_cameras_geojson(
+        self,
+        *,
+        bbox: str | None,
+        provider: str | None,
+        camera_type: str | None,
+    ) -> dict[str, Any]:
+        payload = await self.list_cameras(
+            bbox=bbox,
+            provider=provider,
+            camera_type=camera_type,
+        )
+        if payload.get("status") != "ok":
+            return {"type": "FeatureCollection", "features": []}
+        return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
     async def get_camera(self, camera_id: str) -> dict[str, Any]:
@@ -301,6 +398,7 @@ class GeospatialApiService:
             "stale": response.stale,
         }
 
+    # -------------------------------------------------------------------------
     def _parse_bbox(
         self, value: str | None
     ) -> tuple[float, float, float, float] | None:
@@ -319,6 +417,7 @@ class GeospatialApiService:
         min_lon, min_lat, max_lon, max_lat = parts
         return min_lon, min_lat, max_lon, max_lat
 
+    # -------------------------------------------------------------------------
     def _parse_time(self, value: str | None) -> datetime | None:
         if not value:
             return None
@@ -327,6 +426,7 @@ class GeospatialApiService:
         except ValueError as exc:
             raise GeospatialInvalidRequestError("time must be ISO-8601.") from exc
 
+    # -------------------------------------------------------------------------
     def _parse_camera_identifier(self, camera_id: str) -> tuple[str | None, str]:
         normalized = camera_id.strip()
         for separator in ("/", ":"):
@@ -341,6 +441,7 @@ class GeospatialApiService:
                     return canonical_provider_id, provider_camera_id
         return None, normalized
 
+    # -------------------------------------------------------------------------
     def _provider_requires_credentials(self, provider_id: str) -> bool:
         for item in self._iter_manifest_payloads_for_account_setup():
             auth = item.get("auth") if isinstance(item.get("auth"), dict) else {}
@@ -351,6 +452,7 @@ class GeospatialApiService:
                 return bool(auth.get("required"))
         return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
 
+    # -------------------------------------------------------------------------
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
         payload = self.manifest_loader.load_all()
         for collection_name in ("providers", "overlays", "transit", "cameras"):
@@ -358,6 +460,7 @@ class GeospatialApiService:
                 if isinstance(item, dict):
                     yield item
 
+    # -------------------------------------------------------------------------
     def _extract_account_setup_record(
         self, payload: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -420,6 +523,7 @@ class GeospatialApiService:
             in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
         }
 
+    # -------------------------------------------------------------------------
     def _dedupe_account_setup_records(
         self, records: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
@@ -435,6 +539,7 @@ class GeospatialApiService:
                 deduped[key] = record
         return list(deduped.values())
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _account_setup_specificity(record: dict[str, Any]) -> int:
         automation = (
@@ -452,6 +557,7 @@ class GeospatialApiService:
             + len(automation.get("safety_notes") or [])
         )
 
+    # -------------------------------------------------------------------------
     def _build_account_setup_automation(
         self,
         *,
@@ -498,6 +604,7 @@ class GeospatialApiService:
             ),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_automation_support(provider_key: str) -> str:
         if provider_key == "opentripmap":
@@ -506,6 +613,7 @@ class GeospatialApiService:
             return "manual_only"
         return "agent_assisted"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_user_action_notes(provider_key: str, support: str) -> list[str]:
         if support == "unsupported":
@@ -524,6 +632,7 @@ class GeospatialApiService:
             )
         return notes
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_safety_notes(provider_key: str, support: str) -> list[str]:
         notes = [
@@ -540,6 +649,7 @@ class GeospatialApiService:
             )
         return notes
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _key_format_hint(provider_key: str) -> str | None:
         return {
@@ -548,6 +658,7 @@ class GeospatialApiService:
             "windy_webcams": "Windy Webcams API key",
         }.get(provider_key)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _string_list(value: Any) -> list[str]:
         return (
@@ -556,6 +667,7 @@ class GeospatialApiService:
             else []
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_docs_url(provider: dict[str, Any]) -> str | None:
         metadata = (
@@ -577,6 +689,7 @@ class GeospatialApiService:
                     return item.strip()
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_account_setup_instructions(
         *,
@@ -608,10 +721,52 @@ class GeospatialApiService:
         instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
 
-    async def _fetch_binary_url(self, url: str) -> bytes:
-        return await asyncio.to_thread(self._fetch_binary_url_sync, url)
+    # -------------------------------------------------------------------------
+    def _resolve_credentialed_tile_template(
+        self,
+        *,
+        template: str,
+        provider: str,
+        capability_id: str,
+        z: int,
+        x: int,
+        y: int,
+    ) -> str:
+        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
+        if "{api_key}" in template:
+            if not env_name:
+                raise GeospatialUnsupportedTileError(
+                    f"No credential mapping is configured for provider '{provider}'."
+                )
+            api_key = os.getenv(env_name, "").strip()
+            if not api_key:
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} credentials are required."
+                )
+            template = template.replace("{api_key}", quote(api_key, safe=""))
+        resolved = (
+            template.replace("{z}", str(z))
+            .replace("{x}", str(x))
+            .replace("{y}", str(y))
+        )
+        if resolved == template and all(token not in template for token in ("{z}", "{x}", "{y}")):
+            raise GeospatialUnsupportedTileError(
+                f"Capability '{capability_id}' does not expose a tile template."
+            )
+        return resolved
 
-    def _fetch_binary_url_sync(self, url: str) -> bytes:
-        request = urllib.request.Request(url, headers={"User-Agent": "AEGIS/1.0"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return response.read()
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _humanize_provider(provider: str) -> str:
+        lookup = {
+            "tomtom": "TomTom",
+            "geoapify": "Geoapify",
+            "google_maps": "Google Maps",
+            "openaq": "OpenAQ",
+            "arcgis": "ArcGIS",
+        }
+        return lookup.get(provider, provider or "Provider")
+
+    # -------------------------------------------------------------------------
+    async def _fetch_binary_url(self, url: str) -> bytes:
+        return await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})

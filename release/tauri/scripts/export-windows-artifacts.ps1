@@ -6,8 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\.."))
-$clientDir = Join-Path $repoRoot "app\client"
-$releaseDir = Join-Path $clientDir "src-tauri\target\release"
+$appDir = Join-Path $repoRoot "app"
+$releaseDir = Join-Path $appDir "src-tauri\target\release"
 $bundleDir = Join-Path $releaseDir "bundle"
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -18,6 +18,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 
 $installersDir = Join-Path $outputDir "installers"
 $portableDir = Join-Path $outputDir "portable"
+$portableRuntimeDir = Join-Path $portableDir "runtime"
 
 if (-not (Test-Path $bundleDir)) {
   throw "Bundle directory not found. Run 'npm run tauri:build' first. Missing: $bundleDir"
@@ -29,6 +30,7 @@ if (Test-Path $outputDir) {
 
 New-Item -ItemType Directory -Path $installersDir -Force | Out-Null
 New-Item -ItemType Directory -Path $portableDir -Force | Out-Null
+New-Item -ItemType Directory -Path $portableRuntimeDir -Force | Out-Null
 
 $installerArtifacts = @()
 
@@ -57,15 +59,21 @@ foreach ($file in $portableExeCandidates) {
   Copy-Item -Path $file.FullName -Destination $portableDir -Force
 }
 
-$portableResourceEntries = @(
-  "r",
+$portableRuntimeSource = Join-Path $releaseDir "r"
+if (Test-Path $portableRuntimeSource) {
+  Get-ChildItem -LiteralPath $portableRuntimeSource -Force | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination (Join-Path $portableRuntimeDir $_.Name) -Recurse -Force
+  }
+}
+
+$portableAuxiliaryEntries = @(
   "_up_"
 )
 
-foreach ($entry in $portableResourceEntries) {
+foreach ($entry in $portableAuxiliaryEntries) {
   $sourcePath = Join-Path $releaseDir $entry
   if (Test-Path $sourcePath) {
-    $destinationPath = Join-Path $portableDir $entry
+    $destinationPath = Join-Path $portableRuntimeDir $entry
     Copy-Item -Path $sourcePath -Destination $destinationPath -Recurse -Force
   }
 }
@@ -77,7 +85,7 @@ AEGIS desktop build output
    Open installers\ and run the setup executable (.exe) or .msi.
 
 2) Portable executable:
-   portable\ contains the app .exe and the required runtime resource payload.
+   portable\ contains the app .exe and a sibling runtime\ folder.
    Keep the exported contents together in the same directory.
 
 Generated from:
@@ -98,4 +106,10 @@ if ($portableFiles.Count -eq 0) {
   Write-Host " - none found"
 } else {
   $portableFiles | ForEach-Object { Write-Host " - $($_.FullName)" }
+}
+Write-Host "[INFO] Portable runtime folder:"
+if (Test-Path $portableRuntimeDir) {
+  Write-Host " - $portableRuntimeDir"
+} else {
+  Write-Host " - none found"
 }

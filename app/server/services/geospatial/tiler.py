@@ -1,25 +1,18 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from server.domain.geospatial.tiler import TileBuildResult
 
+
+###############################################################################
 class TileBuildError(RuntimeError):
     """Raised when a geospatial dataset cannot be prepared for tile delivery."""
 
 
-@dataclass(frozen=True)
-class TileBuildResult:
-    capability_id: str
-    tile_manifest_file: str
-    source_file: str | None
-    tile_format: str
-    feature_count: int
-    warnings: list[str]
-
-
+###############################################################################
 def build_vector_tile_manifest(
     *,
     capability_id: str,
@@ -55,6 +48,7 @@ def build_vector_tile_manifest(
     )
 
 
+###############################################################################
 def build_raster_tile_manifest(
     *,
     capability_id: str,
@@ -87,6 +81,7 @@ def build_raster_tile_manifest(
     )
 
 
+###############################################################################
 def _feature_count(source_path: Path | None) -> int:
     if source_path is None:
         return 0

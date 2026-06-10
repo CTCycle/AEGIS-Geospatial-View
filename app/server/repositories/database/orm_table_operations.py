@@ -4,25 +4,31 @@ from typing import Any
 
 from sqlalchemy import UniqueConstraint, func, inspect, select
 
-from server.repositories.schemas import Base
 from server.common.logger import logger
+from server.repositories.schemas import Base
 
 
+###############################################################################
 class SqlAlchemyTableOperationsMixin:
     engine: Any
     session_factory: Any
     insert_batch_size: int
     warn_on_missing_table: bool = False
 
-    def _insert_statement(self, table_cls: type[Any], records: list[dict[str, object]]) -> Any:
+    # -------------------------------------------------------------------------
+    def _insert_statement(
+        self, table_cls: type[Any], records: list[dict[str, object]]
+    ) -> Any:
         raise NotImplementedError
 
+    # -------------------------------------------------------------------------
     def get_table_class(self, table_name: str) -> Any:
         for cls in Base.__subclasses__():
             if getattr(cls, "__tablename__", None) == table_name:
                 return cls
         raise ValueError(f"No table class found for name {table_name}")
 
+    # -------------------------------------------------------------------------
     def _get_upsert_constraint_columns(self, table_cls: Any) -> list[str]:
         mapper = inspect(table_cls)
         primary_key_columns = [column.key for column in mapper.primary_key]
@@ -33,7 +39,10 @@ class SqlAlchemyTableOperationsMixin:
                 return list(constraint.columns.keys())
         raise ValueError(f"No unique constraint found for {table_cls.__name__}")
 
-    def _normalize_record(self, table_cls: Any, record: dict[str, Any]) -> dict[str, Any]:
+    # -------------------------------------------------------------------------
+    def _normalize_record(
+        self, table_cls: Any, record: dict[str, Any]
+    ) -> dict[str, Any]:
         column_payload: dict[str, Any] = {}
         for column in table_cls.__table__.columns:
             if column.name not in record:
@@ -44,17 +53,22 @@ class SqlAlchemyTableOperationsMixin:
             column_payload[column.name] = value
         return column_payload
 
+    # -------------------------------------------------------------------------
     def _serialize_model(self, instance: Any) -> dict[str, Any]:
         return {
             column.name: getattr(instance, column.name)
             for column in instance.__table__.columns
         }
 
+    # -------------------------------------------------------------------------
     def list_columns(self, table_name: str) -> list[str]:
         table_cls = self.get_table_class(table_name)
         return [column.name for column in table_cls.__table__.columns]
 
-    def upsert_into_database(self, records: list[dict[str, Any]], table_name: str) -> None:
+    # -------------------------------------------------------------------------
+    def upsert_into_database(
+        self, records: list[dict[str, Any]], table_name: str
+    ) -> None:
         if not records:
             return
         table_cls = self.get_table_class(table_name)
@@ -91,6 +105,7 @@ class SqlAlchemyTableOperationsMixin:
                 session.execute(statement)
             session.commit()
 
+    # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]:
         table_cls = self.get_table_class(table_name)
         canonical_name = str(table_cls.__tablename__)
@@ -102,12 +117,14 @@ class SqlAlchemyTableOperationsMixin:
             rows = session.execute(select(table_cls)).scalars().all()
         return [self._serialize_model(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def count_rows(self, table_name: str) -> int:
         table_cls = self.get_table_class(table_name)
         with self.session_factory() as session:
             value = session.scalar(select(func.count()).select_from(table_cls)) or 0
         return int(value)
 
+    # -------------------------------------------------------------------------
     def count_records(self, model: type[Base]) -> int:
         with self.session_factory() as session:
             value = session.scalar(select(func.count()).select_from(model)) or 0

@@ -4,6 +4,7 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.types import LLMToolDefinition
 
 
+###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
         name="execute_geospatial_capability",
@@ -12,8 +13,13 @@ def _tool() -> LLMToolDefinition:
     )
 
 
+###############################################################################
 def test_ollama_uses_show_capabilities_when_present() -> None:
+
+    ###############################################################################
     class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             assert path == "/api/show"
             return {"capabilities": ["completion", "tools"]}
@@ -24,8 +30,13 @@ def test_ollama_uses_show_capabilities_when_present() -> None:
     assert provider._tool_support_source("llama") == "ollama_show"
 
 
+###############################################################################
 def test_ollama_falls_back_to_probe_when_show_capabilities_absent() -> None:
+
+    ###############################################################################
     class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             if path == "/api/show":
                 return {}
@@ -50,8 +61,13 @@ def test_ollama_falls_back_to_probe_when_show_capabilities_absent() -> None:
     assert provider._tool_support_source("llama") == "ollama_probe"
 
 
+###############################################################################
 def test_ollama_marks_unsupported_probe_false() -> None:
+
+    ###############################################################################
     class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict):
             if path == "/api/show":
                 return {}
@@ -63,6 +79,7 @@ def test_ollama_marks_unsupported_probe_false() -> None:
     assert "tools" not in provider.get_model_capabilities("plain")
 
 
+###############################################################################
 def test_ollama_emits_native_tool_result_message_format() -> None:
     schema = OllamaProvider.tool_to_ollama_schema(_tool())
     assert schema["type"] == "function"

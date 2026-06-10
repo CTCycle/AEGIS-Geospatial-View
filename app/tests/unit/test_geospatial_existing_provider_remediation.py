@@ -8,6 +8,7 @@ from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
 
 
+###############################################################################
 def test_existing_raster_providers_emit_renderable_payloads() -> None:
     gibs = asyncio.run(
         NASAGIBSProvider().fetch(
@@ -26,6 +27,7 @@ def test_existing_raster_providers_emit_renderable_payloads() -> None:
     assert rainviewer.attribution
 
 
+###############################################################################
 def test_tomtom_traffic_flow_keeps_key_server_side() -> None:
     response = asyncio.run(
         TomTomProvider(api_key="tomtom-secret").fetch(

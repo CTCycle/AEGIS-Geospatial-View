@@ -15,9 +15,11 @@ from server.services.geospatial.providers.nominatim import NominatimProvider
 from server.services.geospatial.providers.transitland import TransitlandProvider
 
 
+###############################################################################
 class _FeatureOnlyProvider:
     provider_id = "feature_only"
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: FeatureRequest) -> ProviderResult:
         return ProviderResult(
             capability_id=request.capability_id,
@@ -26,10 +28,12 @@ class _FeatureOnlyProvider:
             attribution=["Example Attribution"],
         )
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         raise AssertionError("fetch_features should be preferred")
 
 
+###############################################################################
 def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
     registry = ProviderRegistry(providers=[_FeatureOnlyProvider()])
 
@@ -41,6 +45,7 @@ def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
     assert response.attribution == ["Example Attribution"]
 
 
+###############################################################################
 def test_provider_cache_key_uses_safe_stable_request_parts() -> None:
     request = FeatureRequest(
         capability_id="layer",
@@ -57,6 +62,7 @@ def test_provider_cache_key_uses_safe_stable_request_parts() -> None:
     assert key_a.startswith("provider:layer:")
 
 
+###############################################################################
 def test_safe_request_params_redacts_credentials() -> None:
     params = safe_request_params(
         {"token": "abc", "authorization": "Bearer abc", "category": "parks"}
@@ -69,6 +75,7 @@ def test_safe_request_params_redacts_credentials() -> None:
     }
 
 
+###############################################################################
 def test_nominatim_provider_geocodes_live_contract_payload() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         assert "q=Rome" in url
@@ -96,6 +103,7 @@ def test_nominatim_provider_geocodes_live_contract_payload() -> None:
     assert response.payload["results"][0]["latitude"] == 41.8933
 
 
+###############################################################################
 def test_transitland_provider_queries_bounded_feed_discovery() -> None:
     calls: list[tuple[str, dict[str, str] | None]] = []
 

@@ -26,7 +26,7 @@ jobs:
 
       - name: Run backend unit suites
         run: |
-          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_backend_python_compile.py app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/services/vector app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
+          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_backend_python_compile.py app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
 
   frontend-build-and-tests:
     runs-on: ubuntu-latest
@@ -119,7 +119,7 @@ jobs:
           pip install -e "app/server[test]"
 
       - name: Validate manifest completeness
-        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/vector/test_capability_manifest_completeness.py
+        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/geospatial/test_capability_registry.py
 
       - name: Validate geospatial schema v2 audit
         run: |
@@ -168,8 +168,8 @@ jobs:
             app/tests/unit/test_geospatial_poi_deduplication.py \
             app/tests/unit/test_geospatial_infrastructure_sources.py \
             app/tests/unit/test_geospatial_materialization_runner.py \
-            app/tests/unit/test_agentic_geospatial_selection.py \
-            app/tests/unit/test_agentic_geospatial_policy_gates.py \
+            app/tests/unit/services/agent/test_parser_service_contract.py \
+            app/tests/unit/services/agent/test_policy_engine_authorization.py \
             app/tests/unit/test_agentic_geospatial_map_session.py \
             app/tests/unit/test_geospatial_e2e_scenarios.py
 
@@ -177,5 +177,5 @@ jobs:
         run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/geospatial/test_runtime_registry.py::test_runtime_profiles_cover_all_capabilities
 
       - name: Validate tool binding completeness
-        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/agent/test_tool_registry.py::test_tool_registry_has_binding_for_all_tool_manifests
+        run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/agent/test_tool_registry.py::test_tool_registry_has_binding_for_all_direct_tool_capabilities
 

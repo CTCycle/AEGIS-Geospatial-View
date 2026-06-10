@@ -13,6 +13,7 @@ from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvi
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 
 
+###############################################################################
 def _gtfs_zip() -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
@@ -43,6 +44,7 @@ def _gtfs_zip() -> bytes:
     return buffer.getvalue()
 
 
+###############################################################################
 def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
     response = asyncio.run(
         GTFSStaticProvider().fetch(
@@ -62,6 +64,7 @@ def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
     assert response.payload["summary"]["shapePointCount"] == 2
 
 
+###############################################################################
 def test_gtfs_static_provider_rejects_bad_zip() -> None:
     with pytest.raises(ProviderUnavailableError):
         asyncio.run(
@@ -74,6 +77,7 @@ def test_gtfs_static_provider_rejects_bad_zip() -> None:
         )
 
 
+###############################################################################
 def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
     now = int(datetime.now(UTC).timestamp())
     response = asyncio.run(
@@ -116,6 +120,7 @@ def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
     assert response.payload["vehicleRenderingAllowed"] is True
 
 
+###############################################################################
 def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
     response = asyncio.run(
         GTFSRealtimeProvider().fetch(
@@ -148,6 +153,7 @@ def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
     assert response.payload["vehicleRenderingAllowed"] is False
 
 
+###############################################################################
 def test_provider_registry_binds_gtfs_adapters_from_manifests() -> None:
     registry = ProviderRegistry()
 

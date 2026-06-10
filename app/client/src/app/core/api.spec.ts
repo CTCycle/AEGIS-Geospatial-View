@@ -5,16 +5,19 @@ import {
 import {
   ApiRequestError,
   buildApiError,
+  fetchGeospatialCameraDetail,
+  fetchGeospatialCameras,
+  fetchGeospatialLayerFeatures,
+  sendChatTurn,
+  streamChatTurn,
+} from './api';
+import {
+  buildModelDescription,
   parseCatalogResponse,
   parseChatTurnResponse,
   parseModelSettingsResponse,
   parseSearchResponse,
-  fetchGeospatialCameraDetail,
-  fetchGeospatialLayerFeatures,
-  buildModelDescription,
-  sendChatTurn,
-  streamChatTurn,
-} from './api';
+} from './api-parsers';
 
 describe('core/api', () => {
   afterEach(() => {
@@ -116,6 +119,12 @@ describe('core/api', () => {
       decision: {
         plan: { state: 'direct_tool', mode: 'direct_text', action_id: 'weather', overlay_ids: [] },
       },
+      operation: {
+        kind: 'direct_answer',
+        status: 'success',
+        message: 'done',
+        warnings: [],
+      },
       context_usage: {
         estimated_input_tokens: 100,
         selected_context_window: 2048,
@@ -128,6 +137,7 @@ describe('core/api', () => {
     expect(parsed.request_id).toBe('chat-abc');
     expect(parsed.session_id).toBe(12);
     expect(parsed.assistant_message).toBe('done');
+    expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
   });
 
@@ -174,7 +184,7 @@ describe('core/api', () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode('{"event":"status","data":{"message":"received"}}\n'));
-        controller.enqueue(new TextEncoder().encode('{"event":"assistant_delta","data":{"delta":"hi "}}\n{"event":"final","data":{}}\n{bad'));
+        controller.enqueue(new TextEncoder().encode('{"event":"parsed","data":{"task_class":"map_search"}}\n{"event":"final","data":{}}\n{bad'));
         controller.close();
       },
     });
@@ -184,7 +194,7 @@ describe('core/api', () => {
     (window.fetch as unknown) = fetchSpy;
     const events: string[] = [];
     await streamChatTurn({ message: 'x' }, (event) => events.push(event.event));
-    expect(events).toEqual(['status', 'assistant_delta', 'final']);
+    expect(events).toEqual(['status', 'parsed', 'final']);
   });
 
   it('streamChatTurn emits error event behavior as ApiRequestError', async () => {
@@ -232,6 +242,7 @@ describe('core/api', () => {
         assistant_message: 'ok',
         turn_contract: {},
         decision: {},
+        operation: { kind: 'direct_answer', status: 'success', message: 'ok' },
         memory_snapshot: {},
       }), {
         status: 200,
@@ -275,6 +286,29 @@ describe('core/api', () => {
     expect(calledUrl).toContain('incidents=true');
   });
 
+  it('fetchGeospatialCameras omits empty, false, and undefined query params', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response(JSON.stringify({
+        status: 'ok',
+        provider: 'windy_webcams',
+        payload: {},
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await fetchGeospatialCameras({
+      bbox: '',
+      provider: 'windy_webcams',
+      camera_type: undefined,
+    });
+
+    const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
+    expect(calledUrl).toBe(`${API_BASE_URL}/geospatial/cameras?provider=windy_webcams`);
+  });
+
   it('fetchGeospatialCameraDetail encodes camera identifiers', async () => {
     const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
       new Response(JSON.stringify({
@@ -291,6 +325,21 @@ describe('core/api', () => {
 
     const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
     expect(calledUrl).toContain('/geospatial/cameras/windy_webcams%2Fcam%201');
+  });
+
+  it('geospatial provider payload requests fall back to unavailable payloads', async () => {
+    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
+      new Response('null', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    (window.fetch as unknown) = fetchSpy;
+
+    await expectAsync(fetchGeospatialCameraDetail('windy_webcams/cam-1')).toBeResolvedTo({
+      status: 'unavailable',
+      provider: 'unknown',
+    });
   });
 
   it('treats placeholder local Ollama descriptions as missing', () => {

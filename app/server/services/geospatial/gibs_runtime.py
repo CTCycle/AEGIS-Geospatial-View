@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
-from server.domain.gibs import Capabilities, LayerMetadata
 from server.common.constants import (
     CAPABILITIES_QUERY,
     EARTH_RADIUS_M,
@@ -25,6 +24,7 @@ from server.common.constants import (
     ORIGIN_SHIFT,
 )
 from server.common.logger import logger
+from server.domain.gibs import Capabilities, LayerMetadata
 from server.services.geospatial.gibs_errors import (
     GIBSPayloadIntegrityError,
     GIBSRequestError,
@@ -36,12 +36,14 @@ type BBox = list[float]
 
 type LayerStore = dict[str, LayerMetadata]
 
-
+###############################################################################
 def clamp(value: float, lower: float, upper: float) -> float:
     return max(min(value, upper), lower)
 
-
+###############################################################################
 class GIBSRuntimeMixin:
+
+    # -------------------------------------------------------------------------
     def normalize_bbox(
         self,
         *,
@@ -163,15 +165,6 @@ class GIBSRuntimeMixin:
     def build_capability_candidates(self, requested_crs: str, layer: str) -> list[str]:
         requested = requested_crs.upper()
         candidates: list[str] = [requested]
-        metadata = self.get_layer_metadata(layer)
-        if metadata and metadata.projections:
-            for projection in metadata.projections:
-                normalized = projection.upper()
-                if (
-                    normalized in self.wms_base_endpoints
-                    and normalized not in candidates
-                ):
-                    candidates.append(normalized)
         for fallback in ("EPSG:3857", "EPSG:4326"):
             if fallback in self.wms_base_endpoints and fallback not in candidates:
                 candidates.append(fallback)

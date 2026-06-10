@@ -7,14 +7,16 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.base import LLMProvider
 from server.services.llm.errors import LLMConfigurationError
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
-from server.services.llm.types import LLMRequest
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.types import LLMRequest
 
 ###############################################################################
 class LLMFactory:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -72,16 +74,19 @@ class LLMFactory:
     def get_chat_provider(self, provider: str) -> LLMProvider:
         return _ChatOnlyProvider(self.get_provider(provider))
 
-
 ###############################################################################
 class _ChatOnlyProvider:
+
+    # -------------------------------------------------------------------------
     def __init__(self, delegate: LLMProvider) -> None:
         self._delegate = delegate
         self.provider_name = getattr(delegate, "provider_name", "chat")
 
+    # -------------------------------------------------------------------------
     def __getattr__(self, item: str):  # noqa: ANN001
         return getattr(self._delegate, item)
 
+    # -------------------------------------------------------------------------
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:

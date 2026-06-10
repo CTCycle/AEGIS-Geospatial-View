@@ -1,25 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
 
 
-@dataclass(frozen=True)
-class LayerMetadata:
-    name: str
-    supported_crs: frozenset[str]
-    formats: frozenset[str]
-    time_extent: str | None
+###############################################################################
+class LayerMetadata(BaseModel):
+    layer_id: str
+    title: str
+    abstract: str | None = None
+    projections: set[str] = Field(default_factory=set)
+    source_urls: set[str] = Field(default_factory=set)
+    tile_matrix_sets: set[str] = Field(default_factory=set)
 
 
-@dataclass(frozen=True)
-class LayerCatalogEntry:
-    name: str
-    projections: frozenset[str]
-    meters_per_pixel: tuple[float, ...]
-
-
-@dataclass(frozen=True)
-class Capabilities:
-    layers: dict[str, LayerMetadata]
-    supported_formats: frozenset[str]
-    retrieved_at: float
+###############################################################################
+class Capabilities(BaseModel):
+    layers: list[LayerMetadata] = Field(default_factory=list)

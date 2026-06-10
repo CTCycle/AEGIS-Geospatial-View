@@ -6,10 +6,14 @@ from server.services.geospatial.live_validator import validate_live_geospatial_s
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
 
+###############################################################################
 class _LiveValidationRegistry:
+
+    # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
         return None
 
+    # -------------------------------------------------------------------------
     async def fetch(self, provider_id: str, request: ProviderRequest) -> ProviderResponse:
         if provider_id == "nominatim":
             payload = {"results": [{"latitude": 41.9, "longitude": 12.5}]}
@@ -26,6 +30,7 @@ class _LiveValidationRegistry:
         )
 
 
+###############################################################################
 def test_live_validator_runs_public_provider_checks_with_injected_registry() -> None:
     report = asyncio.run(
         validate_live_geospatial_sources(registry_factory=_LiveValidationRegistry)

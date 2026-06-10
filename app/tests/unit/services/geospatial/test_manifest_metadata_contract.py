@@ -5,7 +5,10 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 class _NoCredentials:
+
+    # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
         return None
 
@@ -21,6 +24,7 @@ REQUIRED_TRAIT_FIELDS = {
 }
 
 
+###############################################################################
 def test_all_manifest_entries_expose_source_traits() -> None:
     payload = GeospatialManifestLoader().load_all()
     missing: list[str] = []
@@ -32,19 +36,7 @@ def test_all_manifest_entries_expose_source_traits() -> None:
                     missing.append(f"{collection_name}:{item['id']}:metadata.{field}")
     assert not missing
 
-
-def test_queryable_vector_claims_are_consistent() -> None:
-    payload = GeospatialManifestLoader().load_all()
-    invalid: list[str] = []
-    for item in payload["overlays"]:
-        metadata = dict(item.get("metadata") or {})
-        if metadata.get("vectorizable") and not metadata.get("queryable"):
-            invalid.append(str(item["id"]))
-        if metadata.get("vectorizable") and "json" not in str(metadata.get("data_format", "")).lower():
-            invalid.append(str(item["id"]))
-    assert not invalid
-
-
+###############################################################################
 def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypatch) -> None:
     monkeypatch.delenv("OPENAQ_API_KEY", raising=False)
     monkeypatch.delenv("FRED_API_KEY", raising=False)
@@ -55,6 +47,7 @@ def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypat
     assert runtime.provider_health("fred_regional_market_indicators") == "missing_credentials"
 
 
+###############################################################################
 def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None:
     payload = GeospatialManifestLoader().load_all()
     overlays = {item["id"]: item for item in payload["overlays"]}

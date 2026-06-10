@@ -6,6 +6,7 @@ from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
 
+###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
         name="describe_geospatial_capability",
@@ -18,6 +19,7 @@ def _tool() -> LLMToolDefinition:
     )
 
 
+###############################################################################
 def test_google_converts_aegis_tools_into_declarations() -> None:
     assert GoogleProvider.tool_to_google_schema(_tool()) == {
         "name": "describe_geospatial_capability",
@@ -30,6 +32,7 @@ def test_google_converts_aegis_tools_into_declarations() -> None:
     }
 
 
+###############################################################################
 def test_google_parses_function_calls() -> None:
     calls = GoogleProvider._parse_tool_calls(
         {
@@ -55,6 +58,7 @@ def test_google_parses_function_calls() -> None:
     assert calls[0].arguments == {"capability_id": "rain"}
 
 
+###############################################################################
 def test_google_converts_tool_results_to_function_responses() -> None:
     contents = GoogleProvider._contents_from_messages(
         [
@@ -82,6 +86,7 @@ def test_google_converts_tool_results_to_function_responses() -> None:
     ]
 
 
+###############################################################################
 def test_google_rejects_tools_plus_response_schema() -> None:
     with pytest.raises(ValueError, match="cannot combine native tools"):
         LLMRequest(

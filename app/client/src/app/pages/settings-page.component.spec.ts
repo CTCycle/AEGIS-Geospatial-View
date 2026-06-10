@@ -112,6 +112,22 @@ describe('pages/settings-page.component', () => {
     expect(component.displayedModels.length).toBe(1);
   });
 
+  it('keeps the All provider filter active after the initial model load', async () => {
+    window.history.replaceState({}, '', '/settings');
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const buttons = Array.from(
+      fixture.nativeElement.querySelectorAll('.provider-filter-toggle button'),
+    ) as HTMLButtonElement[];
+    const activeButton = buttons.find((button) => button.classList.contains('active'));
+
+    expect(activeButton?.textContent?.trim()).toBe('All');
+    expect(fixture.componentInstance.displayedModels.length).toBeGreaterThan(0);
+  });
+
   it('keeps richer Ollama library descriptions for installed models', async () => {
     window.history.replaceState({}, '', '/settings');
     fetchChatModelsMock.and.resolveTo({
@@ -321,6 +337,27 @@ describe('pages/settings-page.component', () => {
     expect(component.statusText).toContain('refreshed');
     await component.pullLocalModel({ id: 'llama3.2', name: 'llama3.2', description: '', provider: 'ollama', capabilities: [], metadata: {} });
     expect(component.statusText).toContain('Pulled');
+  });
+
+  it('prevents overlapping refresh requests', async () => {
+    let releaseRefresh: (() => void) | undefined;
+    refreshOllamaModelsMock.and.returnValue(new Promise((resolve) => {
+      releaseRefresh = () => resolve({});
+    }));
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    const firstRefresh = component.refreshOllamaLibrary();
+    const secondRefresh = component.refreshOllamaLibrary();
+
+    expect(refreshOllamaModelsMock).toHaveBeenCalledTimes(1);
+    expect(component.isRefreshingOllama).toBeTrue();
+
+    releaseRefresh?.();
+    await Promise.all([firstRefresh, secondRefresh]);
+    expect(component.isRefreshingOllama).toBeFalse();
   });
 
   it('syncQueryState and persistence update URL and store', async () => {

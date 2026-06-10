@@ -6,6 +6,7 @@ from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
 
+###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
         name="list_geospatial_capabilities",
@@ -14,6 +15,7 @@ def _tool() -> LLMToolDefinition:
     )
 
 
+###############################################################################
 def test_openai_converts_tool_definitions() -> None:
     schema = OpenAIProvider.tool_to_openai_schema(_tool())
     assert schema == {
@@ -26,6 +28,7 @@ def test_openai_converts_tool_definitions() -> None:
     }
 
 
+###############################################################################
 def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
     messages = OpenAIProvider.normalize_tool_messages(
         [
@@ -58,6 +61,7 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
     }
 
 
+###############################################################################
 def test_openai_rejects_tools_plus_response_schema() -> None:
     with pytest.raises(ValueError, match="cannot combine native tools"):
         LLMRequest(

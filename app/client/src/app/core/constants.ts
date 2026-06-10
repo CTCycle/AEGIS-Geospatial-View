@@ -45,6 +45,9 @@ export const API_GEOSPATIAL_CAPABILITIES_PATH = '/geospatial/capabilities';
 export const API_GEOSPATIAL_LAYERS_PATH = '/geospatial/layers';
 export const API_GEOSPATIAL_CAMERAS_PATH = '/geospatial/cameras';
 export const API_GEOSPATIAL_AUDIT_PATH = '/geospatial/audit';
+export const API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH = (providerId: string): string =>
+  `/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`;
+export const API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH = '/geospatial/providers/account-setup';
 export const API_CHAT_TURN_PATH = '/chat/turn';
 export const API_CHAT_STREAM_PATH = '/chat/stream';
 export const API_CHAT_MODELS_PATH = '/chat/models';
@@ -52,7 +55,6 @@ export const API_CHAT_SETTINGS_PATH = '/chat/settings';
 export const API_OLLAMA_REFRESH_PATH = '/chat/models/ollama/refresh';
 export const API_OLLAMA_PULL_PATH = '/chat/models/ollama/pull';
 export const API_OLLAMA_HEALTH_PATH = '/chat/models/ollama/health';
-export const API_VECTOR_REBUILD_PATH = '/chat/vectors/rebuild';
 
 export const DEFAULT_OVERLAY_OPACITY = 0.65;
 export const DEFAULT_WMS_LAYER_ID = '0';

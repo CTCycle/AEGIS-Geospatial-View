@@ -3,7 +3,10 @@ from __future__ import annotations
 from server.services.chat.history_buffer import ChatHistoryBuffer
 
 
+###############################################################################
 class _HistoryRepoStub:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: int = 0
         self.messages: list[dict[str, object]] = [
@@ -11,6 +14,7 @@ class _HistoryRepoStub:
             {"role": "assistant", "content": "second"},
         ]
 
+    # -------------------------------------------------------------------------
     def list_recent_messages(
         self, session_id: int, limit: int
     ) -> list[dict[str, object]]:
@@ -18,6 +22,7 @@ class _HistoryRepoStub:
         return self.messages[-limit:]
 
 
+###############################################################################
 def test_history_buffer_hydrates_once_and_reuses_cache() -> None:
     repo = _HistoryRepoStub()
     buffer = ChatHistoryBuffer(history_repo=repo, max_messages=3)
@@ -27,6 +32,7 @@ def test_history_buffer_hydrates_once_and_reuses_cache() -> None:
     assert repo.calls == 1
 
 
+###############################################################################
 def test_history_buffer_appends_and_trims() -> None:
     repo = _HistoryRepoStub()
     buffer = ChatHistoryBuffer(history_repo=repo, max_messages=2)

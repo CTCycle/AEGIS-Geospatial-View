@@ -29,6 +29,7 @@ ROME_MAP_SESSION = {
 }
 
 
+###############################################################################
 def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     return {
         "user_text": message,
@@ -49,6 +50,7 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
         "plan": {
@@ -60,6 +62,7 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     }
 
 
+###############################################################################
 def chat_turn_map_response(
     session_id: int, assistant_message: str, basemap_id: str = "osm_default"
 ) -> dict[str, Any]:
@@ -79,6 +82,7 @@ def chat_turn_map_response(
     }
 
 
+###############################################################################
 def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
     return {
         "request_id": f"chat-stub-{session_id}",
@@ -93,6 +97,7 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
     }
 
 
+###############################################################################
 def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
     return {
         "request_id": f"chat-stub-{session_id}",
@@ -105,6 +110,7 @@ def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any
     }
 
 
+###############################################################################
 def model_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "local",
@@ -121,6 +127,7 @@ def model_settings_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def model_catalog_payload() -> dict[str, Any]:
     return {
         "cloud": [
@@ -170,6 +177,7 @@ def model_catalog_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def split_role_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "cloud",
@@ -186,32 +194,88 @@ def split_role_settings_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def chat_stream_events(
     session_id: int, assistant_message: str, include_tool_status: bool = True
 ) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = [
         {"event": "status", "data": {"message": "received"}}
     ]
-    for token in assistant_message.split():
-        events.append({"event": "assistant_delta", "data": {"delta": f"{token} "}})
+    events.append(
+        {
+            "event": "parsed",
+            "data": {
+                "request_id": f"chat-stub-{session_id}",
+                "session_id": session_id,
+                "task_class": "map_search",
+                "action_id": "stub",
+                "requires_location": False,
+                "location_signal_count": 0,
+                "ambiguities": [],
+            },
+        }
+    )
+    events.append(
+        {
+            "event": "policy",
+            "data": {
+                "request_id": f"chat-stub-{session_id}",
+                "session_id": session_id,
+                "state": "map_search",
+                "mode": "map",
+                "action_id": "stub",
+                "trace_steps": ["stub"],
+                "has_clarification": False,
+            },
+        }
+    )
     if include_tool_status:
         events.append(
             {
-                "event": "tool_status",
+                "event": "tool_call_started",
                 "data": {
-                    "available": True,
-                    "execution": "map_search",
-                    "has_satellite_imagery": False,
-                    "has_map_session": True,
-                    "overlay_count": 1,
+                    "request_id": f"chat-stub-{session_id}",
+                    "session_id": session_id,
+                    "tool_call_id": "tool-1",
+                    "name": "execute_geospatial_capability",
+                    "arguments": {"capability_id": "openaq_air_quality"},
+                },
+            }
+        )
+        events.append(
+            {
+                "event": "tool_call_completed",
+                "data": {
+                    "request_id": f"chat-stub-{session_id}",
+                    "session_id": session_id,
+                    "tool_call_id": "tool-1",
+                    "name": "execute_geospatial_capability",
+                    "ok": True,
+                    "error": None,
+                    "content": {
+                        "ok": True,
+                        "data": {"map_session": ROME_MAP_SESSION},
+                        "error": None,
+                    },
                 },
             }
         )
     events.append(
         {
+            "event": "map_session_created",
+            "data": {
+                "request_id": f"chat-stub-{session_id}",
+                "session_id": session_id,
+                "map_session": ROME_MAP_SESSION,
+            },
+        }
+    )
+    events.append(
+        {
             "event": "final",
             "data": {
                 "session_id": session_id,
+                "request_id": f"chat-stub-{session_id}",
                 "assistant_message": assistant_message,
                 "map_session": ROME_MAP_SESSION,
             },

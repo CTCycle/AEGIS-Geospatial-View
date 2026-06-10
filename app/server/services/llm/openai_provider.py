@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from typing import Any
 
 from openai import OpenAI
@@ -11,38 +11,52 @@ from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
 from server.services.llm.context_budget import compute_context_usage
 from server.services.llm.response_serialization import dump_response_payload
-from server.services.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition, ModelDescriptor
+from server.services.llm.types import (
+    LLMRequest,
+    LLMResult,
+    LLMToolCall,
+    LLMToolDefinition,
+    ModelDescriptor,
+)
 
 
+###############################################################################
 class OpenAIProvider(LLMProvider):
     provider_name = "openai"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
         self.api_key = api_key
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
         self.last_context_usage: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     def _client(self) -> Any:
         return OpenAI(api_key=self.api_key, base_url=self.base_url)
 
+    # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         return [
             entry for entry in get_cloud_model_catalog() if entry.provider == "openai"
         ]
 
+    # -------------------------------------------------------------------------
     def supports_tools(self, model: str) -> bool:
         return "tools" in self._capabilities_for_model(model)
 
+    # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool:
         capabilities = self._capabilities_for_model(model)
         return "structured" in capabilities or "structured_output" in capabilities
 
+    # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
         for entry in self.list_models():
             if entry.name == model:
                 return set(entry.capabilities)
         return {"chat", "stream", "structured", "structured_output", "tools"}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def tool_to_openai_schema(tool: LLMToolDefinition) -> dict[str, Any]:
         return {
@@ -54,6 +68,7 @@ class OpenAIProvider(LLMProvider):
             },
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
@@ -91,6 +106,7 @@ class OpenAIProvider(LLMProvider):
             normalized.append(message)
         return normalized
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
@@ -112,6 +128,7 @@ class OpenAIProvider(LLMProvider):
             )
         return calls
 
+    # -------------------------------------------------------------------------
     def chat(
         self,
         request: LLMRequest,
@@ -158,6 +175,7 @@ class OpenAIProvider(LLMProvider):
             finish_reason=raw.get("finish_reason") if isinstance(raw, dict) else None,
         )
 
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
@@ -175,6 +193,7 @@ class OpenAIProvider(LLMProvider):
             if delta:
                 yield str(delta)
 
+    # -------------------------------------------------------------------------
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
@@ -201,6 +220,7 @@ class OpenAIProvider(LLMProvider):
             return loaded if isinstance(loaded, dict) else {}
         return {}
 
+    # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
         response = self._client().embeddings.create(model=model, input=input_text)
         data = getattr(response, "data", None)
@@ -211,6 +231,7 @@ class OpenAIProvider(LLMProvider):
             return []
         return [float(value) for value in embedding if isinstance(value, (int, float))]
 
+    # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
 

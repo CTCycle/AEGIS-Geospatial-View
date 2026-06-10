@@ -4,9 +4,10 @@
       type="button"
       class="model-card__duty"
       [class.model-card__duty--active]="isSelected(role)"
+      [class.model-card__duty--disabled]="isDisabled(role)"
       [disabled]="isDisabled(role)"
-      [attr.title]="disabledReason(role) ?? roleName(role)"
-      [attr.aria-label]="disabledReason(role) ?? roleName(role)"
+      [attr.title]="roleTitle(role)"
+      [attr.aria-label]="roleTitle(role)"
       (click)="onSelect(role)"
     >
       <span class="model-card__duty-icon" aria-hidden="true">
@@ -28,9 +29,6 @@
         }
       </span>
       <span class="model-card__duty-name">{{ roleName(role) }}</span>
-      @if (disabledReason(role); as reason) {
-        <span class="model-card__duty-reason">{{ reason }}</span>
-      }
     </button>
   }
 </div>

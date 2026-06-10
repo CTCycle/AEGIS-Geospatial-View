@@ -4,6 +4,7 @@ from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
 
+###############################################################################
 class CensusProvider(ArcGISRestProvider):
     provider_id = "census"
 
@@ -16,6 +17,7 @@ class CensusProvider(ArcGISRestProvider):
         "TIGERweb/Hydro/MapServer/0/query"
     )
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         service_url = self.TIGERWEB_TRACTS_URL
         if "hydrography" in request.capability_id:

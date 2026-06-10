@@ -3,9 +3,11 @@ from __future__ import annotations
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
 
+###############################################################################
 class OvertureProvider:
     provider_id = "overture"
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         return ProviderResponse(
             capability_id=request.capability_id,

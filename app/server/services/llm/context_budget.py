@@ -11,6 +11,7 @@ CONTEXT_HEADROOM_TOKENS = 512
 CONTEXT_WINDOW_STEP = 512
 
 
+###############################################################################
 def estimate_message_tokens(messages: list[dict[str, str]]) -> int:
     total = 0
     for message in messages:
@@ -22,6 +23,7 @@ def estimate_message_tokens(messages: list[dict[str, str]]) -> int:
     return max(total, 1)
 
 
+###############################################################################
 def resolve_model_context_limit(model: str) -> int:
     normalized = model.strip().lower()
     explicit = re.search(r"(?P<size>\d+)\s*k(?:$|[-_:])", normalized)
@@ -45,6 +47,7 @@ def resolve_model_context_limit(model: str) -> int:
     return DEFAULT_MODEL_CONTEXT_LIMIT
 
 
+###############################################################################
 def compute_ollama_context_usage(request: LLMRequest) -> ContextUsage:
     estimated = estimate_message_tokens(request.messages)
     model_limit = resolve_model_context_limit(request.model)
@@ -62,6 +65,7 @@ def compute_ollama_context_usage(request: LLMRequest) -> ContextUsage:
     )
 
 
+###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
     estimated = estimate_message_tokens(request.messages)
     normalized = provider.strip().lower()

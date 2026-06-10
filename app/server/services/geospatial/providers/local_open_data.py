@@ -17,9 +17,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class LocalOpenDataProvider:
     provider_id = "local_open_data"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -29,6 +31,7 @@ class LocalOpenDataProvider:
         self.source_map = source_map or self._source_map_from_env()
         self.fetcher = fetcher or fetch_json_url
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         source = str(
             request.params.get("source")
@@ -54,9 +57,11 @@ class LocalOpenDataProvider:
             attribution=["Local open data provider"],
         )
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
         return await self.fetch(request)
 
+    # -------------------------------------------------------------------------
     async def _load_source(self, source: str) -> dict[str, Any]:
         if source.startswith(("http://", "https://")):
             payload = await call_json_fetcher(self.fetcher, source, None)
@@ -65,6 +70,7 @@ class LocalOpenDataProvider:
             payload = json.loads(path.read_text(encoding="utf-8"))
         return self._normalize_payload(payload, source=source)
 
+    # -------------------------------------------------------------------------
     def _normalize_payload(self, payload: object, *, source: str) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise ProviderMalformedPayloadError("Local open-data source must be a JSON object.")
@@ -86,6 +92,7 @@ class LocalOpenDataProvider:
             }
         return payload | {"source": source}
 
+    # -------------------------------------------------------------------------
     def _camera_feature(self, item: dict[str, Any]) -> dict[str, Any]:
         longitude = item.get("longitude") or item.get("lon")
         latitude = item.get("latitude") or item.get("lat")
@@ -96,6 +103,7 @@ class LocalOpenDataProvider:
             "properties": item,
         }
 
+    # -------------------------------------------------------------------------
     def _source_map_from_env(self) -> dict[str, str]:
         raw = os.getenv("LOCAL_OPEN_DATA_SOURCES", "").strip()
         if not raw:

@@ -17,9 +17,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class NominatimProvider(GeospatialProvider):
     provider_id = "nominatim"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -29,6 +31,7 @@ class NominatimProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         query = str(request.params.get("query") or request.params.get("q") or "").strip()
         if not query:
@@ -71,9 +74,11 @@ class NominatimProvider(GeospatialProvider):
                 )
             raise
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
         return await self.fetch(request)
 
+    # -------------------------------------------------------------------------
     def _url(self, query: str) -> str:
         params = {
             "q": query,
@@ -83,6 +88,7 @@ class NominatimProvider(GeospatialProvider):
         }
         return f"https://nominatim.openstreetmap.org/search?{urlencode(params)}"
 
+    # -------------------------------------------------------------------------
     def _normalize(self, payload: object, *, query: str) -> dict[str, object]:
         if not isinstance(payload, list):
             raise ProviderMalformedPayloadError("Nominatim search payload must be a list.")
@@ -113,6 +119,7 @@ class NominatimProvider(GeospatialProvider):
             "resultCount": len(results),
         }
 
+    # -------------------------------------------------------------------------
     def _float_or_none(self, value: object) -> float | None:
         try:
             return float(str(value))

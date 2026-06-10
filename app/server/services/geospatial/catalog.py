@@ -8,6 +8,8 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
 class GeospatialCatalogService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -17,6 +19,7 @@ class GeospatialCatalogService:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.runtime_registry = runtime_registry or RuntimeRegistry()
 
+    # -------------------------------------------------------------------------
     def _descriptor(self, item: dict[str, Any], kind: str) -> dict[str, Any]:
         metadata = dict(item.get("metadata") or {})
         capability_id = str(item.get("id") or "")
@@ -48,7 +51,6 @@ class GeospatialCatalogService:
             "data_format": str(metadata.get("data_format") or ""),
             "geometry_type": str(metadata.get("geometry_type") or ""),
             "queryable": bool(metadata.get("queryable", False)),
-            "vectorizable": bool(metadata.get("vectorizable", False)),
             "endpoint_health": str(reliability.get("status") or "unknown"),
             "auth_mode": str(auth.get("type") or "none"),
             "official_docs_url": "; ".join(
@@ -61,6 +63,7 @@ class GeospatialCatalogService:
             "metadata": metadata,
         }
 
+    # -------------------------------------------------------------------------
     def _provider_descriptor(self, item: dict[str, Any]) -> dict[str, Any]:
         metadata = dict(item.get("metadata") or {})
         provider_id = str(item.get("id") or item.get("provider") or "unknown")
@@ -102,7 +105,6 @@ class GeospatialCatalogService:
             "data_format": str(metadata.get("data_format") or ""),
             "geometry_type": str(metadata.get("geometry_type") or ""),
             "queryable": bool(metadata.get("queryable", False)),
-            "vectorizable": bool(metadata.get("vectorizable", False)),
             "endpoint_health": str(reliability.get("status") or "unknown"),
             "auth_mode": str(auth.get("type") or "none"),
             "official_docs_url": "; ".join(
@@ -115,6 +117,7 @@ class GeospatialCatalogService:
             "metadata": metadata,
         }
 
+    # -------------------------------------------------------------------------
     def list_catalog(self) -> dict[str, list[dict[str, Any]]]:
         snapshot = self.capability_registry.load_capabilities()
         self.runtime_registry.build_snapshot()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 AGENT_EXTRACTION_PROMPT = """
 Role:
 You are the parser model. You extract only the Stage-A structured routing action.
@@ -161,14 +160,12 @@ Rules:
 8. When the request is for air quality, prefer air_quality in requested_visualizations and action tags unless the user explicitly requests another theme.
 """.strip()
 
-
 ###############################################################################
 def get_agent_extraction_prompt(
     provider: str | None = None, model: str | None = None
 ) -> str:
     _ = provider, model
     return AGENT_EXTRACTION_PROMPT
-
 
 ###############################################################################
 def get_agent_enrichment_prompt(
@@ -177,14 +174,12 @@ def get_agent_enrichment_prompt(
     _ = provider, model
     return AGENT_ENRICHMENT_PROMPT
 
-
 ###############################################################################
 def get_agent_decision_system_prompt(
     provider: str | None = None, model: str | None = None
 ) -> str:
     _ = provider, model
     return AGENT_DECISION_SYSTEM_PROMPT
-
 
 ###############################################################################
 def get_agent_response_prompt(
@@ -193,14 +188,12 @@ def get_agent_response_prompt(
     _ = provider, model
     return AGENT_RESPONSE_PROMPT
 
-
 ###############################################################################
 def get_parser_system_prompt(
     provider: str | None = None, model: str | None = None
 ) -> str:
     _ = provider, model
     return PARSER_SYSTEM_PROMPT
-
 
 ###############################################################################
 def prompt_within_budget(prompt: str, *, max_tokens: int = 2000) -> bool:

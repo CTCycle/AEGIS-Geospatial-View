@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest, ProviderResponse
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderRequest,
+    ProviderResponse,
+)
 
 
+###############################################################################
 class MapillaryProvider:
     provider_id = "mapillary"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, access_token: str | None = None) -> None:
         self.access_token = access_token
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.access_token:
             raise ProviderAuthError("Mapillary access requires a configured token.")

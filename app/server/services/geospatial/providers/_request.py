@@ -5,6 +5,7 @@ from typing import Any
 from server.services.geospatial.providers.base import ProviderRequest
 
 
+###############################################################################
 def request_center(request: ProviderRequest) -> tuple[float, float]:
     latitude = _number_param(request.params, "latitude", "lat")
     longitude = _number_param(request.params, "longitude", "lon", "lng")
@@ -16,6 +17,7 @@ def request_center(request: ProviderRequest) -> tuple[float, float]:
     raise ValueError("Provider request requires latitude/longitude or bbox.")
 
 
+###############################################################################
 def request_radius_m(request: ProviderRequest, default_radius_m: float) -> float:
     value = _number_param(request.params, "radius_m", "radius")
     if value is not None and value > 0:
@@ -23,6 +25,7 @@ def request_radius_m(request: ProviderRequest, default_radius_m: float) -> float
     return default_radius_m
 
 
+###############################################################################
 def _number_param(params: dict[str, Any], *keys: str) -> float | None:
     for key in keys:
         value = params.get(key)

@@ -72,6 +72,12 @@ describe('e2e/geospatial browser smoke', () => {
         ],
       },
     },
+    operation: {
+      kind: 'map_session',
+      status: 'success',
+      message: 'Rendered a mocked geospatial session.',
+      warnings: [],
+    },
     memory_snapshot: { provider_secret_sample: forbiddenSecret },
     map_session: {
       session_id: 'mock-map-session',
@@ -115,7 +121,7 @@ describe('e2e/geospatial browser smoke', () => {
           rendering_mode: 'clustered-points',
           data_format: 'GeoJSON',
           geometry_type: 'Point',
-          url: '/api/geospatial/layers/mock_clustered_points/features?bbox=12.45,41.86,12.55,41.94',
+          url: '/api/geospatial/layers/mock_clustered_points/geojson?bbox=12.45,41.86,12.55,41.94',
           attribution: 'Mock source',
           default_opacity: 0.8,
         },
@@ -147,7 +153,7 @@ describe('e2e/geospatial browser smoke', () => {
           rendering_mode: 'geojson',
           data_format: 'GeoJSON',
           geometry_type: 'LineString',
-          url: '/api/geospatial/layers/tomtom_traffic_incidents/features?bbox=12.45,41.86,12.55,41.94',
+          url: '/api/geospatial/layers/tomtom_traffic_incidents/geojson?bbox=12.45,41.86,12.55,41.94',
           attribution: 'TomTom',
         },
         {
@@ -196,7 +202,7 @@ describe('e2e/geospatial browser smoke', () => {
           rendering_mode: 'clustered-points',
           data_format: 'GeoJSON',
           geometry_type: 'Point',
-          url: '/api/geospatial/layers/gtfs_realtime/features?include=stops,routes,alerts,vehicles',
+          url: '/api/geospatial/layers/gtfs_realtime/geojson?include=stops,routes,alerts,vehicles',
           attribution: 'GTFS feed agency',
         },
         {
@@ -207,7 +213,7 @@ describe('e2e/geospatial browser smoke', () => {
           rendering_mode: 'clustered-points',
           data_format: 'GeoJSON',
           geometry_type: 'Point',
-          url: '/api/geospatial/layers/overpass_poi_amenities/features?fixture=1000-pois',
+          url: '/api/geospatial/layers/overpass_poi_amenities/geojson?fixture=1000-pois',
           attribution: 'OpenStreetMap contributors',
         },
         {
@@ -218,7 +224,7 @@ describe('e2e/geospatial browser smoke', () => {
           rendering_mode: 'choropleth',
           data_format: 'GeoJSON',
           geometry_type: 'Polygon',
-          url: '/api/geospatial/layers/performance_fixture/features?feature_count=5000',
+          url: '/api/geospatial/layers/performance_fixture/geojson?feature_count=5000',
           attribution: 'AEGIS fixture',
           default_opacity: 0.5,
         },
@@ -306,7 +312,7 @@ describe('e2e/geospatial browser smoke', () => {
     const geoJsonSource = fakeMap.addSource.calls.allArgs()
       .map((args) => args[1] as { type?: string; data?: string; tiles?: string[] })
       .find((source) => source.type === 'geojson');
-    expect(geoJsonSource?.data).toContain('/api/geospatial/layers/mock_clustered_points/features');
+    expect(geoJsonSource?.data).toContain('/api/geospatial/layers/mock_clustered_points/geojson');
 
     const clusteredLayer = fakeMap.addLayer.calls.allArgs()
       .map((args) => args[0] as { type?: string; paint?: Record<string, unknown> })
@@ -344,7 +350,7 @@ describe('e2e/geospatial browser smoke', () => {
 
     expect(sourceInputs).toContain('rainviewer_precipitation_radar/tiles');
     expect(sourceInputs).toContain('tomtom_traffic_flow/tiles');
-    expect(sourceInputs).toContain('tomtom_traffic_incidents/features');
+    expect(sourceInputs).toContain('tomtom_traffic_incidents/geojson');
     expect(sourceInputs).toContain('service=WMS');
     expect(sourceInputs).toContain('service=WMTS');
     expect(sourceInputs).toContain('include=stops,routes,alerts,vehicles');

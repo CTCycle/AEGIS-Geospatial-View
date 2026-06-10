@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
 
+###############################################################################
 def test_webcam_provider_marks_stale_and_expired_previews() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         return {

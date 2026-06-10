@@ -8,17 +8,15 @@ from server.domain.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,
-    VectorizationResponse,
 )
 from server.services.chat.model_library import ChatModelLibraryService
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.ollama import OllamaProvider
-from server.services.vector.indexer import VectorIndexer
-
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 
 OllamaProviderFactory = Callable[[str, OllamaToolCapabilityCache], OllamaProvider]
 
 
+###############################################################################
 def create_ollama_provider(
     base_url: str,
     tool_capability_cache: OllamaToolCapabilityCache,
@@ -30,17 +28,17 @@ def create_ollama_provider(
 
 ###############################################################################
 class ChatMaintenanceService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         get_ollama_url: Callable[[], str],
-        vector_indexer: VectorIndexer,
         model_library_service: ChatModelLibraryService | None = None,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
         ollama_provider_factory: OllamaProviderFactory = create_ollama_provider,
     ) -> None:
         self.get_ollama_url = get_ollama_url
-        self.vector_indexer = vector_indexer
         self.model_library_service = model_library_service or ChatModelLibraryService(
             ollama_tool_capability_cache=ollama_tool_capability_cache
         )
@@ -78,14 +76,6 @@ class ChatMaintenanceService:
     def get_ollama_health(self) -> OllamaHealthResponse:
         provider = self._ollama_provider()
         return OllamaHealthResponse.model_validate(provider.health_check())
-
-    # -------------------------------------------------------------------------
-    def sync_vectors(self) -> VectorizationResponse:
-        return VectorizationResponse.model_validate(self.vector_indexer.sync())
-
-    # -------------------------------------------------------------------------
-    def rebuild_vectors(self) -> VectorizationResponse:
-        return VectorizationResponse.model_validate(self.vector_indexer.rebuild())
 
     # -------------------------------------------------------------------------
     def _ollama_provider(self) -> OllamaProvider:

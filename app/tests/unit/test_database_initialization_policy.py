@@ -13,6 +13,7 @@ from server.repositories.schemas import (
 )
 
 
+###############################################################################
 def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "database.db"),
@@ -30,7 +31,10 @@ def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> Non
     )
     created: list[object] = []
 
+    ###############################################################################
     class _Repository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, passed_settings: DatabaseSettings) -> None:
             self.engine = object()
             self.db_path = passed_settings.database_path
@@ -51,6 +55,7 @@ def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> Non
     assert calls == created
 
 
+###############################################################################
 def test_initialize_database_uses_passed_database_settings(
     monkeypatch, tmp_path
 ) -> None:
@@ -70,7 +75,10 @@ def test_initialize_database_uses_passed_database_settings(
     )
     received: list[DatabaseSettings] = []
 
+    ###############################################################################
     class _Repository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, passed_settings: DatabaseSettings) -> None:
             received.append(passed_settings)
             self.engine = object()
@@ -90,9 +98,8 @@ def test_initialize_database_uses_passed_database_settings(
     assert received == [settings]
 
 
-def test_initialize_database_defaults_to_server_settings(
-    monkeypatch, tmp_path
-) -> None:
+###############################################################################
+def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "default.db"),
         embedded_database=True,
@@ -109,7 +116,10 @@ def test_initialize_database_defaults_to_server_settings(
     )
     received: list[DatabaseSettings] = []
 
+    ###############################################################################
     class _Repository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, passed_settings: DatabaseSettings) -> None:
             received.append(passed_settings)
             self.engine = object()
@@ -133,6 +143,7 @@ def test_initialize_database_defaults_to_server_settings(
     assert received == [settings]
 
 
+###############################################################################
 def test_initialize_database_ensures_postgres_schema_when_external_mode(
     monkeypatch, tmp_path
 ) -> None:
@@ -169,12 +180,15 @@ def test_initialize_database_ensures_postgres_schema_when_external_mode(
     assert "server.repositories.database.postgres" in __import__("sys").modules
 
 
+###############################################################################
 def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
     created_tables: list[str] = []
 
+    ###############################################################################
     class _Engine:
         pass
 
+    ###############################################################################
     class _Database:
         engine = _Engine()
 
@@ -204,18 +218,30 @@ def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
     assert created_tables == sorted(created_tables)
 
 
-def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch) -> None:
+###############################################################################
+def test_startup_path_seeds_reference_catalog_after_schema_creation(
+    monkeypatch,
+) -> None:
     call_order: list[str] = []
 
+    ###############################################################################
     class _Backend:
         engine = object()
 
+    ###############################################################################
     class _Database:
         backend = _Backend()
 
     monkeypatch.setattr(
         "server.app.get_server_settings",
-        lambda: type("Settings", (), {"database": object(), "vectors": type("Vectors", (), {"auto_sync_on_start": False})()})(),
+        lambda: type(
+            "Settings",
+            (),
+            {
+                "database": object(),
+                "jobs": type("JobsSettings", (), {"polling_interval": 1.0})(),
+            },
+        )(),
     )
     monkeypatch.setattr("server.app.get_database", lambda: _Database())
     monkeypatch.setattr(
@@ -228,7 +254,18 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch)
     )
     monkeypatch.setattr(
         "server.app.build_search_runtime",
-        lambda: type("SearchRuntime", (), {"search_orchestrator": object()})(),
+        lambda: type(
+            "SearchRuntime",
+            (),
+            {
+                "search_orchestrator": object(),
+                "search_execution": type(
+                    "SearchExecution",
+                    (),
+                    {"orchestrator": type("Orchestrator", (), {"execute": staticmethod(lambda payload: payload)})()},
+                )(),
+            },
+        )(),
     )
     monkeypatch.setattr(
         "server.app.build_chat_runtime",
@@ -236,19 +273,39 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(monkeypatch)
             "ChatRuntime",
             (),
             {
+                "agent_orchestrator": object(),
                 "settings_service": type(
                     "SettingsService", (), {"get_settings": staticmethod(lambda: None)}
                 )(),
-                "vector_indexer": type("VectorIndexer", (), {"sync": staticmethod(lambda: None)})(),
+                "maintenance_service": object(),
             },
         )(),
     )
+    monkeypatch.setattr(
+        "server.app.build_geospatial_runtime",
+        lambda: type(
+            "GeospatialRuntime",
+            (),
+            {"api_service": object()},
+        )(),
+    )
+    monkeypatch.setattr(
+        "server.app.BackgroundJobService",
+        lambda **kwargs: type(
+            "JobService",
+            (),
+            {"start": staticmethod(lambda: None), "stop": staticmethod(lambda: None)},
+        )(),
+    )
+    monkeypatch.setattr("server.app.ChatStreamingService", lambda orchestrator: object())
     monkeypatch.setattr("server.app.run_startup_validations", lambda settings: None)
 
     app_module = __import__("server.app", fromlist=["app_lifespan"])
 
     async def _exercise() -> None:
-        async with app_module.app_lifespan(type("Application", (), {"state": type("State", (), {})()})()):
+        async with app_module.app_lifespan(
+            type("Application", (), {"state": type("State", (), {})()})()
+        ):
             pass
 
     __import__("asyncio").run(_exercise())

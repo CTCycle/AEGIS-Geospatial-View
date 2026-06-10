@@ -2,18 +2,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.services.geospatial.normalizers import NormalizationError, normalize_poi_feature
+from server.services.geospatial.normalizers import (
+    NormalizationError,
+    normalize_poi_feature,
+)
 from server.services.geospatial.overpass import (
     OverpassRateLimitError,
     OverpassService,
     OverpassServiceError,
 )
-from server.services.geospatial.providers._request import request_center, request_radius_m
+from server.services.geospatial.providers._request import (
+    request_center,
+    request_radius_m,
+)
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderRateLimitError,
     ProviderRequest,
     ProviderResponse,
-    ProviderRateLimitError,
     ProviderUnavailableError,
 )
 
@@ -27,12 +33,15 @@ AMENITY_GROUPS = {
 }
 
 
+###############################################################################
 class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, service: OverpassService | None = None) -> None:
         self.service = service or OverpassService()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         radius_m = request_radius_m(request, self.service.default_radius_m)
@@ -86,6 +95,7 @@ class OverpassProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None

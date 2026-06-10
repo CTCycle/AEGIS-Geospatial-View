@@ -9,7 +9,10 @@ from server.services.llm.prompts import PARSER_SYSTEM_PROMPT
 from server.services.llm.errors import LLMConfigurationError
 
 
+###############################################################################
 class _ProviderStub:
+
+    # -------------------------------------------------------------------------
     def structured_output(self, request, schema):  # noqa: ANN001
         payload = json.loads(request.messages[-1]["content"])
         user_message = payload.get("user_message", "")
@@ -91,16 +94,23 @@ class _ProviderStub:
         }
 
 
+###############################################################################
 class _FactoryStub:
+
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         return _ProviderStub()
 
 
+###############################################################################
 class _ConfigErrorFactoryStub:
+
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
 
 
+###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
@@ -112,6 +122,7 @@ def test_parser_service_classifies_direct_query() -> None:
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
 
 
+###############################################################################
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
@@ -136,6 +147,7 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     assert recent[0]["content"] == ""
 
 
+###############################################################################
 def test_parser_service_does_not_hide_configuration_errors() -> None:
     parser = ParserService(
         llm_factory=_ConfigErrorFactoryStub(),
@@ -151,12 +163,14 @@ def test_parser_service_does_not_hide_configuration_errors() -> None:
         )
 
 
+###############################################################################
 def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> None:
     assert "The user may write in any language" in PARSER_SYSTEM_PROMPT
     assert "raw_value must be a verbatim span" in PARSER_SYSTEM_PROMPT
     assert "requested_visualizations must use only canonical ids" in PARSER_SYSTEM_PROMPT
 
 
+###############################################################################
 def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
@@ -168,6 +182,7 @@ def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
     assert result.ambiguities == []
 
 
+###############################################################################
 def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(

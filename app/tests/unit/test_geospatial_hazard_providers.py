@@ -9,6 +9,7 @@ from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 
 
+###############################################################################
 def test_hazard_providers_emit_renderable_descriptors() -> None:
     earthquake = asyncio.run(USGSProvider().fetch(ProviderRequest(capability_id="usgs_earthquakes")))
     alerts = asyncio.run(NOAAProvider().fetch(ProviderRequest(capability_id="noaa_weather_alerts")))

@@ -7,7 +7,6 @@ from typing import Any
 
 import folium
 
-from server.configurations import get_server_settings
 from server.common.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
@@ -16,6 +15,7 @@ from server.common.constants import (
     MIN_GEO_LAT,
     MIN_LONGITUDE,
 )
+from server.configurations import get_server_settings
 
 type BBox = list[float]
 
@@ -28,30 +28,27 @@ __all__ = [
     "MapService",
 ]
 
-
-# -----------------------------------------------------------------------------
+###############################################################################
 def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
     del default_tiles
     return {name: label for name, label in COMMON_FOLIUM_MAPS.items() if name.strip()}
-
 
 ###############################################################################
 class MapServiceError(Exception):
     pass
 
-
 ###############################################################################
 class MapValidationError(MapServiceError):
     pass
-
 
 ###############################################################################
 class MapRequestError(MapServiceError):
     pass
 
-
 ###############################################################################
 class MapService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
