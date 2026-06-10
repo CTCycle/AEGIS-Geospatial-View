@@ -5,12 +5,15 @@ import asyncio
 import json
 import os
 import sys
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Callable
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from server.domain.geospatial.providers import ProviderRequest
+from server.domain.geospatial.registry import (
+    LiveCheck,
+    LiveValidationCheckResult,
+    LiveValidationReport,
+)
 from server.services.geospatial.provider_registry import (
     ProviderRegistry,
     ProviderRegistryError,
@@ -18,40 +21,7 @@ from server.services.geospatial.provider_registry import (
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderError,
-    ProviderRequest,
 )
-
-
-class LiveValidationCheckResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    provider_id: str
-    capability_id: str
-    status: str
-    message: str | None = None
-    feature_count: int | None = None
-    checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-
-class LiveValidationReport(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    error_count: int = 0
-    skipped_count: int = 0
-    results: list[LiveValidationCheckResult] = Field(default_factory=list)
-
-    @property
-    def ok(self) -> bool:
-        return self.error_count == 0
-
-
-@dataclass(frozen=True)
-class LiveCheck:
-    provider_id: str
-    request: ProviderRequest
-    credential_env: str | None = None
-    required_feature_count: int | None = None
 
 
 PUBLIC_LIVE_CHECKS = (

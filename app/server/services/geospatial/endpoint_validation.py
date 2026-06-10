@@ -1,19 +1,11 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-###############################################################################
-@dataclass(frozen=True)
-class EndpointValidationResult:
-    capability_id: str
-    ok: bool
-    status_code: int | None
-    data_format: str
-    message: str
+from server.domain.geospatial.validation import EndpointValidationResult
 
 ###############################################################################
 class EndpointValidationService:

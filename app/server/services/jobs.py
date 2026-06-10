@@ -27,32 +27,7 @@ from server.domain.jobs import (
 from server.services.chat.streaming import ChatStreamingService
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
-@dataclass
-class BackgroundJob:
-    job_id: str
-    job_type: str
-    request_id: str
-    input_json: dict[str, Any]
-    parent_job_id: str | None = None
-    session_id: int | None = None
-    status: str = JOB_STATUS_QUEUED
-    priority: int = 0
-    progress_percent: int | None = 0
-    status_message: str | None = "Queued"
-    result_json: dict[str, Any] | None = None
-    error_json: dict[str, Any] | None = None
-    created_at: datetime = field(default_factory=_utc_now)
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-    cancel_requested_at: datetime | None = None
-    attempt_count: int = 0
-    max_attempts: int = 1
-    last_heartbeat_at: datetime | None = None
-    events: list[BackgroundJobEvent] = field(default_factory=list)
+from server.domain.jobs import BackgroundJob
 
 
 class BackgroundJobService:

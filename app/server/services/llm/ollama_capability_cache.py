@@ -1,14 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from time import time
 
-
-@dataclass(frozen=True)
-class OllamaToolCapabilityCacheRecord:
-    supports_tools: bool
-    source: str
-    cached_at: float
+from server.domain.llm.cache import OllamaToolCapabilityCacheRecord
 
 
 class OllamaToolCapabilityCache:

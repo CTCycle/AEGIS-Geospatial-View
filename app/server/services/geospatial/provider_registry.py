@@ -108,11 +108,7 @@ class ProviderNotRegisteredError(ProviderRegistryError):
     """Raised when no provider is registered for a provider id."""
 
 
-@dataclass(frozen=True)
-class ProviderExecutionPolicy:
-    timeout_seconds: float = 10.0
-    max_attempts: int = 1
-    circuit_breaker_failures: int = 3
+from server.domain.geospatial.providers import ProviderExecutionPolicy
 
 
 class ProviderRegistry:

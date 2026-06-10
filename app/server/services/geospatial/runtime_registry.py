@@ -1,17 +1,11 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import Any
 
+from server.domain.geospatial.registry import RuntimeRegistrySnapshot
 from server.repositories.credentials import CredentialRepository
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
-
-
-@dataclass(frozen=True)
-class RuntimeRegistrySnapshot:
-    profiles: dict[str, dict[str, Any]]
-    manifests: dict[str, dict[str, Any]]
 
 
 class RuntimeRegistry:

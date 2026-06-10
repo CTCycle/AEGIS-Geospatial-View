@@ -1,19 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
+from server.domain.geospatial.registry import CapabilityRegistrySnapshot
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
-
-###############################################################################
-@dataclass(frozen=True)
-class CapabilityRegistrySnapshot:
-    providers: list[dict[str, Any]]
-    basemaps: list[dict[str, Any]]
-    overlays: list[dict[str, Any]]
-    cameras: list[dict[str, Any]]
-    transit: list[dict[str, Any]]
-    tools: list[dict[str, Any]]
 
 ###############################################################################
 class CapabilityRegistry:
