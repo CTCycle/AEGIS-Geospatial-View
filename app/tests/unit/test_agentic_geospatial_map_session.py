@@ -12,6 +12,7 @@ from server.services.search.request_builder import RequestBuilder
 T = TypeVar("T")
 
 
+###############################################################################
 def _run_async(awaitable) -> T:  # type: ignore[no-untyped-def]
     result: dict[str, T] = {}
     error: dict[str, BaseException] = {}
@@ -30,6 +31,7 @@ def _run_async(awaitable) -> T:  # type: ignore[no-untyped-def]
     return result["value"]
 
 
+###############################################################################
 def test_agentic_geospatial_selected_capabilities_flow_into_map_session() -> None:
     location = ResolvedLocation(
         label="Rome",
@@ -55,6 +57,7 @@ def test_agentic_geospatial_selected_capabilities_flow_into_map_session() -> Non
     assert session.center == {"latitude": 41.9, "longitude": 12.5}
 
 
+###############################################################################
 def test_agentic_geospatial_map_session_keeps_credential_warnings() -> None:
     location = ResolvedLocation(
         label="Rome",
@@ -76,6 +79,7 @@ def test_agentic_geospatial_map_session_keeps_credential_warnings() -> None:
     assert any("provider API key is required" in item for item in session.compliance_warnings)
 
 
+###############################################################################
 def test_agentic_geospatial_map_session_never_serializes_provider_api_keys(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
     location = ResolvedLocation(
@@ -100,6 +104,7 @@ def test_agentic_geospatial_map_session_never_serializes_provider_api_keys(monke
     assert "/api/geospatial/tiles/tomtom_traffic_flow/" in serialized
 
 
+###############################################################################
 def test_agentic_geospatial_wms_and_wmts_descriptors_include_backend_render_templates() -> None:
     location = ResolvedLocation(
         label="Rome",
@@ -134,6 +139,7 @@ def test_agentic_geospatial_wms_and_wmts_descriptors_include_backend_render_temp
     assert "tilematrix=EPSG:3857:{z}" in esa["tile_url_template"]
 
 
+###############################################################################
 def test_agentic_geospatial_metadata_only_descriptors_stay_non_renderable() -> None:
     location = ResolvedLocation(
         label="Rome",

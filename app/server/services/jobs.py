@@ -27,11 +27,15 @@ from server.domain.jobs import (
 from server.services.chat.streaming import ChatStreamingService
 
 
+###############################################################################
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+###############################################################################
 class BackgroundJobService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -48,21 +52,25 @@ class BackgroundJobService:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    # -------------------------------------------------------------------------
     @property
     def poll_interval(self) -> float:
         return self._polling_interval
 
+    # -------------------------------------------------------------------------
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
         self._thread = threading.Thread(target=self._run, name="background-job-worker", daemon=True)
         self._thread.start()
 
+    # -------------------------------------------------------------------------
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=2)
 
+    # -------------------------------------------------------------------------
     def create_chat_job(self, payload: ChatTurnRequest) -> BackgroundJobCreateResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         job = self._create_job(
@@ -73,6 +81,7 @@ class BackgroundJobService:
         )
         return self._to_create_response(job, "Chat job queued")
 
+    # -------------------------------------------------------------------------
     def create_map_job(
         self,
         payload: LocationSearchRequest,
@@ -97,6 +106,7 @@ class BackgroundJobService:
         )
         return self._to_create_response(job, "Map fetch job queued")
 
+    # -------------------------------------------------------------------------
     def _create_job(
         self,
         *,
@@ -125,11 +135,13 @@ class BackgroundJobService:
             self._append_event_locked(job, "queued", {"request_id": request_id, "job_type": job_type})
             return job
 
+    # -------------------------------------------------------------------------
     def get_job(self, job_id: str) -> BackgroundJobStatusResponse | None:
         with self._lock:
             job = self._jobs.get(job_id)
             return self._to_status_response(job) if job is not None else None
 
+    # -------------------------------------------------------------------------
     def list_events(self, job_id: str) -> BackgroundJobEventsResponse | None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -137,6 +149,7 @@ class BackgroundJobService:
                 return None
             return BackgroundJobEventsResponse(job_id=job_id, events=list(job.events))
 
+    # -------------------------------------------------------------------------
     def cancel_job(self, job_id: str) -> JobCancelResponse | None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -156,6 +169,7 @@ class BackgroundJobService:
             self._append_event_locked(job, "cancelled", {"message": "Cancellation requested"})
             return JobCancelResponse(job_id=job_id, success=True, message="Cancellation requested")
 
+    # -------------------------------------------------------------------------
     def _run(self) -> None:
         while not self._stop.is_set():
             claimed = self._claim_next_job()
@@ -167,6 +181,7 @@ class BackgroundJobService:
             except Exception as exc:  # noqa: BLE001
                 self._fail_job(claimed.job_id, {"message": str(exc) or "Unexpected job failure"})
 
+    # -------------------------------------------------------------------------
     def _claim_next_job(self) -> BackgroundJob | None:
         with self._lock:
             queued = sorted(
@@ -196,6 +211,7 @@ class BackgroundJobService:
             self._append_event_locked(job, "started", {"message": "Job started"})
             return job
 
+    # -------------------------------------------------------------------------
     async def _execute_job(self, job: BackgroundJob) -> None:
         if job.job_type == "chat_turn":
             await self._execute_chat_job(job)
@@ -205,6 +221,7 @@ class BackgroundJobService:
             return
         self._fail_job(job.job_id, {"message": f"Unsupported job type: {job.job_type}"})
 
+    # -------------------------------------------------------------------------
     async def _execute_chat_job(self, job: BackgroundJob) -> None:
         payload = ChatTurnRequest.model_validate(job.input_json)
         final_response: dict[str, Any] | None = None
@@ -235,6 +252,7 @@ class BackgroundJobService:
             },
         )
 
+    # -------------------------------------------------------------------------
     async def _execute_map_job(self, job: BackgroundJob) -> None:
         payload = LocationSearchRequest.model_validate(job.input_json["map_request"])
         self._heartbeat(job.job_id, 25, "Fetching map data")
@@ -260,6 +278,7 @@ class BackgroundJobService:
             },
         )
 
+    # -------------------------------------------------------------------------
     def _heartbeat(self, job_id: str, progress_percent: int, status_message: str) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -274,6 +293,7 @@ class BackgroundJobService:
                 {"progress_percent": progress_percent, "status_message": status_message},
             )
 
+    # -------------------------------------------------------------------------
     def _record_stream_event(self, job_id: str, event_name: str, payload_json: dict[str, Any]) -> None:
         mapped_name = {
             "tool_call_started": "tool_call",
@@ -287,6 +307,7 @@ class BackgroundJobService:
                 return
             self._append_event_locked(job, mapped_name, payload_json)
 
+    # -------------------------------------------------------------------------
     def _complete_job(self, job_id: str, result_json: dict[str, Any]) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -302,6 +323,7 @@ class BackgroundJobService:
             job.completed_at = _utc_now()
             self._append_event_locked(job, "completed", {"result_json": result_json})
 
+    # -------------------------------------------------------------------------
     def _fail_job(self, job_id: str, error_json: dict[str, Any]) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -316,6 +338,7 @@ class BackgroundJobService:
             job.status_message = str(error_json.get("message") or "Failed")
             self._append_event_locked(job, "failed", error_json)
 
+    # -------------------------------------------------------------------------
     def _cancel_running_job(self, job_id: str) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -326,11 +349,13 @@ class BackgroundJobService:
             job.status_message = "Cancelled"
             self._append_event_locked(job, "cancelled", {"message": "Cancelled"})
 
+    # -------------------------------------------------------------------------
     def _is_cancel_requested(self, job_id: str) -> bool:
         with self._lock:
             job = self._jobs.get(job_id)
             return bool(job and job.cancel_requested_at is not None)
 
+    # -------------------------------------------------------------------------
     def _to_create_response(self, job: BackgroundJob, message: str) -> BackgroundJobCreateResponse:
         return BackgroundJobCreateResponse(
             job_id=job.job_id,
@@ -341,6 +366,7 @@ class BackgroundJobService:
             poll_interval=self._polling_interval,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _to_status_response(job: BackgroundJob) -> BackgroundJobStatusResponse:
         return BackgroundJobStatusResponse(
@@ -364,6 +390,7 @@ class BackgroundJobService:
             last_heartbeat_at=job.last_heartbeat_at,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _append_event_locked(job: BackgroundJob, event_type: str, payload_json: dict[str, Any]) -> None:
         job.events.append(

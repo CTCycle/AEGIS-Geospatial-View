@@ -23,14 +23,17 @@ from server.services.llm.types import (
 DEFAULT_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 
+###############################################################################
 class GoogleProvider(LLMProvider):
     provider_name = "google"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, api_key: str, base_url: str | None = None) -> None:
         self.api_key = api_key
         self.base_url = base_url.rstrip("/") if base_url else None
         self.last_context_usage: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     def _client(self) -> Any:
         if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
             return genai.Client(
@@ -42,24 +45,29 @@ class GoogleProvider(LLMProvider):
             )
         return genai.Client(api_key=self.api_key)
 
+    # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         return [
             entry for entry in get_cloud_model_catalog() if entry.provider == "google"
         ]
 
+    # -------------------------------------------------------------------------
     def supports_tools(self, model: str) -> bool:
         return "tools" in self._capabilities_for_model(model)
 
+    # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool:
         capabilities = self._capabilities_for_model(model)
         return "structured" in capabilities or "structured_output" in capabilities
 
+    # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
         for entry in self.list_models():
             if entry.name == model:
                 return set(entry.capabilities)
         return {"chat", "stream", "structured", "structured_output", "tools"}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def tool_to_google_schema(tool: LLMToolDefinition) -> dict[str, Any]:
         return {
@@ -68,6 +76,7 @@ class GoogleProvider(LLMProvider):
             "parameters": tool.parameters_json_schema,
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
@@ -88,10 +97,12 @@ class GoogleProvider(LLMProvider):
                 )
         return calls
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return messages
 
+    # -------------------------------------------------------------------------
     def chat(
         self,
         request: LLMRequest,
@@ -135,6 +146,7 @@ class GoogleProvider(LLMProvider):
             finish_reason=self._extract_finish_reason(raw),
         )
 
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
@@ -149,6 +161,7 @@ class GoogleProvider(LLMProvider):
             if text:
                 yield str(text)
 
+    # -------------------------------------------------------------------------
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
@@ -171,6 +184,7 @@ class GoogleProvider(LLMProvider):
         loaded = json.loads(str(getattr(response, "text", "") or "{}"))
         return loaded if isinstance(loaded, dict) else {}
 
+    # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
         response = self._client().models.embed_content(model=model, contents=input_text)
         embeddings = getattr(response, "embeddings", None)
@@ -186,9 +200,11 @@ class GoogleProvider(LLMProvider):
             return [float(value) for value in values if isinstance(value, (int, float))]
         return []
 
+    # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _contents_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         contents: list[dict[str, Any]] = []
@@ -237,6 +253,7 @@ class GoogleProvider(LLMProvider):
             )
         return contents or [{"role": "user", "parts": [{"text": ""}]}]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_finish_reason(raw: dict[str, Any]) -> str | None:
         candidates = raw.get("candidates") if isinstance(raw, dict) else None
@@ -248,6 +265,7 @@ class GoogleProvider(LLMProvider):
         reason = candidate.get("finishReason") or candidate.get("finish_reason")
         return str(reason) if reason else None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _config_from_request(request: LLMRequest) -> dict[str, Any]:
         system_instruction = "\n\n".join(

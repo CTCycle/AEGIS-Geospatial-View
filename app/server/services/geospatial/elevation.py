@@ -16,11 +16,9 @@ __all__ = [
     "OpenElevationError",
 ]
 
-
 ###############################################################################
 class OpenElevationError(Exception):
     """Exception for Open-Elevation service failures."""
-
 
 ###############################################################################
 class OpenElevationService:
@@ -34,6 +32,7 @@ class OpenElevationService:
 
     BASE_URL = OPEN_ELEVATION_API_BASE_URL
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

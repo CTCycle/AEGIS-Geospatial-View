@@ -22,7 +22,10 @@ from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
 
+###############################################################################
 class AgentToolCatalogService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -44,6 +47,7 @@ class AgentToolCatalogService:
         self.tool_registry = tool_registry
         self.policy_engine = policy_engine
 
+    # -------------------------------------------------------------------------
     def build_native_tools(
         self,
         context: AgentExecutionContext | None = None,
@@ -93,6 +97,7 @@ class AgentToolCatalogService:
             ),
         ]
 
+    # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         for definition in self.build_native_tools():
             if definition.name == "list_geospatial_capabilities":
@@ -102,6 +107,7 @@ class AgentToolCatalogService:
             elif definition.name == "execute_geospatial_capability":
                 registry.register_native_tool(definition, self._execute_tool_handler)
 
+    # -------------------------------------------------------------------------
     async def _list_tool_handler(
         self,
         arguments: dict[str, Any],
@@ -110,6 +116,7 @@ class AgentToolCatalogService:
         _ = context
         return self.list_geospatial_capabilities(CapabilityCatalogFilter(**arguments))
 
+    # -------------------------------------------------------------------------
     async def _describe_tool_handler(
         self,
         arguments: dict[str, Any],
@@ -118,6 +125,7 @@ class AgentToolCatalogService:
         _ = context
         return self.describe_geospatial_capability(str(arguments["capability_id"]))
 
+    # -------------------------------------------------------------------------
     async def _execute_tool_handler(
         self,
         arguments: dict[str, Any],
@@ -129,6 +137,7 @@ class AgentToolCatalogService:
             context=context,
         )
 
+    # -------------------------------------------------------------------------
     def list_geospatial_capabilities(
         self,
         filters: CapabilityCatalogFilter,
@@ -179,6 +188,7 @@ class AgentToolCatalogService:
             "total": len(items),
         }
 
+    # -------------------------------------------------------------------------
     def describe_geospatial_capability(self, capability_id: str) -> dict[str, Any]:
         capability = self.capability_registry.get_capability(capability_id)
         if capability is None:
@@ -189,6 +199,7 @@ class AgentToolCatalogService:
             "argument_schema": self._argument_schema_for(capability),
         }
 
+    # -------------------------------------------------------------------------
     async def execute_geospatial_capability(
         self,
         capability_id: str,
@@ -295,6 +306,7 @@ class AgentToolCatalogService:
             "metadata": {"manifest": self._compact_descriptor(manifest)},
         }
 
+    # -------------------------------------------------------------------------
     def _all_capabilities(self) -> list[dict[str, Any]]:
         snapshot = self.capability_registry.load_capabilities()
         return [
@@ -305,6 +317,7 @@ class AgentToolCatalogService:
             *snapshot.tools,
         ]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _compact_descriptor(item: dict[str, Any]) -> dict[str, Any]:
         metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
@@ -318,6 +331,7 @@ class AgentToolCatalogService:
             "queryable": metadata.get("queryable"),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _argument_schema_for(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = capability.get("metadata") if isinstance(capability.get("metadata"), dict) else {}
@@ -326,6 +340,7 @@ class AgentToolCatalogService:
             return schema
         return {"type": "object", "properties": {}}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _decode_cursor(cursor: str | None) -> int:
         if cursor is None:
@@ -335,10 +350,12 @@ class AgentToolCatalogService:
         except ValueError:
             return 0
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_basemap_capability(manifest: dict[str, Any]) -> bool:
         return str(manifest.get("capabilityKind") or manifest.get("type") or "").strip().lower() == "basemap"
 
+    # -------------------------------------------------------------------------
     def _supports_direct_execution(self, capability_id: str, manifest: dict[str, Any]) -> bool:
         if self.tool_registry is None:
             return False
@@ -346,11 +363,13 @@ class AgentToolCatalogService:
             capability_id
         ) is not None
 
+    # -------------------------------------------------------------------------
     def _supports_map_execution(self, capability_id: str, manifest: dict[str, Any]) -> bool:
         if self._is_basemap_capability(manifest):
             return False
         return self.runtime_registry.supports_mode(capability_id, "map")
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _authorization_error_result(
         *,
@@ -385,6 +404,7 @@ class AgentToolCatalogService:
             "metadata": metadata,
         }
 
+    # -------------------------------------------------------------------------
     async def _execute_direct_result(
         self,
         *,
@@ -427,6 +447,7 @@ class AgentToolCatalogService:
             "metadata": {},
         }
 
+    # -------------------------------------------------------------------------
     async def _resolve_location(
         self,
         arguments: dict[str, Any],
@@ -450,6 +471,7 @@ class AgentToolCatalogService:
             )
         return resolved
 
+    # -------------------------------------------------------------------------
     def _build_map_execution_plan(
         self,
         *,
@@ -473,6 +495,7 @@ class AgentToolCatalogService:
             overlay_ids=[capability_id],
         )
 
+    # -------------------------------------------------------------------------
     def _build_direct_execution_plan(
         self,
         *,
@@ -492,6 +515,7 @@ class AgentToolCatalogService:
             tool_id=capability_id,
         )
 
+    # -------------------------------------------------------------------------
     def _build_argument_location_signals(
         self, arguments: dict[str, Any]
     ) -> list[LocationSignal]:
@@ -524,6 +548,7 @@ class AgentToolCatalogService:
             )
         return signals
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _parsed_request_from_context(context: AgentExecutionContext | None) -> TurnParseResult | None:
         if context is None or not isinstance(context.parsed_request, dict):
@@ -533,6 +558,7 @@ class AgentToolCatalogService:
         except Exception:
             return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _map_result(
         *,
@@ -554,6 +580,7 @@ class AgentToolCatalogService:
             "metadata": {},
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _capability_selection_result(
         *,
@@ -575,6 +602,7 @@ class AgentToolCatalogService:
             "metadata": {},
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _error_result(
         *,

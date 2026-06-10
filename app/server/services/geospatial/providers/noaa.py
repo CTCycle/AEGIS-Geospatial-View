@@ -15,12 +15,15 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class NOAAProvider(GeospatialProvider):
     provider_id = "noaa"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, fetcher: JsonFetcher | None = None) -> None:
         self.fetcher = fetcher or fetch_json_url
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if request.capability_id == "noaa_coops_water_levels":
             return self._coops_water_levels(request)
@@ -28,6 +31,7 @@ class NOAAProvider(GeospatialProvider):
             return self._radar_tiles(request)
         return await self._weather_alerts(request)
 
+    # -------------------------------------------------------------------------
     async def _weather_alerts(self, request: ProviderRequest) -> ProviderResponse:
         params: dict[str, str] = {"status": "actual", "message_type": "alert"}
         if request.bbox is not None:
@@ -67,6 +71,7 @@ class NOAAProvider(GeospatialProvider):
             attribution=["NOAA National Weather Service"],
         )
 
+    # -------------------------------------------------------------------------
     def _radar_tiles(self, request: ProviderRequest) -> ProviderResponse:
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -81,6 +86,7 @@ class NOAAProvider(GeospatialProvider):
             attribution=["NOAA/NCEP nowCOAST"],
         )
 
+    # -------------------------------------------------------------------------
     def _coops_water_levels(self, request: ProviderRequest) -> ProviderResponse:
         params = {
             "product": "water_level",
@@ -103,6 +109,7 @@ class NOAAProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
         raise ProviderUnavailableError("NOAA alert payload must be a GeoJSON object.")

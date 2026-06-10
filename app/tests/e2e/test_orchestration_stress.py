@@ -14,10 +14,12 @@ from tests.e2e.helpers.chat_stub_payloads import (
 )
 
 
+###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
 
+###############################################################################
 def _stub_ui_api(page: Page) -> None:
     state = {"session_id": 777}
 
@@ -62,6 +64,7 @@ def _stub_ui_api(page: Page) -> None:
     )
 
 
+###############################################################################
 def test_25_sequential_turns_mixed_with_new_chat_resets(
     page: Page, base_url: str
 ) -> None:
@@ -79,6 +82,7 @@ def test_25_sequential_turns_mixed_with_new_chat_resets(
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 
+###############################################################################
 def test_rapid_double_submit_does_not_duplicate_assistant_state(
     page: Page, base_url: str
 ) -> None:
@@ -98,6 +102,7 @@ def test_rapid_double_submit_does_not_duplicate_assistant_state(
     expect(page.locator(".chat-message--assistant")).to_have_count(1, timeout=10000)
 
 
+###############################################################################
 def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> None:
     _stub_ui_api(page)
     page.goto(base_url)
@@ -110,6 +115,7 @@ def test_repeated_refresh_loop_preserves_state(page: Page, base_url: str) -> Non
         expect(page.locator(".chat-message").first).to_be_visible()
 
 
+###############################################################################
 def test_route_switching_20_cycles_preserves_query_and_chat_state(
     page: Page, base_url: str
 ) -> None:
@@ -131,6 +137,7 @@ def test_route_switching_20_cycles_preserves_query_and_chat_state(
     expect(page.get_by_placeholder("Search models")).to_have_value("gpt")
 
 
+###############################################################################
 def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> None:
     _stub_ui_api(page)
     page.goto(base_url)
@@ -141,6 +148,7 @@ def test_large_composer_input_does_not_freeze_ui(page: Page, base_url: str) -> N
     expect(page.get_by_label("Chat message")).to_be_visible()
 
 
+###############################################################################
 def test_overlay_toggle_and_opacity_restore_after_refresh(
     page: Page, base_url: str
 ) -> None:

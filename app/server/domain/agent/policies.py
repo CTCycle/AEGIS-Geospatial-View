@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentPolicyConstraints:
     requires_location: bool
@@ -12,6 +13,7 @@ class AgentPolicyConstraints:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolAuthorizationResult:
     allowed: bool
@@ -19,6 +21,7 @@ class ToolAuthorizationResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolValidationResult:
     valid: bool

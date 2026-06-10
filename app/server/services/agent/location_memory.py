@@ -5,11 +5,11 @@ import re
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.extraction.models import LocationSignal, NormalizedAction
 
-
 ###############################################################################
 class LocationMemoryService:
     REFERENCE_PATTERN = re.compile(r"\b(there|that place|same place|same area|there now)\b", re.IGNORECASE)
 
+    # -------------------------------------------------------------------------
     def build_memory_snapshot(self, last_assistant_payload: dict | None) -> dict:
         if not isinstance(last_assistant_payload, dict):
             return {"location_slots": [], "active_location": None}
@@ -21,6 +21,7 @@ class LocationMemoryService:
             }
         return {"location_slots": [], "active_location": None}
 
+    # -------------------------------------------------------------------------
     def resolve_explicit_references(self, user_text: str, snapshot: dict) -> list[LocationSignal]:
         if not self.REFERENCE_PATTERN.search(user_text):
             return []
@@ -42,6 +43,7 @@ class LocationMemoryService:
             )
         ]
 
+    # -------------------------------------------------------------------------
     def update_memory_snapshot(
         self,
         snapshot: dict,

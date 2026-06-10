@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 ###############################################################################
 class GIBSServiceError(Exception):
     """Base exception for GIBS service failures."""

@@ -17,12 +17,16 @@ ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, ob
 NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
 
 
+###############################################################################
 class ToolRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, *, runtime_registry: RuntimeRegistry | None = None) -> None:
         self.runtime_registry = runtime_registry or RuntimeRegistry()
         self._handlers: dict[str, ToolHandler] = {}
         self._native_tools: dict[str, RegisteredNativeTool] = {}
 
+    # -------------------------------------------------------------------------
     def register_native_tool(
         self,
         definition: LLMToolDefinition,
@@ -33,12 +37,15 @@ class ToolRegistry:
             handler=handler,
         )
 
+    # -------------------------------------------------------------------------
     def list_native_tools(self) -> list[LLMToolDefinition]:
         return [item.definition for item in self._native_tools.values()]
 
+    # -------------------------------------------------------------------------
     def has_native_tool(self, name: str) -> bool:
         return name in self._native_tools
 
+    # -------------------------------------------------------------------------
     async def execute_native_tool(
         self,
         name: str,
@@ -72,6 +79,7 @@ class ToolRegistry:
             )
         return ToolExecutionEnvelope(ok=True, data=result)
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_arguments(
         cls,
@@ -82,6 +90,7 @@ class ToolRegistry:
             return "Tool arguments must be an object."
         return cls._validate_schema_node(schema, arguments, path="")
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_schema_node(
         cls,
@@ -112,6 +121,7 @@ class ToolRegistry:
             return numeric_error
         return None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_object_schema(
         cls,
@@ -147,6 +157,7 @@ class ToolRegistry:
                 return field_error
         return None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_array_schema(
         cls,
@@ -172,6 +183,7 @@ class ToolRegistry:
                 return item_error
         return None
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_numeric_schema(
         cls,
@@ -190,6 +202,7 @@ class ToolRegistry:
             return f"{cls._label_for_path(path)} must be <= {maximum}."
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _child_path(path: str, child: str) -> str:
         if not path:
@@ -198,10 +211,12 @@ class ToolRegistry:
             return f"{path}[{child}]"
         return f"{path}.{child}"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _label_for_path(path: str) -> str:
         return f"Argument '{path}'" if path else "Tool arguments"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _format_expected_type(expected_type: Any) -> str:
         if isinstance(expected_type, str):
@@ -210,6 +225,7 @@ class ToolRegistry:
             return " or ".join(str(item) for item in expected_type)
         return str(expected_type)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _matches_json_type(value: Any, expected_type: Any) -> bool:
         expected = {expected_type} if isinstance(expected_type, str) else set(expected_type)
@@ -223,6 +239,7 @@ class ToolRegistry:
             or ("null" in expected and value is None)
         )
 
+    # -------------------------------------------------------------------------
     def load_tool_bindings(self) -> dict[str, ToolHandler]:
         self.runtime_registry.build_snapshot()
         handler_lookup: dict[str, ToolHandler] = {
@@ -243,11 +260,13 @@ class ToolRegistry:
         self._handlers = bindings
         return bindings
 
+    # -------------------------------------------------------------------------
     def get_handler(self, tool_id: str) -> ToolHandler | None:
         if not self._handlers:
             self.load_tool_bindings()
         return self._handlers.get(tool_id)
 
+    # -------------------------------------------------------------------------
     async def execute(
         self,
         tool_id: str,

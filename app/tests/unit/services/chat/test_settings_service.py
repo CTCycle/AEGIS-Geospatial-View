@@ -12,12 +12,14 @@ from server.services.chat.settings_service import (
 )
 
 
+###############################################################################
 @dataclass
 class EncryptedValue:
     value: str
     key_version: str
 
 
+###############################################################################
 @dataclass
 class FakeSettingsRecord:
     active_provider_mode: str = "cloud"
@@ -32,14 +34,19 @@ class FakeSettingsRecord:
     google_base_url: str | None = "https://google.example/v1"
 
 
+###############################################################################
 class FakeSettingsRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self, record: FakeSettingsRecord | None = None) -> None:
         self.record = record or FakeSettingsRecord()
         self.last_update: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     def get_or_create(self) -> FakeSettingsRecord:
         return self.record
 
+    # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> FakeSettingsRecord:
         self.last_update = kwargs
         for key, value in kwargs.items():
@@ -47,17 +54,23 @@ class FakeSettingsRepository:
         return self.record
 
 
+###############################################################################
 class FakeCredentialsRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.deactivated: list[tuple[str, str]] = []
         self.upserts: list[tuple[str, str, str, str]] = []
 
+    # -------------------------------------------------------------------------
     def list_active(self) -> list[Any]:
         return []
 
+    # -------------------------------------------------------------------------
     def deactivate(self, *, provider: str, label: str) -> None:
         self.deactivated.append((provider, label))
 
+    # -------------------------------------------------------------------------
     def upsert(
         self,
         *,
@@ -69,15 +82,22 @@ class FakeCredentialsRepository:
         self.upserts.append((provider, label, encrypted_value, key_version))
 
 
+###############################################################################
 class FakeCryptoService:
+
+    # -------------------------------------------------------------------------
     def encrypt(self, value: str) -> EncryptedValue:
         return EncryptedValue(value=f"enc:{value}", key_version="v1")
 
+    # -------------------------------------------------------------------------
     def decrypt(self, value: str) -> str:
         return value
 
 
+###############################################################################
 class FakeModelLibraryService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         local_model_ids: set[str] | None = None,
@@ -86,6 +106,7 @@ class FakeModelLibraryService:
         self.local_model_ids = local_model_ids or set()
         self.model_overrides = model_overrides or {}
 
+    # -------------------------------------------------------------------------
     def list_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
         local = [
             {
@@ -121,6 +142,7 @@ class FakeModelLibraryService:
             "local": local,
         }
 
+    # -------------------------------------------------------------------------
     def find_model(
         self,
         *,
@@ -136,6 +158,7 @@ class FakeModelLibraryService:
         return None
 
 
+###############################################################################
 def build_service(
     *,
     settings_repo: FakeSettingsRepository | None = None,
@@ -150,6 +173,7 @@ def build_service(
     )
 
 
+###############################################################################
 def test_partial_update_preserves_existing_settings_when_fields_are_omitted() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(settings_repo=settings_repo)
@@ -170,6 +194,7 @@ def test_partial_update_preserves_existing_settings_when_fields_are_omitted() ->
     }
 
 
+###############################################################################
 def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
     credentials_repo = FakeCredentialsRepository()
@@ -192,6 +217,7 @@ def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> 
     assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
 
 
+###############################################################################
 def test_local_chat_model_validation_rejects_unavailable_ollama_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
@@ -204,6 +230,7 @@ def test_local_chat_model_validation_rejects_unavailable_ollama_model() -> None:
         )
 
 
+###############################################################################
 def test_local_parser_model_validation_rejects_unavailable_ollama_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
@@ -216,6 +243,7 @@ def test_local_parser_model_validation_rejects_unavailable_ollama_model() -> Non
         )
 
 
+###############################################################################
 def test_local_agent_model_validation_rejects_unavailable_ollama_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
@@ -228,6 +256,7 @@ def test_local_agent_model_validation_rejects_unavailable_ollama_model() -> None
         )
 
 
+###############################################################################
 def test_available_local_models_allow_update() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(
@@ -253,6 +282,7 @@ def test_available_local_models_allow_update() -> None:
     assert settings_repo.last_update["chat_model_name"] == "llama3.2"
 
 
+###############################################################################
 def test_agent_model_without_tools_is_rejected() -> None:
     service = build_service(
         model_library_service=FakeModelLibraryService(
@@ -274,6 +304,7 @@ def test_agent_model_without_tools_is_rejected() -> None:
         )
 
 
+###############################################################################
 def test_parser_model_without_structured_output_is_rejected() -> None:
     service = build_service(
         model_library_service=FakeModelLibraryService(

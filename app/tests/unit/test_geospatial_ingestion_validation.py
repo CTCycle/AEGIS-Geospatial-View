@@ -9,6 +9,7 @@ from server.services.geospatial.ingestion import (
 )
 
 
+###############################################################################
 def _manifest(source: str) -> dict:
     return {
         "id": "validation_sample",
@@ -36,6 +37,7 @@ def _manifest(source: str) -> dict:
     }
 
 
+###############################################################################
 def test_ingestion_validation_reports_missing_download_fields(tmp_path) -> None:
     manifest = _manifest(str(tmp_path / "missing.geojson"))
     del manifest["download"]["sourceUrl"]
@@ -46,6 +48,7 @@ def test_ingestion_validation_reports_missing_download_fields(tmp_path) -> None:
     assert "sourceUrl" in errors[0]
 
 
+###############################################################################
 def test_ingestion_validation_accepts_checksum_url(tmp_path) -> None:
     source = tmp_path / "source.geojson"
     source.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")

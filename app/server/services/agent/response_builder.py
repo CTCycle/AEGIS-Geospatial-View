@@ -7,7 +7,10 @@ from server.domain.chat import ChatOperationResult
 from server.domain.geographics import MapSession
 
 
+###############################################################################
 class AgentResponseBuilder:
+
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_final_decision(
         *,
@@ -39,6 +42,7 @@ class AgentResponseBuilder:
             trace=DecisionTrace(steps=trace_steps),
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def should_build_fallback_map(
         cls,
@@ -81,6 +85,7 @@ class AgentResponseBuilder:
                 return False
         return True
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def tool_payload_has_error(tool_payload: dict[str, Any] | None) -> bool:
         if not isinstance(tool_payload, dict):
@@ -93,6 +98,7 @@ class AgentResponseBuilder:
                 return True
         return False
 
+    # -------------------------------------------------------------------------
     @classmethod
     def build_verified_assistant_message(
         cls,
@@ -112,6 +118,7 @@ class AgentResponseBuilder:
             return tool_error
         return fallback_text or "Done."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def build_preflight_operation_result(
         *,
@@ -130,6 +137,7 @@ class AgentResponseBuilder:
             message=assistant_message,
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def build_verified_operation_result(
         cls,
@@ -184,6 +192,7 @@ class AgentResponseBuilder:
             warnings=warnings,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def extract_tool_error_message(tool_payload: dict[str, Any] | None) -> str | None:
         if not isinstance(tool_payload, dict):
@@ -199,6 +208,7 @@ class AgentResponseBuilder:
                 return error["message"]
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def collect_operation_warnings(
         *,
@@ -232,6 +242,7 @@ class AgentResponseBuilder:
                     warnings.append(warning)
         return warnings
 
+    # -------------------------------------------------------------------------
     @classmethod
     def compose_direct_tool_message(
         cls,
@@ -282,6 +293,7 @@ class AgentResponseBuilder:
                     return f"Weather for {location}{suffix}: {', '.join(details)}."
         return f"Completed {cls.humanize_identifier(tool_id)}."
 
+    # -------------------------------------------------------------------------
     @classmethod
     def compose_map_session_message(cls, map_payload: dict[str, Any]) -> str:
         location = cls.extract_label(map_payload.get("resolved_location"))
@@ -306,6 +318,7 @@ class AgentResponseBuilder:
             parts.append(f"Some requested map data needs attention: {' '.join(warnings)}")
         return " ".join(parts)
 
+    # -------------------------------------------------------------------------
     @classmethod
     def extract_overlay_labels(cls, map_payload: dict[str, Any]) -> list[str]:
         overlays = map_payload.get("overlays")
@@ -324,6 +337,7 @@ class AgentResponseBuilder:
             if overlay_id
         ]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def extract_label(value: object) -> str | None:
         if isinstance(value, dict):
@@ -332,6 +346,7 @@ class AgentResponseBuilder:
                 return label.strip()
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def format_label_list(labels: list[str]) -> str:
         if len(labels) == 1:
@@ -340,6 +355,7 @@ class AgentResponseBuilder:
             return f"the {labels[0]} and {labels[1]} overlays"
         return f"the {', '.join(labels[:-1])}, and {labels[-1]} overlays"
 
+    # -------------------------------------------------------------------------
     @classmethod
     def humanize_warning(cls, warning: str) -> str:
         message = warning.strip()
@@ -362,6 +378,7 @@ class AgentResponseBuilder:
             message += "."
         return message
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def humanize_identifier(value: object) -> str:
         if not isinstance(value, str) or not value.strip():

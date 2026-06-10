@@ -13,6 +13,7 @@ from server.repositories.schemas import (
 )
 
 
+###############################################################################
 def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "database.db"),
@@ -30,7 +31,10 @@ def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> Non
     )
     created: list[object] = []
 
+    ###############################################################################
     class _Repository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, passed_settings: DatabaseSettings) -> None:
             self.engine = object()
             self.db_path = passed_settings.database_path
@@ -51,6 +55,7 @@ def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> Non
     assert calls == created
 
 
+###############################################################################
 def test_initialize_database_uses_passed_database_settings(
     monkeypatch, tmp_path
 ) -> None:
@@ -70,7 +75,10 @@ def test_initialize_database_uses_passed_database_settings(
     )
     received: list[DatabaseSettings] = []
 
+    ###############################################################################
     class _Repository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, passed_settings: DatabaseSettings) -> None:
             received.append(passed_settings)
             self.engine = object()
@@ -90,6 +98,7 @@ def test_initialize_database_uses_passed_database_settings(
     assert received == [settings]
 
 
+###############################################################################
 def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "default.db"),
@@ -107,7 +116,10 @@ def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) 
     )
     received: list[DatabaseSettings] = []
 
+    ###############################################################################
     class _Repository:
+
+        # -------------------------------------------------------------------------
         def __init__(self, passed_settings: DatabaseSettings) -> None:
             received.append(passed_settings)
             self.engine = object()
@@ -131,6 +143,7 @@ def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) 
     assert received == [settings]
 
 
+###############################################################################
 def test_initialize_database_ensures_postgres_schema_when_external_mode(
     monkeypatch, tmp_path
 ) -> None:
@@ -167,12 +180,15 @@ def test_initialize_database_ensures_postgres_schema_when_external_mode(
     assert "server.repositories.database.postgres" in __import__("sys").modules
 
 
+###############################################################################
 def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
     created_tables: list[str] = []
 
+    ###############################################################################
     class _Engine:
         pass
 
+    ###############################################################################
     class _Database:
         engine = _Engine()
 
@@ -202,14 +218,17 @@ def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
     assert created_tables == sorted(created_tables)
 
 
+###############################################################################
 def test_startup_path_seeds_reference_catalog_after_schema_creation(
     monkeypatch,
 ) -> None:
     call_order: list[str] = []
 
+    ###############################################################################
     class _Backend:
         engine = object()
 
+    ###############################################################################
     class _Database:
         backend = _Backend()
 

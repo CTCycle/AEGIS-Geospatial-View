@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+###############################################################################
 class LayerProviderEntry(BaseModel):
     layer_id: str
     title: str

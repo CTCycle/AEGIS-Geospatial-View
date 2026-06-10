@@ -14,7 +14,10 @@ from server.services.geospatial.rainviewer import (
 )
 
 
+###############################################################################
 class LocationSearchOrchestrator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -24,6 +27,7 @@ class LocationSearchOrchestrator:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.rainviewer_service = rainviewer_service or RainViewerService()
 
+    # -------------------------------------------------------------------------
     async def execute(self, payload: LocationSearchRequest) -> MapSession:
         self.capability_registry.load_capabilities()
         basemap = await self._build_basemap_descriptor(payload.basemap_id)
@@ -72,6 +76,7 @@ class LocationSearchOrchestrator:
             },
         )
 
+    # -------------------------------------------------------------------------
     async def _build_basemap_descriptor(self, basemap_id: str) -> dict[str, object] | None:
         capability = self.capability_registry.get_capability(basemap_id)
         if capability is None:
@@ -92,6 +97,7 @@ class LocationSearchOrchestrator:
             "attribution": str(metadata.get("attribution") or ""),
         }
 
+    # -------------------------------------------------------------------------
     async def _build_overlay_descriptor(
         self, overlay_id: str, *, payload: LocationSearchRequest
     ) -> tuple[dict[str, object], list[str]] | None:
@@ -229,6 +235,7 @@ class LocationSearchOrchestrator:
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_backend_render_tile_template(
         *,
@@ -288,6 +295,7 @@ class LocationSearchOrchestrator:
             return resolved_url
         return None
 
+    # -------------------------------------------------------------------------
     def _apply_spatial_placeholders(
         self, value: object, *, payload: LocationSearchRequest
     ) -> object:
@@ -304,6 +312,7 @@ class LocationSearchOrchestrator:
             template = template.replace("{lon}", str(payload.viewport.center_longitude))
         return template
 
+    # -------------------------------------------------------------------------
     def _feature_endpoint_url(
         self, overlay_id: str, *, payload: LocationSearchRequest
     ) -> str:
@@ -313,15 +322,18 @@ class LocationSearchOrchestrator:
         }
         return f"/api/geospatial/layers/{overlay_id}/geojson?{urlencode(params)}"
 
+    # -------------------------------------------------------------------------
     def _bbox_query_value(self, payload: LocationSearchRequest) -> str:
         bounds = payload.viewport.bbox or self._bounds_from_viewport(payload.viewport) or []
         return ",".join(str(round(float(item), 6)) for item in bounds)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = capability.get("metadata")
         return dict(metadata) if isinstance(metadata, dict) else {}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _optional_string(value: object) -> str | None:
         if not isinstance(value, str):
@@ -329,6 +341,7 @@ class LocationSearchOrchestrator:
         stripped = value.strip()
         return stripped or None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _bounds_from_viewport(viewport: Any) -> list[float] | None:
         latitude = getattr(viewport, "center_latitude", None)
@@ -348,6 +361,7 @@ class LocationSearchOrchestrator:
             min(90.0, float(latitude) + lat_delta),
         ]
 
+    # -------------------------------------------------------------------------
     async def _resolve_runtime_tile_url(
         self,
         value: object,
@@ -374,6 +388,7 @@ class LocationSearchOrchestrator:
             "RainViewer metadata could not be fetched; using a timestamp fallback.",
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _resolve_credential_placeholders(
         cls,
@@ -403,12 +418,14 @@ class LocationSearchOrchestrator:
             return f"/api/geospatial/tiles/{capability_id}/{{z}}/{{x}}/{{y}}.png", None
         return template, f"Credentialed tile capability for provider '{provider}' is missing a stable id."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _credential_env_for_provider(provider: str) -> str | None:
         return {
             "windy_webcams": "WINDY_WEBCAMS_API_KEY",
         }.get(provider.strip().lower())
 
+    # -------------------------------------------------------------------------
     async def _resolve_rainviewer_tile_url(self) -> str | None:
         try:
             metadata = await self.rainviewer_service.get_latest_radar_metadata()
@@ -419,6 +436,7 @@ class LocationSearchOrchestrator:
             return None
         return tile_url
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_bounds(value: object) -> bool:
         return (

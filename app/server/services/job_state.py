@@ -7,16 +7,19 @@ from typing import Any
 from server.domain.jobs import BackgroundJobState
 
 
+###############################################################################
 @dataclass
 class JobState(BackgroundJobState):
     lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
+    # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> None:
         with self.lock:
             for key, value in kwargs.items():
                 if hasattr(self, key):
                     setattr(self, key, value)
 
+    # -------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return {

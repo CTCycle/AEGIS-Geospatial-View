@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DatasetIngestionPlan:
     capability_id: str
@@ -25,6 +26,7 @@ class DatasetIngestionPlan:
     validation: dict[str, Any] | None = None
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DatasetIngestionResult:
     capability_id: str

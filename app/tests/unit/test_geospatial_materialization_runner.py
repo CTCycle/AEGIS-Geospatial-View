@@ -6,6 +6,7 @@ from pathlib import Path
 from server.services.geospatial.materialization_runner import materialize_datasets
 
 
+###############################################################################
 def _write_manifest(path: Path, capability_id: str, source_file: Path) -> None:
     path.write_text(
         json.dumps(
@@ -43,6 +44,7 @@ def _write_manifest(path: Path, capability_id: str, source_file: Path) -> None:
     )
 
 
+###############################################################################
 def test_materialize_datasets_filters_by_capability_id(tmp_path: Path) -> None:
     manifest_root = tmp_path / "manifests"
     manifest_root.mkdir(parents=True)

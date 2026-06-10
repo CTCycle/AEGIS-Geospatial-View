@@ -8,6 +8,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 
 
+###############################################################################
 def _sample_gtfs_static_zip() -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
@@ -19,6 +20,7 @@ def _sample_gtfs_static_zip() -> bytes:
     return buffer.getvalue()
 
 
+###############################################################################
 def test_gtfs_static_ingestion_parses_core_feed_tables() -> None:
     response = asyncio.run(
         GTFSStaticProvider().fetch(
@@ -36,6 +38,7 @@ def test_gtfs_static_ingestion_parses_core_feed_tables() -> None:
     assert response.payload["shapes"][0]["geometry"]["type"] == "LineString"
 
 
+###############################################################################
 def test_gtfs_static_provider_fetches_configured_feed_url() -> None:
     calls: list[str] = []
 

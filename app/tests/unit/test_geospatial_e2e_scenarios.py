@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
+###############################################################################
 def test_client_geospatial_e2e_scenario_specs_exist() -> None:
     root = Path("app/client/e2e")
 

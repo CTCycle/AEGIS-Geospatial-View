@@ -14,10 +14,12 @@ from server.configurations.environment import (
 from server.configurations.management import ConfigurationManager
 
 
+###############################################################################
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+###############################################################################
 def test_database_settings_uses_constants_database_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -42,6 +44,7 @@ def test_database_settings_uses_constants_database_path(
     assert settings.embedded_database is True
 
 
+###############################################################################
 def test_database_settings_reads_insert_batch_size_from_env_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -50,6 +53,7 @@ def test_database_settings_reads_insert_batch_size_from_env_only(
     assert settings.insert_batch_size == 777
 
 
+###############################################################################
 def test_database_settings_reads_external_database_keys_from_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -86,6 +90,7 @@ def test_database_settings_reads_external_database_keys_from_env(
     assert settings.insert_batch_size == 2200
 
 
+###############################################################################
 def test_database_settings_ignores_json_database_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -121,6 +126,7 @@ def test_database_settings_ignores_json_database_keys(
     assert settings.insert_batch_size > 0
 
 
+###############################################################################
 def test_configuration_manager_reads_database_settings_from_env_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

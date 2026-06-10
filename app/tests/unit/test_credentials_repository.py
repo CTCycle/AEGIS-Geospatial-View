@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.repositories.credentials import CredentialRepository
 
 
+###############################################################################
 def test_credentials_repository_upsert_and_lookup() -> None:
     repository = CredentialRepository()
     record = repository.upsert(

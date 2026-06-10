@@ -23,8 +23,8 @@ from server.services.agent.orchestrator import AgentOrchestrator
 
 ###############################################################################
 # Helpers
-###############################################################################
 
+###############################################################################
 def make_map_session(
     *,
     session_id: str = "map-123",
@@ -61,6 +61,7 @@ def make_map_session(
     )
 
 
+###############################################################################
 def make_tool_result(
     *,
     operation: str,
@@ -95,13 +96,16 @@ def make_tool_result(
 
 ###############################################################################
 # Tests: NativeToolLoop._extract_map_session
-###############################################################################
 
+###############################################################################
 class TestExtractMapSession:
+
+    # -------------------------------------------------------------------------
     def test_empty_results_returns_none(self):
         result = NativeToolLoop._extract_map_session([])
         assert result is None
 
+    # -------------------------------------------------------------------------
     def test_no_map_session_in_results_returns_none(self):
         results = [
             make_tool_result(operation="capability_selection_created"),
@@ -110,6 +114,7 @@ class TestExtractMapSession:
         result = NativeToolLoop._extract_map_session(results)
         assert result is None
 
+    # -------------------------------------------------------------------------
     def test_map_session_created_returns_validated_session(self):
         ms = make_map_session()
         ms_raw = ms.model_dump(mode="json")
@@ -121,6 +126,7 @@ class TestExtractMapSession:
         assert result.session_id == ms.session_id
         assert result.basemap_id == ms.basemap_id
 
+    # -------------------------------------------------------------------------
     def test_multiple_results_picks_first_map_session(self):
         ms1 = make_map_session(session_id="map-1", basemap_id="gibs_satellite")
         ms2 = make_map_session(session_id="map-2", basemap_id="osm_default")
@@ -133,6 +139,7 @@ class TestExtractMapSession:
         assert result is not None
         assert result.session_id == "map-1"
 
+    # -------------------------------------------------------------------------
     def test_malformed_map_session_dict_returns_none(self):
         results = [
             make_tool_result(
@@ -143,6 +150,7 @@ class TestExtractMapSession:
         result = NativeToolLoop._extract_map_session(results)
         assert result is None
 
+    # -------------------------------------------------------------------------
     def test_error_results_are_skipped(self):
         ms = make_map_session()
         results = [
@@ -156,8 +164,8 @@ class TestExtractMapSession:
 
 ###############################################################################
 # Tests: AgentOrchestrator._build_combined_map_session_from_tool_results
-###############################################################################
 
+###############################################################################
 def make_tool_payload(
     tool_results_data: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -179,6 +187,7 @@ def make_tool_payload(
     }
 
 
+###############################################################################
 def _make_turn_contract(action_id: str = "map_search") -> MagicMock:
     tc = MagicMock(spec=TurnParseResult)
     tc.location_signals = []
@@ -198,6 +207,7 @@ def _make_turn_contract(action_id: str = "map_search") -> MagicMock:
     return tc
 
 
+###############################################################################
 @pytest.fixture
 def orchestrator():
     """Create an AgentOrchestrator with all dependencies mocked."""
@@ -229,7 +239,10 @@ def orchestrator():
     return orchestrator
 
 
+###############################################################################
 class TestCombinedBuilder:
+
+    # -------------------------------------------------------------------------
     async def test_none_tool_payload_returns_none(self, orchestrator):
         result = await orchestrator._build_combined_map_session_from_tool_results(
             tool_payload=None,
@@ -238,6 +251,7 @@ class TestCombinedBuilder:
         )
         assert result is None
 
+    # -------------------------------------------------------------------------
     async def test_empty_tool_results_returns_none(self, orchestrator):
         result = await orchestrator._build_combined_map_session_from_tool_results(
             tool_payload={"tool_results": []},
@@ -246,6 +260,7 @@ class TestCombinedBuilder:
         )
         assert result is None
 
+    # -------------------------------------------------------------------------
     async def test_single_basemap_selection_creates_session(self, orchestrator):
         payload = make_tool_payload([
             {
@@ -269,6 +284,7 @@ class TestCombinedBuilder:
         assert result is not None
         orchestrator.search_orchestrator.execute.assert_awaited_once()
 
+    # -------------------------------------------------------------------------
     async def test_single_overlay_map_session_creates_session(self, orchestrator):
         ms = make_map_session(basemap_id="osm_default", overlay_ids=["rainviewer_radar"])
         payload = make_tool_payload([
@@ -290,6 +306,7 @@ class TestCombinedBuilder:
         assert result is not None
         orchestrator.search_orchestrator.execute.assert_awaited_once()
 
+    # -------------------------------------------------------------------------
     async def test_basemap_plus_overlay_combined_session(self, orchestrator):
         payload = make_tool_payload([
             {
@@ -325,6 +342,7 @@ class TestCombinedBuilder:
         assert result is not None
         orchestrator.search_orchestrator.execute.assert_awaited_once()
 
+    # -------------------------------------------------------------------------
     async def test_multiple_overlays_merged_into_one_session(self, orchestrator):
         """Multiple tool results (basemap + 2 overlays) are merged into one combined MapSession."""
         payload = make_tool_payload([
@@ -373,6 +391,7 @@ class TestCombinedBuilder:
         assert result is not None
         orchestrator.search_orchestrator.execute.assert_awaited_once()
 
+    # -------------------------------------------------------------------------
     async def test_validated_only_results_returns_none(self, orchestrator):
         payload = make_tool_payload([
             {
@@ -393,6 +412,7 @@ class TestCombinedBuilder:
         )
         assert result is None
 
+    # -------------------------------------------------------------------------
     async def test_all_error_results_returns_none(self, orchestrator):
         payload = make_tool_payload([
             {
@@ -411,8 +431,8 @@ class TestCombinedBuilder:
 
 ###############################################################################
 # Tests: Post-processing priority chain
-###############################################################################
 
+###############################################################################
 def test_agent_tool_loop_result_map_session_field():
     """AgentToolLoopResult accepts the new map_session field."""
     ms = make_map_session()
@@ -427,6 +447,7 @@ def test_agent_tool_loop_result_map_session_field():
     assert result.map_session is ms
 
 
+###############################################################################
 def test_agent_tool_loop_result_map_session_defaults_none():
     """map_session defaults to None for backward compatibility."""
     result = AgentToolLoopResult(
@@ -439,6 +460,7 @@ def test_agent_tool_loop_result_map_session_defaults_none():
     assert result.map_session is None
 
 
+###############################################################################
 def test_agent_tool_loop_result_map_session_in_turn_response():
     """Verify map_session flows through ChatTurnResponse model."""
     ms = make_map_session()

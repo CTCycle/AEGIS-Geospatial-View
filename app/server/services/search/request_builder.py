@@ -9,7 +9,10 @@ from server.domain.geographics import (
 )
 
 
+###############################################################################
 class RequestBuilder:
+
+    # -------------------------------------------------------------------------
     def build_location_search_request(
         self,
         plan: ExecutionPlan,
@@ -32,6 +35,7 @@ class RequestBuilder:
             presentation=self.build_presentation(overlays),
         )
 
+    # -------------------------------------------------------------------------
     def choose_basemap(self, plan: ExecutionPlan) -> str:
         if plan.basemap_id:
             return plan.basemap_id
@@ -43,6 +47,7 @@ class RequestBuilder:
             return "osm_terrain"
         return "osm_default"
 
+    # -------------------------------------------------------------------------
     def build_viewport(
         self,
         location: ResolvedLocation,
@@ -71,6 +76,7 @@ class RequestBuilder:
             radius_m=radius_m,
         )
 
+    # -------------------------------------------------------------------------
     def build_presentation(self, overlays: list[str]) -> PresentationPolicy:
         high_contrast = any(
             marker in overlay

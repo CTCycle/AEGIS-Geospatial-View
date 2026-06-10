@@ -17,6 +17,7 @@ from server.services.geospatial.providers.opentripmap import OpenTripMapProvider
 from server.services.geospatial.providers.ourairports import OurAirportsProvider
 
 
+###############################################################################
 def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
     with pytest.raises(ProviderAuthError):
         asyncio.run(
@@ -41,6 +42,7 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
     assert "kinds=museums" in response.payload["featuresUrl"]
 
 
+###############################################################################
 def test_openchargemap_supports_optional_key() -> None:
     response = asyncio.run(
         OpenChargeMapProvider().fetch(
@@ -63,6 +65,7 @@ def test_openchargemap_supports_optional_key() -> None:
     assert "charge-key" in keyed.payload["featuresUrl"]
 
 
+###############################################################################
 def test_nrel_requires_key_for_afdc_descriptor() -> None:
     with pytest.raises(ProviderAuthError):
         asyncio.run(
@@ -86,6 +89,7 @@ def test_nrel_requires_key_for_afdc_descriptor() -> None:
     assert "alt-fuel-stations" in response.payload["featuresUrl"]
 
 
+###############################################################################
 def test_ourairports_returns_source_ready_descriptor() -> None:
     response = asyncio.run(
         OurAirportsProvider().fetch(ProviderRequest(capability_id="ourairports_airports"))
@@ -95,6 +99,7 @@ def test_ourairports_returns_source_ready_descriptor() -> None:
     assert response.payload["downloadUrl"].endswith("airports.csv")
 
 
+###############################################################################
 def test_provider_registry_binds_phase8_adapters_from_manifests() -> None:
     registry = ProviderRegistry()
 
@@ -104,6 +109,7 @@ def test_provider_registry_binds_phase8_adapters_from_manifests() -> None:
         assert provider_id in registry.list_provider_ids()
 
 
+###############################################################################
 def test_opentripmap_live_fetch_normalizes_geojson() -> None:
     async def fetcher(url, headers):
         assert "api.opentripmap.com" in url
@@ -132,6 +138,7 @@ def test_opentripmap_live_fetch_normalizes_geojson() -> None:
     assert response.payload["features"][0]["category"] == "tourism"
 
 
+###############################################################################
 def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     async def fetcher(url, headers):
         assert "api.openchargemap.io" in url
@@ -151,6 +158,7 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     assert response.payload["featureCount"] == 0
 
 
+###############################################################################
 def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
     async def fetcher(url, headers):
         assert "developer.nrel.gov" in url
@@ -181,6 +189,7 @@ def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
     assert response.payload["features"][0]["category"] == "ev_charging"
 
 
+###############################################################################
 def test_phase8_live_provider_malformed_payload_fails_cleanly() -> None:
     async def fetcher(url, headers):
         return "not-json-shape"
@@ -196,6 +205,7 @@ def test_phase8_live_provider_malformed_payload_fails_cleanly() -> None:
         )
 
 
+###############################################################################
 def test_phase8_live_provider_uses_stale_cache_on_failure() -> None:
     calls = 0
 

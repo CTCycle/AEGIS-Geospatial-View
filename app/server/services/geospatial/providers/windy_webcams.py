@@ -24,9 +24,11 @@ WINDY_WEBCAMS_ENDPOINT = "https://api.windy.com/webcams/api/v3/webcams"
 STALE_CAMERA_AFTER = timedelta(hours=24)
 
 
+###############################################################################
 class WindyWebcamsProvider(GeospatialProvider):
     provider_id = "windy_webcams"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self, *, api_key: str | None = None, fetcher: JsonFetcher | None = None
     ) -> None:
@@ -34,6 +36,7 @@ class WindyWebcamsProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_json_url
         self._last_response: ProviderResponse | None = None
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.api_key:
             raise ProviderAuthError("Windy Webcams API key is required.")
@@ -67,6 +70,7 @@ class WindyWebcamsProvider(GeospatialProvider):
         self._last_response = response
         return response
 
+    # -------------------------------------------------------------------------
     def _response_from_cameras(
         self, request: ProviderRequest, cameras: list[Any]
     ) -> ProviderResponse:
@@ -98,6 +102,7 @@ class WindyWebcamsProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _build_windy_webcams_url(request: ProviderRequest) -> str:
     params = ["include=images,location,urls,player", "limit=50"]
     if request.bbox is not None:
@@ -109,6 +114,7 @@ def _build_windy_webcams_url(request: ProviderRequest) -> str:
     return f"{WINDY_WEBCAMS_ENDPOINT}?{'&'.join(params)}"
 
 
+###############################################################################
 def _extract_windy_cameras(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
         return []
@@ -120,6 +126,7 @@ def _extract_windy_cameras(payload: object) -> list[dict[str, object]]:
     return [_normalize_windy_camera(item) for item in raw_items if isinstance(item, dict)]
 
 
+###############################################################################
 def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
     location = item.get("location") if isinstance(item.get("location"), dict) else {}
     images = item.get("images") if isinstance(item.get("images"), dict) else {}
@@ -154,6 +161,7 @@ def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
     }
 
 
+###############################################################################
 def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
     if not isinstance(payload, dict):
         return None
@@ -168,6 +176,7 @@ def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
     return None
 
 
+###############################################################################
 def _preview_image_url(images: object) -> str | None:
     if not isinstance(images, dict):
         return None
@@ -184,6 +193,7 @@ def _preview_image_url(images: object) -> str | None:
     return None
 
 
+###############################################################################
 def _embedding_allowed(item: dict[str, object], player: object) -> bool:
     if item.get("embedding_allowed") is True or item.get("embeddingAllowed") is True:
         return True
@@ -194,6 +204,7 @@ def _embedding_allowed(item: dict[str, object], player: object) -> bool:
     return False
 
 
+###############################################################################
 def _is_stale_timestamp(value: object) -> bool:
     timestamp = _parse_timestamp(value)
     if timestamp is None:
@@ -201,6 +212,7 @@ def _is_stale_timestamp(value: object) -> bool:
     return datetime.now(UTC) - timestamp > STALE_CAMERA_AFTER
 
 
+###############################################################################
 def _is_expired_timestamp(value: object) -> bool:
     timestamp = _parse_timestamp(value)
     if timestamp is None:
@@ -208,6 +220,7 @@ def _is_expired_timestamp(value: object) -> bool:
     return timestamp <= datetime.now(UTC)
 
 
+###############################################################################
 def _parse_timestamp(value: object) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None

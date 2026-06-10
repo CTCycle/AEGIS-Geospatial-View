@@ -16,9 +16,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class TransitlandProvider:
     provider_id = "transitland"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -30,6 +32,7 @@ class TransitlandProvider:
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.api_key:
             raise ProviderAuthError("Transitland access requires a configured API key.")
@@ -68,9 +71,11 @@ class TransitlandProvider:
                 )
             raise
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
         return await self.fetch(request)
 
+    # -------------------------------------------------------------------------
     def _url(self, request: ProviderRequest) -> str:
         params: dict[str, str] = {
             "limit": str(int(request.params.get("limit") or 50)),
@@ -83,6 +88,7 @@ class TransitlandProvider:
             params["bbox"] = f"{west},{south},{east},{north}"
         return f"https://transit.land/api/v2/rest/feeds?{urlencode(params)}"
 
+    # -------------------------------------------------------------------------
     def _normalize(self, payload: object) -> dict[str, object]:
         if not isinstance(payload, dict):
             return {"renderingMode": "metadata-only", "feeds": [], "feedCount": 0}
@@ -95,6 +101,7 @@ class TransitlandProvider:
             "feedCount": len(feeds),
         }
 
+    # -------------------------------------------------------------------------
     def _feed(self, item: dict[str, object]) -> dict[str, object]:
         urls = item.get("urls") if isinstance(item.get("urls"), dict) else {}
         operator = item.get("operator") if isinstance(item.get("operator"), dict) else {}

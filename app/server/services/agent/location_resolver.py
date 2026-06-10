@@ -6,7 +6,6 @@ from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
 from server.domain.extraction.models import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
-
 ###############################################################################
 class LocationResolver:
     SPECIFICITY_BY_SIGNAL_TYPE = {
@@ -17,9 +16,11 @@ class LocationResolver:
         "country": 1,
     }
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, nominatim_service: NominatimService | None = None) -> None:
         self.nominatim_service = nominatim_service or NominatimService()
 
+    # -------------------------------------------------------------------------
     async def resolve_location_signals(
         self,
         location_signals: list[LocationSignal],
@@ -71,6 +72,7 @@ class LocationResolver:
 
         return resolved_candidates[0]
 
+    # -------------------------------------------------------------------------
     def score_location_matches(self, location_signals: Sequence[LocationSignal]) -> list[LocationSignal]:
         return sorted(
             location_signals,
@@ -81,11 +83,13 @@ class LocationResolver:
             reverse=True,
         )
 
+    # -------------------------------------------------------------------------
     def _specificity_gap_is_small(self, left: LocationSignal, right: LocationSignal) -> bool:
         left_specificity = self.SPECIFICITY_BY_SIGNAL_TYPE.get(left.signal_type, 0)
         right_specificity = self.SPECIFICITY_BY_SIGNAL_TYPE.get(right.signal_type, 0)
         return left_specificity == right_specificity
 
+    # -------------------------------------------------------------------------
     def _same_resolved_point(self, left: LocationSignal, right: LocationSignal) -> bool:
         if None in {left.latitude, left.longitude, right.latitude, right.longitude}:
             return False
@@ -94,12 +98,14 @@ class LocationResolver:
             and abs(float(left.longitude) - float(right.longitude)) < 0.01
         )
 
+    # -------------------------------------------------------------------------
     def _same_resolved_location(self, left: ResolvedLocation, right: ResolvedLocation) -> bool:
         return (
             abs(float(left.latitude) - float(right.latitude)) < 0.01
             and abs(float(left.longitude) - float(right.longitude)) < 0.01
         )
 
+    # -------------------------------------------------------------------------
     async def _resolve_signal(self, signal: LocationSignal) -> ResolvedLocation | None:
         if signal.latitude is not None and signal.longitude is not None:
             return ResolvedLocation(
@@ -125,6 +131,7 @@ class LocationResolver:
             confidence=float(geocoded.get("confidence") or signal.confidence),
         )
 
+    # -------------------------------------------------------------------------
     def build_ambiguity_question(self, candidates: Sequence[LocationSignal]) -> ClarificationRequest:
         options = ", ".join((candidate.raw_value for candidate in candidates if candidate.raw_value))
         return ClarificationRequest(

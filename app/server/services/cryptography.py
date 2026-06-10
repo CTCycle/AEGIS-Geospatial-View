@@ -9,6 +9,7 @@ from server.repositories.credential_material import (
 )
 
 
+###############################################################################
 def _load_fernet_from_material(key_material: str) -> Fernet:
     normalized = str(key_material or "").strip()
     if not normalized:
@@ -16,7 +17,10 @@ def _load_fernet_from_material(key_material: str) -> Fernet:
     return Fernet(normalized.encode("utf-8"))
 
 
+###############################################################################
 class CredentialEncryptionService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         material_repo: CredentialEncryptionMaterialRepository | None = None,
@@ -30,10 +34,12 @@ class CredentialEncryptionService:
             )
         self._fernet = _load_fernet_from_material(self._material.key_material)
 
+    # -------------------------------------------------------------------------
     def encrypt(self, raw_value: str) -> EncryptedSecret:
         token = self._fernet.encrypt(raw_value.encode("utf-8")).decode("utf-8")
         return EncryptedSecret(value=token, key_version=self._material.key_version)
 
+    # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         try:
             decrypted = self._fernet.decrypt(encrypted_value.encode("utf-8"))
@@ -43,6 +49,7 @@ class CredentialEncryptionService:
             ) from exc
         return decrypted.decode("utf-8")
 
+    # -------------------------------------------------------------------------
     def decrypt_with_key_version(
         self, encrypted_value: str, key_version: int
     ) -> str:
@@ -62,6 +69,7 @@ class CredentialEncryptionService:
             ) from exc
         return decrypted.decode("utf-8")
 
+    # -------------------------------------------------------------------------
     def mask(self, encrypted_value: str | None) -> str | None:
         if not encrypted_value:
             return None

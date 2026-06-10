@@ -24,9 +24,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class GeoapifyProvider(GeospatialProvider):
     provider_id = "geoapify"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -42,6 +44,7 @@ class GeoapifyProvider(GeospatialProvider):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.api_key:
             raise ProviderAuthError("Geoapify API key is required.")
@@ -91,6 +94,7 @@ class GeoapifyProvider(GeospatialProvider):
             attribution=["Geoapify, OpenStreetMap contributors"],
         )
 
+    # -------------------------------------------------------------------------
     async def validate_credentials(
         self, credentials: Mapping[str, str]
     ) -> ProviderCredentialValidationResult:
@@ -132,6 +136,7 @@ class GeoapifyProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _build_places_url(request: ProviderRequest, api_key: str) -> str:
     categories = str(request.params.get("categories") or "amenity").strip()
     params = {
@@ -146,6 +151,7 @@ def _build_places_url(request: ProviderRequest, api_key: str) -> str:
     return f"https://api.geoapify.com/v2/places?{urlencode(params)}"
 
 
+###############################################################################
 def _cache_key(request: ProviderRequest) -> str:
     bbox = ",".join(str(part) for part in request.bbox or ())
     categories = str(request.params.get("categories") or "amenity").strip()
@@ -153,6 +159,7 @@ def _cache_key(request: ProviderRequest) -> str:
     return f"geoapify:places:{bbox}:{categories}:{limit}"
 
 
+###############################################################################
 def _places_response(
     request: ProviderRequest, payload: dict[str, object], *, stale: bool
 ) -> ProviderResponse:
@@ -165,6 +172,7 @@ def _places_response(
     )
 
 
+###############################################################################
 def _normalize_places_payload(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
         return []
@@ -204,6 +212,7 @@ def _normalize_places_payload(payload: object) -> list[dict[str, object]]:
     return features
 
 
+###############################################################################
 def _first_category(value: object) -> str:
     if isinstance(value, list) and value:
         return str(value[0])

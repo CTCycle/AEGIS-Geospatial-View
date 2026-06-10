@@ -9,39 +9,46 @@ from pathlib import Path
 from urllib import error, parse, request
 
 
+###############################################################################
 class SpaProxyHandler(SimpleHTTPRequestHandler):
     server_version = "AEGIS-SpaProxy/1.0"
 
+    # -------------------------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
         if self.path.startswith("/api/"):
             self._proxy_request()
             return
         self._serve_spa()
 
+    # -------------------------------------------------------------------------
     def do_POST(self) -> None:  # noqa: N802
         if self.path.startswith("/api/"):
             self._proxy_request()
             return
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
 
+    # -------------------------------------------------------------------------
     def do_PUT(self) -> None:  # noqa: N802
         if self.path.startswith("/api/"):
             self._proxy_request()
             return
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
 
+    # -------------------------------------------------------------------------
     def do_DELETE(self) -> None:  # noqa: N802
         if self.path.startswith("/api/"):
             self._proxy_request()
             return
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
 
+    # -------------------------------------------------------------------------
     def do_PATCH(self) -> None:  # noqa: N802
         if self.path.startswith("/api/"):
             self._proxy_request()
             return
         self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
 
+    # -------------------------------------------------------------------------
     def _serve_spa(self) -> None:
         path_only = self.path.split("?", 1)[0]
         local_path = Path(self.translate_path(path_only))
@@ -50,6 +57,7 @@ class SpaProxyHandler(SimpleHTTPRequestHandler):
         self.path = "/index.html"
         return super().do_GET()
 
+    # -------------------------------------------------------------------------
     def _proxy_request(self) -> None:
         backend_base: str = self.server.backend_base_url  # type: ignore[attr-defined]
         target_url = parse.urljoin(backend_base, self.path)
@@ -93,6 +101,7 @@ class SpaProxyHandler(SimpleHTTPRequestHandler):
             self.wfile.write(str(exc).encode("utf-8"))
 
 
+###############################################################################
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
@@ -102,6 +111,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+###############################################################################
 def main() -> int:
     args = parse_args()
     frontend_root = Path(args.frontend_root).resolve()

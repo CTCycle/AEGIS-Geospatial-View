@@ -8,6 +8,7 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 @dataclass(frozen=True)
 class OverlayInferenceResult:
     overlay_ids: list[str]
@@ -15,7 +16,10 @@ class OverlayInferenceResult:
     reasons: dict[str, list[str]]
 
 
+###############################################################################
 class OverlayInferenceService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -25,6 +29,7 @@ class OverlayInferenceService:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.runtime_registry = runtime_registry or RuntimeRegistry()
 
+    # -------------------------------------------------------------------------
     def infer_overlays(
         self,
         *,

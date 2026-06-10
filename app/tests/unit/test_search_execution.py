@@ -8,6 +8,7 @@ from server.domain.geographics import LocationSearchRequest, SearchByLocationRes
 from server.services.search.composition import build_search_runtime
 
 
+###############################################################################
 def _location_request() -> LocationSearchRequest:
     return LocationSearchRequest(
         resolved_location=ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5),
@@ -20,6 +21,7 @@ def _location_request() -> LocationSearchRequest:
     )
 
 
+###############################################################################
 def test_location_search_request_is_the_only_input_contract() -> None:
     signature_search = inspect.signature(build_search_runtime().search_execution.search_by_location)
     assert signature_search.parameters["payload"].annotation in {
@@ -28,6 +30,7 @@ def test_location_search_request_is_the_only_input_contract() -> None:
     }
 
 
+###############################################################################
 def test_search_by_location_returns_response(monkeypatch) -> None:
     runtime = build_search_runtime()
     service = runtime.search_execution

@@ -7,10 +7,12 @@ from typing import Any
 from server.domain.geospatial.tiler import TileBuildResult
 
 
+###############################################################################
 class TileBuildError(RuntimeError):
     """Raised when a geospatial dataset cannot be prepared for tile delivery."""
 
 
+###############################################################################
 def build_vector_tile_manifest(
     *,
     capability_id: str,
@@ -46,6 +48,7 @@ def build_vector_tile_manifest(
     )
 
 
+###############################################################################
 def build_raster_tile_manifest(
     *,
     capability_id: str,
@@ -78,6 +81,7 @@ def build_raster_tile_manifest(
     )
 
 
+###############################################################################
 def _feature_count(source_path: Path | None) -> int:
     if source_path is None:
         return 0

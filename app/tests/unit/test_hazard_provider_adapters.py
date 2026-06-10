@@ -12,6 +12,7 @@ from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 
 
+###############################################################################
 def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     earthquake = asyncio.run(
         USGSProvider().fetch(ProviderRequest(capability_id="usgs_earthquakes"))
@@ -30,6 +31,7 @@ def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     assert "bBox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
 
 
+###############################################################################
 def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
         assert "all_day.geojson" in url
@@ -60,6 +62,7 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["features"][0]["magnitude"] == 2.5
 
 
+###############################################################################
 def test_usgs_provider_normalizes_live_water_gauges() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
         assert "waterservices.usgs.gov" in url
@@ -104,6 +107,7 @@ def test_usgs_provider_normalizes_live_water_gauges() -> None:
     assert response.payload["features"][0]["metadata"]["unit"] == "ft"
 
 
+###############################################################################
 def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     alerts = asyncio.run(
         NOAAProvider().fetch(ProviderRequest(capability_id="noaa_weather_alerts"))
@@ -120,6 +124,7 @@ def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     assert "tidesandcurrents.noaa.gov" in coops.payload["featuresUrl"]
 
 
+###############################################################################
 def test_noaa_provider_normalizes_live_alert_geojson() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
         assert "api.weather.gov/alerts/active" in url
@@ -162,6 +167,7 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
     assert response.payload["features"][0]["severity"] == "Severe"
 
 
+###############################################################################
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     response = asyncio.run(
         FEMAProvider().fetch(ProviderRequest(capability_id="fema_nfhl_flood_zones"))
@@ -171,6 +177,7 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     assert "hazards.fema.gov" in response.payload["tileUrl"]
 
 
+###############################################################################
 def test_nasa_firms_requires_key_before_descriptor() -> None:
     with pytest.raises(ProviderAuthError):
         asyncio.run(
@@ -193,6 +200,7 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
     assert "test-key" in response.payload["featuresUrl"]
 
 
+###############################################################################
 def test_nasa_firms_normalizes_live_csv() -> None:
     async def fetcher(url: str) -> str:
         assert "test-key" in url
@@ -216,6 +224,7 @@ def test_nasa_firms_normalizes_live_csv() -> None:
     assert response.payload["features"][0]["timestamp"] == "2026-05-11T09:30:00Z"
 
 
+###############################################################################
 def test_provider_registry_binds_hazard_adapters_from_manifests() -> None:
     registry = ProviderRegistry()
 

@@ -17,10 +17,12 @@ from server.services.geospatial.providers.base import (
 )
 
 
+###############################################################################
 class OpenAQProvider(GeospatialProvider):
     provider_id = "openaq"
     supported_pollutants = {"pm25", "pm10", "no2", "o3", "so2", "co"}
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -36,6 +38,7 @@ class OpenAQProvider(GeospatialProvider):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.api_key:
             raise ProviderAuthError("OpenAQ API key is required.")
@@ -84,6 +87,7 @@ class OpenAQProvider(GeospatialProvider):
         )
         return self._response(request, normalized, stale=False)
 
+    # -------------------------------------------------------------------------
     def _response(
         self,
         request: ProviderRequest,
@@ -104,6 +108,7 @@ class OpenAQProvider(GeospatialProvider):
             stale=stale,
         )
 
+    # -------------------------------------------------------------------------
     def _features(
         self, payload: dict[str, Any], *, pollutants: list[str]
     ) -> list[dict[str, Any]]:
@@ -132,6 +137,7 @@ class OpenAQProvider(GeospatialProvider):
             )
         return features
 
+    # -------------------------------------------------------------------------
     def _pollutants(self, request: ProviderRequest) -> list[str]:
         raw = request.params.get("pollutants") or request.params.get("pollutant")
         if isinstance(raw, str):
@@ -143,6 +149,7 @@ class OpenAQProvider(GeospatialProvider):
         filtered = [item for item in values if item in self.supported_pollutants]
         return filtered or sorted(self.supported_pollutants)
 
+    # -------------------------------------------------------------------------
     def _filter_measurements(
         self, measurements: Any, pollutants: list[str]
     ) -> dict[str, Any]:

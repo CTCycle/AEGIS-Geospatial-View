@@ -4,6 +4,7 @@ from server.repositories.catalog.reference_loader import load_reference_catalog
 from server.services.sanitization import LocationSanitizationService
 
 
+###############################################################################
 def test_country_canonical_names_and_aliases_normalize_through_reference_mapping() -> (
     None
 ):

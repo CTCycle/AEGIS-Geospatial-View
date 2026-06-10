@@ -10,6 +10,7 @@ from server.common.constants import (
 )
 
 
+###############################################################################
 def test_upsert_uses_orm_and_updates_existing_rows(tmp_path) -> None:
     repository = SQLiteRepository(
         DatabaseSettings(
@@ -59,6 +60,7 @@ def test_upsert_uses_orm_and_updates_existing_rows(tmp_path) -> None:
     assert rows[0]["display_name"] == "Updated"
 
 
+###############################################################################
 def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
     repository = SQLiteRepository(
         DatabaseSettings(
@@ -120,6 +122,7 @@ def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
     assert by_id["layer-2"]["display_name"] == "Two"
 
 
+###############################################################################
 def test_upsert_omits_null_autoincrement_primary_key(tmp_path) -> None:
     repository = SQLiteRepository(
         DatabaseSettings(
@@ -159,6 +162,7 @@ def test_upsert_omits_null_autoincrement_primary_key(tmp_path) -> None:
     assert rows[0]["status"] == "active"
 
 
+###############################################################################
 def test_repository_uses_database_path_from_settings(tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "database.db"),
@@ -180,6 +184,7 @@ def test_repository_uses_database_path_from_settings(tmp_path) -> None:
     assert repository.db_path == settings.database_path
 
 
+###############################################################################
 def test_repository_creates_parent_directory_for_database_path(tmp_path) -> None:
     database_path = tmp_path / "nested" / "data" / "database.db"
     settings = DatabaseSettings(

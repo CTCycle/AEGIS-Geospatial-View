@@ -15,6 +15,7 @@ from server.repositories.schemas import Base
 from server.services.catalog.loader import load_reference_catalog
 
 
+###############################################################################
 def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings().database
     repository = SQLiteRepository(resolved_settings)
@@ -22,6 +23,7 @@ def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None
     logger.info("Ensured local SQLite schema at %s", repository.db_path)
 
 
+###############################################################################
 def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings().database
     repository = PostgresRepository(resolved_settings)
@@ -35,6 +37,7 @@ def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
         )
 
 
+###############################################################################
 def initialize_database(
     database: DatabaseBackend | DatabaseSettings | None = None,
 ) -> None:
@@ -55,6 +58,7 @@ def initialize_database(
     logger.info("Ensured relational schema using active database backend.")
 
 
+###############################################################################
 def seed_reference_catalog(database: DatabaseBackend) -> ReferenceSeedResult:
     catalog = load_reference_catalog()
     return ReferenceCatalogSeeder(database).seed_if_needed(catalog)

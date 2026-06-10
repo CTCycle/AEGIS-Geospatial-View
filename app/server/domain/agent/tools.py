@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.agent.actions import AgentAction
 from server.domain.llm.types import LLMToolDefinition
 
-
 ###############################################################################
 class AgentToolName(str, Enum):
     SEARCH_MAPS = "search_maps"
@@ -52,12 +51,14 @@ class AgentToolResult(BaseModel):
     error: str | None = None
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolError:
     code: str
     message: str
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolExecutionEnvelope:
     ok: bool
@@ -65,6 +66,7 @@ class ToolExecutionEnvelope:
     error: ToolError | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.ok,
@@ -76,6 +78,7 @@ class ToolExecutionEnvelope:
         }
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RegisteredNativeTool:
     definition: LLMToolDefinition

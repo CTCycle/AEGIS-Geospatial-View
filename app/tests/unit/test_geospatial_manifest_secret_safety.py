@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.services.geospatial.layer_auditor import audit_all_manifests
 
 
+###############################################################################
 def test_geospatial_manifests_do_not_contain_secret_values() -> None:
     report = audit_all_manifests(strict=True)
     issues = [

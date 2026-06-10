@@ -21,6 +21,7 @@ from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ChatRuntime:
     settings_service: ChatSettingsService
@@ -29,6 +30,7 @@ class ChatRuntime:
     agent_orchestrator: AgentOrchestrator
 
 
+###############################################################################
 def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatRuntime:
     settings_repo = ModelSettingsRepository()
     ollama_tool_capability_cache = OllamaToolCapabilityCache()

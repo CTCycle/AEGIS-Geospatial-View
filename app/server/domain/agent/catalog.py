@@ -6,6 +6,7 @@ from typing import Any, TypedDict
 CATALOG_PAGE_LIMIT = 50
 
 
+###############################################################################
 @dataclass(frozen=True)
 class CapabilityCatalogFilter:
     query: str | None = None
@@ -16,6 +17,7 @@ class CapabilityCatalogFilter:
     cursor: str | None = None
 
 
+###############################################################################
 class GeospatialCapabilityExecutionResult(TypedDict, total=False):
     ok: bool
     operation: str

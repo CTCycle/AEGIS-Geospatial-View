@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.geospatial.nominatim import NominatimService
 
-
 ###############################################################################
 def test_nominatim_rank_candidates_prefers_poi_when_expected() -> None:
     service = NominatimService(user_agent="test-suite", timeout=0.1)

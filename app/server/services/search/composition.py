@@ -10,6 +10,7 @@ from server.services.search.execution import MapSearchExecutionService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 
 
+###############################################################################
 @dataclass(frozen=True)
 class SearchRuntime:
     search_execution: MapSearchExecutionService
@@ -17,6 +18,7 @@ class SearchRuntime:
     osm_tile_proxy_service: OsmTileProxyService
 
 
+###############################################################################
 def build_search_runtime() -> SearchRuntime:
     capability_registry = CapabilityRegistry()
     runtime_registry = RuntimeRegistry()

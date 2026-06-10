@@ -28,30 +28,27 @@ __all__ = [
     "MapService",
 ]
 
-
 ###############################################################################
 def get_map_tile_options(default_tiles: str | None = None) -> dict[str, str]:
     del default_tiles
     return {name: label for name, label in COMMON_FOLIUM_MAPS.items() if name.strip()}
 
-
 ###############################################################################
 class MapServiceError(Exception):
     pass
-
 
 ###############################################################################
 class MapValidationError(MapServiceError):
     pass
 
-
 ###############################################################################
 class MapRequestError(MapServiceError):
     pass
 
-
 ###############################################################################
 class MapService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

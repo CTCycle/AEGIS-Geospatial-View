@@ -6,6 +6,7 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 def run_startup_validations() -> None:
     loader = GeospatialManifestLoader()
     loader.load_all()

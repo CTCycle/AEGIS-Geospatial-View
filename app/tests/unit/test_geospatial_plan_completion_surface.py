@@ -15,6 +15,7 @@ from server.services.geospatial.search_index import (
 from server.services.geospatial.tiler import build_vector_tile_manifest
 
 
+###############################################################################
 def test_plan_named_provider_adapters_are_bound() -> None:
     registry = ProviderRegistry()
     registry.build_from_manifests()
@@ -29,6 +30,7 @@ def test_plan_named_provider_adapters_are_bound() -> None:
         assert registry.get(provider_id).provider_id == provider_id
 
 
+###############################################################################
 def test_ingestion_only_providers_return_graceful_state() -> None:
     registry = ProviderRegistry()
     registry.build_from_manifests()
@@ -44,6 +46,7 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
     assert response.payload["downloadUrl"].startswith("https://")
 
 
+###############################################################################
 def test_transitland_requires_configured_key() -> None:
     registry = ProviderRegistry()
     registry.build_from_manifests()
@@ -57,6 +60,7 @@ def test_transitland_requires_configured_key() -> None:
         )
 
 
+###############################################################################
 def test_search_index_queries_feature_metadata() -> None:
     index = build_feature_search_index(
         [
@@ -75,6 +79,7 @@ def test_search_index_queries_feature_metadata() -> None:
     assert [item.id for item in matches] == ["1"]
 
 
+###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:
     geojson = tmp_path / "features.geojson"
     geojson.write_text(

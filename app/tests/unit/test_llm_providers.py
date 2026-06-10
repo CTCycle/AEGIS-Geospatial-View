@@ -11,11 +11,15 @@ from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMResult
 
 
+###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str = "structured"
 
 
+###############################################################################
 class _Message:
+
+    # -------------------------------------------------------------------------
     def __init__(self, content) -> None:  # noqa: ANN001
         self.content = content
         self.response_metadata = {"provider": "fake"}
@@ -23,10 +27,14 @@ class _Message:
         self.additional_kwargs = {}
 
 
+###############################################################################
 class _StructuredModel:
+
+    # -------------------------------------------------------------------------
     def __init__(self, schema: type[object]) -> None:
         self._schema = schema
 
+    # -------------------------------------------------------------------------
     def invoke(self, _messages):  # noqa: ANN001, ANN202
         validator = getattr(self._schema, "model_validate", None)
         if callable(validator):
@@ -34,44 +42,59 @@ class _StructuredModel:
         return {"answer": "structured"}
 
 
+###############################################################################
 class _FakeChatModel:
     instances: list["_FakeChatModel"] = []
 
+    # -------------------------------------------------------------------------
     def __init__(self, **_kwargs) -> None:
         self.kwargs = _kwargs
         self.instances.append(self)
 
+    # -------------------------------------------------------------------------
     def invoke(self, _messages):  # noqa: ANN001, ANN202
         return _Message("chat-ok")
 
+    # -------------------------------------------------------------------------
     def stream(self, _messages):  # noqa: ANN001, ANN202
         yield _Message([{"text": "chunk-1"}])
         yield _Message("chunk-2")
 
+    # -------------------------------------------------------------------------
     def with_structured_output(self, schema: type[object]) -> _StructuredModel:
         return _StructuredModel(schema)
 
 
+###############################################################################
 class _FakeEmbeddings:
+
+    # -------------------------------------------------------------------------
     def __init__(self, **_kwargs) -> None:
         pass
 
+    # -------------------------------------------------------------------------
     def embed_query(self, _input_text: str) -> list[float]:
         return [0.1, 0.2, 0.3]
 
 
+###############################################################################
 class _FakeOpenAIResponse:
     output_text = "chat-ok"
 
+    # -------------------------------------------------------------------------
     def model_dump(self, *, mode: str) -> dict[str, object]:
         return {"mode": mode, "id": "resp-test"}
 
 
+###############################################################################
 class _FakeOpenAIResponses:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.create_calls: list[dict[str, object]] = []
         self.parse_calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs):  # noqa: ANN001, ANN202
         self.create_calls.append(kwargs)
         if kwargs.get("stream"):
@@ -82,6 +105,7 @@ class _FakeOpenAIResponses:
             ]
         return _FakeOpenAIResponse()
 
+    # -------------------------------------------------------------------------
     def parse(self, **kwargs):  # noqa: ANN001, ANN202
         self.parse_calls.append(kwargs)
         return SimpleNamespace(
@@ -90,18 +114,24 @@ class _FakeOpenAIResponses:
         )
 
 
+###############################################################################
 class _FakeOpenAIEmbeddingEndpoint:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.create_calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs):  # noqa: ANN001, ANN202
         self.create_calls.append(kwargs)
         return SimpleNamespace(data=[SimpleNamespace(embedding=[0.1, 0.2, 0.3])])
 
 
+###############################################################################
 class _FakeOpenAIClient:
     instances: list["_FakeOpenAIClient"] = []
 
+    # -------------------------------------------------------------------------
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
         self.responses = _FakeOpenAIResponses()
@@ -109,12 +139,16 @@ class _FakeOpenAIClient:
         self.instances.append(self)
 
 
+###############################################################################
 class _FakeGoogleModels:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.generate_content_calls: list[dict[str, object]] = []
         self.generate_content_stream_calls: list[dict[str, object]] = []
         self.embed_content_calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def generate_content(self, **kwargs):  # noqa: ANN001, ANN202
         self.generate_content_calls.append(kwargs)
         config = kwargs.get("config")
@@ -122,10 +156,12 @@ class _FakeGoogleModels:
             return SimpleNamespace(text=json.dumps({"answer": "structured"}))
         return SimpleNamespace(text="chat-ok", model_dump=lambda mode: {"mode": mode})
 
+    # -------------------------------------------------------------------------
     def generate_content_stream(self, **kwargs):  # noqa: ANN001, ANN202
         self.generate_content_stream_calls.append(kwargs)
         return [SimpleNamespace(text="chunk-1"), SimpleNamespace(text="chunk-2")]
 
+    # -------------------------------------------------------------------------
     def embed_content(self, **kwargs):  # noqa: ANN001, ANN202
         self.embed_content_calls.append(kwargs)
         return SimpleNamespace(
@@ -133,20 +169,26 @@ class _FakeGoogleModels:
         )
 
 
+###############################################################################
 class _FakeGoogleClient:
     instances: list["_FakeGoogleClient"] = []
 
+    # -------------------------------------------------------------------------
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
         self.models = _FakeGoogleModels()
         self.instances.append(self)
 
 
+###############################################################################
 class _FakeHttpOptions:
+
+    # -------------------------------------------------------------------------
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
 
 
+###############################################################################
 def _request() -> LLMRequest:
     return LLMRequest(
         model="test-model",
@@ -157,6 +199,7 @@ def _request() -> LLMRequest:
     )
 
 
+###############################################################################
 def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     _FakeOpenAIClient.instances = []
     monkeypatch.setattr("server.services.llm.openai_provider.OpenAI", _FakeOpenAIClient)
@@ -189,6 +232,7 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     }
 
 
+###############################################################################
 def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     _FakeGoogleClient.instances = []
     monkeypatch.setattr("server.services.llm.google_provider.genai.Client", _FakeGoogleClient)
@@ -235,6 +279,7 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     }
 
 
+###############################################################################
 def test_ollama_provider_langchain_paths(monkeypatch) -> None:
     _FakeChatModel.instances = []
     monkeypatch.setattr(

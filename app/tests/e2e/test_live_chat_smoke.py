@@ -16,6 +16,7 @@ from tests.e2e.helpers.artifacts import (
 )
 
 
+###############################################################################
 def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     response = page.request.post(
         f"{api_base_url.rstrip('/')}/api/chat/turn",
@@ -32,12 +33,14 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     return False, f"Unexpected provider precondition status {response.status}"
 
 
+###############################################################################
 def _assert_clean_backend_tail(tail: str) -> None:
     normalized = tail.lower()
     assert "traceback" not in normalized
     assert "unhandled exception" not in normalized
 
 
+###############################################################################
 def _read_session_id(page: Page) -> int | None:
     raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-state:v3')")
     if not raw:
@@ -46,6 +49,7 @@ def _read_session_id(page: Page) -> int | None:
     return data.get("chatPage", {}).get("chatPanel", {}).get("sessionId")
 
 
+###############################################################################
 def test_live_chat_happy_path(
     page: Page,
     base_url: str,
@@ -90,6 +94,7 @@ def test_live_chat_happy_path(
     )
 
 
+###############################################################################
 def test_live_follow_up_same_session(
     page: Page,
     base_url: str,
@@ -135,6 +140,7 @@ def test_live_follow_up_same_session(
     )
 
 
+###############################################################################
 def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> None:
     ready, reason = _check_live_provider(page, api_base_url)
     if not ready:
@@ -148,6 +154,7 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
     expect(page.locator(".overlay-controls")).not_to_be_visible()
 
 
+###############################################################################
 def test_live_degraded_path_shows_user_failure_without_crash(
     page: Page, base_url: str
 ) -> None:

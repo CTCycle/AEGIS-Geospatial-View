@@ -9,6 +9,7 @@ import server.app as app_module
 from server.common.paths import FASTAPI_API_PREFIX
 
 
+###############################################################################
 def _settings():  # noqa: ANN202
     return SimpleNamespace(
         database=SimpleNamespace(database_path="test.db", insert_batch_size=1000),
@@ -18,6 +19,7 @@ def _settings():  # noqa: ANN202
     )
 
 
+###############################################################################
 def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
     return SimpleNamespace(
         agent_orchestrator=object(),
@@ -28,10 +30,12 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
     )
 
 
+###############################################################################
 def _build_geospatial_runtime() -> SimpleNamespace:
     return SimpleNamespace(api_service=object())
 
 
+###############################################################################
 def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
@@ -44,6 +48,7 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
 
 
+###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
     search_runtime = SimpleNamespace(

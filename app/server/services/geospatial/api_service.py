@@ -56,6 +56,7 @@ class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
 
+###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
     if isinstance(value, dict) and value.get("type") == "FeatureCollection":
         features = value.get("features")
@@ -75,9 +76,10 @@ def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
         }
     return {"type": "FeatureCollection", "features": []}
 
-
 ###############################################################################
 class GeospatialApiService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -396,6 +398,7 @@ class GeospatialApiService:
             "stale": response.stale,
         }
 
+    # -------------------------------------------------------------------------
     def _parse_bbox(
         self, value: str | None
     ) -> tuple[float, float, float, float] | None:
@@ -414,6 +417,7 @@ class GeospatialApiService:
         min_lon, min_lat, max_lon, max_lat = parts
         return min_lon, min_lat, max_lon, max_lat
 
+    # -------------------------------------------------------------------------
     def _parse_time(self, value: str | None) -> datetime | None:
         if not value:
             return None
@@ -422,6 +426,7 @@ class GeospatialApiService:
         except ValueError as exc:
             raise GeospatialInvalidRequestError("time must be ISO-8601.") from exc
 
+    # -------------------------------------------------------------------------
     def _parse_camera_identifier(self, camera_id: str) -> tuple[str | None, str]:
         normalized = camera_id.strip()
         for separator in ("/", ":"):
@@ -436,6 +441,7 @@ class GeospatialApiService:
                     return canonical_provider_id, provider_camera_id
         return None, normalized
 
+    # -------------------------------------------------------------------------
     def _provider_requires_credentials(self, provider_id: str) -> bool:
         for item in self._iter_manifest_payloads_for_account_setup():
             auth = item.get("auth") if isinstance(item.get("auth"), dict) else {}
@@ -446,6 +452,7 @@ class GeospatialApiService:
                 return bool(auth.get("required"))
         return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
 
+    # -------------------------------------------------------------------------
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
         payload = self.manifest_loader.load_all()
         for collection_name in ("providers", "overlays", "transit", "cameras"):
@@ -453,6 +460,7 @@ class GeospatialApiService:
                 if isinstance(item, dict):
                     yield item
 
+    # -------------------------------------------------------------------------
     def _extract_account_setup_record(
         self, payload: dict[str, Any]
     ) -> dict[str, Any] | None:
@@ -515,6 +523,7 @@ class GeospatialApiService:
             in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
         }
 
+    # -------------------------------------------------------------------------
     def _dedupe_account_setup_records(
         self, records: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
@@ -530,6 +539,7 @@ class GeospatialApiService:
                 deduped[key] = record
         return list(deduped.values())
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _account_setup_specificity(record: dict[str, Any]) -> int:
         automation = (
@@ -547,6 +557,7 @@ class GeospatialApiService:
             + len(automation.get("safety_notes") or [])
         )
 
+    # -------------------------------------------------------------------------
     def _build_account_setup_automation(
         self,
         *,
@@ -593,6 +604,7 @@ class GeospatialApiService:
             ),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_automation_support(provider_key: str) -> str:
         if provider_key == "opentripmap":
@@ -601,6 +613,7 @@ class GeospatialApiService:
             return "manual_only"
         return "agent_assisted"
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_user_action_notes(provider_key: str, support: str) -> list[str]:
         if support == "unsupported":
@@ -619,6 +632,7 @@ class GeospatialApiService:
             )
         return notes
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _default_safety_notes(provider_key: str, support: str) -> list[str]:
         notes = [
@@ -635,6 +649,7 @@ class GeospatialApiService:
             )
         return notes
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _key_format_hint(provider_key: str) -> str | None:
         return {
@@ -643,6 +658,7 @@ class GeospatialApiService:
             "windy_webcams": "Windy Webcams API key",
         }.get(provider_key)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _string_list(value: Any) -> list[str]:
         return (
@@ -651,6 +667,7 @@ class GeospatialApiService:
             else []
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_docs_url(provider: dict[str, Any]) -> str | None:
         metadata = (
@@ -672,6 +689,7 @@ class GeospatialApiService:
                     return item.strip()
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_account_setup_instructions(
         *,
@@ -703,6 +721,7 @@ class GeospatialApiService:
         instructions.append("Refresh AEGIS so the runtime can detect the credential.")
         return instructions
 
+    # -------------------------------------------------------------------------
     def _resolve_credentialed_tile_template(
         self,
         *,
@@ -736,6 +755,7 @@ class GeospatialApiService:
             )
         return resolved
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _humanize_provider(provider: str) -> str:
         lookup = {
@@ -747,5 +767,6 @@ class GeospatialApiService:
         }
         return lookup.get(provider, provider or "Provider")
 
+    # -------------------------------------------------------------------------
     async def _fetch_binary_url(self, url: str) -> bytes:
         return await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})

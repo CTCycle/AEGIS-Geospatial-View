@@ -14,9 +14,11 @@ from server.services.geospatial.rainviewer import (
 )
 
 
+###############################################################################
 class RainViewerProvider(GeospatialProvider):
     provider_id = "rainviewer"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -30,6 +32,7 @@ class RainViewerProvider(GeospatialProvider):
         self.cache_ttl_seconds = cache_ttl_seconds
         self.stale_while_revalidate_seconds = stale_while_revalidate_seconds
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         cache_key = f"{self.provider_id}:latest-radar"
         cached = self.cache.get(cache_key)
@@ -73,6 +76,7 @@ class RainViewerProvider(GeospatialProvider):
         )
         return self._response(request, metadata)
 
+    # -------------------------------------------------------------------------
     def _response(
         self,
         request: ProviderRequest,
@@ -96,6 +100,7 @@ class RainViewerProvider(GeospatialProvider):
             stale=stale,
         )
 
+    # -------------------------------------------------------------------------
     def _empty_response(self, request: ProviderRequest, *, warning: str) -> ProviderResponse:
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -112,6 +117,7 @@ class RainViewerProvider(GeospatialProvider):
             warnings=[warning],
         )
 
+    # -------------------------------------------------------------------------
     def _is_usable_metadata(self, metadata: dict[str, Any]) -> bool:
         tile_url = str(metadata.get("tile_url_template") or "").strip()
         latest_time = metadata.get("latest_time")

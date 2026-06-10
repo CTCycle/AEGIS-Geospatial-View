@@ -18,19 +18,18 @@ __all__ = [
     "LayerProviderService",
 ]
 
-
 ###############################################################################
 class LayerProviderError(Exception):
     """Base exception raised when a layer provider cannot fulfill a request."""
-
 
 ###############################################################################
 class LayerProviderNotFoundError(LayerProviderError):
     """Raised when a requested layer does not have a registered provider."""
 
-
 ###############################################################################
 class LayerProviderService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         layer_definitions: dict[str, LayerDefinition] | None = None,
@@ -153,6 +152,7 @@ class LayerProviderService:
         return entry.label
 
 
+###############################################################################
 def build_geospatial_layer_catalog(database: DatabaseBackend) -> LayerProviderService:
     repository = ReferenceCatalogRepository(database)
     return LayerProviderService(

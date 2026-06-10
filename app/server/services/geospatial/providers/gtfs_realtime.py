@@ -19,9 +19,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -31,6 +33,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_bytes_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         decoded_feed = request.params.get("decoded_feed")
         feed_url = str(request.params.get("feed_url") or "").strip()
@@ -54,9 +57,11 @@ class GTFSRealtimeProvider(GeospatialProvider):
             attribution=["GTFS Realtime feed publisher"],
         )
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
         return await self.fetch(request)
 
+    # -------------------------------------------------------------------------
     async def _fetch_and_parse_feed(
         self, feed_url: str, *, request: ProviderRequest
     ) -> dict[str, Any]:
@@ -85,6 +90,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
                 return stale_payload
             raise
 
+    # -------------------------------------------------------------------------
     def _parse_protobuf(
         self, feed_bytes: bytes, *, request: ProviderRequest | None = None
     ) -> dict[str, Any]:
@@ -113,6 +119,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             request=request,
         )
 
+    # -------------------------------------------------------------------------
     def _normalize_decoded_feed(
         self, feed: dict[str, Any], *, request: ProviderRequest | None = None
     ) -> dict[str, Any]:
@@ -158,6 +165,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             "vehicleRenderingAllowed": vehicle_rendering_allowed,
         }
 
+    # -------------------------------------------------------------------------
     def _vehicle_feature(self, vehicle: dict[str, Any]) -> dict[str, Any]:
         position = (
             vehicle.get("position") if isinstance(vehicle.get("position"), dict) else {}
@@ -173,6 +181,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             "timestamp": vehicle.get("timestamp"),
         }
 
+    # -------------------------------------------------------------------------
     def _feed_timestamp(self, header: Any) -> str | None:
         if not isinstance(header, dict):
             return None
@@ -181,6 +190,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             return None
         return datetime.fromtimestamp(value, tz=UTC).isoformat()
 
+    # -------------------------------------------------------------------------
     def _vehicle_rendering_allowed(
         self, feed_timestamp: str | None, *, request: ProviderRequest | None
     ) -> bool:
@@ -197,6 +207,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             return False
         return (datetime.now(UTC) - timestamp).total_seconds() <= max_age
 
+    # -------------------------------------------------------------------------
     def _trip_update_feature(self, trip_update: dict[str, Any]) -> dict[str, Any]:
         return {
             "tripId": trip_update.get("tripId") or trip_update.get("trip_id"),
@@ -207,6 +218,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             or [],
         }
 
+    # -------------------------------------------------------------------------
     def _alert_feature(self, alert: dict[str, Any]) -> dict[str, Any]:
         return {
             "cause": alert.get("cause"),
@@ -217,6 +229,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             or len(alert.get("activePeriods") or []),
         }
 
+    # -------------------------------------------------------------------------
     def _vehicle_from_entity(self, entity: Any) -> dict[str, Any] | None:
         if not entity.HasField("vehicle"):
             return None
@@ -235,6 +248,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
             },
         }
 
+    # -------------------------------------------------------------------------
     def _alert_from_entity(self, entity: Any) -> dict[str, Any] | None:
         if not entity.HasField("alert"):
             return None

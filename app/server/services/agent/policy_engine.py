@@ -19,7 +19,10 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
+###############################################################################
 class PolicyEngine:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -32,6 +35,7 @@ class PolicyEngine:
         self.capability_registry = capability_registry
         self.runtime_registry = runtime_registry
 
+    # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn: TurnParseResult) -> PolicyDecision | None:
         trace = DecisionTrace(steps=["1.validate_task_class"])
         task_validation = self._validate_task_class(turn)
@@ -68,6 +72,7 @@ class PolicyEngine:
             )
         return None
 
+    # -------------------------------------------------------------------------
     def build_agent_constraints(
         self,
         parsed_request: TurnParseResult,
@@ -85,6 +90,7 @@ class PolicyEngine:
             metadata={"map_state": map_state or {}},
         )
 
+    # -------------------------------------------------------------------------
     def authorize_tool_call(
         self,
         tool_name: str,
@@ -107,6 +113,7 @@ class PolicyEngine:
             )
         return ToolAuthorizationResult(allowed=True)
 
+    # -------------------------------------------------------------------------
     def validate_tool_result(
         self,
         tool_name: str,
@@ -120,6 +127,7 @@ class PolicyEngine:
             return ToolValidationResult(valid=False, reason=str(reason))
         return ToolValidationResult(valid=True)
 
+    # -------------------------------------------------------------------------
     def authorize_capability_execution(
         self,
         capability_id: str,
@@ -197,6 +205,7 @@ class PolicyEngine:
 
         return ToolAuthorizationResult(allowed=True)
 
+    # -------------------------------------------------------------------------
     def _validate_task_class(self, turn: TurnParseResult) -> ClarificationRequest | None:
         if turn.task_class in {"map_search", "direct_query", "general_question"}:
             return None
@@ -206,6 +215,7 @@ class PolicyEngine:
             missing_fields=["task"],
         )
 
+    # -------------------------------------------------------------------------
     def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
         if "deictic_without_memory" in turn.ambiguities:
             return ClarificationRequest(
@@ -234,6 +244,7 @@ class PolicyEngine:
             )
         return None
 
+    # -------------------------------------------------------------------------
     def _enforce_safety_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
         actionable_patterns = self._actionable_disallowed_patterns(turn)
         if not actionable_patterns:
@@ -244,6 +255,7 @@ class PolicyEngine:
             missing_fields=[],
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _requested_capability_mode(parsed_request: TurnParseResult) -> str | None:
         if parsed_request.task_class == "map_search":
@@ -252,6 +264,7 @@ class PolicyEngine:
             return "direct_text"
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _requires_location_for_capability(parsed_request: TurnParseResult, capability: dict[str, Any]) -> bool:
         if parsed_request.normalized_action.requires_location:
@@ -259,6 +272,7 @@ class PolicyEngine:
         geometry_type = str((capability.get("metadata") or {}).get("geometry_type") or "").strip().lower()
         return geometry_type not in {"", "not-applicable", "global"}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_location_context(
         *,
@@ -272,6 +286,7 @@ class PolicyEngine:
         active_location = parsed_request.conversation_context.memory_snapshot.get("active_location")
         return isinstance(active_location, dict) and bool(active_location.get("label"))
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_sane_bbox(value: Any) -> bool:
         if not isinstance(value, list) or len(value) != 4:
@@ -288,6 +303,7 @@ class PolicyEngine:
             and min_lat < max_lat
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _actionable_disallowed_patterns(turn: TurnParseResult):
         return [

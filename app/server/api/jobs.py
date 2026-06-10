@@ -18,10 +18,12 @@ from server.services.jobs import BackgroundJobService
 router = APIRouter(prefix=JOBS_ROUTER_PREFIX, tags=["jobs"])
 
 
+###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
 
+###############################################################################
 @router.get(JOBS_JOB_ROUTE, response_model=BackgroundJobStatusResponse, status_code=status.HTTP_200_OK)
 async def get_job(
     job_id: str,
@@ -33,6 +35,7 @@ async def get_job(
     return job
 
 
+###############################################################################
 @router.get(
     JOBS_JOB_EVENTS_ROUTE,
     response_model=BackgroundJobEventsResponse,
@@ -48,6 +51,7 @@ async def get_job_events(
     return events
 
 
+###############################################################################
 @router.post(
     JOBS_JOB_CANCEL_ROUTE,
     response_model=JobCancelResponse,

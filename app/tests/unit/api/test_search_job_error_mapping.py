@@ -12,31 +12,42 @@ from server.services.search.errors import (
 )
 
 
+###############################################################################
 class _FakeJobService:
+
+    # -------------------------------------------------------------------------
     def create_map_job(self, payload):  # noqa: ANN001
         _ = payload
         raise_map_search_http_error(MapSearchJobInitializationError("init failed"))
 
+    # -------------------------------------------------------------------------
     def get_job(self, job_id: str):
         _ = job_id
         return None
 
+    # -------------------------------------------------------------------------
     def cancel_job(self, job_id: str):
         _ = job_id
         return None
 
 
+###############################################################################
 class _FakeSearchExecution:
+
+    # -------------------------------------------------------------------------
     async def search_by_location(self, payload):  # noqa: ANN001
         return payload
 
+    # -------------------------------------------------------------------------
     async def get_catalog(self):
         return {"categories": [], "capabilities": []}
 
+    # -------------------------------------------------------------------------
     def fetch_osm_basemap_tile(self, z: int, x: int, y: int):
         return b"", "image/png", "max-age=60"
 
 
+###############################################################################
 def _build_client() -> TestClient:
     app = FastAPI()
     app.include_router(router, prefix="/api")
@@ -45,6 +56,7 @@ def _build_client() -> TestClient:
     return TestClient(app)
 
 
+###############################################################################
 def test_get_map_job_endpoint_maps_not_found_to_http_404() -> None:
     client = _build_client()
     response = client.get("/api/maps/jobs/missing")
@@ -52,6 +64,7 @@ def test_get_map_job_endpoint_maps_not_found_to_http_404() -> None:
     assert response.json()["detail"] == "Job not found: missing"
 
 
+###############################################################################
 def test_delete_map_job_endpoint_maps_not_found_to_http_404() -> None:
     client = _build_client()
     response = client.delete("/api/maps/jobs/missing")
@@ -59,6 +72,7 @@ def test_delete_map_job_endpoint_maps_not_found_to_http_404() -> None:
     assert response.json()["detail"] == "Job not found: missing"
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_detail"),
     [

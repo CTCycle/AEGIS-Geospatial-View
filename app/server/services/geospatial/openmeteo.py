@@ -12,7 +12,6 @@ from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
 
-
 ###############################################################################
 class OpenMeteoServiceError(Exception):
     """Base exception for Open-Meteo failures."""
@@ -23,6 +22,8 @@ class OpenMeteoRequestError(OpenMeteoServiceError):
 
 ###############################################################################
 class OpenMeteoService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -53,6 +54,7 @@ class OpenMeteoService:
         self._last_call_by_key: dict[str, float] = {}
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
+    # -------------------------------------------------------------------------
     async def get_weather_forecast(
         self, *, latitude: float, longitude: float
     ) -> dict[str, Any]:
@@ -113,6 +115,7 @@ class OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
+    # -------------------------------------------------------------------------
     async def get_air_quality_forecast(
         self, *, latitude: float, longitude: float
     ) -> dict[str, Any]:
@@ -158,6 +161,7 @@ class OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
+    # -------------------------------------------------------------------------
     def _get_json(
         self, *, endpoint: str, params: dict[str, str], provider_key: str
     ) -> dict[str, Any]:
@@ -184,6 +188,7 @@ class OpenMeteoService:
         self._cache_set(cache_key, data)
         return data
 
+    # -------------------------------------------------------------------------
     def _cache_get(self, cache_key: str) -> dict[str, Any] | None:
         with self._lock:
             cached = self._cache.get(cache_key)
@@ -195,10 +200,12 @@ class OpenMeteoService:
                 return None
             return dict(payload)
 
+    # -------------------------------------------------------------------------
     def _cache_set(self, cache_key: str, payload: dict[str, Any]) -> None:
         with self._lock:
             self._cache[cache_key] = (time.time(), payload)
 
+    # -------------------------------------------------------------------------
     def _wait_for_rate_limit_slot(self, key: str) -> None:
         with self._lock:
             now = time.time()

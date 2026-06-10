@@ -26,11 +26,9 @@ from server.common.constants import (
     REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME,
 )
 
-
 ###############################################################################
 class Base(DeclarativeBase):
     pass
-
 
 ###############################################################################
 class ReferenceCountryRecord(Base):
@@ -40,6 +38,7 @@ class ReferenceCountryRecord(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
 
 
+###############################################################################
 class ReferenceCountryAliasRecord(Base):
     __tablename__ = REFERENCE_COUNTRY_ALIASES_TABLE_NAME
 
@@ -54,6 +53,7 @@ class ReferenceCountryAliasRecord(Base):
     __table_args__ = (Index("ix_reference_country_aliases_iso2", "iso2"),)
 
 
+###############################################################################
 class ReferenceGeospatialLayerRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
 
@@ -63,6 +63,7 @@ class ReferenceGeospatialLayerRecord(Base):
     provider: Mapped[str | None] = mapped_column(String(64))
 
 
+###############################################################################
 class ReferenceGeospatialLayerAliasRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYER_ALIASES_TABLE_NAME
 
@@ -80,6 +81,7 @@ class ReferenceGeospatialLayerAliasRecord(Base):
     __table_args__ = (Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),)
 
 
+###############################################################################
 class ReferenceGeospatialLayerKeywordRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYER_KEYWORDS_TABLE_NAME
 
@@ -100,6 +102,7 @@ class ReferenceGeospatialLayerKeywordRecord(Base):
     )
 
 
+###############################################################################
 class ReferenceGibsTileMatrixSetRecord(Base):
     __tablename__ = REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME
 
@@ -107,6 +110,7 @@ class ReferenceGibsTileMatrixSetRecord(Base):
     meters_per_pixel: Mapped[float] = mapped_column(Float, nullable=False)
 
 
+###############################################################################
 class ReferenceGibsLayerDefaultRecord(Base):
     __tablename__ = REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME
 
@@ -115,6 +119,7 @@ class ReferenceGibsLayerDefaultRecord(Base):
     date_fallback_days: Mapped[int | None] = mapped_column(Integer)
 
 
+###############################################################################
 class ModelProviderSettingsRecord(Base):
     __tablename__ = "model_provider_settings"
 
@@ -146,7 +151,6 @@ class ModelProviderSettingsRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-
 ###############################################################################
 class CredentialEncryptionMaterial(Base):
     __tablename__ = "credential_encryption_materials"
@@ -161,7 +165,6 @@ class CredentialEncryptionMaterial(Base):
     )
     activated_at: Mapped[datetime | None] = mapped_column(DateTime)
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime)
-
 
 ###############################################################################
 class ModelCredentialRecord(Base):
@@ -181,7 +184,6 @@ class ModelCredentialRecord(Base):
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-
 ###############################################################################
 class ChatSessionRecord(Base):
     __tablename__ = "chat_sessions"
@@ -196,7 +198,6 @@ class ChatSessionRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
     last_map_session_json: Mapped[str | None] = mapped_column(Text)
-
 
 ###############################################################################
 class ChatMessageRecord(Base):

@@ -33,12 +33,15 @@ AMENITY_GROUPS = {
 }
 
 
+###############################################################################
 class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, service: OverpassService | None = None) -> None:
         self.service = service or OverpassService()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         radius_m = request_radius_m(request, self.service.default_radius_m)
@@ -92,6 +95,7 @@ class OverpassProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None

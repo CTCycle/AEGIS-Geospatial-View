@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.geospatial.providers import ProviderRequest
 
 
+###############################################################################
 @dataclass(frozen=True)
 class CapabilityRegistrySnapshot:
     providers: list[dict[str, Any]]
@@ -18,12 +19,14 @@ class CapabilityRegistrySnapshot:
     tools: list[dict[str, Any]]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RuntimeRegistrySnapshot:
     profiles: dict[str, dict[str, Any]]
     manifests: dict[str, dict[str, Any]]
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AttributionEntry:
     capability_id: str
@@ -33,6 +36,7 @@ class AttributionEntry:
     required: bool
 
 
+###############################################################################
 class LiveValidationCheckResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -44,6 +48,7 @@ class LiveValidationCheckResult(BaseModel):
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+###############################################################################
 class LiveValidationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,11 +57,13 @@ class LiveValidationReport(BaseModel):
     skipped_count: int = 0
     results: list[LiveValidationCheckResult] = Field(default_factory=list)
 
+    # -------------------------------------------------------------------------
     @property
     def ok(self) -> bool:
         return self.error_count == 0
 
 
+###############################################################################
 @dataclass(frozen=True)
 class LiveCheck:
     provider_id: str

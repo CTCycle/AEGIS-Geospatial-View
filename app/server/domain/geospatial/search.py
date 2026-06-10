@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+###############################################################################
 @dataclass(frozen=True)
 class IndexedFeature:
     id: str
@@ -15,6 +16,7 @@ class IndexedFeature:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class SearchIndex:
     features: list[IndexedFeature]

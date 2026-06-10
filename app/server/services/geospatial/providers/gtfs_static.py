@@ -20,9 +20,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class GTFSStaticProvider(GeospatialProvider):
     provider_id = "gtfs_static"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -32,6 +34,7 @@ class GTFSStaticProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_bytes_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         feed_bytes = request.params.get("feed_bytes")
         feed_url = str(request.params.get("feed_url") or "").strip()
@@ -52,9 +55,11 @@ class GTFSStaticProvider(GeospatialProvider):
             attribution=["GTFS Static feed publisher"],
         )
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: ProviderRequest) -> ProviderResponse:
         return await self.fetch(request)
 
+    # -------------------------------------------------------------------------
     async def _fetch_and_parse_feed(self, feed_url: str) -> dict[str, Any]:
         cache_key = f"{self.provider_id}:{feed_url}"
         try:
@@ -79,6 +84,7 @@ class GTFSStaticProvider(GeospatialProvider):
                 return stale_payload
             raise
 
+    # -------------------------------------------------------------------------
     def _parse_feed(self, feed_bytes: bytes) -> dict[str, Any]:
         try:
             with zipfile.ZipFile(io.BytesIO(feed_bytes)) as archive:
@@ -115,6 +121,7 @@ class GTFSStaticProvider(GeospatialProvider):
             },
         }
 
+    # -------------------------------------------------------------------------
     def _read_csv(self, archive: zipfile.ZipFile, filename: str) -> list[dict[str, str]]:
         try:
             raw = archive.read(filename)
@@ -123,9 +130,11 @@ class GTFSStaticProvider(GeospatialProvider):
         text = raw.decode("utf-8-sig")
         return [dict(row) for row in csv.DictReader(io.StringIO(text))]
 
+    # -------------------------------------------------------------------------
     def _has_stop_geometry(self, row: dict[str, str]) -> bool:
         return bool(row.get("stop_lat") and row.get("stop_lon"))
 
+    # -------------------------------------------------------------------------
     def _stop_feature(self, row: dict[str, str]) -> dict[str, Any]:
         return {
             "id": row.get("stop_id") or row.get("stop_code") or row.get("stop_name"),
@@ -139,6 +148,7 @@ class GTFSStaticProvider(GeospatialProvider):
             },
         }
 
+    # -------------------------------------------------------------------------
     def _route_feature(self, row: dict[str, str]) -> dict[str, Any]:
         return {
             "id": row.get("route_id"),
@@ -149,6 +159,7 @@ class GTFSStaticProvider(GeospatialProvider):
             "textColor": row.get("route_text_color"),
         }
 
+    # -------------------------------------------------------------------------
     def _agency_record(self, row: dict[str, str]) -> dict[str, Any]:
         return {
             "id": row.get("agency_id") or row.get("agency_name"),
@@ -159,6 +170,7 @@ class GTFSStaticProvider(GeospatialProvider):
             "phone": row.get("agency_phone"),
         }
 
+    # -------------------------------------------------------------------------
     def _calendar_record(self, row: dict[str, str]) -> dict[str, Any]:
         return {
             "serviceId": row.get("service_id"),
@@ -178,6 +190,7 @@ class GTFSStaticProvider(GeospatialProvider):
             "endDate": row.get("end_date"),
         }
 
+    # -------------------------------------------------------------------------
     def _shape_lines(self, rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         grouped: dict[str, list[dict[str, str]]] = {}
         for row in rows:
@@ -209,6 +222,7 @@ class GTFSStaticProvider(GeospatialProvider):
             )
         return features
 
+    # -------------------------------------------------------------------------
     def _sequence(self, row: dict[str, str]) -> int:
         value = row.get("shape_pt_sequence")
         try:
@@ -216,6 +230,7 @@ class GTFSStaticProvider(GeospatialProvider):
         except ValueError:
             return 0
 
+    # -------------------------------------------------------------------------
     def _float_or_none(self, value: str | None) -> float | None:
         if value is None or not str(value).strip():
             return None

@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
 
+###############################################################################
 def test_camera_normalization_never_embeds_without_explicit_permission() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         return {

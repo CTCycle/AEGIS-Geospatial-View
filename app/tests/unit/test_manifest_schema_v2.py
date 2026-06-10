@@ -8,6 +8,7 @@ from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 
+###############################################################################
 def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
     report = audit_all_manifests(strict=True)
 
@@ -15,6 +16,7 @@ def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
     assert report.manifest_count > 0
 
 
+###############################################################################
 def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
     manifests = Path("app/tests/artifacts/tmp_manifest_schema_v2")
     if manifests.exists():
@@ -80,6 +82,7 @@ def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
         shutil.rmtree(manifests, ignore_errors=True)
 
 
+###############################################################################
 def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     loader = GeospatialManifestLoader()
     loaded = loader.load_all()

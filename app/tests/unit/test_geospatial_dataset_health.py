@@ -6,6 +6,7 @@ from pathlib import Path
 from server.services.geospatial.ingestion import build_ingestion_plan, execute_ingestion_plan
 
 
+###############################################################################
 def test_dataset_ingestion_writes_health_record(tmp_path) -> None:
     source = tmp_path / "source.geojson"
     source.write_text(

@@ -24,9 +24,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class NRELProvider(GeospatialProvider):
     provider_id = "nrel"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -38,6 +40,7 @@ class NRELProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         api_key = (self.api_key or os.getenv("NREL_API_KEY") or "").strip()
         if not api_key:
@@ -95,6 +98,7 @@ class NRELProvider(GeospatialProvider):
                 raise
             raise ProviderUnavailableError(str(exc)) from exc
 
+    # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
         if not isinstance(payload, dict):
             raise ValueError("NREL AFDC payload must be an object.")

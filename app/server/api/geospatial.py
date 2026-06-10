@@ -37,10 +37,12 @@ GEOSPATIAL_ERROR_STATUS = {
 }
 
 
+###############################################################################
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
     return request.app.state.geospatial_runtime.api_service
 
 
+###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
     status_code = next(
         (
@@ -61,6 +63,7 @@ def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
     ) from error
 
 
+###############################################################################
 @router.get(
     "/capabilities",
     response_model=GeospatialCatalogResponse,
@@ -72,6 +75,7 @@ async def get_geospatial_capabilities(
     return GeospatialCatalogResponse.model_validate(service.list_capabilities())
 
 
+###############################################################################
 @router.get(
     "/layers",
     response_model=GeospatialLayersResponse,
@@ -83,6 +87,7 @@ async def get_geospatial_layers(
     return GeospatialLayersResponse.model_validate(service.list_layers())
 
 
+###############################################################################
 @router.get(
     "/layers/{layer_id}/health",
     response_model=GeospatialLayerHealthResponse,
@@ -100,6 +105,7 @@ async def get_layer_health(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.get(
     "/layers/{layer_id}/features",
     response_model=GeospatialProviderPayloadResponse,
@@ -129,6 +135,7 @@ async def get_layer_features(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.get(
     "/layers/{layer_id}/geojson",
     status_code=status.HTTP_200_OK,
@@ -155,6 +162,7 @@ async def get_layer_geojson(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.get(
     "/tiles/{capability_id}/{z}/{x}/{y}.png",
     status_code=status.HTTP_200_OK,
@@ -177,6 +185,7 @@ async def proxy_capability_tile(
     )
 
 
+###############################################################################
 @router.get(
     "/proxy/tomtom/{kind}/{z}/{x}/{y}.png",
     status_code=status.HTTP_200_OK,
@@ -199,6 +208,7 @@ async def proxy_tomtom_tile(
     )
 
 
+###############################################################################
 @router.get(
     "/cameras",
     response_model=GeospatialProviderPayloadResponse,
@@ -222,6 +232,7 @@ async def get_geospatial_cameras(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.get(
     "/cameras.geojson",
     status_code=status.HTTP_200_OK,
@@ -242,6 +253,7 @@ async def get_geospatial_cameras_geojson(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.get(
     "/cameras/{camera_id:path}",
     response_model=GeospatialCameraDetailResponse,
@@ -256,6 +268,7 @@ async def get_geospatial_camera(
     )
 
 
+###############################################################################
 @router.get(
     "/sources/{provider_id}/credential-status",
     response_model=GeospatialCredentialStatusResponse,
@@ -270,6 +283,7 @@ async def get_credential_status(
     )
 
 
+###############################################################################
 @router.get(
     "/providers/account-setup",
     response_model=GeospatialProviderAccountSetupListResponse,
@@ -283,6 +297,7 @@ async def get_provider_account_setups(
     )
 
 
+###############################################################################
 @router.get(
     "/providers/{provider_id}/account-setup",
     response_model=GeospatialProviderAccountSetupResponse,
@@ -300,6 +315,7 @@ async def get_provider_account_setup(
         raise_service_http_error(exc)
 
 
+###############################################################################
 @router.post(
     "/audit",
     response_model=LayerAuditReport,

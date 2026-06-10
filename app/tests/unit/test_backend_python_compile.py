@@ -7,6 +7,7 @@ from pathlib import Path
 IGNORED_PARTS = {".venv", "__pycache__", ".pytest_cache"}
 
 
+###############################################################################
 def _server_python_files() -> list[Path]:
     return [
         path
@@ -15,6 +16,7 @@ def _server_python_files() -> list[Path]:
     ]
 
 
+###############################################################################
 def test_server_python_files_compile() -> None:
     with tempfile.TemporaryDirectory() as cache_dir:
         for path in _server_python_files():
@@ -23,10 +25,12 @@ def test_server_python_files_compile() -> None:
             py_compile.compile(str(path), cfile=cfile, doraise=True)
 
 
+###############################################################################
 def _parse_server_file(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
+###############################################################################
 def test_server_python_files_do_not_define_nested_functions() -> None:
     violations: list[str] = []
     function_types = (ast.FunctionDef, ast.AsyncFunctionDef)
@@ -48,6 +52,7 @@ def test_server_python_files_do_not_define_nested_functions() -> None:
     assert violations == []
 
 
+###############################################################################
 def test_server_python_files_do_not_import_inside_functions_or_classes() -> None:
     violations: list[str] = []
     boundary_types = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
@@ -67,6 +72,7 @@ def test_server_python_files_do_not_import_inside_functions_or_classes() -> None
     assert violations == []
 
 
+###############################################################################
 def test_no_conditional_imports_in_server_python_files() -> None:
     violations: list[str] = []
     import_types = (ast.Import, ast.ImportFrom)
@@ -86,6 +92,7 @@ def test_no_conditional_imports_in_server_python_files() -> None:
     assert violations == []
 
 
+###############################################################################
 def test_server_python_files_do_not_exceed_1000_lines() -> None:
     violations: list[str] = []
     for path in _server_python_files():
@@ -95,6 +102,7 @@ def test_server_python_files_do_not_exceed_1000_lines() -> None:
     assert violations == []
 
 
+###############################################################################
 def test_domain_layer_contains_no_runtime_or_configuration_modules() -> None:
     domain_path = Path("app") / "server" / "domain"
     assert not (domain_path / "settings.py").exists()

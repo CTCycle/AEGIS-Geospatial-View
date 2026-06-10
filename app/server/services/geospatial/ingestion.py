@@ -15,7 +15,6 @@ from server.domain.geospatial.ingestion import (
     DatasetIngestionResult,
 )
 
-
 ###############################################################################
 class IngestionManifestError(ValueError):
     """Raised when a downloadable dataset manifest is incomplete."""
