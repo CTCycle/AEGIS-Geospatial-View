@@ -23,6 +23,7 @@ from server.common.paths import (
 )
 from server.configurations import get_server_settings
 from server.repositories.database import get_database
+from server.repositories.credential_material import seed_credential_encryption_material
 from server.repositories.database.initializer import (
     initialize_database,
     seed_reference_catalog,
@@ -73,13 +74,15 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     database = get_database()
 
     initialize_database(database.backend)
+    seed_credential_encryption_material()
     seed_reference_catalog(database.backend)
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
     geospatial_runtime = build_geospatial_runtime()
+    chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
     job_service = BackgroundJobService(
-        chat_streaming_service=ChatStreamingService(chat_runtime.agent_orchestrator),
+        chat_streaming_service=chat_streaming_service,
         map_search_runner=search_runtime.search_execution.orchestrator.execute,
         polling_interval=settings.jobs.polling_interval,
     )
@@ -88,11 +91,12 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.search_runtime = search_runtime
     application.state.chat_runtime = chat_runtime
     application.state.geospatial_runtime = geospatial_runtime
+    application.state.chat_streaming_service = chat_streaming_service
     application.state.job_service = job_service
 
     chat_runtime.settings_service.get_settings()
 
-    run_startup_validations(settings)
+    run_startup_validations()
 
     yield
     job_service.stop()

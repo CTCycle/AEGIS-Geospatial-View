@@ -143,10 +143,6 @@ class ServerSettings:
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
-    credential_master_key: str
-    credential_key_version: str
-
-
 class JsonDatabaseSettings(BaseModel):
     embedded_database: bool = True
     engine: str = "postgresql+psycopg"
@@ -409,20 +405,11 @@ class AppSettings(BaseSettings):
     ui_port: int = Field(default=8001, ge=1, le=65535)
     reload: bool = True
     optional_dependencies: bool = True
-    credential_master_key: str = "dev-insecure-master-key-change-me"
-    credential_key_version: str = "v1"
-
     @field_validator("fastapi_host", "ui_host", mode="before")
     @classmethod
     def normalize_required_strings(cls, value: Any) -> str:
         text = str(value).strip() if value is not None else ""
         return text or "127.0.0.1"
-
-    @field_validator("credential_master_key", "credential_key_version", mode="before")
-    @classmethod
-    def normalize_secret_strings(cls, value: Any) -> str:
-        text = str(value).strip() if value is not None else ""
-        return text
 
     def to_server_settings(self) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
@@ -511,8 +498,6 @@ class AppSettings(BaseSettings):
                 layer_sync_user_agent=self.gibs.layer_sync_user_agent,
                 layer_sync_timeout=self.gibs.layer_sync_timeout,
             ),
-            credential_master_key=self.credential_master_key,
-            credential_key_version=self.credential_key_version,
         )
 
 

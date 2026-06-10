@@ -1,6 +1,6 @@
 # System Overview
 
-Last updated: 2026-06-02
+Last updated: 2026-06-10
 
 ## Scope
 
@@ -31,6 +31,8 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 
 - loads settings
 - ensures relational schema
+- seeds auto-generated credential encryption key material
+- seeds reference catalog data
 - composes search and chat runtimes
 - seeds chat settings through the settings service
 - runs startup validation

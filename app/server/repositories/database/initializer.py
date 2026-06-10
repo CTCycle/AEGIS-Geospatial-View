@@ -12,6 +12,7 @@ from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
+from server.services.catalog.loader import load_reference_catalog
 
 
 def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None:
@@ -55,4 +56,5 @@ def initialize_database(
 
 
 def seed_reference_catalog(database: DatabaseBackend) -> ReferenceSeedResult:
-    return ReferenceCatalogSeeder(database).seed_if_needed()
+    catalog = load_reference_catalog()
+    return ReferenceCatalogSeeder(database).seed_if_needed(catalog)

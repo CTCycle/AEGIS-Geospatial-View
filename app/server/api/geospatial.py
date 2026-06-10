@@ -16,7 +16,6 @@ from server.domain.geographics import (
     GeospatialProviderPayloadResponse,
     LayerAuditReport,
 )
-from server.services.geospatial.composition import build_geospatial_runtime
 from server.services.geospatial.api_service import (
     GeospatialApiService,
     GeospatialApiServiceError,
@@ -39,11 +38,7 @@ GEOSPATIAL_ERROR_STATUS = {
 
 
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
-    runtime = getattr(request.app.state, "geospatial_runtime", None)
-    if runtime is None:
-        runtime = build_geospatial_runtime()
-        request.app.state.geospatial_runtime = runtime
-    return runtime.api_service
+    return request.app.state.geospatial_runtime.api_service
 
 
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:

@@ -49,6 +49,10 @@ def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
 
+def get_chat_streaming_service(request: Request) -> ChatStreamingService:
+    return request.app.state.chat_streaming_service
+
+
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
@@ -106,9 +110,8 @@ async def chat_turn(
 )
 async def chat_stream(
     payload: ChatTurnRequest,
-    runtime: ChatRuntime = Depends(get_chat_runtime),
+    streaming_service: ChatStreamingService = Depends(get_chat_streaming_service),
 ) -> StreamingResponse:
-    streaming_service = ChatStreamingService(runtime.agent_orchestrator)
     return StreamingResponse(
         _serialize_chat_event_stream(streaming_service, payload),
         media_type="application/x-ndjson",

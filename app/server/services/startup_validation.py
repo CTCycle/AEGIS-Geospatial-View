@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from server.configurations import ServerSettings, get_server_settings
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 
-def run_startup_validations(settings: ServerSettings | None = None) -> None:
-    resolved_settings = settings or get_server_settings()
-    if not resolved_settings.credential_master_key:
-        raise RuntimeError("Credential master key must be configured.")
-    if not resolved_settings.credential_key_version:
-        raise RuntimeError("Credential key version must be configured.")
-
+def run_startup_validations() -> None:
     loader = GeospatialManifestLoader()
     loader.load_all()
 

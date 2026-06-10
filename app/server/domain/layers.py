@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
 
 
-###############################################################################
-@dataclass(frozen=True)
-class LayerProviderEntry:
-    name: str
-    provider: str
-    label: str
-    aliases: tuple[str, ...]
-    provider_name: str | None = None
-    resolution_m: float | None = None
+class LayerProviderEntry(BaseModel):
+    layer_id: str
+    title: str
+    abstract: str | None = None
+    projections: set[str] = Field(default_factory=set)
+    source_urls: set[str] = Field(default_factory=set)
+    tile_matrix_sets: set[str] = Field(default_factory=set)

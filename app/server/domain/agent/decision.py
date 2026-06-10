@@ -111,7 +111,7 @@ class PolicyDecision(BaseModel):
 
     @property
     def requires_external_source_query(self) -> bool:
-        return self.plan.action_id == AgentAction.MAP_EXTERNAL_SOURCE_COMBINATION.value
+        return self.plan.action_id == AgentAction.MAP_EXTERNAL_SOURCE_COMBINATION
 
     @property
     def requires_user_clarification(self) -> bool:

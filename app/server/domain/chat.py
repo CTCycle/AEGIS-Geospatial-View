@@ -16,6 +16,8 @@ ModelProviderMode = Literal["local", "cloud"]
 
 ###############################################################################
 class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
@@ -23,6 +25,8 @@ class ChatMessage(BaseModel):
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     session_id: int | None = None
     title: str | None = None
     message: str
@@ -32,6 +36,8 @@ class ChatTurnRequest(BaseModel):
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     estimated_input_tokens: int
     selected_context_window: int | None = None
     model_context_limit: int | None = None
@@ -42,6 +48,8 @@ class ContextUsageResponse(BaseModel):
 
 ###############################################################################
 class ChatOperationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     kind: Literal[
         "map_session",
         "direct_answer",
@@ -59,6 +67,8 @@ class ChatOperationResult(BaseModel):
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     request_id: str
     session_id: int
     assistant_message: str
@@ -73,6 +83,8 @@ class ChatTurnResponse(BaseModel):
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     event: Literal[
         "status",
         "parsed",
@@ -89,6 +101,8 @@ class ChatStreamEvent(BaseModel):
 
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str
     name: str
     description: str
@@ -104,6 +118,8 @@ class ModelCardDescriptor(BaseModel):
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     active_provider_mode: ModelProviderMode
     chat_model_provider: str
     chat_model_name: str
@@ -149,12 +165,16 @@ class ModelSettingsUpdateRequest(BaseModel):
 
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     cloud: list[ModelCardDescriptor] = Field(default_factory=list)
     local: list[ModelCardDescriptor] = Field(default_factory=list)
 
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
     library_models: list[str] = Field(default_factory=list)
     local_models: list[str] = Field(default_factory=list)
@@ -163,6 +183,8 @@ class OllamaRefreshResponse(BaseModel):
 
 ###############################################################################
 class OllamaPullRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     model: str
 
 

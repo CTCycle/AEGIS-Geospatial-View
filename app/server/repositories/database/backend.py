@@ -5,7 +5,6 @@ from typing import Any
 
 from server.configurations import get_server_settings
 from server.repositories.database.contracts import DatabaseBackend
-from server.repositories.database.initializer import validate_postgres_schema
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.schemas import Base
 from server.repositories.database.sqlite import SQLiteRepository
@@ -20,9 +19,7 @@ class AEGISDatabase:
         if self.settings.embedded_database:
             return SQLiteRepository(self.settings)
 
-        backend = PostgresRepository(self.settings)
-        validate_postgres_schema(self.settings)
-        return backend
+        return PostgresRepository(self.settings)
 
     # -------------------------------------------------------------------------
     @property

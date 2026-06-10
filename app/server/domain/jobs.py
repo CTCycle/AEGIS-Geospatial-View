@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 BackgroundJobType = Literal["chat_turn", "map_fetch"]
 BackgroundJobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
@@ -23,6 +23,8 @@ BackgroundJobEventType = Literal[
 
 
 class BackgroundJobCreateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     job_type: BackgroundJobType
     status: BackgroundJobStatus
@@ -32,6 +34,8 @@ class BackgroundJobCreateResponse(BaseModel):
 
 
 class BackgroundJobEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     event_type: BackgroundJobEventType
     sequence: int
@@ -40,6 +44,8 @@ class BackgroundJobEvent(BaseModel):
 
 
 class BackgroundJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     job_type: BackgroundJobType
     status: BackgroundJobStatus
@@ -61,11 +67,15 @@ class BackgroundJobStatusResponse(BaseModel):
 
 
 class BackgroundJobEventsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     events: list[BackgroundJobEvent] = Field(default_factory=list)
 
 
 class JobCancelResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     job_id: str
     success: bool
     message: str
