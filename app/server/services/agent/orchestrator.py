@@ -8,7 +8,7 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
 from server.domain.geographics import MapSession
 from server.domain.extraction.models import LocationSignal
-from server.repositories.chat_history import ChatHistoryRepository
+from server.services.chat.history_service import ChatHistoryService
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.location_memory import LocationMemoryService
@@ -43,7 +43,7 @@ class AgentOrchestrator:
         agent_tool_catalog_service: AgentToolCatalogService | None = None,
         overlay_inference_service: OverlayInferenceService | None = None,
         settings_repo: ModelSettingsRepository | None = None,
-        history_repo: ChatHistoryRepository | None = None,
+        history_service: ChatHistoryService | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -68,7 +68,7 @@ class AgentOrchestrator:
             provider_factory=LLMFactory(settings_repo=self.settings_repo),
             tool_registry=self.tool_registry,
         )
-        self.history_repo = history_repo or ChatHistoryRepository()
+        self.history_service = history_service or ChatHistoryService()
 
     async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
@@ -78,25 +78,25 @@ class AgentOrchestrator:
             payload.session_id,
             len(payload.message),
         )
-        session = self.history_repo.upsert_session(payload.session_id, title=payload.title)
+        session = self.history_service.upsert_session(payload.session_id, title=payload.title)
         existing_response = self._load_existing_response(session.id, request_id)
         if existing_response is not None:
             return existing_response
-        if self.history_repo.find_message_by_request_id(
+        if self.history_service.find_message_by_request_id(
             session_id=session.id,
             role="user",
             request_id=request_id,
         ) is None:
-            self.history_repo.append_message(
+            self.history_service.append_message(
                 session_id=session.id,
                 role="user",
                 content=payload.message,
                 request_id=request_id,
             )
 
-        recent_messages = self.history_repo.list_recent_messages(session.id, limit=12)
-        latest_contract = self.history_repo.get_latest_turn_contract(session.id)
-        latest_memory = self.history_repo.get_latest_memory_snapshot(session.id)
+        recent_messages = self.history_service.list_recent_messages(session.id, limit=12)
+        latest_contract = self.history_service.get_latest_turn_contract(session.id)
+        latest_memory = self.history_service.get_latest_memory_snapshot(session.id)
 
         turn_contract = self.parser_service.parse_turn(
             user_message=payload.message,
@@ -119,7 +119,7 @@ class AgentOrchestrator:
                 status="failed",
                 message=assistant_message,
             )
-            self.history_repo.append_message(
+            self.history_service.append_message(
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
@@ -163,7 +163,7 @@ class AgentOrchestrator:
                 status="failed",
                 message=assistant_message,
             )
-            self.history_repo.append_message(
+            self.history_service.append_message(
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
@@ -207,7 +207,7 @@ class AgentOrchestrator:
                 status="success",
                 message=assistant_message,
             )
-            self.history_repo.append_message(
+            self.history_service.append_message(
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
@@ -247,7 +247,7 @@ class AgentOrchestrator:
                 decision_state=preflight_decision.plan.state,
                 assistant_message=assistant_message,
             )
-            self.history_repo.append_message(
+            self.history_service.append_message(
                 session_id=session.id,
                 role="assistant",
                 content=assistant_message,
@@ -388,7 +388,7 @@ class AgentOrchestrator:
             trace_steps=decision_trace_steps,
         )
 
-        self.history_repo.append_message(
+        self.history_service.append_message(
             session_id=session.id,
             role="assistant",
             content=assistant_message,
@@ -429,7 +429,7 @@ class AgentOrchestrator:
         session_id: int,
         request_id: str,
     ) -> ChatTurnResponse | None:
-        existing = self.history_repo.find_message_by_request_id(
+        existing = self.history_service.find_message_by_request_id(
             session_id=session_id,
             role="assistant",
             request_id=request_id,

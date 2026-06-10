@@ -137,17 +137,6 @@ class ChatHistoryRepository:
             return payload
         return structured_payload
 
-    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
-        with self._session_factory() as session:
-            statement = (
-                select(ChatMessageRecord)
-                .where(ChatMessageRecord.session_id == session_id)
-                .order_by(ChatMessageRecord.turn_index.desc())
-                .limit(max(1, limit))
-            )
-            rows = list(reversed(session.execute(statement).scalars().all()))
-        return [self._to_message_dict(row) for row in rows]
-
     def _last_assistant_payload(self, session_id: int) -> dict[str, Any] | None:
         with self._session_factory() as session:
             statement = (
@@ -165,21 +154,16 @@ class ChatHistoryRepository:
         payload = _from_json_payload(row.structured_payload_json)
         return payload if isinstance(payload, dict) else None
 
-    def get_latest_turn_contract(self, session_id: int) -> dict[str, Any] | None:
-        payload = self._last_assistant_payload(session_id)
-        if not isinstance(payload, dict):
-            return None
-        contract = payload.get("turn_contract")
-        return contract if isinstance(contract, dict) else None
-
-    def get_latest_memory_snapshot(self, session_id: int) -> dict[str, Any]:
-        payload = self._last_assistant_payload(session_id)
-        if not isinstance(payload, dict):
-            return {"location_slots": [], "active_location": None}
-        snapshot = payload.get("memory_snapshot")
-        if not isinstance(snapshot, dict):
-            return {"location_slots": [], "active_location": None}
-        return snapshot
+    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
+        with self._session_factory() as session:
+            statement = (
+                select(ChatMessageRecord)
+                .where(ChatMessageRecord.session_id == session_id)
+                .order_by(ChatMessageRecord.turn_index.desc())
+                .limit(max(1, limit))
+            )
+            rows = list(reversed(session.execute(statement).scalars().all()))
+        return [self._to_message_dict(row) for row in rows]
 
     def get_last_assistant_message(self, session_id: int) -> dict[str, Any] | None:
         with self._session_factory() as session:
@@ -207,25 +191,4 @@ class ChatHistoryRepository:
             rows = session.execute(statement).scalars().all()
             return [self._to_message_dict(row) for row in rows]
 
-    def find_message_by_request_id(
-        self,
-        *,
-        session_id: int,
-        role: str,
-        request_id: str,
-    ) -> dict[str, Any] | None:
-        with self._session_factory() as session:
-            statement = (
-                select(ChatMessageRecord)
-                .where(
-                    ChatMessageRecord.session_id == session_id,
-                    ChatMessageRecord.role == role,
-                )
-                .order_by(ChatMessageRecord.turn_index.asc())
-            )
-            rows = session.execute(statement).scalars().all()
-        for row in rows:
-            payload = _from_json_payload(row.structured_payload_json)
-            if isinstance(payload, dict) and payload.get("request_id") == request_id:
-                return self._to_message_dict(row)
-        return None
+

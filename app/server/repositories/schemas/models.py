@@ -148,6 +148,22 @@ class ModelProviderSettingsRecord(Base):
 
 
 ###############################################################################
+class CredentialEncryptionMaterial(Base):
+    __tablename__ = "credential_encryption_materials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key_purpose: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    key_material: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    seeded_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+###############################################################################
 class ModelCredentialRecord(Base):
     __tablename__ = "model_credentials"
 
@@ -155,7 +171,7 @@ class ModelCredentialRecord(Base):
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
-    key_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

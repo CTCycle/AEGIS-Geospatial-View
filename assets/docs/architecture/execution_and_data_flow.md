@@ -21,7 +21,7 @@ AEGIS uses these main backend layers:
 - `domain/` holds request, response, and domain contracts.
 - Runtime job state is owned by `app/server/services/job_state.py`.
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
-- Static reference catalog loading, lookup, and seeding live under `app/server/repositories/catalog/`.
+- Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
 
 ## Representative Request Flow
 

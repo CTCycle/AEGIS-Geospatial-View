@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-06-03
+Last updated: 2026-06-10
 
 ## Purpose
 
@@ -62,7 +62,7 @@ Key backend directories under `app/server`:
 - `domain/`
   Request/response contracts and domain models.
 - `repositories/`
-  Persistence, serialization, database helpers, and reference catalog loading/seeding.
+  Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
 

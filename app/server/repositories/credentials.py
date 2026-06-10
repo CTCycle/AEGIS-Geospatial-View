@@ -17,7 +17,7 @@ class CredentialRepository:
         provider: str,
         label: str,
         encrypted_value: str,
-        key_version: str,
+        key_version: int,
     ) -> ModelCredentialRecord:
         with self._session_factory() as session:
             statement = (

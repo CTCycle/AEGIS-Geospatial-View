@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from server.domain.catalog import ReferenceCatalog
-from server.repositories.catalog.reference_loader import load_reference_catalog
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.schemas import (
     ReferenceCountryAliasRecord,
@@ -26,14 +25,10 @@ class ReferenceSeedResult:
 
 
 class ReferenceCatalogSeeder:
-    def __init__(
-        self, database: DatabaseBackend, catalog_root: Path | None = None
-    ) -> None:
+    def __init__(self, database: DatabaseBackend) -> None:
         self.database = database
-        self.catalog_root = catalog_root
 
-    def seed_if_needed(self) -> ReferenceSeedResult:
-        catalog = load_reference_catalog(self.catalog_root)
+    def seed_if_needed(self, catalog: ReferenceCatalog) -> ReferenceSeedResult:
         return ReferenceSeedResult(
             countries_seeded=self._seed_countries_if_empty(catalog),
             geospatial_layers_seeded=self._seed_geospatial_layers_if_empty(catalog),
