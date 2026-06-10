@@ -2,21 +2,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from html.parser import HTMLParser
-from typing import Any
+from typing import Any, TextIO
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-
 from server.services.llm.base import LLMProvider
 from server.services.llm.context_budget import compute_ollama_context_usage
-from server.services.llm.langchain_runtime import (
-    invoke_chat_model,
-    invoke_structured_chat_model,
-    stream_chat_model,
-)
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -81,23 +74,6 @@ class OllamaProvider(LLMProvider):
         self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
         self.last_context_usage: dict[str, Any] | None = None
 
-    def _build_chat_model(
-        self, *, model: str, temperature: float, num_ctx: int | None = None
-    ) -> ChatOllama:
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "temperature": temperature,
-            "base_url": self.base_url,
-        }
-        if num_ctx is not None:
-            kwargs["num_ctx"] = num_ctx
-        return ChatOllama(
-            **kwargs,
-        )
-
-    def _build_embedding_model(self, *, model: str) -> OllamaEmbeddings:
-        return OllamaEmbeddings(model=model, base_url=self.base_url)
-
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = Request(
             f"{self.base_url}{path}",
@@ -107,6 +83,26 @@ class OllamaProvider(LLMProvider):
         )
         with urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
+
+    def _stream_post(
+        self, path: str, payload: dict[str, Any]
+    ) -> Iterator[dict[str, Any]]:
+        request = Request(
+            f"{self.base_url}{path}",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request, timeout=60) as response:
+            reader: TextIO = response  # type: ignore[assignment]
+            for line in reader:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    pass
 
     def _get_json(self, path: str) -> dict[str, Any]:
         request = Request(f"{self.base_url}{path}", method="GET")
@@ -325,67 +321,77 @@ class OllamaProvider(LLMProvider):
             response_json_schema=schema,
         )
         self._validate_request_capabilities(effective_request)
-        if native_tools or schema:
-            payload: dict[str, Any] = {
-                "model": request.model,
-                "messages": request.messages,
-                "stream": False,
-                "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
-            }
-            if native_tools:
-                payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in native_tools]
-            if schema and not native_tools:
-                payload["format"] = schema
-            response = self._post_json("/api/chat", payload)
-            message = response.get("message") if isinstance(response.get("message"), dict) else {}
-            return LLMResult(
-                content=str(message.get("content") or ""),
-                raw=response,
-                tool_calls=self._parse_tool_calls(message),
-                finish_reason=str(response.get("done_reason") or "") or None,
-            )
-        return invoke_chat_model(
-            chat_model=self._build_chat_model(
-                model=request.model,
-                temperature=request.temperature,
-                num_ctx=usage.selected_context_window,
-            ),
-            request=request,
+        payload: dict[str, Any] = {
+            "model": request.model,
+            "messages": request.messages,
+            "stream": False,
+            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+        }
+        if native_tools:
+            payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in native_tools]
+        if schema:
+            payload["format"] = schema
+        response = self._post_json("/api/chat", payload)
+        message = response.get("message") if isinstance(response.get("message"), dict) else {}
+        return LLMResult(
+            content=str(message.get("content") or ""),
+            raw=response,
+            tool_calls=self._parse_tool_calls(message),
+            finish_reason=str(response.get("done_reason") or "") or None,
         )
 
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         usage = compute_ollama_context_usage(request)
         self.last_context_usage = usage.to_dict()
-        return stream_chat_model(
-            chat_model=self._build_chat_model(
-                model=request.model,
-                temperature=request.temperature,
-                num_ctx=usage.selected_context_window,
-            ),
-            request=request,
-        )
+        payload: dict[str, Any] = {
+            "model": request.model,
+            "messages": request.messages,
+            "stream": True,
+            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+        }
+        for event in self._stream_post("/api/chat", payload):
+            message = event.get("message") if isinstance(event.get("message"), dict) else None
+            if message is not None:
+                content = message.get("content")
+                if isinstance(content, str) and content:
+                    yield content
+            if event.get("done"):
+                break
 
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
         usage = compute_ollama_context_usage(request)
         self.last_context_usage = usage.to_dict()
-        payload = invoke_structured_chat_model(
-            chat_model=self._build_chat_model(
-                model=request.model,
-                temperature=request.temperature,
-                num_ctx=usage.selected_context_window,
-            ),
-            request=request,
-            schema=schema,
-        )
-        return dict(payload)
+        schema_json = schema.model_json_schema() if hasattr(schema, "model_json_schema") else {}
+        payload: dict[str, Any] = {
+            "model": request.model,
+            "messages": request.messages,
+            "stream": False,
+            "format": schema_json,
+            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+        }
+        response = self._post_json("/api/chat", payload)
+        message = response.get("message") if isinstance(response.get("message"), dict) else {}
+        content = str(message.get("content") or "{}")
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            return {}
 
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
-        vector = self._build_embedding_model(model=model).embed_query(input_text)
-        if not isinstance(vector, list):
+        payload: dict[str, Any] = {
+            "model": model,
+            "prompt": input_text,
+        }
+        try:
+            response = self._post_json("/api/embeddings", payload)
+        except Exception:
             return []
-        return [float(value) for value in vector if isinstance(value, (int, float))]
+        embedding = response.get("embedding")
+        if not isinstance(embedding, list):
+            return []
+        return [float(value) for value in embedding if isinstance(value, (int | float))]
 
     def health_check(self) -> dict[str, Any]:
         try:

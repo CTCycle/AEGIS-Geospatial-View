@@ -345,11 +345,7 @@ class AgentOrchestrator:
             latest_memory=latest_memory,
         )
         if map_session is None:
-            map_session = await self._extract_map_session_from_tool_results(
-                tool_payload=tool_payload,
-                turn_contract=turn_contract,
-                latest_memory=latest_memory,
-            )
+            map_session = tool_loop_result.map_session
         direct_result = self._extract_direct_result_from_tool_results(tool_payload)
         capability_selection = self._extract_capability_selection_from_tool_results(tool_payload)
         if map_session is None and capability_selection is not None:
@@ -505,16 +501,6 @@ class AgentOrchestrator:
         return unique
 
     @staticmethod
-    def _has_verified_map_result(tool_results: list[Any]) -> bool:
-        for result in tool_results:
-            if not isinstance(getattr(result, "content", None), dict):
-                continue
-            data = result.content.get("data")
-            if isinstance(data, dict) and data.get("map_session"):
-                return True
-        return False
-
-    @staticmethod
     def _build_native_agent_messages(
         *,
         turn_contract,
@@ -605,29 +591,6 @@ class AgentOrchestrator:
     @staticmethod
     def _has_parser_authentication_failure(turn_contract) -> bool:
         return "parser_authentication_failed" in set(turn_contract.ambiguities or [])
-
-    async def _extract_map_session_from_tool_results(
-        self,
-        *,
-        tool_payload: dict[str, Any] | None,
-        turn_contract,
-        latest_memory: dict[str, Any] | None,
-    ) -> MapSession | None:
-        if not isinstance(tool_payload, dict):
-            return None
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
-                continue
-            content = result.get("content")
-            if not isinstance(content, dict):
-                continue
-            data = content.get("data")
-            if not isinstance(data, dict):
-                continue
-            map_payload = data.get("map_session")
-            if isinstance(map_payload, dict):
-                return MapSession.model_validate(map_payload)
-        return None
 
     def _extract_direct_result_from_tool_results(
         self,
@@ -812,14 +775,10 @@ class AgentOrchestrator:
                 for overlay_id in selection.get("overlay_ids") or []:
                     if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
                         overlay_ids.append(overlay_id)
-            capability_id = data.get("capability_id")
-            if isinstance(capability_id, str) and capability_id and capability_id not in overlay_ids:
-                if "map_session" in entry or "capability_selection" in entry:
-                    overlay_ids.append(capability_id)
             if entry.keys() != {"data"}:
                 successful_entries.append(entry)
 
-        if len(overlay_ids) <= 1:
+        if not overlay_ids and basemap_id is None:
             return None
 
         resolved_location = await self.policy_engine.location_resolver.resolve_location_signals(
