@@ -23,6 +23,7 @@ _ASYNC_HTTP_CLIENT = httpx.AsyncClient(
 )
 
 
+###############################################################################
 async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any:
     body = await fetch_bytes_url(url, headers)
     try:
@@ -31,6 +32,7 @@ async def fetch_json_url(url: str, headers: dict[str, str] | None = None) -> Any
         raise ProviderUnavailableError("Provider returned malformed JSON.") from exc
 
 
+###############################################################################
 async def fetch_bytes_url(url: str, headers: dict[str, str] | None = None) -> bytes:
     try:
         response = await _ASYNC_HTTP_CLIENT.get(url, headers=headers or {})
@@ -49,6 +51,7 @@ async def fetch_bytes_url(url: str, headers: dict[str, str] | None = None) -> by
         raise ProviderUnavailableError(f"Provider unavailable: {exc}") from exc
 
 
+###############################################################################
 async def call_json_fetcher(
     fetcher: JsonFetcher, url: str, headers: dict[str, str] | None = None
 ) -> Any:
@@ -58,6 +61,7 @@ async def call_json_fetcher(
     return value
 
 
+###############################################################################
 async def call_bytes_fetcher(
     fetcher: BytesFetcher, url: str, headers: dict[str, str] | None = None
 ) -> bytes:

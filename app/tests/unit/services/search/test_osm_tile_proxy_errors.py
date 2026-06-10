@@ -9,11 +9,15 @@ from server.services.search.errors import MapSearchTileProxyError
 from server.services.search.execution import MapSearchExecutionService
 
 
+###############################################################################
 class _FailingProxyService:
+
+    # -------------------------------------------------------------------------
     def fetch_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:  # noqa: ARG002
         raise OsmTileProxyError("OSM basemap tile provider is unavailable.")
 
 
+###############################################################################
 def test_execution_wraps_osm_proxy_failures() -> None:
     service = MapSearchExecutionService(
         orchestrator=object(),  # type: ignore[arg-type]
@@ -28,11 +32,15 @@ def test_execution_wraps_osm_proxy_failures() -> None:
         raise AssertionError("Expected MapSearchTileProxyError")
 
 
+###############################################################################
 def test_endpoint_returns_502_text_plain_for_tile_proxy_failures() -> None:
     app = FastAPI()
     app.include_router(router)
 
+    ###############################################################################
     class _ExecutionStub:
+
+        # -------------------------------------------------------------------------
         def fetch_osm_basemap_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:  # noqa: ARG002
             raise MapSearchTileProxyError("OSM basemap tile provider is unavailable.")
 

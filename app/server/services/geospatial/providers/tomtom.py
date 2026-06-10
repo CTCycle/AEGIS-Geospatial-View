@@ -18,6 +18,7 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class TomTomProvider(GeospatialProvider):
     provider_id = "tomtom"
     flow_proxy_template = (
@@ -25,12 +26,14 @@ class TomTomProvider(GeospatialProvider):
     )
     basemap_proxy_template = "/api/geospatial/proxy/tomtom/basic/{z}/{x}/{y}.png"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self, *, api_key: str | None = None, fetcher: JsonFetcher | None = None
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.fetcher = fetcher or fetch_json_url
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.api_key:
             raise ProviderAuthError("TomTom API key is required.")
@@ -63,6 +66,7 @@ class TomTomProvider(GeospatialProvider):
             attribution=["TomTom"],
         )
 
+    # -------------------------------------------------------------------------
     async def validate_credentials(
         self, credentials: Mapping[str, str]
     ) -> ProviderCredentialValidationResult:
@@ -106,6 +110,7 @@ class TomTomProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
     if kind == "basic":
         return (
@@ -118,6 +123,7 @@ def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> st
     )
 
 
+###############################################################################
 def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
     bbox = request.bbox or (-180.0, -90.0, 180.0, 90.0)
     west, south, east, north = bbox
@@ -135,6 +141,7 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
     return f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
 
 
+###############################################################################
 def _normalize_incidents(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
         return []
@@ -182,6 +189,7 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
     return features
 
 
+###############################################################################
 def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
     if not isinstance(geometry, dict):
         return None
@@ -197,6 +205,7 @@ def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
     return float(longitude), float(latitude)
 
 
+###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
     if not isinstance(value, list) or not value:
         return None
@@ -205,6 +214,7 @@ def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
     return _first_coordinate_pair(value[0])
 
 
+###############################################################################
 def _first_event_description(events: list[object]) -> str | None:
     for event in events:
         if isinstance(event, dict) and event.get("description"):
@@ -212,6 +222,7 @@ def _first_event_description(events: list[object]) -> str | None:
     return None
 
 
+###############################################################################
 def _incident_category(value: object) -> str:
     category = str(value or "").strip()
     return f"traffic_incident_{category}" if category else "traffic_incident"

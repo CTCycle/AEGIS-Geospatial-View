@@ -27,7 +27,10 @@ from server.services.llm.types import LLMRequest
 LOGGER = logging.getLogger(__name__)
 
 
+###############################################################################
 class ParserService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -42,12 +45,14 @@ class ParserService:
         self.model = model
         self.last_context_usage: dict[str, object] | None = None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _to_text(value: object) -> str:
         if value is None:
             return ""
         return str(value)
 
+    # -------------------------------------------------------------------------
     def _normalize_recent_messages(
         self, conversation_messages: list[dict]
     ) -> list[dict[str, str]]:
@@ -68,6 +73,7 @@ class ParserService:
             )
         return normalized
 
+    # -------------------------------------------------------------------------
     def _dedupe(self, values: list[str]) -> list[str]:
         seen: set[str] = set()
         result: list[str] = []
@@ -79,6 +85,7 @@ class ParserService:
             result.append(text)
         return result
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _contains_verbatim_span(user_message: str, candidate: str) -> bool:
         message = " ".join(str(user_message or "").casefold().split())
@@ -87,6 +94,7 @@ class ParserService:
             return False
         return span in message
 
+    # -------------------------------------------------------------------------
     def _ambiguity_has_text_evidence(self, user_message: str, ambiguity: str) -> bool:
         normalized = str(ambiguity or "").strip()
         if not normalized:
@@ -105,6 +113,7 @@ class ParserService:
             return True
         return any(self._contains_verbatim_span(user_message, term) for term in quoted_terms)
 
+    # -------------------------------------------------------------------------
     def _extract_turn(self, *, user_message: str, memory_snapshot: dict, recent_messages: list[dict[str, str]]) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
@@ -156,6 +165,7 @@ class ParserService:
         )
         return extracted
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_coordinate_signal(user_message: str) -> LLMLocationSignal | None:
         match = re.search(
@@ -178,6 +188,7 @@ class ParserService:
             confidence=0.98,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _looks_like_map_request(user_message: str) -> bool:
         text = user_message.casefold()
@@ -204,6 +215,7 @@ class ParserService:
         )
         return any(marker in text for marker in markers)
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _extract_text_location_signal(cls, user_message: str) -> LLMLocationSignal | None:
         coordinate_signal = cls._extract_coordinate_signal(user_message)
@@ -230,6 +242,7 @@ class ParserService:
             confidence=0.72 if signal_type == "address" else 0.68,
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _fallback_extraction(cls, user_message: str) -> LLMParserExtraction:
         location_signal = cls._extract_text_location_signal(user_message)
@@ -272,6 +285,7 @@ class ParserService:
             parser_confidence=0.65,
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _should_use_fallback(
         cls,
@@ -288,6 +302,7 @@ class ParserService:
             return True
         return False
 
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -428,6 +443,7 @@ class ParserService:
             parser_confidence=max(0.0, min(1.0, confidence)),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _normalize_action_id(action_id: str, confidence: float) -> str:
         if confidence < 0.25:
@@ -437,6 +453,7 @@ class ParserService:
         except ValueError:
             return AgentAction.UNKNOWN.value
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_known_ambiguous_bare_place(
         user_message: str,

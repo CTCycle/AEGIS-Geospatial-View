@@ -5,6 +5,7 @@ import asyncio
 from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
 
 
+###############################################################################
 def test_rainviewer_service_returns_cached_metadata_without_refetch() -> None:
     calls: list[str] = []
 
@@ -32,6 +33,7 @@ def test_rainviewer_service_returns_cached_metadata_without_refetch() -> None:
     assert calls == ["https://api.rainviewer.com/public/weather-maps.json"]
 
 
+###############################################################################
 def test_rainviewer_service_rejects_malformed_payload() -> None:
     async def _fetcher(url: str, headers: dict[str, str] | None = None) -> dict[str, object]:
         _ = url, headers

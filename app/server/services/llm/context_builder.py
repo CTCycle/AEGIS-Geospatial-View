@@ -4,7 +4,6 @@ from typing import Any
 
 from server.configurations import get_server_settings
 
-
 ###############################################################################
 def build_conversation_context(
     *,

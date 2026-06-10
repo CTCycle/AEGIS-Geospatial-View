@@ -6,7 +6,10 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 
 
+###############################################################################
 class _OpenMeteoService:
+
+    # -------------------------------------------------------------------------
     async def get_weather_forecast(self, *, latitude: float, longitude: float):
         return {
             "kind": "weather_forecast",
@@ -22,6 +25,7 @@ class _OpenMeteoService:
             "attribution": "Data from Open-Meteo",
         }
 
+    # -------------------------------------------------------------------------
     async def get_air_quality_forecast(self, *, latitude: float, longitude: float):
         return {
             "kind": "air_quality_forecast",
@@ -32,6 +36,7 @@ class _OpenMeteoService:
         }
 
 
+###############################################################################
 def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:
     response = asyncio.run(
         OpenMeteoProvider(service=_OpenMeteoService()).fetch(  # type: ignore[arg-type]

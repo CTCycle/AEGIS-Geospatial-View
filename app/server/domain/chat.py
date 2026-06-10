@@ -13,7 +13,6 @@ from server.domain.geographics import MapSession
 ChatRole = Literal["user", "assistant", "system", "tool"]
 ModelProviderMode = Literal["local", "cloud"]
 
-
 ###############################################################################
 class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -21,7 +20,6 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     created_at: datetime = Field(default_factory=utc_now)
-
 
 ###############################################################################
 class ChatTurnRequest(BaseModel):
@@ -33,7 +31,6 @@ class ChatTurnRequest(BaseModel):
     datetime: str | None = None
     request_id: str | None = None
 
-
 ###############################################################################
 class ContextUsageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -44,7 +41,6 @@ class ContextUsageResponse(BaseModel):
     usage_percent: float
     provider: str
     model: str
-
 
 ###############################################################################
 class ChatOperationResult(BaseModel):
@@ -64,7 +60,6 @@ class ChatOperationResult(BaseModel):
     map_session: MapSession | None = None
     direct_result: dict[str, Any] | None = None
 
-
 ###############################################################################
 class ChatTurnResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -79,7 +74,6 @@ class ChatTurnResponse(BaseModel):
     map_session: MapSession | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     context_usage: ContextUsageResponse | None = None
-
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
@@ -98,7 +92,6 @@ class ChatStreamEvent(BaseModel):
     ]
     data: dict[str, Any]
 
-
 ###############################################################################
 class ModelCardDescriptor(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -114,7 +107,6 @@ class ModelCardDescriptor(BaseModel):
     supports_embeddings: bool = False
     tool_support_source: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=dict)
-
 
 ###############################################################################
 class ModelSettingsResponse(BaseModel):
@@ -133,7 +125,6 @@ class ModelSettingsResponse(BaseModel):
     credentials: dict[str, dict[str, bool]]
     credential_health: dict[str, dict[str, str]] = Field(default_factory=dict)
 
-
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -150,6 +141,7 @@ class ModelSettingsUpdateRequest(BaseModel):
     google_base_url: str | None = None
     credentials: dict[str, dict[str, str]] = Field(default_factory=dict)
 
+    # -------------------------------------------------------------------------
     @field_validator("ollama_url", "openai_base_url", "google_base_url")
     @classmethod
     def validate_base_url(cls, value: str | None) -> str | None:
@@ -162,14 +154,12 @@ class ModelSettingsUpdateRequest(BaseModel):
             raise ValueError("Base URL must start with http:// or https://")
         return normalized
 
-
 ###############################################################################
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     cloud: list[ModelCardDescriptor] = Field(default_factory=list)
     local: list[ModelCardDescriptor] = Field(default_factory=list)
-
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
@@ -180,18 +170,15 @@ class OllamaRefreshResponse(BaseModel):
     local_models: list[str] = Field(default_factory=list)
     local_model_capabilities: list[ModelCardDescriptor] = Field(default_factory=list)
 
-
 ###############################################################################
 class OllamaPullRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str
 
-
 ###############################################################################
 class OllamaPullResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
-
 
 ###############################################################################
 class OllamaHealthResponse(BaseModel):

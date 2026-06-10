@@ -89,30 +89,37 @@ class PolicyDecision(BaseModel):
     candidates: list[CapabilityCandidate] = Field(default_factory=list)
     trace: DecisionTrace = Field(default_factory=DecisionTrace)
 
+    # -------------------------------------------------------------------------
     @property
     def selected_action(self) -> str:
         return self.plan.action_id
 
+    # -------------------------------------------------------------------------
     @property
     def action_confidence(self) -> float:
         return 1.0
 
+    # -------------------------------------------------------------------------
     @property
     def selected_tool_names(self) -> list[str]:
         return [self.plan.tool_id] if self.plan.tool_id else []
 
+    # -------------------------------------------------------------------------
     @property
     def requires_location_resolution(self) -> bool:
         return self.resolved_location is None and self.plan.state in {"clarify", "map_search"}
 
+    # -------------------------------------------------------------------------
     @property
     def requires_overlay_resolution(self) -> bool:
         return bool(self.plan.overlay_ids)
 
+    # -------------------------------------------------------------------------
     @property
     def requires_external_source_query(self) -> bool:
         return self.plan.action_id == AgentAction.MAP_EXTERNAL_SOURCE_COMBINATION
 
+    # -------------------------------------------------------------------------
     @property
     def requires_user_clarification(self) -> bool:
         return self.clarification is not None

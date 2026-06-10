@@ -20,13 +20,17 @@ from server.services.llm.types import (
 )
 
 
+###############################################################################
 class _OllamaLibraryParser(HTMLParser):
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
         self._active_model: str | None = None
         self._chunks: list[str] = []
         self.entries: dict[str, str] = {}
 
+    # -------------------------------------------------------------------------
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag != "a":
             return
@@ -40,6 +44,7 @@ class _OllamaLibraryParser(HTMLParser):
         self._active_model = model
         self._chunks = []
 
+    # -------------------------------------------------------------------------
     def handle_data(self, data: str) -> None:
         if self._active_model is None:
             return
@@ -47,6 +52,7 @@ class _OllamaLibraryParser(HTMLParser):
         if text:
             self._chunks.append(text)
 
+    # -------------------------------------------------------------------------
     def handle_endtag(self, tag: str) -> None:
         if tag != "a" or self._active_model is None:
             return
@@ -61,9 +67,11 @@ class _OllamaLibraryParser(HTMLParser):
         self._chunks = []
 
 
+###############################################################################
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -74,6 +82,7 @@ class OllamaProvider(LLMProvider):
         self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
         self.last_context_usage: dict[str, Any] | None = None
 
+    # -------------------------------------------------------------------------
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = Request(
             f"{self.base_url}{path}",
@@ -84,6 +93,7 @@ class OllamaProvider(LLMProvider):
         with urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
 
+    # -------------------------------------------------------------------------
     def _stream_post(
         self, path: str, payload: dict[str, Any]
     ) -> Iterator[dict[str, Any]]:
@@ -104,16 +114,19 @@ class OllamaProvider(LLMProvider):
                 except json.JSONDecodeError:
                     pass
 
+    # -------------------------------------------------------------------------
     def _get_json(self, path: str) -> dict[str, Any]:
         request = Request(f"{self.base_url}{path}", method="GET")
         with urlopen(request, timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))
 
+    # -------------------------------------------------------------------------
     def _get_text(self, url: str) -> str:
         request = Request(url, headers={"User-Agent": "AEGIS/1.0"}, method="GET")
         with urlopen(request, timeout=20) as response:
             return response.read().decode("utf-8", errors="ignore")
 
+    # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
         try:
             payload = self._get_json("/api/tags")
@@ -152,6 +165,7 @@ class OllamaProvider(LLMProvider):
             )
         return models
 
+    # -------------------------------------------------------------------------
     def _descriptor_from_tag_item(
         self,
         *,
@@ -180,6 +194,7 @@ class OllamaProvider(LLMProvider):
             },
         )
 
+    # -------------------------------------------------------------------------
     def get_model_capabilities(self, model: str) -> set[str]:
         capabilities = {"chat", "stream", "embeddings"}
         show_capabilities = self._show_capabilities(model)
@@ -197,13 +212,16 @@ class OllamaProvider(LLMProvider):
             capabilities.add("tools")
         return capabilities
 
+    # -------------------------------------------------------------------------
     def supports_tools(self, model: str) -> bool:
         return "tools" in self.get_model_capabilities(model)
 
+    # -------------------------------------------------------------------------
     def supports_structured_output(self, model: str) -> bool:
         _ = model
         return True
 
+    # -------------------------------------------------------------------------
     def _show_capabilities(self, model: str) -> set[str] | None:
         try:
             payload = self._post_json("/api/show", {"name": model})
@@ -214,6 +232,7 @@ class OllamaProvider(LLMProvider):
             return None
         return {str(item).strip().lower() for item in raw if str(item).strip()}
 
+    # -------------------------------------------------------------------------
     def _probe_tool_support(self, model: str) -> bool:
         cached = self.tool_capability_cache.get(self.base_url, model)
         if cached is not None:
@@ -252,9 +271,11 @@ class OllamaProvider(LLMProvider):
         )
         return supported
 
+    # -------------------------------------------------------------------------
     def _tool_support_source(self, model: str) -> str:
         return self.tool_capability_cache.source(self.base_url, model) or "unknown"
 
+    # -------------------------------------------------------------------------
     def list_library_models(self) -> list[ModelDescriptor]:
         try:
             html = self._get_text("https://registry.ollama.ai/library")
@@ -273,9 +294,11 @@ class OllamaProvider(LLMProvider):
             for name, description in parser.entries.items()
         ]
 
+    # -------------------------------------------------------------------------
     def pull_model(self, *, model: str) -> dict[str, Any]:
         return self._post_json("/api/pull", {"name": model, "stream": False})
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def tool_to_ollama_schema(tool: LLMToolDefinition) -> dict[str, Any]:
         return {
@@ -287,6 +310,7 @@ class OllamaProvider(LLMProvider):
             },
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _parse_tool_calls(message: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
@@ -303,6 +327,7 @@ class OllamaProvider(LLMProvider):
             )
         return calls
 
+    # -------------------------------------------------------------------------
     def chat(
         self,
         request: LLMRequest,
@@ -340,6 +365,7 @@ class OllamaProvider(LLMProvider):
             finish_reason=str(response.get("done_reason") or "") or None,
         )
 
+    # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
         usage = compute_ollama_context_usage(request)
         self.last_context_usage = usage.to_dict()
@@ -358,6 +384,7 @@ class OllamaProvider(LLMProvider):
             if event.get("done"):
                 break
 
+    # -------------------------------------------------------------------------
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
@@ -379,6 +406,7 @@ class OllamaProvider(LLMProvider):
         except json.JSONDecodeError:
             return {}
 
+    # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
         payload: dict[str, Any] = {
             "model": model,
@@ -393,6 +421,7 @@ class OllamaProvider(LLMProvider):
             return []
         return [float(value) for value in embedding if isinstance(value, (int | float))]
 
+    # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:
         try:
             payload = self._get_json("/api/tags")

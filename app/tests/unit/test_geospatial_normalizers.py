@@ -11,6 +11,7 @@ from server.services.geospatial.normalizers import (
 )
 
 
+###############################################################################
 def test_normalize_poi_feature_accepts_common_coordinate_aliases() -> None:
     poi = normalize_poi_feature(
         {
@@ -31,6 +32,7 @@ def test_normalize_poi_feature_accepts_common_coordinate_aliases() -> None:
     assert poi.metadata == {"raw_tag": "drinking_water"}
 
 
+###############################################################################
 def test_normalize_camera_feature_requires_official_url() -> None:
     with pytest.raises(NormalizationError):
         normalize_camera_feature(
@@ -40,6 +42,7 @@ def test_normalize_camera_feature_requires_official_url() -> None:
         )
 
 
+###############################################################################
 def test_normalize_camera_feature_defaults_to_no_embedding() -> None:
     camera = normalize_camera_feature(
         {
@@ -59,6 +62,7 @@ def test_normalize_camera_feature_defaults_to_no_embedding() -> None:
     assert camera.official_url == "https://example.test/cam"
 
 
+###############################################################################
 def test_normalize_poi_category_maps_phase8_sources() -> None:
     assert normalize_poi_category("charging station") == "ev_charging"
     assert normalize_poi_category("gas-station") == "fuel"
@@ -74,6 +78,7 @@ def test_normalize_poi_category_maps_phase8_sources() -> None:
     assert normalize_poi_category("railway station") == "rail"
 
 
+###############################################################################
 def test_deduplicate_poi_features_by_name_category_and_coordinates() -> None:
     first = normalize_poi_feature(
         {"id": "osm-1", "name": "Central Charger", "lat": 45.0, "lon": 7.0},

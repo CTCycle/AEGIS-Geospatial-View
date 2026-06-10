@@ -40,6 +40,7 @@ MAP_SEARCH_ERROR_STATUS = {
 }
 
 
+###############################################################################
 def raise_map_search_http_error(error: MapSearchExecutionError) -> NoReturn:
     status_code = next(
         (
@@ -55,14 +56,17 @@ def raise_map_search_http_error(error: MapSearchExecutionError) -> NoReturn:
     ) from error
 
 
+###############################################################################
 def get_search_execution(request: Request) -> MapSearchExecutionService:
     return request.app.state.search_runtime.search_execution
 
 
+###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
 
+###############################################################################
 @router.get(
     MAPS_CATALOG_ROUTE,
     response_model=GeospatialCatalogResponse,
@@ -74,6 +78,7 @@ async def get_catalog(
     return await search_execution.get_catalog()
 
 
+###############################################################################
 @router.get(MAPS_OSM_BASEMAP_TILE_ROUTE, include_in_schema=False)
 def proxy_osm_basemap_tile(
     z: int,
@@ -100,6 +105,7 @@ def proxy_osm_basemap_tile(
         )
 
 
+###############################################################################
 @router.post(
     MAPS_SEARCH_ROUTE,
     response_model=SearchByLocationResponse,
@@ -112,6 +118,7 @@ async def search_by_location(
     return await search_execution.search_by_location(payload)
 
 
+###############################################################################
 @router.post(
     MAPS_JOBS_ROUTE,
     response_model=JobStartResponse,
@@ -124,6 +131,7 @@ async def start_search_job(
     return job_service.create_map_job(payload)
 
 
+###############################################################################
 @router.get(
     MAPS_JOB_ROUTE, response_model=JobStatusResponse, status_code=status.HTTP_200_OK
 )
@@ -137,6 +145,7 @@ async def get_search_job_status(
     return response
 
 
+###############################################################################
 @router.delete(
     MAPS_JOB_ROUTE, response_model=JobCancelResponse, status_code=status.HTTP_200_OK
 )

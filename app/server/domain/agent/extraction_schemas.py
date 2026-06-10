@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.domain.agent.actions import AgentAction
 
 
+###############################################################################
 class LLMTemporalSignal(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -15,6 +16,7 @@ class LLMTemporalSignal(BaseModel):
     reference_time_iso: str | None = None
 
 
+###############################################################################
 class LLMLocationSignal(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -26,6 +28,7 @@ class LLMLocationSignal(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+###############################################################################
 class LLMDisallowedPattern(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -34,6 +37,7 @@ class LLMDisallowedPattern(BaseModel):
     matched_text: str
 
 
+###############################################################################
 class LLMParserExtraction(BaseModel):
     model_config = ConfigDict(extra="ignore")
 

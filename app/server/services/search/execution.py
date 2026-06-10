@@ -12,7 +12,10 @@ from server.services.search.errors import MapSearchTileProxyError
 from server.services.search.orchestrator import LocationSearchOrchestrator
 
 
+###############################################################################
 class MapSearchExecutionService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -24,6 +27,7 @@ class MapSearchExecutionService:
         self.catalog_service = catalog_service
         self.osm_tile_proxy_service = osm_tile_proxy_service
 
+    # -------------------------------------------------------------------------
     async def search_by_location(self, payload: LocationSearchRequest) -> SearchByLocationResponse:
         map_session = await self.orchestrator.execute(payload)
         return SearchByLocationResponse(
@@ -31,10 +35,12 @@ class MapSearchExecutionService:
             map_session=map_session,
         )
 
+    # -------------------------------------------------------------------------
     async def get_catalog(self) -> GeospatialCatalogResponse:
         catalog = self.catalog_service.list_catalog()
         return GeospatialCatalogResponse.model_validate(catalog)
 
+    # -------------------------------------------------------------------------
     def fetch_osm_basemap_tile(self, z: int, x: int, y: int) -> tuple[bytes, str, str]:
         try:
             return self.osm_tile_proxy_service.fetch_tile(z, x, y)

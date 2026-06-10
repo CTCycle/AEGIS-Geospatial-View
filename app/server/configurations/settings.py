@@ -26,6 +26,7 @@ from server.common.constants import (
 from server.common.paths import DATABASE_FILE_PATH
 
 
+###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
     database_path: str
@@ -42,6 +43,7 @@ class DatabaseSettings:
     insert_batch_size: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class NominatimSettings:
     base_url: str
@@ -49,6 +51,7 @@ class NominatimSettings:
     timeout: float
 
 
+###############################################################################
 @dataclass(frozen=True)
 class GeospatialSettings:
     min_timeline_year: int
@@ -59,6 +62,7 @@ class GeospatialSettings:
     max_mercator_extent: float
 
 
+###############################################################################
 @dataclass(frozen=True)
 class MapSettings:
     default_size_m: float
@@ -66,11 +70,13 @@ class MapSettings:
     tiles: str
 
 
+###############################################################################
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ChatRuntimeSettings:
     max_history_messages: int
@@ -78,6 +84,7 @@ class ChatRuntimeSettings:
     parser_max_retries: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class OpenMeteoSettings:
     weather_base_url: str
@@ -88,6 +95,7 @@ class OpenMeteoSettings:
     min_call_interval_s: float
 
 
+###############################################################################
 @dataclass(frozen=True)
 class OverpassSettings:
     base_url: str
@@ -99,6 +107,7 @@ class OverpassSettings:
     default_limit: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class RainViewerSettings:
     metadata_url: str
@@ -111,6 +120,7 @@ class RainViewerSettings:
     tile_snow: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class GIBSSettings:
     user_agent: str
@@ -131,6 +141,7 @@ class GIBSSettings:
     layer_sync_timeout: float
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ServerSettings:
     database: DatabaseSettings
@@ -143,6 +154,8 @@ class ServerSettings:
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
+
+###############################################################################
 class JsonDatabaseSettings(BaseModel):
     embedded_database: bool = True
     engine: str = "postgresql+psycopg"
@@ -156,6 +169,7 @@ class JsonDatabaseSettings(BaseModel):
     connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
     insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "host", "database_name", "username", "password", "ssl_ca", mode="before"
     )
@@ -166,6 +180,7 @@ class JsonDatabaseSettings(BaseModel):
         text = str(value).strip()
         return text or None
 
+    # -------------------------------------------------------------------------
     @field_validator("engine", mode="before")
     @classmethod
     def normalize_engine(cls, value: Any) -> str:
@@ -173,12 +188,14 @@ class JsonDatabaseSettings(BaseModel):
         return text or "postgresql+psycopg"
 
 
+###############################################################################
 class JsonNominatimSettings(BaseModel):
     base_url: str = NOMINATIM_SEARCH_URL
     user_agent: str = DEFAULT_NOMINATIM_USER_AGENT
     timeout: float = Field(default=10.0, ge=1.0)
 
 
+###############################################################################
 class JsonGeospatialSettings(BaseModel):
     min_timeline_year: int = 1900
     max_lat: float = 90.0
@@ -188,22 +205,26 @@ class JsonGeospatialSettings(BaseModel):
     max_mercator_extent: float = 20037508.3427892
 
 
+###############################################################################
 class JsonMapSettings(BaseModel):
     default_size_m: float = Field(default=500.0, ge=1.0)
     render_delay_s: float = Field(default=1.0, ge=0.0)
     tiles: str = "OpenStreetMap"
 
 
+###############################################################################
 class JsonJobsSettings(BaseModel):
     polling_interval: float = 1.0
 
 
+###############################################################################
 class JsonChatRuntimeSettings(BaseModel):
     max_history_messages: int = Field(default=12, ge=1, le=100)
     parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     parser_max_retries: int = Field(default=2, ge=0, le=5)
 
 
+###############################################################################
 class JsonOpenMeteoSettings(BaseModel):
     weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
     air_quality_base_url: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
@@ -213,6 +234,7 @@ class JsonOpenMeteoSettings(BaseModel):
     min_call_interval_s: float = Field(default=0.15, ge=0.05)
 
 
+###############################################################################
 class JsonOverpassSettings(BaseModel):
     base_url: str = "https://overpass-api.de/api/interpreter"
     user_agent: str = "AEGIS-Overpass/1.0"
@@ -223,6 +245,7 @@ class JsonOverpassSettings(BaseModel):
     default_limit: int = Field(default=30, ge=1, le=200)
 
 
+###############################################################################
 class JsonRainViewerSettings(BaseModel):
     metadata_url: str = "https://api.rainviewer.com/public/weather-maps.json"
     user_agent: str = "AEGIS-RainViewer/1.0"
@@ -234,6 +257,7 @@ class JsonRainViewerSettings(BaseModel):
     tile_snow: int = Field(default=1, ge=0, le=1)
 
 
+###############################################################################
 class JsonGIBSSettings(BaseModel):
     user_agent: str = DEFAULT_GIBS_USER_AGENT
     timeout: float = Field(default=20.0, ge=1.0)
@@ -265,6 +289,7 @@ class JsonGIBSSettings(BaseModel):
     layer_sync_user_agent: str = DEFAULT_GIBS_LAYER_SYNC_USER_AGENT
     layer_sync_timeout: float = Field(default=30.0, ge=1.0)
 
+    # -------------------------------------------------------------------------
     @field_validator(
         "wms_base_endpoints", "capabilities_endpoints", "ows_namespaces", mode="before"
     )
@@ -281,6 +306,7 @@ class JsonGIBSSettings(BaseModel):
         return normalized
 
 
+###############################################################################
 def _read_env_text(name: str) -> str | None:
     value = os.getenv(name)
     if value is None:
@@ -289,6 +315,7 @@ def _read_env_text(name: str) -> str | None:
     return text or None
 
 
+###############################################################################
 def _read_env_int(name: str) -> int | None:
     value = _read_env_text(name)
     if value is None:
@@ -299,6 +326,7 @@ def _read_env_int(name: str) -> int | None:
         raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
 
 
+###############################################################################
 def _read_env_bool(name: str) -> bool | None:
     value = _read_env_text(name)
     if value is None:
@@ -312,6 +340,7 @@ def _read_env_bool(name: str) -> bool | None:
     raise RuntimeError(f"Invalid boolean value for {name}: {value}")
 
 
+###############################################################################
 def _database_payload_from_url(database_url: str) -> dict[str, Any]:
     parsed = urllib.parse.urlparse(database_url)
     scheme = (parsed.scheme or "").strip().lower()
@@ -337,6 +366,7 @@ def _database_payload_from_url(database_url: str) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def build_database_payload_from_env() -> dict[str, Any]:
     payload: dict[str, Any] = {}
 
@@ -373,6 +403,7 @@ def build_database_payload_from_env() -> dict[str, Any]:
     return payload
 
 
+###############################################################################
 def build_database_settings() -> DatabaseSettings:
     try:
         db = JsonDatabaseSettings.model_validate(build_database_payload_from_env())
@@ -381,6 +412,7 @@ def build_database_settings() -> DatabaseSettings:
     return _to_database_settings(db)
 
 
+###############################################################################
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
@@ -405,12 +437,15 @@ class AppSettings(BaseSettings):
     ui_port: int = Field(default=8001, ge=1, le=65535)
     reload: bool = True
     optional_dependencies: bool = True
+
+    # -------------------------------------------------------------------------
     @field_validator("fastapi_host", "ui_host", mode="before")
     @classmethod
     def normalize_required_strings(cls, value: Any) -> str:
         text = str(value).strip() if value is not None else ""
         return text or "127.0.0.1"
 
+    # -------------------------------------------------------------------------
     def to_server_settings(self) -> ServerSettings:
         gibs_wms_base_endpoints = _normalize_upper_key_mapping(
             self.gibs.wms_base_endpoints,
@@ -500,7 +535,6 @@ class AppSettings(BaseSettings):
             ),
         )
 
-
 ###############################################################################
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     if db.embedded_database:
@@ -534,7 +568,6 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         insert_batch_size=db.insert_batch_size,
     )
 
-
 ###############################################################################
 def _normalize_upper_key_mapping(
     mapping: dict[str, str],
@@ -548,7 +581,6 @@ def _normalize_upper_key_mapping(
         if k and v:
             normalized[k] = v
     return normalized or dict(fallback)
-
 
 ###############################################################################
 def _normalize_key_mapping(

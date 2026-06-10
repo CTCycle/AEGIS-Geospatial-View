@@ -37,10 +37,12 @@ from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
 
+###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
 
 
+###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
     client_root = CLIENT_DIST_PATH.resolve()
     requested_path = (client_root / full_path).resolve()
@@ -54,10 +56,12 @@ def _resolve_client_file(full_path: str) -> Path | None:
     return None
 
 
+###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
 
+###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
     client_file = _resolve_client_file(full_path)
     if client_file is not None:
@@ -65,10 +69,12 @@ def serve_client_path(full_path: str) -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
 
+###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
 
 
+###############################################################################
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_server_settings()
@@ -103,6 +109,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     job_service.stop()
 
 
+###############################################################################
 def create_app() -> FastAPI:
     application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
 

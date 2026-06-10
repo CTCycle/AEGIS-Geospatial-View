@@ -8,6 +8,7 @@ from server.services.llm.prompts import (
 )
 
 
+###############################################################################
 def test_prompt_builders_include_required_guardrails() -> None:
     extraction = get_agent_extraction_prompt(provider="ollama", model="llama3.2")
     decision = get_agent_decision_system_prompt(provider="openai", model="gpt-4.1-mini")
@@ -21,6 +22,7 @@ def test_prompt_builders_include_required_guardrails() -> None:
         assert "ask for missing information only when genuinely necessary" in lowered
 
 
+###############################################################################
 def test_prompt_builders_stay_under_token_budget() -> None:
     prompts = [
         get_agent_extraction_prompt(provider="ollama", model="llama3.2"),

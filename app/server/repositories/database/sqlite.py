@@ -15,10 +15,12 @@ from server.repositories.schemas import Base
 
 
 # [SQLITE DATABASE]
+
 ###############################################################################
 class SQLiteRepository(SqlAlchemyTableOperationsMixin):
     warn_on_missing_table = True
 
+    # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings | None = None) -> None:
         self.settings = settings or get_server_settings().database
         db_path = Path(self.settings.database_path)

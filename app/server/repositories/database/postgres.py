@@ -14,9 +14,11 @@ from server.repositories.database.orm_table_operations import (
 )
 
 
+###############################################################################
 class PostgresRepository(SqlAlchemyTableOperationsMixin):
     warn_on_missing_table = False
 
+    # -------------------------------------------------------------------------
     def __init__(self, settings: DatabaseSettings) -> None:
         if not settings.host:
             raise ValueError("Database host must be provided for external database.")
@@ -52,6 +54,7 @@ class PostgresRepository(SqlAlchemyTableOperationsMixin):
         self.session = self.session_factory
         self.insert_batch_size = settings.insert_batch_size
 
+    # -------------------------------------------------------------------------
     def _insert_statement(
         self,
         table_cls: type[Any],

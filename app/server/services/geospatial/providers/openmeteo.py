@@ -12,12 +12,15 @@ from server.services.geospatial.providers.base import (
 )
 
 
+###############################################################################
 class OpenMeteoProvider(GeospatialProvider):
     provider_id = "openmeteo"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, service: OpenMeteoService | None = None) -> None:
         self.service = service or OpenMeteoService()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         try:
@@ -47,6 +50,7 @@ class OpenMeteoProvider(GeospatialProvider):
             attribution=[str(payload.get("attribution") or "Data from Open-Meteo")],
         )
 
+    # -------------------------------------------------------------------------
     def _payload(
         self, payload: dict[str, Any], *, rendering_mode: str
     ) -> dict[str, Any]:
@@ -63,6 +67,7 @@ class OpenMeteoProvider(GeospatialProvider):
             "resolvedAt": payload.get("resolved_at"),
         }
 
+    # -------------------------------------------------------------------------
     def _features(
         self, payload: dict[str, Any], *, rendering_mode: str
     ) -> list[dict[str, Any]]:

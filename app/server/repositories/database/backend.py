@@ -10,11 +10,15 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
 
 
+###############################################################################
 class AEGISDatabase:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.settings = get_server_settings().database
         self.backend = self._build_backend()
 
+    # -------------------------------------------------------------------------
     def _build_backend(self) -> DatabaseBackend:
         if self.settings.embedded_database:
             return SQLiteRepository(self.settings)
@@ -49,6 +53,7 @@ class AEGISDatabase:
         return self.backend.count_records(model)
 
 
+###############################################################################
 @cache
 def get_database() -> AEGISDatabase:
     return AEGISDatabase()

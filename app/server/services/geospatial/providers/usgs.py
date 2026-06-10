@@ -15,17 +15,21 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, fetcher: JsonFetcher | None = None) -> None:
         self.fetcher = fetcher or fetch_json_url
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if request.capability_id == "usgs_water_gauges":
             return await self._water_services(request)
         return await self._earthquakes(request)
 
+    # -------------------------------------------------------------------------
     async def _earthquakes(self, request: ProviderRequest) -> ProviderResponse:
         feed = str(request.params.get("feed") or "all_day").strip()
         features_url = f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/{feed}.geojson"
@@ -58,6 +62,7 @@ class USGSProvider(GeospatialProvider):
             attribution=["U.S. Geological Survey"],
         )
 
+    # -------------------------------------------------------------------------
     async def _water_services(self, request: ProviderRequest) -> ProviderResponse:
         params = {
             "format": "json",
@@ -98,6 +103,7 @@ class USGSProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
         raise ProviderUnavailableError("USGS earthquake payload must be a GeoJSON object.")
@@ -136,6 +142,7 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
     return features
 
 
+###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
         raise ProviderUnavailableError("USGS water-services payload must be an object.")
@@ -180,6 +187,7 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
     return features
 
 
+###############################################################################
 def _latest_usgs_value(values: list[object]) -> dict[str, object]:
     if not values or not isinstance(values[0], dict):
         return {}
@@ -190,6 +198,7 @@ def _latest_usgs_value(values: list[object]) -> dict[str, object]:
     return latest if isinstance(latest, dict) else {}
 
 
+###############################################################################
 def _unit_code(series: dict[str, object]) -> object:
     variable = series.get("variable") if isinstance(series.get("variable"), dict) else {}
     unit = variable.get("unit") if isinstance(variable.get("unit"), dict) else {}

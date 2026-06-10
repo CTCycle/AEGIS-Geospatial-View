@@ -18,16 +18,13 @@ __all__ = [
     "OpenAQRequestError",
 ]
 
-
 ###############################################################################
 class OpenAQServiceError(Exception):
     """Base exception for OpenAQ service failures."""
 
-
 ###############################################################################
 class OpenAQRequestError(OpenAQServiceError):
     """Raised when OpenAQ API cannot fulfill the request."""
-
 
 ###############################################################################
 class OpenAQService:
@@ -55,6 +52,7 @@ class OpenAQService:
         "bc": "Black Carbon (BC)",
     }
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

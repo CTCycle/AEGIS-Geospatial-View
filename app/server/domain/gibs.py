@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+###############################################################################
 class LayerMetadata(BaseModel):
     layer_id: str
     title: str
@@ -12,5 +13,6 @@ class LayerMetadata(BaseModel):
     tile_matrix_sets: set[str] = Field(default_factory=set)
 
 
+###############################################################################
 class Capabilities(BaseModel):
     layers: list[LayerMetadata] = Field(default_factory=list)

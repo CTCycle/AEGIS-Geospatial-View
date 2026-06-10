@@ -4,6 +4,7 @@ from server.api.search import router
 from server.domain.jobs import JobCancelResponse, JobStartResponse, JobStatusResponse
 
 
+###############################################################################
 def test_jobs_router_wiring_and_response_models() -> None:
     route_map = {
         (route.path, tuple(sorted(route.methods or []))): route

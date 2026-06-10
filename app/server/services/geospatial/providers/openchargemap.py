@@ -23,9 +23,11 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class OpenChargeMapProvider(GeospatialProvider):
     provider_id = "openchargemap"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -37,6 +39,7 @@ class OpenChargeMapProvider(GeospatialProvider):
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         radius_m = request_radius_m(request, 10000.0)
@@ -95,6 +98,7 @@ class OpenChargeMapProvider(GeospatialProvider):
                 raise
             raise ProviderUnavailableError(str(exc)) from exc
 
+    # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
         if not isinstance(payload, list):
             raise ValueError("Open Charge Map payload must be a list.")

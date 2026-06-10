@@ -20,15 +20,18 @@ from server.services.geospatial.providers.base import (
 TextFetcher = Callable[[str], Awaitable[str] | str]
 
 
+###############################################################################
 class NASAFIRMSProvider(GeospatialProvider):
     provider_id = "nasa_firms"
 
+    # -------------------------------------------------------------------------
     def __init__(
         self, *, api_key: str | None = None, fetcher: TextFetcher | None = None
     ) -> None:
         self.api_key = api_key
         self.fetcher = fetcher or _fetch_text_url
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         api_key = (self.api_key or os.getenv("NASA_API_KEY") or "").strip()
         if not api_key:
@@ -66,6 +69,7 @@ class NASAFIRMSProvider(GeospatialProvider):
         )
 
 
+###############################################################################
 async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
     value = fetcher(url)
     if hasattr(value, "__await__"):
@@ -73,15 +77,18 @@ async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
     return value
 
 
+###############################################################################
 async def _fetch_text_url(url: str) -> str:
     return await asyncio.to_thread(_fetch_text_url_sync, url)
 
 
+###############################################################################
 def _fetch_text_url_sync(url: str) -> str:
     with urllib.request.urlopen(url, timeout=20) as response:
         return response.read().decode("utf-8")
 
 
+###############################################################################
 def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
     try:
         rows = list(csv.DictReader(io.StringIO(csv_text)))
@@ -115,6 +122,7 @@ def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:
     return features
 
 
+###############################################################################
 def _firms_timestamp(row: dict[str, str]) -> str | None:
     date = (row.get("acq_date") or "").strip()
     time = (row.get("acq_time") or "").strip().zfill(4)
@@ -125,6 +133,7 @@ def _firms_timestamp(row: dict[str, str]) -> str | None:
     return f"{date}T{time[:2]}:{time[2:]}:00Z"
 
 
+###############################################################################
 def _float_or_none(value: str | None) -> float | None:
     if value is None or not str(value).strip():
         return None

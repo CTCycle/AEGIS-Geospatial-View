@@ -22,6 +22,7 @@ BackgroundJobEventType = Literal[
 ]
 
 
+###############################################################################
 class BackgroundJobCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -33,6 +34,7 @@ class BackgroundJobCreateResponse(BaseModel):
     poll_interval: float = 1.0
 
 
+###############################################################################
 class BackgroundJobEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,6 +45,7 @@ class BackgroundJobEvent(BaseModel):
     payload_json: dict[str, Any] = Field(default_factory=dict)
 
 
+###############################################################################
 class BackgroundJobStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -66,6 +69,7 @@ class BackgroundJobStatusResponse(BaseModel):
     last_heartbeat_at: datetime | None = None
 
 
+###############################################################################
 class BackgroundJobEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -73,6 +77,7 @@ class BackgroundJobEventsResponse(BaseModel):
     events: list[BackgroundJobEvent] = Field(default_factory=list)
 
 
+###############################################################################
 class JobCancelResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,6 +94,7 @@ from dataclasses import dataclass, field  # noqa: E402
 from time import monotonic  # noqa: E402
 
 
+###############################################################################
 @dataclass
 class BackgroundJobState:
     job_id: str
@@ -105,6 +111,7 @@ class BackgroundJobState:
 from datetime import UTC  # noqa: E402
 
 
+###############################################################################
 @dataclass
 class BackgroundJob:
     job_id: str

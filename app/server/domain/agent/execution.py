@@ -7,6 +7,7 @@ from server.domain.geographics import MapSession
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionContext:
     request_id: str | None = None
@@ -17,6 +18,7 @@ class AgentExecutionContext:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentToolLoopRequest:
     provider: str
@@ -28,6 +30,7 @@ class AgentToolLoopRequest:
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class AgentToolLoopResult:
     final_text: str

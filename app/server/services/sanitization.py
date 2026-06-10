@@ -6,13 +6,14 @@ from collections.abc import Mapping
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
 from server.repositories.database.contracts import DatabaseBackend
 
-
 ###############################################################################
 class LocationSanitizationService:
+
+    # -------------------------------------------------------------------------
     def __init__(self, country_alias_to_iso2: Mapping[str, str]) -> None:
         self._country_alias_to_iso2 = dict(country_alias_to_iso2)
 
-    ###############################################################################
+    # -------------------------------------------------------------------------
     def normalize_whitespace(self, value: str | None) -> str | None:
         if value is None:
             return None
@@ -21,13 +22,13 @@ class LocationSanitizationService:
             return None
         return " ".join(stripped.split())
 
-    ###############################################################################
+    # -------------------------------------------------------------------------
     def normalize_country_key(self, value: str | None) -> str:
         if value is None:
             return ""
         return " ".join(value.strip().casefold().split())
 
-    ###############################################################################
+    # -------------------------------------------------------------------------
     def normalize_country(self, value: str | None) -> str | None:
         normalized = self.normalize_whitespace(value)
         if not normalized:
@@ -41,13 +42,13 @@ class LocationSanitizationService:
             return self._country_alias_to_iso2[key]
         return None
 
-    ###############################################################################
+    # -------------------------------------------------------------------------
     def classify_query(self, value: str) -> str:
         if re.search(r"\d", value):
             return "address"
         return "place"
 
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def sanitize_location_inputs(
         self,
         address: str,
@@ -75,6 +76,7 @@ class LocationSanitizationService:
         }
 
 
+###############################################################################
 def build_location_sanitization_service(
     database: DatabaseBackend,
 ) -> LocationSanitizationService:

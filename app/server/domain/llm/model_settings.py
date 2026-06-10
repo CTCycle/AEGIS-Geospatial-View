@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+###############################################################################
 class ModelRoleSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -24,6 +25,7 @@ class ModelRoleSettings(BaseModel):
     ] = "unknown"
 
 
+###############################################################################
 class RuntimeModelSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

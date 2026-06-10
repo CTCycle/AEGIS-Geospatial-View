@@ -18,10 +18,12 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
 )
 
 
+###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
 
+###############################################################################
 def _models_payload() -> dict[str, Any]:
     return {
         "cloud": [
@@ -38,6 +40,7 @@ def _models_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _turn_payload() -> dict[str, Any]:
     payload = chat_turn_map_response(7001, "Search executed successfully.")
     payload["map_session"]["bounds"] = [12.4963044, 41.902725, 12.4964044, 41.902825]
@@ -47,6 +50,7 @@ def _turn_payload() -> dict[str, Any]:
     return payload
 
 
+###############################################################################
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     page.route(
         re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
@@ -79,6 +83,7 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     )
 
 
+###############################################################################
 def _collect_console_errors(page: Page) -> list[str]:
     errors: list[str] = []
 
@@ -90,6 +95,7 @@ def _collect_console_errors(page: Page) -> list[str]:
     return errors
 
 
+###############################################################################
 def _assert_no_render_blockers(errors: list[str]) -> None:
     blockers = [
         line
@@ -106,6 +112,7 @@ def _assert_no_render_blockers(errors: list[str]) -> None:
     assert not blockers, f"Render-blocking console errors detected: {blockers}"
 
 
+###############################################################################
 def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     page: Page, base_url: str
 ) -> None:
@@ -124,6 +131,7 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     _assert_no_render_blockers(errors)
 
 
+###############################################################################
 def test_refresh_restores_rendered_map_without_console_errors(
     page: Page, base_url: str
 ) -> None:

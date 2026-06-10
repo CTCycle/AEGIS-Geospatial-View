@@ -20,10 +20,12 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
 )
 
 
+###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
 
+###############################################################################
 def _setup_stub_harness(
     page: Page,
     *,
@@ -108,6 +110,7 @@ def _setup_stub_harness(
     return captured_put_payloads
 
 
+###############################################################################
 def test_settings_mobile_layout_has_no_overlap_at_320px(
     page: Page, base_url: str
 ) -> None:
@@ -162,6 +165,7 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(
     )
 
 
+###############################################################################
 def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) -> None:
     put_payloads: list[dict[str, Any]] = []
     expected_initial = split_role_settings_payload()
@@ -200,6 +204,7 @@ def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) 
     assert all("api_key" not in values for values in payload["credentials"].values())
 
 
+###############################################################################
 def test_capabilities_tables_do_not_clip_desktop_columns(
     page: Page, base_url: str
 ) -> None:
@@ -231,6 +236,7 @@ def test_capabilities_tables_do_not_clip_desktop_columns(
     assert all(item["right"] <= item["pageRight"] + 1 for item in metrics["wrappedTables"])
 
 
+###############################################################################
 def test_chat_composer_does_not_cover_latest_assistant_message(
     page: Page, base_url: str
 ) -> None:
@@ -266,6 +272,7 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
     assert metrics["assistantBottom"] <= metrics["composerTop"] + 1
 
 
+###############################################################################
 def test_settings_query_params_do_not_leak_back_to_chat(
     page: Page, base_url: str
 ) -> None:
@@ -283,6 +290,7 @@ def test_settings_query_params_do_not_leak_back_to_chat(
     assert query == ""
 
 
+###############################################################################
 def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
     page: Page, base_url: str
 ) -> None:

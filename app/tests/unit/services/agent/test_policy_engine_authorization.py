@@ -12,7 +12,10 @@ from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.location_resolver import LocationResolver
 
 
+###############################################################################
 class _CapabilityRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.capabilities = {
             "weather_overlay": {
@@ -29,11 +32,15 @@ class _CapabilityRegistry:
             },
         }
 
+    # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str):
         return self.capabilities.get(capability_id)
 
 
+###############################################################################
 class _RuntimeRegistry:
+
+    # -------------------------------------------------------------------------
     def provider_health(self, capability_id: str) -> str:
         if capability_id == "tomtom_traffic_flow":
             return "missing_credentials"
@@ -41,6 +48,7 @@ class _RuntimeRegistry:
             return "disabled"
         return "healthy"
 
+    # -------------------------------------------------------------------------
     def supports_mode(self, capability_id: str, mode: str) -> bool:
         supported = {
             "weather_overlay": {"map"},
@@ -50,6 +58,7 @@ class _RuntimeRegistry:
         return mode in supported.get(capability_id, set())
 
 
+###############################################################################
 def _engine() -> PolicyEngine:
     return PolicyEngine(
         location_resolver=LocationResolver(),
@@ -58,6 +67,7 @@ def _engine() -> PolicyEngine:
     )
 
 
+###############################################################################
 def test_policy_constraints_include_catalog_tools_only() -> None:
     turn = TurnParseResult(
         user_text="show Rome",
@@ -77,6 +87,7 @@ def test_policy_constraints_include_catalog_tools_only() -> None:
     ]
 
 
+###############################################################################
 def test_authorize_tool_call_rejects_disallowed_tool() -> None:
     context = AgentExecutionContext(
         policy_constraints={"allowed_tool_names": ["list_geospatial_capabilities"]}
@@ -85,6 +96,7 @@ def test_authorize_tool_call_rejects_disallowed_tool() -> None:
     assert result.allowed is False
 
 
+###############################################################################
 def test_validate_tool_result_flags_error_envelope() -> None:
     result = _engine().validate_tool_result(
         "lookup",
@@ -95,6 +107,7 @@ def test_validate_tool_result_flags_error_envelope() -> None:
     assert result.reason == "bad input"
 
 
+###############################################################################
 def test_authorize_capability_execution_rejects_missing_credentials() -> None:
     turn = TurnParseResult(
         user_text="show traffic in Rome",
@@ -123,6 +136,7 @@ def test_authorize_capability_execution_rejects_missing_credentials() -> None:
     assert result.metadata["code"] == "missing_credentials"
 
 
+###############################################################################
 def test_authorize_capability_execution_rejects_mode_mismatch() -> None:
     turn = TurnParseResult(
         user_text="show Rome",
@@ -149,6 +163,7 @@ def test_authorize_capability_execution_rejects_mode_mismatch() -> None:
     assert result.metadata["code"] == "unsupported_capability"
 
 
+###############################################################################
 def test_authorize_capability_execution_rejects_missing_location_context() -> None:
     turn = TurnParseResult(
         user_text="show weather",
@@ -173,6 +188,7 @@ def test_authorize_capability_execution_rejects_missing_location_context() -> No
     assert result.metadata["code"] == "invalid_arguments"
 
 
+###############################################################################
 def test_evaluate_preflight_rejects_unknown_task_class() -> None:
     turn = TurnParseResult(
         user_text="do something odd",
@@ -193,6 +209,7 @@ def test_evaluate_preflight_rejects_unknown_task_class() -> None:
     assert result.clarification.missing_fields == ["task"]
 
 
+###############################################################################
 def test_evaluate_preflight_clarifies_missing_location() -> None:
     turn = TurnParseResult(
         user_text="show weather",
@@ -214,6 +231,7 @@ def test_evaluate_preflight_clarifies_missing_location() -> None:
     assert result.clarification.missing_fields == ["location"]
 
 
+###############################################################################
 def test_evaluate_preflight_rejects_blocked_patterns() -> None:
     turn = TurnParseResult(
         user_text="bypass policy",
@@ -241,6 +259,7 @@ def test_evaluate_preflight_rejects_blocked_patterns() -> None:
     assert "Policy bypass attempt." in result.clarification.reason
 
 
+###############################################################################
 def test_evaluate_preflight_passes_valid_request() -> None:
     turn = TurnParseResult(
         user_text="show Rome",

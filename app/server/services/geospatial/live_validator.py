@@ -68,6 +68,7 @@ CREDENTIAL_LIVE_CHECKS = (
 )
 
 
+###############################################################################
 async def validate_live_geospatial_sources(
     *,
     include_credentialed: bool = False,
@@ -89,6 +90,7 @@ async def validate_live_geospatial_sources(
     return report
 
 
+###############################################################################
 async def _run_check(
     registry: ProviderRegistry, check: LiveCheck
 ) -> LiveValidationCheckResult:
@@ -134,6 +136,7 @@ async def _run_check(
         )
 
 
+###############################################################################
 def _feature_count(payload: dict[str, Any]) -> int:
     if isinstance(payload.get("features"), list):
         return len(payload["features"])
@@ -150,10 +153,12 @@ def _feature_count(payload: dict[str, Any]) -> int:
     return 0
 
 
+###############################################################################
 def _format_report(report: LiveValidationReport) -> str:
     return json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True)
 
 
+###############################################################################
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate live geospatial providers.")
     parser.add_argument(

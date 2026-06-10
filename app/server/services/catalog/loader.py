@@ -21,10 +21,12 @@ GIBS_TILE_MATRIX_SETS_REFERENCE_FILE_NAME = "gibs_tile_matrix_sets.json"
 GIBS_LAYER_DEFAULTS_REFERENCE_FILE_NAME = "gibs_layer_defaults.json"
 
 
+###############################################################################
 def get_catalog_root() -> Path:
     return PROJECT_DIR / "resources" / "catalog"
 
 
+###############################################################################
 def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog:
     root = (catalog_root or get_catalog_root()) / REFERENCE_CATALOG_DIR_NAME
     countries_payload = _load_json_file(root / COUNTRIES_REFERENCE_FILE_NAME)
@@ -50,6 +52,7 @@ def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog
     )
 
 
+###############################################################################
 def _load_json_file(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise FileNotFoundError(f"Reference catalog file not found: {path}")
@@ -60,10 +63,12 @@ def _load_json_file(path: Path) -> dict[str, Any]:
     return payload
 
 
+###############################################################################
 def _normalize_alias_key(value: str) -> str:
     return value.strip().casefold()
 
 
+###############################################################################
 def _require_string(value: Any, *, field_name: str) -> str:
     normalized = str(value or "").strip()
     if not normalized:
@@ -71,6 +76,7 @@ def _require_string(value: Any, *, field_name: str) -> str:
     return normalized
 
 
+###############################################################################
 def _require_iso2(value: Any, *, field_name: str) -> str:
     normalized = _require_string(value, field_name=field_name).upper()
     if len(normalized) != 2:
@@ -78,6 +84,7 @@ def _require_iso2(value: Any, *, field_name: str) -> str:
     return normalized
 
 
+###############################################################################
 def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
     entries = payload.get("countries")
     if not isinstance(entries, list):
@@ -96,6 +103,7 @@ def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
     return countries
 
 
+###############################################################################
 def _parse_country_aliases(
     payload: dict[str, Any],
     countries: list[CountryReferenceEntry],
@@ -123,6 +131,7 @@ def _parse_country_aliases(
     return aliases
 
 
+###############################################################################
 def _parse_geospatial_layers(
     payload: dict[str, Any],
 ) -> list[GeospatialLayerReferenceEntry]:
@@ -160,6 +169,7 @@ def _parse_geospatial_layers(
     return layers
 
 
+###############################################################################
 def _parse_gibs_tile_matrix_sets(
     payload: dict[str, Any],
 ) -> list[GibsTileMatrixSetReferenceEntry]:
@@ -199,6 +209,7 @@ def _parse_gibs_tile_matrix_sets(
     return tile_matrix_sets
 
 
+###############################################################################
 def _parse_gibs_layer_defaults(
     payload: dict[str, Any],
 ) -> list[GibsLayerDefaultReferenceEntry]:
@@ -240,6 +251,7 @@ def _parse_gibs_layer_defaults(
     return defaults
 
 
+###############################################################################
 def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:
     if value is None:
         return tuple()

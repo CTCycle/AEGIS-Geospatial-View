@@ -29,6 +29,7 @@ ROME_MAP_SESSION = {
 }
 
 
+###############################################################################
 def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     return {
         "user_text": message,
@@ -49,6 +50,7 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
         "plan": {
@@ -60,6 +62,7 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     }
 
 
+###############################################################################
 def chat_turn_map_response(
     session_id: int, assistant_message: str, basemap_id: str = "osm_default"
 ) -> dict[str, Any]:
@@ -79,6 +82,7 @@ def chat_turn_map_response(
     }
 
 
+###############################################################################
 def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
     return {
         "request_id": f"chat-stub-{session_id}",
@@ -93,6 +97,7 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
     }
 
 
+###############################################################################
 def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
     return {
         "request_id": f"chat-stub-{session_id}",
@@ -105,6 +110,7 @@ def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any
     }
 
 
+###############################################################################
 def model_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "local",
@@ -121,6 +127,7 @@ def model_settings_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def model_catalog_payload() -> dict[str, Any]:
     return {
         "cloud": [
@@ -170,6 +177,7 @@ def model_catalog_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def split_role_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "cloud",
@@ -186,6 +194,7 @@ def split_role_settings_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def chat_stream_events(
     session_id: int, assistant_message: str, include_tool_status: bool = True
 ) -> list[dict[str, Any]]:

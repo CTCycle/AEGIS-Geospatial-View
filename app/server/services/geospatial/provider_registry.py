@@ -98,10 +98,12 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
 }
 
 
+###############################################################################
 class ProviderRegistryError(Exception):
     """Base provider registry error."""
 
 
+###############################################################################
 class ProviderNotRegisteredError(ProviderRegistryError):
     """Raised when no provider is registered for a provider id."""
 
@@ -109,7 +111,10 @@ class ProviderNotRegisteredError(ProviderRegistryError):
 from server.domain.geospatial.providers import ProviderExecutionPolicy
 
 
+###############################################################################
 class ProviderRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -126,12 +131,14 @@ class ProviderRegistry:
         for provider in providers or []:
             self.register(provider)
 
+    # -------------------------------------------------------------------------
     def register(self, provider: GeospatialProvider) -> None:
         provider_id = str(provider.provider_id).strip().lower()
         if not provider_id:
             raise ValueError("Provider id is required.")
         self._providers[provider_id] = provider
 
+    # -------------------------------------------------------------------------
     def get(self, provider_id: str) -> GeospatialProvider:
         normalized = str(provider_id).strip().lower()
         if not normalized:
@@ -143,15 +150,18 @@ class ProviderRegistry:
             )
         return provider
 
+    # -------------------------------------------------------------------------
     def list_provider_ids(self) -> list[str]:
         return sorted(self._providers)
 
+    # -------------------------------------------------------------------------
     def configure_rate_limit(
         self, provider_id: str, *, min_call_interval_s: float
     ) -> None:
         normalized = self._normalize_provider_id(provider_id)
         self._min_call_interval_s[normalized] = max(0.0, float(min_call_interval_s))
 
+    # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
         payload = self.manifest_loader.load_all()
         items = []
@@ -188,6 +198,7 @@ class ProviderRegistry:
                 continue
             self.register(self._provider_for_manifest(provider_id.lower(), dict(item)))
 
+    # -------------------------------------------------------------------------
     async def fetch(
         self, provider_id: str, request: ProviderRequest
     ) -> ProviderResponse:
@@ -227,6 +238,7 @@ class ProviderRegistry:
             raise last_error
         raise ProviderUnavailableError(f"Provider '{normalized}' did not return data.")
 
+    # -------------------------------------------------------------------------
     async def _fetch_provider(
         self, provider: GeospatialProvider, request: ProviderRequest
     ) -> ProviderResponse:
@@ -237,6 +249,7 @@ class ProviderRegistry:
                 return response
         return await provider.fetch(request)
 
+    # -------------------------------------------------------------------------
     def _provider_for_manifest(
         self, provider_id: str, manifest: dict[str, Any]
     ) -> GeospatialProvider:
@@ -248,12 +261,14 @@ class ProviderRegistry:
             f"Provider '{provider_id}' is not registered for manifest '{capability_id}'."
         )
 
+    # -------------------------------------------------------------------------
     def _normalize_provider_id(self, provider_id: str) -> str:
         normalized = str(provider_id).strip().lower()
         if not normalized:
             raise ProviderNotRegisteredError("Provider id is required.")
         return normalized
 
+    # -------------------------------------------------------------------------
     def _ensure_circuit_closed(self, provider_id: str) -> None:
         limit = max(1, int(self.execution_policy.circuit_breaker_failures))
         if self._failures.get(provider_id, 0) >= limit:
@@ -261,9 +276,11 @@ class ProviderRegistry:
                 f"Provider '{provider_id}' circuit is open after repeated failures."
             )
 
+    # -------------------------------------------------------------------------
     def _record_failure(self, provider_id: str) -> None:
         self._failures[provider_id] = self._failures.get(provider_id, 0) + 1
 
+    # -------------------------------------------------------------------------
     async def _wait_for_rate_limit(self, provider_id: str) -> None:
         min_interval = self._min_call_interval_s.get(provider_id, 0.0)
         if min_interval <= 0:

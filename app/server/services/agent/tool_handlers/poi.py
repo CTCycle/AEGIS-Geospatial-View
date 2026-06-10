@@ -4,6 +4,7 @@ from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.overpass import OverpassService
 
 
+###############################################################################
 async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, object]:
     service = OverpassService()
     radius_m = 2500.0

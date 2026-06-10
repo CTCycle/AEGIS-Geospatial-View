@@ -8,17 +8,23 @@ from server.domain.chat import (
 from server.services.chat.maintenance_service import ChatMaintenanceService
 
 
+###############################################################################
 def test_maintenance_service_delegates_to_ollama_provider() -> None:
     provider_calls: list[tuple[str, str | None]] = []
 
+    ###############################################################################
     class _Provider:
+
+        # -------------------------------------------------------------------------
         def __init__(self, *, base_url: str) -> None:
             provider_calls.append(("init", base_url))
 
+        # -------------------------------------------------------------------------
         def list_library_models(self):  # noqa: ANN201
             provider_calls.append(("list_library_models", None))
             return [type("Model", (), {"name": "llama3.2"})()]
 
+        # -------------------------------------------------------------------------
         def list_models(self):  # noqa: ANN201
             provider_calls.append(("list_models", None))
             return [
@@ -35,10 +41,12 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
                 )()
             ]
 
+        # -------------------------------------------------------------------------
         def pull_model(self, *, model: str):  # noqa: ANN201
             provider_calls.append(("pull_model", model))
             return {"status": "ok", "model": model}
 
+        # -------------------------------------------------------------------------
         def health_check(self):  # noqa: ANN201
             provider_calls.append(("health_check", None))
             return {"ok": True, "detail": "healthy"}

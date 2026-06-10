@@ -41,29 +41,33 @@ from server.services.llm.errors import LLMConfigurationError
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
 
 
+###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
     return request.app.state.chat_runtime
 
 
+###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
 
 
+###############################################################################
 def get_chat_streaming_service(request: Request) -> ChatStreamingService:
     return request.app.state.chat_streaming_service
-
 
 ###############################################################################
 def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
 
 
+###############################################################################
 def _ensure_request_id(payload: ChatTurnRequest) -> ChatTurnRequest:
     if payload.request_id:
         return payload
     return payload.model_copy(update={"request_id": f"chat-{uuid4().hex[:12]}"})
 
 
+###############################################################################
 async def _serialize_chat_event_stream(
     streaming_service: ChatStreamingService,
     payload: ChatTurnRequest,
@@ -73,6 +77,7 @@ async def _serialize_chat_event_stream(
         yield _stream_event(event)
 
 
+###############################################################################
 @router.post(
     CHAT_JOBS_ROUTE,
     response_model=BackgroundJobCreateResponse,
@@ -86,6 +91,7 @@ async def create_chat_job(
     return job_service.create_chat_job(payload)
 
 
+###############################################################################
 @router.post(
     CHAT_TURN_ROUTE,
     response_model=ChatTurnResponse,
@@ -104,6 +110,7 @@ async def chat_turn(
         ) from exc
 
 
+###############################################################################
 @router.post(
     CHAT_STREAM_ROUTE,
     status_code=status.HTTP_200_OK,
@@ -118,6 +125,7 @@ async def chat_stream(
     )
 
 
+###############################################################################
 @router.get(
     CHAT_MODELS_ROUTE,
     response_model=ModelLibraryResponse,
@@ -132,6 +140,7 @@ def get_models(
     return ModelLibraryResponse.model_validate(response)
 
 
+###############################################################################
 @router.get(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
@@ -143,6 +152,7 @@ def get_settings(
     return runtime.settings_service.get_settings()
 
 
+###############################################################################
 @router.put(
     CHAT_SETTINGS_ROUTE,
     response_model=ModelSettingsResponse,
@@ -163,6 +173,7 @@ def update_settings(
         ) from exc
 
 
+###############################################################################
 @router.post(
     CHAT_OLLAMA_REFRESH_ROUTE,
     response_model=OllamaRefreshResponse,
@@ -174,6 +185,7 @@ def refresh_ollama_models(
     return runtime.maintenance_service.refresh_ollama_models()
 
 
+###############################################################################
 @router.post(
     CHAT_OLLAMA_PULL_ROUTE,
     response_model=OllamaPullResponse,
@@ -201,6 +213,7 @@ def pull_ollama_model(
         ) from exc
 
 
+###############################################################################
 @router.get(
     CHAT_OLLAMA_HEALTH_ROUTE,
     response_model=OllamaHealthResponse,

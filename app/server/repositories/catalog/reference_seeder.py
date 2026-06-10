@@ -15,6 +15,7 @@ from server.repositories.schemas import (
 )
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ReferenceSeedResult:
     countries_seeded: bool
@@ -23,10 +24,14 @@ class ReferenceSeedResult:
     gibs_layer_defaults_seeded: bool
 
 
+###############################################################################
 class ReferenceCatalogSeeder:
+
+    # -------------------------------------------------------------------------
     def __init__(self, database: DatabaseBackend) -> None:
         self.database = database
 
+    # -------------------------------------------------------------------------
     def seed_if_needed(self, catalog: ReferenceCatalog) -> ReferenceSeedResult:
         return ReferenceSeedResult(
             countries_seeded=self._seed_countries_if_empty(catalog),
@@ -37,6 +42,7 @@ class ReferenceCatalogSeeder:
             gibs_layer_defaults_seeded=self._seed_gibs_layer_defaults_if_empty(catalog),
         )
 
+    # -------------------------------------------------------------------------
     def _seed_countries_if_empty(self, catalog: ReferenceCatalog) -> bool:
         if self.database.count_records(ReferenceCountryRecord) > 0:
             return False
@@ -56,6 +62,7 @@ class ReferenceCatalogSeeder:
             session.commit()
         return True
 
+    # -------------------------------------------------------------------------
     def _seed_geospatial_layers_if_empty(self, catalog: ReferenceCatalog) -> bool:
         if self.database.count_records(ReferenceGeospatialLayerRecord) > 0:
             return False
@@ -90,6 +97,7 @@ class ReferenceCatalogSeeder:
             session.commit()
         return True
 
+    # -------------------------------------------------------------------------
     def _seed_gibs_tile_matrix_sets_if_empty(self, catalog: ReferenceCatalog) -> bool:
         if self.database.count_records(ReferenceGibsTileMatrixSetRecord) > 0:
             return False
@@ -104,6 +112,7 @@ class ReferenceCatalogSeeder:
             session.commit()
         return True
 
+    # -------------------------------------------------------------------------
     def _seed_gibs_layer_defaults_if_empty(self, catalog: ReferenceCatalog) -> bool:
         if self.database.count_records(ReferenceGibsLayerDefaultRecord) > 0:
             return False

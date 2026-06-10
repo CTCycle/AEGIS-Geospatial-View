@@ -7,6 +7,7 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
 
+###############################################################################
 def test_tool_registry_executes_coordinates() -> None:
     registry = ToolRegistry()
     plan = ExecutionPlan(state="direct_tool", mode="direct_text", action_id="location_lookup", tool_id="location_to_coordinates")
@@ -19,6 +20,7 @@ def test_tool_registry_executes_coordinates() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_tool_registry_has_binding_for_all_direct_tool_capabilities() -> None:
     registry = ToolRegistry()
     bindings = registry.load_tool_bindings()

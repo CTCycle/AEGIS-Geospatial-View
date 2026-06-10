@@ -27,41 +27,53 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
 
+###############################################################################
 @dataclass
 class _Session:
     id: int = 7
 
 
+###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
 
 
+###############################################################################
 class _HistoryRepo:
+
+    # -------------------------------------------------------------------------
     def __init__(self, latest_memory: dict[str, Any] | None = None) -> None:
         self.messages: list[dict[str, Any]] = []
         self.latest_memory = latest_memory or {}
 
+    # -------------------------------------------------------------------------
     def upsert_session(self, session_id, title=None):  # noqa: ANN001
         return _Session(id=session_id or 7)
 
+    # -------------------------------------------------------------------------
     def append_message(self, **kwargs: Any) -> None:
         self.messages.append(kwargs)
 
+    # -------------------------------------------------------------------------
     def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
         return []
 
+    # -------------------------------------------------------------------------
     def get_latest_turn_contract(self, session_id: int):
         return None
 
+    # -------------------------------------------------------------------------
     def get_latest_memory_snapshot(self, session_id: int) -> dict[str, Any]:
         return self.latest_memory
 
 
+###############################################################################
 class _Parser:
     last_context_usage = None
 
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -96,7 +108,10 @@ class _Parser:
         )
 
 
+###############################################################################
 class _DeicticParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -123,7 +138,10 @@ class _DeicticParser(_Parser):
         )
 
 
+###############################################################################
 class _ParisParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -158,7 +176,10 @@ class _ParisParser(_Parser):
         )
 
 
+###############################################################################
 class _ZurichParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -193,7 +214,10 @@ class _ZurichParser(_Parser):
         )
 
 
+###############################################################################
 class _TimesSquareParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -228,7 +252,10 @@ class _TimesSquareParser(_Parser):
         )
 
 
+###############################################################################
 class _CoordinateParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -263,7 +290,10 @@ class _CoordinateParser(_Parser):
         )
 
 
+###############################################################################
 class _MemoryMapParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -297,7 +327,10 @@ class _MemoryMapParser(_Parser):
         )
 
 
+###############################################################################
 class _DirectToolParser(_Parser):
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,
@@ -332,7 +365,10 @@ class _DirectToolParser(_Parser):
         )
 
 
+###############################################################################
 class _LocationResolver:
+
+    # -------------------------------------------------------------------------
     async def resolve_location_signals(self, location_signals, memory_snapshot):  # noqa: ANN001
         if not location_signals and memory_snapshot.get("active_location"):
             active = memory_snapshot["active_location"]
@@ -362,23 +398,31 @@ class _LocationResolver:
         )
 
 
+###############################################################################
 class _Policy:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.preflight_calls = 0
         self.location_resolver = _LocationResolver()
 
+    # -------------------------------------------------------------------------
     def build_agent_constraints(self, parsed_request, map_state):
         return AgentPolicyConstraints(
             requires_location=True,
             allowed_tool_names=["execute_geospatial_capability", "list_geospatial_capabilities"],
         )
 
+    # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn):
         self.preflight_calls += 1
         return None
 
 
+###############################################################################
 class _ClarifyingPolicy(_Policy):
+
+    # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn):
         self.preflight_calls += 1
         return PolicyDecision(
@@ -396,7 +440,10 @@ class _ClarifyingPolicy(_Policy):
         )
 
 
+###############################################################################
 class _RejectingPolicy(_Policy):
+
+    # -------------------------------------------------------------------------
     def evaluate_preflight(self, turn):
         self.preflight_calls += 1
         return PolicyDecision(
@@ -414,7 +461,10 @@ class _RejectingPolicy(_Policy):
         )
 
 
+###############################################################################
 class _Catalog:
+
+    # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
             LLMToolDefinition(
@@ -432,6 +482,7 @@ class _Catalog:
             self._handler,
         )
 
+    # -------------------------------------------------------------------------
     async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
         _ = arguments, context
         return {
@@ -469,7 +520,10 @@ class _Catalog:
         }
 
 
+###############################################################################
 class _FallbackCatalog:
+
+    # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
             LLMToolDefinition(
@@ -480,30 +534,42 @@ class _FallbackCatalog:
             self._handler,
         )
 
+    # -------------------------------------------------------------------------
     async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
         _ = arguments, context
         return {"items": []}
 
 
+###############################################################################
 class _NativeLoop:
+
+    # -------------------------------------------------------------------------
     def __init__(self, result: AgentToolLoopResult) -> None:
         self.result = result
         self.requests: list[Any] = []
 
+    # -------------------------------------------------------------------------
     async def run(self, request):
         self.requests.append(request)
         return self.result
 
 
+###############################################################################
 class _SettingsRepo:
+
+    # -------------------------------------------------------------------------
     def get_or_create(self) -> _Settings:
         return _Settings()
 
 
+###############################################################################
 class _SearchOrchestrator:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.requests: list[Any] = []
 
+    # -------------------------------------------------------------------------
     async def execute(self, payload):  # noqa: ANN001
         self.requests.append(payload)
         return MapSession(
@@ -523,7 +589,10 @@ class _SearchOrchestrator:
         )
 
 
+###############################################################################
 class _WarningSearchOrchestrator(_SearchOrchestrator):
+
+    # -------------------------------------------------------------------------
     async def execute(self, payload):  # noqa: ANN001
         session = await super().execute(payload)
         warnings: list[str] = []
@@ -540,7 +609,10 @@ class _WarningSearchOrchestrator(_SearchOrchestrator):
         return session
 
 
+###############################################################################
 class _FailingCatalog:
+
+    # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
             LLMToolDefinition(
@@ -558,6 +630,7 @@ class _FailingCatalog:
             self._handler,
         )
 
+    # -------------------------------------------------------------------------
     async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
         _ = arguments, context
         return {
@@ -575,7 +648,10 @@ class _FailingCatalog:
         }
 
 
+###############################################################################
 class _DirectResultCatalog:
+
+    # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:
         registry.register_native_tool(
             LLMToolDefinition(
@@ -593,6 +669,7 @@ class _DirectResultCatalog:
             self._handler,
         )
 
+    # -------------------------------------------------------------------------
     async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
         _ = arguments, context
         return {
@@ -615,6 +692,7 @@ class _DirectResultCatalog:
         }
 
 
+###############################################################################
 def test_orchestrator_uses_verified_tool_map_session() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -678,6 +756,7 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -734,6 +813,7 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -785,6 +865,7 @@ def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> 
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -828,6 +909,7 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -871,6 +953,7 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainviewer() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -912,6 +995,7 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -951,6 +1035,7 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -994,8 +1079,13 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
+
+    ###############################################################################
     class _MultiOverlayCatalog:
+
+        # -------------------------------------------------------------------------
         def register_with(self, registry: ToolRegistry) -> None:
             registry.register_native_tool(
                 LLMToolDefinition(
@@ -1013,6 +1103,7 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
                 self._handler,
             )
 
+        # -------------------------------------------------------------------------
         async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
             capability_id = str(arguments.get("capability_id") or "unknown_overlay")
             return {
@@ -1121,8 +1212,13 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_order() -> None:
+
+    ###############################################################################
     class _SelectionCatalog:
+
+        # -------------------------------------------------------------------------
         def register_with(self, registry: ToolRegistry) -> None:
             registry.register_native_tool(
                 LLMToolDefinition(
@@ -1140,6 +1236,7 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
                 self._handler,
             )
 
+        # -------------------------------------------------------------------------
         async def _handler(self, arguments: dict[str, Any], context: Any) -> dict[str, Any]:
             capability_id = str(arguments.get("capability_id") or "")
             selection_by_id = {
@@ -1253,6 +1350,7 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() -> None:
     async def _run() -> None:
         history = _HistoryRepo(
@@ -1321,6 +1419,7 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() -> None:
     async def _run() -> None:
         history = _HistoryRepo(
@@ -1380,6 +1479,7 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_updates_active_location_when_user_switches_places() -> None:
     async def _run() -> None:
         history = _HistoryRepo(
@@ -1447,6 +1547,7 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_without_clarification() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -1496,6 +1597,7 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
     async def _run() -> None:
         starting_memory = {
@@ -1573,6 +1675,7 @@ def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_returns_clarification_operation_for_preflight_question() -> None:
     async def _run() -> None:
         policy = _ClarifyingPolicy()
@@ -1611,6 +1714,7 @@ def test_orchestrator_returns_clarification_operation_for_preflight_question() -
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
     async def _run() -> None:
         policy = _RejectingPolicy()
@@ -1649,6 +1753,7 @@ def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool() -> None:
     async def _run() -> None:
         policy = _Policy()
@@ -1709,6 +1814,7 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
     asyncio.run(_run())
 
 
+###############################################################################
 def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
     async def _run() -> None:
         policy = _Policy()

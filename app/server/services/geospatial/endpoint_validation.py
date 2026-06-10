@@ -7,15 +7,16 @@ from urllib.request import Request, urlopen
 
 from server.domain.geospatial.validation import EndpointValidationResult
 
-
 ###############################################################################
 class EndpointValidationService:
     """Performs sampled, read-only health checks for manifest endpoints."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, timeout_seconds: float = 5.0, max_bytes: int = 1_000_000) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_bytes = max_bytes
 
+    # -------------------------------------------------------------------------
     def build_validation_url(
         self, manifest: dict[str, Any], *, sample_bbox: str = "12.45,41.88,12.52,41.92"
     ) -> str | None:
@@ -44,6 +45,7 @@ class EndpointValidationService:
             url = f"{url}{separator}{query}"
         return url
 
+    # -------------------------------------------------------------------------
     def validate_manifest(
         self, manifest: dict[str, Any], *, sample_bbox: str = "12.45,41.88,12.52,41.92"
     ) -> EndpointValidationResult:

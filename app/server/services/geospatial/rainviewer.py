@@ -15,15 +15,20 @@ from server.services.geospatial.providers.http import (
 )
 
 
+###############################################################################
 class RainViewerServiceError(Exception):
     """Base exception for RainViewer failures."""
 
 
+###############################################################################
 class RainViewerRequestError(RainViewerServiceError):
     """Raised when RainViewer metadata cannot be fetched."""
 
 
+###############################################################################
 class RainViewerService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -64,6 +69,7 @@ class RainViewerService:
         self._last_call = 0.0
         self._cache: tuple[float, dict[str, Any]] | None = None
 
+    # -------------------------------------------------------------------------
     async def get_latest_radar_metadata(self) -> dict[str, Any]:
         payload = await self._fetch_metadata_payload()
         radar = payload.get("radar") if isinstance(payload.get("radar"), dict) else {}
@@ -92,6 +98,7 @@ class RainViewerService:
             "attribution": "© RainViewer",
         }
 
+    # -------------------------------------------------------------------------
     async def _fetch_metadata_payload(self) -> dict[str, Any]:
         cached = self._cache_get()
         if cached is not None:
@@ -110,6 +117,7 @@ class RainViewerService:
         self._cache_set(data)
         return data
 
+    # -------------------------------------------------------------------------
     def _cache_get(self) -> dict[str, Any] | None:
         with self._lock:
             if self._cache is None:
@@ -120,10 +128,12 @@ class RainViewerService:
                 return None
             return dict(payload)
 
+    # -------------------------------------------------------------------------
     def _cache_set(self, payload: dict[str, Any]) -> None:
         with self._lock:
             self._cache = (time.time(), payload)
 
+    # -------------------------------------------------------------------------
     async def _wait_for_rate_limit_slot(self) -> None:
         with self._lock:
             now = time.time()

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ProviderRequest:
     capability_id: str
@@ -14,6 +15,7 @@ class ProviderRequest:
     params: dict[str, Any] = field(default_factory=dict)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ProviderResponse:
     capability_id: str
@@ -25,6 +27,7 @@ class ProviderResponse:
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ProviderExecutionPolicy:
     timeout_seconds: float = 10.0

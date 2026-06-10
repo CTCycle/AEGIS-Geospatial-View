@@ -16,7 +16,10 @@ from server.repositories.schemas import (
 )
 
 
+###############################################################################
 class ReferenceCatalogRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self, database: DatabaseBackend) -> None:
         self.database = database
         self._country_alias_to_iso2: dict[str, str] | None = None
@@ -27,6 +30,7 @@ class ReferenceCatalogRepository:
         self._native_resolution_map: dict[str, float] | None = None
         self._date_fallback_days_map: dict[str, int] | None = None
 
+    # -------------------------------------------------------------------------
     def load_country_alias_to_iso2(self) -> dict[str, str]:
         if self._country_alias_to_iso2 is not None:
             return dict(self._country_alias_to_iso2)
@@ -35,6 +39,7 @@ class ReferenceCatalogRepository:
         self._country_alias_to_iso2 = {row.alias_key: row.iso2 for row in rows}
         return dict(self._country_alias_to_iso2)
 
+    # -------------------------------------------------------------------------
     def load_geospatial_layer_catalog(
         self,
     ) -> tuple[GeospatialLayerReferenceEntry, ...]:
@@ -73,6 +78,7 @@ class ReferenceCatalogRepository:
         )
         return self._geospatial_layer_catalog
 
+    # -------------------------------------------------------------------------
     def load_gibs_tile_matrix_resolution_map(self) -> dict[str, float]:
         if self._tile_matrix_resolution_map is not None:
             return dict(self._tile_matrix_resolution_map)
@@ -87,6 +93,7 @@ class ReferenceCatalogRepository:
         }
         return dict(self._tile_matrix_resolution_map)
 
+    # -------------------------------------------------------------------------
     def load_gibs_layer_native_resolution_map(self) -> dict[str, float]:
         if self._native_resolution_map is not None:
             return dict(self._native_resolution_map)
@@ -101,6 +108,7 @@ class ReferenceCatalogRepository:
         }
         return dict(self._native_resolution_map)
 
+    # -------------------------------------------------------------------------
     def load_gibs_layer_date_fallback_days_map(self) -> dict[str, int]:
         if self._date_fallback_days_map is not None:
             return dict(self._date_fallback_days_map)

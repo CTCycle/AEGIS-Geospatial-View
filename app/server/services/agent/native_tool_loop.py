@@ -24,7 +24,10 @@ from server.services.llm.types import (
 LOGGER = logging.getLogger(__name__)
 
 
+###############################################################################
 class NativeToolLoop:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -42,6 +45,7 @@ class NativeToolLoop:
         self.max_tool_result_chars = max_tool_result_chars
         self.tool_timeout_seconds = tool_timeout_seconds
 
+    # -------------------------------------------------------------------------
     async def run(self, request: AgentToolLoopRequest) -> AgentToolLoopResult:
         provider = self.provider_factory.get_provider(request.provider)
         messages = list(request.messages)
@@ -132,6 +136,7 @@ class NativeToolLoop:
             map_session=self._extract_map_session(all_results),
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_map_session(
         results: list[LLMToolResult],
@@ -154,6 +159,7 @@ class NativeToolLoop:
                     LOGGER.warning("Failed to validate MapSession from tool result", exc_info=True)
         return None
 
+    # -------------------------------------------------------------------------
     async def _execute_tool_call(
         self,
         call: LLMToolCall,
@@ -220,6 +226,7 @@ class NativeToolLoop:
             ),
         )
 
+    # -------------------------------------------------------------------------
     def _truncate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         serialized = json.dumps(payload, ensure_ascii=True, default=str)
         if len(serialized) <= self.max_tool_result_chars:
@@ -236,6 +243,7 @@ class NativeToolLoop:
             "metadata": payload.get("metadata", {}),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _extract_next_cursor(payload: dict[str, Any]) -> Any | None:
         data = payload.get("data")
@@ -243,12 +251,14 @@ class NativeToolLoop:
             return data.get("next_cursor") or data.get("cursor")
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _stringify_tool_result(result: LLMToolResult) -> str:
         if isinstance(result.content, str):
             return result.content
         return json.dumps(result.content, ensure_ascii=True, default=str)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _policy_rejection(
         call: LLMToolCall,

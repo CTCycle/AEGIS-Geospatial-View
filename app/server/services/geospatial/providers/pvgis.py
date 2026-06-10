@@ -10,12 +10,15 @@ from server.services.geospatial.providers.base import (
 from server.services.geospatial.pvgis import PVGISError, PVGISService
 
 
+###############################################################################
 class PVGISProvider(GeospatialProvider):
     provider_id = "pvgis"
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, service: PVGISService | None = None) -> None:
         self.service = service or PVGISService()
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         try:

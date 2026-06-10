@@ -16,9 +16,10 @@ from server.services.geospatial.gibs_runtime import GIBSRuntimeMixin
 type BBox = list[float]
 type LayerStore = dict[str, object]
 
-
 ###############################################################################
 class CapabilitiesCache:
+
+    # -------------------------------------------------------------------------
     def __init__(self, ttl_s: float) -> None:
         self.ttl_s = ttl_s
         self.store: dict[str, Capabilities] = {}
@@ -40,9 +41,10 @@ class CapabilitiesCache:
         with self.lock:
             self.store[key] = value
 
-
 ###############################################################################
 class ResponseCache:
+
+    # -------------------------------------------------------------------------
     def __init__(self, max_entries: int) -> None:
         self.max_entries = max_entries
         self.cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -65,9 +67,10 @@ class ResponseCache:
             while len(self.cache) > self.max_entries:
                 self.cache.popitem(last=False)
 
-
 ###############################################################################
 class GIBSService(GIBSRuntimeMixin):
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,

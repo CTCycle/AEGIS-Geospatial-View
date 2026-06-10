@@ -5,6 +5,7 @@ import time
 from playwright.sync_api import APIRequestContext
 
 
+###############################################################################
 def _payload() -> dict[str, object]:
     return {
         "resolved_location": {
@@ -34,6 +35,7 @@ def _payload() -> dict[str, object]:
     }
 
 
+###############################################################################
 def test_start_poll_cancel_and_idempotence(api_context: APIRequestContext) -> None:
     start = api_context.post("/api/maps/jobs", data=_payload())
     assert start.status in {202, 502, 503, 504}
@@ -58,6 +60,7 @@ def test_start_poll_cancel_and_idempotence(api_context: APIRequestContext) -> No
     assert cancel_again.ok
 
 
+###############################################################################
 def test_unknown_job_id_behavior(api_context: APIRequestContext) -> None:
     status_missing = api_context.get("/api/maps/jobs/unknown-job-id")
     cancel_missing = api_context.delete("/api/maps/jobs/unknown-job-id")
@@ -65,6 +68,7 @@ def test_unknown_job_id_behavior(api_context: APIRequestContext) -> None:
     assert cancel_missing.status == 404
 
 
+###############################################################################
 def test_memory_backed_non_durable_semantics_shape(
     api_context: APIRequestContext,
 ) -> None:

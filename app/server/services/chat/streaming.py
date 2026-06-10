@@ -8,9 +8,10 @@ from server.domain.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnRespons
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.llm.errors import LLMConfigurationError
 
-
 ###############################################################################
 class ChatStreamingService:
+
+    # -------------------------------------------------------------------------
     def __init__(self, agent_orchestrator: AgentOrchestrator) -> None:
         self.agent_orchestrator = agent_orchestrator
 
@@ -67,7 +68,7 @@ class ChatStreamingService:
                     "request_id": request_id,
                 },
             )
-    
+
     # -------------------------------------------------------------------------
     @staticmethod
     def _build_parsed_payload(response: ChatTurnResponse) -> dict[str, Any]:
@@ -81,6 +82,7 @@ class ChatStreamingService:
             "ambiguities": list(response.turn_contract.ambiguities),
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_policy_payload(response: ChatTurnResponse) -> dict[str, Any]:
         return {
@@ -93,6 +95,7 @@ class ChatStreamingService:
             "has_clarification": response.decision.clarification is not None,
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_tool_lifecycle_events(response: ChatTurnResponse) -> list[ChatStreamEvent]:
         tool_payload = response.tool_payload
@@ -149,6 +152,7 @@ class ChatStreamingService:
             )
         return events
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _serialize_chat_turn_response(response: ChatTurnResponse) -> dict[str, Any]:
         return {

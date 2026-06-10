@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolLoopStarted:
     provider: str
@@ -11,6 +12,7 @@ class ToolLoopStarted:
     tool_count: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolCallRequested:
     tool_name: str
@@ -18,12 +20,14 @@ class ToolCallRequested:
     arguments: dict[str, Any] = field(default_factory=dict)
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolCallAuthorized:
     tool_name: str
     iteration: int
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolCallRejected:
     tool_name: str
@@ -31,6 +35,7 @@ class ToolCallRejected:
     reason: str
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolCallExecuted:
     tool_name: str
@@ -40,6 +45,7 @@ class ToolCallExecuted:
     error_code: str | None = None
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolLoopCompleted:
     provider: str
@@ -48,6 +54,7 @@ class ToolLoopCompleted:
     stopped_reason: str
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ToolLoopFailed:
     provider: str

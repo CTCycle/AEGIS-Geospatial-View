@@ -5,10 +5,12 @@ from typing import Any
 from server.domain.geographics import CameraFeature, PoiFeature
 
 
+###############################################################################
 class NormalizationError(ValueError):
     """Raised when a provider payload cannot be normalized."""
 
 
+###############################################################################
 def normalize_poi_feature(
     payload: dict[str, Any],
     *,
@@ -34,11 +36,13 @@ def normalize_poi_feature(
     )
 
 
+###############################################################################
 def normalize_poi_category(raw_category: str | None) -> str:
     value = _category_key(raw_category)
     return POI_CATEGORY_MAP.get(value, value or "unknown")
 
 
+###############################################################################
 def deduplicate_poi_features(features: list[PoiFeature]) -> list[PoiFeature]:
     seen: set[tuple[str, str, float, float]] = set()
     deduplicated: list[PoiFeature] = []
@@ -63,6 +67,7 @@ def deduplicate_poi_features(features: list[PoiFeature]) -> list[PoiFeature]:
     return deduplicated
 
 
+###############################################################################
 def normalize_camera_feature(
     payload: dict[str, Any],
     *,
@@ -95,6 +100,7 @@ def normalize_camera_feature(
     )
 
 
+###############################################################################
 def _first_number(payload: dict[str, Any], *keys: str) -> float | None:
     for key in keys:
         value = payload.get(key)
@@ -108,6 +114,7 @@ def _first_number(payload: dict[str, Any], *keys: str) -> float | None:
     return None
 
 
+###############################################################################
 def _optional_string(value: Any) -> str | None:
     if value is None:
         return None
@@ -115,6 +122,7 @@ def _optional_string(value: Any) -> str | None:
     return normalized or None
 
 
+###############################################################################
 def _category_key(value: str | None) -> str:
     if value is None:
         return ""

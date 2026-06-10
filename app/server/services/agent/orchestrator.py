@@ -30,6 +30,8 @@ LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class AgentOrchestrator:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -70,6 +72,7 @@ class AgentOrchestrator:
         )
         self.history_service = history_service or ChatHistoryService()
 
+    # -------------------------------------------------------------------------
     async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
@@ -424,6 +427,7 @@ class AgentOrchestrator:
             context_usage=context_usage,
         )
 
+    # -------------------------------------------------------------------------
     def _load_existing_response(
         self,
         session_id: int,
@@ -453,6 +457,7 @@ class AgentOrchestrator:
         }
         return ChatTurnResponse.model_validate(response_payload)
 
+    # -------------------------------------------------------------------------
     def _merge_memory_location_signals(
         self,
         *,
@@ -482,6 +487,7 @@ class AgentOrchestrator:
             }
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _dedupe_location_signals(signals: list[LocationSignal]) -> list[LocationSignal]:
         unique: list[LocationSignal] = []
@@ -500,6 +506,7 @@ class AgentOrchestrator:
             unique.append(signal)
         return unique
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_native_agent_messages(
         *,
@@ -528,6 +535,7 @@ class AgentOrchestrator:
             },
         ]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _build_direct_reject_decision(action_id: str):
         return PolicyDecision(
@@ -535,6 +543,7 @@ class AgentOrchestrator:
             trace=DecisionTrace(steps=["general_question.direct_response"]),
         )
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _compose_general_question_message(
         cls,
@@ -555,6 +564,7 @@ class AgentOrchestrator:
             )
         return "I can help with location-based maps, coordinates, weather, rainfall, traffic layers, and related geospatial questions."
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _asks_about_previous_user_turn(text: str) -> bool:
         return (
@@ -564,6 +574,7 @@ class AgentOrchestrator:
             or "what did i ask you to keep in mind" in text
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _previous_user_message(
         recent_messages: list[dict[str, Any]],
@@ -579,19 +590,23 @@ class AgentOrchestrator:
                 return content
         return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_capability_question(user_text: str) -> bool:
         text = user_text.lower()
         return "capabil" in text and any(marker in text for marker in ("model", "you", "app", "aegis"))
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_parser_runtime_failure(turn_contract) -> bool:
         return "parser_unavailable" in set(turn_contract.ambiguities or [])
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _has_parser_authentication_failure(turn_contract) -> bool:
         return "parser_authentication_failed" in set(turn_contract.ambiguities or [])
 
+    # -------------------------------------------------------------------------
     def _extract_direct_result_from_tool_results(
         self,
         tool_payload: dict[str, Any] | None,
@@ -612,6 +627,7 @@ class AgentOrchestrator:
                 return direct_result
         return None
 
+    # -------------------------------------------------------------------------
     def _extract_capability_selection_from_tool_results(
         self,
         tool_payload: dict[str, Any] | None,
@@ -632,6 +648,7 @@ class AgentOrchestrator:
                 return selection
         return None
 
+    # -------------------------------------------------------------------------
     async def _build_map_session_from_capability_selection(
         self,
         *,
@@ -660,6 +677,7 @@ class AgentOrchestrator:
         request = self.request_builder.build_location_search_request(plan, resolved_location)
         return await self.search_orchestrator.execute(request)
 
+    # -------------------------------------------------------------------------
     async def _build_map_session_from_turn_contract(
         self,
         turn_contract,
@@ -686,6 +704,7 @@ class AgentOrchestrator:
         request = self.request_builder.build_location_search_request(plan, resolved_location)
         return await self.search_orchestrator.execute(request)
 
+    # -------------------------------------------------------------------------
     async def _build_updated_memory_snapshot(
         self,
         *,
@@ -711,6 +730,7 @@ class AgentOrchestrator:
             turn_contract.normalized_action,
         )
 
+    # -------------------------------------------------------------------------
     async def _resolve_verified_location_for_memory(
         self,
         *,
@@ -734,6 +754,7 @@ class AgentOrchestrator:
             return None
         return resolved
 
+    # -------------------------------------------------------------------------
     async def _build_combined_map_session_from_tool_results(
         self,
         *,
@@ -802,6 +823,7 @@ class AgentOrchestrator:
         request = self.request_builder.build_location_search_request(plan, resolved_location)
         return await self.search_orchestrator.execute(request)
 
+    # -------------------------------------------------------------------------
     def _infer_overlay_ids(
         self,
         *,
@@ -820,6 +842,7 @@ class AgentOrchestrator:
                 merged.append(overlay_id)
         return merged
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _infer_basemap_id(turn_contract) -> str | None:
         haystack = " ".join(

@@ -4,10 +4,14 @@ from server.domain.geographics import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
 
+###############################################################################
 class SourceHealthMonitor:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._records: dict[str, SourceHealthRecord] = {}
 
+    # -------------------------------------------------------------------------
     def record(
         self,
         provider_id: str,
@@ -29,9 +33,11 @@ class SourceHealthMonitor:
         self._records[normalized_provider] = record
         return record
 
+    # -------------------------------------------------------------------------
     def get(self, provider_id: str) -> SourceHealthRecord | None:
         return self._records.get(self._normalize_provider_id(provider_id))
 
+    # -------------------------------------------------------------------------
     def status_for_manifest(self, manifest: dict[str, object]) -> LayerHealthStatus:
         provider_id = str(manifest.get("provider") or "").strip().lower()
         if provider_id:
@@ -45,6 +51,7 @@ class SourceHealthMonitor:
                 return LayerHealthStatus(value)
         return LayerHealthStatus.UNKNOWN
 
+    # -------------------------------------------------------------------------
     def _normalize_provider_id(self, provider_id: str) -> str:
         normalized = str(provider_id).strip().lower()
         if not normalized:

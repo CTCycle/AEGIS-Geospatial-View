@@ -14,30 +14,37 @@ from server.domain.geospatial.providers import (
 )
 
 
+###############################################################################
 class ProviderError(Exception):
     """Base error for geospatial provider execution failures."""
 
 
+###############################################################################
 class ProviderAuthError(ProviderError):
     """Raised when a provider needs credentials that are unavailable or invalid."""
 
 
+###############################################################################
 class ProviderCircuitOpenError(ProviderError):
     """Raised when a provider circuit is open after repeated failures."""
 
 
+###############################################################################
 class ProviderRateLimitError(ProviderError):
     """Raised when a provider rejects or cannot satisfy rate limits."""
 
 
+###############################################################################
 class ProviderTimeoutError(ProviderError):
     """Raised when a provider request exceeds its timeout."""
 
 
+###############################################################################
 class ProviderUnavailableError(ProviderError):
     """Raised when a provider cannot be reached or is temporarily unhealthy."""
 
 
+###############################################################################
 class ProviderMalformedPayloadError(ProviderError):
     """Raised when a provider returns a payload that cannot be normalized."""
 
@@ -45,6 +52,7 @@ class ProviderMalformedPayloadError(ProviderError):
 SENSITIVE_PARAM_MARKERS = ("key", "secret", "token", "password", "authorization")
 
 
+###############################################################################
 def safe_request_params(params: dict[str, Any]) -> dict[str, Any]:
     safe: dict[str, Any] = {}
     for key, value in sorted(params.items()):
@@ -56,6 +64,7 @@ def safe_request_params(params: dict[str, Any]) -> dict[str, Any]:
     return safe
 
 
+###############################################################################
 def provider_cache_key(provider_id: str, request: ProviderRequest) -> str:
     payload = {
         "provider": str(provider_id).strip().lower(),
@@ -70,6 +79,7 @@ def provider_cache_key(provider_id: str, request: ProviderRequest) -> str:
     return f"{payload['provider']}:{request.capability_id}:{digest}"
 
 
+###############################################################################
 def response_without_credentials(response: ProviderResponse) -> ProviderResponse:
     return ProviderResponse(
         capability_id=response.capability_id,
@@ -82,6 +92,7 @@ def response_without_credentials(response: ProviderResponse) -> ProviderResponse
     )
 
 
+###############################################################################
 def _redact_secrets(value: Any) -> Any:
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
@@ -97,21 +108,26 @@ def _redact_secrets(value: Any) -> Any:
     return value
 
 
+###############################################################################
 class GeospatialProvider(Protocol):
     provider_id: str
 
+    # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         """Fetch and normalize a provider payload for a geospatial capability."""
 
+    # -------------------------------------------------------------------------
     async def fetch_features(self, request: FeatureRequest) -> ProviderResult:
         """Fetch features using the canonical geospatial provider contract."""
 
+    # -------------------------------------------------------------------------
     async def validate_credentials(
         self, credentials: Mapping[str, str]
     ) -> ProviderCredentialValidationResult:
         """Validate provider credentials without persisting them."""
 
 
+###############################################################################
 async def unsupported_credential_validation(
     provider_id: str,
 ) -> ProviderCredentialValidationResult:

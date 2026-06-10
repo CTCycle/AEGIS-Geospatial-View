@@ -7,10 +7,14 @@ from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelCredentialRecord
 
 
+###############################################################################
 class CredentialRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._session_factory = get_database().backend.session
 
+    # -------------------------------------------------------------------------
     def upsert(
         self,
         *,
@@ -44,6 +48,7 @@ class CredentialRepository:
             session.refresh(record)
             return record
 
+    # -------------------------------------------------------------------------
     def list_active(self) -> list[ModelCredentialRecord]:
         with self._session_factory() as session:
             statement = (
@@ -54,6 +59,7 @@ class CredentialRepository:
             )
             return list(session.execute(statement).scalars().all())
 
+    # -------------------------------------------------------------------------
     def deactivate(self, *, provider: str, label: str) -> None:
         with self._session_factory() as session:
             statement = (
@@ -69,6 +75,7 @@ class CredentialRepository:
             record.updated_at = utc_now_naive()
             session.commit()
 
+    # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str) -> ModelCredentialRecord | None:
         with self._session_factory() as session:
             statement = (
@@ -79,6 +86,7 @@ class CredentialRepository:
             )
             return session.execute(statement).scalars().first()
 
+    # -------------------------------------------------------------------------
     def mark_used(self, *, provider: str, label: str) -> None:
         with self._session_factory() as session:
             statement = (

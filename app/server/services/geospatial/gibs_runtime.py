@@ -42,6 +42,8 @@ def clamp(value: float, lower: float, upper: float) -> float:
 
 ###############################################################################
 class GIBSRuntimeMixin:
+
+    # -------------------------------------------------------------------------
     def normalize_bbox(
         self,
         *,

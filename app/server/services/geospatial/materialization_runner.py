@@ -7,14 +7,17 @@ from pathlib import Path
 from .ingestion import build_ingestion_plan, execute_ingestion_plan
 
 
+###############################################################################
 def _iter_manifest_paths(manifest_root: Path) -> list[Path]:
     return sorted(path for path in manifest_root.rglob("*.json") if path.is_file())
 
 
+###############################################################################
 def _load_manifest(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+###############################################################################
 def materialize_datasets(
     *,
     workspace_root: Path,
@@ -43,6 +46,7 @@ def materialize_datasets(
     return results
 
 
+###############################################################################
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Materialize geospatial dataset-ingestion manifests."
@@ -66,6 +70,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+###############################################################################
 def main() -> int:
     args = _parse_args()
     include_ids = {item.strip() for item in args.include if item.strip()} or None

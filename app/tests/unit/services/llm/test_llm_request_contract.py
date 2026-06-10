@@ -5,6 +5,7 @@ import pytest
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
 
+###############################################################################
 def test_llm_request_rejects_tools_plus_structured_schema() -> None:
     tool = LLMToolDefinition(
         name="lookup",

@@ -19,10 +19,12 @@ BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
 DIFF_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "visual_diffs"
 
 
+###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
 
+###############################################################################
 def _models_payload() -> dict[str, Any]:
     return {
         "cloud": [
@@ -39,6 +41,7 @@ def _models_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _turn_payload() -> dict[str, Any]:
     return {
         "request_id": "visual-regression-7901",
@@ -104,6 +107,7 @@ def _turn_payload() -> dict[str, Any]:
     }
 
 
+###############################################################################
 def _setup_stubs(page: Page) -> None:
     page.route(
         re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
@@ -156,6 +160,7 @@ def _setup_stubs(page: Page) -> None:
     )
 
 
+###############################################################################
 def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
     BASELINE_ROOT.mkdir(parents=True, exist_ok=True)
     DIFF_ROOT.mkdir(parents=True, exist_ok=True)
@@ -191,6 +196,7 @@ def _assert_visual_baseline(actual_bytes: bytes, baseline_name: str) -> None:
         )
 
 
+###############################################################################
 def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
     _setup_stubs(page)
     page.goto(base_url)
@@ -202,6 +208,7 @@ def test_map_canvas_matches_visual_baseline(page: Page, base_url: str) -> None:
     _assert_visual_baseline(map_canvas.screenshot(), "map-canvas.png")
 
 
+###############################################################################
 def test_overlay_panel_matches_visual_baseline(page: Page, base_url: str) -> None:
     _setup_stubs(page)
     page.goto(base_url)

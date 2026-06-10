@@ -6,6 +6,7 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 
 
+###############################################################################
 def test_gtfs_realtime_vehicle_positions_require_fresh_feed() -> None:
     response = asyncio.run(
         GTFSRealtimeProvider().fetch(

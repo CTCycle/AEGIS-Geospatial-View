@@ -12,10 +12,14 @@ from server.repositories.schemas.models import CredentialEncryptionMaterial
 DEFAULT_KEY_PURPOSE = "credential_encryption"
 
 
+###############################################################################
 class CredentialEncryptionMaterialRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._session_factory = get_database().backend.session
 
+    # -------------------------------------------------------------------------
     def ensure_seeded(
         self, purpose: str = DEFAULT_KEY_PURPOSE
     ) -> CredentialEncryptionMaterial:
@@ -38,6 +42,7 @@ class CredentialEncryptionMaterialRepository:
             session.refresh(material)
         return material
 
+    # -------------------------------------------------------------------------
     def get_active_material(
         self, purpose: str = DEFAULT_KEY_PURPOSE
     ) -> CredentialEncryptionMaterial | None:
@@ -51,6 +56,7 @@ class CredentialEncryptionMaterialRepository:
             )
             return session.execute(statement).scalars().first()
 
+    # -------------------------------------------------------------------------
     def get_material_by_version(
         self, version: int, purpose: str = DEFAULT_KEY_PURPOSE
     ) -> CredentialEncryptionMaterial | None:
@@ -62,6 +68,7 @@ class CredentialEncryptionMaterialRepository:
             )
             return session.execute(statement).scalars().first()
 
+    # -------------------------------------------------------------------------
     def rotate_material(
         self, purpose: str = DEFAULT_KEY_PURPOSE
     ) -> CredentialEncryptionMaterial:
@@ -91,5 +98,6 @@ class CredentialEncryptionMaterialRepository:
         return material
 
 
+###############################################################################
 def seed_credential_encryption_material() -> CredentialEncryptionMaterial:
     return CredentialEncryptionMaterialRepository().ensure_seeded()
