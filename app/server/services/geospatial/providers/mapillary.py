@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest, ProviderResponse
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderRequest,
+    ProviderResponse,
+)
 
 
 class MapillaryProvider:

@@ -9,11 +9,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from server.common.paths import (
+    CHAT_JOBS_ROUTE,
     CHAT_MODELS_ROUTE,
     CHAT_OLLAMA_HEALTH_ROUTE,
     CHAT_OLLAMA_PULL_ROUTE,
     CHAT_OLLAMA_REFRESH_ROUTE,
-    CHAT_JOBS_ROUTE,
     CHAT_ROUTER_PREFIX,
     CHAT_SETTINGS_ROUTE,
     CHAT_STREAM_ROUTE,
@@ -33,9 +33,9 @@ from server.domain.chat import (
 )
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
-from server.services.jobs import BackgroundJobService
 from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
+from server.services.jobs import BackgroundJobService
 from server.services.llm.errors import LLMConfigurationError
 
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])

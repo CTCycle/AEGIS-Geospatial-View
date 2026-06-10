@@ -6,6 +6,7 @@ from typing import Any
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
+
 ###############################################################################
 class GeospatialCatalogService:
     def __init__(

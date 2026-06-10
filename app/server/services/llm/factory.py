@@ -7,11 +7,12 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.base import LLMProvider
 from server.services.llm.errors import LLMConfigurationError
-from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
-from server.services.llm.types import LLMRequest
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.openai_provider import OpenAIProvider
+from server.services.llm.types import LLMRequest
+
 
 ###############################################################################
 class LLMFactory:

@@ -5,6 +5,14 @@ from typing import NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 
+from server.common.paths import (
+    MAPS_CATALOG_ROUTE,
+    MAPS_JOB_ROUTE,
+    MAPS_JOBS_ROUTE,
+    MAPS_OSM_BASEMAP_TILE_ROUTE,
+    MAPS_ROUTER_PREFIX,
+    MAPS_SEARCH_ROUTE,
+)
 from server.domain.geographics import (
     GeospatialCatalogResponse,
     LocationSearchRequest,
@@ -15,6 +23,7 @@ from server.domain.jobs import (
     JobStartResponse,
     JobStatusResponse,
 )
+from server.services.jobs import BackgroundJobService
 from server.services.search.errors import (
     MapSearchExecutionError,
     MapSearchJobInitializationError,
@@ -22,15 +31,6 @@ from server.services.search.errors import (
     MapSearchTileProxyError,
 )
 from server.services.search.execution import MapSearchExecutionService
-from server.services.jobs import BackgroundJobService
-from server.common.paths import (
-    MAPS_CATALOG_ROUTE,
-    MAPS_JOB_ROUTE,
-    MAPS_JOBS_ROUTE,
-    MAPS_OSM_BASEMAP_TILE_ROUTE,
-    MAPS_ROUTER_PREFIX,
-    MAPS_SEARCH_ROUTE,
-)
 
 router = APIRouter(prefix=MAPS_ROUTER_PREFIX, tags=["search"])
 

@@ -4,7 +4,10 @@ from typing import Any
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.openaq import OpenAQService, OpenAQServiceError
-from server.services.geospatial.providers._request import request_center, request_radius_m
+from server.services.geospatial.providers._request import (
+    request_center,
+    request_radius_m,
+)
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,

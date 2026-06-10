@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from urllib.parse import urlencode
 from collections.abc import Mapping
+from urllib.parse import urlencode
 
 from server.domain.geographics import ProviderCredentialValidationResult
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache

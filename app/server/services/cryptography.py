@@ -4,8 +4,8 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from server.domain.crypto import EncryptedSecret
 from server.repositories.credential_material import (
-    CredentialEncryptionMaterialRepository,
     DEFAULT_KEY_PURPOSE,
+    CredentialEncryptionMaterialRepository,
 )
 
 

@@ -7,7 +7,6 @@ from typing import Any
 
 import folium
 
-from server.configurations import get_server_settings
 from server.common.constants import (
     COMMON_FOLIUM_MAPS,
     EARTH_RADIUS_M,
@@ -16,6 +15,7 @@ from server.common.constants import (
     MIN_GEO_LAT,
     MIN_LONGITUDE,
 )
+from server.configurations import get_server_settings
 
 type BBox = list[float]
 

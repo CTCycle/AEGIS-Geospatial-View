@@ -18,8 +18,8 @@ from server.common.constants import (
     NOMINATIM_REVERSE_PATH,
     NOMINATIM_SEARCH_PATH,
 )
-from server.configurations import get_server_settings
 from server.common.logger import logger
+from server.configurations import get_server_settings
 
 
 ###############################################################################

@@ -6,6 +6,7 @@ from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
 from server.domain.extraction.models import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
+
 ###############################################################################
 class LocationResolver:
     SPECIFICITY_BY_SIGNAL_TYPE = {

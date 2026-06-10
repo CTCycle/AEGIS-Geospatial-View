@@ -3,13 +3,13 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from server.common.paths import CONFIGURATIONS_FILE
 from server.configurations.environment import (
     ensure_environment_loaded,
     reset_environment_bootstrap_for_tests,
 )
 from server.configurations.management import ConfigurationManager
 from server.configurations.settings import ServerSettings
-from server.common.paths import CONFIGURATIONS_FILE
 
 
 def _resolve_config_path(config_path: str | Path | None = None) -> str:

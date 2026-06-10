@@ -8,6 +8,7 @@ from server.domain.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnRespons
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.llm.errors import LLMConfigurationError
 
+
 ###############################################################################
 class ChatStreamingService:
     def __init__(self, agent_orchestrator: AgentOrchestrator) -> None:

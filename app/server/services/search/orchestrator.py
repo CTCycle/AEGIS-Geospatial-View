@@ -8,7 +8,10 @@ from urllib.parse import urlencode
 
 from server.domain.geographics import LocationSearchRequest, MapSession
 from server.services.geospatial.capability_registry import CapabilityRegistry
-from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
+from server.services.geospatial.rainviewer import (
+    RainViewerRequestError,
+    RainViewerService,
+)
 
 
 class LocationSearchOrchestrator:

@@ -6,12 +6,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from server.common.paths import CONFIGURATIONS_FILE
 from server.configurations.settings import (
     AppSettings,
     ServerSettings,
     build_database_payload_from_env,
 )
-from server.common.paths import CONFIGURATIONS_FILE
 
 
 def _ensure_mapping(value: Any) -> dict[str, Any]:

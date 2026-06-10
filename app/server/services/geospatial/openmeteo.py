@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
 
+
 ###############################################################################
 class OpenMeteoServiceError(Exception):
     """Base exception for Open-Meteo failures."""

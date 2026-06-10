@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from typing import Any
 
 from google import genai
@@ -12,7 +12,13 @@ from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
 from server.services.llm.context_budget import compute_context_usage
 from server.services.llm.response_serialization import dump_response_payload
-from server.services.llm.types import LLMRequest, LLMResult, LLMToolCall, LLMToolDefinition, ModelDescriptor
+from server.services.llm.types import (
+    LLMRequest,
+    LLMResult,
+    LLMToolCall,
+    LLMToolDefinition,
+    ModelDescriptor,
+)
 
 DEFAULT_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 

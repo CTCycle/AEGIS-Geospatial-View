@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,8 +23,8 @@ from server.common.paths import (
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
 from server.configurations import get_server_settings
-from server.repositories.database import get_database
 from server.repositories.credential_material import seed_credential_encryption_material
+from server.repositories.database import get_database
 from server.repositories.database.initializer import (
     initialize_database,
     seed_reference_catalog,

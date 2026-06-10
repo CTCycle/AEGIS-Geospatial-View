@@ -9,9 +9,9 @@ from server.domain.agent.tools import (
     ToolError,
     ToolExecutionEnvelope,
 )
-from server.services.llm.types import LLMToolDefinition
 from server.services.agent.tool_handlers import air_quality, coordinates, poi, weather
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.llm.types import LLMToolDefinition
 
 ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
 NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]

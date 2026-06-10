@@ -9,7 +9,11 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.http import JsonFetcher, call_json_fetcher, fetch_json_url
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
+)
 
 
 class ESAProvider(GeospatialProvider):

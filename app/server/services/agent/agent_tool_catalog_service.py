@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.domain.agent.decision import ExecutionPlan
 from server.domain.agent.catalog import (
     CATALOG_PAGE_LIMIT,
     CapabilityCatalogFilter,
     GeospatialCapabilityExecutionResult,
 )
+from server.domain.agent.decision import ExecutionPlan
 from server.domain.agent.execution import AgentExecutionContext
-from server.domain.agent.policies import AgentPolicyConstraints
-from server.domain.extraction.models import LocationSignal
-from server.domain.extraction.models import TurnParseResult
+from server.domain.extraction.models import LocationSignal, TurnParseResult
 from server.domain.geographics import MapSession
 from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.policy_engine import PolicyEngine

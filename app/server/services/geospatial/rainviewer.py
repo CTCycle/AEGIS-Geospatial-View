@@ -8,7 +8,11 @@ from typing import Any
 
 from server.configurations import get_server_settings
 from server.services.geospatial.providers.base import ProviderUnavailableError
-from server.services.geospatial.providers.http import JsonFetcher, call_json_fetcher, fetch_json_url
+from server.services.geospatial.providers.http import (
+    JsonFetcher,
+    call_json_fetcher,
+    fetch_json_url,
+)
 
 
 class RainViewerServiceError(Exception):

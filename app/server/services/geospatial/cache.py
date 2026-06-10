@@ -6,7 +6,10 @@ from threading import RLock
 from typing import Any
 
 from server.domain.geospatial.cache import CacheLookup, CacheLookupStatus
-from server.services.geospatial.providers.base import ProviderRequest, provider_cache_key
+from server.services.geospatial.providers.base import (
+    ProviderRequest,
+    provider_cache_key,
+)
 
 
 ###############################################################################
