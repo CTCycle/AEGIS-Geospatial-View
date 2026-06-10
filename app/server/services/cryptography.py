@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from cryptography.fernet import Fernet, InvalidToken
 
+from server.domain.crypto import EncryptedSecret
 from server.repositories.credential_material import (
     CredentialEncryptionMaterialRepository,
     DEFAULT_KEY_PURPOSE,
@@ -15,12 +14,6 @@ def _load_fernet_from_material(key_material: str) -> Fernet:
     if not normalized:
         raise RuntimeError("Encryption key material is missing")
     return Fernet(normalized.encode("utf-8"))
-
-
-@dataclass(frozen=True)
-class EncryptedSecret:
-    value: str
-    key_version: int
 
 
 class CredentialEncryptionService:

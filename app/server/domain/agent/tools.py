@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.domain.agent.actions import AgentAction
+from server.domain.llm.types import LLMToolDefinition
 
 ###############################################################################
 class AgentToolName(str, Enum):
@@ -47,3 +49,33 @@ class AgentToolResult(BaseModel):
     name: str
     result: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+
+
+@dataclass(frozen=True)
+class ToolError:
+    code: str
+    message: str
+
+
+@dataclass(frozen=True)
+class ToolExecutionEnvelope:
+    ok: bool
+    data: Any | None = None
+    error: ToolError | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "data": self.data,
+            "error": None
+            if self.error is None
+            else {"code": self.error.code, "message": self.error.message},
+            "metadata": self.metadata,
+        }
+
+
+@dataclass(frozen=True)
+class RegisteredNativeTool:
+    definition: LLMToolDefinition
+    handler: Any

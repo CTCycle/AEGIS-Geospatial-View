@@ -4,10 +4,13 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
-from server.domain.geographics import MapSession
+from server.domain.agent.execution import (
+    AgentExecutionContext,
+    AgentToolLoopRequest,
+    AgentToolLoopResult,
+)
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.factory import LLMFactory
 from server.services.llm.types import (
@@ -18,37 +21,6 @@ from server.services.llm.types import (
 )
 
 LOGGER = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class AgentExecutionContext:
-    request_id: str | None = None
-    session_id: str | None = None
-    parsed_request: Any | None = None
-    map_state: dict[str, Any] = field(default_factory=dict)
-    policy_constraints: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class AgentToolLoopRequest:
-    provider: str
-    model: str
-    messages: list[dict[str, Any]]
-    tools: list[LLMToolDefinition]
-    temperature: float
-    max_tokens: int | None = None
-    context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
-
-
-@dataclass(frozen=True)
-class AgentToolLoopResult:
-    final_text: str
-    tool_calls: list[LLMToolCall]
-    tool_results: list[LLMToolResult]
-    iterations: int
-    stopped_reason: Literal["final", "max_iterations", "provider_error", "tool_error"]
-    map_session: MapSession | None = None
 
 
 class NativeToolLoop:

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
 import hashlib
 import json
 from collections.abc import Mapping
 from typing import Any, Protocol
 
 from server.domain.geographics import ProviderCredentialValidationResult
+from server.domain.geospatial.providers import (
+    FeatureRequest,
+    ProviderRequest,
+    ProviderResponse,
+    ProviderResult,
+)
 
 
 class ProviderError(Exception):
@@ -37,29 +41,6 @@ class ProviderUnavailableError(ProviderError):
 class ProviderMalformedPayloadError(ProviderError):
     """Raised when a provider returns a payload that cannot be normalized."""
 
-
-@dataclass(frozen=True)
-class ProviderRequest:
-    capability_id: str
-    bbox: tuple[float, float, float, float] | None = None
-    zoom: int | None = None
-    time: datetime | None = None
-    params: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ProviderResponse:
-    capability_id: str
-    provider_id: str
-    payload: dict[str, Any]
-    attribution: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    stale: bool = False
-    fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-
-
-FeatureRequest = ProviderRequest
-ProviderResult = ProviderResponse
 
 SENSITIVE_PARAM_MARKERS = ("key", "secret", "token", "password", "authorization")
 

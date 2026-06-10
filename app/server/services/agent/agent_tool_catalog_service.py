@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any
 
 from server.domain.agent.decision import ExecutionPlan
+from server.domain.agent.catalog import (
+    CATALOG_PAGE_LIMIT,
+    CapabilityCatalogFilter,
+    GeospatialCapabilityExecutionResult,
+)
+from server.domain.agent.execution import AgentExecutionContext
+from server.domain.agent.policies import AgentPolicyConstraints
 from server.domain.extraction.models import LocationSignal
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
 from server.services.agent.location_resolver import LocationResolver
-from server.services.agent.native_tool_loop import AgentExecutionContext
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
@@ -17,32 +22,6 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
-
-CATALOG_PAGE_LIMIT = 50
-
-
-@dataclass(frozen=True)
-class CapabilityCatalogFilter:
-    query: str | None = None
-    category: str | None = None
-    geometry_type: str | None = None
-    bbox: list[float] | None = None
-    limit: int = CATALOG_PAGE_LIMIT
-    cursor: str | None = None
-
-
-class GeospatialCapabilityExecutionResult(TypedDict, total=False):
-    ok: bool
-    operation: str
-    capability_id: str
-    arguments: dict[str, Any]
-    map_session: dict[str, Any] | None
-    direct_result: dict[str, Any] | None
-    capability_selection: dict[str, Any] | None
-    observations: list[dict[str, Any]]
-    warnings: list[str]
-    error: dict[str, str] | None
-    metadata: dict[str, Any]
 
 
 class AgentToolCatalogService:

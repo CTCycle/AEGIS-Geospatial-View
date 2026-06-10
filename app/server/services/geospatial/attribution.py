@@ -1,15 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class AttributionEntry:
-    capability_id: str
-    provider_id: str
-    label: str
-    url: str
-    required: bool
+from server.domain.geospatial.registry import AttributionEntry
 
 
 class AttributionService:

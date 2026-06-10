@@ -1,26 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
-@dataclass(frozen=True)
-class IndexedFeature:
-    id: str
-    label: str
-    category: str | None = None
-    source: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class SearchIndex:
-    features: list[IndexedFeature]
-    terms: dict[str, list[str]]
+from server.domain.geospatial.search import IndexedFeature, SearchIndex
 
 
 def build_feature_search_index(features: list[IndexedFeature]) -> SearchIndex:

@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Literal
 
-from server.domain.agent.actions import AgentAction
+from server.domain.agent.extraction_schemas import (
+    LLMDisallowedPattern,
+    LLMLocationSignal,
+    LLMParserExtraction,
+    LLMTemporalSignal,
+)
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
     DisallowedPattern,
@@ -19,57 +23,8 @@ from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
-from pydantic import BaseModel, ConfigDict, Field
 
 LOGGER = logging.getLogger(__name__)
-
-
-class _LLMTemporalSignal(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    mode: Literal["current", "historical", "forecast", "none"] = "none"
-    raw_text: str | None = None
-    reference_time_iso: str | None = None
-
-
-class _LLMLocationSignal(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    signal_type: Literal["address", "city", "country", "coordinates", "deictic"] = (
-        "address"
-    )
-    raw_value: str = ""
-    normalized_value: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-
-
-class _LLMDisallowedPattern(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    pattern_id: str
-    reason: str
-    matched_text: str
-
-
-class _LLMParserExtraction(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    task_class: Literal["map_search", "direct_query", "general_question", "unclear"] = (
-        "unclear"
-    )
-    action_id: str = AgentAction.UNKNOWN.value
-    action_label: str = "General map request"
-    task_tags: list[str] = Field(default_factory=list)
-    action_tags: list[str] = Field(default_factory=list)
-    requested_visualizations: list[str] = Field(default_factory=list)
-    requires_location: bool = True
-    location_signals: list[_LLMLocationSignal] = Field(default_factory=list)
-    temporal_signal: _LLMTemporalSignal = Field(default_factory=_LLMTemporalSignal)
-    ambiguities: list[str] = Field(default_factory=list)
-    disallowed_patterns: list[_LLMDisallowedPattern] = Field(default_factory=list)
-    parser_confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class ParserService:
@@ -150,7 +105,7 @@ class ParserService:
             return True
         return any(self._contains_verbatim_span(user_message, term) for term in quoted_terms)
 
-    def _extract_turn(self, *, user_message: str, memory_snapshot: dict, recent_messages: list[dict[str, str]]) -> _LLMParserExtraction:
+    def _extract_turn(self, *, user_message: str, memory_snapshot: dict, recent_messages: list[dict[str, str]]) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
             settings = self.settings_repo.get_or_create()
@@ -187,11 +142,11 @@ class ParserService:
             ],
         )
         payload = parser_provider.structured_output(
-            request=request, schema=_LLMParserExtraction
+            request=request, schema=LLMParserExtraction
         )
         usage = getattr(parser_provider, "last_context_usage", None)
         self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
-        extracted = _LLMParserExtraction.model_validate(payload)
+        extracted = LLMParserExtraction.model_validate(payload)
         LOGGER.debug(
             "Parser LLM extraction: provider=%s model=%s task=%s action=%s",
             provider_name,
@@ -202,7 +157,7 @@ class ParserService:
         return extracted
 
     @staticmethod
-    def _extract_coordinate_signal(user_message: str) -> _LLMLocationSignal | None:
+    def _extract_coordinate_signal(user_message: str) -> LLMLocationSignal | None:
         match = re.search(
             r"(?P<lat>[+-]?\d{1,2}(?:\.\d+)?)\s*[,;]\s*(?P<lon>[+-]?\d{1,3}(?:\.\d+)?)",
             user_message,
@@ -214,7 +169,7 @@ class ParserService:
         if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
             return None
         raw_value = match.group(0)
-        return _LLMLocationSignal(
+        return LLMLocationSignal(
             signal_type="coordinates",
             raw_value=raw_value,
             normalized_value=raw_value,
@@ -250,7 +205,7 @@ class ParserService:
         return any(marker in text for marker in markers)
 
     @classmethod
-    def _extract_text_location_signal(cls, user_message: str) -> _LLMLocationSignal | None:
+    def _extract_text_location_signal(cls, user_message: str) -> LLMLocationSignal | None:
         coordinate_signal = cls._extract_coordinate_signal(user_message)
         if coordinate_signal is not None:
             return coordinate_signal
@@ -268,7 +223,7 @@ class ParserService:
             return None
 
         signal_type: Literal["address", "city"] = "address" if re.search(r"\d", cleaned) else "city"
-        return _LLMLocationSignal(
+        return LLMLocationSignal(
             signal_type=signal_type,
             raw_value=cleaned,
             normalized_value=cleaned,
@@ -276,7 +231,7 @@ class ParserService:
         )
 
     @classmethod
-    def _fallback_extraction(cls, user_message: str) -> _LLMParserExtraction:
+    def _fallback_extraction(cls, user_message: str) -> LLMParserExtraction:
         location_signal = cls._extract_text_location_signal(user_message)
         if location_signal is not None:
             task_tags = ["map"]
@@ -295,7 +250,7 @@ class ParserService:
             if any(marker in text for marker in ("satellite", "imagery")):
                 action_tags.append("satellite")
                 requested_visualizations.append("satellite")
-            return _LLMParserExtraction(
+            return LLMParserExtraction(
                 task_class="map_search",
                 action_id=AgentAction.MAP_SEARCH.value,
                 action_label="General map request",
@@ -307,7 +262,7 @@ class ParserService:
                 parser_confidence=0.72,
             )
 
-        return _LLMParserExtraction(
+        return LLMParserExtraction(
             task_class="general_question",
             action_id=AgentAction.CHAT_RESPONSE.value,
             action_label="General question",
@@ -321,8 +276,8 @@ class ParserService:
     def _should_use_fallback(
         cls,
         *,
-        extracted: _LLMParserExtraction,
-        fallback: _LLMParserExtraction,
+        extracted: LLMParserExtraction,
+        fallback: LLMParserExtraction,
     ) -> bool:
         if fallback.task_class == "map_search" and (
             extracted.task_class in {"unclear", "general_question"}
@@ -357,7 +312,7 @@ class ParserService:
                 else "parser_unavailable"
             )
             parser_failure_ambiguity = failure_ambiguity
-            extracted = _LLMParserExtraction(
+            extracted = LLMParserExtraction(
                 task_class="unclear",
                 action_id=AgentAction.UNKNOWN.value,
                 action_label="General map request",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
 from server.domain.agent.decision import (
@@ -9,32 +8,15 @@ from server.domain.agent.decision import (
     ExecutionPlan,
     PolicyDecision,
 )
+from server.domain.agent.policies import (
+    AgentPolicyConstraints,
+    ToolAuthorizationResult,
+    ToolValidationResult,
+)
 from server.domain.extraction.models import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.agent.location_resolver import LocationResolver
-
-
-@dataclass(frozen=True)
-class AgentPolicyConstraints:
-    requires_location: bool
-    blocked_patterns: list[str] = field(default_factory=list)
-    allowed_tool_names: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ToolAuthorizationResult:
-    allowed: bool
-    reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ToolValidationResult:
-    valid: bool
-    reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class PolicyEngine:

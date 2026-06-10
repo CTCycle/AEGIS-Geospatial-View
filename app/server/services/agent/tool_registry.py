@@ -1,46 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
 from typing import Any
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.domain.agent.tools import (
+    RegisteredNativeTool,
+    ToolError,
+    ToolExecutionEnvelope,
+)
 from server.services.llm.types import LLMToolDefinition
 from server.services.agent.tool_handlers import air_quality, coordinates, poi, weather
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
 NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
-
-
-@dataclass(frozen=True)
-class ToolError:
-    code: str
-    message: str
-
-
-@dataclass(frozen=True)
-class ToolExecutionEnvelope:
-    ok: bool
-    data: Any | None = None
-    error: ToolError | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "ok": self.ok,
-            "data": self.data,
-            "error": None
-            if self.error is None
-            else {"code": self.error.code, "message": self.error.message},
-            "metadata": self.metadata,
-        }
-
-
-@dataclass(frozen=True)
-class RegisteredNativeTool:
-    definition: LLMToolDefinition
-    handler: NativeToolHandler
 
 
 class ToolRegistry:

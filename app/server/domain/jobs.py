@@ -83,3 +83,47 @@ class JobCancelResponse(BaseModel):
 
 JobStartResponse = BackgroundJobCreateResponse
 JobStatusResponse = BackgroundJobStatusResponse
+
+
+from dataclasses import dataclass, field  # noqa: E402
+from time import monotonic  # noqa: E402
+
+
+@dataclass
+class BackgroundJobState:
+    job_id: str
+    job_type: str
+    status: str = "queued"
+    progress: float = 0.0
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    created_at: float = field(default_factory=monotonic)
+    completed_at: float | None = None
+    stop_requested: bool = False
+
+
+from datetime import UTC, datetime  # noqa: E402
+
+
+@dataclass
+class BackgroundJob:
+    job_id: str
+    job_type: str
+    request_id: str
+    input_json: dict[str, Any]
+    parent_job_id: str | None = None
+    session_id: int | None = None
+    status: str = "queued"
+    priority: int = 0
+    progress_percent: int | None = 0
+    status_message: str | None = "Queued"
+    result_json: dict[str, Any] | None = None
+    error_json: dict[str, Any] | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    cancel_requested_at: datetime | None = None
+    attempt_count: int = 0
+    max_attempts: int = 1
+    last_heartbeat_at: datetime | None = None
+    events: list["BackgroundJobEvent"] = field(default_factory=list)

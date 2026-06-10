@@ -2,30 +2,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from enum import Enum
 from threading import RLock
 from typing import Any
 
+from server.domain.geospatial.cache import CacheLookup, CacheLookupStatus
 from server.services.geospatial.providers.base import ProviderRequest, provider_cache_key
 
-
-###############################################################################
-class CacheLookupStatus(str, Enum):
-    HIT = "hit"
-    MISS = "miss"
-    STALE = "stale"
-
-
-###############################################################################
-@dataclass(frozen=True)
-class CacheLookup:
-    status: CacheLookupStatus
-    value: Any | None = None
-
-    @property
-    def usable(self) -> bool:
-        return self.status in {CacheLookupStatus.HIT, CacheLookupStatus.STALE}
-    
 
 ###############################################################################
 @dataclass(frozen=True)
