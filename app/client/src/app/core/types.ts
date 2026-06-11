@@ -463,6 +463,7 @@ export interface ModelSettingsResponse {
   ollama_url: string;
   openai_base_url?: string | null;
   google_base_url?: string | null;
+  deepseek_base_url?: string | null;
   credentials: Record<string, Record<string, boolean>>;
   credential_health?: Record<string, Record<string, 'healthy' | 'unreadable' | string>>;
 }
@@ -478,6 +479,7 @@ export interface ModelSettingsUpdateRequest {
   ollama_url: string;
   openai_base_url?: string | null;
   google_base_url?: string | null;
+  deepseek_base_url?: string | null;
   credentials: Record<string, { api_key?: string }>;
 }
 

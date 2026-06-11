@@ -280,8 +280,11 @@ export const streamChatTurn = async (
   }
 };
 
-export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}`, {
+export const fetchChatModels = async (
+  provider?: 'deepseek',
+): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
+  const suffix = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}${suffix}`, {
     method: 'GET',
     cache: 'no-store',
   });

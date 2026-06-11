@@ -6,6 +6,7 @@ from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
 from server.services.llm.base import LLMProvider
+from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
@@ -40,13 +41,23 @@ class LLMFactory:
                 raise LLMConfigurationError(
                     "OpenAI credentials are not configured. Add an OpenAI API key in Settings."
                 )
+            if provider == "deepseek":
+                raise LLMConfigurationError(
+                    "DeepSeek credentials are not configured. Add a DeepSeek API key in Settings."
+                )
             raise LLMConfigurationError(
                 "Google credentials are not configured. Add a Google/Gemini API key in Settings."
             )
         try:
             api_key = self.crypto_service.decrypt(credential.encrypted_value)
         except ValueError as exc:
-            provider_label = "OpenAI" if provider == "openai" else "Google"
+            provider_label = (
+                "OpenAI"
+                if provider == "openai"
+                else "DeepSeek"
+                if provider == "deepseek"
+                else "Google"
+            )
             raise LLMConfigurationError(
                 f"{provider_label} credentials are saved but cannot be decrypted. Re-enter the API key in Settings."
             ) from exc
@@ -68,6 +79,12 @@ class LLMFactory:
         if normalized == "google":
             api_key = self._resolve_provider_api_key("google")
             return GoogleProvider(api_key=api_key, base_url=settings.google_base_url)
+        if normalized == "deepseek":
+            api_key = self._resolve_provider_api_key("deepseek")
+            return DeepSeekProvider(
+                api_key=api_key,
+                base_url=settings.deepseek_base_url,
+            )
         raise ValueError(f"Unsupported model provider '{provider}'.")
 
     # -------------------------------------------------------------------------

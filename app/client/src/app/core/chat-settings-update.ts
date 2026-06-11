@@ -13,6 +13,7 @@ export const buildSettingsUpdateBase = (
   ollama_url: settings.ollama_url,
   openai_base_url: settings.openai_base_url,
   google_base_url: settings.google_base_url,
+  deepseek_base_url: settings.deepseek_base_url,
   credentials: {},
 });
 

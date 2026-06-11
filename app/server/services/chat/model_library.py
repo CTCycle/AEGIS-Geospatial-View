@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
+from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import ModelDescriptor
@@ -14,9 +17,13 @@ class ChatModelLibraryService:
         self,
         *,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
+        provider_factory: LLMFactory | None = None,
     ) -> None:
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
+        )
+        self.provider_factory = provider_factory or LLMFactory(
+            ollama_tool_capability_cache=self.ollama_tool_capability_cache
         )
 
     # -------------------------------------------------------------------------
@@ -33,7 +40,11 @@ class ChatModelLibraryService:
         tool_support_source = str(
             metadata.get(
                 "tool_support_source",
-                "catalog" if item.provider in {"openai", "google"} else "unknown",
+                "catalog"
+                if item.provider in {"openai", "google"}
+                else "provider"
+                if item.provider == "deepseek"
+                else "unknown",
             )
         )
         return {
@@ -51,10 +62,20 @@ class ChatModelLibraryService:
         }
 
     # -------------------------------------------------------------------------
-    def list_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
+    def list_models(
+        self,
+        *,
+        ollama_url: str,
+        cloud_provider: Literal["deepseek"] | None = None,
+    ) -> dict[str, list[dict[str, object]]]:
         cloud: list[dict[str, object]] = [
             self.model_payload(item) for item in get_cloud_model_catalog()
         ]
+        if cloud_provider == "deepseek":
+            provider = self.provider_factory.get_provider("deepseek")
+            cloud.extend(
+                self.model_payload(item) for item in provider.list_models()
+            )
         ollama = OllamaProvider(
             base_url=ollama_url,
             tool_capability_cache=self.ollama_tool_capability_cache,
@@ -76,7 +97,13 @@ class ChatModelLibraryService:
         model_name: str,
         ollama_url: str,
     ) -> dict[str, object] | None:
-        library = self.list_models(ollama_url=ollama_url)
+        dynamic_cloud_provider: Literal["deepseek"] | None = (
+            "deepseek" if provider == "deepseek" else None
+        )
+        library = self.list_models(
+            ollama_url=ollama_url,
+            cloud_provider=dynamic_cloud_provider,
+        )
         for bucket in ("cloud", "local"):
             for item in library.get(bucket, []):
                 if item.get("provider") == provider and item.get("name") == model_name:

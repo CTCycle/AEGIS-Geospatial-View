@@ -94,6 +94,7 @@ describe('core/api', () => {
     expect(parsed.ollama_url).toBe('http://localhost:11434');
     expect(parsed.credentials).toEqual({});
     expect(parsed.credential_health?.openai.api_key).toBe('unreadable');
+    expect(parsed.deepseek_base_url).toBeNull();
   });
 
   it('parseChatTurnResponse accepts valid backend response', () => {
