@@ -48,6 +48,9 @@ describe('pages/settings-page.component', () => {
       agent_model_provider: 'ollama',
       agent_model_name: 'llama3.2',
       ollama_url: 'http://localhost:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
       credentials: {},
       credential_health: {},
     });
@@ -61,7 +64,7 @@ describe('pages/settings-page.component', () => {
     pullOllamaModelMock = jasmine.createSpy('pullOllamaModel').and.resolveTo({});
 
     apiClient.fetchChatSettings.and.callFake(() => fetchChatSettingsMock());
-    apiClient.fetchChatModels.and.callFake(() => fetchChatModelsMock());
+    apiClient.fetchChatModels.and.callFake((provider) => fetchChatModelsMock(provider));
     apiClient.updateChatSettings.and.callFake((payload) => updateChatSettingsMock(payload));
     apiClient.checkOllamaHealth.and.callFake(() => checkOllamaHealthMock());
     apiClient.refreshOllamaModels.and.callFake(() => refreshOllamaModelsMock());
@@ -110,6 +113,44 @@ describe('pages/settings-page.component', () => {
     component.setProviderFilter('openai');
     component.setSearchText('gpt');
     expect(component.displayedModels.length).toBe(1);
+  });
+
+  it('loads DeepSeek models when the DeepSeek filter is selected with a saved key', async () => {
+    fetchChatSettingsMock.and.resolveTo({
+      active_provider_mode: 'cloud',
+      chat_model_provider: 'openai',
+      chat_model_name: 'gpt-4.1-mini',
+      parser_model_provider: 'openai',
+      parser_model_name: 'gpt-4.1-mini',
+      agent_model_provider: 'openai',
+      agent_model_name: 'gpt-4.1-mini',
+      ollama_url: 'http://localhost:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: { deepseek: { api_key: true } },
+      credential_health: { deepseek: { api_key: 'healthy' } },
+    });
+    fetchChatModelsMock.and.callFake(async (provider?: string) => (
+      provider === 'deepseek'
+        ? {
+          cloud: [{ id: 'deepseek-v4-flash', name: 'deepseek-v4-flash', description: 'deepseek', provider: 'deepseek', capabilities: ['tools', 'structured_output'], supports_tools: true, supports_structured_output: true, metadata: {} }],
+          local: [{ id: 'llama3.2', name: 'llama3.2', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
+        }
+        : {
+          cloud: [{ id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', description: 'cloud', provider: 'openai', capabilities: [], metadata: {} }],
+          local: [{ id: 'llama3.2', name: 'llama3.2', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
+        }
+    ));
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    fixture.componentInstance.setProviderFilter('deepseek');
+    await fixture.whenStable();
+
+    expect(fetchChatModelsMock).toHaveBeenCalledWith('deepseek');
+    expect(fixture.componentInstance.displayedModels.some((model) => model.provider === 'deepseek')).toBeTrue();
   });
 
   it('keeps the All provider filter active after the initial model load', async () => {
@@ -225,6 +266,7 @@ describe('pages/settings-page.component', () => {
       ollama_url: 'http://localhost:11434',
       openai_base_url: null,
       google_base_url: null,
+      deepseek_base_url: null,
       credentials: { openai: { api_key: true }, google: { api_key: true } },
       credential_health: { openai: { api_key: 'unreadable' }, google: { api_key: 'healthy' } },
     });
@@ -240,16 +282,18 @@ describe('pages/settings-page.component', () => {
     expect(payload.credentials.google.api_key).toBeUndefined();
   });
 
-  it('API key validation rules enforce OpenAI and Google prefixes', async () => {
+  it('API key validation rules enforce OpenAI, Google, and DeepSeek prefixes', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
     component.openaiKey = 'bad-openai-key';
     component.googleKey = 'bad-google-key';
+    component.deepseekKey = 'bad-deepseek-key';
     await component.saveKeys();
     expect(component.keyValidationErrors.openai).toContain('sk-');
     expect(component.keyValidationErrors.google).toContain('AIza');
+    expect(component.keyValidationErrors.deepseek).toContain('sk-');
   });
 
   it('save keys success and failure', async () => {
@@ -258,8 +302,12 @@ describe('pages/settings-page.component', () => {
     await fixture.whenStable();
     const component = fixture.componentInstance;
     component.openaiKey = 'sk-valid-openai-key-12345';
+    component.deepseekKey = 'sk-valid-deepseek-key-12345';
     await component.saveKeys();
     expect(component.statusText).toContain('API keys saved');
+
+    const payload = updateChatSettingsMock.calls.mostRecent().args[0];
+    expect(payload.credentials.deepseek.api_key).toBe('sk-valid-deepseek-key-12345');
 
     updateChatSettingsMock.and.rejectWith(new Error('fail'));
     component.openaiKey = 'sk-valid-openai-key-12345';
@@ -279,6 +327,7 @@ describe('pages/settings-page.component', () => {
       ollama_url: 'http://localhost:11434',
       openai_base_url: null,
       google_base_url: null,
+      deepseek_base_url: null,
       credentials: { openai: { api_key: true }, google: { api_key: true } },
       credential_health: { openai: { api_key: 'unreadable' }, google: { api_key: 'healthy' } },
     });
@@ -305,6 +354,9 @@ describe('pages/settings-page.component', () => {
       agent_model_provider: 'openai',
       agent_model_name: 'gpt-4.1-mini',
       ollama_url: 'http://localhost:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
       credentials: { openai: { api_key: true } },
       credential_health: { openai: { api_key: 'unreadable' } },
     });

@@ -23,6 +23,7 @@ const baseSettings = (): ModelSettingsResponse => ({
   ollama_url: 'http://localhost:11434',
   openai_base_url: null,
   google_base_url: null,
+  deepseek_base_url: null,
   credentials: {},
 });
 

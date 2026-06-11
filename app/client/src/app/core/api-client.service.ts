@@ -69,8 +69,8 @@ export class ApiClientService {
     return sendChatTurn(payload);
   }
 
-  fetchChatModels(): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> {
-    return fetchChatModels();
+  fetchChatModels(provider?: 'deepseek'): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> {
+    return fetchChatModels(provider);
   }
 
   fetchChatSettings(): Promise<ModelSettingsResponse> {

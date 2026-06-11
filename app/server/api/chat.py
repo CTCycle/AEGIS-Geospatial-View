@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from server.common.paths import (
@@ -132,12 +132,28 @@ async def chat_stream(
     status_code=status.HTTP_200_OK,
 )
 def get_models(
+    provider: str | None = Query(default=None),
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelLibraryResponse:
-    response = runtime.model_library_service.list_models(
-        ollama_url=runtime.settings_service.get_ollama_url()
-    )
-    return ModelLibraryResponse.model_validate(response)
+    cloud_provider = "deepseek" if provider == "deepseek" else None
+    try:
+        response = runtime.model_library_service.list_models(
+            ollama_url=runtime.settings_service.get_ollama_url(),
+            cloud_provider=cloud_provider,
+        )
+        return ModelLibraryResponse.model_validate(response)
+    except LLMConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        if cloud_provider is None:
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc) or f"Could not load {cloud_provider} models.",
+        ) from exc
 
 
 ###############################################################################

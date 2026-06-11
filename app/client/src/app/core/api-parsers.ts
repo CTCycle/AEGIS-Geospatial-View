@@ -326,6 +326,7 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     ollama_url: String(value.ollama_url ?? 'http://localhost:11434'),
     openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
     google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
+    deepseek_base_url: typeof value.deepseek_base_url === 'string' ? value.deepseek_base_url : null,
     credentials: parseBooleanCredentialMap(value.credentials),
     credential_health: isRecord(value.credential_health)
       ? value.credential_health as ModelSettingsResponse['credential_health']

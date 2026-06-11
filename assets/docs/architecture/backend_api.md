@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-07
+Last updated: 2026-06-11
 
 ## Mounting
 
@@ -77,6 +77,7 @@ Defined in `app/server/api/chat.py`:
   Streams NDJSON chat events.
 - `GET /api/chat/models`
   Returns available cloud and local models.
+  Optional query: `provider=deepseek` to fetch the live DeepSeek model catalog using the saved DeepSeek API key.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PUT /api/chat/settings`

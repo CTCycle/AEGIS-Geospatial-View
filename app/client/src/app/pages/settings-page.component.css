@@ -354,6 +354,16 @@
     width: 85%;
 }
 
+.settings-modal__provider-section {
+    padding-top: 0.2rem;
+    border-top: 1px solid #263a45;
+}
+
+.settings-modal__field-hint {
+    color: #88a0ab;
+    line-height: 1.4;
+}
+
 .settings-modal__body input.input-invalid {
     border-color: #d94f5f;
     box-shadow: 0 0 0 2px rgb(217 79 95 / 18%);

@@ -57,7 +57,9 @@ class ChatSettingsService:
                 health_bucket[item.label] = "unreadable"
             else:
                 health_bucket[item.label] = (
-                    "healthy" if item.provider in {"openai", "google"} else "stored"
+                    "healthy"
+                    if item.provider in {"openai", "google", "deepseek"}
+                    else "stored"
                 )
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
@@ -70,6 +72,7 @@ class ChatSettingsService:
             ollama_url=record.ollama_url,
             openai_base_url=record.openai_base_url,
             google_base_url=record.google_base_url,
+            deepseek_base_url=record.deepseek_base_url,
             credentials=credential_presence,
             credential_health=credential_health,
         )
@@ -114,6 +117,13 @@ class ChatSettingsService:
             if payload.google_base_url is not None
             else current.google_base_url
         )
+        next_deepseek_base_url = (
+            None
+            if payload.deepseek_base_url == ""
+            else payload.deepseek_base_url
+            if payload.deepseek_base_url is not None
+            else current.deepseek_base_url
+        )
         self._validate_local_model_selection(
             chat_model_provider=next_chat_model_provider,
             chat_model_name=next_chat_model_name,
@@ -153,6 +163,7 @@ class ChatSettingsService:
             ollama_url=next_ollama_url,
             openai_base_url=next_openai_base_url,
             google_base_url=next_google_base_url,
+            deepseek_base_url=next_deepseek_base_url,
         )
         return self.get_settings()
 

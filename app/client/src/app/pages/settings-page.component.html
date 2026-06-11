@@ -45,6 +45,7 @@
               <button type="button" [class.active]="providerFilter === 'ollama'" (click)="setProviderFilter('ollama')">Ollama</button>
               <button type="button" [class.active]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
               <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
+              <button type="button" [class.active]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
             </div>
 
           </div>
@@ -146,6 +147,19 @@
             }
             @if (keyValidationErrors.google) {
               <span class="settings-modal__field-error">{{ keyValidationErrors.google }}</span>
+            }
+          </label>
+          <label class="settings-modal__provider-section">
+            <span>DeepSeek API key {{ deepSeekConfigured() ? '(Configured)' : '(Not configured)' }}</span>
+            <input type="password" autocomplete="off" [ngModel]="deepseekKey" (ngModelChange)="deepseekKey = $event; keyValidationErrors.deepseek = undefined" name="deepseek_api_key" placeholder="sk-..." [class.input-invalid]="!!keyValidationErrors.deepseek" />
+            <small class="settings-modal__field-hint">Used to discover DeepSeek models and run chat, parser, and agent roles through the DeepSeek API.</small>
+            @if (deepSeekCredentialHealth() === 'unreadable') {
+              <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+            } @else if (deepSeekCredentialHealth() === 'healthy') {
+              <span class="settings-modal__field-health">Saved key is readable.</span>
+            }
+            @if (keyValidationErrors.deepseek) {
+              <span class="settings-modal__field-error">{{ keyValidationErrors.deepseek }}</span>
             }
           </label>
           @if (keysModalStatusText) {
