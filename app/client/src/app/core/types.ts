@@ -245,6 +245,8 @@ export interface MapSession {
   compliance_warnings?: string[];
 }
 
+export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
+
 export interface SearchResponse {
   status_message: string;
   map_session: MapSession;

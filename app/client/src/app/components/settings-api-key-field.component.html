@@ -1,0 +1,27 @@
+<label [class.settings-modal__provider-section]="providerSection">
+  @if (providerSection) {
+    <span>{{ labelText }}</span>
+  } @else {
+    {{ labelText }}
+  }
+  <input
+    type="password"
+    autocomplete="off"
+    [ngModel]="value"
+    (ngModelChange)="onValueChange($event)"
+    [name]="inputName"
+    [placeholder]="placeholder"
+    [class.input-invalid]="!!validationError"
+  />
+  @if (hint) {
+    <small class="settings-modal__field-hint">{{ hint }}</small>
+  }
+  @if (credentialHealth === 'unreadable') {
+    <span class="settings-modal__field-error">Saved key cannot be decrypted. Re-enter the key.</span>
+  } @else if (credentialHealth === 'healthy') {
+    <span class="settings-modal__field-health">Saved key is readable.</span>
+  }
+  @if (validationError) {
+    <span class="settings-modal__field-error">{{ validationError }}</span>
+  }
+</label>
