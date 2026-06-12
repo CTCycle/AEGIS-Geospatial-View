@@ -12,10 +12,10 @@ import {
   DEFAULT_WMTS_FORMAT,
   DEFAULT_WMTS_MATRIX_SET,
 } from '../core/constants';
-import { MapSession, OverlayRenderStatus } from '../core/types';
+import { MapOverlayEntry, MapSession, OverlayRenderStatus } from '../core/types';
 import { isFiniteNumber } from '../core/type-guards';
 
-export type OverlayEntry = NonNullable<MapSession['overlays']>[number];
+export type OverlayEntry = MapOverlayEntry;
 type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
 
 const toMessage = (error: unknown): string => {

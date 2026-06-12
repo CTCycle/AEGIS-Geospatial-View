@@ -68,6 +68,12 @@
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
             "polyfills": [
               "zone.js",
               "zone.js/testing"

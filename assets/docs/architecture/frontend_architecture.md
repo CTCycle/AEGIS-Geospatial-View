@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-04
+Last updated: 2026-06-12
 
 ## Route-Level Pages
 
@@ -32,6 +32,7 @@ Reusable component examples include:
 - `model-role-actions.component.*`
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
+- `settings-api-key-field.component.*`
 - `model-stats-panel.component.*`
 
 ## Routing Rule

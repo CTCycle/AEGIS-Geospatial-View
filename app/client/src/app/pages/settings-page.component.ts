@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ModelCardComponent } from '../components/model-card.component';
+import { SettingsApiKeyFieldComponent } from '../components/settings-api-key-field.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
@@ -37,6 +38,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
     CommonModule,
     FormsModule,
     ModelCardComponent,
+    SettingsApiKeyFieldComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
     ModelStatsPanelComponent,
@@ -224,11 +226,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.syncState();
   }
 
-  setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google' | 'deepseek'): void {
+  async setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google' | 'deepseek'): Promise<void> {
     this.providerFilter = filter;
     this.resetModelGridScroll();
     this.syncState();
-    void this.ensureProviderModelsLoaded(filter);
+    await this.ensureProviderModelsLoaded(filter);
   }
 
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {

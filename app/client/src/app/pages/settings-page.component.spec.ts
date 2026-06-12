@@ -146,7 +146,7 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    fixture.componentInstance.setProviderFilter('deepseek');
+    await fixture.componentInstance.setProviderFilter('deepseek');
     await fixture.whenStable();
 
     expect(fetchChatModelsMock).toHaveBeenCalledWith('deepseek');

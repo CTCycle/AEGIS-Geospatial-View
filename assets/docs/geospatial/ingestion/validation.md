@@ -1,6 +1,6 @@
 # Validation
 
-Last updated: 2026-06-02
+Last updated: 2026-06-12
 
 ## Static Validation
 
@@ -33,7 +33,7 @@ npm --prefix app/client run build
 npm --prefix app/client test -- --watch=false --browsers=ChromeHeadlessNoGpu
 ```
 
-Frontend validation covers schema-v2 types, geospatial API helpers, services, layer catalog behavior, source-health display, camera popup behavior, and renderer dispatch.
+Frontend validation covers schema-v2 types, geospatial API helpers, services, capability catalog behavior, source-health display, camera popup behavior, and renderer dispatch.
 
 ## Browser Validation
 
@@ -44,7 +44,7 @@ Major renderer changes require browser validation covering:
 - raster descriptor rendering
 - mocked vector payload rendering
 - webcam missing-key and mocked camera payloads
-- layer-catalog filtering and source-health display
+- capability catalog filtering and source-health display
 
 ## CI And Live Validation
 
