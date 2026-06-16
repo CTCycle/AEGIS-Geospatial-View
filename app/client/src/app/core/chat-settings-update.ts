@@ -1,5 +1,12 @@
 import { ModelSettingsResponse, ModelSettingsUpdateRequest } from './types';
 
+export type CloudCredentialProvider = 'openai' | 'google' | 'deepseek';
+export type ModelProviderFilter = 'all' | 'ollama' | CloudCredentialProvider;
+export type ApiKeyValidationErrors = Partial<Record<CloudCredentialProvider, string>>;
+export type CloudCredentialDrafts = Record<CloudCredentialProvider, string>;
+
+export const CLOUD_CREDENTIAL_PROVIDERS: readonly CloudCredentialProvider[] = ['openai', 'google', 'deepseek'];
+
 export const buildSettingsUpdateBase = (
   settings: ModelSettingsResponse,
 ): ModelSettingsUpdateRequest => ({
@@ -26,4 +33,16 @@ export const buildCredentialUpdateRequest = (
   credentials: {
     [provider]: { api_key: apiKey },
   },
+});
+
+export const buildCloudCredentialUpdateRequest = (
+  settings: ModelSettingsResponse,
+  drafts: CloudCredentialDrafts,
+): ModelSettingsUpdateRequest => ({
+  ...buildSettingsUpdateBase(settings),
+  credentials: CLOUD_CREDENTIAL_PROVIDERS.reduce<ModelSettingsUpdateRequest['credentials']>((acc, provider) => {
+    const apiKey = drafts[provider].trim();
+    acc[provider] = apiKey ? { api_key: apiKey } : {};
+    return acc;
+  }, {}),
 });

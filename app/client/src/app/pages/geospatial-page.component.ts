@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { ChatMessageComponent } from '../components/chat-message.component';
 import { MapPreviewComponent } from '../components/map-preview.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
@@ -23,7 +24,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
 @Component({
   selector: 'app-geospatial-page',
   standalone: true,
-  imports: [CommonModule, MapPreviewComponent],
+  imports: [CommonModule, ChatMessageComponent, MapPreviewComponent],
   templateUrl: './geospatial-page.component.html',
   styleUrl: './geospatial-page.component.css',
 })
