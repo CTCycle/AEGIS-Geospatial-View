@@ -32,6 +32,7 @@ class FakeSettingsRecord:
     ollama_url: str = "http://localhost:11434"
     openai_base_url: str | None = "https://openai.example/v1"
     google_base_url: str | None = "https://google.example/v1"
+    deepseek_base_url: str | None = "https://deepseek.example/v1"
 
 
 ###############################################################################
@@ -191,6 +192,7 @@ def test_partial_update_preserves_existing_settings_when_fields_are_omitted() ->
         "ollama_url": "http://localhost:11434",
         "openai_base_url": "https://openai.example/v1",
         "google_base_url": "https://google.example/v1",
+        "deepseek_base_url": "https://deepseek.example/v1",
     }
 
 
@@ -214,6 +216,7 @@ def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> 
     assert settings_repo.last_update["agent_model_name"] == "gpt-4.1"
     assert settings_repo.last_update["openai_base_url"] == "https://openai.example/v1"
     assert settings_repo.last_update["google_base_url"] == "https://google.example/v1"
+    assert settings_repo.last_update["deepseek_base_url"] == "https://deepseek.example/v1"
     assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
 
 

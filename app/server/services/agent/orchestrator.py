@@ -46,6 +46,7 @@ class AgentOrchestrator:
         overlay_inference_service: OverlayInferenceService | None = None,
         settings_repo: ModelSettingsRepository | None = None,
         history_service: ChatHistoryService | None = None,
+        history_repo: ChatHistoryService | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -70,7 +71,17 @@ class AgentOrchestrator:
             provider_factory=LLMFactory(settings_repo=self.settings_repo),
             tool_registry=self.tool_registry,
         )
-        self.history_service = history_service or ChatHistoryService()
+        self.history_service = history_service or history_repo or ChatHistoryService()
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compose_map_session_message(map_payload: dict[str, Any]) -> str:
+        return AgentResponseBuilder.compose_map_session_message(map_payload)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _compose_direct_tool_message(tool_id: str, direct_result: dict[str, Any]) -> str:
+        return AgentResponseBuilder.compose_direct_tool_message(tool_id, direct_result)
 
     # -------------------------------------------------------------------------
     async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
@@ -85,7 +96,7 @@ class AgentOrchestrator:
         existing_response = self._load_existing_response(session.id, request_id)
         if existing_response is not None:
             return existing_response
-        if self.history_service.find_message_by_request_id(
+        if self._find_history_message_by_request_id(
             session_id=session.id,
             role="user",
             request_id=request_id,
@@ -433,7 +444,7 @@ class AgentOrchestrator:
         session_id: int,
         request_id: str,
     ) -> ChatTurnResponse | None:
-        existing = self.history_service.find_message_by_request_id(
+        existing = self._find_history_message_by_request_id(
             session_id=session_id,
             role="assistant",
             request_id=request_id,
@@ -456,6 +467,23 @@ class AgentOrchestrator:
             "context_usage": payload.get("context_usage"),
         }
         return ChatTurnResponse.model_validate(response_payload)
+
+    # -------------------------------------------------------------------------
+    def _find_history_message_by_request_id(
+        self,
+        *,
+        session_id: int,
+        role: str,
+        request_id: str,
+    ) -> dict[str, Any] | None:
+        finder = getattr(self.history_service, "find_message_by_request_id", None)
+        if finder is None:
+            return None
+        return finder(
+            session_id=session_id,
+            role=role,
+            request_id=request_id,
+        )
 
     # -------------------------------------------------------------------------
     def _merge_memory_location_signals(
