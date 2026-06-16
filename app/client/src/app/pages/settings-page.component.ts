@@ -11,7 +11,13 @@ import { ModelStatsPanelComponent } from '../components/model-stats-panel.compon
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
-import { buildSettingsUpdateBase } from '../core/chat-settings-update';
+import {
+  ApiKeyValidationErrors,
+  CloudCredentialProvider,
+  ModelProviderFilter,
+  buildSettingsUpdateBase,
+} from '../core/chat-settings-update';
+import { CredentialSettingsService } from '../core/credential-settings.service';
 import {
   ModelRole,
   SelectedModelStat,
@@ -83,9 +89,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ollamaUrlDraft = 'http://localhost:11434';
   keysModalStatusText = '';
   ollamaModalStatusText = '';
-  keyValidationErrors: { openai?: string; google?: string; deepseek?: string } = {};
+  keyValidationErrors: ApiKeyValidationErrors = {};
 
-  providerFilter: 'all' | 'ollama' | 'openai' | 'google' | 'deepseek' = 'all';
+  providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
 
   constructor(
@@ -93,6 +99,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
+    private readonly credentialSettingsService: CredentialSettingsService,
     private readonly router: Router,
     private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
@@ -226,7 +233,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.syncState();
   }
 
-  async setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google' | 'deepseek'): Promise<void> {
+  async setProviderFilter(filter: ModelProviderFilter): Promise<void> {
     this.providerFilter = filter;
     this.resetModelGridScroll();
     this.syncState();
@@ -267,13 +274,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     try {
-      const updated = await this.apiClient.updateChatSettings({
-        ...this.settingsUpdateBase(),
-        credentials: {
-          openai: this.openaiKey.trim() ? { api_key: this.openaiKey.trim() } : {},
-          google: this.googleKey.trim() ? { api_key: this.googleKey.trim() } : {},
-          deepseek: this.deepseekKey.trim() ? { api_key: this.deepseekKey.trim() } : {},
-        },
+      const updated = await this.credentialSettingsService.saveCloudCredentials(this.settings, {
+        openai: this.openaiKey,
+        google: this.googleKey,
+        deepseek: this.deepseekKey,
       });
       this.settings = updated;
       this.openaiKey = '';
@@ -419,7 +423,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return modelDisplayDescription(model);
   }
 
-  private credentialHealth(provider: 'openai' | 'google' | 'deepseek'): string | null {
+  private credentialHealth(provider: CloudCredentialProvider): string | null {
     const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
     if (!configured) {
       return null;
@@ -427,8 +431,8 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.settings.credential_health?.[provider]?.['api_key'] ?? 'unknown';
   }
 
-  private validateKeyInputs(): { openai?: string; google?: string; deepseek?: string } {
-    const errors: { openai?: string; google?: string; deepseek?: string } = {};
+  private validateKeyInputs(): ApiKeyValidationErrors {
+    const errors: ApiKeyValidationErrors = {};
     const openAiValue = this.openaiKey.trim();
     const googleValue = this.googleKey.trim();
     const deepSeekValue = this.deepseekKey.trim();
@@ -509,7 +513,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async ensureProviderModelsLoaded(
-    provider: 'all' | 'ollama' | 'openai' | 'google' | 'deepseek',
+    provider: ModelProviderFilter,
     forceRefresh = false,
   ): Promise<void> {
     if (provider !== 'deepseek') {

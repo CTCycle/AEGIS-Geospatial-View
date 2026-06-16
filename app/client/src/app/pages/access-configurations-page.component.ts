@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ApiClientService } from '../core/api-client.service';
-import { buildCredentialUpdateRequest } from '../core/chat-settings-update';
+import { CredentialSettingsService } from '../core/credential-settings.service';
 import { GeospatialProviderAccountSetup, ModelSettingsResponse } from '../core/types';
 
 type GeoProviderId = string;
@@ -40,6 +40,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
 
   constructor(
     private readonly apiClient: ApiClientService,
+    private readonly credentialSettingsService: CredentialSettingsService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -165,7 +166,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
 
   private async loadSettings(): Promise<void> {
     try {
-      this.settings = await this.apiClient.fetchChatSettings();
+      this.settings = await this.credentialSettingsService.fetchSettings();
       this.statusText = 'Default workflow uses free and open providers. Optional keys are only used when configured.';
     } catch {
       this.statusText = 'Could not load access configuration.';
@@ -178,9 +179,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
     }
     this.isSaving = true;
     try {
-      this.settings = await this.apiClient.updateChatSettings(
-        buildCredentialUpdateRequest(this.settings, provider, apiKey),
-      );
+      this.settings = await this.credentialSettingsService.saveProviderCredential(this.settings, provider, apiKey);
       return true;
     } catch {
       this.statusText = `Could not update ${this.providerName(provider)} access.`;
