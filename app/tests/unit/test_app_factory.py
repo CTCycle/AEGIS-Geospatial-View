@@ -65,14 +65,20 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
+    monkeypatch.setattr(
+        app_module,
+        "get_database",
+        lambda: SimpleNamespace(backend=SimpleNamespace()),
+    )
     monkeypatch.setattr(app_module, "initialize_database", lambda backend: call_order.append("initialize_database"))
+    monkeypatch.setattr(app_module, "seed_credential_encryption_material", lambda: call_order.append("seed_credential_encryption_material"))
     monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: call_order.append("build_search_runtime") or search_runtime)
     monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator: call_order.append("build_chat_runtime") or chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda: call_order.append("build_geospatial_runtime") or geospatial_runtime)
     monkeypatch.setattr(app_module, "BackgroundJobService", lambda **kwargs: job_service)
     monkeypatch.setattr(app_module, "ChatStreamingService", lambda orchestrator: object())
-    monkeypatch.setattr(app_module, "run_startup_validations", lambda settings: call_order.append("run_startup_validations"))
+    monkeypatch.setattr(app_module, "run_startup_validations", lambda: call_order.append("run_startup_validations"))
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
     created = app_module.create_app()
@@ -85,6 +91,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
 
     assert call_order == [
         "initialize_database",
+        "seed_credential_encryption_material",
         "build_search_runtime",
         "build_chat_runtime",
         "build_geospatial_runtime",

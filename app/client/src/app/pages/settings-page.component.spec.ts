@@ -116,6 +116,7 @@ describe('pages/settings-page.component', () => {
   });
 
   it('loads DeepSeek models when the DeepSeek filter is selected with a saved key', async () => {
+    window.history.replaceState({}, '', '/settings');
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
       chat_model_provider: 'openai',
