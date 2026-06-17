@@ -6,7 +6,6 @@ import {
   JsonValue,
   ModelCardDescriptor,
   ModelSettingsResponse,
-  SearchResponse,
 } from './types';
 import { isRecord, isStringArray } from './type-guards';
 
@@ -268,25 +267,6 @@ export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
         metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
       };
     });
-};
-
-export const parseSearchResponse = (value: unknown): SearchResponse => {
-  if (!isRecord(value)) {
-    throw new Error('Unexpected search response format');
-  }
-
-  const statusMessage = value.status_message;
-  if (typeof statusMessage !== 'string') {
-    throw new Error('Search response is missing status_message');
-  }
-  if (!isRecord(value.map_session)) {
-    throw new Error('Search response is missing map_session');
-  }
-
-  return {
-    status_message: statusMessage,
-    map_session: value.map_session as unknown as SearchResponse['map_session'],
-  };
 };
 
 export const parseCatalogResponse = (value: unknown): CatalogResponse => {

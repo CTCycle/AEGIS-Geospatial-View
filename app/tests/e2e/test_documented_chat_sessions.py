@@ -96,7 +96,7 @@ def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
         lambda route: _json_ok(route, models_payload),
     )
     page.route(
-        re.compile(r".*/api/maps/catalog$"),
+        re.compile(r".*/api/geospatial/capabilities$"),
         lambda route: _json_ok(
             route, {"providers": [], "basemaps": [], "overlays": []}
         ),

@@ -1,6 +1,6 @@
 # Manifest Contract
 
-Last updated: 2026-06-03
+Last updated: 2026-06-17
 
 ## Loader Contract
 
@@ -44,4 +44,4 @@ Every metadata object must expose:
 - Additive capability work must update manifest JSON, `runtime_profiles.json`, tests, and docs together.
 - Credential-required providers remain optional unless product policy changes.
 - Default capability selection should favor free or open providers.
-- UI pages should consume `/api/maps/catalog` instead of duplicating manifest parsing.
+- UI pages should consume `/api/geospatial/capabilities` instead of duplicating manifest parsing.

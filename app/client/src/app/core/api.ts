@@ -10,8 +10,6 @@ import {
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
-  API_MAPS_CATALOG_PATH,
-  API_MAPS_SEARCH_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
   API_OLLAMA_REFRESH_PATH,
@@ -23,7 +21,6 @@ import {
   parseChatTurnResponse,
   parseGeospatialProviderAccountSetups,
   parseModelSettingsResponse,
-  parseSearchResponse,
 } from './api-parsers';
 import {
   CatalogResponse,
@@ -34,12 +31,10 @@ import {
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
   GeospatialProviderPayload,
-  LocationSearchRequest,
   ModelCardDescriptor,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
-  SearchResponse,
 } from './types';
 import { isRecord } from './type-guards';
 
@@ -105,19 +100,8 @@ export const buildApiError = async (response: Response): Promise<ApiRequestError
   });
 };
 
-export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_SEARCH_PATH}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-  return parseSearchResponse(data);
-};
-
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_CATALOG_PATH}`, {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAPABILITIES_PATH}`, {
     method: 'GET',
   });
   return parseCatalogResponse(data);

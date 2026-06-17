@@ -262,11 +262,10 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
             "SearchRuntime",
             (),
             {
-                "search_orchestrator": object(),
-                "search_execution": type(
-                    "SearchExecution",
+                "search_orchestrator": type(
+                    "Orchestrator",
                     (),
-                    {"orchestrator": type("Orchestrator", (), {"execute": staticmethod(lambda payload: payload)})()},
+                    {"execute": staticmethod(lambda payload: payload)},
                 )(),
             },
         )(),

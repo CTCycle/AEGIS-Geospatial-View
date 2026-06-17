@@ -30,16 +30,6 @@ export interface PresentationPolicy {
   show_legend: boolean;
 }
 
-export interface LocationSearchRequest {
-  resolved_location: ResolvedLocation;
-  action_id: string;
-  time_mode: 'current' | 'historical' | 'forecast';
-  basemap_id: string;
-  overlay_ids: string[];
-  viewport: ViewportPolicy;
-  presentation: PresentationPolicy;
-}
-
 export interface CapabilityDescriptor {
   id: string;
   name: string;
@@ -247,11 +237,6 @@ export interface MapSession {
 
 export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
 
-export interface SearchResponse {
-  status_message: string;
-  map_session: MapSession;
-}
-
 export interface SearchResponsePayload {
   satellite_imagery?: Record<string, JsonValue>;
   map_session?: MapSession;
@@ -429,7 +414,6 @@ export type ChatStreamEventType =
   | 'tool_call_started'
   | 'tool_call_completed'
   | 'map_session_created'
-  | 'assistant_delta'
   | 'final'
   | 'error';
 

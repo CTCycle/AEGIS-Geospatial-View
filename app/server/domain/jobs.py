@@ -86,28 +86,7 @@ class JobCancelResponse(BaseModel):
     message: str
 
 
-JobStartResponse = BackgroundJobCreateResponse
-JobStatusResponse = BackgroundJobStatusResponse
-
-
 from dataclasses import dataclass, field  # noqa: E402
-from time import monotonic  # noqa: E402
-
-
-###############################################################################
-@dataclass
-class BackgroundJobState:
-    job_id: str
-    job_type: str
-    status: str = "queued"
-    progress: float = 0.0
-    result: dict[str, Any] | None = None
-    error: str | None = None
-    created_at: float = field(default_factory=monotonic)
-    completed_at: float | None = None
-    stop_requested: bool = False
-
-
 from datetime import UTC  # noqa: E402
 
 

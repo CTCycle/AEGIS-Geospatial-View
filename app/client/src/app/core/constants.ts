@@ -39,8 +39,6 @@ const globalApiBase = typeof window !== 'undefined'
   : '';
 
 export const API_BASE_URL = normalizeApiBaseUrl(globalApiBase || computeDefaultApiBaseUrl());
-export const API_MAPS_SEARCH_PATH = '/maps/search';
-export const API_MAPS_CATALOG_PATH = '/maps/catalog';
 export const API_GEOSPATIAL_CAPABILITIES_PATH = '/geospatial/capabilities';
 export const API_GEOSPATIAL_LAYERS_PATH = '/geospatial/layers';
 export const API_GEOSPATIAL_CAMERAS_PATH = '/geospatial/cameras';
@@ -63,7 +61,7 @@ export const DEFAULT_WMS_EXCEPTIONS = 'application/vnd.ogc.se_inimage';
 export const DEFAULT_WMTS_MATRIX_SET = 'EPSG:3857';
 export const DEFAULT_WMTS_FORMAT = 'image/png';
 export const DEFAULT_BASE_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-export const DEFAULT_BASE_TILE_PROXY_URL = `${API_BASE_URL}/maps/basemaps/osm/{z}/{x}/{y}.png`;
+export const DEFAULT_BASE_TILE_PROXY_URL = `${API_BASE_URL}/geospatial/tiles/osm_default/{z}/{x}/{y}.png`;
 export const DEFAULT_BASE_ATTRIBUTION = '© OpenStreetMap contributors';
 export const DEFAULT_BASE_TILE_MAX_ZOOM = 19;
 export const DEFAULT_MAP_FIT_MAX_ZOOM = 18;

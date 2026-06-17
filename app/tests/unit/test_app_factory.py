@@ -43,19 +43,22 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
 
     assert isinstance(created, FastAPI)
     route_paths = {route.path for route in created.routes}
-    assert f"{FASTAPI_API_PREFIX}/maps/search" in route_paths
+    removed_maps_prefix = f"{FASTAPI_API_PREFIX}/" + "maps"
+    assert f"{removed_maps_prefix}/search" not in route_paths
+    assert f"{removed_maps_prefix}/catalog" not in route_paths
+    assert f"{removed_maps_prefix}/jobs" not in route_paths
+    assert f"{FASTAPI_API_PREFIX}/geospatial/capabilities" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/geospatial/tiles/{{capability_id}}/{{z}}/{{x}}/{{y}}.png" in route_paths
     assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
+    assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
 
 
 ###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
     search_runtime = SimpleNamespace(
-        search_orchestrator=object(),
-        search_execution=SimpleNamespace(
-            orchestrator=SimpleNamespace(execute=lambda payload: payload)
-        ),
+        search_orchestrator=SimpleNamespace(execute=lambda payload: payload),
     )
     chat_runtime = _build_chat_runtime(call_order)
     geospatial_runtime = _build_geospatial_runtime()
