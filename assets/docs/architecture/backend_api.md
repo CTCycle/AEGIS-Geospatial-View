@@ -1,27 +1,10 @@
 # Backend API
 
-Last updated: 2026-06-11
+Last updated: 2026-06-17
 
 ## Mounting
 
 All routers are mounted with `/api` prefix in `app/server/app.py`.
-
-## Search Routes
-
-Defined in `app/server/api/search.py`:
-
-- `GET /api/maps/catalog`
-  Returns `GeospatialCatalogResponse`.
-- `GET /api/maps/basemaps/osm/{z}/{x}/{y}.png`
-  Proxies OSM basemap tiles.
-- `POST /api/maps/search`
-  Runs synchronous location search from `LocationSearchRequest` to `SearchByLocationResponse`.
-- `POST /api/maps/jobs`
-  Starts asynchronous map fetch and returns `JobStartResponse` with HTTP 202.
-- `GET /api/maps/jobs/{job_id}`
-  Wrapper around the canonical job status response.
-- `DELETE /api/maps/jobs/{job_id}`
-  Wrapper around the canonical cancel operation.
 
 ## Job Routes
 
@@ -48,6 +31,8 @@ Defined in `app/server/api/geospatial.py`:
   Returns `GeospatialProviderPayloadResponse`.
 - `GET /api/geospatial/layers/{layer_id}/geojson`
   Returns raw GeoJSON `FeatureCollection` for map rendering.
+- `GET /api/geospatial/tiles/{capability_id}/{z}/{x}/{y}.png`
+  Proxies manifest-backed raster tiles.
 - `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`
   Proxies TomTom tiles.
 - `GET /api/geospatial/cameras`
@@ -140,7 +125,4 @@ Supported event names:
 - `final`
 - `error`
 
-Notes:
-
-- `assistant_delta` remains in the schema for forward compatibility, but current backend behavior does not emit fake token deltas.
-- `final` carries the full serialized `ChatTurnResponse`, including `operation`.
+`final` carries the full serialized `ChatTurnResponse`, including `operation`.

@@ -405,13 +405,6 @@ class MapSession(BaseModel):
 
 
 ###############################################################################
-class SearchByLocationResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    status_message: str
-    map_session: MapSession
-
-###############################################################################
 class GeospatialCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

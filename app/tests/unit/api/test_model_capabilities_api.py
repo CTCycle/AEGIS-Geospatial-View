@@ -8,8 +8,9 @@ from server.domain.chat import OllamaRefreshResponse
 class _ModelLibraryService:
 
     # -------------------------------------------------------------------------
-    def list_models(self, *, ollama_url: str):
+    def list_models(self, *, ollama_url: str, cloud_provider: str | None = None):
         assert ollama_url == "http://ollama.test"
+        assert cloud_provider is None
         return {
             "cloud": [
                 {

@@ -11,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from server.api.chat import router as chat_router
 from server.api.geospatial import router as geospatial_router
 from server.api.jobs import router as jobs_router
-from server.api.search import router as search_router
 from server.common.paths import (
     CLIENT_ASSETS_PATH,
     CLIENT_DIST_PATH,
@@ -90,7 +89,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
     job_service = BackgroundJobService(
         chat_streaming_service=chat_streaming_service,
-        map_search_runner=search_runtime.search_execution.orchestrator.execute,
+        map_search_runner=search_runtime.search_orchestrator.execute,
         polling_interval=settings.jobs.polling_interval,
     )
     job_service.start()
@@ -113,7 +112,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
 
-    application.include_router(search_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)

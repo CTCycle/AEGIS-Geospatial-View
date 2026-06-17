@@ -16,22 +16,11 @@ import {
   parseCatalogResponse,
   parseChatTurnResponse,
   parseModelSettingsResponse,
-  parseSearchResponse,
 } from './api-parsers';
 
 describe('core/api', () => {
   afterEach(() => {
     (window.fetch as unknown) = undefined;
-  });
-
-  it('parseSearchResponse happy path and missing-field failure', () => {
-    const parsed = parseSearchResponse({
-      status_message: 'ok',
-      map_session: { session_id: 'map-1' },
-    });
-    expect(parsed.status_message).toBe('ok');
-    expect(parsed.map_session.session_id).toBe('map-1');
-    expect(() => parseSearchResponse({ payload: {} })).toThrowError('Search response is missing status_message');
   });
 
   it('parseCatalogResponse normalizes entries', () => {

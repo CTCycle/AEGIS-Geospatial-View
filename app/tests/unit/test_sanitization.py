@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.repositories.catalog.reference_loader import load_reference_catalog
+from server.services.catalog.loader import load_reference_catalog
 from server.services.sanitization import LocationSanitizationService
 
 

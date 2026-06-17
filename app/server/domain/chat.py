@@ -86,7 +86,6 @@ class ChatStreamEvent(BaseModel):
         "tool_call_started",
         "tool_call_completed",
         "map_session_created",
-        "assistant_delta",
         "final",
         "error",
     ]

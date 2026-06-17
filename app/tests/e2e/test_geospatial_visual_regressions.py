@@ -121,13 +121,13 @@ def _setup_stubs(page: Page) -> None:
         lambda route: _json_ok(route, _models_payload()),
     )
     page.route(
-        re.compile(r".*/api/maps/catalog$"),
+        re.compile(r".*/api/geospatial/capabilities$"),
         lambda route: _json_ok(
             route, {"providers": [], "basemaps": [], "overlays": []}
         ),
     )
     page.route(
-        re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"),
+        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"),
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),

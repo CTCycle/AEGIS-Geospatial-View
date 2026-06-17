@@ -1,6 +1,6 @@
 # Background Jobs
 
-Last updated: 2026-06-07
+Last updated: 2026-06-17
 
 ## Scope
 
@@ -42,15 +42,12 @@ Important fields include:
 - `GET /api/jobs/{job_id}`
 - `GET /api/jobs/{job_id}/events`
 - `POST /api/jobs/{job_id}/cancel`
-- `POST /api/maps/jobs`
-- `GET /api/maps/jobs/{job_id}`
-- `DELETE /api/maps/jobs/{job_id}`
 
 ## Execution Model
 
 - One worker thread claims queued jobs and dispatches by `job_type`.
 - Chat jobs stream lifecycle events from the orchestrator into a shared event model.
-- Map jobs execute the same location-search pipeline used by synchronous map requests.
+- Map jobs execute the current location-search pipeline used by chat/tool orchestration.
 - Missing-job failures are translated into HTTP 404 by the API layer.
 
 ## Cancellation And Constraints
