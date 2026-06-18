@@ -25,21 +25,19 @@ export const buildSettingsUpdateBase = (
 });
 
 export const buildCredentialUpdateRequest = (
-  settings: ModelSettingsResponse,
+  _settings: ModelSettingsResponse,
   provider: string,
   apiKey: string,
 ): ModelSettingsUpdateRequest => ({
-  ...buildSettingsUpdateBase(settings),
   credentials: {
     [provider]: { api_key: apiKey },
   },
 });
 
 export const buildCloudCredentialUpdateRequest = (
-  settings: ModelSettingsResponse,
+  _settings: ModelSettingsResponse,
   drafts: CloudCredentialDrafts,
 ): ModelSettingsUpdateRequest => ({
-  ...buildSettingsUpdateBase(settings),
   credentials: CLOUD_CREDENTIAL_PROVIDERS.reduce<ModelSettingsUpdateRequest['credentials']>((acc, provider) => {
     const apiKey = drafts[provider].trim();
     acc[provider] = apiKey ? { api_key: apiKey } : {};

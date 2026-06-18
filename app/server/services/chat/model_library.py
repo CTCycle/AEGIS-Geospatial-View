@@ -80,8 +80,6 @@ class ChatModelLibraryService:
             base_url=ollama_url,
             tool_capability_cache=self.ollama_tool_capability_cache,
         )
-        for item in ollama.list_library_models():
-            cloud.append(self.model_payload(item))
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
         for entry in cloud:
             key = (str(entry.get("provider", "")), str(entry.get("id", "")))

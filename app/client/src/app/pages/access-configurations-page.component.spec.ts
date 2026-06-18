@@ -90,6 +90,7 @@ describe('pages/access-configurations-page.component', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Manage optional API keys');
+    expect(fixture.nativeElement.textContent).toContain('Default workflow uses free and open providers.');
     const triggers = fixture.debugElement.queryAll(By.css('.access-signup-trigger'));
     expect(triggers.length).toBeGreaterThanOrEqual(2);
     expect(fixture.nativeElement.textContent).toContain('Get API');
@@ -116,15 +117,20 @@ describe('pages/access-configurations-page.component', () => {
     const fixture = TestBed.createComponent(AccessConfigurationsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
 
     const component = fixture.componentInstance;
     component.drafts.geoapify = 'geo-key';
     await component.saveProvider('geoapify');
+    fixture.detectChanges();
     expect(updateChatSettingsMock).toHaveBeenCalled();
     expect(component.configured('geoapify')).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('Provider access has not been validated.');
 
     await component.clearProvider('geoapify');
+    fixture.detectChanges();
     expect(component.statusText).toContain('cleared');
+    expect(fixture.nativeElement.textContent).toContain('Optional capabilities are disabled.');
   });
 
   it('saves a pasted key through the guided modal flow', async () => {

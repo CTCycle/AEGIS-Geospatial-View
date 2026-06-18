@@ -8,6 +8,7 @@ Primary runtime environment file: `settings/.env`
 
 Common keys include:
 
+- `AEGIS_RUNTIME_DATA_DIR`
 - `FASTAPI_HOST`
 - `FASTAPI_PORT`
 - `UI_HOST`
@@ -41,6 +42,11 @@ Common keys include:
 Database mode and all database connection/security/performance settings come only
 from `settings/.env` (or process environment variables). The JSON settings file
 does not provide database configuration.
+
+`AEGIS_RUNTIME_DATA_DIR` optionally overrides the local runtime storage root used
+for the embedded SQLite database. When unset, the embedded database defaults to
+`%TEMP%/AEGIS Geospatial View/database.db` on Windows and
+`<repo>/.runtime/database.db` elsewhere.
 
 ## Profile Differences
 

@@ -87,6 +87,19 @@ class ChatSettingsService:
         self, payload: ModelSettingsUpdateRequest
     ) -> ModelSettingsResponse:
         current = self.get_settings()
+        should_validate_model_selection = any(
+            value is not None
+            for value in (
+                payload.active_provider_mode,
+                payload.chat_model_provider,
+                payload.chat_model_name,
+                payload.parser_model_provider,
+                payload.parser_model_name,
+                payload.agent_model_provider,
+                payload.agent_model_name,
+                payload.ollama_url,
+            )
+        )
         next_active_provider_mode = (
             payload.active_provider_mode or current.active_provider_mode
         )
@@ -124,22 +137,23 @@ class ChatSettingsService:
             if payload.deepseek_base_url is not None
             else current.deepseek_base_url
         )
-        self._validate_local_model_selection(
-            chat_model_provider=next_chat_model_provider,
-            chat_model_name=next_chat_model_name,
-            parser_model_provider=next_parser_model_provider,
-            parser_model_name=next_parser_model_name,
-            agent_model_provider=next_agent_model_provider,
-            agent_model_name=next_agent_model_name,
-            ollama_url=next_ollama_url,
-        )
-        self._validate_role_capabilities(
-            parser_model_provider=next_parser_model_provider,
-            parser_model_name=next_parser_model_name,
-            agent_model_provider=next_agent_model_provider,
-            agent_model_name=next_agent_model_name,
-            ollama_url=next_ollama_url,
-        )
+        if should_validate_model_selection:
+            self._validate_local_model_selection(
+                chat_model_provider=next_chat_model_provider,
+                chat_model_name=next_chat_model_name,
+                parser_model_provider=next_parser_model_provider,
+                parser_model_name=next_parser_model_name,
+                agent_model_provider=next_agent_model_provider,
+                agent_model_name=next_agent_model_name,
+                ollama_url=next_ollama_url,
+            )
+            self._validate_role_capabilities(
+                parser_model_provider=next_parser_model_provider,
+                parser_model_name=next_parser_model_name,
+                agent_model_provider=next_agent_model_provider,
+                agent_model_name=next_agent_model_name,
+                ollama_url=next_ollama_url,
+            )
         for provider, labels in payload.credentials.items():
             for label, raw_value in labels.items():
                 if not raw_value.strip():

@@ -221,6 +221,36 @@ def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> 
 
 
 ###############################################################################
+def test_updating_only_credentials_skips_unrelated_local_model_validation() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(
+            chat_model_provider="ollama",
+            chat_model_name="missing-chat",
+            parser_model_provider="ollama",
+            parser_model_name="missing-parser",
+            agent_model_provider="ollama",
+            agent_model_name="missing-agent",
+        )
+    )
+    credentials_repo = FakeCredentialsRepository()
+    service = build_service(
+        settings_repo=settings_repo,
+        credentials_repo=credentials_repo,
+        model_library_service=FakeModelLibraryService({"different-installed-model"}),
+    )
+
+    service.update_settings(
+        ModelSettingsUpdateRequest(credentials={"geoapify": {"api_key": " geo "}})
+    )
+
+    assert credentials_repo.upserts == [("geoapify", "api_key", "enc:geo", "v1")]
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["chat_model_name"] == "missing-chat"
+    assert settings_repo.last_update["parser_model_name"] == "missing-parser"
+    assert settings_repo.last_update["agent_model_name"] == "missing-agent"
+
+
+###############################################################################
 def test_local_chat_model_validation_rejects_unavailable_ollama_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 

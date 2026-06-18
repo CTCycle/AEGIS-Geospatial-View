@@ -161,6 +161,9 @@ class OllamaProvider(LLMProvider):
                     family=family,
                     parameter_size=parameter_size,
                     quantization_level=quantization_level,
+                    tag_capabilities=item.get("capabilities")
+                    if isinstance(item.get("capabilities"), list)
+                    else None,
                 )
             )
         return models
@@ -175,10 +178,25 @@ class OllamaProvider(LLMProvider):
         family: str,
         parameter_size: str,
         quantization_level: str,
+        tag_capabilities: Sequence[str] | None = None,
     ) -> ModelDescriptor:
-        capabilities = self.get_model_capabilities(model_name)
+        if tag_capabilities is not None:
+            capabilities = {
+                str(value).strip().lower()
+                for value in tag_capabilities
+                if str(value).strip()
+            }
+            capabilities.update({"chat", "stream"})
+            if "embedding" in capabilities:
+                capabilities.add("embeddings")
+        else:
+            capabilities = self.get_model_capabilities(model_name)
         supports_tools = "tools" in capabilities
-        source = self._tool_support_source(model_name)
+        source = (
+            "ollama_tags"
+            if tag_capabilities is not None
+            else self._tool_support_source(model_name)
+        )
         return ModelDescriptor(
             name=model_name,
             description=description,
