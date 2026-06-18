@@ -12,7 +12,16 @@ Last updated: 2026-06-10
 
 Database mode and connection settings come from `settings/.env` or runtime
 environment variables. SQLite resolves through
-`server.common.constants.DATABASE_FILE_PATH`.
+`server.common.paths.DATABASE_FILE_PATH`.
+
+Embedded SQLite storage defaults to a local runtime directory instead of the
+repository tree:
+
+- Windows: `%TEMP%/AEGIS Geospatial View/database.db`
+- other environments: `<repo>/.runtime/database.db`
+
+Override this location with `AEGIS_RUNTIME_DATA_DIR` when an explicit runtime
+storage directory is required.
 
 Schema initialization is handled by `app/server/repositories/database/initializer.py`.
 

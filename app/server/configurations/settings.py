@@ -23,7 +23,7 @@ from server.common.constants import (
     NASA_ATTRIBUTION,
     NOMINATIM_SEARCH_URL,
 )
-from server.common.paths import DATABASE_FILE_PATH
+from server.common.paths import resolve_database_file_path
 
 
 ###############################################################################
@@ -537,9 +537,10 @@ class AppSettings(BaseSettings):
 
 ###############################################################################
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
+    database_file_path = resolve_database_file_path()
     if db.embedded_database:
         return DatabaseSettings(
-            database_path=str(DATABASE_FILE_PATH),
+            database_path=str(database_file_path),
             embedded_database=True,
             engine=None,
             host=None,
@@ -554,7 +555,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         )
 
     return DatabaseSettings(
-        database_path=str(DATABASE_FILE_PATH),
+        database_path=str(database_file_path),
         embedded_database=False,
         engine=db.engine.strip().lower(),
         host=db.host,
