@@ -35,7 +35,7 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
                         "name": "llama3.2",
                         "description": "local",
                         "provider": "ollama",
-                        "capabilities": ["chat", "tools"],
+                        "capabilities": ["chat", "structured_output", "tools"],
                         "metadata": {"tool_support_source": "ollama_probe"},
                     },
                 )()
@@ -61,6 +61,7 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
 
     assert isinstance(refresh, OllamaRefreshResponse)
     assert refresh.local_model_capabilities[0].supports_tools is True
+    assert refresh.local_model_capabilities[0].supports_structured_output is True
     assert refresh.local_model_capabilities[0].tool_support_source == "ollama_probe"
     assert isinstance(pull, OllamaPullResponse)
     assert health.ok is True
