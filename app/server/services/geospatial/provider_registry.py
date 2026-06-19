@@ -6,6 +6,7 @@ from collections.abc import Callable
 from time import monotonic
 from typing import Any
 
+from server.domain.geographics import GeospatialProviderLayerDescriptor
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import (
@@ -237,6 +238,59 @@ class ProviderRegistry:
         if last_error is not None:
             raise last_error
         raise ProviderUnavailableError(f"Provider '{normalized}' did not return data.")
+
+    # -------------------------------------------------------------------------
+    async def list_layers(
+        self,
+        provider_id: str,
+        *,
+        query: str | None = None,
+        limit: int = 100,
+        refresh: bool = False,
+    ) -> list[GeospatialProviderLayerDescriptor]:
+        normalized = self._normalize_provider_id(provider_id)
+        provider = self.get(normalized)
+        list_layers = getattr(provider, "list_layers", None)
+        if not callable(list_layers):
+            raise ProviderUnavailableError(
+                f"Provider '{normalized}' does not support live layer discovery."
+            )
+        self._ensure_circuit_closed(normalized)
+        await self._wait_for_rate_limit(normalized)
+        try:
+            return await asyncio.wait_for(
+                list_layers(query=query, limit=limit, refresh=refresh),
+                timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
+            )
+        except TimeoutError as exc:
+            self._record_failure(normalized)
+            raise ProviderTimeoutError(f"Provider '{normalized}' timed out.") from exc
+
+    # -------------------------------------------------------------------------
+    async def describe_layer(
+        self,
+        provider_id: str,
+        layer_id: str,
+        *,
+        refresh: bool = False,
+    ) -> GeospatialProviderLayerDescriptor:
+        normalized = self._normalize_provider_id(provider_id)
+        provider = self.get(normalized)
+        describe_layer = getattr(provider, "describe_layer", None)
+        if not callable(describe_layer):
+            raise ProviderUnavailableError(
+                f"Provider '{normalized}' does not support live layer discovery."
+            )
+        self._ensure_circuit_closed(normalized)
+        await self._wait_for_rate_limit(normalized)
+        try:
+            return await asyncio.wait_for(
+                describe_layer(layer_id, refresh=refresh),
+                timeout=max(0.01, float(self.execution_policy.timeout_seconds)),
+            )
+        except TimeoutError as exc:
+            self._record_failure(normalized)
+            raise ProviderTimeoutError(f"Provider '{normalized}' timed out.") from exc
 
     # -------------------------------------------------------------------------
     async def _fetch_provider(

@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-17
+Last updated: 2026-06-19
 
 ## Mounting
 
@@ -31,6 +31,10 @@ Defined in `app/server/api/geospatial.py`:
   Returns `GeospatialProviderPayloadResponse`.
 - `GET /api/geospatial/layers/{layer_id}/geojson`
   Returns raw GeoJSON `FeatureCollection` for map rendering.
+- `GET /api/geospatial/providers/{provider_id}/layers`
+  Returns normalized live provider-native layer descriptors. NASA GIBS uses WMS/WMTS XML capabilities and does not expose raw XML to the frontend.
+- `GET /api/geospatial/providers/{provider_id}/layers/{layer_id}`
+  Returns one normalized live provider layer descriptor with render metadata when available.
 - `GET /api/geospatial/tiles/{capability_id}/{z}/{x}/{y}.png`
   Proxies manifest-backed raster tiles.
 - `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`

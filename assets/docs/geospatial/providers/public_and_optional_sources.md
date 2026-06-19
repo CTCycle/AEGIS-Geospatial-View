@@ -1,6 +1,6 @@
 # Public And Optional Sources
 
-Last updated: 2026-06-02
+Last updated: 2026-06-19
 
 ## Public Sources
 
@@ -25,7 +25,9 @@ Use for weather and air-quality forecasts.
 Use for satellite imagery and thematic earth-observation layers.
 
 - No API key is required for public WMS or WMTS access.
-- Use layer-specific dates, CRS, and image sizes validated by the GIBS runtime.
+- Discover live layers from WMS/WMTS XML capabilities through `NASAGIBSProvider`.
+- Prefer WMTS render descriptors for tiled MapLibre rendering; use WMS only as fallback.
+- Preserve layer time dimensions and default time values in render descriptors.
 - Some products are raster-only and not machine-queryable vectors.
 
 ### GTFS Realtime

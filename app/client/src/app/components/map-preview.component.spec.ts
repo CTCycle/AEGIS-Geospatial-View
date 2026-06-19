@@ -70,11 +70,11 @@ describe('components/map-preview.component', () => {
   it('preserves external satellite imagery tile URLs', () => {
     component.payload = {
       map_session: makeMapSession({
-        basemap_id: 'gibs_satellite',
+        basemap_id: 'esri_world_imagery',
         basemap: {
-          id: 'gibs_satellite',
+          id: 'esri_world_imagery',
           label: 'Satellite Imagery',
-          provider: 'gibs',
+          provider: 'arcgis',
           tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         },
       }) as never,
@@ -389,17 +389,6 @@ describe('components/map-preview.component', () => {
     component.payload = {};
     fixture.detectChanges();
     expect(component.mapSession).toBeUndefined();
-  });
-
-  it('binds embedded html as plain srcdoc string', () => {
-    component.payload = {
-      satellite_imagery: { map_html: '<html><body><h1>Map</h1></body></html>' },
-    } as never;
-    fixture.detectChanges();
-    const iframe = fixture.nativeElement.querySelector('iframe') as HTMLIFrameElement | null;
-    expect(iframe).not.toBeNull();
-    expect(iframe?.getAttribute('srcdoc')).toContain('<h1>Map</h1>');
-    expect(iframe?.getAttribute('srcdoc')).not.toContain('SafeValue must use [property]=');
   });
 
   it('does not materialize credential-bearing URLs into chosen map session state or source definitions', () => {

@@ -94,6 +94,59 @@ export type RenderingMode =
   | 'camera-points'
   | 'metadata-only';
 
+export interface GeospatialLayerRenderDescriptor {
+  provider: string;
+  layer_id: string;
+  rendering_mode: RenderingMode | string;
+  source_protocol: string;
+  url?: string | null;
+  tile_url_template?: string | null;
+  crs?: string | null;
+  format?: string | null;
+  style?: string | null;
+  time?: string | null;
+  default_time?: string | null;
+  tile_matrix_set?: string | null;
+  tile_size?: number | null;
+  min_zoom?: number | null;
+  max_zoom?: number | null;
+  attribution?: string[];
+  warnings?: string[];
+}
+
+export interface GeospatialProviderLayerDescriptor {
+  provider: string;
+  layer_id: string;
+  title: string;
+  abstract?: string | null;
+  rendering_mode: RenderingMode | string;
+  source_protocol: string;
+  data_format: string;
+  geometry_type: string;
+  queryable: boolean;
+  crs: string[];
+  formats: string[];
+  styles: string[];
+  time_extent?: string | null;
+  default_time?: string | null;
+  tile_matrix_sets: string[];
+  render?: GeospatialLayerRenderDescriptor | null;
+  attribution: string[];
+  warnings: string[];
+}
+
+export interface GeospatialProviderLayersResponse {
+  provider: string;
+  layers: GeospatialProviderLayerDescriptor[];
+  warnings: string[];
+}
+
+export interface GeospatialProviderLayerResponse {
+  provider: string;
+  layer: GeospatialProviderLayerDescriptor;
+  warnings: string[];
+}
+
 export interface ProviderAuthPolicy {
   type: ProviderAuthType | string;
   required: boolean;
@@ -231,6 +284,13 @@ export interface MapSession {
     source_protocol?: string;
     data_format?: string;
     geometry_type?: string;
+    crs?: string | null;
+    format?: string | null;
+    style?: string | null;
+    time?: string | null;
+    default_time?: string | null;
+    warnings?: string[];
+    render?: GeospatialLayerRenderDescriptor | null;
   }>;
   compliance_warnings?: string[];
 }
@@ -238,7 +298,6 @@ export interface MapSession {
 export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
 
 export interface SearchResponsePayload {
-  satellite_imagery?: Record<string, JsonValue>;
   map_session?: MapSession;
   compliance_warnings?: string[];
 }

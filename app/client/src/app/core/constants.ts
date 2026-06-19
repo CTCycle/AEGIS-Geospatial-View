@@ -41,6 +41,10 @@ const globalApiBase = typeof window !== 'undefined'
 export const API_BASE_URL = normalizeApiBaseUrl(globalApiBase || computeDefaultApiBaseUrl());
 export const API_GEOSPATIAL_CAPABILITIES_PATH = '/geospatial/capabilities';
 export const API_GEOSPATIAL_LAYERS_PATH = '/geospatial/layers';
+export const API_GEOSPATIAL_PROVIDER_LAYERS_PATH = (providerId: string): string =>
+  `/geospatial/providers/${encodeURIComponent(providerId)}/layers`;
+export const API_GEOSPATIAL_PROVIDER_LAYER_PATH = (providerId: string, layerId: string): string =>
+  `/geospatial/providers/${encodeURIComponent(providerId)}/layers/${encodeURIComponent(layerId)}`;
 export const API_GEOSPATIAL_CAMERAS_PATH = '/geospatial/cameras';
 export const API_GEOSPATIAL_AUDIT_PATH = '/geospatial/audit';
 export const API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH = (providerId: string): string =>

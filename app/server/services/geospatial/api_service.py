@@ -6,7 +6,11 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
-from server.domain.geographics import LayerAuditReport
+from server.domain.geographics import (
+    GeospatialProviderLayerResponse,
+    GeospatialProviderLayersResponse,
+    LayerAuditReport,
+)
 from server.services.geospatial.catalog import GeospatialCatalogService
 from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -117,6 +121,50 @@ class GeospatialApiService:
             "reliability": reliability if isinstance(reliability, dict) else {},
             "runtime": self.runtime_registry.provider_health(layer_id),
         }
+
+    # -------------------------------------------------------------------------
+    async def list_provider_layers(
+        self,
+        provider_id: str,
+        *,
+        query: str | None,
+        limit: int,
+        refresh: bool,
+    ) -> GeospatialProviderLayersResponse:
+        self.provider_registry.build_from_manifests()
+        try:
+            layers = await self.provider_registry.list_layers(
+                provider_id,
+                query=query,
+                limit=limit,
+                refresh=refresh,
+            )
+        except ProviderNotRegisteredError as exc:
+            raise GeospatialCapabilityNotFoundError(str(exc)) from exc
+        except (ProviderUnavailableError, ProviderTimeoutError, ProviderCircuitOpenError, ProviderError) as exc:
+            raise GeospatialTileRequestError(str(exc)) from exc
+        return GeospatialProviderLayersResponse(provider=provider_id, layers=layers)
+
+    # -------------------------------------------------------------------------
+    async def get_provider_layer(
+        self,
+        provider_id: str,
+        layer_id: str,
+        *,
+        refresh: bool,
+    ) -> GeospatialProviderLayerResponse:
+        self.provider_registry.build_from_manifests()
+        try:
+            layer = await self.provider_registry.describe_layer(
+                provider_id,
+                layer_id,
+                refresh=refresh,
+            )
+        except ProviderNotRegisteredError as exc:
+            raise GeospatialCapabilityNotFoundError(str(exc)) from exc
+        except (ProviderUnavailableError, ProviderTimeoutError, ProviderCircuitOpenError, ProviderError) as exc:
+            raise GeospatialTileRequestError(str(exc)) from exc
+        return GeospatialProviderLayerResponse(provider=provider_id, layer=layer)
 
     # -------------------------------------------------------------------------
     async def get_layer_features(

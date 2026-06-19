@@ -5,7 +5,7 @@ const requiredLayerIds = [
   'osm_default',
   'osm_dark',
   'osm_terrain',
-  'gibs_satellite',
+  'esri_world_imagery',
   'tomtom_basic',
   'geoapify_osm',
   'VIIRS_SNPP_CorrectedReflectance_TrueColor',

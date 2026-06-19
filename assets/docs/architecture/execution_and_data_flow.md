@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-17
+Last updated: 2026-06-19
 
 ## Layering
 
@@ -58,6 +58,16 @@ Geospatial API services are composed during application startup and accessed thr
 - `provider_registry.py` binds fetchable manifests to concrete provider adapters.
 
 Provider metadata manifests are registered only when a backend adapter exists. Basemap tile URLs stay manifest-backed and are served through proxy paths where applicable.
+
+Live provider-native layer discovery flows through:
+
+- `geospatial.py`
+- `GeospatialApiService`
+- `ProviderRegistry`
+- provider adapter such as `NASAGIBSProvider`
+- XML capability parsing and normalized provider layer descriptors
+
+Renderable map overlays are produced by `RenderDescriptorService` and then placed in `MapSession.overlays`. The frontend should consume those descriptors directly rather than constructing provider-specific WMS or WMTS defaults.
 
 ## Async And Threaded Behavior
 
