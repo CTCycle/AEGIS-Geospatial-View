@@ -964,7 +964,7 @@
       "auth_required": false
     },
     {
-      "capability_id": "gibs_satellite",
+      "capability_id": "esri_world_imagery",
       "enabled_by_default": true,
       "credential_provider": null,
       "supports_map": true,

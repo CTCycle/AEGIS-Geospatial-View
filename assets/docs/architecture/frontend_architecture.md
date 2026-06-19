@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-16
+Last updated: 2026-06-19
 
 ## Route-Level Pages
 
@@ -24,6 +24,10 @@ Last updated: 2026-06-16
 - Model selection and model list utilities: `core/model-selection.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
+
+## Map Rendering
+
+`MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.
 
 ## Component Patterns
 

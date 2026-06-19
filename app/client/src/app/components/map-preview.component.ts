@@ -8,11 +8,9 @@ import {
   OnChanges,
   OnDestroy,
   Output,
-  SecurityContext,
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
-import { DomSanitizer } from '@angular/platform-browser';
 import maplibregl, { Map } from 'maplibre-gl';
 
 import { DEFAULT_MAP_FIT_MAX_ZOOM, DEFAULT_OVERLAY_OPACITY } from '../core/constants';
@@ -68,10 +66,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private mapContainerRef?: ElementRef<HTMLDivElement>;
   private viewInitialized = false;
 
-  constructor(
-    private readonly sanitizer: DomSanitizer,
-    private readonly changeDetector: ChangeDetectorRef,
-  ) {}
+  constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
   get hasCenter(): boolean {
     return Number.isFinite(this.mapSession?.center?.latitude)
@@ -112,14 +107,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   get failedOverlayStatuses(): OverlayRenderStatus[] {
     return this.overlayRenderStatuses.filter((status) => status.status === 'failed');
-  }
-
-  get embeddedMapHtml(): string | null {
-    const mapHtml = this.mapSession?.payload?.embedded_map_html ?? this.payload?.satellite_imagery?.map_html;
-    if (typeof mapHtml !== 'string' || mapHtml.trim().length === 0) {
-      return null;
-    }
-    return this.sanitizer.sanitize(SecurityContext.HTML, mapHtml);
   }
 
   ngAfterViewInit(): void {
@@ -257,10 +244,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private recreateMapIfPossible(): void {
-    if (this.embeddedMapHtml) {
-      this.destroyMap();
-      return;
-    }
     const center = this.mapSession?.center;
     if (!this.viewInitialized) {
       return;

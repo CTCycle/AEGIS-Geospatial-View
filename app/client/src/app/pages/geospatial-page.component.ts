@@ -7,6 +7,7 @@ import { MapPreviewComponent } from '../components/map-preview.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
+import { normalizeMapSession } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
 import {
   ChatOperationResult,
@@ -307,9 +308,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
     const operation = result.operation;
-    const mapSession = operation?.map_session ?? result.map_session;
-    if (typeof mapSession === 'object' && mapSession !== null) {
-      this.handleMapSession(mapSession as MapSession);
+    const mapSession = normalizeMapSession(operation?.map_session ?? result.map_session);
+    if (mapSession) {
+      this.handleMapSession(mapSession);
     }
     this.lastDecision = result.decision;
     this.lastOperation = operation;
@@ -348,7 +349,6 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     this.mapSession = mapSession;
     this.payload = {
-      satellite_imagery: this.payload?.satellite_imagery,
       map_session: mapSession,
       compliance_warnings: mapSession.compliance_warnings,
     };

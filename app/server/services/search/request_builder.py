@@ -42,7 +42,7 @@ class RequestBuilder:
         if plan.action_id in {"weather", "air_quality"}:
             return "osm_dark"
         if plan.action_id in {"imagery", "satellite"}:
-            return "gibs_satellite"
+            return "esri_world_imagery"
         if plan.action_id in {"solar", "terrain"}:
             return "osm_terrain"
         return "osm_default"

@@ -9,6 +9,8 @@ import {
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
+  API_GEOSPATIAL_PROVIDER_LAYER_PATH,
+  API_GEOSPATIAL_PROVIDER_LAYERS_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
@@ -20,6 +22,8 @@ import {
   parseCatalogResponse,
   parseChatTurnResponse,
   parseGeospatialProviderAccountSetups,
+  parseGeospatialProviderLayer,
+  parseGeospatialProviderLayers,
   parseModelSettingsResponse,
 } from './api-parsers';
 import {
@@ -30,6 +34,8 @@ import {
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
+  GeospatialProviderLayerResponse,
+  GeospatialProviderLayersResponse,
   GeospatialProviderPayload,
   ModelCardDescriptor,
   ModelSettingsResponse,
@@ -137,6 +143,35 @@ export const fetchGeospatialLayerFeatures = async (
     { method: 'GET' },
   );
   return asProviderPayload(data);
+};
+
+export const fetchProviderLayers = async (
+  providerId: string,
+  options: { query?: string | null; limit?: number; refresh?: boolean } = {},
+): Promise<GeospatialProviderLayersResponse> => {
+  const suffix = buildQuerySuffix({
+    query: options.query || undefined,
+    limit: options.limit,
+    refresh: options.refresh,
+  });
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_LAYERS_PATH(providerId)}${suffix}`,
+    { method: 'GET' },
+  );
+  return parseGeospatialProviderLayers(data);
+};
+
+export const fetchProviderLayer = async (
+  providerId: string,
+  layerId: string,
+  options: { refresh?: boolean } = {},
+): Promise<GeospatialProviderLayerResponse> => {
+  const suffix = buildQuerySuffix({ refresh: options.refresh });
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_LAYER_PATH(providerId, layerId)}${suffix}`,
+    { method: 'GET' },
+  );
+  return parseGeospatialProviderLayer(data);
 };
 
 export const fetchGeospatialCameras = async (

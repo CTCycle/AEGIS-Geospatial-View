@@ -64,6 +64,8 @@ class LayerProviderService:
                 )
                 resolution_value = self._resolve_resolution(name)
                 entries[name] = LayerProviderEntry(
+                    layer_id=name,
+                    title=label,
                     name=name,
                     provider=provider,
                     label=label,
@@ -83,6 +85,8 @@ class LayerProviderService:
                 else item.layer_id
             )
             entries[item.layer_id] = LayerProviderEntry(
+                layer_id=item.layer_id,
+                title=item.display_name,
                 name=item.layer_id,
                 provider=str(item.provider or "").strip().lower(),
                 label=item.display_name,

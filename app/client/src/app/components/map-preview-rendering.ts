@@ -51,6 +51,14 @@ const appendQuery = (baseUrl: string, query: string): string => {
   return `${baseUrl}${separator}${query}`;
 };
 
+const applyTimeIfNeeded = (
+  template: string,
+  descriptor: { time?: string | null; default_time?: string | null },
+): string => {
+  const time = descriptor.time || descriptor.default_time;
+  return time ? template.replaceAll('{time}', encodeURIComponent(time)) : template;
+};
+
 const isFiniteBoundsTuple = (value: unknown): value is [number, number, number, number] => (
   Array.isArray(value)
   && value.length === 4
@@ -66,44 +74,53 @@ const normalizeOverlayBounds = (
   return bounds;
 };
 
-const buildWmsTileUrl = (overlay: OverlayEntry): string | null => {
-  if (overlay.tile_url_template) {
-    return overlay.tile_url_template;
+const buildWmsTileUrl = (
+  descriptor: OverlayEntry | NonNullable<OverlayEntry['render']>,
+): string | null => {
+  if (descriptor.tile_url_template) {
+    return applyTimeIfNeeded(descriptor.tile_url_template, descriptor);
   }
-  if (!overlay.url) {
+  if (!descriptor.url) {
     return null;
   }
-  const layers = overlay.layers || DEFAULT_WMS_LAYER_ID;
-  const version = overlay.wms_version || DEFAULT_WMS_VERSION;
-  const exceptions = overlay.wms_exceptions || DEFAULT_WMS_EXCEPTIONS;
+  const layers = 'layers' in descriptor && descriptor.layers ? descriptor.layers : descriptor.layer_id || DEFAULT_WMS_LAYER_ID;
+  const version = 'wms_version' in descriptor && descriptor.wms_version ? descriptor.wms_version : DEFAULT_WMS_VERSION;
+  const exceptions = 'wms_exceptions' in descriptor && descriptor.wms_exceptions ? descriptor.wms_exceptions : DEFAULT_WMS_EXCEPTIONS;
+  const crs = descriptor.crs || 'EPSG:3857';
+  const format = descriptor.format || 'image/png';
+  const style = descriptor.style || '';
+  const crsKey = version.startsWith('1.3') ? 'crs' : 'srs';
   const query = [
     'service=WMS',
     'request=GetMap',
     `layers=${encodeURIComponent(layers)}`,
-    'styles=',
-    'format=image/png',
+    `styles=${encodeURIComponent(style)}`,
+    `format=${encodeURIComponent(format)}`,
     'transparent=true',
     `version=${encodeURIComponent(version)}`,
-    'srs=EPSG:3857',
+    `${crsKey}=${encodeURIComponent(crs)}`,
     `exceptions=${encodeURIComponent(exceptions)}`,
     'bbox={bbox-epsg-3857}',
     'width=256',
     'height=256',
+    ...((descriptor.time || descriptor.default_time) ? [`time=${encodeURIComponent(descriptor.time || descriptor.default_time || '')}`] : []),
   ].join('&');
-  return appendQuery(overlay.url, query);
+  return appendQuery(descriptor.url, query);
 };
 
-const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
-  if (overlay.tile_url_template) {
-    return overlay.tile_url_template;
+const buildWmtsTileUrl = (
+  descriptor: OverlayEntry | NonNullable<OverlayEntry['render']>,
+): string | null => {
+  if (descriptor.tile_url_template) {
+    return applyTimeIfNeeded(descriptor.tile_url_template, descriptor);
   }
-  if (!overlay.url) {
+  if (!descriptor.url) {
     return null;
   }
-  const layerId = overlay.layer_id || overlay.layers || DEFAULT_WMS_LAYER_ID;
-  const matrixSet = overlay.tile_matrix_set || DEFAULT_WMTS_MATRIX_SET;
-  const format = overlay.wmts_format || DEFAULT_WMTS_FORMAT;
-  const style = overlay.wmts_style ?? '';
+  const layerId = descriptor.layer_id || ('layers' in descriptor ? descriptor.layers : undefined) || DEFAULT_WMS_LAYER_ID;
+  const matrixSet = descriptor.tile_matrix_set || DEFAULT_WMTS_MATRIX_SET;
+  const format = descriptor.format || ('wmts_format' in descriptor ? descriptor.wmts_format : undefined) || DEFAULT_WMTS_FORMAT;
+  const style = descriptor.style || ('wmts_style' in descriptor ? descriptor.wmts_style : undefined) || 'default';
   const query = [
     'service=WMTS',
     'request=GetTile',
@@ -115,8 +132,9 @@ const buildWmtsTileUrl = (overlay: OverlayEntry): string | null => {
     'tilerow={y}',
     'tilecol={x}',
     `format=${encodeURIComponent(format)}`,
+    ...((descriptor.time || descriptor.default_time) ? [`time=${encodeURIComponent(descriptor.time || descriptor.default_time || '')}`] : []),
   ].join('&');
-  return appendQuery(overlay.url, query);
+  return appendQuery(descriptor.url, query);
 };
 
 const buildBasemapTileUrl = (mapSession?: MapSession): string => {
@@ -380,6 +398,21 @@ const addVectorTileOverlayLayer = (
 };
 
 const buildRasterOverlayTiles = (overlay: OverlayEntry): string[] | null => {
+  const render = overlay.render;
+  if (render?.tile_url_template) {
+    return [applyTimeIfNeeded(render.tile_url_template, render)];
+  }
+  if (overlay.tile_url_template) {
+    return [applyTimeIfNeeded(overlay.tile_url_template, overlay)];
+  }
+  if (render?.rendering_mode === 'wms') {
+    const wmsTiles = buildWmsTileUrl(render);
+    return wmsTiles ? [wmsTiles] : null;
+  }
+  if (render?.rendering_mode === 'wmts') {
+    const wmtsTiles = buildWmtsTileUrl(render);
+    return wmtsTiles ? [wmtsTiles] : null;
+  }
   const overlayType = String(overlay.rendering_mode || overlay.type) as RasterOverlayKind | 'raster-tile' | 'xyz';
   if ((overlayType === 'tile' || overlayType === 'raster-tile' || overlayType === 'xyz') && (overlay.tile_url_template || overlay.url)) {
     return [overlay.tile_url_template || overlay.url as string];

@@ -882,7 +882,7 @@ class AgentOrchestrator:
             ]
         )
         if any(marker in haystack for marker in ("satellite", "imagery", "true color")):
-            return "gibs_satellite"
+            return "esri_world_imagery"
         if any(marker in haystack for marker in ("terrain", "elevation", "topography")):
             return "osm_terrain"
         return None
