@@ -186,7 +186,7 @@ class OllamaProvider(LLMProvider):
                 for value in tag_capabilities
                 if str(value).strip()
             }
-            capabilities.update({"chat", "stream"})
+            capabilities.update({"chat", "stream", "structured_output"})
             if "embedding" in capabilities:
                 capabilities.add("embeddings")
         else:
@@ -214,11 +214,15 @@ class OllamaProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def get_model_capabilities(self, model: str) -> set[str]:
-        capabilities = {"chat", "stream", "embeddings"}
+        capabilities = {"chat", "stream", "structured_output", "embeddings"}
         show_capabilities = self._show_capabilities(model)
         if show_capabilities is not None:
             if "tools" in show_capabilities:
                 capabilities.add("tools")
+            if "vision" in show_capabilities:
+                capabilities.add("vision")
+            if "embedding" in show_capabilities:
+                capabilities.add("embeddings")
             self.tool_capability_cache.set(
                 self.base_url,
                 model,
@@ -276,22 +280,52 @@ class OllamaProvider(LLMProvider):
         try:
             response = self._post_json("/api/chat", payload)
             message = response.get("message") if isinstance(response, dict) else None
-            supported = bool(
-                isinstance(message, dict) and self._parse_tool_calls(message)
+            supported = True
+            source = "ollama_tool_request_accepted"
+            if isinstance(message, dict) and self._parse_tool_calls(message):
+                source = "ollama_probe"
+        except HTTPError as exc:
+            supported = False
+            source = (
+                "ollama_tool_request_rejected"
+                if self._is_explicit_tool_unsupported_error(exc)
+                else "ollama_probe"
             )
         except Exception:
             supported = False
+            source = "ollama_probe"
         self.tool_capability_cache.set(
             self.base_url,
             model,
             supported,
-            source="ollama_probe",
+            source=source,
         )
         return supported
 
     # -------------------------------------------------------------------------
     def _tool_support_source(self, model: str) -> str:
         return self.tool_capability_cache.source(self.base_url, model) or "unknown"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_explicit_tool_unsupported_error(exc: HTTPError) -> bool:
+        try:
+            body = exc.read().decode("utf-8", errors="ignore")
+        except Exception:
+            body = ""
+        text = f"{exc.reason} {body}".lower()
+        if "tool" not in text and "function" not in text:
+            return False
+        return any(
+            marker in text
+            for marker in (
+                "not support",
+                "unsupported",
+                "does not support",
+                "doesn't support",
+                "no support",
+            )
+        )
 
     # -------------------------------------------------------------------------
     def list_library_models(self) -> list[ModelDescriptor]:
