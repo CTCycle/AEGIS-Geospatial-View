@@ -251,42 +251,40 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
 
 
 ###############################################################################
-def test_local_chat_model_validation_rejects_unavailable_ollama_model() -> None:
+@pytest.mark.parametrize(
+    ("payload", "error_match"),
+    [
+        (
+            {
+                "chat_model_provider": "ollama",
+                "chat_model_name": "missing-model",
+            },
+            "not available from Ollama",
+        ),
+        (
+            {
+                "parser_model_provider": "ollama",
+                "parser_model_name": "missing-parser",
+            },
+            "Selected parser model",
+        ),
+        (
+            {
+                "agent_model_provider": "ollama",
+                "agent_model_name": "missing-agent",
+            },
+            "Selected agent model",
+        ),
+    ],
+)
+def test_local_model_validation_rejects_unavailable_ollama_model(
+    payload: dict[str, str],
+    error_match: str,
+) -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
-    with pytest.raises(ChatSettingsValidationError, match="not available from Ollama"):
-        service.update_settings(
-            ModelSettingsUpdateRequest(
-                chat_model_provider="ollama",
-                chat_model_name="missing-model",
-            )
-        )
-
-
-###############################################################################
-def test_local_parser_model_validation_rejects_unavailable_ollama_model() -> None:
-    service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
-
-    with pytest.raises(ChatSettingsValidationError, match="Selected parser model"):
-        service.update_settings(
-            ModelSettingsUpdateRequest(
-                parser_model_provider="ollama",
-                parser_model_name="missing-parser",
-            )
-        )
-
-
-###############################################################################
-def test_local_agent_model_validation_rejects_unavailable_ollama_model() -> None:
-    service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
-
-    with pytest.raises(ChatSettingsValidationError, match="Selected agent model"):
-        service.update_settings(
-            ModelSettingsUpdateRequest(
-                agent_model_provider="ollama",
-                agent_model_name="missing-agent",
-            )
-        )
+    with pytest.raises(ChatSettingsValidationError, match=error_match):
+        service.update_settings(ModelSettingsUpdateRequest(**payload))
 
 
 ###############################################################################

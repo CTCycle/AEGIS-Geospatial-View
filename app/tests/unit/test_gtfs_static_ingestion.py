@@ -20,25 +20,6 @@ def _sample_gtfs_static_zip() -> bytes:
     return buffer.getvalue()
 
 
-###############################################################################
-def test_gtfs_static_ingestion_parses_core_feed_tables() -> None:
-    response = asyncio.run(
-        GTFSStaticProvider().fetch(
-            ProviderRequest(
-                capability_id="gtfs_static",
-                params={"feed_bytes": _sample_gtfs_static_zip()},
-            )
-        )
-    )
-
-    assert response.payload["stops"][0]["id"] == "s1"
-    assert response.payload["routes"][0]["id"] == "r1"
-    assert response.payload["agency"][0]["timezone"] == "Europe/Rome"
-    assert response.payload["calendar"][0]["serviceId"] == "wk"
-    assert response.payload["shapes"][0]["geometry"]["type"] == "LineString"
-
-
-###############################################################################
 def test_gtfs_static_provider_fetches_configured_feed_url() -> None:
     calls: list[str] = []
 

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 
 import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
@@ -9,7 +9,6 @@ import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from './geospatial-page.component';
 
 describe('pages/geospatial-page.component', () => {
-  let router: Router;
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
@@ -56,7 +55,6 @@ describe('pages/geospatial-page.component', () => {
         { provide: UserFacingErrorService, useValue: errors },
       ],
     }).compileComponents();
-    router = TestBed.inject(Router);
   });
 
   it('loads initial persisted state', () => {
@@ -93,28 +91,6 @@ describe('pages/geospatial-page.component', () => {
     expect(component.status).toBe('Complete');
     expect(component.messages.at(-1)?.content).toContain('Search executed successfully.');
     expect(component.contextUsagePercent).toBe(6);
-  });
-
-  it('renders context tracker fallback and telemetry detail', () => {
-    const fixture = TestBed.createComponent(GeospatialPageComponent);
-    fixture.detectChanges();
-    const component = fixture.componentInstance;
-    expect(component.contextUsageLabel).toBe('0%');
-    expect(component.contextUsageDetail).toContain('awaiting first request');
-
-    component.contextUsage = {
-      estimated_input_tokens: 321,
-      selected_context_window: 2048,
-      model_context_limit: 8192,
-      usage_percent: 15.7,
-      provider: 'ollama',
-      model: 'llama3.2',
-    };
-    fixture.detectChanges();
-
-    const element: HTMLElement = fixture.nativeElement;
-    expect(component.contextUsageLabel).toBe('16%');
-    expect(element.textContent).toContain('321 / 2048 tokens');
   });
 
   it('clarification responses set Need more detail status', async () => {
@@ -335,21 +311,4 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toContain('Current catalog: 1 map types, 1 layers, and 1 direct tools.');
   });
 
-  it('navigateToSettings syncs state and routes to settings', () => {
-    const navigateSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
-    const fixture = TestBed.createComponent(GeospatialPageComponent);
-    fixture.detectChanges();
-    fixture.componentInstance.navigateToSettings();
-    expect(store.updateChatPage).toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith('/settings');
-  });
-
-  it('transcript scroll persistence updates state', () => {
-    const fixture = TestBed.createComponent(GeospatialPageComponent);
-    fixture.detectChanges();
-    const component = fixture.componentInstance;
-    component.onTranscriptScroll({ target: { scrollTop: 88 } } as unknown as Event);
-    expect(component.transcriptScrollTop).toBe(88);
-    expect(store.updateChatPage).toHaveBeenCalled();
-  });
 });

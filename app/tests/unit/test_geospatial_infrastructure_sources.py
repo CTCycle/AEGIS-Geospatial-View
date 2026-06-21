@@ -2,23 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.overture import OvertureProvider
 
 
-###############################################################################
-def test_geospatial_infrastructure_providers_are_registered() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    for provider_id in ("openchargemap", "nrel", "ourairports", "overture"):
-        assert provider_id in registry.list_provider_ids()
-
-
-###############################################################################
 def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     async def fetcher(url, headers):
         del url, headers

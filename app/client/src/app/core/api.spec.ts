@@ -131,31 +131,38 @@ describe('core/api', () => {
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
   });
 
-  it('parseChatTurnResponse rejects missing request_id', () => {
-    expect(() => parseChatTurnResponse({
-      session_id: 1,
-      assistant_message: 'ok',
-      turn_contract: {},
-      decision: {},
-    })).toThrow();
-  });
-
-  it('parseChatTurnResponse rejects missing turn_contract', () => {
-    expect(() => parseChatTurnResponse({
-      request_id: 'chat-1',
-      session_id: 1,
-      assistant_message: 'ok',
-      decision: {},
-    })).toThrow();
-  });
-
-  it('parseChatTurnResponse rejects missing decision', () => {
-    expect(() => parseChatTurnResponse({
-      request_id: 'chat-1',
-      session_id: 1,
-      assistant_message: 'ok',
-      turn_contract: {},
-    })).toThrow();
+  [
+    {
+      label: 'request_id',
+      payload: {
+        session_id: 1,
+        assistant_message: 'ok',
+        turn_contract: {},
+        decision: {},
+      },
+    },
+    {
+      label: 'turn_contract',
+      payload: {
+        request_id: 'chat-1',
+        session_id: 1,
+        assistant_message: 'ok',
+        decision: {},
+      },
+    },
+    {
+      label: 'decision',
+      payload: {
+        request_id: 'chat-1',
+        session_id: 1,
+        assistant_message: 'ok',
+        turn_contract: {},
+      },
+    },
+  ].forEach(({ label, payload }) => {
+    it(`parseChatTurnResponse rejects missing ${label}`, () => {
+      expect(() => parseChatTurnResponse(payload)).toThrow();
+    });
   });
 
   it('buildApiError builds ApiRequestError', async () => {
@@ -332,32 +339,42 @@ describe('core/api', () => {
     });
   });
 
-  it('treats placeholder local Ollama descriptions as missing', () => {
-    expect(buildModelDescription({
-      description: 'local',
-      metadata: {
-        family: 'qwen2',
-        parameter_size: '7.6B',
-        quantization_level: 'Q4_K_M',
+  [
+    {
+      label: 'treats placeholder local Ollama descriptions as missing',
+      payload: {
+        description: 'local',
+        metadata: {
+          family: 'qwen2',
+          parameter_size: '7.6B',
+          quantization_level: 'Q4_K_M',
+        },
       },
-    })).toBe('Optimized for qwen2 7.6B Q4_K_M.');
-  });
-
-  it('treats Ollama technical summaries as generated metadata, not authored descriptions', () => {
-    expect(buildModelDescription({
-      description: 'qwen2 | 7.6B | Q4_K_M',
-      metadata: {
-        family: 'qwen2',
-        parameter_size: '7.6B',
-        quantization_level: 'Q4_K_M',
+      expected: 'Optimized for qwen2 7.6B Q4_K_M.',
+    },
+    {
+      label: 'treats Ollama technical summaries as generated metadata, not authored descriptions',
+      payload: {
+        description: 'qwen2 | 7.6B | Q4_K_M',
+        metadata: {
+          family: 'qwen2',
+          parameter_size: '7.6B',
+          quantization_level: 'Q4_K_M',
+        },
       },
-    })).toBe('Optimized for qwen2 7.6B Q4_K_M.');
-  });
-
-  it('keeps provider-authored model descriptions', () => {
-    expect(buildModelDescription({
-      description: 'A provider-authored summary.',
-      metadata: {},
-    })).toBe('A provider-authored summary.');
+      expected: 'Optimized for qwen2 7.6B Q4_K_M.',
+    },
+    {
+      label: 'keeps provider-authored model descriptions',
+      payload: {
+        description: 'A provider-authored summary.',
+        metadata: {},
+      },
+      expected: 'A provider-authored summary.',
+    },
+  ].forEach(({ label, payload, expected }) => {
+    it(label, () => {
+      expect(buildModelDescription(payload)).toBe(expected);
+    });
   });
 });

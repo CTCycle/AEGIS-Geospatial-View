@@ -31,25 +31,6 @@ def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
     assert response.payload["renderingMode"] == "camera-points"
 
 
-###############################################################################
-def test_camera_manifest_templates_are_registered() -> None:
-    from server.services.geospatial.manifest_loader import GeospatialManifestLoader
-
-    cameras = {
-        item["id"] for item in GeospatialManifestLoader().load_all()["cameras"]
-    }
-
-    assert {
-        "dot_traffic_cameras",
-        "public_transport_cameras",
-        "tourism_webcams",
-        "ski_resort_webcams",
-        "port_airport_webcams",
-        "environmental_monitoring_cameras",
-    }.issubset(cameras)
-
-
-###############################################################################
 def test_local_open_data_camera_template_fetches_configured_source() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         return {

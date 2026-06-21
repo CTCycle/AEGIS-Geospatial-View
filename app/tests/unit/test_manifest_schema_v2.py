@@ -14,6 +14,12 @@ def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
 
     assert report.ok, report.model_dump()
     assert report.manifest_count > 0
+    assert report.source_doc_coverage.get("with_source_docs") == report.manifest_count
+    assert not [
+        issue
+        for issue in report.issues
+        if issue.message == "Metadata-only manifest cannot claim map geometry."
+    ]
 
 
 ###############################################################################
