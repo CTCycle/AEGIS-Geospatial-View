@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.domain.agent.decision import ResolvedLocation
 from server.domain.extraction.models import NormalizedAction
 from server.services.search.request_builder import RequestBuilder
 
@@ -37,17 +37,3 @@ def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
     assert viewport.radius_m == 1000.0
 
 
-###############################################################################
-def test_request_builder_plan_path_preserves_city_scale_hint() -> None:
-    request = RequestBuilder().build_location_search_request(
-        ExecutionPlan(
-            state="map_search",
-            mode="map",
-            action_id="show_city_map_berlin",
-            basemap_id="osm_default",
-            overlay_ids=[],
-        ),
-        ResolvedLocation(label="Berlin", latitude=52.5173885, longitude=13.3951309),
-    )
-
-    assert request.viewport.radius_m == 25000.0

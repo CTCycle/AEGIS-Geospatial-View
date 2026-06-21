@@ -43,16 +43,10 @@ const model = (overrides: Partial<ModelCardDescriptor> = {}): ModelCardDescripto
 });
 
 describe('model-selection', () => {
-  it('keeps model role order stable', () => {
+  it('returns assigned roles as model role values', () => {
     expect(MODEL_ROLES).toEqual(['parser', 'chat', 'agent']);
-  });
-
-  it('returns stable role labels', () => {
     expect(modelRoleLabel('parser')).toBe('Parser');
     expect(modelRoleStatusLabel('parser')).toBe('parser');
-  });
-
-  it('returns assigned roles as model role values', () => {
     const rows = buildSelectedModelStats(baseSettings(), new Set<string>(['gpt-4.1-mini']));
     expect(rows[0].assignedRoles).toEqual(['parser']);
     expect(rows[1].assignedRoles).toEqual(['chat']);
@@ -132,11 +126,8 @@ describe('model-selection', () => {
     );
   });
 
-  it('allows chat assignment for normal chat models', () => {
-    expect(canAssignRole(model(), 'chat')).toBeTrue();
-  });
-
   it('rejects invalid role assignments when building payloads', () => {
+    expect(canAssignRole(model(), 'chat')).toBeTrue();
     expect(() => buildModelSelectionPayload(baseSettings(), 'agent', model({ supports_tools: false }))).toThrowError(
       'Agent role requires native tool calling.',
     );

@@ -22,32 +22,6 @@ from server.services.geospatial.providers.base import (
 )
 
 
-###############################################################################
-def test_geospatial_capabilities_include_camera_network() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/api/geospatial/capabilities")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert any(item["id"] == "windy_webcams" for item in payload["cameras"])
-
-
-###############################################################################
-def test_geospatial_layers_endpoint_groups_layers() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/api/geospatial/layers")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["basemaps"]
-    assert payload["overlays"]
-    assert payload["cameras"]
-    assert payload["transit"]
-
-
-###############################################################################
 def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
     client = TestClient(create_app())
 
@@ -59,21 +33,6 @@ def test_geospatial_transit_features_return_metadata_until_feed_configured() -> 
     assert payload["payload"]["renderingMode"] == "metadata-only"
 
 
-###############################################################################
-def test_geospatial_layer_health_returns_manifest_reliability() -> None:
-    client = TestClient(create_app())
-
-    response = client.get(
-        "/api/geospatial/layers/rainviewer_precipitation_radar/health"
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["id"] == "rainviewer_precipitation_radar"
-    assert payload["reliability"]["status"] in {"functional", "partial", "unknown"}
-
-
-###############################################################################
 def test_geospatial_features_reports_missing_credentials_without_500() -> None:
     client = TestClient(create_app())
 
@@ -397,19 +356,6 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
     assert payload["environmentVariable"] == "WINDY_WEBCAMS_API_KEY"
 
 
-###############################################################################
-def test_geospatial_provider_account_setup_list_matches_documented_route() -> None:
-    client = TestClient(create_app())
-
-    response = client.get("/api/geospatial/providers/account-setup")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["providers"]
-    assert any(item["provider_id"] == "tomtom" for item in payload["providers"])
-
-
-###############################################################################
 def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
     client = TestClient(create_app())

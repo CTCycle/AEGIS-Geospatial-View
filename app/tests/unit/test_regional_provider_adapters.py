@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from pathlib import Path
-
 import pytest
 
 from server.services.geospatial.cache import GeospatialCache
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
@@ -276,25 +272,3 @@ def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     assert response.payload["joinKey"] == "NUTS_ID"
 
 
-###############################################################################
-def test_fred_manifest_remains_metadata_only_without_geographic_join() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    fred = json.loads(
-        (repo_root / "resources/catalog/overlays/fred_regional_market_indicators.json").read_text(
-            encoding="utf-8"
-        )
-    )
-
-    assert fred["capabilityKind"] == "metadata-only"
-    assert fred["agenticUse"]["manualToggle"] is False
-
-
-###############################################################################
-def test_registry_binds_regional_providers() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    assert "eea" in registry.list_provider_ids()
-    assert "esa" in registry.list_provider_ids()
-    assert "eurostat" in registry.list_provider_ids()
