@@ -434,7 +434,7 @@ def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> No
         ("nrel", "NREL_API_KEY"),
     ],
 )
-def test_phase8_credential_status_uses_provider_environment(
+def test_optional_provider_credential_status_uses_provider_environment(
     monkeypatch, provider_id: str, env_name: str
 ) -> None:
     monkeypatch.delenv(env_name, raising=False)

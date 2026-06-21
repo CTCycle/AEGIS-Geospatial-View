@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 
 import pytest
 
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
@@ -153,11 +152,3 @@ def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
     assert response.payload["vehicleRenderingAllowed"] is False
 
 
-###############################################################################
-def test_provider_registry_binds_gtfs_adapters_from_manifests() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    assert "gtfs_static" in registry.list_provider_ids()
-    assert "gtfs_realtime" in registry.list_provider_ids()

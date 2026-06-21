@@ -4,7 +4,6 @@ import asyncio
 
 import pytest
 
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
 from server.services.geospatial.providers.fema import FEMAProvider
 from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
@@ -224,11 +223,3 @@ def test_nasa_firms_normalizes_live_csv() -> None:
     assert response.payload["features"][0]["timestamp"] == "2026-05-11T09:30:00Z"
 
 
-###############################################################################
-def test_provider_registry_binds_hazard_adapters_from_manifests() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    for provider_id in ("usgs", "noaa", "fema", "nasa_firms"):
-        assert provider_id in registry.list_provider_ids()

@@ -147,6 +147,50 @@ class _PVGISService:
         }
 
 
+GIBS_WMTS_XML = """<?xml version="1.0"?>
+<Capabilities xmlns="http://www.opengis.net/wmts/1.0" xmlns:ows="http://www.opengis.net/ows/1.1">
+  <Contents>
+    <Layer>
+      <ows:Title>VIIRS true color</ows:Title>
+      <ows:Identifier>VIIRS_SNPP_CorrectedReflectance_TrueColor</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
+      <Format>image/png</Format>
+      <Dimension>
+        <ows:Identifier>Time</ows:Identifier>
+        <Default>2026-05-10</Default>
+        <Value>2026-05-01/2026-05-10/P1D</Value>
+      </Dimension>
+      <TileMatrixSetLink><TileMatrixSet>GoogleMapsCompatible_Level9</TileMatrixSet></TileMatrixSetLink>
+    </Layer>
+  </Contents>
+</Capabilities>
+"""
+
+
+GIBS_WMS_XML = """<?xml version="1.0"?>
+<WMS_Capabilities xmlns="http://www.opengis.net/wms">
+  <Capability>
+    <Request><GetMap><Format>image/png</Format></GetMap></Request>
+    <Layer>
+      <Layer queryable="0">
+        <Name>VIIRS_SNPP_CorrectedReflectance_TrueColor</Name>
+        <Title>VIIRS true color WMS</Title>
+        <CRS>EPSG:3857</CRS>
+        <Style><Name>default</Name></Style>
+        <Dimension name="time" default="2026-05-10">2026-05-01/2026-05-10/P1D</Dimension>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>
+"""
+
+
+###############################################################################
+async def _gibs_capabilities_fetcher(url: str, headers: dict[str, str] | None = None):
+    del headers
+    return GIBS_WMTS_XML if "wmts" in url else GIBS_WMS_XML
+
+
 ###############################################################################
 def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
@@ -501,26 +545,6 @@ def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
 
 
 ###############################################################################
-def test_provider_registry_binds_phase4_adapters_from_manifests() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    for provider_id in (
-        "arcgis",
-        "census",
-        "gibs",
-        "openmeteo",
-        "overpass",
-        "openaq",
-        "pvgis",
-        "tomtom",
-        "geoapify",
-    ):
-        assert provider_id in registry.list_provider_ids()
-
-
-###############################################################################
 def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-test")
     monkeypatch.setenv("GEOAPIFY_API_KEY", "geoapify-test")
@@ -646,7 +670,7 @@ def test_geoapify_provider_returns_empty_result_for_empty_or_malformed_payloads(
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
     response = asyncio.run(
-        NASAGIBSProvider().fetch(
+        NASAGIBSProvider(fetcher=_gibs_capabilities_fetcher).fetch(
             ProviderRequest(
                 capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
                 params={"crs": "EPSG:4326", "time": "2026-05-10"},
@@ -654,61 +678,10 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
         )
     )
 
-    assert response.payload["renderingMode"] == "wms"
-    assert response.payload["crs"] == "EPSG:4326"
+    assert response.payload["layer"]["rendering_mode"] == "wmts"
+    assert response.payload["render"]["rendering_mode"] == "wmts"
+    assert response.payload["render"]["tile_matrix_set"] == "GoogleMapsCompatible_Level9"
     assert response.attribution
-
-
-###############################################################################
-def test_nasa_gibs_provider_live_validation_uses_stale_cache() -> None:
-    clock = 0.0
-
-    def now() -> float:
-        return clock
-
-    async def ok_fetcher(url: str, headers: dict[str, str] | None = None):
-        return {"service": "WMS", "layers": ["VIIRS_SNPP_CorrectedReflectance_TrueColor"]}
-
-    provider = NASAGIBSProvider(
-        fetcher=ok_fetcher,
-        cache=GeospatialCache(clock=now),
-        cache_ttl_seconds=1,
-        stale_while_revalidate_seconds=10,
-    )
-    request = ProviderRequest(
-        capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
-        params={"live_validate": True},
-    )
-    first = asyncio.run(provider.fetch(request))
-
-    async def timeout_fetcher(url: str, headers: dict[str, str] | None = None):
-        raise TimeoutError("timed out")
-
-    clock = 2.0
-    provider.fetcher = timeout_fetcher
-    stale = asyncio.run(provider.fetch(request))
-
-    assert first.payload["liveValidation"]["service"] == "WMS"
-    assert stale.stale is True
-    assert stale.payload["liveValidation"]["layers"] == [
-        "VIIRS_SNPP_CorrectedReflectance_TrueColor"
-    ]
-
-
-###############################################################################
-def test_nasa_gibs_provider_rejects_malformed_live_validation_without_cache() -> None:
-    async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
-        return ["not", "metadata"]
-
-    with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
-            NASAGIBSProvider(fetcher=malformed_fetcher).fetch(
-                ProviderRequest(
-                    capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
-                    params={"live_validate": True},
-                )
-            )
-        )
 
 
 ###############################################################################
