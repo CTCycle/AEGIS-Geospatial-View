@@ -2,10 +2,12 @@ import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { ChatMessageComponent } from '../components/chat-message.component';
 import { MapPreviewComponent } from '../components/map-preview.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
+import { normalizeMapSession } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
 import {
   ChatOperationResult,
@@ -23,7 +25,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
 @Component({
   selector: 'app-geospatial-page',
   standalone: true,
-  imports: [CommonModule, MapPreviewComponent],
+  imports: [CommonModule, ChatMessageComponent, MapPreviewComponent],
   templateUrl: './geospatial-page.component.html',
   styleUrl: './geospatial-page.component.css',
 })
@@ -306,9 +308,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
     const operation = result.operation;
-    const mapSession = operation?.map_session ?? result.map_session;
-    if (typeof mapSession === 'object' && mapSession !== null) {
-      this.handleMapSession(mapSession as MapSession);
+    const mapSession = normalizeMapSession(operation?.map_session ?? result.map_session);
+    if (mapSession) {
+      this.handleMapSession(mapSession);
     }
     this.lastDecision = result.decision;
     this.lastOperation = operation;
@@ -347,7 +349,6 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     this.mapSession = mapSession;
     this.payload = {
-      satellite_imagery: this.payload?.satellite_imagery,
       map_session: mapSession,
       compliance_warnings: mapSession.compliance_warnings,
     };

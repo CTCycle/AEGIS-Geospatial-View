@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -15,6 +16,7 @@ from server.services.geospatial.providers.base import (
 
 JsonFetcher = Callable[[str, dict[str, str] | None], Awaitable[Any] | Any]
 BytesFetcher = Callable[[str, dict[str, str] | None], Awaitable[bytes] | bytes]
+TextFetcher = Callable[[str, dict[str, str] | None], Awaitable[str] | str]
 
 _DEFAULT_TIMEOUT = httpx.Timeout(20.0)
 _ASYNC_HTTP_CLIENT = httpx.AsyncClient(
@@ -52,11 +54,27 @@ async def fetch_bytes_url(url: str, headers: dict[str, str] | None = None) -> by
 
 
 ###############################################################################
+async def fetch_text_url(url: str, headers: dict[str, str] | None = None) -> str:
+    body = await fetch_bytes_url(url, headers)
+    return body.decode("utf-8", errors="replace")
+
+
+###############################################################################
 async def call_json_fetcher(
     fetcher: JsonFetcher, url: str, headers: dict[str, str] | None = None
 ) -> Any:
     value = fetcher(url, headers)
     if hasattr(value, "__await__"):
+        return await value
+    return value
+
+
+###############################################################################
+async def call_text_fetcher(
+    fetcher: TextFetcher, url: str, headers: dict[str, str] | None = None
+) -> str:
+    value = fetcher(url, headers)
+    if inspect.isawaitable(value):
         return await value
     return value
 

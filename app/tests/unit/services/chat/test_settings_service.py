@@ -32,6 +32,7 @@ class FakeSettingsRecord:
     ollama_url: str = "http://localhost:11434"
     openai_base_url: str | None = "https://openai.example/v1"
     google_base_url: str | None = "https://google.example/v1"
+    deepseek_base_url: str | None = "https://deepseek.example/v1"
 
 
 ###############################################################################
@@ -191,6 +192,7 @@ def test_partial_update_preserves_existing_settings_when_fields_are_omitted() ->
         "ollama_url": "http://localhost:11434",
         "openai_base_url": "https://openai.example/v1",
         "google_base_url": "https://google.example/v1",
+        "deepseek_base_url": "https://deepseek.example/v1",
     }
 
 
@@ -214,7 +216,38 @@ def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> 
     assert settings_repo.last_update["agent_model_name"] == "gpt-4.1"
     assert settings_repo.last_update["openai_base_url"] == "https://openai.example/v1"
     assert settings_repo.last_update["google_base_url"] == "https://google.example/v1"
+    assert settings_repo.last_update["deepseek_base_url"] == "https://deepseek.example/v1"
     assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
+
+
+###############################################################################
+def test_updating_only_credentials_skips_unrelated_local_model_validation() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(
+            chat_model_provider="ollama",
+            chat_model_name="missing-chat",
+            parser_model_provider="ollama",
+            parser_model_name="missing-parser",
+            agent_model_provider="ollama",
+            agent_model_name="missing-agent",
+        )
+    )
+    credentials_repo = FakeCredentialsRepository()
+    service = build_service(
+        settings_repo=settings_repo,
+        credentials_repo=credentials_repo,
+        model_library_service=FakeModelLibraryService({"different-installed-model"}),
+    )
+
+    service.update_settings(
+        ModelSettingsUpdateRequest(credentials={"geoapify": {"api_key": " geo "}})
+    )
+
+    assert credentials_repo.upserts == [("geoapify", "api_key", "enc:geo", "v1")]
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["chat_model_name"] == "missing-chat"
+    assert settings_repo.last_update["parser_model_name"] == "missing-parser"
+    assert settings_repo.last_update["agent_model_name"] == "missing-agent"
 
 
 ###############################################################################

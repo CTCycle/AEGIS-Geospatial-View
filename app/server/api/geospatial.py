@@ -13,6 +13,8 @@ from server.domain.geographics import (
     GeospatialLayersResponse,
     GeospatialProviderAccountSetupListResponse,
     GeospatialProviderAccountSetupResponse,
+    GeospatialProviderLayerResponse,
+    GeospatialProviderLayersResponse,
     GeospatialProviderPayloadResponse,
     LayerAuditReport,
 )
@@ -25,6 +27,7 @@ from server.services.geospatial.api_service import (
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
+from server.services.geospatial.composition import build_geospatial_runtime
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
@@ -39,7 +42,11 @@ GEOSPATIAL_ERROR_STATUS = {
 
 ###############################################################################
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
-    return request.app.state.geospatial_runtime.api_service
+    runtime = getattr(request.app.state, "geospatial_runtime", None)
+    if runtime is None:
+        runtime = build_geospatial_runtime()
+        request.app.state.geospatial_runtime = runtime
+    return runtime.api_service
 
 
 ###############################################################################
@@ -85,6 +92,52 @@ async def get_geospatial_layers(
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialLayersResponse:
     return GeospatialLayersResponse.model_validate(service.list_layers())
+
+
+###############################################################################
+@router.get(
+    "/providers/{provider_id}/layers",
+    response_model=GeospatialProviderLayersResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def list_provider_layers(
+    provider_id: str,
+    query: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=250),
+    refresh: bool = Query(default=False),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> GeospatialProviderLayersResponse:
+    try:
+        return await service.list_provider_layers(
+            provider_id,
+            query=query,
+            limit=limit,
+            refresh=refresh,
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
+
+
+###############################################################################
+@router.get(
+    "/providers/{provider_id}/layers/{layer_id:path}",
+    response_model=GeospatialProviderLayerResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_provider_layer(
+    provider_id: str,
+    layer_id: str,
+    refresh: bool = Query(default=False),
+    service: GeospatialApiService = Depends(get_geospatial_api_service),
+) -> GeospatialProviderLayerResponse:
+    try:
+        return await service.get_provider_layer(
+            provider_id,
+            layer_id,
+            refresh=refresh,
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
 
 
 ###############################################################################

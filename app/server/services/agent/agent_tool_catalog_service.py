@@ -15,6 +15,7 @@ from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
@@ -37,6 +38,7 @@ class AgentToolCatalogService:
         location_resolver: LocationResolver | None = None,
         tool_registry: ToolRegistry | None = None,
         policy_engine: PolicyEngine | None = None,
+        geospatial_api_service: GeospatialApiService | None = None,
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
@@ -46,6 +48,7 @@ class AgentToolCatalogService:
         self.location_resolver = location_resolver or LocationResolver()
         self.tool_registry = tool_registry
         self.policy_engine = policy_engine
+        self.geospatial_api_service = geospatial_api_service or GeospatialApiService()
 
     # -------------------------------------------------------------------------
     def build_native_tools(
@@ -95,6 +98,34 @@ class AgentToolCatalogService:
                     "required": ["capability_id", "arguments"],
                 },
             ),
+            LLMToolDefinition(
+                name="fetch_geospatial_provider_layers",
+                description="Fetch normalized provider-native geospatial layers without returning raw provider XML.",
+                parameters_json_schema={
+                    "type": "object",
+                    "properties": {
+                        "provider_id": {
+                            "type": "string",
+                            "description": "Provider ID, for example gibs.",
+                        },
+                        "query": {
+                            "type": ["string", "null"],
+                            "description": "Optional search text for provider-native layers.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 250,
+                            "default": 50,
+                        },
+                        "refresh": {
+                            "type": "boolean",
+                            "default": False,
+                        },
+                    },
+                    "required": ["provider_id"],
+                },
+            ),
         ]
 
     # -------------------------------------------------------------------------
@@ -106,6 +137,8 @@ class AgentToolCatalogService:
                 registry.register_native_tool(definition, self._describe_tool_handler)
             elif definition.name == "execute_geospatial_capability":
                 registry.register_native_tool(definition, self._execute_tool_handler)
+            elif definition.name == "fetch_geospatial_provider_layers":
+                registry.register_native_tool(definition, self._provider_layers_tool_handler)
 
     # -------------------------------------------------------------------------
     async def _list_tool_handler(
@@ -136,6 +169,21 @@ class AgentToolCatalogService:
             dict(arguments.get("arguments") or {}),
             context=context,
         )
+
+    # -------------------------------------------------------------------------
+    async def _provider_layers_tool_handler(
+        self,
+        arguments: dict[str, Any],
+        context: AgentExecutionContext,
+    ) -> dict[str, Any]:
+        _ = context
+        response = await self.geospatial_api_service.list_provider_layers(
+            str(arguments["provider_id"]),
+            query=arguments.get("query") if isinstance(arguments.get("query"), str) else None,
+            limit=int(arguments.get("limit") or 50),
+            refresh=bool(arguments.get("refresh", False)),
+        )
+        return response.model_dump(mode="json")
 
     # -------------------------------------------------------------------------
     def list_geospatial_capabilities(

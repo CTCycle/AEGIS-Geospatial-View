@@ -34,8 +34,13 @@ class ChatRuntime:
 def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatRuntime:
     settings_repo = ModelSettingsRepository()
     ollama_tool_capability_cache = OllamaToolCapabilityCache()
+    llm_factory = LLMFactory(
+        settings_repo=settings_repo,
+        ollama_tool_capability_cache=ollama_tool_capability_cache,
+    )
     model_library_service = ChatModelLibraryService(
-        ollama_tool_capability_cache=ollama_tool_capability_cache
+        ollama_tool_capability_cache=ollama_tool_capability_cache,
+        provider_factory=llm_factory,
     )
     settings_service = ChatSettingsService(
         settings_repo=settings_repo,
@@ -58,10 +63,7 @@ def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatR
         policy_engine=policy_engine,
     )
     native_tool_loop = NativeToolLoop(
-        provider_factory=LLMFactory(
-            settings_repo=settings_repo,
-            ollama_tool_capability_cache=ollama_tool_capability_cache,
-        ),
+        provider_factory=llm_factory,
         tool_registry=tool_registry,
     )
     request_builder = RequestBuilder()

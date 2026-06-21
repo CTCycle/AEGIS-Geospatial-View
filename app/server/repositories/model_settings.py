@@ -69,6 +69,7 @@ class ModelSettingsRepository:
         ollama_url: str,
         openai_base_url: str | None,
         google_base_url: str | None,
+        deepseek_base_url: str | None,
     ) -> ModelProviderSettingsRecord:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
@@ -89,6 +90,7 @@ class ModelSettingsRepository:
             record.ollama_url = ollama_url
             record.openai_base_url = openai_base_url
             record.google_base_url = google_base_url
+            record.deepseek_base_url = deepseek_base_url
             record.updated_at = utc_now_naive()
             session.commit()
             session.refresh(record)

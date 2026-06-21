@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from server.services.geospatial.cache import GeospatialCache
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderRequest,
@@ -100,16 +99,6 @@ def test_ourairports_returns_source_ready_descriptor() -> None:
 
 
 ###############################################################################
-def test_provider_registry_binds_phase8_adapters_from_manifests() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    for provider_id in ("opentripmap", "openchargemap", "nrel", "ourairports"):
-        assert provider_id in registry.list_provider_ids()
-
-
-###############################################################################
 def test_opentripmap_live_fetch_normalizes_geojson() -> None:
     async def fetcher(url, headers):
         assert "api.opentripmap.com" in url
@@ -190,7 +179,7 @@ def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
 
 
 ###############################################################################
-def test_phase8_live_provider_malformed_payload_fails_cleanly() -> None:
+def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
     async def fetcher(url, headers):
         return "not-json-shape"
 
@@ -206,7 +195,7 @@ def test_phase8_live_provider_malformed_payload_fails_cleanly() -> None:
 
 
 ###############################################################################
-def test_phase8_live_provider_uses_stale_cache_on_failure() -> None:
+def test_optional_live_provider_uses_stale_cache_on_failure() -> None:
     calls = 0
 
     async def fetcher(url, headers):

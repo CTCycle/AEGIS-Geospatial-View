@@ -57,7 +57,9 @@ class ChatSettingsService:
                 health_bucket[item.label] = "unreadable"
             else:
                 health_bucket[item.label] = (
-                    "healthy" if item.provider in {"openai", "google"} else "stored"
+                    "healthy"
+                    if item.provider in {"openai", "google", "deepseek"}
+                    else "stored"
                 )
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
@@ -70,6 +72,7 @@ class ChatSettingsService:
             ollama_url=record.ollama_url,
             openai_base_url=record.openai_base_url,
             google_base_url=record.google_base_url,
+            deepseek_base_url=record.deepseek_base_url,
             credentials=credential_presence,
             credential_health=credential_health,
         )
@@ -84,6 +87,19 @@ class ChatSettingsService:
         self, payload: ModelSettingsUpdateRequest
     ) -> ModelSettingsResponse:
         current = self.get_settings()
+        should_validate_model_selection = any(
+            value is not None
+            for value in (
+                payload.active_provider_mode,
+                payload.chat_model_provider,
+                payload.chat_model_name,
+                payload.parser_model_provider,
+                payload.parser_model_name,
+                payload.agent_model_provider,
+                payload.agent_model_name,
+                payload.ollama_url,
+            )
+        )
         next_active_provider_mode = (
             payload.active_provider_mode or current.active_provider_mode
         )
@@ -114,22 +130,30 @@ class ChatSettingsService:
             if payload.google_base_url is not None
             else current.google_base_url
         )
-        self._validate_local_model_selection(
-            chat_model_provider=next_chat_model_provider,
-            chat_model_name=next_chat_model_name,
-            parser_model_provider=next_parser_model_provider,
-            parser_model_name=next_parser_model_name,
-            agent_model_provider=next_agent_model_provider,
-            agent_model_name=next_agent_model_name,
-            ollama_url=next_ollama_url,
+        next_deepseek_base_url = (
+            None
+            if payload.deepseek_base_url == ""
+            else payload.deepseek_base_url
+            if payload.deepseek_base_url is not None
+            else current.deepseek_base_url
         )
-        self._validate_role_capabilities(
-            parser_model_provider=next_parser_model_provider,
-            parser_model_name=next_parser_model_name,
-            agent_model_provider=next_agent_model_provider,
-            agent_model_name=next_agent_model_name,
-            ollama_url=next_ollama_url,
-        )
+        if should_validate_model_selection:
+            self._validate_local_model_selection(
+                chat_model_provider=next_chat_model_provider,
+                chat_model_name=next_chat_model_name,
+                parser_model_provider=next_parser_model_provider,
+                parser_model_name=next_parser_model_name,
+                agent_model_provider=next_agent_model_provider,
+                agent_model_name=next_agent_model_name,
+                ollama_url=next_ollama_url,
+            )
+            self._validate_role_capabilities(
+                parser_model_provider=next_parser_model_provider,
+                parser_model_name=next_parser_model_name,
+                agent_model_provider=next_agent_model_provider,
+                agent_model_name=next_agent_model_name,
+                ollama_url=next_ollama_url,
+            )
         for provider, labels in payload.credentials.items():
             for label, raw_value in labels.items():
                 if not raw_value.strip():
@@ -153,6 +177,7 @@ class ChatSettingsService:
             ollama_url=next_ollama_url,
             openai_base_url=next_openai_base_url,
             google_base_url=next_google_base_url,
+            deepseek_base_url=next_deepseek_base_url,
         )
         return self.get_settings()
 

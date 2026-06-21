@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-06
+Last updated: 2026-06-19
 
 ## Layering
 
@@ -19,13 +19,13 @@ AEGIS uses these main backend layers:
 - Repositories remain the persistence boundary.
 - `app/server/repositories/database/contracts.py` defines the shared database backend contract.
 - `domain/` holds request, response, and domain contracts.
-- Runtime job state is owned by `app/server/services/job_state.py`.
+- Runtime job state is owned by `app/server/services/jobs.py`.
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
 
 ## Representative Request Flow
 
-- endpoint (`chat.py` or `search.py`)
+- endpoint (`chat.py` or `geospatial.py`)
 - composition/orchestration service
 - execution and provider services
 - repository or database operations
@@ -59,18 +59,28 @@ Geospatial API services are composed during application startup and accessed thr
 
 Provider metadata manifests are registered only when a backend adapter exists. Basemap tile URLs stay manifest-backed and are served through proxy paths where applicable.
 
+Live provider-native layer discovery flows through:
+
+- `geospatial.py`
+- `GeospatialApiService`
+- `ProviderRegistry`
+- provider adapter such as `NASAGIBSProvider`
+- XML capability parsing and normalized provider layer descriptors
+
+Renderable map overlays are produced by `RenderDescriptorService` and then placed in `MapSession.overlays`. The frontend should consume those descriptors directly rather than constructing provider-specific WMS or WMTS defaults.
+
 ## Async And Threaded Behavior
 
 ### Async
 
 - FastAPI route handlers are predominantly `async`.
 - `POST /api/chat/stream` uses streaming NDJSON.
-- Search jobs can run asynchronously through `/api/maps/jobs`.
+- Chat jobs run asynchronously through `/api/chat/jobs` and are observed through `/api/jobs/{job_id}`.
 
 ### Threaded
 
 - Long-running chat and map jobs use one in-memory `BackgroundJobService` worker and a shared job/event contract.
-- `MapSearchExecutionService.start_search_job` bridges async work inside job threads with `asyncio.run(...)`.
+- Map job execution uses the current location-search orchestrator from the shared background job worker.
 - Cancellation is cooperative through `stop_requested`.
 
 ## Runtime Constraints

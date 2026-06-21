@@ -130,6 +130,67 @@ class GeospatialProviderPayloadResponse(BaseModel):
     stale: bool = False
 
 ###############################################################################
+class GeospatialLayerRenderDescriptor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    layer_id: str
+    rendering_mode: str
+    source_protocol: str
+    url: str | None = None
+    tile_url_template: str | None = None
+    crs: str | None = None
+    format: str | None = None
+    style: str | None = None
+    time: str | None = None
+    default_time: str | None = None
+    tile_matrix_set: str | None = None
+    tile_size: int | None = None
+    min_zoom: int | None = None
+    max_zoom: int | None = None
+    attribution: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+###############################################################################
+class GeospatialProviderLayerDescriptor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    layer_id: str
+    title: str
+    abstract: str | None = None
+    rendering_mode: str
+    source_protocol: str
+    data_format: str
+    geometry_type: str
+    queryable: bool = False
+    crs: list[str] = Field(default_factory=list)
+    formats: list[str] = Field(default_factory=list)
+    styles: list[str] = Field(default_factory=list)
+    time_extent: str | None = None
+    default_time: str | None = None
+    tile_matrix_sets: list[str] = Field(default_factory=list)
+    render: GeospatialLayerRenderDescriptor | None = None
+    attribution: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+###############################################################################
+class GeospatialProviderLayersResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    layers: list[GeospatialProviderLayerDescriptor]
+    warnings: list[str] = Field(default_factory=list)
+
+###############################################################################
+class GeospatialProviderLayerResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    layer: GeospatialProviderLayerDescriptor
+    warnings: list[str] = Field(default_factory=list)
+
+###############################################################################
 class GeospatialCameraDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -403,13 +464,6 @@ class MapSession(BaseModel):
     overlays: list[dict[str, object]] = Field(default_factory=list)
     compliance_warnings: list[str] = Field(default_factory=list)
 
-
-###############################################################################
-class SearchByLocationResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    status_message: str
-    map_session: MapSession
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):

@@ -8,8 +8,9 @@ from server.domain.chat import OllamaRefreshResponse
 class _ModelLibraryService:
 
     # -------------------------------------------------------------------------
-    def list_models(self, *, ollama_url: str):
+    def list_models(self, *, ollama_url: str, cloud_provider: str | None = None):
         assert ollama_url == "http://ollama.test"
+        assert cloud_provider is None
         return {
             "cloud": [
                 {
@@ -29,9 +30,9 @@ class _ModelLibraryService:
                     "name": "llama",
                     "description": "local",
                     "provider": "ollama",
-                    "capabilities": ["chat"],
+                    "capabilities": ["chat", "structured_output"],
                     "supports_tools": False,
-                    "supports_structured_output": False,
+                    "supports_structured_output": True,
                     "tool_support_source": "ollama_probe",
                     "metadata": {},
                 }
@@ -62,9 +63,9 @@ class _MaintenanceService:
                     "name": "llama",
                     "description": "local",
                     "provider": "ollama",
-                    "capabilities": ["chat", "tools"],
+                    "capabilities": ["chat", "structured_output", "tools"],
                     "supports_tools": True,
-                    "supports_structured_output": False,
+                    "supports_structured_output": True,
                     "tool_support_source": "ollama_probe",
                     "metadata": {},
                 }
@@ -85,6 +86,7 @@ def test_models_endpoint_returns_capability_metadata() -> None:
     assert response.cloud[0].supports_tools is True
     assert response.cloud[0].supports_structured_output is True
     assert response.local[0].supports_tools is False
+    assert response.local[0].supports_structured_output is True
     assert response.local[0].tool_support_source == "ollama_probe"
 
 

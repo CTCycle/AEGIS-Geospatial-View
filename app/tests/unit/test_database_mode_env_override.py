@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from server.common.paths import DATABASE_FILE_PATH
+from server.common.paths import DATABASE_FILE_PATH, RUNTIME_DATA_PATH, resolve_database_file_path
 from server.configurations import build_database_settings
 from server.configurations.environment import (
     ensure_environment_loaded,
@@ -24,6 +24,7 @@ def test_database_settings_uses_constants_database_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for key in (
+        "AEGIS_RUNTIME_DATA_DIR",
         "EMBEDDED_DATABASE",
         "DATABASE_URL",
         "DATABASE_ENGINE",
@@ -51,6 +52,17 @@ def test_database_settings_reads_insert_batch_size_from_env_only(
     monkeypatch.setenv("DATABASE_INSERT_BATCH_SIZE", "777")
     settings = build_database_settings()
     assert settings.insert_batch_size == 777
+
+
+###############################################################################
+def test_database_settings_reads_runtime_directory_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AEGIS_RUNTIME_DATA_DIR", str(tmp_path))
+
+    settings = build_database_settings()
+
+    assert settings.database_path == str(tmp_path / "database.db")
 
 
 ###############################################################################
@@ -95,6 +107,7 @@ def test_database_settings_ignores_json_database_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for key in (
+        "AEGIS_RUNTIME_DATA_DIR",
         "EMBEDDED_DATABASE",
         "DATABASE_URL",
         "DATABASE_ENGINE",
@@ -124,6 +137,12 @@ def test_database_settings_ignores_json_database_keys(
     assert settings.ssl_ca is None
     assert settings.connect_timeout > 0
     assert settings.insert_batch_size > 0
+
+
+###############################################################################
+def test_database_path_defaults_to_runtime_data_root() -> None:
+    assert DATABASE_FILE_PATH == RUNTIME_DATA_PATH / "database.db"
+    assert resolve_database_file_path() == RUNTIME_DATA_PATH / "database.db"
 
 
 ###############################################################################

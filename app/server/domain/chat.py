@@ -86,7 +86,6 @@ class ChatStreamEvent(BaseModel):
         "tool_call_started",
         "tool_call_completed",
         "map_session_created",
-        "assistant_delta",
         "final",
         "error",
     ]
@@ -122,6 +121,7 @@ class ModelSettingsResponse(BaseModel):
     ollama_url: str
     openai_base_url: str | None = None
     google_base_url: str | None = None
+    deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
     credential_health: dict[str, dict[str, str]] = Field(default_factory=dict)
 
@@ -139,10 +139,13 @@ class ModelSettingsUpdateRequest(BaseModel):
     ollama_url: str | None = None
     openai_base_url: str | None = None
     google_base_url: str | None = None
+    deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, str]] = Field(default_factory=dict)
 
     # -------------------------------------------------------------------------
-    @field_validator("ollama_url", "openai_base_url", "google_base_url")
+    @field_validator(
+        "ollama_url", "openai_base_url", "google_base_url", "deepseek_base_url"
+    )
     @classmethod
     def validate_base_url(cls, value: str | None) -> str | None:
         if value is None:

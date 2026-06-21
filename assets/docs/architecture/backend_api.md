@@ -1,27 +1,10 @@
 # Backend API
 
-Last updated: 2026-06-07
+Last updated: 2026-06-19
 
 ## Mounting
 
 All routers are mounted with `/api` prefix in `app/server/app.py`.
-
-## Search Routes
-
-Defined in `app/server/api/search.py`:
-
-- `GET /api/maps/catalog`
-  Returns `GeospatialCatalogResponse`.
-- `GET /api/maps/basemaps/osm/{z}/{x}/{y}.png`
-  Proxies OSM basemap tiles.
-- `POST /api/maps/search`
-  Runs synchronous location search from `LocationSearchRequest` to `SearchByLocationResponse`.
-- `POST /api/maps/jobs`
-  Starts asynchronous map fetch and returns `JobStartResponse` with HTTP 202.
-- `GET /api/maps/jobs/{job_id}`
-  Wrapper around the canonical job status response.
-- `DELETE /api/maps/jobs/{job_id}`
-  Wrapper around the canonical cancel operation.
 
 ## Job Routes
 
@@ -48,6 +31,12 @@ Defined in `app/server/api/geospatial.py`:
   Returns `GeospatialProviderPayloadResponse`.
 - `GET /api/geospatial/layers/{layer_id}/geojson`
   Returns raw GeoJSON `FeatureCollection` for map rendering.
+- `GET /api/geospatial/providers/{provider_id}/layers`
+  Returns normalized live provider-native layer descriptors. NASA GIBS uses WMS/WMTS XML capabilities and does not expose raw XML to the frontend.
+- `GET /api/geospatial/providers/{provider_id}/layers/{layer_id}`
+  Returns one normalized live provider layer descriptor with render metadata when available.
+- `GET /api/geospatial/tiles/{capability_id}/{z}/{x}/{y}.png`
+  Proxies manifest-backed raster tiles.
 - `GET /api/geospatial/proxy/tomtom/{kind}/{z}/{x}/{y}.png`
   Proxies TomTom tiles.
 - `GET /api/geospatial/cameras`
@@ -77,6 +66,7 @@ Defined in `app/server/api/chat.py`:
   Streams NDJSON chat events.
 - `GET /api/chat/models`
   Returns available cloud and local models.
+  Optional query: `provider=deepseek` to fetch the live DeepSeek model catalog using the saved DeepSeek API key.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PUT /api/chat/settings`
@@ -139,7 +129,4 @@ Supported event names:
 - `final`
 - `error`
 
-Notes:
-
-- `assistant_delta` remains in the schema for forward compatibility, but current backend behavior does not emit fake token deltas.
-- `final` carries the full serialized `ChatTurnResponse`, including `operation`.
+`final` carries the full serialized `ChatTurnResponse`, including `operation`.

@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-06-02
+Last updated: 2026-06-12
 
 ## Reusable Components
 
@@ -8,6 +8,7 @@ Last updated: 2026-06-02
 - `model-role-actions.component.*`
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
+- `settings-api-key-field.component.*`
 - `model-stats-panel.component.*`
 
 ## Interaction States

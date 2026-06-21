@@ -31,7 +31,7 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `osm_default` | general street and place context | public |
 | `osm_dark` | high-contrast dark basemap | public |
 | `osm_terrain` | terrain-oriented context | public |
-| `gibs_satellite` | satellite imagery context | public |
+| `esri_world_imagery` | satellite imagery context | public |
 | `geoapify_osm` | polished OSM Bright variant | credentialed |
 | `tomtom_basic` | optional road and transport basemap | credentialed |
 

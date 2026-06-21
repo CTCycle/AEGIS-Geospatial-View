@@ -44,9 +44,16 @@
     "requires_key": false,
     "official_docs_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
     "source_protocol": "provider-api",
-    "data_format": "JSON/API",
+    "data_format": "XML capabilities",
     "geometry_type": "not-applicable",
-    "queryable": false,
+    "queryable": true,
+    "live_layers_supported": true,
+    "live_capabilities_protocols": [
+      "wmts",
+      "wms"
+    ],
+    "preferred_rendering_mode": "wmts",
+    "auth_required": false,
     "vectorizable": false,
     "endpoint_health": "validated-by-sampled-health-check",
     "auth_mode": "none",

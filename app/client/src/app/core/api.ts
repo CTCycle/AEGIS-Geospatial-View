@@ -9,9 +9,9 @@ import {
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
+  API_GEOSPATIAL_PROVIDER_LAYER_PATH,
+  API_GEOSPATIAL_PROVIDER_LAYERS_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
-  API_MAPS_CATALOG_PATH,
-  API_MAPS_SEARCH_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
   API_OLLAMA_REFRESH_PATH,
@@ -22,8 +22,9 @@ import {
   parseCatalogResponse,
   parseChatTurnResponse,
   parseGeospatialProviderAccountSetups,
+  parseGeospatialProviderLayer,
+  parseGeospatialProviderLayers,
   parseModelSettingsResponse,
-  parseSearchResponse,
 } from './api-parsers';
 import {
   CatalogResponse,
@@ -33,13 +34,13 @@ import {
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
+  GeospatialProviderLayerResponse,
+  GeospatialProviderLayersResponse,
   GeospatialProviderPayload,
-  LocationSearchRequest,
   ModelCardDescriptor,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
-  SearchResponse,
 } from './types';
 import { isRecord } from './type-guards';
 
@@ -105,19 +106,8 @@ export const buildApiError = async (response: Response): Promise<ApiRequestError
   });
 };
 
-export const searchLocation = async (payload: LocationSearchRequest): Promise<SearchResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_SEARCH_PATH}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-  return parseSearchResponse(data);
-};
-
 export const fetchCatalog = async (): Promise<CatalogResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_MAPS_CATALOG_PATH}`, {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAPABILITIES_PATH}`, {
     method: 'GET',
   });
   return parseCatalogResponse(data);
@@ -153,6 +143,35 @@ export const fetchGeospatialLayerFeatures = async (
     { method: 'GET' },
   );
   return asProviderPayload(data);
+};
+
+export const fetchProviderLayers = async (
+  providerId: string,
+  options: { query?: string | null; limit?: number; refresh?: boolean } = {},
+): Promise<GeospatialProviderLayersResponse> => {
+  const suffix = buildQuerySuffix({
+    query: options.query || undefined,
+    limit: options.limit,
+    refresh: options.refresh,
+  });
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_LAYERS_PATH(providerId)}${suffix}`,
+    { method: 'GET' },
+  );
+  return parseGeospatialProviderLayers(data);
+};
+
+export const fetchProviderLayer = async (
+  providerId: string,
+  layerId: string,
+  options: { refresh?: boolean } = {},
+): Promise<GeospatialProviderLayerResponse> => {
+  const suffix = buildQuerySuffix({ refresh: options.refresh });
+  const data = await executeApiRequest(
+    `${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_LAYER_PATH(providerId, layerId)}${suffix}`,
+    { method: 'GET' },
+  );
+  return parseGeospatialProviderLayer(data);
 };
 
 export const fetchGeospatialCameras = async (
@@ -280,8 +299,11 @@ export const streamChatTurn = async (
   }
 };
 
-export const fetchChatModels = async (): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}`, {
+export const fetchChatModels = async (
+  provider?: 'deepseek',
+): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
+  const suffix = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}${suffix}`, {
     method: 'GET',
     cache: 'no-store',
   });

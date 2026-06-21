@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from server.repositories.catalog.reference_loader import (
+from server.services.catalog.loader import (
     get_catalog_root,
     load_reference_catalog,
 )

@@ -4,13 +4,20 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ModelCardComponent } from '../components/model-card.component';
+import { SettingsApiKeyFieldComponent } from '../components/settings-api-key-field.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
 import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
-import { buildSettingsUpdateBase } from '../core/chat-settings-update';
+import {
+  ApiKeyValidationErrors,
+  CloudCredentialProvider,
+  ModelProviderFilter,
+  buildSettingsUpdateBase,
+} from '../core/chat-settings-update';
+import { CredentialSettingsService } from '../core/credential-settings.service';
 import {
   ModelRole,
   SelectedModelStat,
@@ -37,6 +44,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
     CommonModule,
     FormsModule,
     ModelCardComponent,
+    SettingsApiKeyFieldComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
     ModelStatsPanelComponent,
@@ -59,6 +67,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     ollama_url: 'http://localhost:11434',
     openai_base_url: null,
     google_base_url: null,
+    deepseek_base_url: null,
     credentials: {},
     credential_health: {},
   };
@@ -76,12 +85,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   isOllamaModalOpen = false;
   openaiKey = '';
   googleKey = '';
+  deepseekKey = '';
   ollamaUrlDraft = 'http://localhost:11434';
   keysModalStatusText = '';
   ollamaModalStatusText = '';
-  keyValidationErrors: { openai?: string; google?: string } = {};
+  keyValidationErrors: ApiKeyValidationErrors = {};
 
-  providerFilter: 'all' | 'ollama' | 'openai' | 'google' = 'all';
+  providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
 
   constructor(
@@ -89,6 +99,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly appStateStore: AppStateStoreService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
+    private readonly credentialSettingsService: CredentialSettingsService,
     private readonly router: Router,
     private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
@@ -168,6 +179,15 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (providerKey === 'ollama-library') {
       return 'ollama · available to pull';
     }
+    if (providerKey === 'openai') {
+      return 'OpenAI';
+    }
+    if (providerKey === 'google') {
+      return 'Google';
+    }
+    if (providerKey === 'deepseek') {
+      return 'DeepSeek';
+    }
     return providerKey;
   }
 
@@ -213,10 +233,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.syncState();
   }
 
-  setProviderFilter(filter: 'all' | 'ollama' | 'openai' | 'google'): void {
+  async setProviderFilter(filter: ModelProviderFilter): Promise<void> {
     this.providerFilter = filter;
     this.resetModelGridScroll();
     this.syncState();
+    await this.ensureProviderModelsLoaded(filter);
   }
 
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
@@ -247,22 +268,27 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async saveKeys(): Promise<void> {
     this.keyValidationErrors = this.validateKeyInputs();
-    if (this.keyValidationErrors.openai || this.keyValidationErrors.google) {
+    if (this.keyValidationErrors.openai || this.keyValidationErrors.google || this.keyValidationErrors.deepseek) {
       this.keysModalStatusText = 'Fix the highlighted API key fields before saving.';
       return;
     }
 
     try {
-      const updated = await this.apiClient.updateChatSettings({
-        ...this.settingsUpdateBase(),
-        credentials: {
-          openai: this.openaiKey.trim() ? { api_key: this.openaiKey.trim() } : {},
-          google: this.googleKey.trim() ? { api_key: this.googleKey.trim() } : {},
-        },
+      const updated = await this.credentialSettingsService.saveCloudCredentials(this.settings, {
+        openai: this.openaiKey,
+        google: this.googleKey,
+        deepseek: this.deepseekKey,
       });
       this.settings = updated;
       this.openaiKey = '';
       this.googleKey = '';
+      this.deepseekKey = '';
+      await this.ensureProviderModelsLoaded(
+        this.providerFilter === 'deepseek' || this.hasSelectedProvider(updated, 'deepseek')
+          ? 'deepseek'
+          : 'all',
+        true,
+      );
       this.statusText = 'API keys saved';
       this.keysModalStatusText = 'API keys saved';
       this.isKeysModalOpen = false;
@@ -373,12 +399,20 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return Boolean(this.settings.credentials['google']?.['api_key']);
   }
 
+  deepSeekConfigured(): boolean {
+    return Boolean(this.settings.credentials['deepseek']?.['api_key']);
+  }
+
   openAiCredentialHealth(): string | null {
     return this.credentialHealth('openai');
   }
 
   googleCredentialHealth(): string | null {
     return this.credentialHealth('google');
+  }
+
+  deepSeekCredentialHealth(): string | null {
+    return this.credentialHealth('deepseek');
   }
 
   requiresPull(model: ModelCardDescriptor): boolean {
@@ -389,7 +423,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return modelDisplayDescription(model);
   }
 
-  private credentialHealth(provider: 'openai' | 'google'): string | null {
+  private credentialHealth(provider: CloudCredentialProvider): string | null {
     const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
     if (!configured) {
       return null;
@@ -397,12 +431,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.settings.credential_health?.[provider]?.['api_key'] ?? 'unknown';
   }
 
-  private validateKeyInputs(): { openai?: string; google?: string } {
-    const errors: { openai?: string; google?: string } = {};
+  private validateKeyInputs(): ApiKeyValidationErrors {
+    const errors: ApiKeyValidationErrors = {};
     const openAiValue = this.openaiKey.trim();
     const googleValue = this.googleKey.trim();
+    const deepSeekValue = this.deepseekKey.trim();
     const openAiPattern = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
     const googlePattern = /^AIza[A-Za-z0-9_-]{20,}$/;
+    const deepSeekPattern = /^sk-[A-Za-z0-9][A-Za-z0-9_-]{10,}$/;
 
     if (openAiValue && !openAiPattern.test(openAiValue)) {
       errors.openai = 'OpenAI key must start with "sk-" and include a valid key body.';
@@ -410,6 +446,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (googleValue && !googlePattern.test(googleValue)) {
       errors.google = 'Google key must start with "AIza" and include a valid key body.';
+    }
+
+    if (deepSeekValue && !deepSeekPattern.test(deepSeekValue)) {
+      errors.deepseek = 'DeepSeek key must start with "sk-" and include a valid key body.';
     }
 
     return errors;
@@ -420,10 +460,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.statusText = 'Loading model settings';
     this.syncState();
     try {
-      const [nextSettings, modelLibrary] = await Promise.all([
-        this.apiClient.fetchChatSettings(),
-        this.apiClient.fetchChatModels(),
-      ]);
+      const nextSettings = await this.apiClient.fetchChatSettings();
+      let modelLibrary: { cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] };
+      try {
+        modelLibrary = await this.apiClient.fetchChatModels(
+          this.shouldLoadDeepSeekModels(nextSettings) ? 'deepseek' : undefined,
+        );
+      } catch (error: unknown) {
+        modelLibrary = await this.apiClient.fetchChatModels();
+        this.statusText = this.userFacingErrorService.toUserFacingError(
+          error,
+          'Could not load DeepSeek models right now.',
+        );
+      }
       if (this.isDestroyed) {
         return;
       }
@@ -432,7 +481,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.cloudModels = modelLibrary.cloud;
       this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
-      this.statusText = 'Ready';
+      if (this.statusText === 'Loading model settings') {
+        this.statusText = 'Ready';
+      }
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
@@ -447,6 +498,56 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.isLoadingModels = false;
       this.changeDetectorRef.detectChanges();
+    }
+  }
+
+  private shouldLoadDeepSeekModels(settings: ModelSettingsResponse): boolean {
+    return this.providerFilter === 'deepseek'
+      || this.hasSelectedProvider(settings, 'deepseek');
+  }
+
+  private hasSelectedProvider(settings: ModelSettingsResponse, provider: string): boolean {
+    return settings.chat_model_provider === provider
+      || settings.parser_model_provider === provider
+      || settings.agent_model_provider === provider;
+  }
+
+  private async ensureProviderModelsLoaded(
+    provider: ModelProviderFilter,
+    forceRefresh = false,
+  ): Promise<void> {
+    if (provider !== 'deepseek') {
+      return;
+    }
+    if (!this.deepSeekConfigured()) {
+      this.statusText = 'Add a DeepSeek API key to load DeepSeek models.';
+      this.syncState();
+      return;
+    }
+    if (!forceRefresh && this.cloudModels.some((model) => model.provider === 'deepseek')) {
+      return;
+    }
+    try {
+      const modelLibrary = await this.apiClient.fetchChatModels('deepseek');
+      if (this.isDestroyed) {
+        return;
+      }
+      this.cloudModels = mergeModelCards(
+        this.cloudModels.filter((model) => model.provider !== 'deepseek'),
+        modelLibrary.cloud,
+      );
+      this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
+      this.statusText = 'DeepSeek models loaded';
+      this.syncState();
+    } catch (error: unknown) {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.statusText = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not load DeepSeek models right now.',
+      );
+      this.syncState();
     }
   }
 

@@ -79,7 +79,7 @@ def _setup_stub_harness(
         lambda route: _json_ok(route, active_models),
     )
     page.route(
-        re.compile(r".*/api/maps/catalog.*"),
+        re.compile(r".*/api/geospatial/capabilities.*"),
         lambda route: _json_ok(
             route,
             {
@@ -102,7 +102,7 @@ def _setup_stub_harness(
     )
     page.route(re.compile(r".*/api/chat/turn.*"), handle_turn)
     page.route(
-        re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"),
+        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"),
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),
