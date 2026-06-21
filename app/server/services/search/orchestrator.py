@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 from server.domain.geographics import LocationSearchRequest, MapSession
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.geospatial.rainviewer import (
     RainViewerRequestError,
     RainViewerService,
@@ -23,14 +24,19 @@ class LocationSearchOrchestrator:
         *,
         capability_registry: CapabilityRegistry | None = None,
         rainviewer_service: RainViewerService | None = None,
+        render_descriptor_service: RenderDescriptorService | None = None,
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.rainviewer_service = rainviewer_service or RainViewerService()
+        self.render_descriptor_service = render_descriptor_service or RenderDescriptorService(
+            capability_registry=self.capability_registry,
+            rainviewer_service=self.rainviewer_service,
+        )
 
     # -------------------------------------------------------------------------
     async def execute(self, payload: LocationSearchRequest) -> MapSession:
         self.capability_registry.load_capabilities()
-        basemap = await self._build_basemap_descriptor(payload.basemap_id)
+        basemap = await self.render_descriptor_service.build_basemap_descriptor(payload.basemap_id)
         overlays: list[dict[str, object]] = []
         warnings: list[str] = []
         if (
@@ -41,14 +47,17 @@ class LocationSearchOrchestrator:
             warnings.append(
                 f"{payload.basemap_id}: provider API key is required; falling back to osm_default."
             )
-            basemap = await self._build_basemap_descriptor("osm_default")
+            basemap = await self.render_descriptor_service.build_basemap_descriptor("osm_default")
         effective_basemap_id = (
             str(basemap.get("id"))
             if isinstance(basemap, dict) and basemap.get("id")
             else payload.basemap_id
         )
         for overlay_id in payload.overlay_ids:
-            overlay_result = await self._build_overlay_descriptor(overlay_id, payload=payload)
+            overlay_result = await self.render_descriptor_service.build_overlay_descriptor(
+                overlay_id,
+                request=payload,
+            )
             if overlay_result is None:
                 warnings.append(f"Overlay '{overlay_id}' is not available in the capability catalog.")
                 continue

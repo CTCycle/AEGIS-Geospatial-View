@@ -1,12 +1,17 @@
 import {
   CatalogResponse,
   ChatTurnResponse,
+  GeospatialLayerRenderDescriptor,
   GeospatialProviderAccountSetup,
   GeospatialProviderAccountSetupListResponse,
+  GeospatialProviderLayerDescriptor,
+  GeospatialProviderLayerResponse,
+  GeospatialProviderLayersResponse,
   JsonValue,
+  MapOverlayEntry,
+  MapSession,
   ModelCardDescriptor,
   ModelSettingsResponse,
-  SearchResponse,
 } from './types';
 import { isRecord, isStringArray } from './type-guards';
 
@@ -208,6 +213,181 @@ export const parseGeospatialProviderAccountSetups = (
   return { providers };
 };
 
+const stringOrNull = (value: unknown): string | null => (
+  typeof value === 'string' && value.trim() ? value : null
+);
+
+const numberOrNull = (value: unknown): number | null => (
+  typeof value === 'number' && Number.isFinite(value) ? value : null
+);
+
+export const normalizeLayerRenderDescriptor = (
+  value: unknown,
+): GeospatialLayerRenderDescriptor | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const provider = stringOrNull(value.provider);
+  const layerId = stringOrNull(value.layer_id);
+  const renderingMode = stringOrNull(value.rendering_mode);
+  const sourceProtocol = stringOrNull(value.source_protocol);
+  if (!provider || !layerId || !renderingMode || !sourceProtocol) {
+    return null;
+  }
+  return {
+    provider,
+    layer_id: layerId,
+    rendering_mode: renderingMode,
+    source_protocol: sourceProtocol,
+    url: stringOrNull(value.url),
+    tile_url_template: stringOrNull(value.tile_url_template),
+    crs: stringOrNull(value.crs),
+    format: stringOrNull(value.format),
+    style: stringOrNull(value.style),
+    time: stringOrNull(value.time),
+    default_time: stringOrNull(value.default_time),
+    tile_matrix_set: stringOrNull(value.tile_matrix_set),
+    tile_size: numberOrNull(value.tile_size),
+    min_zoom: numberOrNull(value.min_zoom),
+    max_zoom: numberOrNull(value.max_zoom),
+    attribution: isStringArray(value.attribution) ? value.attribution : [],
+    warnings: isStringArray(value.warnings) ? value.warnings : [],
+  };
+};
+
+export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null => {
+  if (!isRecord(value) || typeof value.id !== 'string') {
+    return null;
+  }
+  const render = normalizeLayerRenderDescriptor(value.render);
+  return {
+    id: String(value.id),
+    label: String(value.label ?? value.id),
+    provider: String(value.provider ?? render?.provider ?? 'unknown'),
+    type: String(value.type ?? value.rendering_mode ?? render?.rendering_mode ?? 'metadata-only'),
+    rendering_mode: typeof value.rendering_mode === 'string' ? value.rendering_mode : render?.rendering_mode,
+    default_opacity: typeof value.default_opacity === 'number' ? value.default_opacity : undefined,
+    url: stringOrNull(value.url ?? render?.url),
+    tile_url_template: stringOrNull(value.tile_url_template ?? render?.tile_url_template) ?? undefined,
+    layers: stringOrNull(value.layers) ?? undefined,
+    layer_id: stringOrNull(value.layer_id ?? render?.layer_id) ?? undefined,
+    source_layer: stringOrNull(value.source_layer) ?? undefined,
+    tile_matrix_set: stringOrNull(value.tile_matrix_set ?? render?.tile_matrix_set) ?? undefined,
+    tile_size: numberOrNull(value.tile_size ?? render?.tile_size) ?? undefined,
+    minzoom: numberOrNull(value.minzoom ?? render?.min_zoom) ?? undefined,
+    maxzoom: numberOrNull(value.maxzoom ?? render?.max_zoom) ?? undefined,
+    render_params: isRecord(value.render_params) ? value.render_params as Record<string, JsonValue> : undefined,
+    bounds: Array.isArray(value.bounds) && value.bounds.length === 4
+      ? value.bounds as [number, number, number, number]
+      : undefined,
+    attribution: stringOrNull(value.attribution) ?? render?.attribution?.join('; '),
+    source_protocol: stringOrNull(value.source_protocol ?? render?.source_protocol) ?? undefined,
+    data_format: stringOrNull(value.data_format) ?? undefined,
+    geometry_type: stringOrNull(value.geometry_type) ?? undefined,
+    crs: stringOrNull(value.crs ?? render?.crs),
+    format: stringOrNull(value.format ?? render?.format),
+    style: stringOrNull(value.style ?? render?.style),
+    time: stringOrNull(value.time ?? render?.time),
+    default_time: stringOrNull(value.default_time ?? render?.default_time),
+    warnings: isStringArray(value.warnings) ? value.warnings : render?.warnings,
+    render,
+  };
+};
+
+export const normalizeMapSession = (value: unknown): MapSession | null => {
+  if (!isRecord(value) || typeof value.session_id !== 'string' || !isRecord(value.resolved_location)) {
+    return null;
+  }
+  const overlays = Array.isArray(value.overlays)
+    ? value.overlays.map(normalizeMapOverlayEntry).filter((item): item is MapOverlayEntry => item !== null)
+    : [];
+  return {
+    ...value,
+    session_id: String(value.session_id),
+    resolved_location: value.resolved_location as unknown as MapSession['resolved_location'],
+    basemap_id: String(value.basemap_id ?? ''),
+    overlay_ids: isStringArray(value.overlay_ids) ? value.overlay_ids : overlays.map((overlay) => overlay.id),
+    viewport: isRecord(value.viewport) ? value.viewport as unknown as MapSession['viewport'] : {
+      center_latitude: 0,
+      center_longitude: 0,
+      radius_m: 2500,
+    },
+    payload: isRecord(value.payload) ? value.payload as Record<string, JsonValue> : {},
+    center: isRecord(value.center) ? value.center as MapSession['center'] : undefined,
+    bounds: Array.isArray(value.bounds) ? value.bounds as number[] : undefined,
+    basemap: isRecord(value.basemap) ? value.basemap as MapSession['basemap'] : undefined,
+    overlays,
+    compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
+  };
+};
+
+const parseProviderLayerDescriptor = (value: unknown): GeospatialProviderLayerDescriptor | null => {
+  if (!isRecord(value) || typeof value.layer_id !== 'string') {
+    return null;
+  }
+  return {
+    provider: String(value.provider ?? ''),
+    layer_id: String(value.layer_id),
+    title: String(value.title ?? value.layer_id),
+    abstract: stringOrNull(value.abstract),
+    rendering_mode: String(value.rendering_mode ?? 'metadata-only'),
+    source_protocol: String(value.source_protocol ?? 'provider-api'),
+    data_format: String(value.data_format ?? ''),
+    geometry_type: String(value.geometry_type ?? ''),
+    queryable: Boolean(value.queryable),
+    crs: isStringArray(value.crs) ? value.crs : [],
+    formats: isStringArray(value.formats) ? value.formats : [],
+    styles: isStringArray(value.styles) ? value.styles : [],
+    time_extent: stringOrNull(value.time_extent),
+    default_time: stringOrNull(value.default_time),
+    tile_matrix_sets: isStringArray(value.tile_matrix_sets) ? value.tile_matrix_sets : [],
+    render: normalizeLayerRenderDescriptor(value.render),
+    attribution: isStringArray(value.attribution) ? value.attribution : [],
+    warnings: isStringArray(value.warnings) ? value.warnings : [],
+  };
+};
+
+export const parseGeospatialProviderLayers = (
+  value: unknown,
+): GeospatialProviderLayersResponse => {
+  const record = isRecord(value) ? value : {};
+  return {
+    provider: String(record.provider ?? ''),
+    layers: Array.isArray(record.layers)
+      ? record.layers.map(parseProviderLayerDescriptor).filter((item): item is GeospatialProviderLayerDescriptor => item !== null)
+      : [],
+    warnings: isStringArray(record.warnings) ? record.warnings : [],
+  };
+};
+
+export const parseGeospatialProviderLayer = (
+  value: unknown,
+): GeospatialProviderLayerResponse => {
+  const record = isRecord(value) ? value : {};
+  const layer = parseProviderLayerDescriptor(record.layer);
+  return {
+    provider: String(record.provider ?? layer?.provider ?? ''),
+    layer: layer ?? {
+      provider: String(record.provider ?? ''),
+      layer_id: '',
+      title: '',
+      rendering_mode: 'metadata-only',
+      source_protocol: 'provider-api',
+      data_format: '',
+      geometry_type: '',
+      queryable: false,
+      crs: [],
+      formats: [],
+      styles: [],
+      tile_matrix_sets: [],
+      render: null,
+      attribution: [],
+      warnings: ['Provider layer response was empty or malformed.'],
+    },
+    warnings: isStringArray(record.warnings) ? record.warnings : [],
+  };
+};
+
 export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usage'] => {
   if (!isRecord(input)) {
     return undefined;
@@ -270,25 +450,6 @@ export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
     });
 };
 
-export const parseSearchResponse = (value: unknown): SearchResponse => {
-  if (!isRecord(value)) {
-    throw new Error('Unexpected search response format');
-  }
-
-  const statusMessage = value.status_message;
-  if (typeof statusMessage !== 'string') {
-    throw new Error('Search response is missing status_message');
-  }
-  if (!isRecord(value.map_session)) {
-    throw new Error('Search response is missing map_session');
-  }
-
-  return {
-    status_message: statusMessage,
-    map_session: value.map_session as unknown as SearchResponse['map_session'],
-  };
-};
-
 export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
@@ -326,6 +487,7 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     ollama_url: String(value.ollama_url ?? 'http://localhost:11434'),
     openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
     google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
+    deepseek_base_url: typeof value.deepseek_base_url === 'string' ? value.deepseek_base_url : null,
     credentials: parseBooleanCredentialMap(value.credentials),
     credential_health: isRecord(value.credential_health)
       ? value.credential_health as ModelSettingsResponse['credential_health']
@@ -337,6 +499,14 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected chat response format');
   }
+  const operation = isRecord(value.operation) ? { ...value.operation } as Record<string, unknown> : undefined;
+  if (operation && isRecord(operation.map_session)) {
+    operation.map_session = normalizeMapSession(operation.map_session);
+  }
+  const toolPayload = isRecord(value.tool_payload) ? { ...value.tool_payload } as Record<string, unknown> : undefined;
+  if (toolPayload && isRecord(toolPayload.map_session)) {
+    toolPayload.map_session = normalizeMapSession(toolPayload.map_session);
+  }
 
   return {
     request_id: requireString(value.request_id, 'request_id'),
@@ -344,9 +514,9 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     assistant_message: requireString(value.assistant_message, 'assistant_message'),
     turn_contract: requireRecord(value.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
     decision: requireRecord(value.decision, 'decision') as unknown as ChatTurnResponse['decision'],
-    operation: isRecord(value.operation) ? value.operation as unknown as ChatTurnResponse['operation'] : undefined,
-    tool_payload: isRecord(value.tool_payload) ? value.tool_payload as ChatTurnResponse['tool_payload'] : undefined,
-    map_session: isRecord(value.map_session) ? value.map_session as unknown as ChatTurnResponse['map_session'] : undefined,
+    operation: operation as unknown as ChatTurnResponse['operation'],
+    tool_payload: toolPayload as ChatTurnResponse['tool_payload'],
+    map_session: normalizeMapSession(value.map_session),
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
     context_usage: parseContextUsage(value.context_usage),
   };

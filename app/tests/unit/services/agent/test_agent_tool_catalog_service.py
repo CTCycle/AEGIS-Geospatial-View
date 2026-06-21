@@ -307,6 +307,7 @@ def test_catalog_builds_stable_native_tools() -> None:
         "list_geospatial_capabilities",
         "describe_geospatial_capability",
         "execute_geospatial_capability",
+        "fetch_geospatial_provider_layers",
     ]
 
 
@@ -411,4 +412,5 @@ def test_catalog_tools_register_with_tool_registry() -> None:
     registry = ToolRegistry()
     _service().register_with(registry)
     assert registry.has_native_tool("list_geospatial_capabilities")
-    assert len(registry.list_native_tools()) == 3
+    assert registry.has_native_tool("fetch_geospatial_provider_layers")
+    assert len(registry.list_native_tools()) == 4

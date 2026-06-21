@@ -2,13 +2,11 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { DEFAULT_OVERLAY_OPACITY } from '../core/constants';
 import {
-  MapSession,
+  MapOverlayEntry,
   OverlayOpacityChange,
   OverlayRenderStatus,
   OverlayVisibilityChange,
 } from '../core/types';
-
-type OverlayEntry = NonNullable<MapSession['overlays']>[number];
 
 @Component({
   selector: 'app-overlay-controls',
@@ -17,7 +15,7 @@ type OverlayEntry = NonNullable<MapSession['overlays']>[number];
   styleUrl: './overlay-controls.component.css',
 })
 export class OverlayControlsComponent {
-  @Input({ required: true }) overlays: OverlayEntry[] = [];
+  @Input({ required: true }) overlays: MapOverlayEntry[] = [];
   @Input({ required: true }) overlayVisibility: Record<string, boolean> = {};
   @Input({ required: true }) overlayOpacity: Record<string, number> = {};
   @Input() overlayRenderStatuses: OverlayRenderStatus[] = [];
@@ -25,11 +23,11 @@ export class OverlayControlsComponent {
   @Output() overlayVisibilityChange = new EventEmitter<OverlayVisibilityChange>();
   @Output() overlayOpacityChange = new EventEmitter<OverlayOpacityChange>();
 
-  trackOverlay(_: number, overlay: OverlayEntry): string {
+  trackOverlay(_: number, overlay: MapOverlayEntry): string {
     return overlay.id;
   }
 
-  getOpacityPercent(overlay: OverlayEntry): number {
+  getOpacityPercent(overlay: MapOverlayEntry): number {
     return Math.round((this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY) * 100);
   }
 

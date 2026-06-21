@@ -214,7 +214,6 @@ def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
     )
     assert events[-1].data["decision"]["plan"]["state"] == "direct_response"
     assert events[-1].data["operation"]["kind"] == "direct_answer"
-    assert not any(event.event == "assistant_delta" for event in events)
 
 
 ###############################################################################

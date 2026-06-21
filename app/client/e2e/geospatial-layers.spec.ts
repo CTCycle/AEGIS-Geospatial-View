@@ -16,7 +16,7 @@ export const geospatialLayerScenarios: GeospatialLayerScenario[] = [
   { id: 'osm_default', description: 'Default OSM basemap renders', expectedState: 'renders' },
   { id: 'osm_dark', description: 'Dark OSM basemap renders', expectedState: 'renders' },
   { id: 'osm_terrain', description: 'Terrain basemap renders', expectedState: 'renders' },
-  { id: 'gibs_satellite', description: 'GIBS satellite basemap renders', expectedState: 'renders' },
+  { id: 'esri_world_imagery', description: 'Esri satellite basemap renders', expectedState: 'renders' },
   { id: 'tomtom_basic', description: 'TomTom missing key is shown without breaking map', expectedState: 'missing-credential' },
   { id: 'geoapify_osm', description: 'Geoapify missing key is shown without breaking map', expectedState: 'missing-credential' },
   { id: 'VIIRS_SNPP_CorrectedReflectance_TrueColor', description: 'NASA GIBS true color overlay renders', expectedState: 'renders' },

@@ -249,6 +249,10 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
         lambda database: call_order.append("initialize"),
     )
     monkeypatch.setattr(
+        "server.app.seed_credential_encryption_material",
+        lambda: call_order.append("seed_credential_encryption_material"),
+    )
+    monkeypatch.setattr(
         "server.app.seed_reference_catalog",
         lambda database: call_order.append("seed"),
     )
@@ -258,11 +262,10 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
             "SearchRuntime",
             (),
             {
-                "search_orchestrator": object(),
-                "search_execution": type(
-                    "SearchExecution",
+                "search_orchestrator": type(
+                    "Orchestrator",
                     (),
-                    {"orchestrator": type("Orchestrator", (), {"execute": staticmethod(lambda payload: payload)})()},
+                    {"execute": staticmethod(lambda payload: payload)},
                 )(),
             },
         )(),
@@ -298,7 +301,7 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
         )(),
     )
     monkeypatch.setattr("server.app.ChatStreamingService", lambda orchestrator: object())
-    monkeypatch.setattr("server.app.run_startup_validations", lambda settings: None)
+    monkeypatch.setattr("server.app.run_startup_validations", lambda: None)
 
     app_module = __import__("server.app", fromlist=["app_lifespan"])
 
@@ -310,4 +313,8 @@ def test_startup_path_seeds_reference_catalog_after_schema_creation(
 
     __import__("asyncio").run(_exercise())
 
-    assert call_order[:2] == ["initialize", "seed"]
+    assert call_order[:3] == [
+        "initialize",
+        "seed_credential_encryption_material",
+        "seed",
+    ]

@@ -30,16 +30,6 @@ export interface PresentationPolicy {
   show_legend: boolean;
 }
 
-export interface LocationSearchRequest {
-  resolved_location: ResolvedLocation;
-  action_id: string;
-  time_mode: 'current' | 'historical' | 'forecast';
-  basemap_id: string;
-  overlay_ids: string[];
-  viewport: ViewportPolicy;
-  presentation: PresentationPolicy;
-}
-
 export interface CapabilityDescriptor {
   id: string;
   name: string;
@@ -103,6 +93,59 @@ export type RenderingMode =
   | 'choropleth'
   | 'camera-points'
   | 'metadata-only';
+
+export interface GeospatialLayerRenderDescriptor {
+  provider: string;
+  layer_id: string;
+  rendering_mode: RenderingMode | string;
+  source_protocol: string;
+  url?: string | null;
+  tile_url_template?: string | null;
+  crs?: string | null;
+  format?: string | null;
+  style?: string | null;
+  time?: string | null;
+  default_time?: string | null;
+  tile_matrix_set?: string | null;
+  tile_size?: number | null;
+  min_zoom?: number | null;
+  max_zoom?: number | null;
+  attribution?: string[];
+  warnings?: string[];
+}
+
+export interface GeospatialProviderLayerDescriptor {
+  provider: string;
+  layer_id: string;
+  title: string;
+  abstract?: string | null;
+  rendering_mode: RenderingMode | string;
+  source_protocol: string;
+  data_format: string;
+  geometry_type: string;
+  queryable: boolean;
+  crs: string[];
+  formats: string[];
+  styles: string[];
+  time_extent?: string | null;
+  default_time?: string | null;
+  tile_matrix_sets: string[];
+  render?: GeospatialLayerRenderDescriptor | null;
+  attribution: string[];
+  warnings: string[];
+}
+
+export interface GeospatialProviderLayersResponse {
+  provider: string;
+  layers: GeospatialProviderLayerDescriptor[];
+  warnings: string[];
+}
+
+export interface GeospatialProviderLayerResponse {
+  provider: string;
+  layer: GeospatialProviderLayerDescriptor;
+  warnings: string[];
+}
 
 export interface ProviderAuthPolicy {
   type: ProviderAuthType | string;
@@ -241,17 +284,20 @@ export interface MapSession {
     source_protocol?: string;
     data_format?: string;
     geometry_type?: string;
+    crs?: string | null;
+    format?: string | null;
+    style?: string | null;
+    time?: string | null;
+    default_time?: string | null;
+    warnings?: string[];
+    render?: GeospatialLayerRenderDescriptor | null;
   }>;
   compliance_warnings?: string[];
 }
 
-export interface SearchResponse {
-  status_message: string;
-  map_session: MapSession;
-}
+export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
 
 export interface SearchResponsePayload {
-  satellite_imagery?: Record<string, JsonValue>;
   map_session?: MapSession;
   compliance_warnings?: string[];
 }
@@ -427,7 +473,6 @@ export type ChatStreamEventType =
   | 'tool_call_started'
   | 'tool_call_completed'
   | 'map_session_created'
-  | 'assistant_delta'
   | 'final'
   | 'error';
 
@@ -463,21 +508,23 @@ export interface ModelSettingsResponse {
   ollama_url: string;
   openai_base_url?: string | null;
   google_base_url?: string | null;
+  deepseek_base_url?: string | null;
   credentials: Record<string, Record<string, boolean>>;
   credential_health?: Record<string, Record<string, 'healthy' | 'unreadable' | string>>;
 }
 
 export interface ModelSettingsUpdateRequest {
-  active_provider_mode: ModelProviderMode;
-  chat_model_provider: string;
-  chat_model_name: string;
-  parser_model_provider: string;
-  parser_model_name: string;
-  agent_model_provider: string;
-  agent_model_name: string;
-  ollama_url: string;
+  active_provider_mode?: ModelProviderMode;
+  chat_model_provider?: string;
+  chat_model_name?: string;
+  parser_model_provider?: string;
+  parser_model_name?: string;
+  agent_model_provider?: string;
+  agent_model_name?: string;
+  ollama_url?: string;
   openai_base_url?: string | null;
   google_base_url?: string | null;
+  deepseek_base_url?: string | null;
   credentials: Record<string, { api_key?: string }>;
 }
 

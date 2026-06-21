@@ -64,7 +64,7 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
         lambda route: _json_ok(route, _models_payload()),
     )
     page.route(
-        re.compile(r".*/api/maps/catalog$"),
+        re.compile(r".*/api/geospatial/capabilities$"),
         lambda route: _json_ok(
             route, {"providers": [], "basemaps": [], "overlays": []}
         ),
@@ -72,14 +72,14 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
 
     def handle_osm_proxy(route: Route) -> None:
         match = re.search(
-            r"/api/maps/basemaps/osm/(\d+)/\d+/\d+\.png$", route.request.url
+            r"/api/geospatial/tiles/osm_default/(\d+)/\d+/\d+\.png$", route.request.url
         )
         if match:
             record_tile_zoom(int(match.group(1)))
         route.fulfill(status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT)
 
     page.route(
-        re.compile(r".*/api/maps/basemaps/osm/\d+/\d+/\d+\.png$"), handle_osm_proxy
+        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"), handle_osm_proxy
     )
 
 

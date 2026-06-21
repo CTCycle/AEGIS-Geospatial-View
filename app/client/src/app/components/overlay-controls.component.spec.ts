@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { MapOverlayEntry } from '../core/types';
 import { OverlayControlsComponent } from './overlay-controls.component';
 
 describe('OverlayControlsComponent', () => {
@@ -13,7 +14,8 @@ describe('OverlayControlsComponent', () => {
 
     fixture = TestBed.createComponent(OverlayControlsComponent);
     component = fixture.componentInstance;
-    component.overlays = [{ id: 'ov1', label: 'Overlay 1', provider: 'x', type: 'tile' }] as never;
+    const overlays: MapOverlayEntry[] = [{ id: 'ov1', label: 'Overlay 1', provider: 'x', type: 'tile' }];
+    component.overlays = overlays;
     component.overlayVisibility = { ov1: true };
     component.overlayOpacity = { ov1: 0.5 };
   });
