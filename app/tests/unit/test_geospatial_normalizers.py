@@ -63,7 +63,7 @@ def test_normalize_camera_feature_defaults_to_no_embedding() -> None:
 
 
 ###############################################################################
-def test_normalize_poi_category_maps_phase8_sources() -> None:
+def test_normalize_poi_category_maps_optional_provider_sources() -> None:
     assert normalize_poi_category("charging station") == "ev_charging"
     assert normalize_poi_category("gas-station") == "fuel"
     assert normalize_poi_category("railway") == "rail"
