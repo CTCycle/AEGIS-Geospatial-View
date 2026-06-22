@@ -10,11 +10,9 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMResult
 
-
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str = "structured"
-
 
 ###############################################################################
 class _Message:
@@ -25,7 +23,6 @@ class _Message:
         self.response_metadata = {"provider": "fake"}
         self.usage_metadata = {"total_tokens": 3}
         self.additional_kwargs = {}
-
 
 ###############################################################################
 class _StructuredModel:
@@ -40,7 +37,6 @@ class _StructuredModel:
         if callable(validator):
             return validator({"answer": "structured"})
         return {"answer": "structured"}
-
 
 ###############################################################################
 class _FakeChatModel:
@@ -64,7 +60,6 @@ class _FakeChatModel:
     def with_structured_output(self, schema: type[object]) -> _StructuredModel:
         return _StructuredModel(schema)
 
-
 ###############################################################################
 class _FakeEmbeddings:
 
@@ -76,7 +71,6 @@ class _FakeEmbeddings:
     def embed_query(self, _input_text: str) -> list[float]:
         return [0.1, 0.2, 0.3]
 
-
 ###############################################################################
 class _FakeOpenAIResponse:
     output_text = "chat-ok"
@@ -84,7 +78,6 @@ class _FakeOpenAIResponse:
     # -------------------------------------------------------------------------
     def model_dump(self, *, mode: str) -> dict[str, object]:
         return {"mode": mode, "id": "resp-test"}
-
 
 ###############################################################################
 class _FakeOpenAIResponses:
@@ -113,7 +106,6 @@ class _FakeOpenAIResponses:
             output_text="",
         )
 
-
 ###############################################################################
 class _FakeOpenAIEmbeddingEndpoint:
 
@@ -126,7 +118,6 @@ class _FakeOpenAIEmbeddingEndpoint:
         self.create_calls.append(kwargs)
         return SimpleNamespace(data=[SimpleNamespace(embedding=[0.1, 0.2, 0.3])])
 
-
 ###############################################################################
 class _FakeOpenAIClient:
     instances: list["_FakeOpenAIClient"] = []
@@ -137,7 +128,6 @@ class _FakeOpenAIClient:
         self.responses = _FakeOpenAIResponses()
         self.embeddings = _FakeOpenAIEmbeddingEndpoint()
         self.instances.append(self)
-
 
 ###############################################################################
 class _FakeGoogleModels:
@@ -168,7 +158,6 @@ class _FakeGoogleModels:
             embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])]
         )
 
-
 ###############################################################################
 class _FakeGoogleClient:
     instances: list["_FakeGoogleClient"] = []
@@ -179,14 +168,12 @@ class _FakeGoogleClient:
         self.models = _FakeGoogleModels()
         self.instances.append(self)
 
-
 ###############################################################################
 class _FakeHttpOptions:
 
     # -------------------------------------------------------------------------
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
-
 
 ###############################################################################
 def _request() -> LLMRequest:
@@ -197,7 +184,6 @@ def _request() -> LLMRequest:
             {"role": "user", "content": "Hello"},
         ],
     )
-
 
 ###############################################################################
 def test_openai_provider_uses_responses_api(monkeypatch) -> None:
@@ -230,7 +216,6 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
         "model": "embed-model",
         "input": "hello",
     }
-
 
 ###############################################################################
 def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
@@ -277,7 +262,6 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
         "model": "embed-model",
         "contents": "hello",
     }
-
 
 ###############################################################################
 def test_ollama_provider_langchain_paths(monkeypatch) -> None:

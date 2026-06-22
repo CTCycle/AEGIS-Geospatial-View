@@ -5,7 +5,6 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMToolDefinition
 
-
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -13,7 +12,6 @@ def _tool() -> LLMToolDefinition:
         description="Resolve location",
         parameters_json_schema={"type": "object", "properties": {"q": {"type": "string"}}},
     )
-
 
 ###############################################################################
 def test_provider_tool_schema_conversion() -> None:
@@ -23,7 +21,6 @@ def test_provider_tool_schema_conversion() -> None:
     assert openai_schema["function"]["name"] == "resolve_location"
     assert GoogleProvider.tool_to_google_schema(tool)["name"] == "resolve_location"
     assert OllamaProvider.tool_to_ollama_schema(tool)["function"]["name"] == "resolve_location"
-
 
 ###############################################################################
 def test_tool_call_parsing() -> None:

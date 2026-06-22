@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.domain.catalog import GeospatialLayerReferenceEntry
 from server.services.geospatial.layers import LayerProviderService
 
-
 ###############################################################################
 def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
     service = LayerProviderService(
@@ -23,7 +22,6 @@ def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
 
     assert entry.name == "MODIS_Combined_Thermal_Anomalies_Fire"
     assert entry.provider_name == "MODIS_Combined_Thermal_Anomalies_All"
-
 
 ###############################################################################
 def test_legacy_gibs_service_is_not_imported_by_runtime_composition() -> None:

@@ -4,7 +4,6 @@ from typing import Any, Protocol
 
 from server.repositories.schemas import Base
 
-
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None

@@ -11,7 +11,6 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
 
-
 ###############################################################################
 class RenderDescriptorService:
 

@@ -11,7 +11,6 @@ from server.services.agent.native_tool_loop import (
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
 
-
 ###############################################################################
 def _tool(name: str = "lookup") -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -23,7 +22,6 @@ def _tool(name: str = "lookup") -> LLMToolDefinition:
             "required": ["q"],
         },
     )
-
 
 ###############################################################################
 class _Provider:
@@ -38,7 +36,6 @@ class _Provider:
         self.requests.append(request)
         return self.responses.pop(0)
 
-
 ###############################################################################
 class _Factory:
 
@@ -49,7 +46,6 @@ class _Factory:
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str) -> _Provider:
         return self.provider
-
 
 ###############################################################################
 def test_native_tool_loop_executes_single_tool_call() -> None:
@@ -86,7 +82,6 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
     async def _run() -> None:
@@ -119,7 +114,6 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
         assert result.tool_results[0].content["error"]["code"] == "invalid_arguments"
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_native_tool_loop_stops_at_max_iterations() -> None:
@@ -157,7 +151,6 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
         assert result.iterations == 2
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> None:

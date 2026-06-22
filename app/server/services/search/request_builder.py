@@ -8,7 +8,6 @@ from server.domain.geographics import (
     ViewportPolicy,
 )
 
-
 ###############################################################################
 class RequestBuilder:
 

@@ -13,21 +13,17 @@ from urllib.request import Request, urlopen
 
 from server.configurations import get_server_settings
 
-
 ###############################################################################
 class OverpassServiceError(Exception):
     """Base exception for Overpass failures."""
-
 
 ###############################################################################
 class OverpassRequestError(OverpassServiceError):
     """Raised when Overpass cannot fulfill a request."""
 
-
 ###############################################################################
 class OverpassRateLimitError(OverpassServiceError):
     """Raised when Overpass rejects a request due to rate limits."""
-
 
 ###############################################################################
 class OverpassService:

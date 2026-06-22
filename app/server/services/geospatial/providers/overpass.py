@@ -32,7 +32,6 @@ AMENITY_GROUPS = {
     "fuel": ["fuel", "charging_station"],
 }
 
-
 ###############################################################################
 class OverpassProvider(GeospatialProvider):
     provider_id = "overpass"
@@ -93,7 +92,6 @@ class OverpassProvider(GeospatialProvider):
                 str(payload.get("attribution") or "© OpenStreetMap contributors (ODbL)")
             ],
         )
-
 
 ###############################################################################
 def _optional_int(value: Any) -> int | None:

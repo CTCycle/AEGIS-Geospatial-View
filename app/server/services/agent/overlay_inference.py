@@ -7,14 +7,12 @@ from server.domain.extraction.models import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class OverlayInferenceResult:
     overlay_ids: list[str]
     warnings: list[str]
     reasons: dict[str, list[str]]
-
 
 ###############################################################################
 class OverlayInferenceService:

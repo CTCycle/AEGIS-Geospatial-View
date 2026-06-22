@@ -7,7 +7,6 @@ from sqlalchemy import UniqueConstraint, func, inspect, select
 from server.common.logger import logger
 from server.repositories.schemas import Base
 
-
 ###############################################################################
 class SqlAlchemyTableOperationsMixin:
     engine: Any

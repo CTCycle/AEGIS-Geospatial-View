@@ -20,6 +20,7 @@ CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"
 CONFIGURATIONS_FILE = SETTING_PATH / "configurations.json"
 
 
+###############################################################################
 def resolve_runtime_data_root() -> Path:
     override = os.getenv("AEGIS_RUNTIME_DATA_DIR", "").strip()
     if override:
@@ -33,6 +34,7 @@ def resolve_runtime_data_root() -> Path:
     return ROOT_DIR / ".runtime"
 
 
+###############################################################################
 def resolve_database_file_path() -> Path:
     return resolve_runtime_data_root() / DATABASE_FILENAME
 

@@ -464,7 +464,6 @@ class MapSession(BaseModel):
     overlays: list[dict[str, object]] = Field(default_factory=list)
     compliance_warnings: list[str] = Field(default_factory=list)
 
-
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -5,34 +5,28 @@ import json
 import pytest
 from playwright.sync_api import APIRequestContext
 
-
 ###############################################################################
 def _post(api_context: APIRequestContext, path: str, payload: dict):
     return api_context.post(path, data=payload)
-
 
 ###############################################################################
 def _get(api_context: APIRequestContext, path: str):
     return api_context.get(path)
 
-
 ###############################################################################
 def _put(api_context: APIRequestContext, path: str, payload: dict):
     return api_context.put(path, data=payload)
-
 
 ###############################################################################
 def _require_provider_or_skip(response) -> None:  # noqa: ANN001
     if response.status in {400, 502, 503}:
         pytest.skip(f"Providers unavailable for this check ({response.status}).")
 
-
 ###############################################################################
 def _require_parser_or_skip(body: dict) -> None:
     assistant_text = str(body.get("assistant_message") or "").lower()
     if "configured parser model is unavailable" in assistant_text:
         pytest.skip("Configured parser model is unavailable for this check.")
-
 
 ###############################################################################
 def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) -> None:
@@ -68,7 +62,6 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
     restored = _put(api_context, "/api/chat/settings", base_body)
     assert restored.ok
 
-
 ###############################################################################
 def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) -> None:
     response = _put(
@@ -80,7 +73,6 @@ def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) 
     if response.ok:
         body = response.json()
         assert "active_provider_mode" in body
-
 
 ###############################################################################
 def test_chat_models_with_prefix_parity(
@@ -94,7 +86,6 @@ def test_chat_models_with_prefix_parity(
     assert isinstance(base_body.get("cloud"), list)
     assert isinstance(base_body.get("local"), list)
     assert set(base_body.keys()) == set(prefixed_body.keys())
-
 
 ###############################################################################
 def test_chat_turn_stream_event_order_and_contract_parity(
@@ -154,7 +145,6 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     _require_provider_or_skip(prefixed_stream)
     assert prefixed_stream.ok
 
-
 ###############################################################################
 def test_chat_turn_coordinate_lookup_and_follow_up(
     api_context: APIRequestContext,
@@ -190,7 +180,6 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
         return
     assistant = str(unsupported_body.get("assistant_message") or "").lower()
     assert "weather" in assistant or "forecast" in assistant or "clarify" in assistant
-
 
 ###############################################################################
 def test_ollama_refresh_pull_health(api_context: APIRequestContext) -> None:

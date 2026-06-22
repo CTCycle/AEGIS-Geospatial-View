@@ -41,7 +41,6 @@ WMS_XML = """<?xml version="1.0"?>
 </WMS_Capabilities>
 """
 
-
 ###############################################################################
 @pytest.mark.asyncio
 async def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
@@ -62,7 +61,6 @@ async def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     assert layer.render is not None
     assert layer.render.tile_url_template is not None
     assert "GoogleMapsCompatible_Level9" in layer.render.tile_url_template
-
 
 ###############################################################################
 @pytest.mark.asyncio

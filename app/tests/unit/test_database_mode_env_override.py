@@ -13,11 +13,9 @@ from server.configurations.environment import (
 )
 from server.configurations.management import ConfigurationManager
 
-
 ###############################################################################
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
-
 
 ###############################################################################
 def test_database_settings_uses_constants_database_path(
@@ -44,7 +42,6 @@ def test_database_settings_uses_constants_database_path(
     assert settings.database_path == str(DATABASE_FILE_PATH)
     assert settings.embedded_database is True
 
-
 ###############################################################################
 def test_database_settings_reads_insert_batch_size_from_env_only(
     monkeypatch: pytest.MonkeyPatch,
@@ -52,7 +49,6 @@ def test_database_settings_reads_insert_batch_size_from_env_only(
     monkeypatch.setenv("DATABASE_INSERT_BATCH_SIZE", "777")
     settings = build_database_settings()
     assert settings.insert_batch_size == 777
-
 
 ###############################################################################
 def test_database_settings_reads_runtime_directory_override(
@@ -63,7 +59,6 @@ def test_database_settings_reads_runtime_directory_override(
     settings = build_database_settings()
 
     assert settings.database_path == str(tmp_path / "database.db")
-
 
 ###############################################################################
 def test_database_settings_reads_external_database_keys_from_env(
@@ -101,7 +96,6 @@ def test_database_settings_reads_external_database_keys_from_env(
     assert settings.connect_timeout == 55
     assert settings.insert_batch_size == 2200
 
-
 ###############################################################################
 def test_database_settings_ignores_json_database_keys(
     monkeypatch: pytest.MonkeyPatch,
@@ -138,12 +132,10 @@ def test_database_settings_ignores_json_database_keys(
     assert settings.connect_timeout > 0
     assert settings.insert_batch_size > 0
 
-
 ###############################################################################
 def test_database_path_defaults_to_runtime_data_root() -> None:
     assert DATABASE_FILE_PATH == RUNTIME_DATA_PATH / "database.db"
     assert resolve_database_file_path() == RUNTIME_DATA_PATH / "database.db"
-
 
 ###############################################################################
 def test_configuration_manager_reads_database_settings_from_env_only(

@@ -98,11 +98,9 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     ),
 }
 
-
 ###############################################################################
 class ProviderRegistryError(Exception):
     """Base provider registry error."""
-
 
 ###############################################################################
 class ProviderNotRegisteredError(ProviderRegistryError):
@@ -110,7 +108,6 @@ class ProviderNotRegisteredError(ProviderRegistryError):
 
 
 from server.domain.geospatial.providers import ProviderExecutionPolicy
-
 
 ###############################################################################
 class ProviderRegistry:

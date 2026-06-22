@@ -10,6 +10,7 @@ from server.services.geospatial.providers.base import ProviderAuthError, Provide
 from server.services.geospatial.tiler import build_vector_tile_manifest
 
 
+###############################################################################
 def test_ingestion_only_providers_return_graceful_state() -> None:
     registry = ProviderRegistry()
     registry.build_from_manifests()
@@ -23,7 +24,6 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
 
     assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].startswith("https://")
-
 
 ###############################################################################
 def test_transitland_requires_configured_key() -> None:
@@ -39,6 +39,7 @@ def test_transitland_requires_configured_key() -> None:
         )
 
 
+###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:
     geojson = tmp_path / "features.geojson"
     geojson.write_text(

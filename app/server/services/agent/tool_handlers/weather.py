@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.openmeteo import OpenMeteoService
 
-
 ###############################################################################
 async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, object]:
     service = OpenMeteoService()
@@ -18,7 +17,6 @@ async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, 
         "location": location.label,
         "result": result,
     }
-
 
 ###############################################################################
 def _select_requested_forecast(

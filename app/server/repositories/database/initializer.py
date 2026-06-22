@@ -14,14 +14,12 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
 from server.services.catalog.loader import load_reference_catalog
 
-
 ###############################################################################
 def initialize_sqlite_database(settings: DatabaseSettings | None = None) -> None:
     resolved_settings = settings or get_server_settings().database
     repository = SQLiteRepository(resolved_settings)
     Base.metadata.create_all(repository.engine)
     logger.info("Ensured local SQLite schema at %s", repository.db_path)
-
 
 ###############################################################################
 def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
@@ -35,7 +33,6 @@ def validate_postgres_schema(settings: DatabaseSettings | None = None) -> None:
             "PostgreSQL schema is missing required tables. "
             f"Missing: {', '.join(missing)}"
         )
-
 
 ###############################################################################
 def initialize_database(
@@ -56,7 +53,6 @@ def initialize_database(
 
     Base.metadata.create_all(database.engine)
     logger.info("Ensured relational schema using active database backend.")
-
 
 ###############################################################################
 def seed_reference_catalog(database: DatabaseBackend) -> ReferenceSeedResult:

@@ -10,7 +10,6 @@ from server.services.geospatial.providers.nasa_firms import NASAFIRMSProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 
-
 ###############################################################################
 def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     earthquake = asyncio.run(
@@ -30,7 +29,6 @@ def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     assert earthquake.payload["legend"]["type"]
     assert "bBox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
     assert water.payload["freshnessLabel"]
-
 
 ###############################################################################
 def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
@@ -61,7 +59,6 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
     assert response.payload["totalResults"] == 1
     assert response.payload["features"][0]["category"] == "earthquake"
     assert response.payload["features"][0]["magnitude"] == 2.5
-
 
 ###############################################################################
 def test_usgs_provider_normalizes_live_water_gauges() -> None:
@@ -107,7 +104,6 @@ def test_usgs_provider_normalizes_live_water_gauges() -> None:
     assert response.payload["features"][0]["id"] == "01646500"
     assert response.payload["features"][0]["metadata"]["unit"] == "ft"
 
-
 ###############################################################################
 def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     alerts = asyncio.run(
@@ -126,7 +122,6 @@ def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     assert radar.payload["legend"]["label"]
     assert "tidesandcurrents.noaa.gov" in coops.payload["featuresUrl"]
     assert coops.payload["freshnessLabel"]
-
 
 ###############################################################################
 def test_noaa_provider_normalizes_live_alert_geojson() -> None:
@@ -170,7 +165,6 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
     assert response.payload["features"][0]["category"] == "weather_alert"
     assert response.payload["features"][0]["severity"] == "Severe"
 
-
 ###############################################################################
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     response = asyncio.run(
@@ -180,7 +174,6 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
     assert response.payload["renderingMode"] == "wms"
     assert "hazards.fema.gov" in response.payload["tileUrl"]
     assert response.payload["legend"]["type"]
-
 
 ###############################################################################
 def test_nasa_firms_requires_key_before_descriptor() -> None:
@@ -204,7 +197,6 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
     )
     assert "test-key" in response.payload["featuresUrl"]
     assert response.payload["freshnessLabel"]
-
 
 ###############################################################################
 def test_nasa_firms_normalizes_live_csv() -> None:

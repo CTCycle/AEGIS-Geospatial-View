@@ -13,11 +13,9 @@ from server.repositories.model_settings import ModelSettingsRepository
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.cryptography import CredentialEncryptionService
 
-
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
     pass
-
 
 ###############################################################################
 class ChatSettingsService:

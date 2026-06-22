@@ -155,7 +155,6 @@ class LayerProviderService:
             return value
         return entry.label
 
-
 ###############################################################################
 def build_geospatial_layer_catalog(database: DatabaseBackend) -> LayerProviderService:
     repository = ReferenceCatalogRepository(database)

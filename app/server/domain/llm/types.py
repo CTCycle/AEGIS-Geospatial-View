@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ModelDescriptor:
@@ -12,7 +11,6 @@ class ModelDescriptor:
     provider: str
     capabilities: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -31,7 +29,6 @@ class LLMRequest:
         if self.tools and self.response_json_schema is not None:
             raise ValueError("LLMRequest cannot combine native tools with structured response_schema")
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMResult:
@@ -40,7 +37,6 @@ class LLMResult:
     tool_calls: list["LLMToolCall"] = field(default_factory=list)
     finish_reason: str | None = None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMToolDefinition:
@@ -48,14 +44,12 @@ class LLMToolDefinition:
     description: str
     parameters_json_schema: dict[str, Any]
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMToolCall:
     id: str | None = None
     name: str = ""
     arguments: dict[str, Any] = field(default_factory=dict)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -66,14 +60,12 @@ class LLMToolResult:
     error: str | None = None
     is_error: bool = False
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class LLMAssistantToolCallMessage:
     role: Literal["assistant"] = "assistant"
     content: str | None = None
     tool_calls: list[LLMToolCall] = field(default_factory=list)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -82,7 +74,6 @@ class LLMToolResultMessage:
     tool_call_id: str | None = None
     name: str = ""
     content: str = ""
-
 
 ###############################################################################
 @dataclass(frozen=True)

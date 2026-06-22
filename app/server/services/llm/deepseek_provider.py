@@ -20,7 +20,6 @@ from server.services.llm.types import (
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-
 ###############################################################################
 class DeepSeekProvider(LLMProvider):
     provider_name = "deepseek"

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.domain.agent.tools import AgentToolResult
 
-
 ###############################################################################
 class ChatAgent:
 

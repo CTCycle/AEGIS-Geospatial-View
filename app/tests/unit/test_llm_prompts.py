@@ -7,7 +7,6 @@ from server.services.llm.prompts import (
     prompt_within_budget,
 )
 
-
 ###############################################################################
 def test_prompt_builders_include_required_guardrails() -> None:
     extraction = get_agent_extraction_prompt(provider="ollama", model="llama3.2")
@@ -20,7 +19,6 @@ def test_prompt_builders_include_required_guardrails() -> None:
         assert "never explain technical implementation details" in lowered
         assert "never expose app internals" in lowered
         assert "ask for missing information only when genuinely necessary" in lowered
-
 
 ###############################################################################
 def test_prompt_builders_stay_under_token_budget() -> None:

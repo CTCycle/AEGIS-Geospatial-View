@@ -22,7 +22,6 @@ from server.services.llm.types import (
 
 DEFAULT_GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
-
 ###############################################################################
 class GoogleProvider(LLMProvider):
     provider_name = "google"

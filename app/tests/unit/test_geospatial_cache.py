@@ -7,7 +7,6 @@ from server.services.geospatial.cache import (
 )
 from server.services.geospatial.providers.base import ProviderRequest
 
-
 ###############################################################################
 class _Clock:
 
@@ -18,7 +17,6 @@ class _Clock:
     # -------------------------------------------------------------------------
     def __call__(self) -> float:
         return self.value
-
 
 ###############################################################################
 def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
@@ -35,7 +33,6 @@ def test_geospatial_cache_returns_hit_stale_then_miss() -> None:
     clock.value = 16.0
     assert cache.get("rainviewer:metadata").status == CacheLookupStatus.MISS
 
-
 ###############################################################################
 def test_geospatial_cache_can_invalidate_entries() -> None:
     cache = GeospatialCache()
@@ -44,7 +41,6 @@ def test_geospatial_cache_can_invalidate_entries() -> None:
     cache.invalidate("openaq:stations")
 
     assert cache.get("openaq:stations").status == CacheLookupStatus.MISS
-
 
 ###############################################################################
 def test_geospatial_cache_key_for_request_excludes_raw_credentials() -> None:

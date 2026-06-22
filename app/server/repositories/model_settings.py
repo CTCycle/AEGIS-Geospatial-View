@@ -14,7 +14,6 @@ from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
-
 ###############################################################################
 class ModelSettingsRepository:
 

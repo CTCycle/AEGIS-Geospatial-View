@@ -6,7 +6,6 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
 )
 
-
 ###############################################################################
 class FEMAProvider(GeospatialProvider):
     provider_id = "fema"

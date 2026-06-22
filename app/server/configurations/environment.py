@@ -10,19 +10,16 @@ from dotenv import load_dotenv
 from server.common.logger import logger
 from server.common.paths import ENV_FILE_PATH
 
-
 ###############################################################################
 @dataclass
 class _EnvironmentState:
     lock: Lock = field(default_factory=Lock)
     bootstrapped: bool = False
 
-
 ###############################################################################
 @lru_cache(maxsize=1)
 def _bootstrap_state() -> _EnvironmentState:
     return _EnvironmentState()
-
 
 ###############################################################################
 def ensure_environment_loaded(*, force: bool = False) -> Path | None:
@@ -40,7 +37,6 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
 
         state.bootstrapped = True
         return path if path.exists() else None
-
 
 ###############################################################################
 def reset_environment_bootstrap_for_tests() -> None:

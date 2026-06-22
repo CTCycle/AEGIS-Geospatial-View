@@ -14,7 +14,6 @@ from server.services.geospatial.rainviewer import (
     RainViewerService,
 )
 
-
 ###############################################################################
 class LocationSearchOrchestrator:
 

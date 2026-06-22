@@ -4,7 +4,6 @@ from time import time
 
 from server.domain.llm.cache import OllamaToolCapabilityCacheRecord
 
-
 ###############################################################################
 class OllamaToolCapabilityCache:
 

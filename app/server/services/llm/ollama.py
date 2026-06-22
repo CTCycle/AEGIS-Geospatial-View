@@ -19,7 +19,6 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
-
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
 
@@ -65,7 +64,6 @@ class _OllamaLibraryParser(HTMLParser):
         )
         self._active_model = None
         self._chunks = []
-
 
 ###############################################################################
 class OllamaProvider(LLMProvider):

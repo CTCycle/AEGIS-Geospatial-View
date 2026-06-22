@@ -26,11 +26,9 @@ from server.domain.jobs import (
 )
 from server.services.chat.streaming import ChatStreamingService
 
-
 ###############################################################################
 def _utc_now() -> datetime:
     return datetime.now(UTC)
-
 
 ###############################################################################
 class BackgroundJobService:

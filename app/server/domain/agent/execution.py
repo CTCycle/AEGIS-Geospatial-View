@@ -6,7 +6,6 @@ from typing import Any, Literal
 from server.domain.geographics import MapSession
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class AgentExecutionContext:
@@ -16,7 +15,6 @@ class AgentExecutionContext:
     map_state: dict[str, Any] = field(default_factory=dict)
     policy_constraints: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -28,7 +26,6 @@ class AgentToolLoopRequest:
     temperature: float
     max_tokens: int | None = None
     context: AgentExecutionContext = field(default_factory=AgentExecutionContext)
-
 
 ###############################################################################
 @dataclass(frozen=True)

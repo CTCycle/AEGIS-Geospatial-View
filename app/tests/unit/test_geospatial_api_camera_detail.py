@@ -6,7 +6,6 @@ from server.api import geospatial
 from server.app import create_app
 from server.services.geospatial.api_service import GeospatialApiService
 
-
 ###############################################################################
 def test_camera_detail_uses_provider_backed_lookup() -> None:
 
@@ -47,7 +46,6 @@ def test_camera_detail_uses_provider_backed_lookup() -> None:
     assert payload["status"] == "ok"
     assert payload["provider"] == "windy_webcams"
     assert payload["camera"]["official_url"] == "https://example.test/camera-1"
-
 
 ###############################################################################
 def test_camera_detail_preserves_safe_fallback_without_provider_data() -> None:

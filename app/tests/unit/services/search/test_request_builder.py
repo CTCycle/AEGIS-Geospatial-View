@@ -4,7 +4,6 @@ from server.domain.agent.decision import ResolvedLocation
 from server.domain.extraction.models import NormalizedAction
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     builder = RequestBuilder()
@@ -19,7 +18,6 @@ def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
     )
 
     assert viewport.radius_m == 25000.0
-
 
 ###############################################################################
 def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
