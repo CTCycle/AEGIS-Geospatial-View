@@ -329,6 +329,85 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   created_at?: string;
+  kind?: 'normal' | 'steering' | 'system_progress';
+  runVersion?: number;
+}
+
+export type AgentRunState =
+  | 'pending'
+  | 'running'
+  | 'updating'
+  | 'waiting_for_clarification'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export type RunEventType =
+  | 'progress'
+  | 'assistant_text_delta'
+  | 'assistant_text_completed'
+  | 'tool_started'
+  | 'tool_completed'
+  | 'request_updated'
+  | 'error'
+  | 'completed'
+  | 'cancelled';
+
+export type RunEventVisibility = 'user' | 'internal';
+
+export interface RunEvent {
+  event_id: string;
+  sequence: number;
+  conversation_id: string;
+  run_id: string;
+  run_version: number;
+  type: RunEventType;
+  timestamp: string;
+  visibility: RunEventVisibility;
+  payload: Record<string, JsonValue>;
+}
+
+export interface ConversationCreateRequest {
+  title?: string | null;
+}
+
+export interface ConversationCreateResponse {
+  conversation_id: string;
+  title?: string | null;
+}
+
+export interface AgentRunCreateRequest {
+  message: string;
+  client_request_id?: string;
+}
+
+export interface AgentRunCreateResponse {
+  conversation_id: string;
+  run_id: string;
+  run_version: number;
+  state: AgentRunState;
+  stream_url: string;
+}
+
+export interface SteeringMessageRequest {
+  message: string;
+  client_mutation_id?: string;
+}
+
+export interface SteeringMessageResponse {
+  conversation_id: string;
+  run_id: string;
+  steering_id: string;
+  run_version: number;
+  aggregated_request: string;
+  state: AgentRunState;
+}
+
+export interface AgentRunCancelResponse {
+  conversation_id: string;
+  run_id: string;
+  state: AgentRunState;
+  cancel_requested_at?: string | null;
 }
 
 export interface ChatTurnRequest {

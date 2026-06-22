@@ -213,3 +213,87 @@ class ChatMessageRecord(Base):
         DateTime, nullable=False, server_default=func.now()
     )
 
+###############################################################################
+class ConversationRecord(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    owner_user_id: Mapped[str | None] = mapped_column(String(120))
+    title: Mapped[str | None] = mapped_column(String(200))
+    active_run_id: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+###############################################################################
+class AgentRunRecord(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(
+        String(80), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    original_request: Mapped[str] = mapped_column(Text, nullable=False)
+    aggregated_request: Mapped[str] = mapped_column(Text, nullable=False)
+    active_run_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    state: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
+    observed_by_worker_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    error_code: Mapped[str | None] = mapped_column(String(120))
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (Index("ix_agent_runs_conversation_id", "conversation_id"),)
+
+###############################################################################
+class AgentSteeringMessageRecord(Base):
+    __tablename__ = "agent_steering_messages"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    run_id: Mapped[str] = mapped_column(
+        String(80), ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    run_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    client_mutation_id: Mapped[str | None] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_agent_steering_messages_run_id", "run_id"),
+        UniqueConstraint("run_id", "client_mutation_id", name="ux_agent_steering_mutation"),
+    )
+
+###############################################################################
+class AgentRunEventRecord(Base):
+    __tablename__ = "agent_run_events"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    run_id: Mapped[str] = mapped_column(
+        String(80), ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    conversation_id: Mapped[str] = mapped_column(
+        String(80), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    run_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    type: Mapped[str] = mapped_column(String(60), nullable=False)
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "sequence", name="ux_agent_run_events_sequence"),
+        Index("ix_agent_run_events_run_id_sequence", "run_id", "sequence"),
+    )
+

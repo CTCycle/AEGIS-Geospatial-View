@@ -9,7 +9,6 @@ from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
 from server.services.geospatial.tiler import build_vector_tile_manifest
 
-
 ###############################################################################
 def test_ingestion_only_providers_return_graceful_state() -> None:
     registry = ProviderRegistry()
@@ -37,7 +36,6 @@ def test_transitland_requires_configured_key() -> None:
                 ProviderRequest(capability_id="transitland_feeds"),
             )
         )
-
 
 ###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:

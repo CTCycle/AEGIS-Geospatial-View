@@ -50,6 +50,7 @@ Thumbs.db
 
 # Misc
 .tmp_logs/
+QA/tmp/
 Cargo.toml
 *.lock
 *.log

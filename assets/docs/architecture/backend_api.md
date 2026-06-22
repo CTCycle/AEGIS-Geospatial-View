@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-19
+Last updated: 2026-06-22
 
 ## Mounting
 
@@ -130,3 +130,20 @@ Supported event names:
 - `error`
 
 `final` carries the full serialized `ChatTurnResponse`, including `operation`.
+
+## Conversation Run Routes
+
+Defined in `app/server/api/conversations.py`:
+
+- `POST /api/conversations`
+  Creates a durable conversation shell.
+- `POST /api/conversations/{conversation_id}/runs`
+  Creates one active agent run for the conversation and returns its SSE stream URL.
+- `GET /api/conversations/{conversation_id}/runs/{run_id}/events`
+  Streams durable user-visible run events as Server-Sent Events. Supports `after_event_id` and `Last-Event-ID` replay.
+- `POST /api/conversations/{conversation_id}/runs/{run_id}/steering`
+  Adds a steering message to the active run, rebuilds the deterministic aggregate request, and increments the run version.
+- `POST /api/conversations/{conversation_id}/runs/{run_id}/cancel`
+  Marks the active run cancelled as a terminal user action.
+
+The v1 run stream emits concise user-visible events only: progress labels, assistant text completion, request updates, terminal errors, completion, and cancellation. Internal diagnostics can be persisted with internal visibility and are not replayed on the normal user stream.

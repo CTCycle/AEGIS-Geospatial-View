@@ -6,7 +6,6 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.overture import OvertureProvider
 
-
 ###############################################################################
 def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     async def fetcher(url, headers):

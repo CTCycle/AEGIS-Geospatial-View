@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-19
+Last updated: 2026-06-22
 
 ## Route-Level Pages
 
@@ -24,6 +24,12 @@ Last updated: 2026-06-19
 - Model selection and model list utilities: `core/model-selection.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
+
+## Agent Run Interaction
+
+`GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, creates one active run, and opens an `EventSource` stream. Additional composer submissions while the run is active are sent as steering updates and rendered as compact refinements rather than independent tasks.
+
+The page tracks the last run event ID and ignores duplicate event IDs so reconnect replay can be applied without duplicating assistant or progress output.
 
 ## Map Rendering
 

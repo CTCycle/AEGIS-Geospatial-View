@@ -91,7 +91,6 @@ class ChatStreamingService:
             "state": response.decision.plan.state,
             "mode": response.decision.plan.mode,
             "action_id": response.decision.plan.action_id,
-            "trace_steps": list(response.decision.trace.steps),
             "has_clarification": response.decision.clarification is not None,
         }
 
@@ -129,7 +128,6 @@ class ChatStreamingService:
                         "session_id": response.session_id,
                         "tool_call_id": tool_call_id,
                         "name": tool_call.get("name"),
-                        "arguments": tool_call.get("arguments"),
                     },
                 )
             )
@@ -146,7 +144,6 @@ class ChatStreamingService:
                         "name": tool_result.get("name") or tool_call.get("name"),
                         "ok": bool(not tool_result.get("is_error")),
                         "error": tool_result.get("error"),
-                        "content": tool_result.get("content"),
                     },
                 )
             )

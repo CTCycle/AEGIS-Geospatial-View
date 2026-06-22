@@ -8,7 +8,7 @@ import { ChatMessage } from '../core/types';
   templateUrl: './chat-message.component.html',
   host: {
     class: 'chat-message',
-    '[class]': "'chat-message chat-message--' + message.role",
+    '[class]': "'chat-message chat-message--' + message.role + (message.kind ? ' chat-message--' + message.kind : '')",
   },
 })
 export class ChatMessageComponent {
