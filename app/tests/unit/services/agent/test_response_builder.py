@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.domain.chat import ChatOperationResult
 from server.services.agent.response_builder import AgentResponseBuilder
 
-
 ###############################################################################
 def test_build_final_decision_maps_map_sessions_to_map_search_state() -> None:
     decision = AgentResponseBuilder.build_final_decision(
@@ -18,7 +17,6 @@ def test_build_final_decision_maps_map_sessions_to_map_search_state() -> None:
 
     assert decision.plan.state == "map_search"
     assert decision.plan.mode == "map"
-
 
 ###############################################################################
 def test_build_final_decision_maps_clarification_and_rejection_to_non_map_states() -> None:
@@ -45,7 +43,6 @@ def test_build_final_decision_maps_clarification_and_rejection_to_non_map_states
     assert clarification.plan.mode is None
     assert rejection.plan.state == "reject"
     assert rejection.plan.mode is None
-
 
 ###############################################################################
 def test_build_final_decision_maps_direct_answers_to_direct_text() -> None:

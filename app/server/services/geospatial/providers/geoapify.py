@@ -23,7 +23,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class GeoapifyProvider(GeospatialProvider):
     provider_id = "geoapify"
@@ -135,7 +134,6 @@ class GeoapifyProvider(GeospatialProvider):
             message="Geoapify accepted the supplied API key.",
         )
 
-
 ###############################################################################
 def _build_places_url(request: ProviderRequest, api_key: str) -> str:
     categories = str(request.params.get("categories") or "amenity").strip()
@@ -150,14 +148,12 @@ def _build_places_url(request: ProviderRequest, api_key: str) -> str:
         params["bias"] = f"rect:{west},{north},{east},{south}"
     return f"https://api.geoapify.com/v2/places?{urlencode(params)}"
 
-
 ###############################################################################
 def _cache_key(request: ProviderRequest) -> str:
     bbox = ",".join(str(part) for part in request.bbox or ())
     categories = str(request.params.get("categories") or "amenity").strip()
     limit = str(request.params.get("limit") or 100)
     return f"geoapify:places:{bbox}:{categories}:{limit}"
-
 
 ###############################################################################
 def _places_response(
@@ -170,7 +166,6 @@ def _places_response(
         attribution=["Geoapify, OpenStreetMap contributors"],
         stale=stale,
     )
-
 
 ###############################################################################
 def _normalize_places_payload(payload: object) -> list[dict[str, object]]:
@@ -210,7 +205,6 @@ def _normalize_places_payload(payload: object) -> list[dict[str, object]]:
         except NormalizationError:
             continue
     return features
-
 
 ###############################################################################
 def _first_category(value: object) -> str:

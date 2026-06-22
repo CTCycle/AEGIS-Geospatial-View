@@ -9,7 +9,6 @@ from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
 
-
 ###############################################################################
 class AEGISDatabase:
 
@@ -51,7 +50,6 @@ class AEGISDatabase:
     # -------------------------------------------------------------------------
     def count_records(self, model: type[Base]) -> int:
         return self.backend.count_records(model)
-
 
 ###############################################################################
 @cache

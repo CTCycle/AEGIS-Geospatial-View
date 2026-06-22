@@ -11,7 +11,6 @@ from server.services.geospatial.ingestion import (
     validate_ingestion_manifest,
 )
 
-
 ###############################################################################
 def _manifest():
     return {
@@ -43,7 +42,6 @@ def _manifest():
         },
     }
 
-
 ###############################################################################
 def test_build_ingestion_plan_from_manifest() -> None:
     plan = build_ingestion_plan(_manifest())
@@ -51,7 +49,6 @@ def test_build_ingestion_plan_from_manifest() -> None:
     assert plan.capability_id == "natural_earth_admin"
     assert plan.expected_format == "shapefile"
     assert plan.spatial_index is True
-
 
 ###############################################################################
 def test_validate_ingestion_manifest_reports_missing_fields() -> None:
@@ -63,7 +60,6 @@ def test_validate_ingestion_manifest_reports_missing_fields() -> None:
     assert errors
     assert "sourceUrl" in errors[0]
 
-
 ###############################################################################
 def test_build_ingestion_plan_rejects_non_ingestion_manifest() -> None:
     try:
@@ -72,7 +68,6 @@ def test_build_ingestion_plan_rejects_non_ingestion_manifest() -> None:
         assert "dataset-ingestion" in str(exc)
     else:
         raise AssertionError("Non-ingestion manifest unexpectedly produced a plan.")
-
 
 ###############################################################################
 def test_execute_ingestion_plan_normalizes_csv_and_writes_indexes(tmp_path) -> None:
@@ -99,7 +94,6 @@ def test_execute_ingestion_plan_normalizes_csv_and_writes_indexes(tmp_path) -> N
     assert result.text_index_file is not None
     assert result.tile_manifest_file is not None
 
-
 ###############################################################################
 def test_execute_ingestion_plan_rejects_checksum_mismatch(tmp_path) -> None:
     source = tmp_path / "source.geojson"
@@ -117,7 +111,6 @@ def test_execute_ingestion_plan_rejects_checksum_mismatch(tmp_path) -> None:
         assert "Checksum mismatch" in str(exc)
     else:
         raise AssertionError("Checksum mismatch did not fail ingestion.")
-
 
 ###############################################################################
 def test_execute_ingestion_plan_accepts_checksum_url(tmp_path) -> None:
@@ -137,7 +130,6 @@ def test_execute_ingestion_plan_accepts_checksum_url(tmp_path) -> None:
 
     assert result.feature_count == 0
     assert '"checksumSource": "checksumUrl"' in Path(result.metadata_file).read_text(encoding="utf-8")
-
 
 ###############################################################################
 def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None:
@@ -181,7 +173,6 @@ def test_execute_ingestion_plan_drops_invalid_geojson_geometry(tmp_path) -> None
     assert result.spatial_index_file is not None
     assert '"bbox": [' in Path(result.spatial_index_file).read_text(encoding="utf-8")
 
-
 ###############################################################################
 def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
     source = tmp_path / "source.geojson"
@@ -217,7 +208,6 @@ def test_execute_ingestion_plan_rejects_non_intersecting_bbox(tmp_path) -> None:
         assert "does not intersect" in str(exc)
     else:
         raise AssertionError("Non-intersecting bbox did not fail ingestion.")
-
 
 ###############################################################################
 def test_dataset_materialization_fixtures_produce_normalized_indexes_tiles_and_health(tmp_path) -> None:

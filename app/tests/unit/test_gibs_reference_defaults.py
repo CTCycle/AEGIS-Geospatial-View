@@ -8,7 +8,6 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
 from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
 
-
 ###############################################################################
 def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
     repository = SQLiteRepository(
@@ -30,7 +29,6 @@ def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
     initialize_database(repository)
     ReferenceCatalogSeeder(repository).seed_if_needed()
     return repository
-
 
 ###############################################################################
 def test_gibs_reference_maps_load_from_reference_tables(tmp_path: Path) -> None:

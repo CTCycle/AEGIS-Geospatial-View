@@ -4,7 +4,6 @@ E2E tests for AEGIS chat-first UI flow.
 
 from playwright.sync_api import Page, expect
 
-
 ###############################################################################
 class TestAppShell:
 
@@ -15,7 +14,6 @@ class TestAppShell:
         expect(page.get_by_text("Map Workspace")).to_be_visible()
         expect(page.get_by_label("Agent Chat")).to_be_visible()
         expect(page.locator(".map-canvas")).to_be_visible()
-
 
 ###############################################################################
 class TestChatFlow:

@@ -6,7 +6,6 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
-
 ###############################################################################
 def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
     calls: list[tuple[str, dict[str, str] | None]] = []
@@ -31,6 +30,7 @@ def test_windy_webcam_provider_builds_bbox_camera_request() -> None:
     assert response.payload["renderingMode"] == "camera-points"
 
 
+###############################################################################
 def test_local_open_data_camera_template_fetches_configured_source() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None = None):
         return {

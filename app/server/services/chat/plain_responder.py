@@ -4,7 +4,6 @@ from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_agent_response_prompt
 from server.services.llm.types import LLMRequest
 
-
 ###############################################################################
 class PlainResponder:
 

@@ -21,7 +21,6 @@ BackgroundJobEventType = Literal[
     "cancelled",
 ]
 
-
 ###############################################################################
 class BackgroundJobCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,7 +32,6 @@ class BackgroundJobCreateResponse(BaseModel):
     message: str
     poll_interval: float = 1.0
 
-
 ###############################################################################
 class BackgroundJobEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -43,7 +41,6 @@ class BackgroundJobEvent(BaseModel):
     sequence: int
     created_at: datetime
     payload_json: dict[str, Any] = Field(default_factory=dict)
-
 
 ###############################################################################
 class BackgroundJobStatusResponse(BaseModel):
@@ -68,14 +65,12 @@ class BackgroundJobStatusResponse(BaseModel):
     max_attempts: int = 1
     last_heartbeat_at: datetime | None = None
 
-
 ###############################################################################
 class BackgroundJobEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     job_id: str
     events: list[BackgroundJobEvent] = Field(default_factory=list)
-
 
 ###############################################################################
 class JobCancelResponse(BaseModel):
@@ -88,7 +83,6 @@ class JobCancelResponse(BaseModel):
 
 from dataclasses import dataclass, field  # noqa: E402
 from datetime import UTC  # noqa: E402
-
 
 ###############################################################################
 @dataclass

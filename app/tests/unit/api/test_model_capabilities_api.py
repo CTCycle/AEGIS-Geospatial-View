@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.api.chat import get_models, refresh_ollama_models
 from server.domain.chat import OllamaRefreshResponse
 
-
 ###############################################################################
 class _ModelLibraryService:
 
@@ -39,14 +38,12 @@ class _ModelLibraryService:
             ],
         }
 
-
 ###############################################################################
 class _SettingsService:
 
     # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
         return "http://ollama.test"
-
 
 ###############################################################################
 class _MaintenanceService:
@@ -72,13 +69,11 @@ class _MaintenanceService:
             ],
         })
 
-
 ###############################################################################
 class _Runtime:
     model_library_service = _ModelLibraryService()
     settings_service = _SettingsService()
     maintenance_service = _MaintenanceService()
-
 
 ###############################################################################
 def test_models_endpoint_returns_capability_metadata() -> None:
@@ -88,7 +83,6 @@ def test_models_endpoint_returns_capability_metadata() -> None:
     assert response.local[0].supports_tools is False
     assert response.local[0].supports_structured_output is True
     assert response.local[0].tool_support_source == "ollama_probe"
-
 
 ###############################################################################
 def test_ollama_refresh_returns_capability_metadata() -> None:

@@ -6,7 +6,6 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 from server.domain.chat import ChatOperationResult
 from server.domain.geographics import MapSession
 
-
 ###############################################################################
 class AgentResponseBuilder:
 

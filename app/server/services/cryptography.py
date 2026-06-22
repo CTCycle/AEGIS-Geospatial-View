@@ -8,14 +8,12 @@ from server.repositories.credential_material import (
     CredentialEncryptionMaterialRepository,
 )
 
-
 ###############################################################################
 def _load_fernet_from_material(key_material: str) -> Fernet:
     normalized = str(key_material or "").strip()
     if not normalized:
         raise RuntimeError("Encryption key material is missing")
     return Fernet(normalized.encode("utf-8"))
-
 
 ###############################################################################
 class CredentialEncryptionService:

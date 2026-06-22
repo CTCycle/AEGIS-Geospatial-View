@@ -67,7 +67,6 @@ CREDENTIAL_LIVE_CHECKS = (
     ),
 )
 
-
 ###############################################################################
 async def validate_live_geospatial_sources(
     *,
@@ -88,7 +87,6 @@ async def validate_live_geospatial_sources(
         if result.status == "skipped":
             report.skipped_count += 1
     return report
-
 
 ###############################################################################
 async def _run_check(
@@ -135,7 +133,6 @@ async def _run_check(
             message=str(exc),
         )
 
-
 ###############################################################################
 def _feature_count(payload: dict[str, Any]) -> int:
     if isinstance(payload.get("features"), list):
@@ -152,11 +149,9 @@ def _feature_count(payload: dict[str, Any]) -> int:
                 return value
     return 0
 
-
 ###############################################################################
 def _format_report(report: LiveValidationReport) -> str:
     return json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True)
-
 
 ###############################################################################
 def main(argv: list[str] | None = None) -> int:

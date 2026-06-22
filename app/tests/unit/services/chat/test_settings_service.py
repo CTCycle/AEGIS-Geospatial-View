@@ -11,13 +11,11 @@ from server.services.chat.settings_service import (
     ChatSettingsValidationError,
 )
 
-
 ###############################################################################
 @dataclass
 class EncryptedValue:
     value: str
     key_version: str
-
 
 ###############################################################################
 @dataclass
@@ -33,7 +31,6 @@ class FakeSettingsRecord:
     openai_base_url: str | None = "https://openai.example/v1"
     google_base_url: str | None = "https://google.example/v1"
     deepseek_base_url: str | None = "https://deepseek.example/v1"
-
 
 ###############################################################################
 class FakeSettingsRepository:
@@ -53,7 +50,6 @@ class FakeSettingsRepository:
         for key, value in kwargs.items():
             setattr(self.record, key, value)
         return self.record
-
 
 ###############################################################################
 class FakeCredentialsRepository:
@@ -82,7 +78,6 @@ class FakeCredentialsRepository:
     ) -> None:
         self.upserts.append((provider, label, encrypted_value, key_version))
 
-
 ###############################################################################
 class FakeCryptoService:
 
@@ -93,7 +88,6 @@ class FakeCryptoService:
     # -------------------------------------------------------------------------
     def decrypt(self, value: str) -> str:
         return value
-
 
 ###############################################################################
 class FakeModelLibraryService:
@@ -158,7 +152,6 @@ class FakeModelLibraryService:
                     return item
         return None
 
-
 ###############################################################################
 def build_service(
     *,
@@ -172,7 +165,6 @@ def build_service(
         crypto_service=FakeCryptoService(),  # type: ignore[arg-type]
         model_library_service=model_library_service or FakeModelLibraryService(),  # type: ignore[arg-type]
     )
-
 
 ###############################################################################
 def test_partial_update_preserves_existing_settings_when_fields_are_omitted() -> None:
@@ -194,7 +186,6 @@ def test_partial_update_preserves_existing_settings_when_fields_are_omitted() ->
         "google_base_url": "https://google.example/v1",
         "deepseek_base_url": "https://deepseek.example/v1",
     }
-
 
 ###############################################################################
 def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> None:
@@ -218,7 +209,6 @@ def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> 
     assert settings_repo.last_update["google_base_url"] == "https://google.example/v1"
     assert settings_repo.last_update["deepseek_base_url"] == "https://deepseek.example/v1"
     assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
-
 
 ###############################################################################
 def test_updating_only_credentials_skips_unrelated_local_model_validation() -> None:
@@ -248,7 +238,6 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
     assert settings_repo.last_update["chat_model_name"] == "missing-chat"
     assert settings_repo.last_update["parser_model_name"] == "missing-parser"
     assert settings_repo.last_update["agent_model_name"] == "missing-agent"
-
 
 ###############################################################################
 @pytest.mark.parametrize(
@@ -286,7 +275,6 @@ def test_local_model_validation_rejects_unavailable_ollama_model(
     with pytest.raises(ChatSettingsValidationError, match=error_match):
         service.update_settings(ModelSettingsUpdateRequest(**payload))
 
-
 ###############################################################################
 def test_available_local_models_allow_update() -> None:
     settings_repo = FakeSettingsRepository()
@@ -312,7 +300,6 @@ def test_available_local_models_allow_update() -> None:
     assert settings_repo.last_update["chat_model_provider"] == "ollama"
     assert settings_repo.last_update["chat_model_name"] == "llama3.2"
 
-
 ###############################################################################
 def test_agent_model_without_tools_is_rejected() -> None:
     service = build_service(
@@ -333,7 +320,6 @@ def test_agent_model_without_tools_is_rejected() -> None:
                 agent_model_name="no-tools",
             )
         )
-
 
 ###############################################################################
 def test_parser_model_without_structured_output_is_rejected() -> None:

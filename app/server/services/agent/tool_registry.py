@@ -16,7 +16,6 @@ from server.services.llm.types import LLMToolDefinition
 ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
 NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
 
-
 ###############################################################################
 class ToolRegistry:
 

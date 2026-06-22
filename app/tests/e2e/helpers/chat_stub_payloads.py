@@ -28,7 +28,6 @@ ROME_MAP_SESSION = {
     "compliance_warnings": ["Demo alert summary for documented session."],
 }
 
-
 ###############################################################################
 def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     return {
@@ -49,7 +48,6 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
         "parser_confidence": 1.0,
     }
 
-
 ###############################################################################
 def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
@@ -60,7 +58,6 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
         },
         "trace": {"steps": ["stub"]},
     }
-
 
 ###############################################################################
 def chat_turn_map_response(
@@ -81,7 +78,6 @@ def chat_turn_map_response(
         },
     }
 
-
 ###############################################################################
 def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
     return {
@@ -96,7 +92,6 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
         },
     }
 
-
 ###############################################################################
 def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
     return {
@@ -108,7 +103,6 @@ def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any
         "map_session": None,
         "tool_payload": {"execution": "location_to_coordinates"},
     }
-
 
 ###############################################################################
 def model_settings_payload() -> dict[str, Any]:
@@ -125,7 +119,6 @@ def model_settings_payload() -> dict[str, Any]:
         "google_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": False}},
     }
-
 
 ###############################################################################
 def model_catalog_payload() -> dict[str, Any]:
@@ -176,7 +169,6 @@ def model_catalog_payload() -> dict[str, Any]:
         ],
     }
 
-
 ###############################################################################
 def split_role_settings_payload() -> dict[str, Any]:
     return {
@@ -192,7 +184,6 @@ def split_role_settings_payload() -> dict[str, Any]:
         "google_base_url": "https://generativelanguage.googleapis.com/v1beta",
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": True}},
     }
-
 
 ###############################################################################
 def chat_stream_events(

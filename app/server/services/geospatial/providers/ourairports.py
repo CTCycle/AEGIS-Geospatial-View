@@ -6,7 +6,6 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
 )
 
-
 ###############################################################################
 class OurAirportsProvider(GeospatialProvider):
     provider_id = "ourairports"

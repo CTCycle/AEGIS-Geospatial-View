@@ -7,7 +7,6 @@ from server.domain.geospatial.registry import RuntimeRegistrySnapshot
 from server.repositories.credentials import CredentialRepository
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
-
 ###############################################################################
 class RuntimeRegistry:
     CREDENTIAL_ENV_BY_PROVIDER = {

@@ -14,7 +14,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
@@ -102,7 +101,6 @@ class USGSProvider(GeospatialProvider):
             attribution=["U.S. Geological Survey"],
         )
 
-
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
@@ -140,7 +138,6 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
             }
         )
     return features
-
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
@@ -186,7 +183,6 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
         )
     return features
 
-
 ###############################################################################
 def _latest_usgs_value(values: list[object]) -> dict[str, object]:
     if not values or not isinstance(values[0], dict):
@@ -196,7 +192,6 @@ def _latest_usgs_value(values: list[object]) -> dict[str, object]:
         return {}
     latest = entries[-1]
     return latest if isinstance(latest, dict) else {}
-
 
 ###############################################################################
 def _unit_code(series: dict[str, object]) -> object:

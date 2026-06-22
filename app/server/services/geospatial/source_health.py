@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.domain.geographics import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
-
 ###############################################################################
 class SourceHealthMonitor:
 

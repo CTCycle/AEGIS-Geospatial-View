@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from server.configurations import DatabaseSettings
 from server.repositories.database.initializer import initialize_database
+
 ###############################################################################
 def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
@@ -44,6 +45,7 @@ def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> Non
     assert calls == created
 
 
+###############################################################################
 def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) -> None:
     settings = DatabaseSettings(
         database_path=str(tmp_path / "default.db"),
@@ -87,7 +89,6 @@ def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) 
 
     assert received == [settings]
 
-
 ###############################################################################
 def test_initialize_database_ensures_postgres_schema_when_external_mode(
     monkeypatch, tmp_path
@@ -125,6 +126,7 @@ def test_initialize_database_ensures_postgres_schema_when_external_mode(
     assert "server.repositories.database.postgres" in __import__("sys").modules
 
 
+###############################################################################
 def test_startup_path_seeds_reference_catalog_after_schema_creation(
     monkeypatch,
 ) -> None:

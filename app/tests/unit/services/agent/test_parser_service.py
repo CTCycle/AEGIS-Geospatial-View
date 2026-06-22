@@ -8,7 +8,6 @@ from server.services.agent.parser_service import ParserService
 from server.services.llm.prompts import PARSER_SYSTEM_PROMPT
 from server.services.llm.errors import LLMConfigurationError
 
-
 ###############################################################################
 class _ProviderStub:
 
@@ -93,7 +92,6 @@ class _ProviderStub:
             "parser_confidence": 0.5,
         }
 
-
 ###############################################################################
 class _FactoryStub:
 
@@ -101,14 +99,12 @@ class _FactoryStub:
     def get_provider(self, provider: str):  # noqa: ARG002
         return _ProviderStub()
 
-
 ###############################################################################
 class _ConfigErrorFactoryStub:
 
     # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
-
 
 ###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
@@ -120,7 +116,6 @@ def test_parser_service_classifies_direct_query() -> None:
     )
     assert result.task_class == "direct_query"
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
-
 
 ###############################################################################
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:
@@ -146,7 +141,6 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     assert recent[0]["turn_index"] == "0"
     assert recent[0]["content"] == ""
 
-
 ###############################################################################
 def test_parser_service_does_not_hide_configuration_errors() -> None:
     parser = ParserService(
@@ -162,13 +156,11 @@ def test_parser_service_does_not_hide_configuration_errors() -> None:
             conversation_messages=[],
         )
 
-
 ###############################################################################
 def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> None:
     assert "The user may write in any language" in PARSER_SYSTEM_PROMPT
     assert "raw_value must be a verbatim span" in PARSER_SYSTEM_PROMPT
     assert "requested_visualizations must use only canonical ids" in PARSER_SYSTEM_PROMPT
-
 
 ###############################################################################
 def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
@@ -180,7 +172,6 @@ def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
     )
     assert [item.raw_value for item in result.location_signals] == ["القاهرة"]
     assert result.ambiguities == []
-
 
 ###############################################################################
 def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:

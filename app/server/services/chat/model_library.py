@@ -8,7 +8,6 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import ModelDescriptor
 
-
 ###############################################################################
 class ChatModelLibraryService:
 

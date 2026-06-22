@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 from server.services.chat.settings_service import ChatSettingsService
 
-
 ###############################################################################
 class _SettingsRepo:
 
@@ -22,7 +21,6 @@ class _SettingsRepo:
             openai_base_url=None,
             google_base_url=None,
         )
-
 
 ###############################################################################
 class _CredentialsRepo:
@@ -42,7 +40,6 @@ class _CredentialsRepo:
             ),
         ]
 
-
 ###############################################################################
 class _Crypto:
 
@@ -51,7 +48,6 @@ class _Crypto:
         if encrypted_value == "broken":
             raise ValueError("bad key")
         return "secret"
-
 
 ###############################################################################
 def test_settings_response_reports_credential_health() -> None:

@@ -7,6 +7,7 @@ from server.services.geospatial.providers.openchargemap import OpenChargeMapProv
 from server.services.geospatial.providers.overture import OvertureProvider
 
 
+###############################################################################
 def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
     async def fetcher(url, headers):
         del url, headers
@@ -33,7 +34,6 @@ def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
 
     assert response.payload["features"][0]["category"] == "ev_charging"
     assert response.payload["features"][0]["source"] == "openchargemap"
-
 
 ###############################################################################
 def test_overture_maps_exposes_ingestion_source_descriptor() -> None:

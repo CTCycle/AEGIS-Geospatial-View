@@ -6,7 +6,6 @@ from typing import Any
 
 from server.domain.geospatial.search import IndexedFeature, SearchIndex
 
-
 ###############################################################################
 def build_feature_search_index(features: list[IndexedFeature]) -> SearchIndex:
     terms: dict[str, list[str]] = {}
@@ -14,7 +13,6 @@ def build_feature_search_index(features: list[IndexedFeature]) -> SearchIndex:
         for term in _terms_for_feature(feature):
             terms.setdefault(term, []).append(feature.id)
     return SearchIndex(features=features, terms=terms)
-
 
 ###############################################################################
 def deduplicate_features(features: list[IndexedFeature]) -> list[IndexedFeature]:
@@ -32,7 +30,6 @@ def deduplicate_features(features: list[IndexedFeature]) -> list[IndexedFeature]
         seen.add(key)
         deduped.append(feature)
     return deduped
-
 
 ###############################################################################
 def build_geojson_search_index(path: str | Path) -> SearchIndex:
@@ -56,7 +53,6 @@ def build_geojson_search_index(path: str | Path) -> SearchIndex:
         )
     return build_feature_search_index(indexed)
 
-
 ###############################################################################
 def query_search_index(index: SearchIndex, query: str, *, limit: int = 20) -> list[IndexedFeature]:
     wanted = {term for term in _tokenize(query) if term}
@@ -70,7 +66,6 @@ def query_search_index(index: SearchIndex, query: str, *, limit: int = 20) -> li
     ranked_ids = sorted(score_by_id, key=lambda item: (-score_by_id[item], item))
     return [feature_by_id[feature_id] for feature_id in ranked_ids[:limit] if feature_id in feature_by_id]
 
-
 ###############################################################################
 def _terms_for_feature(feature: IndexedFeature) -> set[str]:
     values = [feature.label, feature.category or "", feature.source or ""]
@@ -80,12 +75,10 @@ def _terms_for_feature(feature: IndexedFeature) -> set[str]:
         terms.update(_tokenize(value))
     return terms
 
-
 ###############################################################################
 def _tokenize(value: str) -> list[str]:
     cleaned = "".join(char.lower() if char.isalnum() else " " for char in value)
     return [term for term in cleaned.split() if len(term) >= 2]
-
 
 ###############################################################################
 def _point_coordinates(geometry: Any) -> tuple[float, float] | None:

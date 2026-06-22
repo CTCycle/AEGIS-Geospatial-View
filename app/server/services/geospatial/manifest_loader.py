@@ -11,11 +11,9 @@ from server.domain.geographics import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
 
-
 ###############################################################################
 class ManifestValidationError(ValueError):
     pass
-
 
 ###############################################################################
 class GeospatialManifestLoader:

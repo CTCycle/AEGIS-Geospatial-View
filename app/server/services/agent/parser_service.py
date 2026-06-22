@@ -26,7 +26,6 @@ from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class ParserService:
 

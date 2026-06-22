@@ -59,7 +59,6 @@ class GeospatialTileRequestError(GeospatialApiServiceError):
 class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
-
 ###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
     if isinstance(value, dict) and value.get("type") == "FeatureCollection":

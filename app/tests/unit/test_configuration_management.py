@@ -17,11 +17,9 @@ from server.configurations.startup import (
     reload_settings_for_tests,
 )
 
-
 ###############################################################################
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
-
 
 ###############################################################################
 def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
@@ -43,7 +41,6 @@ def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
     assert manager.get_value("jobs", "polling_interval") == 2.5
     assert manager.get_value("jobs", "missing", 99) == 99
 
-
 ###############################################################################
 def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
@@ -64,7 +61,6 @@ def test_configuration_manager_reload_updates_values(tmp_path: Path) -> None:
     assert app_settings.jobs.polling_interval == 3.0
     assert manager.server_settings.jobs.polling_interval == 3.0
 
-
 ###############################################################################
 def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -> None:
     config_file = tmp_path / "configurations.json"
@@ -82,13 +78,11 @@ def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -
     assert "database" not in persisted
     assert persisted["jobs"]["polling_interval"] == 1.5
 
-
 ###############################################################################
 def test_configuration_manager_fails_on_missing_file(tmp_path: Path) -> None:
     manager = ConfigurationManager(config_path=tmp_path / "missing.json")
     with pytest.raises(RuntimeError, match="Configuration file not found"):
         manager.load()
-
 
 ###############################################################################
 def test_startup_loads_environment_before_settings(monkeypatch, tmp_path: Path) -> None:
@@ -106,11 +100,9 @@ def test_startup_loads_environment_before_settings(monkeypatch, tmp_path: Path) 
     app_settings = get_configuration_manager(config_path=config_file).configuration
     assert app_settings.fastapi_port == 6100
 
-
 ###############################################################################
 def test_no_server_settings_global_export() -> None:
     assert not hasattr(configurations, "server_settings")
-
 
 ###############################################################################
 def test_environment_loader_is_idempotent(monkeypatch, tmp_path: Path) -> None:
@@ -134,7 +126,6 @@ def test_environment_loader_is_idempotent(monkeypatch, tmp_path: Path) -> None:
         == 4555
     )
     reload_settings_for_tests()
-
 
 ###############################################################################
 def test_get_server_settings_returns_runtime_settings(

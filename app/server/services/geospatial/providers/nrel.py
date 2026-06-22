@@ -23,7 +23,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class NRELProvider(GeospatialProvider):
     provider_id = "nrel"

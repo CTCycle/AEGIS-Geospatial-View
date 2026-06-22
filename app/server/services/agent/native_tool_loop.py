@@ -23,7 +23,6 @@ from server.services.llm.types import (
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class NativeToolLoop:
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
-
 ###############################################################################
 class OvertureProvider:
     provider_id = "overture"

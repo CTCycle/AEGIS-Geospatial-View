@@ -5,7 +5,6 @@ import pytest
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -13,7 +12,6 @@ def _tool() -> LLMToolDefinition:
         description="List catalog",
         parameters_json_schema={"type": "object", "properties": {}},
     )
-
 
 ###############################################################################
 def test_openai_converts_tool_definitions() -> None:
@@ -26,7 +24,6 @@ def test_openai_converts_tool_definitions() -> None:
             "parameters": {"type": "object", "properties": {}},
         },
     }
-
 
 ###############################################################################
 def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
@@ -59,7 +56,6 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
         "tool_call_id": "call-1",
         "content": "{\"ok\":true}",
     }
-
 
 ###############################################################################
 def test_openai_rejects_tools_plus_response_schema() -> None:

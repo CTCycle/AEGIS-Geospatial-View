@@ -16,7 +16,6 @@ class ConversationContextSnapshot(BaseModel):
     recent_messages: list[dict[str, str]] = Field(default_factory=list)
     memory_snapshot: dict[str, object] = Field(default_factory=dict)
 
-
 ###############################################################################
 class LocationSignal(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -20,11 +20,9 @@ GEOSPATIAL_LAYERS_REFERENCE_FILE_NAME = "geospatial_layers.json"
 GIBS_TILE_MATRIX_SETS_REFERENCE_FILE_NAME = "gibs_tile_matrix_sets.json"
 GIBS_LAYER_DEFAULTS_REFERENCE_FILE_NAME = "gibs_layer_defaults.json"
 
-
 ###############################################################################
 def get_catalog_root() -> Path:
     return PROJECT_DIR / "resources" / "catalog"
-
 
 ###############################################################################
 def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog:
@@ -51,7 +49,6 @@ def load_reference_catalog(catalog_root: Path | None = None) -> ReferenceCatalog
         gibs_layer_defaults=tuple(gibs_layer_defaults),
     )
 
-
 ###############################################################################
 def _load_json_file(path: Path) -> dict[str, Any]:
     if not path.is_file():
@@ -62,11 +59,9 @@ def _load_json_file(path: Path) -> dict[str, Any]:
         raise ValueError(f"Reference catalog file must contain an object: {path}")
     return payload
 
-
 ###############################################################################
 def _normalize_alias_key(value: str) -> str:
     return value.strip().casefold()
-
 
 ###############################################################################
 def _require_string(value: Any, *, field_name: str) -> str:
@@ -75,14 +70,12 @@ def _require_string(value: Any, *, field_name: str) -> str:
         raise ValueError(f"{field_name} must be a non-empty string.")
     return normalized
 
-
 ###############################################################################
 def _require_iso2(value: Any, *, field_name: str) -> str:
     normalized = _require_string(value, field_name=field_name).upper()
     if len(normalized) != 2:
         raise ValueError(f"{field_name} must be a two-letter ISO2 code.")
     return normalized
-
 
 ###############################################################################
 def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
@@ -101,7 +94,6 @@ def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
         seen_iso2.add(iso2)
         countries.append(CountryReferenceEntry(iso2=iso2, name=name))
     return countries
-
 
 ###############################################################################
 def _parse_country_aliases(
@@ -129,7 +121,6 @@ def _parse_country_aliases(
         seen_aliases.add(alias_key)
         aliases.append(CountryAliasReferenceEntry(alias=alias, iso2=iso2))
     return aliases
-
 
 ###############################################################################
 def _parse_geospatial_layers(
@@ -167,7 +158,6 @@ def _parse_geospatial_layers(
             )
         )
     return layers
-
 
 ###############################################################################
 def _parse_gibs_tile_matrix_sets(
@@ -207,7 +197,6 @@ def _parse_gibs_tile_matrix_sets(
             )
         )
     return tile_matrix_sets
-
 
 ###############################################################################
 def _parse_gibs_layer_defaults(
@@ -249,7 +238,6 @@ def _parse_gibs_layer_defaults(
             )
         )
     return defaults
-
 
 ###############################################################################
 def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:

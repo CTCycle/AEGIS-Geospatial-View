@@ -4,7 +4,6 @@ import json
 
 from server.repositories.model_settings import ModelSettingsRepository
 
-
 ###############################################################################
 def test_parser_model_fields_round_trip() -> None:
     repo = ModelSettingsRepository()
@@ -23,7 +22,6 @@ def test_parser_model_fields_round_trip() -> None:
     current = repo.get_or_create()
     assert current.parser_model_provider == "ollama"
     assert current.parser_model_name == "llama3.2"
-
 
 ###############################################################################
 def test_get_or_create_uses_current_schema_defaults() -> None:

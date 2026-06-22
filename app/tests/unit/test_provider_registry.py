@@ -16,7 +16,6 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
-
 ###############################################################################
 class _Provider:
     provider_id = "example"
@@ -28,7 +27,6 @@ class _Provider:
             provider_id=self.provider_id,
             payload={"ok": True},
         )
-
 
 ###############################################################################
 class _TimeoutProvider:
@@ -42,7 +40,6 @@ class _TimeoutProvider:
             provider_id=self.provider_id,
             payload={"ok": True},
         )
-
 
 ###############################################################################
 class _FlakyProvider:
@@ -63,7 +60,6 @@ class _FlakyProvider:
             payload={"attempts": self.calls},
         )
 
-
 ###############################################################################
 class _AuthProvider:
     provider_id = "auth"
@@ -77,7 +73,6 @@ class _AuthProvider:
         self.calls += 1
         raise ProviderAuthError("missing key")
 
-
 ###############################################################################
 def test_provider_registry_registers_and_fetches_provider() -> None:
     registry = ProviderRegistry(providers=[_Provider()])
@@ -89,7 +84,6 @@ def test_provider_registry_registers_and_fetches_provider() -> None:
     assert registry.list_provider_ids() == ["example"]
     assert response.payload == {"ok": True}
 
-
 ###############################################################################
 def test_provider_registry_errors_for_missing_provider() -> None:
     registry = ProviderRegistry()
@@ -100,7 +94,6 @@ def test_provider_registry_errors_for_missing_provider() -> None:
         assert "missing" in str(exc)
     else:
         raise AssertionError("Missing provider unexpectedly resolved.")
-
 
 ###############################################################################
 def test_provider_registry_builds_manifest_backed_providers() -> None:
@@ -114,7 +107,6 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
     assert "osm" not in registry.list_provider_ids()
     assert "gibs" in registry.list_provider_ids()
 
-
 ###############################################################################
 def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
     registry = ProviderRegistry()
@@ -122,7 +114,6 @@ def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:
     registry.build_from_manifests()
 
     assert "osm_tiles" not in registry.list_provider_ids()
-
 
 ###############################################################################
 def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
@@ -157,7 +148,6 @@ def test_provider_registry_raises_for_unknown_fetchable_provider() -> None:
     else:
         raise AssertionError("Unknown fetchable provider unexpectedly registered.")
 
-
 ###############################################################################
 def test_provider_registry_times_out_slow_provider() -> None:
     registry = ProviderRegistry(
@@ -172,7 +162,6 @@ def test_provider_registry_times_out_slow_provider() -> None:
     else:
         raise AssertionError("Slow provider unexpectedly succeeded.")
 
-
 ###############################################################################
 def test_provider_registry_retries_transient_provider_failure() -> None:
     provider = _FlakyProvider()
@@ -186,7 +175,6 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
     )
 
     assert response.payload == {"attempts": 2}
-
 
 ###############################################################################
 def test_provider_registry_does_not_retry_auth_errors() -> None:
@@ -203,7 +191,6 @@ def test_provider_registry_does_not_retry_auth_errors() -> None:
     else:
         raise AssertionError("Auth provider unexpectedly succeeded.")
     assert provider.calls == 1
-
 
 ###############################################################################
 def test_provider_registry_opens_circuit_after_repeated_failures() -> None:

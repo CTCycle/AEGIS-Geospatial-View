@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 
-
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
     template = RenderDescriptorService.build_wms_tile_template(
@@ -25,7 +24,6 @@ def test_render_descriptor_service_builds_complete_wms_template() -> None:
     assert "height=256" in template
     assert "transparent=true" in template
     assert "time=2026-06-18" in template
-
 
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wmts_template() -> None:

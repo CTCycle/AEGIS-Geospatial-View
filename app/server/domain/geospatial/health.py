@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 
 from server.domain.geographics import LayerHealthStatus
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class SourceHealthRecord:

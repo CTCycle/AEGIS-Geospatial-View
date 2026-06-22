@@ -8,7 +8,6 @@ from server.domain.extraction.models import (
 )
 from server.services.agent.overlay_inference import OverlayInferenceService
 
-
 ###############################################################################
 def _turn(
     user_text: str,
@@ -32,11 +31,9 @@ def _turn(
         parser_confidence=0.9,
     )
 
-
 ###############################################################################
 def _location() -> ResolvedLocation:
     return ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5, confidence=0.9)
-
 
 ###############################################################################
 def test_overlay_inference_matches_traffic_intent() -> None:
@@ -49,7 +46,6 @@ def test_overlay_inference_matches_traffic_intent() -> None:
     assert "tomtom_traffic_flow" in result.overlay_ids
     assert "tomtom_traffic_flow" in result.reasons
 
-
 ###############################################################################
 def test_overlay_inference_matches_precipitation_intent() -> None:
     result = OverlayInferenceService().infer_overlays(
@@ -60,7 +56,6 @@ def test_overlay_inference_matches_precipitation_intent() -> None:
 
     assert "rainviewer_precipitation_radar" in result.overlay_ids
 
-
 ###############################################################################
 def test_overlay_inference_matches_air_quality_intent() -> None:
     result = OverlayInferenceService().infer_overlays(
@@ -70,7 +65,6 @@ def test_overlay_inference_matches_air_quality_intent() -> None:
     )
 
     assert "openaq_air_quality" in result.overlay_ids
-
 
 ###############################################################################
 def test_overlay_inference_respects_existing_overlays() -> None:

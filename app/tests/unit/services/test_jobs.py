@@ -6,7 +6,6 @@ from server.common.constants import JOB_STATUS_CANCELLED, JOB_STATUS_QUEUED, JOB
 from server.domain.chat import ChatStreamEvent, ChatTurnRequest
 from server.services.jobs import BackgroundJobService
 
-
 ###############################################################################
 class _ChatStreamingStub:
 
@@ -24,12 +23,10 @@ class _MapSessionStub:
     def model_dump(self, mode: str = "json") -> dict[str, object]:
         return {"session_id": "map-test"}
 
-
 ###############################################################################
 async def _map_runner(payload):  # noqa: ANN001
     _ = payload
     return _MapSessionStub()
-
 
 ###############################################################################
 def _build_service() -> BackgroundJobService:
@@ -38,7 +35,6 @@ def _build_service() -> BackgroundJobService:
         map_search_runner=_map_runner,
         polling_interval=1.0,
     )
-
 
 ###############################################################################
 def test_create_chat_job_is_idempotent() -> None:
@@ -49,7 +45,6 @@ def test_create_chat_job_is_idempotent() -> None:
     assert first.job_id == second.job_id
     assert first.status == JOB_STATUS_QUEUED
 
-
 ###############################################################################
 def test_cancel_queued_job_marks_it_cancelled() -> None:
     service = _build_service()
@@ -58,7 +53,6 @@ def test_cancel_queued_job_marks_it_cancelled() -> None:
     status = service.get_job(created.job_id)
     assert cancelled is not None and cancelled.success is True
     assert status is not None and status.status == JOB_STATUS_CANCELLED
-
 
 ###############################################################################
 def test_worker_completes_chat_job() -> None:

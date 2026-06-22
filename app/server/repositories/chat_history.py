@@ -13,13 +13,11 @@ from server.repositories.schemas.models import (
     ChatSessionRecord,
 )
 
-
 ###############################################################################
 def _to_json_payload(value: Any) -> str | None:
     if value is None:
         return None
     return json.dumps(value, default=str)
-
 
 ###############################################################################
 def _from_json_payload(value: str | None) -> Any:
