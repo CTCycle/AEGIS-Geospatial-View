@@ -4,6 +4,11 @@ import {
   API_CHAT_SETTINGS_PATH,
   API_CHAT_STREAM_PATH,
   API_CHAT_TURN_PATH,
+  API_CONVERSATION_RUN_CANCEL_PATH,
+  API_CONVERSATION_RUN_EVENTS_PATH,
+  API_CONVERSATION_RUN_STEERING_PATH,
+  API_CONVERSATION_RUNS_PATH,
+  API_CONVERSATIONS_PATH,
   API_GEOSPATIAL_AUDIT_PATH,
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
@@ -28,9 +33,14 @@ import {
 } from './api-parsers';
 import {
   CatalogResponse,
+  AgentRunCancelResponse,
+  AgentRunCreateRequest,
+  AgentRunCreateResponse,
   ChatStreamEvent,
   ChatTurnRequest,
   ChatTurnResponse,
+  ConversationCreateRequest,
+  ConversationCreateResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
@@ -41,6 +51,8 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
+  SteeringMessageRequest,
+  SteeringMessageResponse,
 } from './types';
 import { isRecord } from './type-guards';
 
@@ -223,6 +235,64 @@ export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnRe
     body: JSON.stringify(payload),
   });
   return parseChatTurnResponse(data);
+};
+
+export const createConversation = async (
+  payload: ConversationCreateRequest,
+): Promise<ConversationCreateResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATIONS_PATH}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return data as ConversationCreateResponse;
+};
+
+export const createAgentRun = async (
+  conversationId: string,
+  payload: AgentRunCreateRequest,
+): Promise<AgentRunCreateResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_RUNS_PATH(conversationId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return data as AgentRunCreateResponse;
+};
+
+export const sendRunSteering = async (
+  conversationId: string,
+  runId: string,
+  payload: SteeringMessageRequest,
+): Promise<SteeringMessageResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_RUN_STEERING_PATH(conversationId, runId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return data as SteeringMessageResponse;
+};
+
+export const cancelAgentRun = async (
+  conversationId: string,
+  runId: string,
+): Promise<AgentRunCancelResponse> => {
+  const data = await executeApiRequest(`${API_BASE_URL}${API_CONVERSATION_RUN_CANCEL_PATH(conversationId, runId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: 'user_cancelled' }),
+  });
+  return data as AgentRunCancelResponse;
+};
+
+export const openRunEventSource = (
+  conversationId: string,
+  runId: string,
+  afterEventId?: string,
+): EventSource => {
+  const path = API_CONVERSATION_RUN_EVENTS_PATH(conversationId, runId);
+  const suffix = afterEventId ? `?after_event_id=${encodeURIComponent(afterEventId)}` : '';
+  return new EventSource(`${API_BASE_URL}${path}${suffix}`);
 };
 
 export const streamChatTurn = async (

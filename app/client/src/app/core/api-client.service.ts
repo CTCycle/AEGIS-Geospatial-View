@@ -2,6 +2,9 @@ import { Injectable } from '@angular/core';
 
 import {
   checkOllamaHealth,
+  cancelAgentRun,
+  createAgentRun,
+  createConversation,
   fetchCatalog,
   fetchChatModels,
   fetchChatSettings,
@@ -14,12 +17,19 @@ import {
   pullOllamaModel,
   refreshOllamaModels,
   sendChatTurn,
+  sendRunSteering,
+  openRunEventSource,
   updateChatSettings,
 } from './api';
 import {
   CatalogResponse,
+  AgentRunCancelResponse,
+  AgentRunCreateRequest,
+  AgentRunCreateResponse,
   ChatTurnRequest,
   ChatTurnResponse,
+  ConversationCreateRequest,
+  ConversationCreateResponse,
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
@@ -28,6 +38,8 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
+  SteeringMessageRequest,
+  SteeringMessageResponse,
 } from './types';
 
 @Injectable({ providedIn: 'root' })
@@ -67,6 +79,30 @@ export class ApiClientService {
 
   sendChatTurn(payload: ChatTurnRequest): Promise<ChatTurnResponse> {
     return sendChatTurn(payload);
+  }
+
+  createConversation(payload: ConversationCreateRequest): Promise<ConversationCreateResponse> {
+    return createConversation(payload);
+  }
+
+  createAgentRun(conversationId: string, payload: AgentRunCreateRequest): Promise<AgentRunCreateResponse> {
+    return createAgentRun(conversationId, payload);
+  }
+
+  sendRunSteering(
+    conversationId: string,
+    runId: string,
+    payload: SteeringMessageRequest,
+  ): Promise<SteeringMessageResponse> {
+    return sendRunSteering(conversationId, runId, payload);
+  }
+
+  cancelAgentRun(conversationId: string, runId: string): Promise<AgentRunCancelResponse> {
+    return cancelAgentRun(conversationId, runId);
+  }
+
+  openRunEventSource(conversationId: string, runId: string, afterEventId?: string): EventSource {
+    return openRunEventSource(conversationId, runId, afterEventId);
   }
 
   fetchChatModels(provider?: 'deepseek'): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> {

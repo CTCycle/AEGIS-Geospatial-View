@@ -18,6 +18,7 @@ import {
   ChatRole,
   ChatTurnResponse,
   ContextUsage,
+  RunEvent,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
@@ -39,6 +40,13 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   mapState = { overlayVisibility: {}, overlayOpacity: {} } as PersistedChatPageState['mapState'];
 
   sessionId?: number;
+  conversationId?: string;
+  activeRunId?: string;
+  activeRunVersion?: number;
+  lastRunEventId?: string;
+  streamState: PersistedChatPageState['chatPanel']['streamState'] = 'idle';
+  progressStage?: string;
+  progressLabel?: string;
   conversationNonce = 1;
   messages: ChatMessage[] = [];
   lastDecision?: ChatTurnResponse['decision'];
@@ -62,6 +70,11 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   private readonly chatPageState: PersistedChatPageState;
   private mouseMoveHandler?: (event: MouseEvent) => void;
   private mouseUpHandler?: () => void;
+  private activeEventSource?: EventSource;
+  private seenEventIds = new Set<string>();
+  private currentAssistantMessageId?: string;
+  private steeringMutationCounter = 0;
+  private reconnectAttempts = 0;
 
   constructor(
     private readonly router: Router,
@@ -78,6 +91,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.mapState = this.chatPageState.mapState;
 
     this.sessionId = this.chatPageState.chatPanel.sessionId;
+    this.conversationId = this.chatPageState.chatPanel.conversationId;
+    this.activeRunId = this.chatPageState.chatPanel.activeRunId;
+    this.activeRunVersion = this.chatPageState.chatPanel.activeRunVersion;
+    this.lastRunEventId = this.chatPageState.chatPanel.lastRunEventId;
+    this.streamState = this.chatPageState.chatPanel.streamState ?? 'idle';
+    this.progressStage = this.chatPageState.chatPanel.progressStage;
+    this.progressLabel = this.chatPageState.chatPanel.progressLabel;
+    this.seenEventIds = new Set(this.chatPageState.chatPanel.seenRunEventIds ?? []);
     this.conversationNonce = this.chatPageState.chatPanel.conversationNonce;
     this.messages = this.chatPageState.chatPanel.messages;
     this.lastDecision = this.chatPageState.chatPanel.lastDecision;
@@ -97,6 +118,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.closeActiveEventSource();
     this.stopResize();
     this.syncState();
   }
@@ -179,6 +201,15 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   startNewChat(): void {
     this.sessionId = undefined;
+    this.conversationId = undefined;
+    this.activeRunId = undefined;
+    this.activeRunVersion = undefined;
+    this.lastRunEventId = undefined;
+    this.streamState = 'idle';
+    this.progressStage = undefined;
+    this.progressLabel = undefined;
+    this.seenEventIds.clear();
+    this.closeActiveEventSource();
     this.conversationNonce += 1;
     this.messages = [];
     this.lastDecision = undefined;
@@ -259,7 +290,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   async sendMessage(): Promise<void> {
     const trimmed = this.composerDraft.trim();
-    if (!trimmed || this.isLoading) {
+    if (!trimmed) {
       return;
     }
 
@@ -269,33 +300,224 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.composerDraft = '';
+    if (this.activeRunId && this.conversationId && this.isLoading) {
+      await this.sendSteeringMessage(message);
+      return;
+    }
+    await this.startAgentRun(message, requestNonce);
+  }
+
+  private async startAgentRun(message: string, requestNonce: number): Promise<void> {
     this.isLoading = true;
-    this.status = 'Searching map data';
+    this.status = 'AEGIS agent started';
+    this.progressLabel = 'AEGIS agent started';
     this.progressPercent = 18;
-    this.messages = [...this.messages, { role: 'user', content: message }];
+    this.messages = [...this.messages, { role: 'user', content: message, kind: 'normal' }];
     this.assistantDraft = '';
     this.syncState();
 
     try {
-      const result = await this.apiClient.sendChatTurn({
-        session_id: this.sessionId,
+      const conversation = this.conversationId
+        ? { conversation_id: this.conversationId }
+        : await this.apiClient.createConversation({ title: message.slice(0, 120) });
+      if (requestNonce !== this.conversationNonce) {
+        return;
+      }
+      this.conversationId = conversation.conversation_id;
+      const run = await this.apiClient.createAgentRun(conversation.conversation_id, {
         message,
+        client_request_id: `client_req_${Date.now()}`,
       });
-      this.applyTurnResponse(result, requestNonce);
+      this.activeRunId = run.run_id;
+      this.activeRunVersion = run.run_version;
+      this.streamState = 'connecting';
+      this.openRunEventStream(run.conversation_id, run.run_id);
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
-        'Could not complete this request right now.',
+        'Could not start this request right now.',
       );
       this.status = 'Failed';
+      this.progressLabel = 'Failed';
       this.assistantDraft = '';
       this.messages = [...this.messages, { role: 'assistant', content: fallback }];
       this.progressPercent = 0;
-    } finally {
       this.isLoading = false;
+    } finally {
       this.syncState();
       queueMicrotask(() => this.scrollTranscriptToBottom());
     }
+  }
+
+  private async sendSteeringMessage(message: string): Promise<void> {
+    if (!this.conversationId || !this.activeRunId) {
+      return;
+    }
+    const clientMutationId = `client_steer_${Date.now()}_${++this.steeringMutationCounter}`;
+    this.messages = [
+      ...this.messages,
+      { role: 'user', content: message, kind: 'steering', runVersion: this.activeRunVersion },
+    ];
+    this.status = 'Request updated';
+    this.progressLabel = 'Request updated';
+    this.syncState();
+    try {
+      const response = await this.apiClient.sendRunSteering(this.conversationId, this.activeRunId, {
+        message,
+        client_mutation_id: clientMutationId,
+      });
+      this.activeRunVersion = response.run_version;
+    } catch (error: unknown) {
+      const fallback = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not apply that refinement.',
+      );
+      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+    } finally {
+      this.syncState();
+      queueMicrotask(() => this.scrollTranscriptToBottom());
+    }
+  }
+
+  async cancelActiveRun(): Promise<void> {
+    if (!this.conversationId || !this.activeRunId) {
+      return;
+    }
+    try {
+      await this.apiClient.cancelAgentRun(this.conversationId, this.activeRunId);
+      this.status = 'Cancelled';
+      this.progressLabel = 'Cancelled';
+      this.isLoading = false;
+      this.activeRunId = undefined;
+      this.closeActiveEventSource();
+    } catch (error: unknown) {
+      const fallback = this.userFacingErrorService.toUserFacingError(
+        error,
+        'Could not cancel the active run.',
+      );
+      this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+    } finally {
+      this.syncState();
+    }
+  }
+
+  private openRunEventStream(conversationId: string, runId: string, afterEventId = this.lastRunEventId): void {
+    this.closeActiveEventSource();
+    this.streamState = afterEventId ? 'reconnecting' : 'connecting';
+    const source = this.apiClient.openRunEventSource(conversationId, runId, afterEventId);
+    this.activeEventSource = source;
+    source.onopen = () => {
+      this.streamState = 'open';
+      this.reconnectAttempts = 0;
+      this.syncState();
+    };
+    const eventTypes = [
+      'progress',
+      'assistant_text_delta',
+      'assistant_text_completed',
+      'tool_started',
+      'tool_completed',
+      'request_updated',
+      'error',
+      'completed',
+      'cancelled',
+    ];
+    eventTypes.forEach((type) => {
+      source.addEventListener(type, (event) => {
+        const parsed = JSON.parse((event as MessageEvent<string>).data) as RunEvent;
+        this.handleRunEvent(parsed);
+      });
+    });
+    source.onerror = () => {
+      if (!this.activeRunId || !this.conversationId || !this.isLoading) {
+        this.closeActiveEventSource();
+        return;
+      }
+      this.streamState = 'reconnecting';
+      this.closeActiveEventSource();
+      if (this.reconnectAttempts >= 3) {
+        this.streamState = 'failed';
+        this.progressLabel = 'Stream disconnected; reconnect later to replay updates.';
+        this.syncState();
+        return;
+      }
+      this.reconnectAttempts += 1;
+      window.setTimeout(() => {
+        if (this.conversationId && this.activeRunId && this.isLoading) {
+          this.openRunEventStream(this.conversationId, this.activeRunId, this.lastRunEventId);
+        }
+      }, 750 * this.reconnectAttempts);
+      this.syncState();
+    };
+  }
+
+  private handleRunEvent(event: RunEvent): void {
+    if (this.seenEventIds.has(event.event_id)) {
+      return;
+    }
+    this.seenEventIds.add(event.event_id);
+    this.lastRunEventId = event.event_id;
+    this.activeRunVersion = event.run_version;
+    switch (event.type) {
+      case 'progress':
+      case 'tool_started':
+      case 'tool_completed':
+        this.progressStage = String(event.payload['stage'] ?? event.type);
+        this.progressLabel = String(event.payload['label'] ?? this.progressLabel ?? this.status);
+        this.status = this.progressLabel;
+        break;
+      case 'assistant_text_delta':
+        this.currentAssistantMessageId = event.event_id;
+        this.assistantDraft += String(event.payload['delta'] ?? '');
+        break;
+      case 'assistant_text_completed':
+        this.assistantDraft = '';
+        this.currentAssistantMessageId = undefined;
+        this.messages = [...this.messages, { role: 'assistant', content: String(event.payload['content'] ?? '') }];
+        break;
+      case 'request_updated':
+        this.progressStage = 'request_updated';
+        this.progressLabel = String(event.payload['label'] ?? 'Request updated');
+        this.status = 'Request updated';
+        break;
+      case 'error':
+        this.status = 'Failed';
+        this.progressLabel = 'Failed';
+        this.messages = [...this.messages, { role: 'assistant', content: String(event.payload['message'] ?? 'Failed') }];
+        this.isLoading = false;
+        this.closeActiveEventSource();
+        break;
+      case 'completed':
+        this.isLoading = false;
+        this.status = 'Complete';
+        this.progressLabel = 'Completed';
+        this.progressPercent = 100;
+        this.activeRunId = undefined;
+        this.streamState = 'closed';
+        this.applyRunCompletionPayload(event.payload);
+        this.closeActiveEventSource();
+        break;
+      case 'cancelled':
+        this.isLoading = false;
+        this.status = 'Cancelled';
+        this.progressLabel = 'Cancelled';
+        this.activeRunId = undefined;
+        this.streamState = 'closed';
+        this.closeActiveEventSource();
+        break;
+    }
+    this.syncState();
+    queueMicrotask(() => this.scrollTranscriptToBottom());
+  }
+
+  private applyRunCompletionPayload(payload: Record<string, unknown>): void {
+    const mapSession = normalizeMapSession(payload['map_session']);
+    if (mapSession) {
+      this.handleMapSession(mapSession);
+    }
+    this.lastOperation = payload['operation'] as ChatOperationResult | null | undefined;
+    this.memorySnapshot = (payload['memory_snapshot'] as Record<string, unknown> | undefined) ?? this.memorySnapshot;
+    this.contextUsage = payload['context_usage'] as ContextUsage | undefined;
   }
 
   private applyTurnResponse(result: ChatTurnResponse, requestNonce: number): void {
@@ -361,6 +583,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       payload: this.payload,
       chatPanel: {
         sessionId: this.sessionId,
+        conversationId: this.conversationId,
+        activeRunId: this.activeRunId,
+        activeRunVersion: this.activeRunVersion,
+        lastRunEventId: this.lastRunEventId,
+        streamState: this.streamState,
+        progressStage: this.progressStage,
+        progressLabel: this.progressLabel,
+        seenRunEventIds: [...this.seenEventIds].slice(-100),
         conversationNonce: this.conversationNonce,
         messages: this.messages,
         lastDecision: this.lastDecision,
@@ -396,6 +626,11 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       window.removeEventListener('mouseup', this.mouseUpHandler);
       this.mouseUpHandler = undefined;
     }
+  }
+
+  private closeActiveEventSource(): void {
+    this.activeEventSource?.close();
+    this.activeEventSource = undefined;
   }
 
   private scrollTranscriptToBottom(): void {

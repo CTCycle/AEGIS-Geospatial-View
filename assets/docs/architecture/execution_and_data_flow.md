@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-19
+Last updated: 2026-06-22
 
 ## Layering
 
@@ -76,6 +76,8 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - FastAPI route handlers are predominantly `async`.
 - `POST /api/chat/stream` uses streaming NDJSON.
 - Chat jobs run asynchronously through `/api/chat/jobs` and are observed through `/api/jobs/{job_id}`.
+- Conversation runs use `POST /api/conversations/{conversation_id}/runs` for creation and `GET /api/conversations/{conversation_id}/runs/{run_id}/events` for SSE delivery.
+- User steering during an active run is aggregated into the same run through `POST /api/conversations/{conversation_id}/runs/{run_id}/steering`; it does not create a child task or queue.
 
 ### Threaded
 
@@ -89,3 +91,5 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - `app/server/services/jobs.py` defines the single in-memory `BackgroundJobService` used for chat and map jobs.
 - Distributed or high-concurrency workloads would require an external queue/worker model.
 - Async endpoints must avoid blocking CPU-heavy work on the event loop.
+- Run event fanout is in-process in v1, with persisted event replay as the reconnect source of truth.
+- Run cancellation is cooperative and terminal; stale agent results after a version change are persisted as internal diagnostics and discarded from user-visible completion.

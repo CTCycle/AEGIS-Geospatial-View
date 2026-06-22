@@ -21,7 +21,6 @@ from server.services.geospatial.providers.base import (
     ProviderTimeoutError,
 )
 
-
 ###############################################################################
 def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
     client = TestClient(create_app())
@@ -32,7 +31,6 @@ def test_geospatial_transit_features_return_metadata_until_feed_configured() -> 
     payload = response.json()
     assert payload["status"] == "ok"
     assert payload["payload"]["renderingMode"] == "metadata-only"
-
 
 ###############################################################################
 def test_geospatial_features_reports_missing_credentials_without_500() -> None:
@@ -344,7 +342,6 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
     assert payload["required"] is True
     assert payload["configured"] is True
     assert payload["environmentVariable"] == "WINDY_WEBCAMS_API_KEY"
-
 
 ###############################################################################
 def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> None:

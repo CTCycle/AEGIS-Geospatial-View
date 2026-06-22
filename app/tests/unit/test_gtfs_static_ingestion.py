@@ -18,7 +18,6 @@ def _sample_gtfs_static_zip() -> bytes:
         archive.writestr("shapes.txt", "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence\nsh1,41.9,12.5,1\nsh1,42.0,12.6,2\n")
     return buffer.getvalue()
 
-
 ###############################################################################
 def test_gtfs_static_provider_fetches_configured_feed_url() -> None:
     calls: list[str] = []

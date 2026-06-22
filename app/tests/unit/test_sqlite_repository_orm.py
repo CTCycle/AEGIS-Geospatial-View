@@ -9,7 +9,6 @@ from server.common.constants import (
     REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME,
 )
 
-
 ###############################################################################
 def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
     repository = SQLiteRepository(
@@ -109,7 +108,6 @@ def test_upsert_omits_null_autoincrement_primary_key(tmp_path) -> None:
     assert isinstance(rows[0]["id"], int)
     assert rows[0]["title"] == "Current session"
     assert rows[0]["status"] == "active"
-
 
 ###############################################################################
 def test_repository_creates_parent_directory_for_database_path(tmp_path) -> None:
