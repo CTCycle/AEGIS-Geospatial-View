@@ -153,6 +153,22 @@ class ModelSettingsUpdateRequest(BaseModel):
 
     # -------------------------------------------------------------------------
     @field_validator(
+        "chat_model_provider",
+        "chat_model_name",
+        "parser_model_provider",
+        "parser_model_name",
+        "agent_model_provider",
+        "agent_model_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_model_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+    # -------------------------------------------------------------------------
+    @field_validator(
         "ollama_url", "openai_base_url", "google_base_url", "deepseek_base_url"
     )
     @classmethod

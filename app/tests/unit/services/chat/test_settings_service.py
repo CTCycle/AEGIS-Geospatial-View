@@ -19,6 +19,13 @@ class EncryptedValue:
 
 ###############################################################################
 @dataclass
+class FakeCredentialRecord:
+    provider: str
+    label: str
+    encrypted_value: str
+
+###############################################################################
+@dataclass
 class FakeSettingsRecord:
     active_provider_mode: str = "cloud"
     chat_model_provider: str = "openai"
@@ -55,13 +62,14 @@ class FakeSettingsRepository:
 class FakeCredentialsRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
+    def __init__(self, active_items: list[FakeCredentialRecord] | None = None) -> None:
+        self.active_items = active_items or []
         self.deactivated: list[tuple[str, str]] = []
         self.upserts: list[tuple[str, str, str, str]] = []
 
     # -------------------------------------------------------------------------
     def list_active(self) -> list[Any]:
-        return []
+        return list(self.active_items)
 
     # -------------------------------------------------------------------------
     def deactivate(self, *, provider: str, label: str) -> None:
@@ -209,19 +217,61 @@ def test_update_settings_can_clear_a_selected_role() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(settings_repo=settings_repo)
 
-    service.update_settings(
-        ModelSettingsUpdateRequest(
+    with pytest.raises(ChatSettingsValidationError):
+        service.update_settings(
+            ModelSettingsUpdateRequest(
+                chat_model_provider="",
+                chat_model_name="",
+            )
+        )
+
+###############################################################################
+def test_get_settings_repairs_blank_roles_using_configured_provider_models() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(
             chat_model_provider="",
             chat_model_name="",
+            parser_model_provider="",
+            parser_model_name="",
+            agent_model_provider="",
+            agent_model_name="",
         )
     )
+    credentials_repo = FakeCredentialsRepository(
+        active_items=[
+            FakeCredentialRecord(
+                provider="deepseek",
+                label="api_key",
+                encrypted_value="enc:deepseek-key",
+            )
+        ]
+    )
+    model_library_service = FakeModelLibraryService(
+        model_overrides={
+            ("deepseek", "deepseek-chat"): {
+                "provider": "deepseek",
+                "name": "deepseek-chat",
+                "id": "deepseek-chat",
+                "supports_tools": True,
+                "supports_structured_output": True,
+            }
+        }
+    )
+    service = build_service(
+        settings_repo=settings_repo,
+        credentials_repo=credentials_repo,
+        model_library_service=model_library_service,
+    )
 
+    response = service.get_settings()
+
+    assert response.chat_model_provider == "deepseek"
+    assert response.chat_model_name == "deepseek-chat"
+    assert response.parser_model_provider == "deepseek"
+    assert response.parser_model_name == "deepseek-chat"
+    assert response.agent_model_provider == "deepseek"
+    assert response.agent_model_name == "deepseek-chat"
     assert settings_repo.last_update is not None
-    assert settings_repo.last_update["active_provider_mode"] == "cloud"
-    assert settings_repo.last_update["chat_model_provider"] == ""
-    assert settings_repo.last_update["chat_model_name"] == ""
-    assert settings_repo.last_update["parser_model_provider"] == "google"
-    assert settings_repo.last_update["agent_model_provider"] == "openai"
 
 ###############################################################################
 def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> None:

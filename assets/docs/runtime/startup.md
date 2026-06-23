@@ -17,6 +17,7 @@ By default the launcher no longer prunes the uv cache on each start. Set `PRUNE_
 
 ```powershell
 uv sync
+Set-Location app
 uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059
 Set-Location app/client
 npm install

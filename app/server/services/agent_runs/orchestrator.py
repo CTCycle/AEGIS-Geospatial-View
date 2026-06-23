@@ -75,6 +75,29 @@ class AgentRunOrchestrator:
             await self.execute_run(run_id)
             return
         await self._publish_response(latest, response)
+        if self._response_failed(response):
+            failed = self.run_repository.mark_failed(
+                run_id,
+                "agent_operation_failed",
+                response.operation.message if response.operation is not None else "Failed",
+            )
+            await self._publish_progress(failed, RunProgressStage.FAILED)
+            await self.event_publisher.publish(
+                conversation_id=failed.conversation_id,
+                run_id=failed.run_id,
+                run_version=failed.active_run_version,
+                type=RunEventType.ERROR,
+                payload={
+                    "code": "agent_operation_failed",
+                    "message": response.operation.message
+                    if response.operation is not None
+                    else "Failed",
+                    "operation": response.operation.model_dump(mode="json")
+                    if response.operation is not None
+                    else None,
+                },
+            )
+            return
         completed = self.run_repository.mark_completed(run_id)
         await self._publish_progress(completed, RunProgressStage.COMPLETED)
         await self.event_publisher.publish(
@@ -134,3 +157,11 @@ class AgentRunOrchestrator:
             type=RunEventType.CANCELLED,
             payload={"state": cancelled.state.value},
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _response_failed(response: ChatTurnResponse) -> bool:
+        operation = response.operation
+        if operation is None:
+            return False
+        return operation.status == "failed" or operation.kind == "error"
