@@ -5,8 +5,6 @@ import {
   GeospatialProviderAccountSetup,
   GeospatialProviderAccountSetupListResponse,
   GeospatialProviderLayerDescriptor,
-  GeospatialProviderLayerResponse,
-  GeospatialProviderLayersResponse,
   JsonValue,
   MapOverlayEntry,
   MapSession,
@@ -345,47 +343,6 @@ const parseProviderLayerDescriptor = (value: unknown): GeospatialProviderLayerDe
     render: normalizeLayerRenderDescriptor(value.render),
     attribution: isStringArray(value.attribution) ? value.attribution : [],
     warnings: isStringArray(value.warnings) ? value.warnings : [],
-  };
-};
-
-export const parseGeospatialProviderLayers = (
-  value: unknown,
-): GeospatialProviderLayersResponse => {
-  const record = isRecord(value) ? value : {};
-  return {
-    provider: String(record.provider ?? ''),
-    layers: Array.isArray(record.layers)
-      ? record.layers.map(parseProviderLayerDescriptor).filter((item): item is GeospatialProviderLayerDescriptor => item !== null)
-      : [],
-    warnings: isStringArray(record.warnings) ? record.warnings : [],
-  };
-};
-
-export const parseGeospatialProviderLayer = (
-  value: unknown,
-): GeospatialProviderLayerResponse => {
-  const record = isRecord(value) ? value : {};
-  const layer = parseProviderLayerDescriptor(record.layer);
-  return {
-    provider: String(record.provider ?? layer?.provider ?? ''),
-    layer: layer ?? {
-      provider: String(record.provider ?? ''),
-      layer_id: '',
-      title: '',
-      rendering_mode: 'metadata-only',
-      source_protocol: 'provider-api',
-      data_format: '',
-      geometry_type: '',
-      queryable: false,
-      crs: [],
-      formats: [],
-      styles: [],
-      tile_matrix_sets: [],
-      render: null,
-      attribution: [],
-      warnings: ['Provider layer response was empty or malformed.'],
-    },
-    warnings: isStringArray(record.warnings) ? record.warnings : [],
   };
 };
 

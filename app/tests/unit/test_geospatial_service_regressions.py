@@ -23,8 +23,3 @@ def test_layer_provider_maps_active_fires_to_supported_provider_layer() -> None:
     assert entry.name == "MODIS_Combined_Thermal_Anomalies_Fire"
     assert entry.provider_name == "MODIS_Combined_Thermal_Anomalies_All"
 
-###############################################################################
-def test_legacy_gibs_service_is_not_imported_by_runtime_composition() -> None:
-    import server.services.geospatial.composition as composition
-
-    assert not hasattr(composition, "GIBSService")

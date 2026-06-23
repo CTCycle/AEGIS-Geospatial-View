@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from server.common.constants import (
     DEFAULT_MODEL_PROVIDER_MODE,
-    LEGACY_DEFAULT_MODEL_NAME,
-    LEGACY_DEFAULT_MODEL_PROVIDER,
-    LEGACY_DEFAULT_MODEL_PROVIDER_MODE,
 )
 from server.domain.chat import (
     ModelProviderMode,
@@ -44,14 +41,11 @@ class ChatSettingsService:
     def get_settings(self) -> ModelSettingsResponse:
         record = self.settings_repo.get_or_create()
         record = self._repair_incomplete_assignments(record)
-        uses_legacy_defaults = self._is_legacy_default_assignment(record)
         active_provider_mode: ModelProviderMode = (
             record.active_provider_mode
             if record.active_provider_mode in {"local", "cloud"}
             else DEFAULT_MODEL_PROVIDER_MODE
         )
-        if uses_legacy_defaults:
-            active_provider_mode = DEFAULT_MODEL_PROVIDER_MODE
         active_credentials = self.credentials_repo.list_active()
         credential_presence: dict[str, dict[str, bool]] = {}
         credential_health: dict[str, dict[str, str]] = {}
@@ -71,12 +65,12 @@ class ChatSettingsService:
                 )
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
-            chat_model_provider="" if uses_legacy_defaults else record.chat_model_provider,
-            chat_model_name="" if uses_legacy_defaults else record.chat_model_name,
-            parser_model_provider="" if uses_legacy_defaults else record.parser_model_provider,
-            parser_model_name="" if uses_legacy_defaults else record.parser_model_name,
-            agent_model_provider="" if uses_legacy_defaults else record.agent_model_provider,
-            agent_model_name="" if uses_legacy_defaults else record.agent_model_name,
+            chat_model_provider=record.chat_model_provider,
+            chat_model_name=record.chat_model_name,
+            parser_model_provider=record.parser_model_provider,
+            parser_model_name=record.parser_model_name,
+            agent_model_provider=record.agent_model_provider,
+            agent_model_name=record.agent_model_name,
             ollama_url=self.model_library_service.normalize_ollama_url(
                 record.ollama_url
             ),
@@ -590,19 +584,4 @@ class ChatSettingsService:
             changed_roles.add("agent")
         return changed_roles
 
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_legacy_default_assignment(record: object) -> bool:
-        return (
-            getattr(record, "active_provider_mode", None)
-            == LEGACY_DEFAULT_MODEL_PROVIDER_MODE
-            and getattr(record, "chat_model_provider", None)
-            == LEGACY_DEFAULT_MODEL_PROVIDER
-            and getattr(record, "chat_model_name", None) == LEGACY_DEFAULT_MODEL_NAME
-            and getattr(record, "parser_model_provider", None)
-            == LEGACY_DEFAULT_MODEL_PROVIDER
-            and getattr(record, "parser_model_name", None) == LEGACY_DEFAULT_MODEL_NAME
-            and getattr(record, "agent_model_provider", None)
-            == LEGACY_DEFAULT_MODEL_PROVIDER
-            and getattr(record, "agent_model_name", None) == LEGACY_DEFAULT_MODEL_NAME
-        )
+

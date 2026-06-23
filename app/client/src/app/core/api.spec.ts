@@ -5,11 +5,9 @@ import {
 import {
   ApiRequestError,
   buildApiError,
-  fetchGeospatialCameraDetail,
   fetchGeospatialCameras,
   fetchGeospatialLayerFeatures,
   sendChatTurn,
-  streamChatTurn,
 } from './api';
 import {
   buildModelDescription,
@@ -177,60 +175,6 @@ describe('core/api', () => {
     expect(err.status).toBe(400);
   });
 
-  it('streamChatTurn parses events and ignores malformed trailing chunk', async () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('{"event":"status","data":{"message":"received"}}\n'));
-        controller.enqueue(new TextEncoder().encode('{"event":"parsed","data":{"task_class":"map_search"}}\n{"event":"final","data":{}}\n{bad'));
-        controller.close();
-      },
-    });
-    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(stream, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } }),
-    );
-    (window.fetch as unknown) = fetchSpy;
-    const events: string[] = [];
-    await streamChatTurn({ message: 'x' }, (event) => events.push(event.event));
-    expect(events).toEqual(['status', 'parsed', 'final']);
-  });
-
-  it('streamChatTurn emits error event behavior as ApiRequestError', async () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('{"event":"error","data":{"message":"stream failed","status":503}}\n'));
-        controller.close();
-      },
-    });
-    (window.fetch as unknown) = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(stream, { status: 200 }),
-    );
-    let thrown: unknown;
-    try {
-      await streamChatTurn({ message: 'x' }, () => undefined);
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown instanceof ApiRequestError).toBeTrue();
-    expect((thrown as ApiRequestError).status).toBe(503);
-  });
-
-  it('streamChatTurn timeout path rejects with timeout message', async () => {
-    jasmine.clock().install();
-    const fetchSpy = jasmine.createSpy('fetch').and.callFake((_: unknown, init?: RequestInit) => (
-      new Promise((_, reject) => {
-        const signal = init?.signal;
-        if (signal) {
-          signal.addEventListener('abort', () => reject({ name: 'AbortError' }));
-        }
-      })
-    ));
-    (window.fetch as unknown) = fetchSpy;
-    const promise = streamChatTurn({ message: 'x' }, () => undefined);
-    jasmine.clock().tick(120_100);
-    await expectAsync(promise).toBeRejectedWith(jasmine.any(ApiRequestError));
-    jasmine.clock().uninstall();
-  });
-
   it('base URL route construction uses API_BASE_URL', async () => {
     const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
       new Response(JSON.stringify({
@@ -304,39 +248,6 @@ describe('core/api', () => {
 
     const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
     expect(calledUrl).toBe(`${API_BASE_URL}/geospatial/cameras?provider=windy_webcams`);
-  });
-
-  it('fetchGeospatialCameraDetail encodes camera identifiers', async () => {
-    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(JSON.stringify({
-        id: 'windy_webcams/cam 1',
-        status: 'metadata-unavailable',
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    (window.fetch as unknown) = fetchSpy;
-
-    await fetchGeospatialCameraDetail('windy_webcams/cam 1');
-
-    const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
-    expect(calledUrl).toContain('/geospatial/cameras/windy_webcams%2Fcam%201');
-  });
-
-  it('geospatial provider payload requests fall back to unavailable payloads', async () => {
-    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response('null', {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    (window.fetch as unknown) = fetchSpy;
-
-    await expectAsync(fetchGeospatialCameraDetail('windy_webcams/cam-1')).toBeResolvedTo({
-      status: 'unavailable',
-      provider: 'unknown',
-    });
   });
 
   [

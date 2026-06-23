@@ -135,18 +135,6 @@ export interface GeospatialProviderLayerDescriptor {
   warnings: string[];
 }
 
-export interface GeospatialProviderLayersResponse {
-  provider: string;
-  layers: GeospatialProviderLayerDescriptor[];
-  warnings: string[];
-}
-
-export interface GeospatialProviderLayerResponse {
-  provider: string;
-  layer: GeospatialProviderLayerDescriptor;
-  warnings: string[];
-}
-
 export interface ProviderAuthPolicy {
   type: ProviderAuthType | string;
   required: boolean;
