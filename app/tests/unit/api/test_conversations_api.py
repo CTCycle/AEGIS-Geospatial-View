@@ -28,14 +28,12 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.streaming import RunEventStreamService
 
-
 ###############################################################################
 class _DatabaseHandle:
 
     # -------------------------------------------------------------------------
     def __init__(self, backend: object) -> None:
         self.backend = backend
-
 
 ###############################################################################
 class _InMemoryBackend:
@@ -51,7 +49,6 @@ class _InMemoryBackend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
-
 ###############################################################################
 class _FakeRunOrchestrator:
 
@@ -63,14 +60,12 @@ class _FakeRunOrchestrator:
     async def execute_run(self, run_id: str) -> None:
         self.started.append(run_id)
 
-
 ###############################################################################
 async def _read_first_sse_event(stream: AsyncIterator[str]) -> dict:
     frame = await stream.__anext__()
     await stream.aclose()
     data_line = next(line for line in frame.splitlines() if line.startswith("data: "))
     return json.loads(data_line.removeprefix("data: "))
-
 
 ###############################################################################
 @pytest.fixture()
@@ -109,7 +104,6 @@ def conversations_api_client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClien
     client = TestClient(app)
     yield client, app
     client.close()
-
 
 ###############################################################################
 def test_conversation_http_run_stream_and_steering_reach_same_agent_run(

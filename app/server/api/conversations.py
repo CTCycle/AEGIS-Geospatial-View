@@ -27,21 +27,17 @@ from server.services.agent_runs.streaming import RunEventStreamService
 
 router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["conversations"])
 
-
 ###############################################################################
 def get_run_lifecycle_service(request: Request) -> RunLifecycleService:
     return request.app.state.run_lifecycle_service
-
 
 ###############################################################################
 def get_run_steering_service(request: Request) -> RunSteeringService:
     return request.app.state.run_steering_service
 
-
 ###############################################################################
 def get_run_event_stream_service(request: Request) -> RunEventStreamService:
     return request.app.state.run_event_stream_service
-
 
 ###############################################################################
 @router.post(
@@ -54,7 +50,6 @@ def create_conversation(
     lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
 ) -> ConversationCreateResponse:
     return lifecycle_service.create_conversation(title=payload.title)
-
 
 ###############################################################################
 @router.post(
@@ -73,7 +68,6 @@ async def create_agent_run(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except RunConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-
 
 ###############################################################################
 @router.get(
@@ -96,7 +90,6 @@ async def stream_agent_run_events(
         media_type="text/event-stream",
     )
 
-
 ###############################################################################
 @router.post(
     CONVERSATION_RUN_STEERING_ROUTE,
@@ -115,7 +108,6 @@ async def steer_agent_run(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except RunConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-
 
 ###############################################################################
 @router.post(

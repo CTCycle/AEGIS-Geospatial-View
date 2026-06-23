@@ -6,7 +6,6 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
 
-
 ###############################################################################
 class AgentRunOrchestrator:
 

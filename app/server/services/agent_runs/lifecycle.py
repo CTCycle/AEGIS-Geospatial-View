@@ -23,7 +23,6 @@ from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
-
 ###############################################################################
 class RunLifecycleService:
 

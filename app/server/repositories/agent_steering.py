@@ -8,7 +8,6 @@ from server.domain.steering import SteeringMessageRecord
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import AgentSteeringMessageRecord, Base
 
-
 ###############################################################################
 class AgentSteeringRepository:
 
