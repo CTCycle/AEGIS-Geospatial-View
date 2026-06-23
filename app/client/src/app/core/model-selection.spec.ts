@@ -20,7 +20,7 @@ const baseSettings = (): ModelSettingsResponse => ({
   parser_model_name: 'gpt-4.1-mini',
   agent_model_provider: 'google',
   agent_model_name: 'gemini-2.0-flash',
-  ollama_url: 'http://localhost:11434',
+  ollama_url: 'http://127.0.0.1:11434',
   openai_base_url: null,
   google_base_url: null,
   deepseek_base_url: null,
@@ -131,5 +131,27 @@ describe('model-selection', () => {
     expect(() => buildModelSelectionPayload(baseSettings(), 'agent', model({ supports_tools: false }))).toThrowError(
       'Agent role requires native tool calling.',
     );
+  });
+
+  it('builds a minimal provider-scoped payload for model selection', () => {
+    const payload = buildModelSelectionPayload(
+      baseSettings(),
+      'parser',
+      model({
+        provider: 'deepseek',
+        name: 'deepseek-v4-flash',
+        supports_structured_output: true,
+      }),
+    );
+
+    expect(payload).toEqual({
+      active_provider_mode: 'cloud',
+      parser_model_provider: 'deepseek',
+      parser_model_name: 'deepseek-v4-flash',
+      credentials: {},
+    });
+    expect(payload.chat_model_provider).toBeUndefined();
+    expect(payload.agent_model_provider).toBeUndefined();
+    expect(payload.ollama_url).toBeUndefined();
   });
 });

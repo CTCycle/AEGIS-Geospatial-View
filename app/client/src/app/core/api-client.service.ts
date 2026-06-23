@@ -34,7 +34,7 @@ import {
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
   GeospatialProviderPayload,
-  ModelCardDescriptor,
+  ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
@@ -105,7 +105,7 @@ export class ApiClientService {
     return openRunEventSource(conversationId, runId, afterEventId);
   }
 
-  fetchChatModels(provider?: 'deepseek'): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> {
+  fetchChatModels(provider?: 'deepseek'): Promise<ModelLibraryResponse> {
     return fetchChatModels(provider);
   }
 

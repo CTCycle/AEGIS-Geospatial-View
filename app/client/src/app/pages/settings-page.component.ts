@@ -30,6 +30,8 @@ import {
 } from '../core/model-selection';
 import {
   ModelCardDescriptor,
+  ModelLibraryResponse,
+  ModelLibrarySourceStatus,
   ModelProviderMode,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
@@ -57,14 +59,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly state: PersistedSettingsPageState;
   settings: ModelSettingsResponse = {
-    active_provider_mode: 'local',
-    chat_model_provider: 'ollama',
+    active_provider_mode: 'cloud',
+    chat_model_provider: '',
     chat_model_name: '',
-    parser_model_provider: 'ollama',
+    parser_model_provider: '',
     parser_model_name: '',
-    agent_model_provider: 'ollama',
+    agent_model_provider: '',
     agent_model_name: '',
-    ollama_url: 'http://localhost:11434',
+    ollama_url: 'http://127.0.0.1:11434',
     openai_base_url: null,
     google_base_url: null,
     deepseek_base_url: null,
@@ -80,16 +82,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   statusText: string;
   isLoadingModels = false;
   isRefreshingOllama = false;
+  isLoadingDeepSeekModels = false;
 
   isKeysModalOpen = false;
   isOllamaModalOpen = false;
   openaiKey = '';
   googleKey = '';
   deepseekKey = '';
-  ollamaUrlDraft = 'http://localhost:11434';
+  ollamaUrlDraft = 'http://127.0.0.1:11434';
   keysModalStatusText = '';
   ollamaModalStatusText = '';
   keyValidationErrors: ApiKeyValidationErrors = {};
+  ollamaStatus: ModelLibrarySourceStatus | null = null;
+  deepseekStatus: ModelLibrarySourceStatus | null = null;
 
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
@@ -158,7 +163,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   get groupedDisplayedModels(): Record<string, ModelCardDescriptor[]> {
     return this.displayedModels.reduce<Record<string, ModelCardDescriptor[]>>((acc, model) => {
       const key = model.provider === 'ollama'
-        ? (this.localModelIds.has(model.id) ? 'ollama-installed' : 'ollama-library')
+        ? (this.isInstalledOllamaModel(model) ? 'ollama-installed' : 'ollama-library')
         : model.provider.toLowerCase();
       if (!acc[key]) {
         acc[key] = [];
@@ -227,6 +232,17 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
+  get deepSeekLoadFailed(): boolean {
+    return this.providerFilter === 'deepseek' && this.deepseekStatus !== null && !this.deepseekStatus.ok;
+  }
+
+  get deepSeekFailureMessage(): string {
+    if (!this.deepSeekLoadFailed) {
+      return '';
+    }
+    return this.deepseekStatus?.message || 'Could not load DeepSeek models right now.';
+  }
+
   setSearchText(value: string): void {
     this.searchText = value;
     this.syncQueryState();
@@ -241,9 +257,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
-    if (model.provider === 'ollama' && !this.localModelIds.has(model.id)) {
+    if (model.provider === 'ollama' && !this.isInstalledOllamaModel(model)) {
       const pulled = await this.pullLocalModel(model);
-      if (!pulled || !this.localModelIds.has(model.id)) {
+      if (!pulled || !this.isInstalledOllamaModel(model)) {
         return;
       }
     }
@@ -340,7 +356,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       const updated = await this.apiClient.updateChatSettings({
         ...this.settingsUpdateBase(),
-        ollama_url: this.ollamaUrlDraft.trim() || 'http://localhost:11434',
+        ollama_url: this.ollamaUrlDraft.trim() || 'http://127.0.0.1:11434',
       });
       this.settings = updated;
       this.ollamaUrlDraft = updated.ollama_url;
@@ -416,7 +432,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   requiresPull(model: ModelCardDescriptor): boolean {
-    return model.provider === 'ollama' && !this.localModelIds.has(model.id);
+    return model.provider === 'ollama' && !this.isInstalledOllamaModel(model);
   }
 
   modelDescription(model: ModelCardDescriptor): string {
@@ -460,18 +476,15 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.statusText = 'Loading model settings';
     this.syncState();
     try {
-      const nextSettings = await this.apiClient.fetchChatSettings();
-      let modelLibrary: { cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] };
-      try {
-        modelLibrary = await this.apiClient.fetchChatModels(
-          this.shouldLoadDeepSeekModels(nextSettings) ? 'deepseek' : undefined,
-        );
-      } catch (error: unknown) {
-        modelLibrary = await this.apiClient.fetchChatModels();
-        this.statusText = this.userFacingErrorService.toUserFacingError(
-          error,
-          'Could not load DeepSeek models right now.',
-        );
+      const [nextSettings, baseLibrary] = await Promise.all([
+        this.apiClient.fetchChatSettings(),
+        this.apiClient.fetchChatModels(),
+      ]);
+      const needsDeepSeekLibrary = this.shouldLoadDeepSeekModels(nextSettings);
+      let modelLibrary = baseLibrary;
+      if (needsDeepSeekLibrary) {
+        const deepseekLibrary = await this.apiClient.fetchChatModels('deepseek');
+        modelLibrary = this.mergeModelLibraries(baseLibrary, deepseekLibrary);
       }
       if (this.isDestroyed) {
         return;
@@ -479,9 +492,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.settings = nextSettings;
       this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
-      this.cloudModels = modelLibrary.cloud;
-      this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
-      if (this.statusText === 'Loading model settings') {
+      this.applyModelLibrary(modelLibrary);
+      const deepSeekRequestedButFailed = needsDeepSeekLibrary && modelLibrary.sources.deepseek?.ok === false;
+      if (deepSeekRequestedButFailed) {
+        this.statusText = modelLibrary.sources.deepseek?.message || 'Could not load DeepSeek models right now.';
+      }
+      if (this.statusText === 'Loading model settings' && !deepSeekRequestedButFailed) {
         this.statusText = 'Ready';
       }
       this.syncQueryState();
@@ -521,23 +537,32 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (!this.deepSeekConfigured()) {
       this.statusText = 'Add a DeepSeek API key to load DeepSeek models.';
+      this.deepseekStatus = { ok: false, message: 'Add a DeepSeek API key to load DeepSeek models.' };
       this.syncState();
       return;
     }
     if (!forceRefresh && this.cloudModels.some((model) => model.provider === 'deepseek')) {
       return;
     }
+    this.isLoadingDeepSeekModels = true;
+    this.statusText = 'Loading DeepSeek models';
+    this.syncState();
     try {
       const modelLibrary = await this.apiClient.fetchChatModels('deepseek');
       if (this.isDestroyed) {
         return;
       }
-      this.cloudModels = mergeModelCards(
-        this.cloudModels.filter((model) => model.provider !== 'deepseek'),
-        modelLibrary.cloud,
-      );
-      this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
-      this.statusText = 'DeepSeek models loaded';
+      this.applyModelLibrary(this.mergeModelLibraries({
+        cloud: this.cloudModels,
+        local: this.localModels,
+        sources: {
+          ...(this.ollamaStatus ? { ollama: this.ollamaStatus } : {}),
+          ...(this.deepseekStatus ? { deepseek: this.deepseekStatus } : {}),
+        },
+      }, modelLibrary));
+      this.statusText = modelLibrary.sources.deepseek?.ok === false
+        ? (modelLibrary.sources.deepseek.message || 'Could not load DeepSeek models right now.')
+        : 'DeepSeek models loaded';
       this.syncState();
     } catch (error: unknown) {
       if (this.isDestroyed) {
@@ -548,7 +573,43 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         'Could not load DeepSeek models right now.',
       );
       this.syncState();
+    } finally {
+      if (this.isDestroyed) {
+        return;
+      }
+      this.isLoadingDeepSeekModels = false;
     }
+  }
+
+  private isInstalledOllamaModel(model: ModelCardDescriptor): boolean {
+    return model.provider === 'ollama' && this.localModelIds.has(model.id);
+  }
+
+  private applyModelLibrary(modelLibrary: ModelLibraryResponse): void {
+    this.cloudModels = modelLibrary.cloud;
+    this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
+    this.ollamaStatus = modelLibrary.sources.ollama ?? null;
+    this.deepseekStatus = modelLibrary.sources.deepseek ?? null;
+    if (this.providerFilter === 'deepseek' && this.deepseekStatus && !this.deepseekStatus.ok) {
+      this.statusText = this.deepseekStatus.message || 'Could not load DeepSeek models right now.';
+    }
+  }
+
+  private mergeModelLibraries(
+    baseLibrary: ModelLibraryResponse,
+    deepseekLibrary: ModelLibraryResponse,
+  ): ModelLibraryResponse {
+    return {
+      cloud: mergeModelCards(
+        baseLibrary.cloud.filter((model) => model.provider !== 'deepseek'),
+        deepseekLibrary.cloud,
+      ),
+      local: deepseekLibrary.local.length ? deepseekLibrary.local : baseLibrary.local,
+      sources: {
+        ...baseLibrary.sources,
+        ...deepseekLibrary.sources,
+      },
+    };
   }
 
   private syncQueryState(): void {

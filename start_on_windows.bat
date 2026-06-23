@@ -172,6 +172,7 @@ set "UI_HOST=127.0.0.1"
 set "UI_PORT=8001"
 set "RELOAD=false"
 set "OPTIONAL_DEPENDENCIES=false"
+set "PRUNE_UV_CACHE=false"
 
 if exist "%DOTENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
@@ -253,8 +254,12 @@ echo [SUCCESS] Environment setup complete.
 REM ============================================================================
 REM == Step 5: Prune uv cache
 REM ============================================================================
-echo [STEP 5/5] Pruning uv cache
-if exist "%UV_CACHE_DIR%" rd /s /q "%UV_CACHE_DIR%" >nul 2>&1 || echo [WARN] Could not delete cache dir quickly.
+if /i "!PRUNE_UV_CACHE!"=="true" (
+  echo [STEP 5/5] Pruning uv cache
+  if exist "%UV_CACHE_DIR%" rd /s /q "%UV_CACHE_DIR%" >nul 2>&1 || echo [WARN] Could not delete cache dir quickly.
+) else (
+  echo [STEP 5/5] Skipping uv cache prune. Set PRUNE_UV_CACHE=true to prune.
+)
 
 if not exist "%FRONTEND_DIR%\node_modules" (
   echo [STEP] Installing frontend dependencies...
@@ -299,7 +304,7 @@ if not exist "%python_exe%" (
 )
 
 set "reuse_backend="
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '!BACKEND_BASE_URL!/api/health' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {}; exit 1" >nul 2>&1
 if !errorlevel! equ 0 (
   set "reuse_backend=1"
   echo [INFO] Reusing existing backend at !BACKEND_BASE_URL!.
@@ -355,11 +360,11 @@ REM ============================================================================
 :backend_wait
 echo [WAIT] Waiting for backend readiness at !BACKEND_BASE_URL!...
 for /L %%i in (1,1,60) do (
-  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '!BACKEND_BASE_URL!/api/health' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {}; exit 1" >nul 2>&1
   if !errorlevel! equ 0 goto :backend_ready_check
   timeout /t 1 /nobreak >nul 2>&1
 )
-echo [FATAL] Backend did not become ready at !BACKEND_BASE_URL! (checked /api/health, /health, /docs, /).
+echo [FATAL] Backend did not become ready at !BACKEND_BASE_URL! (checked /api/health).
 goto error
 :backend_ready_check
 

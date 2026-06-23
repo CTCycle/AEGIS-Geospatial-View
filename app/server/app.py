@@ -47,6 +47,10 @@ from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
 ###############################################################################
+def health_check() -> dict[str, str]:
+    return {"status": "ok"}
+
+###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
 
@@ -145,6 +149,12 @@ def create_app() -> FastAPI:
     application.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
+    application.add_api_route(
+        f"{FASTAPI_API_PREFIX}/health",
+        health_check,
+        methods=["GET"],
+        include_in_schema=False,
+    )
 
     if _client_build_available():
         if CLIENT_ASSETS_PATH.is_dir():

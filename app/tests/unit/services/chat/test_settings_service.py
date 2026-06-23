@@ -27,7 +27,7 @@ class FakeSettingsRecord:
     parser_model_name: str = "gemini-2.5-flash"
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
-    ollama_url: str = "http://localhost:11434"
+    ollama_url: str = "http://127.0.0.1:11434"
     openai_base_url: str | None = "https://openai.example/v1"
     google_base_url: str | None = "https://google.example/v1"
     deepseek_base_url: str | None = "https://deepseek.example/v1"
@@ -101,8 +101,13 @@ class FakeModelLibraryService:
         self.local_model_ids = local_model_ids or set()
         self.model_overrides = model_overrides or {}
 
+    @staticmethod
+    def normalize_ollama_url(ollama_url: str) -> str:
+        return ollama_url.replace("http://localhost", "http://127.0.0.1")
+
     # -------------------------------------------------------------------------
-    def list_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
+    def list_models(self, *, ollama_url: str, cloud_provider: str | None = None) -> dict[str, object]:
+        _ = cloud_provider
         local = [
             {
                 "id": model_id,
@@ -135,6 +140,14 @@ class FakeModelLibraryService:
         return {
             "cloud": cloud,
             "local": local,
+            "sources": {
+                "ollama": {
+                    "ok": True,
+                    "reachable": True,
+                    "message": None,
+                    "model_count": len(local),
+                }
+            },
         }
 
     # -------------------------------------------------------------------------
@@ -144,9 +157,12 @@ class FakeModelLibraryService:
         provider: str,
         model_name: str,
         ollama_url: str,
+        require_provider_availability: bool = False,
     ) -> dict[str, object] | None:
-        _ = ollama_url
+        _ = (ollama_url, require_provider_availability)
         for bucket in self.list_models(ollama_url=ollama_url).values():
+            if not isinstance(bucket, list):
+                continue
             for item in bucket:
                 if item.get("provider") == provider and item.get("name") == model_name:
                     return item
@@ -181,11 +197,30 @@ def test_partial_update_preserves_existing_settings_when_fields_are_omitted() ->
         "parser_model_name": "gemini-2.5-flash",
         "agent_model_provider": "openai",
         "agent_model_name": "gpt-4.1",
-        "ollama_url": "http://localhost:11434",
+        "ollama_url": "http://127.0.0.1:11434",
         "openai_base_url": "https://openai.example/v1",
         "google_base_url": "https://google.example/v1",
         "deepseek_base_url": "https://deepseek.example/v1",
     }
+
+###############################################################################
+def test_update_settings_can_clear_a_selected_role() -> None:
+    settings_repo = FakeSettingsRepository()
+    service = build_service(settings_repo=settings_repo)
+
+    service.update_settings(
+        ModelSettingsUpdateRequest(
+            chat_model_provider="",
+            chat_model_name="",
+        )
+    )
+
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["active_provider_mode"] == "cloud"
+    assert settings_repo.last_update["chat_model_provider"] == ""
+    assert settings_repo.last_update["chat_model_name"] == ""
+    assert settings_repo.last_update["parser_model_provider"] == "google"
+    assert settings_repo.last_update["agent_model_provider"] == "openai"
 
 ###############################################################################
 def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> None:
@@ -274,6 +309,41 @@ def test_local_model_validation_rejects_unavailable_ollama_model(
 
     with pytest.raises(ChatSettingsValidationError, match=error_match):
         service.update_settings(ModelSettingsUpdateRequest(**payload))
+
+###############################################################################
+def test_update_settings_normalizes_loopback_ollama_url() -> None:
+    settings_repo = FakeSettingsRepository()
+    service = build_service(settings_repo=settings_repo)
+
+    service.update_settings(ModelSettingsUpdateRequest(ollama_url="http://localhost:11434"))
+
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["ollama_url"] == "http://127.0.0.1:11434"
+
+###############################################################################
+def test_get_settings_hides_legacy_placeholder_ollama_defaults() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(
+            active_provider_mode="local",
+            chat_model_provider="ollama",
+            chat_model_name="llama3.2",
+            parser_model_provider="ollama",
+            parser_model_name="llama3.2",
+            agent_model_provider="ollama",
+            agent_model_name="llama3.2",
+        )
+    )
+    service = build_service(settings_repo=settings_repo)
+
+    settings = service.get_settings()
+
+    assert settings.active_provider_mode == "cloud"
+    assert settings.chat_model_provider == ""
+    assert settings.chat_model_name == ""
+    assert settings.parser_model_provider == ""
+    assert settings.parser_model_name == ""
+    assert settings.agent_model_provider == ""
+    assert settings.agent_model_name == ""
 
 ###############################################################################
 def test_available_local_models_allow_update() -> None:

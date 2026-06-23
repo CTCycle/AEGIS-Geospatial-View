@@ -6,14 +6,14 @@ import { GeospatialProviderAccountSetup, ModelSettingsResponse } from '../core/t
 import { AccessConfigurationsPageComponent } from './access-configurations-page.component';
 
 const settings = {
-  active_provider_mode: 'local' as const,
-  chat_model_provider: 'ollama',
-  chat_model_name: 'llama3.2',
-  parser_model_provider: 'ollama',
-  parser_model_name: 'llama3.2',
-  agent_model_provider: 'ollama',
-  agent_model_name: 'llama3.2',
-  ollama_url: 'http://localhost:11434',
+  active_provider_mode: 'cloud' as const,
+  chat_model_provider: '',
+  chat_model_name: '',
+  parser_model_provider: '',
+  parser_model_name: '',
+  agent_model_provider: '',
+  agent_model_name: '',
+  ollama_url: 'http://127.0.0.1:11434',
   openai_base_url: null,
   google_base_url: null,
   deepseek_base_url: null,

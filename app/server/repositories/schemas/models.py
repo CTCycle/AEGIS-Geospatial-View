@@ -117,15 +117,15 @@ class ModelProviderSettingsRecord(Base):
     __tablename__ = "model_provider_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    active_provider_mode: Mapped[str] = mapped_column(String(20), default="local")
-    chat_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
-    chat_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
-    parser_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
-    parser_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
-    agent_model_provider: Mapped[str] = mapped_column(String(64), default="ollama")
-    agent_model_name: Mapped[str] = mapped_column(String(200), default="llama3.2")
+    active_provider_mode: Mapped[str] = mapped_column(String(20), default="cloud")
+    chat_model_provider: Mapped[str] = mapped_column(String(64), default="")
+    chat_model_name: Mapped[str] = mapped_column(String(200), default="")
+    parser_model_provider: Mapped[str] = mapped_column(String(64), default="")
+    parser_model_name: Mapped[str] = mapped_column(String(200), default="")
+    agent_model_provider: Mapped[str] = mapped_column(String(64), default="")
+    agent_model_name: Mapped[str] = mapped_column(String(200), default="")
     ollama_url: Mapped[str] = mapped_column(
-        String(400), default="http://localhost:11434"
+        String(400), default="http://127.0.0.1:11434"
     )
     openai_base_url: Mapped[str | None] = mapped_column(String(400))
     google_base_url: Mapped[str | None] = mapped_column(String(400))

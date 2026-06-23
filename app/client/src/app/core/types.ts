@@ -576,6 +576,19 @@ export interface ModelCardDescriptor {
   metadata: Record<string, JsonValue>;
 }
 
+export interface ModelLibrarySourceStatus {
+  ok: boolean;
+  reachable?: boolean | null;
+  message?: string | null;
+  model_count?: number | null;
+}
+
+export interface ModelLibraryResponse {
+  cloud: ModelCardDescriptor[];
+  local: ModelCardDescriptor[];
+  sources: Record<string, ModelLibrarySourceStatus>;
+}
+
 export interface ModelSettingsResponse {
   active_provider_mode: ModelProviderMode;
   chat_model_provider: string;
