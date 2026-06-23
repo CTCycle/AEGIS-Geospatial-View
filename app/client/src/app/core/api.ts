@@ -2,20 +2,16 @@ import {
   API_BASE_URL,
   API_CHAT_MODELS_PATH,
   API_CHAT_SETTINGS_PATH,
-  API_CHAT_STREAM_PATH,
   API_CHAT_TURN_PATH,
   API_CONVERSATION_RUN_CANCEL_PATH,
   API_CONVERSATION_RUN_EVENTS_PATH,
   API_CONVERSATION_RUN_STEERING_PATH,
   API_CONVERSATION_RUNS_PATH,
   API_CONVERSATIONS_PATH,
-  API_GEOSPATIAL_AUDIT_PATH,
   API_GEOSPATIAL_CAMERAS_PATH,
   API_GEOSPATIAL_CAPABILITIES_PATH,
   API_GEOSPATIAL_LAYERS_PATH,
   API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH,
-  API_GEOSPATIAL_PROVIDER_LAYER_PATH,
-  API_GEOSPATIAL_PROVIDER_LAYERS_PATH,
   API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH,
   API_OLLAMA_HEALTH_PATH,
   API_OLLAMA_PULL_PATH,
@@ -27,8 +23,6 @@ import {
   parseCatalogResponse,
   parseChatTurnResponse,
   parseGeospatialProviderAccountSetups,
-  parseGeospatialProviderLayer,
-  parseGeospatialProviderLayers,
   parseModelLibrarySources,
   parseModelSettingsResponse,
 } from './api-parsers';
@@ -37,7 +31,6 @@ import {
   AgentRunCancelResponse,
   AgentRunCreateRequest,
   AgentRunCreateResponse,
-  ChatStreamEvent,
   ChatTurnRequest,
   ChatTurnResponse,
   ConversationCreateRequest,
@@ -45,8 +38,6 @@ import {
   GenericObjectResponse,
   GeospatialCredentialStatus,
   GeospatialProviderAccountSetupListResponse,
-  GeospatialProviderLayerResponse,
-  GeospatialProviderLayersResponse,
   GeospatialProviderPayload,
   ModelLibraryResponse,
   ModelSettingsResponse,
@@ -70,8 +61,6 @@ export class ApiRequestError extends Error {
     this.raw = options?.raw;
   }
 }
-
-export const CHAT_STREAM_TIMEOUT_MS = 120_000;
 
 const buildQuerySuffix = (params: Record<string, string | number | boolean | undefined>): string => {
   const query = new URLSearchParams();
@@ -158,47 +147,11 @@ export const fetchGeospatialLayerFeatures = async (
   return asProviderPayload(data);
 };
 
-export const fetchProviderLayers = async (
-  providerId: string,
-  options: { query?: string | null; limit?: number; refresh?: boolean } = {},
-): Promise<GeospatialProviderLayersResponse> => {
-  const suffix = buildQuerySuffix({
-    query: options.query || undefined,
-    limit: options.limit,
-    refresh: options.refresh,
-  });
-  const data = await executeApiRequest(
-    `${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_LAYERS_PATH(providerId)}${suffix}`,
-    { method: 'GET' },
-  );
-  return parseGeospatialProviderLayers(data);
-};
-
-export const fetchProviderLayer = async (
-  providerId: string,
-  layerId: string,
-  options: { refresh?: boolean } = {},
-): Promise<GeospatialProviderLayerResponse> => {
-  const suffix = buildQuerySuffix({ refresh: options.refresh });
-  const data = await executeApiRequest(
-    `${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_LAYER_PATH(providerId, layerId)}${suffix}`,
-    { method: 'GET' },
-  );
-  return parseGeospatialProviderLayer(data);
-};
-
 export const fetchGeospatialCameras = async (
   params: { bbox?: string; provider?: string; camera_type?: string } = {},
 ): Promise<GeospatialProviderPayload> => {
   const suffix = buildQuerySuffix(params);
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}${suffix}`, {
-    method: 'GET',
-  });
-  return asProviderPayload(data);
-};
-
-export const fetchGeospatialCameraDetail = async (cameraId: string): Promise<GeospatialProviderPayload> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_CAMERAS_PATH}/${encodeURIComponent(cameraId)}`, {
     method: 'GET',
   });
   return asProviderPayload(data);
@@ -222,11 +175,6 @@ export const fetchGeospatialCredentialStatus = async (providerId: string): Promi
 export const fetchGeospatialProviderAccountSetups = async (): Promise<GeospatialProviderAccountSetupListResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH}`, { method: 'GET' });
   return parseGeospatialProviderAccountSetups(data);
-};
-
-export const runGeospatialAudit = async (): Promise<GenericObjectResponse> => {
-  const data = await executeApiRequest(`${API_BASE_URL}${API_GEOSPATIAL_AUDIT_PATH}`, { method: 'POST' });
-  return isRecord(data) ? data : {};
 };
 
 export const sendChatTurn = async (payload: ChatTurnRequest): Promise<ChatTurnResponse> => {
@@ -294,80 +242,6 @@ export const openRunEventSource = (
   const path = API_CONVERSATION_RUN_EVENTS_PATH(conversationId, runId);
   const suffix = afterEventId ? `?after_event_id=${encodeURIComponent(afterEventId)}` : '';
   return new EventSource(`${API_BASE_URL}${path}${suffix}`);
-};
-
-export const streamChatTurn = async (
-  payload: ChatTurnRequest,
-  onEvent: (event: ChatStreamEvent) => void,
-): Promise<void> => {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), CHAT_STREAM_TIMEOUT_MS);
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${API_CHAT_STREAM_PATH}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-  } catch (error: unknown) {
-    if ((error as { name?: string })?.name === 'AbortError') {
-      throw new ApiRequestError('Streaming request timed out. Please retry.', { status: 408 });
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-
-  if (!response.ok) {
-    throw await buildApiError(response);
-  }
-  if (!response.body) {
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const chunk = await reader.read();
-    if (chunk.done) {
-      break;
-    }
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
-      }
-      let parsed: ChatStreamEvent | null = null;
-      try {
-        parsed = JSON.parse(trimmed) as ChatStreamEvent;
-      } catch {
-        continue;
-      }
-      onEvent(parsed);
-      if (parsed.event === 'error') {
-        const detail = String(parsed.data.message ?? 'Streaming request failed');
-        const statusValue = parsed.data.status;
-        const statusCode = typeof statusValue === 'number' ? statusValue : undefined;
-        throw new ApiRequestError(detail, { detail: parsed.data, status: statusCode, raw: parsed.data });
-      }
-    }
-  }
-
-  const trailing = buffer.trim();
-  if (trailing) {
-    try {
-      const parsed = JSON.parse(trailing) as ChatStreamEvent;
-      onEvent(parsed);
-    } catch {
-      // ignore malformed trailing chunk
-    }
-  }
 };
 
 export const fetchChatModels = async (

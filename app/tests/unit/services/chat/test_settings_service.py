@@ -372,31 +372,6 @@ def test_update_settings_normalizes_loopback_ollama_url() -> None:
     assert settings_repo.last_update["ollama_url"] == "http://127.0.0.1:11434"
 
 ###############################################################################
-def test_get_settings_hides_legacy_placeholder_ollama_defaults() -> None:
-    settings_repo = FakeSettingsRepository(
-        FakeSettingsRecord(
-            active_provider_mode="local",
-            chat_model_provider="ollama",
-            chat_model_name="llama3.2",
-            parser_model_provider="ollama",
-            parser_model_name="llama3.2",
-            agent_model_provider="ollama",
-            agent_model_name="llama3.2",
-        )
-    )
-    service = build_service(settings_repo=settings_repo)
-
-    settings = service.get_settings()
-
-    assert settings.active_provider_mode == "cloud"
-    assert settings.chat_model_provider == ""
-    assert settings.chat_model_name == ""
-    assert settings.parser_model_provider == ""
-    assert settings.parser_model_name == ""
-    assert settings.agent_model_provider == ""
-    assert settings.agent_model_name == ""
-
-###############################################################################
 def test_available_local_models_allow_update() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(
