@@ -75,16 +75,6 @@ export const buildModelSelectionPayload = (
   const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
   return {
     active_provider_mode: nextProviderMode,
-    chat_model_provider: settings.chat_model_provider,
-    chat_model_name: settings.chat_model_name,
-    parser_model_provider: settings.parser_model_provider,
-    parser_model_name: settings.parser_model_name,
-    agent_model_provider: settings.agent_model_provider,
-    agent_model_name: settings.agent_model_name,
-    ollama_url: settings.ollama_url,
-    openai_base_url: settings.openai_base_url,
-    google_base_url: settings.google_base_url,
-    deepseek_base_url: settings.deepseek_base_url,
     [roleFields.provider]: model.provider,
     [roleFields.name]: model.name,
     credentials: toSelectionUpdateCredentials(settings.credentials),
@@ -200,7 +190,7 @@ export const buildSelectedModelStats = (
 
   assignments.forEach(({ role, provider, name }) => {
     const hasSelection = Boolean(provider) && Boolean(name);
-    const local = hasSelection && localModelIds.has(name);
+    const local = hasSelection && provider === 'ollama' && localModelIds.has(name);
     rows.push({
       model: hasSelection ? name : 'Not selected',
       provider: hasSelection ? provider : '-',

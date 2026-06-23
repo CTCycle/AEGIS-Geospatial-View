@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from server.common.constants import (
     DEFAULT_MODEL_PROVIDER_MODE,
+    LEGACY_DEFAULT_MODEL_NAME,
+    LEGACY_DEFAULT_MODEL_PROVIDER,
+    LEGACY_DEFAULT_MODEL_PROVIDER_MODE,
 )
 from server.domain.chat import (
     ModelProviderMode,
@@ -10,7 +13,10 @@ from server.domain.chat import (
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
-from server.services.chat.model_library import ChatModelLibraryService
+from server.services.chat.model_library import (
+    ChatModelLibraryService,
+    ModelLibrarySourceError,
+)
 from server.services.cryptography import CredentialEncryptionService
 
 ###############################################################################
@@ -37,11 +43,14 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
         record = self.settings_repo.get_or_create()
+        uses_legacy_defaults = self._is_legacy_default_assignment(record)
         active_provider_mode: ModelProviderMode = (
             record.active_provider_mode
             if record.active_provider_mode in {"local", "cloud"}
             else DEFAULT_MODEL_PROVIDER_MODE
         )
+        if uses_legacy_defaults:
+            active_provider_mode = DEFAULT_MODEL_PROVIDER_MODE
         active_credentials = self.credentials_repo.list_active()
         credential_presence: dict[str, dict[str, bool]] = {}
         credential_health: dict[str, dict[str, str]] = {}
@@ -61,13 +70,15 @@ class ChatSettingsService:
                 )
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
-            chat_model_provider=record.chat_model_provider,
-            chat_model_name=record.chat_model_name,
-            parser_model_provider=record.parser_model_provider,
-            parser_model_name=record.parser_model_name,
-            agent_model_provider=record.agent_model_provider,
-            agent_model_name=record.agent_model_name,
-            ollama_url=record.ollama_url,
+            chat_model_provider="" if uses_legacy_defaults else record.chat_model_provider,
+            chat_model_name="" if uses_legacy_defaults else record.chat_model_name,
+            parser_model_provider="" if uses_legacy_defaults else record.parser_model_provider,
+            parser_model_name="" if uses_legacy_defaults else record.parser_model_name,
+            agent_model_provider="" if uses_legacy_defaults else record.agent_model_provider,
+            agent_model_name="" if uses_legacy_defaults else record.agent_model_name,
+            ollama_url=self.model_library_service.normalize_ollama_url(
+                record.ollama_url
+            ),
             openai_base_url=record.openai_base_url,
             google_base_url=record.google_base_url,
             deepseek_base_url=record.deepseek_base_url,
@@ -78,7 +89,7 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     def get_ollama_url(self) -> str:
         record = self.settings_repo.get_or_create()
-        return record.ollama_url
+        return self.model_library_service.normalize_ollama_url(record.ollama_url)
 
     # -------------------------------------------------------------------------
     def update_settings(
@@ -99,21 +110,45 @@ class ChatSettingsService:
             )
         )
         next_active_provider_mode = (
-            payload.active_provider_mode or current.active_provider_mode
+            payload.active_provider_mode
+            if payload.active_provider_mode is not None
+            else current.active_provider_mode
         )
         next_chat_model_provider = (
-            payload.chat_model_provider or current.chat_model_provider
+            payload.chat_model_provider
+            if payload.chat_model_provider is not None
+            else current.chat_model_provider
         )
-        next_chat_model_name = payload.chat_model_name or current.chat_model_name
+        next_chat_model_name = (
+            payload.chat_model_name
+            if payload.chat_model_name is not None
+            else current.chat_model_name
+        )
         next_parser_model_provider = (
-            payload.parser_model_provider or current.parser_model_provider
+            payload.parser_model_provider
+            if payload.parser_model_provider is not None
+            else current.parser_model_provider
         )
-        next_parser_model_name = payload.parser_model_name or current.parser_model_name
+        next_parser_model_name = (
+            payload.parser_model_name
+            if payload.parser_model_name is not None
+            else current.parser_model_name
+        )
         next_agent_model_provider = (
-            payload.agent_model_provider or current.agent_model_provider
+            payload.agent_model_provider
+            if payload.agent_model_provider is not None
+            else current.agent_model_provider
         )
-        next_agent_model_name = payload.agent_model_name or current.agent_model_name
-        next_ollama_url = payload.ollama_url or current.ollama_url
+        next_agent_model_name = (
+            payload.agent_model_name
+            if payload.agent_model_name is not None
+            else current.agent_model_name
+        )
+        next_ollama_url = self.model_library_service.normalize_ollama_url(
+            payload.ollama_url
+            if payload.ollama_url is not None
+            else current.ollama_url
+        )
         next_openai_base_url = (
             None
             if payload.openai_base_url == ""
@@ -136,6 +171,7 @@ class ChatSettingsService:
             else current.deepseek_base_url
         )
         if should_validate_model_selection:
+            changed_roles = self._changed_roles(payload)
             self._validate_local_model_selection(
                 chat_model_provider=next_chat_model_provider,
                 chat_model_name=next_chat_model_name,
@@ -144,6 +180,8 @@ class ChatSettingsService:
                 agent_model_provider=next_agent_model_provider,
                 agent_model_name=next_agent_model_name,
                 ollama_url=next_ollama_url,
+                changed_roles=changed_roles,
+                validate_all_local_roles=payload.ollama_url is not None,
             )
             self._validate_role_capabilities(
                 parser_model_provider=next_parser_model_provider,
@@ -151,6 +189,7 @@ class ChatSettingsService:
                 agent_model_provider=next_agent_model_provider,
                 agent_model_name=next_agent_model_name,
                 ollama_url=next_ollama_url,
+                changed_roles=changed_roles,
             )
         for provider, labels in payload.credentials.items():
             for label, raw_value in labels.items():
@@ -190,6 +229,8 @@ class ChatSettingsService:
         agent_model_provider: str,
         agent_model_name: str,
         ollama_url: str,
+        changed_roles: set[str],
+        validate_all_local_roles: bool = False,
     ) -> None:
         assignments = (
             ("chat", chat_model_provider, chat_model_name),
@@ -199,7 +240,9 @@ class ChatSettingsService:
         requested_local_models = {
             model_name
             for _, provider, model_name in assignments
-            if provider == "ollama" and model_name
+            if provider == "ollama"
+            and model_name
+            and (validate_all_local_roles or _ in changed_roles)
         }
         if not requested_local_models:
             return
@@ -211,15 +254,27 @@ class ChatSettingsService:
             if isinstance(item, dict)
         }
         unavailable = requested_local_models.difference(local_models)
-        if chat_model_provider == "ollama" and chat_model_name in unavailable:
+        if (
+            (validate_all_local_roles or "chat" in changed_roles)
+            and chat_model_provider == "ollama"
+            and chat_model_name in unavailable
+        ):
             raise ChatSettingsValidationError(
                 "Selected chat model is not available from Ollama."
             )
-        if parser_model_provider == "ollama" and parser_model_name in unavailable:
+        if (
+            (validate_all_local_roles or "parser" in changed_roles)
+            and parser_model_provider == "ollama"
+            and parser_model_name in unavailable
+        ):
             raise ChatSettingsValidationError(
                 "Selected parser model is not available from Ollama."
             )
-        if agent_model_provider == "ollama" and agent_model_name in unavailable:
+        if (
+            (validate_all_local_roles or "agent" in changed_roles)
+            and agent_model_provider == "ollama"
+            and agent_model_name in unavailable
+        ):
             raise ChatSettingsValidationError(
                 "Selected agent model is not available from Ollama."
             )
@@ -233,24 +288,76 @@ class ChatSettingsService:
         agent_model_provider: str,
         agent_model_name: str,
         ollama_url: str,
+        changed_roles: set[str],
     ) -> None:
-        agent_model = self.model_library_service.find_model(
-            provider=agent_model_provider,
-            model_name=agent_model_name,
-            ollama_url=ollama_url,
+        if "agent" in changed_roles:
+            try:
+                agent_model = self.model_library_service.find_model(
+                    provider=agent_model_provider,
+                    model_name=agent_model_name,
+                    ollama_url=ollama_url,
+                    require_provider_availability=True,
+                )
+            except ModelLibrarySourceError as exc:
+                raise ChatSettingsValidationError(
+                    f"Could not validate DeepSeek model selection: {exc}"
+                ) from exc
+            if agent_model is not None and not bool(agent_model.get("supports_tools")):
+                raise ChatSettingsValidationError(
+                    "Selected agent model does not support native tool calling."
+                )
+            if agent_model is None and agent_model_provider == "deepseek" and agent_model_name:
+                raise ChatSettingsValidationError(
+                    "Selected DeepSeek agent model could not be found in the live DeepSeek catalog."
+                )
+        if "parser" in changed_roles:
+            try:
+                parser_model = self.model_library_service.find_model(
+                    provider=parser_model_provider,
+                    model_name=parser_model_name,
+                    ollama_url=ollama_url,
+                    require_provider_availability=True,
+                )
+            except ModelLibrarySourceError as exc:
+                raise ChatSettingsValidationError(
+                    f"Could not validate DeepSeek model selection: {exc}"
+                ) from exc
+            if parser_model is not None and not bool(
+                parser_model.get("supports_structured_output")
+            ):
+                raise ChatSettingsValidationError(
+                    "Selected parser model does not support structured output."
+                )
+            if parser_model is None and parser_model_provider == "deepseek" and parser_model_name:
+                raise ChatSettingsValidationError(
+                    "Selected DeepSeek parser model could not be found in the live DeepSeek catalog."
+                )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _changed_roles(payload: ModelSettingsUpdateRequest) -> set[str]:
+        changed_roles: set[str] = set()
+        if payload.chat_model_provider is not None or payload.chat_model_name is not None:
+            changed_roles.add("chat")
+        if payload.parser_model_provider is not None or payload.parser_model_name is not None:
+            changed_roles.add("parser")
+        if payload.agent_model_provider is not None or payload.agent_model_name is not None:
+            changed_roles.add("agent")
+        return changed_roles
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_legacy_default_assignment(record: object) -> bool:
+        return (
+            getattr(record, "active_provider_mode", None)
+            == LEGACY_DEFAULT_MODEL_PROVIDER_MODE
+            and getattr(record, "chat_model_provider", None)
+            == LEGACY_DEFAULT_MODEL_PROVIDER
+            and getattr(record, "chat_model_name", None) == LEGACY_DEFAULT_MODEL_NAME
+            and getattr(record, "parser_model_provider", None)
+            == LEGACY_DEFAULT_MODEL_PROVIDER
+            and getattr(record, "parser_model_name", None) == LEGACY_DEFAULT_MODEL_NAME
+            and getattr(record, "agent_model_provider", None)
+            == LEGACY_DEFAULT_MODEL_PROVIDER
+            and getattr(record, "agent_model_name", None) == LEGACY_DEFAULT_MODEL_NAME
         )
-        if agent_model is not None and not bool(agent_model.get("supports_tools")):
-            raise ChatSettingsValidationError(
-                "Selected agent model does not support native tool calling."
-            )
-        parser_model = self.model_library_service.find_model(
-            provider=parser_model_provider,
-            model_name=parser_model_name,
-            ollama_url=ollama_url,
-        )
-        if parser_model is not None and not bool(
-            parser_model.get("supports_structured_output")
-        ):
-            raise ChatSettingsValidationError(
-                "Selected parser model does not support structured output."
-            )

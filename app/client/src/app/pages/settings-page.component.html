@@ -36,6 +36,15 @@
         </span>
       </section>
     }
+    @if (deepSeekLoadFailed) {
+      <section class="settings-page__warning" role="status" aria-live="polite">
+        <span class="settings-page__warning-badge">DeepSeek</span>
+        <span class="settings-page__warning-copy">
+          <strong>DeepSeek models could not be loaded.</strong>
+          {{ deepSeekFailureMessage }}
+        </span>
+      </section>
+    }
     <div class="settings-page__layout">
       <section class="settings-page__left-column">
         <section class="settings-page__controls settings-page__controls--navbar" aria-label="Settings controls">
@@ -80,10 +89,15 @@
               <h2>Loading model catalog</h2>
               <p>Fetching model assignments and provider metadata.</p>
             </section>
+          } @else if (providerFilter === 'deepseek' && isLoadingDeepSeekModels) {
+            <section class="settings-empty-state" aria-live="polite">
+              <h2>Loading DeepSeek models</h2>
+              <p>Fetching the live DeepSeek catalog from the configured provider account.</p>
+            </section>
           } @else if (!hasDisplayedModels) {
             <section class="settings-empty-state" aria-live="polite">
-              <h2>No models match this filter</h2>
-              <p>Adjust the provider tabs or search query to show available models.</p>
+              <h2>{{ deepSeekLoadFailed ? 'DeepSeek models unavailable' : 'No models match this filter' }}</h2>
+              <p>{{ deepSeekLoadFailed ? deepSeekFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
             </section>
           } @else {
             @for (provider of providerKeys; track trackProviderGroup(provider)) {
@@ -101,7 +115,7 @@
                       [model]="model"
                       [settings]="settings"
                       [description]="modelDescription(model)"
-                      [isLocal]="localModelIds.has(model.id)"
+                      [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
                       [requiresPull]="requiresPull(model)"
                       (roleSelected)="onModelRoleSelected($event, model)"
                       (pullRequested)="pullLocalModel($event)"

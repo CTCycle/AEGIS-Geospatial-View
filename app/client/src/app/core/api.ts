@@ -29,6 +29,7 @@ import {
   parseGeospatialProviderAccountSetups,
   parseGeospatialProviderLayer,
   parseGeospatialProviderLayers,
+  parseModelLibrarySources,
   parseModelSettingsResponse,
 } from './api-parsers';
 import {
@@ -47,7 +48,7 @@ import {
   GeospatialProviderLayerResponse,
   GeospatialProviderLayersResponse,
   GeospatialProviderPayload,
-  ModelCardDescriptor,
+  ModelLibraryResponse,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
@@ -371,7 +372,7 @@ export const streamChatTurn = async (
 
 export const fetchChatModels = async (
   provider?: 'deepseek',
-): Promise<{ cloud: ModelCardDescriptor[]; local: ModelCardDescriptor[] }> => {
+): Promise<ModelLibraryResponse> => {
   const suffix = provider ? `?provider=${encodeURIComponent(provider)}` : '';
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}${suffix}`, {
     method: 'GET',
@@ -382,6 +383,7 @@ export const fetchChatModels = async (
   return {
     cloud: normalizeModelCards(value.cloud),
     local: normalizeModelCards(value.local),
+    sources: parseModelLibrarySources(value.sources),
   };
 };
 

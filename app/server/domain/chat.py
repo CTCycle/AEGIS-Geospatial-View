@@ -108,6 +108,15 @@ class ModelCardDescriptor(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 ###############################################################################
+class ModelLibrarySourceStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    reachable: bool | None = None
+    message: str | None = None
+    model_count: int | None = None
+
+###############################################################################
 class ModelSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -163,6 +172,7 @@ class ModelLibraryResponse(BaseModel):
 
     cloud: list[ModelCardDescriptor] = Field(default_factory=list)
     local: list[ModelCardDescriptor] = Field(default_factory=list)
+    sources: dict[str, ModelLibrarySourceStatus] = Field(default_factory=dict)
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):

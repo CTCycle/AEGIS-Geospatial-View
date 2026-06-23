@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-06-04
+Last updated: 2026-06-23
 
 ## Local Development Via Launcher
 
@@ -10,6 +10,8 @@ start_on_windows.bat
 ```
 
 The launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds when needed, and starts backend and frontend services.
+
+By default the launcher no longer prunes the uv cache on each start. Set `PRUNE_UV_CACHE=true` in `settings\.env` only when you explicitly want to reclaim dependency cache space; pruning can take noticeably longer on Windows.
 
 ## Local Development Manual
 

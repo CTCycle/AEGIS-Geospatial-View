@@ -11,6 +11,7 @@ import {
   MapOverlayEntry,
   MapSession,
   ModelCardDescriptor,
+  ModelLibraryResponse,
   ModelSettingsResponse,
 } from './types';
 import { isRecord, isStringArray } from './type-guards';
@@ -450,6 +451,27 @@ export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
     });
 };
 
+export const parseModelLibrarySources = (
+  input: unknown,
+): ModelLibraryResponse['sources'] => {
+  if (!isRecord(input)) {
+    return {};
+  }
+  const sources: ModelLibraryResponse['sources'] = {};
+  Object.entries(input).forEach(([key, value]) => {
+    if (!isRecord(value)) {
+      return;
+    }
+    sources[key] = {
+      ok: Boolean(value.ok),
+      reachable: typeof value.reachable === 'boolean' ? value.reachable : null,
+      message: typeof value.message === 'string' ? value.message : null,
+      model_count: typeof value.model_count === 'number' ? value.model_count : null,
+    };
+  });
+  return sources;
+};
+
 export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
@@ -477,14 +499,14 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     throw new Error('Unexpected settings response format');
   }
   return {
-    active_provider_mode: (value.active_provider_mode === 'cloud' ? 'cloud' : 'local'),
-    chat_model_provider: String(value.chat_model_provider ?? 'ollama'),
+    active_provider_mode: (value.active_provider_mode === 'local' ? 'local' : 'cloud'),
+    chat_model_provider: String(value.chat_model_provider ?? ''),
     chat_model_name: String(value.chat_model_name ?? ''),
-    parser_model_provider: String(value.parser_model_provider ?? 'ollama'),
+    parser_model_provider: String(value.parser_model_provider ?? ''),
     parser_model_name: String(value.parser_model_name ?? ''),
-    agent_model_provider: String(value.agent_model_provider ?? 'ollama'),
+    agent_model_provider: String(value.agent_model_provider ?? ''),
     agent_model_name: String(value.agent_model_name ?? ''),
-    ollama_url: String(value.ollama_url ?? 'http://localhost:11434'),
+    ollama_url: String(value.ollama_url ?? 'http://127.0.0.1:11434'),
     openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
     google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
     deepseek_base_url: typeof value.deepseek_base_url === 'string' ? value.deepseek_base_url : null,
