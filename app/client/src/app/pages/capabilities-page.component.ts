@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 
 import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
@@ -37,7 +37,10 @@ export class CapabilitiesPageComponent implements OnInit {
     { id: 'tools', label: 'Direct Tools', description: 'Fast non-map actions the assistant can execute.' },
   ];
 
-  constructor(private readonly apiClient: ApiClientService) {}
+  constructor(
+    private readonly apiClient: ApiClientService,
+    private readonly changeDetector: ChangeDetectorRef,
+  ) {}
 
   async ngOnInit(): Promise<void> {
     try {
@@ -48,6 +51,7 @@ export class CapabilitiesPageComponent implements OnInit {
       this.statusText = 'Capability catalog unavailable.';
     } finally {
       this.isLoading = false;
+      this.changeDetector.detectChanges();
     }
   }
 

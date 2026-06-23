@@ -4,8 +4,13 @@ from typing import Any
 
 
 ROME_MAP_SESSION = {
+    "session_id": "rome-map-session",
+    "resolved_location": {"label": "Rome, Italy", "latitude": 41.9028, "longitude": 12.4964},
     "center": {"latitude": 41.9028, "longitude": 12.4964},
     "bounds": [12.3, 41.8, 12.7, 42.0],
+    "basemap_id": "osm_default",
+    "overlay_ids": ["openaq_air_quality"],
+    "viewport": {"center_latitude": 41.9028, "center_longitude": 12.4964, "radius_m": 5000},
     "basemap": {
         "id": "osm_default",
         "label": "OpenStreetMap",
@@ -129,7 +134,9 @@ def model_catalog_payload() -> dict[str, Any]:
                 "name": "gpt-5-mini",
                 "description": "Low-latency OpenAI cloud model.",
                 "provider": "openai",
-                "capabilities": ["chat", "tool_use"],
+                "capabilities": ["chat", "tools", "structured_output"],
+                "supports_tools": True,
+                "supports_structured_output": True,
                 "metadata": {"tier": "mini"},
             },
             {
