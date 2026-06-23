@@ -182,6 +182,12 @@ The repository is split into a few broad areas:
 - `app/tests` for automated checks
 - `settings` for environment-specific configuration
 
+## Desktop Artifact Hygiene
+
+`app/src-tauri` is a versioned source area. Keep source code, Tauri configuration, Cargo metadata, capabilities, and icons there. Do not commit generated desktop build output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, or `app/src-tauri/gen`.
+
+Windows installers, portable `.exe` exports, and other packaged desktop artifacts belong in `release/windows` only as generated release output. They should be published through GitHub release artifacts and workflow uploads, not tracked in Git.
+
 ## License
 
 This project is licensed under the MIT License. See `LICENSE` for the full text.
