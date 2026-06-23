@@ -241,11 +241,27 @@ class BackgroundJobService:
         if final_response is None:
             self._fail_job(job.job_id, {"message": "Chat job finished without final response"})
             return
+        operation = (
+            final_response.get("operation")
+            if isinstance(final_response.get("operation"), dict)
+            else {}
+        )
+        if self._operation_failed(operation):
+            self._fail_job(
+                job.job_id,
+                {
+                    "message": str(operation.get("message") or "Chat job failed."),
+                    "chat_turn_response": final_response,
+                    "operation": operation,
+                    "map_session": final_response.get("map_session"),
+                },
+            )
+            return
         self._complete_job(
             job.job_id,
             {
                 "chat_turn_response": final_response,
-                "operation": final_response.get("operation"),
+                "operation": operation,
                 "map_session": final_response.get("map_session"),
             },
         )
@@ -352,6 +368,14 @@ class BackgroundJobService:
         with self._lock:
             job = self._jobs.get(job_id)
             return bool(job and job.cancel_requested_at is not None)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _operation_failed(operation: dict[str, Any]) -> bool:
+        return (
+            str(operation.get("status") or "").strip().lower() == "failed"
+            or str(operation.get("kind") or "").strip().lower() == "error"
+        )
 
     # -------------------------------------------------------------------------
     def _to_create_response(self, job: BackgroundJob, message: str) -> BackgroundJobCreateResponse:

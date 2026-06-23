@@ -55,7 +55,7 @@ PROVIDER_SOURCE_DIR = (
 API_SOURCE_PATH = PROJECT_DIR / "server" / "api" / "geospatial.py"
 CLIENT_SOURCE_DIR = PROJECT_DIR / "client" / "src" / "app"
 TEST_SOURCE_DIR = PROJECT_DIR / "tests" / "unit"
-VISUAL_TEST_SOURCE_DIR = PROJECT_DIR / "client" / "e2e"
+VISUAL_TEST_SOURCE_DIR = PROJECT_DIR / "client" / "src" / "app" / "e2e"
 CLIENT_RENDERING_MODES = {
     "camera-points",
     "choropleth",

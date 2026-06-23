@@ -317,6 +317,15 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.syncState();
 
     try {
+      if (!this.supportsRunTransport()) {
+        const result = await this.apiClient.sendChatTurn({
+          session_id: this.sessionId,
+          message,
+        });
+        this.isLoading = false;
+        this.applyTurnResponse(result, requestNonce);
+        return;
+      }
       const conversation = this.conversationId
         ? { conversation_id: this.conversationId }
         : await this.apiClient.createConversation({ title: message.slice(0, 120) });
@@ -518,6 +527,13 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.lastOperation = payload['operation'] as ChatOperationResult | null | undefined;
     this.memorySnapshot = (payload['memory_snapshot'] as Record<string, unknown> | undefined) ?? this.memorySnapshot;
     this.contextUsage = payload['context_usage'] as ContextUsage | undefined;
+  }
+
+  private supportsRunTransport(): boolean {
+    const client = this.apiClient as unknown as Partial<ApiClientService>;
+    return typeof client.createConversation === 'function'
+      && typeof client.createAgentRun === 'function'
+      && typeof client.openRunEventSource === 'function';
   }
 
   private applyTurnResponse(result: ChatTurnResponse, requestNonce: number): void {

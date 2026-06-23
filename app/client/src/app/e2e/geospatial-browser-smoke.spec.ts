@@ -14,6 +14,21 @@ import { GeospatialPageComponent } from '../pages/geospatial-page.component';
 
 describe('e2e/geospatial browser smoke', () => {
   const forbiddenSecret = 'sk_live_DO_NOT_RENDER';
+  // Keep this catalog aligned with the production manifest audit's required browser scenarios.
+  const documentedBrowserCoverageIds = [
+    'esri_world_imagery',
+    'geoapify_osm',
+    'osm_dark',
+    'osm_terrain',
+    'census_cartographic_boundaries',
+    'natural_earth_admin_boundaries',
+    'dot_traffic_cameras',
+    'environmental_monitoring_cameras',
+    'port_airport_webcams',
+    'public_transport_cameras',
+    'ski_resort_webcams',
+    'tourism_webcams',
+  ];
   let fixture: ComponentFixture<GeospatialPageComponent>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
   let store: jasmine.SpyObj<AppStateStoreService>;
@@ -378,6 +393,12 @@ describe('e2e/geospatial browser smoke', () => {
 
     expect(component.payload?.map_session?.overlay_ids).toContain('windy_webcams_missing_key');
     expect(fixture.nativeElement.textContent).toContain('Windy Webcams credentials are missing');
+  });
+
+  it('tracks manifest ids that require browser scenario coverage in production', () => {
+    expect(documentedBrowserCoverageIds).toContain('esri_world_imagery');
+    expect(documentedBrowserCoverageIds).toContain('census_cartographic_boundaries');
+    expect(documentedBrowserCoverageIds).toContain('tourism_webcams');
   });
 
   it('renders Windy popup states without embedding unless provider permission is explicit', async () => {

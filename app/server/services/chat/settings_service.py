@@ -43,6 +43,7 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:
         record = self.settings_repo.get_or_create()
+        record = self._repair_incomplete_assignments(record)
         uses_legacy_defaults = self._is_legacy_default_assignment(record)
         active_provider_mode: ModelProviderMode = (
             record.active_provider_mode
@@ -170,6 +171,14 @@ class ChatSettingsService:
             if payload.deepseek_base_url is not None
             else current.deepseek_base_url
         )
+        self._validate_role_assignments(
+            chat_model_provider=next_chat_model_provider,
+            chat_model_name=next_chat_model_name,
+            parser_model_provider=next_parser_model_provider,
+            parser_model_name=next_parser_model_name,
+            agent_model_provider=next_agent_model_provider,
+            agent_model_name=next_agent_model_name,
+        )
         if should_validate_model_selection:
             changed_roles = self._changed_roles(payload)
             self._validate_local_model_selection(
@@ -217,6 +226,77 @@ class ChatSettingsService:
             deepseek_base_url=next_deepseek_base_url,
         )
         return self.get_settings()
+
+    # -------------------------------------------------------------------------
+    def _repair_incomplete_assignments(self, record):
+        assignments = self._normalized_assignments(record)
+        incomplete_roles = {
+            role
+            for role, values in assignments.items()
+            if not values["provider"] or not values["model"]
+        }
+        if not incomplete_roles:
+            return record
+
+        available_models = self._available_models(
+            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url)
+        )
+        repaired_assignments = {
+            role: dict(values) for role, values in assignments.items()
+        }
+        for role in sorted(incomplete_roles):
+            repaired_assignments[role] = self._repair_role_assignment(
+                role=role,
+                current_provider=repaired_assignments[role]["provider"],
+                current_model=repaired_assignments[role]["model"],
+                active_provider_mode=str(getattr(record, "active_provider_mode", "") or ""),
+                available_models=available_models,
+            )
+
+        self._validate_role_assignments(
+            chat_model_provider=repaired_assignments["chat"]["provider"],
+            chat_model_name=repaired_assignments["chat"]["model"],
+            parser_model_provider=repaired_assignments["parser"]["provider"],
+            parser_model_name=repaired_assignments["parser"]["model"],
+            agent_model_provider=repaired_assignments["agent"]["provider"],
+            agent_model_name=repaired_assignments["agent"]["model"],
+        )
+        self._validate_local_model_selection(
+            chat_model_provider=repaired_assignments["chat"]["provider"],
+            chat_model_name=repaired_assignments["chat"]["model"],
+            parser_model_provider=repaired_assignments["parser"]["provider"],
+            parser_model_name=repaired_assignments["parser"]["model"],
+            agent_model_provider=repaired_assignments["agent"]["provider"],
+            agent_model_name=repaired_assignments["agent"]["model"],
+            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+            changed_roles={"chat", "parser", "agent"},
+            validate_all_local_roles=True,
+        )
+        self._validate_role_capabilities(
+            parser_model_provider=repaired_assignments["parser"]["provider"],
+            parser_model_name=repaired_assignments["parser"]["model"],
+            agent_model_provider=repaired_assignments["agent"]["provider"],
+            agent_model_name=repaired_assignments["agent"]["model"],
+            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+            changed_roles={"parser", "agent"},
+        )
+        return self.settings_repo.update(
+            active_provider_mode=(
+                record.active_provider_mode
+                if record.active_provider_mode in {"local", "cloud"}
+                else DEFAULT_MODEL_PROVIDER_MODE
+            ),
+            chat_model_provider=repaired_assignments["chat"]["provider"],
+            chat_model_name=repaired_assignments["chat"]["model"],
+            parser_model_provider=repaired_assignments["parser"]["provider"],
+            parser_model_name=repaired_assignments["parser"]["model"],
+            agent_model_provider=repaired_assignments["agent"]["provider"],
+            agent_model_name=repaired_assignments["agent"]["model"],
+            ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+            openai_base_url=record.openai_base_url,
+            google_base_url=record.google_base_url,
+            deepseek_base_url=record.deepseek_base_url,
+        )
 
     # -------------------------------------------------------------------------
     def _validate_local_model_selection(
@@ -331,6 +411,171 @@ class ChatSettingsService:
             if parser_model is None and parser_model_provider == "deepseek" and parser_model_name:
                 raise ChatSettingsValidationError(
                     "Selected DeepSeek parser model could not be found in the live DeepSeek catalog."
+                )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalized_assignments(record: object) -> dict[str, dict[str, str]]:
+        return {
+            "chat": {
+                "provider": str(getattr(record, "chat_model_provider", "") or "").strip(),
+                "model": str(getattr(record, "chat_model_name", "") or "").strip(),
+            },
+            "parser": {
+                "provider": str(getattr(record, "parser_model_provider", "") or "").strip(),
+                "model": str(getattr(record, "parser_model_name", "") or "").strip(),
+            },
+            "agent": {
+                "provider": str(getattr(record, "agent_model_provider", "") or "").strip(),
+                "model": str(getattr(record, "agent_model_name", "") or "").strip(),
+            },
+        }
+
+    # -------------------------------------------------------------------------
+    def _available_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
+        available: dict[str, list[dict[str, object]]] = {}
+        library = self.model_library_service.list_models(
+            ollama_url=ollama_url,
+            cloud_provider="deepseek",
+        )
+        active_credentials = self.credentials_repo.list_active()
+        configured_cloud_providers: set[str] = set()
+        for item in active_credentials:
+            if item.label != "api_key":
+                continue
+            try:
+                self.crypto_service.decrypt(item.encrypted_value)
+            except ValueError:
+                continue
+            configured_cloud_providers.add(item.provider)
+        for entry in library.get("cloud", []):
+            if not isinstance(entry, dict):
+                continue
+            provider = str(entry.get("provider") or "").strip()
+            if provider not in configured_cloud_providers:
+                continue
+            available.setdefault(provider, []).append(entry)
+        local_models = [
+            item
+            for item in library.get("local", [])
+            if isinstance(item, dict)
+        ]
+        if local_models:
+            available["ollama"] = local_models
+        return available
+
+    # -------------------------------------------------------------------------
+    def _repair_role_assignment(
+        self,
+        *,
+        role: str,
+        current_provider: str,
+        current_model: str,
+        active_provider_mode: str,
+        available_models: dict[str, list[dict[str, object]]],
+    ) -> dict[str, str]:
+        provider_preferences: list[str] = []
+        if current_provider:
+            provider_preferences.append(current_provider)
+        if active_provider_mode == "local":
+            provider_preferences.append("ollama")
+        provider_preferences.extend(["deepseek", "openai", "google", "ollama"])
+
+        seen: set[str] = set()
+        deduped_providers = [
+            provider
+            for provider in provider_preferences
+            if provider not in seen and not seen.add(provider)
+        ]
+        for provider in deduped_providers:
+            assignment = self._select_assignment_for_role(
+                role=role,
+                provider=provider,
+                current_model=current_model,
+                models=available_models.get(provider, []),
+            )
+            if assignment is not None:
+                return assignment
+        raise ChatSettingsValidationError(
+            f"No valid configured model assignment is available for the {role} role."
+        )
+
+    # -------------------------------------------------------------------------
+    def _select_assignment_for_role(
+        self,
+        *,
+        role: str,
+        provider: str,
+        current_model: str,
+        models: list[dict[str, object]],
+    ) -> dict[str, str] | None:
+        if not models:
+            return None
+        preferred_models = [current_model] if current_model else []
+        preferred_models.extend(
+            {
+                ("openai", "chat"): ["gpt-4.1-mini", "gpt-5-mini"],
+                ("openai", "parser"): ["gpt-4.1-mini", "gpt-5-mini"],
+                ("openai", "agent"): ["gpt-4.1", "gpt-5-mini"],
+                ("google", "chat"): ["gemini-2.5-flash", "gemini-2.0-flash"],
+                ("google", "parser"): ["gemini-2.5-flash", "gemini-2.0-flash"],
+                ("google", "agent"): ["gemini-2.5-pro", "gemini-2.5-flash"],
+                ("deepseek", "chat"): ["deepseek-chat", "deepseek-reasoner"],
+                ("deepseek", "parser"): ["deepseek-chat", "deepseek-reasoner"],
+                ("deepseek", "agent"): ["deepseek-chat", "deepseek-reasoner"],
+            }.get((provider, role), [])
+        )
+        candidates = [
+            item
+            for item in models
+            if self._role_requirements_met(role=role, model=item)
+        ]
+        if not candidates:
+            return None
+        by_name = {
+            str(item.get("name") or item.get("id") or "").strip(): item
+            for item in candidates
+        }
+        for name in preferred_models:
+            normalized_name = str(name or "").strip()
+            if normalized_name and normalized_name in by_name:
+                return {"provider": provider, "model": normalized_name}
+        fallback_name = str(
+            candidates[0].get("name") or candidates[0].get("id") or ""
+        ).strip()
+        return {"provider": provider, "model": fallback_name} if fallback_name else None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _role_requirements_met(*, role: str, model: dict[str, object]) -> bool:
+        if role == "agent":
+            return bool(model.get("supports_tools"))
+        if role == "parser":
+            return bool(model.get("supports_structured_output"))
+        return True
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _validate_role_assignments(
+        *,
+        chat_model_provider: str,
+        chat_model_name: str,
+        parser_model_provider: str,
+        parser_model_name: str,
+        agent_model_provider: str,
+        agent_model_name: str,
+    ) -> None:
+        assignments = (
+            ("chat", chat_model_provider, chat_model_name),
+            ("parser", parser_model_provider, parser_model_name),
+            ("agent", agent_model_provider, agent_model_name),
+        )
+        for role, provider, model in assignments:
+            normalized_provider = provider.strip()
+            normalized_model = model.strip()
+            if not normalized_provider or not normalized_model:
+                raise ChatSettingsValidationError(
+                    f"{role.capitalize()} model provider and model name must both be configured."
                 )
 
     # -------------------------------------------------------------------------
