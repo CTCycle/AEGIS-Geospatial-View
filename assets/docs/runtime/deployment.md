@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-06-05
+Last updated: 2026-06-23
 
 ## Backend Persistence
 
@@ -32,6 +32,8 @@ Current scripts optimize for local execution, not a standalone server deployment
 
 Build through `release/tauri/build_with_tauri.bat`.
 
+`app/src-tauri` is versioned as source/config only. Keep `Cargo.toml`, `Cargo.lock`, `build.rs`, `tauri.conf.json`, `src/`, `capabilities/`, and `icons/` in Git. Do not commit generated output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, `app/src-tauri/gen`, or packaged desktop binaries.
+
 Artifacts are exported to:
 
 - `release/windows/installers`
@@ -41,3 +43,5 @@ Portable exports contain:
 
 - `aegis-desktop.exe`
 - `runtime/` with the bundled backend, settings, database seed, catalog, and embedded runtimes required at startup
+
+Publish desktop binaries as release artifacts or workflow uploads only. Do not commit `release/windows` output or packaged desktop installers back into the repository.
