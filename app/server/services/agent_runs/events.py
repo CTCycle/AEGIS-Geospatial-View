@@ -8,13 +8,11 @@ from typing import AsyncIterator
 from server.domain.run_events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
 from server.repositories.agent_run_events import AgentRunEventRepository
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class RunEventSubscription:
     run_id: str
     queue: asyncio.Queue[RunEvent | None]
-
 
 ###############################################################################
 class RunEventPublisher:

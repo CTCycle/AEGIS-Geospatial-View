@@ -9,7 +9,6 @@ from server.domain.agent_runs import AgentRunState
 MAX_STEERING_MESSAGE_LENGTH = 4000
 MAX_CLIENT_MUTATION_ID_LENGTH = 160
 
-
 ###############################################################################
 class SteeringMessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -41,7 +40,6 @@ class SteeringMessageRequest(BaseModel):
             raise ValueError("client_mutation_id is too long")
         return normalized
 
-
 ###############################################################################
 class SteeringMessageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -52,7 +50,6 @@ class SteeringMessageResponse(BaseModel):
     run_version: int
     aggregated_request: str
     state: AgentRunState
-
 
 ###############################################################################
 class SteeringMessageRecord(BaseModel):

@@ -8,7 +8,6 @@ from sqlalchemy import select
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import Base, ConversationRecord
 
-
 ###############################################################################
 class ConversationRepository:
 

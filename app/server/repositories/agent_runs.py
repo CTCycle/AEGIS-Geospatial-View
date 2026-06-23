@@ -7,7 +7,6 @@ from server.domain.agent_runs import AgentRunSnapshot, AgentRunState
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
 
-
 ###############################################################################
 class AgentRunRepository:
 

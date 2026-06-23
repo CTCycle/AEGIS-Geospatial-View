@@ -14,7 +14,6 @@ TERMINAL_EVENT_TYPES = {
     RunEventType.ERROR,
 }
 
-
 ###############################################################################
 class RunEventStreamService:
 

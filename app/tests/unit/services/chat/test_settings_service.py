@@ -101,6 +101,7 @@ class FakeModelLibraryService:
         self.local_model_ids = local_model_ids or set()
         self.model_overrides = model_overrides or {}
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def normalize_ollama_url(ollama_url: str) -> str:
         return ollama_url.replace("http://localhost", "http://127.0.0.1")

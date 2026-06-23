@@ -9,7 +9,6 @@ from server.domain.run_events import RunEvent, RunEventCreate, RunEventType, Run
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import AgentRunEventRecord, Base
 
-
 ###############################################################################
 class AgentRunEventRepository:
 
