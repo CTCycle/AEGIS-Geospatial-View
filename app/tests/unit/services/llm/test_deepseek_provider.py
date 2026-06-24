@@ -8,11 +8,9 @@ from pydantic import BaseModel
 from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.types import LLMRequest
 
-
 ###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
-
 
 ###############################################################################
 class _Completions:
@@ -32,7 +30,6 @@ class _Completions:
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
 
-
 ###############################################################################
 class _Client:
 
@@ -40,7 +37,6 @@ class _Client:
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
-
 
 ###############################################################################
 def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:

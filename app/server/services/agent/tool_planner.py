@@ -5,7 +5,6 @@ import json
 from server.domain.agent.pipeline import SpecialistGroup, ToolPlan, ToolPlanStep
 from server.domain.extraction.models import TurnParseResult
 
-
 ###############################################################################
 class DeterministicToolPlanner:
 

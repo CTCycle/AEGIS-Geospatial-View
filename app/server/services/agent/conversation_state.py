@@ -16,7 +16,6 @@ from server.domain.agent.pipeline import (
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
 
-
 ###############################################################################
 @dataclass
 class _ConversationState:
@@ -24,7 +23,6 @@ class _ConversationState:
     tasks: list[ConversationTaskRecord] = field(default_factory=list)
     active_visualization: dict[str, Any] | None = None
     updated_at: datetime = field(default_factory=utc_now)
-
 
 ###############################################################################
 class ConversationTaskStateService:

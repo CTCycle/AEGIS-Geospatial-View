@@ -34,7 +34,6 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMToolDefinition
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 def _turn(
     text: str,
@@ -85,7 +84,6 @@ def _turn(
         clarification_plan=clarification_plan,
     )
 
-
 ###############################################################################
 class _SequenceParser:
     last_context_usage = None
@@ -107,7 +105,6 @@ class _SequenceParser:
             }
         )
 
-
 ###############################################################################
 class _Resolver:
 
@@ -124,7 +121,6 @@ class _Resolver:
             )
         active = memory["active_location"]
         return ResolvedLocation.model_validate(active)
-
 
 ###############################################################################
 class _Search:
@@ -157,12 +153,10 @@ class _Search:
             ],
         )
 
-
 ###############################################################################
 @dataclass
 class _Session:
     id: int = 1
-
 
 ###############################################################################
 class _History:
@@ -191,13 +185,11 @@ class _History:
     def get_latest_memory_snapshot(self, session_id):  # noqa: ANN001
         return {}
 
-
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test"
-
 
 ###############################################################################
 class _SettingsRepo:
@@ -205,7 +197,6 @@ class _SettingsRepo:
     # -------------------------------------------------------------------------
     def get_or_create(self):
         return _Settings()
-
 
 ###############################################################################
 def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
@@ -240,7 +231,6 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         task_state_service=ConversationTaskStateService(),
     )
 
-
 ###############################################################################
 def test_houses_rule_selects_residential_buildings_and_not_amenities() -> None:
     extracted = ParserService._apply_domain_rules(
@@ -252,7 +242,6 @@ def test_houses_rule_selects_residential_buildings_and_not_amenities() -> None:
     assert "amenit" not in " ".join(extracted.requested_layers).lower()
     assert extracted.requested_basemap == "esri_world_imagery"
     assert extracted.entity_target == "residential_buildings"
-
 
 ###############################################################################
 def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() -> None:
@@ -310,7 +299,6 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
     async def _run() -> None:
@@ -348,7 +336,6 @@ def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
     turn = _turn(
@@ -360,7 +347,6 @@ def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
     )
     plan = DeterministicToolPlanner().build_plan(turn, "geospatial_features")
     assert len(plan.steps) == 1
-
 
 ###############################################################################
 def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() -> None:
@@ -414,7 +400,6 @@ def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() ->
         assert results[1].ok is False
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_tool_output_validation_rejects_wrong_capability() -> None:

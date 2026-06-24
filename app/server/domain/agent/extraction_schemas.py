@@ -33,7 +33,6 @@ class LLMDisallowedPattern(BaseModel):
     reason: str
     matched_text: str
 
-
 ###############################################################################
 class LLMAtomicTask(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -46,6 +45,7 @@ class LLMAtomicTask(BaseModel):
     visualization_changes: dict[str, Any] = Field(default_factory=dict)
 
 
+###############################################################################
 class LLMClarificationOption(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -54,6 +54,7 @@ class LLMClarificationOption(BaseModel):
     description: str | None = None
 
 
+###############################################################################
 class LLMClarificationPlan(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
