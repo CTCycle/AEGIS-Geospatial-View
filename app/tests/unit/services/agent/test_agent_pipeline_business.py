@@ -45,6 +45,7 @@ def _turn(
     requested_basemap: str | None = None,
     entity_target: str | None = None,
     ambiguities: list[str] | None = None,
+    clarification_plan: dict[str, Any] | None = None,
 ) -> TurnParseResult:
     return TurnParseResult(
         user_text=text,
@@ -81,6 +82,7 @@ def _turn(
         requested_layers=requested_layers or [],
         requested_basemap=requested_basemap,
         tools_needed=bool(requested_layers),
+        clarification_plan=clarification_plan,
     )
 
 
@@ -267,7 +269,15 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
                     "follow-up",
                     relationship="follow_up",
                     requested_basemap="osm_default",
-                    ambiguities=["ambiguous_ground_temperature"],
+                    ambiguities=["temperature_metric_underspecified"],
+                    clarification_plan={
+                        "question": "Which temperature metric should I use?",
+                        "reason": "Temperature metric is ambiguous.",
+                        "blocking_fields": ["temperature_metric"],
+                        "options": [],
+                        "preserve_valid_results": True,
+                        "apply_visualization_changes": True,
+                    },
                 ),
             ]
         )
@@ -296,7 +306,7 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
         assert second.map_session.resolved_location.label == "Colosseum, Rome"
         assert second.map_session.basemap_id == "osm_default"
         assert second.map_session.overlay_ids == ["overpass_residential_buildings"]
-        assert "air temperature at 2 m" in second.assistant_message
+        assert "Which temperature metric should I use?" in second.assistant_message
 
     asyncio.run(_run())
 
@@ -453,4 +463,3 @@ def test_tool_output_validation_rejects_wrong_capability() -> None:
         assert result.error_code == "invalid_tool_output"
 
     asyncio.run(_run())
-

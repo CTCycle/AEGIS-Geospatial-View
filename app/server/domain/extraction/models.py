@@ -90,4 +90,5 @@ class TurnParseResult(BaseModel):
     capability_limitations: list[str] = Field(default_factory=list)
     expected_frontend_update: str = "assistant_message"
     atomic_tasks: list[dict[str, Any]] = Field(default_factory=list)
+    clarification_plan: dict[str, Any] | None = None
     

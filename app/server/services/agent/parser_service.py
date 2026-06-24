@@ -7,6 +7,7 @@ from typing import Literal
 
 from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
+    LLMClarificationPlan,
     LLMLocationSignal,
     LLMParserExtraction,
 )
@@ -456,6 +457,11 @@ class ParserService:
             capability_limitations=self._dedupe(extracted.capability_limitations),
             expected_frontend_update=extracted.expected_frontend_update,
             atomic_tasks=[item.model_dump(mode="json") for item in extracted.atomic_tasks],
+            clarification_plan=(
+                extracted.clarification_plan.model_dump(mode="json")
+                if extracted.clarification_plan is not None
+                else None
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -547,12 +553,48 @@ class ParserService:
         )
         if ground_temperature:
             updates.update(
-                requested_attributes=cls._dedupe([*extracted.requested_attributes, "ambiguous_ground_temperature"]),
+                requested_attributes=cls._dedupe(
+                    [*extracted.requested_attributes, "ground_temperature"]
+                ),
                 required_tool_category="environmental_data",
                 expected_frontend_update="clarification_with_map_update",
+                clarification_plan=LLMClarificationPlan.model_validate({
+                    "question": (
+                        "Which temperature do you mean: current air temperature at 2 m, "
+                        "daytime land-surface temperature, nighttime land-surface "
+                        "temperature, or a mean over a specific period?"
+                    ),
+                    "reason": (
+                        "The requested temperature metric and averaging period are ambiguous."
+                    ),
+                    "blocking_fields": [
+                        "temperature_metric",
+                        "temperature_time_basis",
+                    ],
+                    "options": [
+                        {
+                            "option_id": "air_temperature_2m",
+                            "label": "Current air temperature at 2 m",
+                        },
+                        {
+                            "option_id": "land_surface_temperature_day",
+                            "label": "Daytime land-surface temperature",
+                        },
+                        {
+                            "option_id": "land_surface_temperature_night",
+                            "label": "Nighttime land-surface temperature",
+                        },
+                        {
+                            "option_id": "mean_temperature_period",
+                            "label": "Mean temperature over a specified period",
+                        },
+                    ],
+                    "preserve_valid_results": True,
+                    "apply_visualization_changes": True,
+                }),
             )
             updates["ambiguities"] = cls._dedupe(
-                [*extracted.ambiguities, "ambiguous_ground_temperature"]
+                [*extracted.ambiguities, "temperature_metric_underspecified"]
             )
 
         return extracted.model_copy(update=updates)

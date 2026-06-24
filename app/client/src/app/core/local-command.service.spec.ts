@@ -1,19 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ApiClientService } from './api-client.service';
 import { LocalCommandService } from './local-command.service';
 
 describe('LocalCommandService', () => {
   let service: LocalCommandService;
-  let apiClient: jasmine.SpyObj<ApiClientService>;
 
   beforeEach(() => {
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['fetchCatalog']);
     TestBed.configureTestingModule({
-      providers: [
-        LocalCommandService,
-        { provide: ApiClientService, useValue: apiClient },
-      ],
+      providers: [LocalCommandService],
     });
     service = TestBed.inject(LocalCommandService);
   });
@@ -33,11 +27,8 @@ describe('LocalCommandService', () => {
     expect(result).toEqual({ handled: false });
   });
 
-  it('uses catalog for capability requests', async () => {
-    apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
+  it('leaves capability requests for the agent', async () => {
     const result = await service.resolve('what can you do', { zoomIn: () => false, zoomOut: () => false });
-    expect(apiClient.fetchCatalog).toHaveBeenCalled();
-    expect(result.handled).toBeTrue();
-    expect(result.assistantMessage).toContain('Current catalog: 0 map types, 0 layers, and 0 direct tools.');
+    expect(result).toEqual({ handled: false });
   });
 });

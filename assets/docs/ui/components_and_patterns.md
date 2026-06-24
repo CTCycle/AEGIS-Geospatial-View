@@ -32,4 +32,6 @@ All interactive components must provide:
 - Use inline alerts for map and session concerns.
 - Keep progress indicators visible during in-flight chat requests.
 - During active agent runs, keep the chat composer enabled. Additional messages are refinements for the active run and should use compact steering presentation.
+- Render assistant messages as sanitized Markdown and user messages as escaped plain text.
+- Keep agent availability shown as ready between requests; use run progress labels only while work is active.
 - Validate Operations Bar navigation, routed layouts, map controls, and text wrapping at desktop and mobile widths after significant UI edits.

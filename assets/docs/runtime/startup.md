@@ -11,6 +11,11 @@ start_on_windows.bat
 
 The launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds when needed, and starts backend and frontend services.
 
+An existing `app\server\.venv` is reused. The launcher recreates it only when
+`pyvenv.cfg` references a different portable Python location, such as after the
+repository or runtime folder is moved. An unrelated dependency-sync failure
+does not delete the environment.
+
 By default the launcher no longer prunes the uv cache on each start. Set `PRUNE_UV_CACHE=true` in `settings\.env` only when you explicitly want to reclaim dependency cache space; pruning can take noticeably longer on Windows.
 
 ## Local Development Manual

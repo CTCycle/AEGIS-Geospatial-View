@@ -91,7 +91,10 @@ def _run_event_stream(
             run_id=run_id,
             sequence=1,
             event_type="progress",
-            payload={"stage": "started", "label": "AEGIS agent started"},
+            payload={
+                "stage": "understanding_request",
+                "label": "Understanding the request",
+            },
         ),
         _sse_event(
             conversation_id=conversation_id,

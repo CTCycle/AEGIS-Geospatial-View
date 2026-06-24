@@ -15,7 +15,7 @@ from server.domain.agent_runs import (
     ConversationCreateResponse,
     TERMINAL_RUN_STATES,
 )
-from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
+from server.domain.run_events import RunEventType
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.aggregation import AggregatedRequestService
@@ -66,16 +66,6 @@ class RunLifecycleService:
         aggregate = self.aggregation_service.build_aggregated_request(payload.message, [])
         run = self.run_repository.create_run(conversation_id, payload.message, aggregate)
         self.conversation_repository.set_active_run(conversation_id, run.run_id)
-        await self.event_publisher.publish(
-            conversation_id=conversation_id,
-            run_id=run.run_id,
-            run_version=run.active_run_version,
-            type=RunEventType.PROGRESS,
-            payload={
-                "stage": RunProgressStage.AGENT_STARTED.value,
-                "label": RUN_PROGRESS_LABELS[RunProgressStage.AGENT_STARTED],
-            },
-        )
         task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
