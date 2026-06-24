@@ -44,6 +44,24 @@ class OverpassProvider(GeospatialProvider):
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         latitude, longitude = request_center(request)
         radius_m = request_radius_m(request, self.service.default_radius_m)
+        if request.capability_id == "overpass_residential_buildings":
+            try:
+                payload = await self.service.get_residential_buildings(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius_m=radius_m,
+                    limit=_optional_int(request.params.get("limit")),
+                )
+            except OverpassRateLimitError as exc:
+                raise ProviderRateLimitError(str(exc)) from exc
+            except (OverpassServiceError, ValueError) as exc:
+                raise ProviderUnavailableError(str(exc)) from exc
+            return ProviderResponse(
+                capability_id=request.capability_id,
+                provider_id=self.provider_id,
+                payload=payload,
+                attribution=["© OpenStreetMap contributors (ODbL)"],
+            )
         tags = request.params.get("amenity_tags")
         amenity_tags = [str(tag) for tag in tags] if isinstance(tags, list) else None
         if amenity_tags is None:

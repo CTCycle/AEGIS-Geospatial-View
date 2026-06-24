@@ -1213,6 +1213,28 @@
       "auth_required": false
     },
     {
+      "capability_id": "overpass_residential_buildings",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null,
+      "capability_kind": "vector-overlay",
+      "rendering_mode": "geojson",
+      "health_status": "partial",
+      "planner_hints": [
+        "houses",
+        "housing",
+        "residential",
+        "apartments",
+        "building footprints"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
       "capability_id": "pvgis_solar",
       "enabled_by_default": true,
       "credential_provider": null,

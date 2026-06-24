@@ -430,6 +430,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       'error',
       'completed',
       'cancelled',
+      'clarification_needed',
     ];
     eventTypes.forEach((type) => {
       source.addEventListener(type, (event) => {
@@ -492,8 +493,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       case 'error':
         this.status = 'Failed';
         this.progressLabel = 'Failed';
-        this.messages = [...this.messages, { role: 'assistant', content: String(event.payload['message'] ?? 'Failed') }];
+        {
+          const message = String(event.payload['message'] ?? 'Failed');
+          if (this.messages.at(-1)?.content !== message) {
+            this.messages = [...this.messages, { role: 'assistant', content: message }];
+          }
+        }
         this.isLoading = false;
+        this.activeRunId = undefined;
         this.closeActiveEventSource();
         break;
       case 'completed':
@@ -512,6 +519,16 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         this.progressLabel = 'Cancelled';
         this.activeRunId = undefined;
         this.streamState = 'closed';
+        this.closeActiveEventSource();
+        break;
+      case 'clarification_needed':
+        this.isLoading = false;
+        this.status = 'Need more detail';
+        this.progressStage = 'waiting_for_clarification';
+        this.progressLabel = 'Waiting for clarification';
+        this.activeRunId = undefined;
+        this.streamState = 'closed';
+        this.applyRunCompletionPayload(event.payload);
         this.closeActiveEventSource();
         break;
     }

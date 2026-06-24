@@ -155,6 +155,18 @@ class PolicyEngine:
                 metadata={"code": "unsupported_capability"},
             )
 
+        allowed_capability_ids = constraints.get("allowed_capability_ids")
+        if (
+            isinstance(allowed_capability_ids, list)
+            and allowed_capability_ids
+            and capability_id not in set(map(str, allowed_capability_ids))
+        ):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=f"Capability '{capability_id}' is outside the routed specialist scope.",
+                metadata={"code": "tool_rejected"},
+            )
+
         runtime_registry = self.runtime_registry
         if runtime_registry is None:
             return ToolAuthorizationResult(allowed=True)

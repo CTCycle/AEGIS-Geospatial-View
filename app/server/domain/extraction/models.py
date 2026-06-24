@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -68,4 +68,26 @@ class TurnParseResult(BaseModel):
     ambiguities: list[str] = Field(default_factory=list)
     disallowed_patterns: list[DisallowedPattern] = Field(default_factory=list)
     parser_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    relationship: Literal[
+        "new_task",
+        "follow_up",
+        "correction",
+        "clarification",
+        "qa",
+        "simple_chat",
+        "failure_inquiry",
+    ] = "new_task"
+    map_target: str | None = None
+    entity_target: str | None = None
+    requested_layers: list[str] = Field(default_factory=list)
+    requested_basemap: str | None = None
+    requested_attributes: list[str] = Field(default_factory=list)
+    required_data_sources: list[str] = Field(default_factory=list)
+    required_tool_category: str | None = None
+    tools_needed: bool = False
+    direct_response_sufficient: bool = False
+    requires_reparse: bool = False
+    capability_limitations: list[str] = Field(default_factory=list)
+    expected_frontend_update: str = "assistant_message"
+    atomic_tasks: list[dict[str, Any]] = Field(default_factory=list)
     

@@ -498,5 +498,13 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     map_session: normalizeMapSession(value.map_session),
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
     context_usage: parseContextUsage(value.context_usage),
+    task_snapshot: isRecord(value.task_snapshot) ? value.task_snapshot as unknown as ChatTurnResponse['task_snapshot'] : undefined,
+    tool_plan: isRecord(value.tool_plan) ? value.tool_plan as unknown as ChatTurnResponse['tool_plan'] : undefined,
+    failure_diagnostic: isRecord(value.failure_diagnostic)
+      ? value.failure_diagnostic as unknown as ChatTurnResponse['failure_diagnostic']
+      : undefined,
+    visualization_update: isRecord(value.visualization_update)
+      ? value.visualization_update as unknown as ChatTurnResponse['visualization_update']
+      : undefined,
   };
 };

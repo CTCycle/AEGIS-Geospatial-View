@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.common.time import utc_now
 from server.domain.agent.decision import PolicyDecision
+from server.domain.agent.pipeline import (
+    ConversationTaskSnapshot,
+    TaskFailureDetail,
+    ToolPlan,
+    VisualizationUpdate,
+)
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
 
@@ -30,6 +36,7 @@ class ChatTurnRequest(BaseModel):
     message: str
     datetime: str | None = None
     request_id: str | None = None
+    conversation_id: str | None = None
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -53,6 +60,7 @@ class ChatOperationResult(BaseModel):
         "clarification",
         "rejection",
         "error",
+        "failure_diagnostic",
     ]
     status: Literal["success", "partial", "failed"]
     message: str
@@ -74,6 +82,10 @@ class ChatTurnResponse(BaseModel):
     map_session: MapSession | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     context_usage: ContextUsageResponse | None = None
+    task_snapshot: ConversationTaskSnapshot | None = None
+    tool_plan: ToolPlan | None = None
+    failure_diagnostic: TaskFailureDetail | None = None
+    visualization_update: VisualizationUpdate | None = None
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):

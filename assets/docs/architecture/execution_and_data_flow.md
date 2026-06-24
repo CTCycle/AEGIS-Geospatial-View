@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-22
+Last updated: 2026-06-24
 
 ## Layering
 
@@ -41,13 +41,19 @@ Geospatial API services are composed during application startup and accessed thr
 
 ## Chat Orchestration Pipeline
 
-1. `AgentOrchestrator` receives the turn.
-2. `ParserService` produces structured parse output.
-3. `PolicyEngine` builds constraints and authorization checks.
-4. `AgentToolCatalogService` exposes stable catalog, describe, and execute tools.
-5. `NativeToolLoop` sends native tool definitions to the selected provider.
-6. `ToolRegistry` validates and executes exact emitted tool names.
-7. The response is persisted through chat repositories.
+1. `AgentOrchestrator` loads volatile conversation task and visualization state.
+2. `ParserService` produces structured intent, relationship, entities, layers, visualization changes, and ambiguities.
+3. `ConversationTaskStateService` creates or updates the current task record.
+4. `DeterministicAgentRouter` selects one specialist group.
+5. `DeterministicToolPlanner` creates a typed, deduplicated dependency plan.
+6. `PolicyEngine` restricts native tools and capability IDs to the routed scope.
+7. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
+8. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
+9. Verified results become a map session, direct answer, clarification, or diagnostic response.
+10. Task status, failure details, and active visualization are updated before persistence.
+
+Conversation task state is process-local, keyed by conversation ID or direct-chat
+session ID, and expires after six hours of inactivity. It is not durable user memory.
 
 ## Geospatial Capability Pipeline
 

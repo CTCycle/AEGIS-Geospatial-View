@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-22
+Last updated: 2026-06-24
 
 ## Route-Level Pages
 
@@ -30,6 +30,10 @@ Last updated: 2026-06-22
 `GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, creates one active run, and opens an `EventSource` stream. Additional composer submissions while the run is active are sent as steering updates and rendered as compact refinements rather than independent tasks.
 
 The page tracks the last run event ID and ignores duplicate event IDs so reconnect replay can be applied without duplicating assistant or progress output.
+
+Clarification runs terminate with `clarification_needed`. The event may include a
+partial validated map update, allowing a basemap or layer correction before the
+user answers. Matching assistant/error messages are deduplicated.
 
 ## Map Rendering
 

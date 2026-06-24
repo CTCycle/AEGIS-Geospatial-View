@@ -1,0 +1,83 @@
+{
+  "id": "overpass_residential_buildings",
+  "name": "OpenStreetMap Residential Buildings",
+  "provider": "overpass",
+  "type": "geojson",
+  "description": "Residential building footprints from OpenStreetMap through Overpass.",
+  "capabilities": ["buildings", "housing", "residential"],
+  "coverage": "global",
+  "metadata": {
+    "label": "Residential buildings",
+    "default_opacity": 0.72,
+    "requires_key": false,
+    "attribution": "© OpenStreetMap contributors (ODbL)",
+    "keywords": ["houses", "housing", "residential", "apartments", "buildings", "footprints"],
+    "action_tags": ["building lookup", "residential features"],
+    "task_tags": ["housing", "urban context"],
+    "map_type_tags": ["thematic"],
+    "coverage_scope": "global",
+    "temporal_behavior": "current OpenStreetMap data",
+    "constraints": "Query volume must respect Overpass limits and ODbL attribution.",
+    "content_hash": "overpass_residential_buildings_v1",
+    "human_summary": "Residential building polygons near a resolved location.",
+    "primary_use_cases": ["housing visualization", "residential footprint lookup"],
+    "search_examples": ["show houses around the Colosseum", "map residential buildings in Rome"],
+    "disambiguation_notes": ["Do not use this capability for amenities or general POI discovery."],
+    "location_dependency": "Strongly location-specific.",
+    "integration_requirements": ["No API key required for public Overpass instances"],
+    "official_docs_url": "https://wiki.openstreetmap.org/wiki/Overpass_API",
+    "source_protocol": "Overpass JSON",
+    "data_format": "GeoJSON",
+    "geometry_type": "polygon",
+    "queryable": true,
+    "vectorizable": true,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "Use bounded radii and limits.",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": true,
+    "last_validated": "2026-06-24"
+  },
+  "version": 1,
+  "last_modified": "2026-06-24T00:00:00+00:00",
+  "capabilityKind": "vector-overlay",
+  "renderingMode": "geojson",
+  "sourceOfficialDocs": ["https://wiki.openstreetmap.org/wiki/Overpass_API"],
+  "license": {
+    "name": "Open Database License",
+    "url": "https://www.openstreetmap.org/copyright",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": true,
+    "plannerHints": ["houses", "housing", "residential", "apartments", "building footprints"],
+    "requiredUserAction": [],
+    "avoidWhen": ["amenity requests", "general chat", "no geographic context"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-06-24",
+    "knownLimitations": ["Completeness depends on OpenStreetMap building tagging."]
+  },
+  "cachePolicy": {
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
+  },
+  "normalization": {
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": null,
+    "fieldMap": {"building": "building"},
+    "expectedGeometry": "polygon"
+  }
+}

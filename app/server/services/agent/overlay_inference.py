@@ -73,11 +73,6 @@ class OverlayInferenceService:
                 "Matched air-quality intent from request text or action metadata.",
             ),
             (
-                ("satellite", "imagery", "true color"),
-                ("VIIRS_SNPP_CorrectedReflectance_TrueColor",),
-                "Matched satellite or imagery intent from request text or action metadata.",
-            ),
-            (
                 ("terrain", "elevation", "topography"),
                 ("SRTM_Color_Index",),
                 "Matched terrain or elevation intent from request text or action metadata.",

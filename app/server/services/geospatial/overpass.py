@@ -38,6 +38,14 @@ class OverpassService:
         "fuel",
         "supermarket",
     )
+    RESIDENTIAL_BUILDING_TAGS = (
+        "house",
+        "residential",
+        "apartments",
+        "detached",
+        "terrace",
+        "semidetached_house",
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -156,6 +164,71 @@ class OverpassService:
         }
 
     # -------------------------------------------------------------------------
+    async def get_residential_buildings(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        radius_m: float | None = None,
+        limit: int | None = None,
+    ) -> dict[str, Any]:
+        resolved_radius_m = max(radius_m or self.default_radius_m, 100.0)
+        resolved_limit = max(1, min(limit or self.default_limit, 500))
+        payload = await asyncio.to_thread(
+            self._query_buildings,
+            latitude=latitude,
+            longitude=longitude,
+            radius_m=resolved_radius_m,
+            limit=resolved_limit,
+        )
+        elements = payload.get("elements") if isinstance(payload.get("elements"), list) else []
+        features: list[dict[str, Any]] = []
+        for raw in elements:
+            if not isinstance(raw, dict) or raw.get("type") != "way":
+                continue
+            tags = raw.get("tags") if isinstance(raw.get("tags"), dict) else {}
+            building_type = str(tags.get("building") or "").strip()
+            if building_type not in self.RESIDENTIAL_BUILDING_TAGS:
+                continue
+            geometry = raw.get("geometry") if isinstance(raw.get("geometry"), list) else []
+            coordinates = [
+                [float(point["lon"]), float(point["lat"])]
+                for point in geometry
+                if isinstance(point, dict)
+                and isinstance(point.get("lat"), int | float)
+                and isinstance(point.get("lon"), int | float)
+            ]
+            if len(coordinates) < 3:
+                continue
+            if coordinates[0] != coordinates[-1]:
+                coordinates.append(coordinates[0])
+            features.append(
+                {
+                    "type": "Feature",
+                    "id": f"way/{raw.get('id')}",
+                    "geometry": {"type": "Polygon", "coordinates": [coordinates]},
+                    "properties": {
+                        "name": tags.get("name"),
+                        "building": building_type,
+                        "source": "openstreetmap",
+                    },
+                }
+            )
+            if len(features) >= resolved_limit:
+                break
+        return {
+            "type": "FeatureCollection",
+            "features": features,
+            "metadata": {
+                "provider": "overpass",
+                "kind": "residential_buildings",
+                "radius_m": resolved_radius_m,
+                "attribution": "© OpenStreetMap contributors (ODbL)",
+                "resolved_at": datetime.now(UTC).isoformat(),
+            },
+        }
+
+    # -------------------------------------------------------------------------
     def _query_overpass(
         self,
         *,
@@ -179,6 +252,54 @@ class OverpassService:
             ]
         )
         query = f"[out:json][timeout:25];\n(\n{filters}\n);\nout center {limit};"
+        payload = urlencode({"data": query}).encode("utf-8")
+        request = Request(
+            self.base_url,
+            data=payload,
+            headers={
+                "User-Agent": self.user_agent,
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            },
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_s) as response:
+                body = response.read().decode("utf-8")
+        except HTTPError as exc:
+            if exc.code == 429:
+                raise OverpassRateLimitError("Overpass rate limit exceeded.") from exc
+            raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
+        except (URLError, TimeoutError) as exc:
+            raise OverpassRequestError(f"Overpass request failed: {exc}") from exc
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise OverpassRequestError("Overpass response was not valid JSON.") from exc
+        if not isinstance(data, dict):
+            raise OverpassRequestError("Overpass response payload is malformed.")
+        self._cache_set(cache_key, data)
+        return data
+
+    # -------------------------------------------------------------------------
+    def _query_buildings(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        radius_m: float,
+        limit: int,
+    ) -> dict[str, Any]:
+        cache_key = (
+            f"buildings:{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{limit}"
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+        self._wait_for_rate_limit_slot()
+        filters = "\n".join(
+            f'way["building"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+            for tag in self.RESIDENTIAL_BUILDING_TAGS
+        )
+        query = f"[out:json][timeout:25];\n(\n{filters}\n);\nout tags geom {limit};"
         payload = urlencode({"data": query}).encode("utf-8")
         request = Request(
             self.base_url,
