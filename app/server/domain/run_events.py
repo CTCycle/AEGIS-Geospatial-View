@@ -19,6 +19,7 @@ class RunEventType(StrEnum):
     ERROR = "error"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    CLARIFICATION_NEEDED = "clarification_needed"
 
 ###############################################################################
 class RunEventVisibility(StrEnum):

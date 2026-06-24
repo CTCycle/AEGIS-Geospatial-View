@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-22
+Last updated: 2026-06-24
 
 ## Mounting
 
@@ -105,6 +105,14 @@ Supported `operation.kind` values:
 - `clarification`
 - `rejection`
 - `error`
+- `failure_diagnostic`
+
+Additional optional response fields:
+
+- `task_snapshot`
+- `tool_plan`
+- `failure_diagnostic`
+- `visualization_update`
 
 Supported `operation.status` values:
 
@@ -147,3 +155,6 @@ Defined in `app/server/api/conversations.py`:
   Marks the active run cancelled as a terminal user action.
 
 The v1 run stream emits concise user-visible events only: progress labels, assistant text completion, request updates, terminal errors, completion, and cancellation. Internal diagnostics can be persisted with internal visibility and are not replayed on the normal user stream.
+
+Clarifications use the terminal `clarification_needed` event and may carry a
+partial map session plus a visualization delta.

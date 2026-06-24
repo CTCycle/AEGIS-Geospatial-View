@@ -54,8 +54,12 @@ class AgentToolCatalogService:
         self,
         context: AgentExecutionContext | None = None,
     ) -> list[LLMToolDefinition]:
-        _ = context
-        return [
+        metadata = context.metadata if context is not None else {}
+        allowed_tool_names = set(map(str, metadata.get("allowed_native_tools") or []))
+        allowed_capability_ids = sorted(
+            set(map(str, metadata.get("allowed_capability_ids") or []))
+        )
+        definitions = [
             LLMToolDefinition(
                 name="list_geospatial_capabilities",
                 description="List available geospatial capabilities with deterministic pagination and filters.",
@@ -126,6 +130,16 @@ class AgentToolCatalogService:
                 },
             ),
         ]
+        if allowed_capability_ids:
+            execute = next(
+                item for item in definitions if item.name == "execute_geospatial_capability"
+            )
+            execute.parameters_json_schema["properties"]["capability_id"]["enum"] = (
+                allowed_capability_ids
+            )
+        if allowed_tool_names:
+            return [item for item in definitions if item.name in allowed_tool_names]
+        return definitions
 
     # -------------------------------------------------------------------------
     def register_with(self, registry: ToolRegistry) -> None:

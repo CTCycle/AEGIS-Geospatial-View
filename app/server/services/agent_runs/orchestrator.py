@@ -37,6 +37,7 @@ class AgentRunOrchestrator:
                     message=snapshot.aggregated_request,
                     request_id=run_id,
                     title=snapshot.original_request[:120],
+                    conversation_id=snapshot.conversation_id,
                 )
             )
         except Exception as exc:
@@ -75,6 +76,32 @@ class AgentRunOrchestrator:
             await self.execute_run(run_id)
             return
         await self._publish_response(latest, response)
+        if response.operation is not None and response.operation.kind == "clarification":
+            clarified = self.run_repository.mark_completed(run_id)
+            await self._publish_progress(
+                clarified,
+                RunProgressStage.WAITING_FOR_CLARIFICATION,
+            )
+            await self.event_publisher.publish(
+                conversation_id=clarified.conversation_id,
+                run_id=clarified.run_id,
+                run_version=clarified.active_run_version,
+                type=RunEventType.CLARIFICATION_NEEDED,
+                payload={
+                    "content": response.assistant_message,
+                    "map_session": response.map_session.model_dump(mode="json")
+                    if response.map_session is not None
+                    else None,
+                    "operation": response.operation.model_dump(mode="json"),
+                    "task_snapshot": response.task_snapshot.model_dump(mode="json")
+                    if response.task_snapshot is not None
+                    else None,
+                    "visualization_update": response.visualization_update.model_dump(mode="json")
+                    if response.visualization_update is not None
+                    else None,
+                },
+            )
+            return
         if self._response_failed(response):
             failed = self.run_repository.mark_failed(
                 run_id,
@@ -116,6 +143,15 @@ class AgentRunOrchestrator:
                 "memory_snapshot": response.memory_snapshot,
                 "context_usage": response.context_usage.model_dump(mode="json")
                 if response.context_usage is not None
+                else None,
+                "task_snapshot": response.task_snapshot.model_dump(mode="json")
+                if response.task_snapshot is not None
+                else None,
+                "failure_diagnostic": response.failure_diagnostic.model_dump(mode="json")
+                if response.failure_diagnostic is not None
+                else None,
+                "visualization_update": response.visualization_update.model_dump(mode="json")
+                if response.visualization_update is not None
                 else None,
             },
         )

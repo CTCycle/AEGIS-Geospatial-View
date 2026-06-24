@@ -237,6 +237,63 @@ describe('pages/geospatial-page.component', () => {
     expect(component.activeAlertItems).toContain('Tool timed out.');
   });
 
+  it('clarification run event applies partial map update and closes the run', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.isLoading = true;
+    component.activeRunId = 'run-1';
+    component['handleRunEvent']({
+      event_id: 'event-1',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'clarification_needed',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: {
+        operation: {
+          kind: 'clarification',
+          status: 'partial',
+          message: 'Which temperature?',
+        },
+        map_session: {
+          session_id: 'street-map',
+          resolved_location: { label: 'Colosseum, Rome', latitude: 41.8902, longitude: 12.4922 },
+          basemap_id: 'osm_default',
+          overlay_ids: ['overpass_residential_buildings'],
+          viewport: { center_latitude: 41.8902, center_longitude: 12.4922, radius_m: 2500 },
+          overlays: [],
+        },
+      },
+    });
+    expect(component.status).toBe('Need more detail');
+    expect(component.isLoading).toBeFalse();
+    expect(component.activeRunId).toBeUndefined();
+    expect(component.mapSession?.basemap_id).toBe('osm_default');
+    expect(component.mapSession?.resolved_location.label).toBe('Colosseum, Rome');
+  });
+
+  it('does not duplicate an assistant message when the matching error event arrives', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.messages = [{ role: 'assistant', content: 'Provider timed out.' }];
+    component['handleRunEvent']({
+      event_id: 'event-error',
+      sequence: 2,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: { message: 'Provider timed out.' },
+    });
+    expect(component.messages.length).toBe(1);
+  });
+
   it('startNewChat clears session and map/chat state', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();

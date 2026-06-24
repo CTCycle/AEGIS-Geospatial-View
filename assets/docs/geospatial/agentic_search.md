@@ -1,18 +1,22 @@
 # Agentic Search
 
-Last updated: 2026-06-06
+Last updated: 2026-06-24
 
 ## Summary
 
 The chat workflow separates structured parsing from provider-native tool calling:
 
-1. `ParserService` emits evidence-oriented `TurnParseResult`.
-2. `PolicyEngine` adds constraints, authorization checks, and audit metadata.
-3. `AgentToolCatalogService` exposes stable geospatial catalog tools.
-4. `NativeToolLoop` sends those tools to the selected provider through native tool-calling APIs.
-5. The model decides exact tool names and arguments.
-6. `ToolRegistry` executes exact emitted tool names and returns structured tool-result messages.
-7. The loop continues until final text or a production limit is reached.
+1. `ParserService` emits evidence-oriented `TurnParseResult`, including prompt relationship, entity/layer targets, basemap changes, ambiguities, and frontend update type.
+2. A volatile task ledger records the supervised task and follow-up relationship.
+3. Deterministic routing selects a narrow specialist group.
+4. A typed tool plan fixes capability IDs, arguments, dependencies, timeouts, retries, validation, and merge behavior before execution.
+5. `PolicyEngine` restricts both tool names and executable capability IDs.
+6. Known capabilities execute through `ToolPlanExecutor`; catalog discovery uses the bounded native tool loop.
+7. Verified results update the map, task status, and structured diagnostics.
+
+Residential-building requests use `overpass_residential_buildings`; amenities
+remain separate. Satellite language selects the imagery basemap unless the user
+explicitly requests an imagery data layer.
 
 No legacy routing compatibility is preserved.
 
@@ -28,6 +32,10 @@ No legacy routing compatibility is preserved.
 - ambiguities
 - disallowed patterns
 - parser confidence
+- task relationship and atomic tasks
+- map/entity targets, requested layers, basemap, and attributes
+- tool requirement/category and expected frontend update
+- capability limitations and parser-recursion signal
 
 It does not contain provider-specific tool schemas, concrete executable tool names, or final map payloads.
 
@@ -91,6 +99,7 @@ Stable high-level fields:
 - `clarification`
 - `rejection`
 - `error`
+- `failure_diagnostic`
 
 `operation.status` values:
 

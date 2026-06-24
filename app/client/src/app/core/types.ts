@@ -339,7 +339,8 @@ export type RunEventType =
   | 'request_updated'
   | 'error'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'clarification_needed';
 
 export type RunEventVisibility = 'user' | 'internal';
 
@@ -477,6 +478,20 @@ export interface TurnParseResult {
   temporal_signal: TemporalSignal;
   ambiguities: string[];
   parser_confidence: number;
+  relationship?: 'new_task' | 'follow_up' | 'correction' | 'clarification' | 'qa' | 'simple_chat' | 'failure_inquiry';
+  map_target?: string | null;
+  entity_target?: string | null;
+  requested_layers?: string[];
+  requested_basemap?: string | null;
+  requested_attributes?: string[];
+  required_data_sources?: string[];
+  required_tool_category?: string | null;
+  tools_needed?: boolean;
+  direct_response_sufficient?: boolean;
+  requires_reparse?: boolean;
+  capability_limitations?: string[];
+  expected_frontend_update?: string;
+  atomic_tasks?: Array<Record<string, JsonValue>>;
 }
 
 export interface ClarificationRequest {
@@ -512,12 +527,79 @@ export interface ToolPayload {
 }
 
 export interface ChatOperationResult {
-  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error';
+  kind: 'map_session' | 'direct_answer' | 'capability_catalog' | 'clarification' | 'rejection' | 'error' | 'failure_diagnostic';
   status: 'success' | 'partial' | 'failed';
   message: string;
   warnings?: string[];
   map_session?: MapSession | null;
   direct_result?: Record<string, JsonValue> | null;
+}
+
+export interface TaskFailureDetail {
+  stage: string;
+  component?: string | null;
+  tool_name?: string | null;
+  sanitized_error: string;
+  missing_input: string[];
+  unsupported_capability?: string | null;
+  partial_results_available: boolean;
+  recovery_suggestion?: string | null;
+  user_explanation: string;
+}
+
+export interface ToolPlanStep {
+  step_id: string;
+  tool_name: string;
+  capability_id?: string | null;
+  reason: string;
+  arguments: Record<string, JsonValue>;
+  depends_on: string[];
+  parallel_group?: string | null;
+  timeout_seconds: number;
+  required: boolean;
+}
+
+export interface ToolPlan {
+  tool_group: string;
+  candidate_tools: string[];
+  selected_tools: string[];
+  steps: ToolPlanStep[];
+  frontend_derivation: string;
+  partial_failure_policy: string;
+}
+
+export interface ConversationTaskRecord {
+  task_id: string;
+  raw_user_text: string;
+  prompt_summary: string;
+  normalized_description: string;
+  task_type: string;
+  intent: string;
+  relationship: string;
+  required_entities: string[];
+  required_data_layers: string[];
+  visualization_changes: Record<string, JsonValue>;
+  specialist: string;
+  status: 'pending' | 'needs_clarification' | 'routed' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  is_current: boolean;
+  parent_task_id?: string | null;
+  blocking_ambiguity?: string | null;
+  failure?: TaskFailureDetail | null;
+  progress_summary?: string | null;
+}
+
+export interface ConversationTaskSnapshot {
+  conversation_key: string;
+  current_task_id?: string | null;
+  tasks: ConversationTaskRecord[];
+  active_visualization?: Record<string, JsonValue> | null;
+}
+
+export interface VisualizationUpdate {
+  basemap_replacement?: string | null;
+  add_layer_ids: string[];
+  remove_layer_ids: string[];
+  replace_layer_ids: Record<string, string>;
 }
 
 export interface ChatTurnResponse {
@@ -531,6 +613,10 @@ export interface ChatTurnResponse {
   map_session?: MapSession | null;
   memory_snapshot: Record<string, JsonValue>;
   context_usage?: ContextUsage | null;
+  task_snapshot?: ConversationTaskSnapshot | null;
+  tool_plan?: ToolPlan | null;
+  failure_diagnostic?: TaskFailureDetail | null;
+  visualization_update?: VisualizationUpdate | null;
 }
 
 export type ChatStreamEventType =

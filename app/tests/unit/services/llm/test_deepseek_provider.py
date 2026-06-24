@@ -9,14 +9,19 @@ from server.services.llm.deepseek_provider import DeepSeekProvider
 from server.services.llm.types import LLMRequest
 
 
+###############################################################################
 class _StructuredPayload(BaseModel):
     answer: str
 
 
+###############################################################################
 class _Completions:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs):  # noqa: ANN003, ANN201
         self.calls.append(kwargs)
         message = SimpleNamespace(
@@ -28,12 +33,16 @@ class _Completions:
         )
 
 
+###############################################################################
 class _Client:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
 
 
+###############################################################################
 def test_structured_output_uses_deepseek_json_object_mode(monkeypatch) -> None:
     client = _Client()
     provider = DeepSeekProvider(api_key="test")

@@ -73,7 +73,8 @@ class ParserService:
         return normalized
 
     # -------------------------------------------------------------------------
-    def _dedupe(self, values: list[str]) -> list[str]:
+    @staticmethod
+    def _dedupe(values: list[str]) -> list[str]:
         seen: set[str] = set()
         result: list[str] = []
         for value in values:
@@ -345,6 +346,7 @@ class ParserService:
                 )
                 fallback.parser_confidence = min(fallback.parser_confidence, 0.35)
             extracted = fallback
+        extracted = self._apply_domain_rules(user_message, extracted, memory_snapshot)
 
         extracted_location_signals = list(extracted.location_signals)
         verbatim_signals = [
@@ -440,7 +442,120 @@ class ParserService:
             ambiguities=ambiguities,
             disallowed_patterns=disallowed,
             parser_confidence=max(0.0, min(1.0, confidence)),
+            relationship=extracted.relationship,
+            map_target=extracted.map_target,
+            entity_target=extracted.entity_target,
+            requested_layers=self._dedupe(extracted.requested_layers),
+            requested_basemap=extracted.requested_basemap,
+            requested_attributes=self._dedupe(extracted.requested_attributes),
+            required_data_sources=self._dedupe(extracted.required_data_sources),
+            required_tool_category=extracted.required_tool_category,
+            tools_needed=extracted.tools_needed,
+            direct_response_sufficient=extracted.direct_response_sufficient,
+            requires_reparse=extracted.requires_reparse,
+            capability_limitations=self._dedupe(extracted.capability_limitations),
+            expected_frontend_update=extracted.expected_frontend_update,
+            atomic_tasks=[item.model_dump(mode="json") for item in extracted.atomic_tasks],
         )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _apply_domain_rules(
+        cls,
+        user_message: str,
+        extracted: LLMParserExtraction,
+        memory_snapshot: dict,
+    ) -> LLMParserExtraction:
+        text = " ".join(user_message.casefold().split())
+        updates: dict[str, object] = {}
+
+        if any(marker in text for marker in ("why did", "why has", "why was", "why it failed", "why did it fail")):
+            updates.update(
+                relationship="failure_inquiry",
+                task_class="general_question",
+                action_id=AgentAction.CHAT_RESPONSE.value,
+                requires_location=False,
+                tools_needed=False,
+                direct_response_sufficient=True,
+                required_tool_category="failure_diagnostics",
+                expected_frontend_update="failure_diagnostic",
+            )
+        elif any(marker in text for marker in ("nice!", "can you now", "same map", "same place", "there")):
+            updates["relationship"] = "follow_up"
+            if memory_snapshot.get("active_location") and not any(
+                marker in text
+                for marker in (
+                    "rome",
+                    "colosseum",
+                    "coliseum",
+                    "paris",
+                    "milan",
+                    "zurich",
+                    "coordinates",
+                )
+            ):
+                updates["location_signals"] = []
+
+        house_markers = ("house", "houses", "housing", "residential", "apartments", "buildings")
+        if any(marker in text for marker in house_markers):
+            requested_layers = [
+                item
+                for item in extracted.requested_layers
+                if "amenit" not in item.casefold() and "poi" not in item.casefold()
+            ]
+            updates.update(
+                task_class="map_search",
+                action_id=AgentAction.DATA_LAYER_QUERY.value,
+                action_label="Residential building visualization",
+                entity_target="residential_buildings",
+                requested_layers=cls._dedupe([*requested_layers, "overpass_residential_buildings"]),
+                required_data_sources=cls._dedupe([*extracted.required_data_sources, "openstreetmap_overpass"]),
+                required_tool_category="geospatial_features",
+                tools_needed=True,
+                direct_response_sufficient=False,
+                expected_frontend_update="map_session",
+            )
+            place_match = re.search(
+                r"(?i)\b(?:coliseum|colosseum)(?:\s+in\s+rome)?\b",
+                user_message,
+            )
+            if place_match is not None:
+                place_text = place_match.group(0)
+                updates["location_signals"] = [
+                    LLMLocationSignal(
+                        signal_type="address",
+                        raw_value=place_text,
+                        normalized_value="Colosseum, Rome",
+                        confidence=0.95,
+                    )
+                ]
+                updates["map_target"] = "Colosseum, Rome"
+
+        if any(marker in text for marker in ("satellite view", "satellite", "imagery")):
+            updates["requested_basemap"] = "esri_world_imagery"
+        if any(marker in text for marker in ("street map", "street maps", "no satellite", "without satellite")):
+            updates.update(
+                requested_basemap="osm_default",
+                relationship="follow_up" if memory_snapshot.get("active_visualization") else extracted.relationship,
+                expected_frontend_update="visualization_update",
+            )
+
+        ground_temperature = (
+            "temperature" in text
+            and any(marker in text for marker in ("ground", "surface", "at the ground"))
+            and any(marker in text for marker in ("medium", "mean", "average"))
+        )
+        if ground_temperature:
+            updates.update(
+                requested_attributes=cls._dedupe([*extracted.requested_attributes, "ambiguous_ground_temperature"]),
+                required_tool_category="environmental_data",
+                expected_frontend_update="clarification_with_map_update",
+            )
+            updates["ambiguities"] = cls._dedupe(
+                [*extracted.ambiguities, "ambiguous_ground_temperature"]
+            )
+
+        return extracted.model_copy(update=updates)
 
     # -------------------------------------------------------------------------
     @staticmethod

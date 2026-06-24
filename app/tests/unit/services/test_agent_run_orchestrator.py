@@ -9,7 +9,6 @@ from server.domain.chat import ChatOperationResult, ChatTurnResponse
 from server.domain.run_events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
-
 ###############################################################################
 class _FakeAgentOrchestrator:
 
@@ -21,7 +20,6 @@ class _FakeAgentOrchestrator:
     async def run_turn(self, payload):  # noqa: ANN001
         _ = payload
         return self.response
-
 
 ###############################################################################
 class _FakeRunRepository:
@@ -68,7 +66,6 @@ class _FakeRunRepository:
         self.snapshot = self.snapshot.model_copy(update={"state": AgentRunState.CANCELLED})
         return self.snapshot
 
-
 ###############################################################################
 class _FakeEventPublisher:
 
@@ -79,7 +76,6 @@ class _FakeEventPublisher:
     # -------------------------------------------------------------------------
     async def publish(self, **kwargs):  # noqa: ANN003
         self.events.append(kwargs)
-
 
 ###############################################################################
 def _snapshot() -> AgentRunSnapshot:
@@ -92,7 +88,6 @@ def _snapshot() -> AgentRunSnapshot:
         state=AgentRunState.PENDING,
         created_at=datetime.now(UTC),
     )
-
 
 ###############################################################################
 def _failed_response() -> ChatTurnResponse:
@@ -133,7 +128,6 @@ def _failed_response() -> ChatTurnResponse:
             message="Configured parser model is unavailable.",
         ),
     )
-
 
 ###############################################################################
 def test_execute_run_marks_failed_operation_as_failed_run() -> None:

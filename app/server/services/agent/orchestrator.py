@@ -5,11 +5,19 @@ from typing import Any
 from uuid import uuid4
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
+from server.domain.agent.pipeline import (
+    ConversationTaskRecord,
+    TaskFailureDetail,
+    VisualizationUpdate,
+)
 from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
 from server.domain.extraction.models import LocationSignal
 from server.domain.geographics import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
+from server.services.agent.conversation_state import (
+    ConversationTaskStateService,
+)
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import (
     AgentExecutionContext,
@@ -17,10 +25,13 @@ from server.services.agent.native_tool_loop import (
     NativeToolLoop,
 )
 from server.services.agent.overlay_inference import OverlayInferenceService
+from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.tool_plan_executor import ToolPlanExecutor
+from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.chat.history_service import ChatHistoryService
 from server.services.llm.factory import LLMFactory
 from server.services.search.orchestrator import LocationSearchOrchestrator
@@ -47,6 +58,10 @@ class AgentOrchestrator:
         settings_repo: ModelSettingsRepository | None = None,
         history_service: ChatHistoryService | None = None,
         history_repo: ChatHistoryService | None = None,
+        task_state_service: ConversationTaskStateService | None = None,
+        pipeline_router: DeterministicAgentRouter | None = None,
+        tool_planner: DeterministicToolPlanner | None = None,
+        tool_plan_executor: ToolPlanExecutor | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -72,6 +87,12 @@ class AgentOrchestrator:
             tool_registry=self.tool_registry,
         )
         self.history_service = history_service or history_repo or ChatHistoryService()
+        self.task_state_service = task_state_service or ConversationTaskStateService()
+        self.pipeline_router = pipeline_router or DeterministicAgentRouter()
+        self.tool_planner = tool_planner or DeterministicToolPlanner()
+        self.tool_plan_executor = tool_plan_executor or ToolPlanExecutor(
+            tool_registry=self.tool_registry
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -111,6 +132,12 @@ class AgentOrchestrator:
         recent_messages = self.history_service.list_recent_messages(session.id, limit=12)
         latest_contract = self.history_service.get_latest_turn_contract(session.id)
         latest_memory = self.history_service.get_latest_memory_snapshot(session.id)
+        conversation_key = payload.conversation_id or f"session:{session.id}"
+        state_before = self.task_state_service.snapshot(conversation_key)
+        latest_memory = self._merge_conversation_state_memory(
+            latest_memory,
+            state_before.active_visualization,
+        )
 
         turn_contract = self.parser_service.parse_turn(
             user_message=payload.message,
@@ -120,6 +147,12 @@ class AgentOrchestrator:
         turn_contract = self._merge_memory_location_signals(
             turn_contract=turn_contract,
             latest_memory=latest_memory,
+        )
+        specialist = self.pipeline_router.select_specialist(turn_contract)
+        task = self.task_state_service.start_task(
+            conversation_key,
+            turn_contract,
+            specialist,
         )
         context_usage = self.parser_service.last_context_usage
         if self._has_parser_authentication_failure(turn_contract):
@@ -132,6 +165,20 @@ class AgentOrchestrator:
                 kind="error",
                 status="failed",
                 message=assistant_message,
+            )
+            failure = TaskFailureDetail(
+                stage="structured_intent_extraction",
+                component="parser_model",
+                sanitized_error="The configured parser credential was rejected.",
+                recovery_suggestion="Replace the saved parser API key in Model Settings.",
+                user_explanation=assistant_message,
+            )
+            self.task_state_service.update_task(
+                conversation_key,
+                task.task_id,
+                status="failed",
+                failure=failure,
+                progress_summary="Intent extraction failed.",
             )
             self.history_service.append_message(
                 session_id=session.id,
@@ -165,6 +212,8 @@ class AgentOrchestrator:
                 map_session=None,
                 memory_snapshot=latest_memory,
                 context_usage=context_usage,
+                task_snapshot=self.task_state_service.snapshot(conversation_key),
+                failure_diagnostic=failure,
             )
         if self._has_parser_runtime_failure(turn_contract):
             assistant_message = (
@@ -176,6 +225,20 @@ class AgentOrchestrator:
                 kind="error",
                 status="failed",
                 message=assistant_message,
+            )
+            failure = TaskFailureDetail(
+                stage="structured_intent_extraction",
+                component="parser_model",
+                sanitized_error="The configured parser model is unavailable.",
+                recovery_suggestion="Select an available parser model or restore the configured runtime.",
+                user_explanation=assistant_message,
+            )
+            self.task_state_service.update_task(
+                conversation_key,
+                task.task_id,
+                status="failed",
+                failure=failure,
+                progress_summary="Intent extraction failed.",
             )
             self.history_service.append_message(
                 session_id=session.id,
@@ -209,6 +272,72 @@ class AgentOrchestrator:
                 map_session=None,
                 memory_snapshot=latest_memory,
                 context_usage=context_usage,
+                task_snapshot=self.task_state_service.snapshot(conversation_key),
+                failure_diagnostic=failure,
+            )
+
+        if turn_contract.relationship == "failure_inquiry":
+            failure = self.task_state_service.latest_failure(conversation_key)
+            if failure is None:
+                assistant_message = (
+                    "The exact cause was not captured for the previous request. "
+                    "That is an instrumentation gap; no structured failed task is available in this conversation."
+                )
+            else:
+                assistant_message = failure.user_explanation
+                if failure.recovery_suggestion:
+                    assistant_message = (
+                        f"{assistant_message} Recovery: {failure.recovery_suggestion}"
+                    )
+            operation = ChatOperationResult(
+                kind="failure_diagnostic",
+                status="success" if failure is not None else "partial",
+                message=assistant_message,
+            )
+            decision = self._build_direct_reject_decision(
+                turn_contract.normalized_action.action_id
+            )
+            self.task_state_service.update_task(
+                conversation_key,
+                task.task_id,
+                status="completed",
+                progress_summary="Explained the latest captured failure.",
+            )
+            self.history_service.append_message(
+                session_id=session.id,
+                role="assistant",
+                content=assistant_message,
+                request_id=request_id,
+                structured_payload={
+                    "turn_contract": turn_contract.model_dump(mode="json"),
+                    "decision": decision.model_dump(mode="json"),
+                    "operation": operation.model_dump(mode="json"),
+                    "memory_snapshot": latest_memory,
+                    "request_id": request_id,
+                },
+            )
+            return ChatTurnResponse(
+                request_id=request_id,
+                session_id=session.id,
+                assistant_message=assistant_message,
+                turn_contract=turn_contract,
+                decision=decision,
+                operation=operation,
+                memory_snapshot=latest_memory,
+                context_usage=context_usage,
+                task_snapshot=self.task_state_service.snapshot(conversation_key),
+                failure_diagnostic=failure,
+            )
+
+        if "ambiguous_ground_temperature" in turn_contract.ambiguities:
+            return await self._build_temperature_clarification_response(
+                request_id=request_id,
+                session_id=session.id,
+                conversation_key=conversation_key,
+                task=task,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+                context_usage=context_usage,
             )
 
         if turn_contract.task_class == "general_question" or self._is_capability_question(turn_contract.user_text):
@@ -237,6 +366,12 @@ class AgentOrchestrator:
                 tool_payload=None,
                 map_session=None,
             )
+            self.task_state_service.update_task(
+                conversation_key,
+                task.task_id,
+                status="completed",
+                progress_summary="Answered without geospatial tools.",
+            )
             return ChatTurnResponse(
                 request_id=request_id,
                 session_id=session.id,
@@ -248,6 +383,7 @@ class AgentOrchestrator:
                 map_session=None,
                 memory_snapshot=latest_memory,
                 context_usage=context_usage,
+                task_snapshot=self.task_state_service.snapshot(conversation_key),
             )
 
         preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
@@ -260,6 +396,17 @@ class AgentOrchestrator:
             operation = AgentResponseBuilder.build_preflight_operation_result(
                 decision_state=preflight_decision.plan.state,
                 assistant_message=assistant_message,
+            )
+            self.task_state_service.update_task(
+                conversation_key,
+                task.task_id,
+                status="needs_clarification"
+                if preflight_decision.plan.state == "clarify"
+                else "failed",
+                blocking_ambiguity=assistant_message
+                if preflight_decision.plan.state == "clarify"
+                else None,
+                progress_summary=assistant_message,
             )
             self.history_service.append_message(
                 session_id=session.id,
@@ -288,9 +435,18 @@ class AgentOrchestrator:
                 map_session=None,
                 memory_snapshot=latest_memory,
                 context_usage=context_usage,
+                task_snapshot=self.task_state_service.snapshot(conversation_key),
             )
 
         settings = self.settings_repo.get_or_create()
+        tool_plan = self.tool_planner.build_plan(turn_contract, specialist)
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="routed",
+            progress_summary=f"Routed to {specialist}.",
+            tool_plan=tool_plan,
+        )
         constraints = self.policy_engine.build_agent_constraints(
             turn_contract,
             latest_memory,
@@ -304,11 +460,49 @@ class AgentOrchestrator:
                 "requires_location": constraints.requires_location,
                 "blocked_patterns": constraints.blocked_patterns,
                 "allowed_tool_names": constraints.allowed_tool_names,
+                "allowed_capability_ids": [
+                    step.capability_id
+                    for step in tool_plan.steps
+                    if step.capability_id is not None
+                ],
                 **constraints.metadata,
             },
-            metadata={"previous_turn_contract": latest_contract},
+            metadata={
+                "previous_turn_contract": latest_contract,
+                "allowed_native_tools": tool_plan.selected_tools,
+                "allowed_capability_ids": [
+                    step.capability_id
+                    for step in tool_plan.steps
+                    if step.capability_id is not None
+                ],
+                "specialist": specialist,
+            },
         )
-        native_tools = self.tool_registry.list_native_tools()
+        if tool_plan.steps:
+            return await self._execute_planned_turn(
+                request_id=request_id,
+                session_id=session.id,
+                conversation_key=conversation_key,
+                task=task,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
+                latest_contract=latest_contract,
+                context_usage=context_usage,
+                native_context=native_context,
+                tool_plan=tool_plan,
+            )
+        tool_builder = getattr(
+            self.agent_tool_catalog_service,
+            "build_native_tools",
+            None,
+        )
+        native_tools = (
+            tool_builder(native_context)
+            if callable(tool_builder)
+            else self.tool_registry.list_native_tools()
+        )
+        if not native_tools:
+            native_tools = self.tool_registry.list_native_tools()
         tool_loop_result = await self.native_tool_loop.run(
             AgentToolLoopRequest(
                 provider=settings.agent_model_provider,
@@ -401,6 +595,21 @@ class AgentOrchestrator:
             operation=operation,
             trace_steps=decision_trace_steps,
         )
+        failure = self._failure_from_operation(operation, tool_payload)
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="failed" if failure is not None else "completed",
+            progress_summary=operation.message,
+            failure=failure,
+            tool_plan=tool_plan,
+            tool_result_refs=[
+                str(item.get("tool_call_id"))
+                for item in tool_payload.get("tool_results") or []
+                if isinstance(item, dict) and item.get("tool_call_id")
+            ],
+        )
+        self.task_state_service.set_active_visualization(conversation_key, map_session)
 
         self.history_service.append_message(
             session_id=session.id,
@@ -436,6 +645,339 @@ class AgentOrchestrator:
             map_session=map_session,
             memory_snapshot=memory_snapshot,
             context_usage=context_usage,
+            task_snapshot=self.task_state_service.snapshot(conversation_key),
+            tool_plan=tool_plan,
+            failure_diagnostic=failure,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _execute_planned_turn(
+        self,
+        *,
+        request_id: str,
+        session_id: int,
+        conversation_key: str,
+        task: ConversationTaskRecord,
+        turn_contract,
+        latest_memory: dict[str, Any],
+        latest_contract: dict[str, Any] | None,
+        context_usage,
+        native_context: AgentExecutionContext,
+        tool_plan,
+    ) -> ChatTurnResponse:
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="in_progress",
+            progress_summary="Executing validated tool plan.",
+            tool_plan=tool_plan,
+        )
+        planned_results = await self.tool_plan_executor.execute(tool_plan, native_context)
+        tool_payload = {
+            "tool_plan": tool_plan.model_dump(mode="json"),
+            "tool_calls": [
+                {
+                    "id": result.step_id,
+                    "name": result.provenance.tool_name,
+                    "arguments": next(
+                        step.arguments
+                        for step in tool_plan.steps
+                        if step.step_id == result.step_id
+                    ),
+                }
+                for result in planned_results
+            ],
+            "tool_results": [
+                {
+                    "tool_call_id": result.step_id,
+                    "name": result.provenance.tool_name,
+                    "content": {
+                        "ok": result.ok,
+                        "data": result.data,
+                        "error": (
+                            {
+                                "code": result.error_code,
+                                "message": result.error_message,
+                            }
+                            if not result.ok
+                            else None
+                        ),
+                    },
+                    "is_error": not result.ok,
+                    "error": result.error_message,
+                    "provenance": result.provenance.model_dump(mode="json"),
+                }
+                for result in planned_results
+            ],
+            "iterations": 1,
+            "stopped_reason": "planned_execution",
+        }
+        required_failures = [
+            result
+            for result in planned_results
+            if not result.ok
+            and next(
+                step.required for step in tool_plan.steps if step.step_id == result.step_id
+            )
+        ]
+        map_session = await self._build_combined_map_session_from_tool_results(
+            tool_payload=tool_payload,
+            turn_contract=turn_contract,
+            latest_memory=latest_memory,
+        )
+        direct_result = self._extract_direct_result_from_tool_results(tool_payload)
+        if required_failures and map_session is None and direct_result is None:
+            first = required_failures[0]
+            assistant_message = first.error_message or "The required geospatial tool failed."
+            operation = ChatOperationResult(
+                kind="error",
+                status="failed",
+                message=assistant_message,
+            )
+        else:
+            assistant_message = AgentResponseBuilder.build_verified_assistant_message(
+                "",
+                map_session=map_session,
+                direct_result=direct_result,
+                tool_payload=tool_payload,
+            )
+            operation = AgentResponseBuilder.build_verified_operation_result(
+                assistant_message=assistant_message,
+                map_session=map_session,
+                direct_result=direct_result,
+                tool_payload=tool_payload,
+                user_text=turn_contract.user_text,
+                is_capability_question=False,
+            )
+            if any(not result.ok for result in planned_results) and operation.status == "success":
+                operation = operation.model_copy(update={"status": "partial"})
+        decision = AgentResponseBuilder.build_final_decision(
+            action_id=turn_contract.normalized_action.action_id,
+            operation=operation,
+            trace_steps=[
+                "1.parse_structured_request",
+                "2.update_conversation_task",
+                "3.route_specialist",
+                "4.build_tool_plan",
+                "5.execute_dependency_levels",
+                "6.validate_tool_results",
+                "7.build_frontend_payload",
+            ],
+        )
+        memory_snapshot = await self._build_updated_memory_snapshot(
+            turn_contract=turn_contract,
+            latest_memory=latest_memory,
+            map_session=map_session,
+            direct_result=direct_result,
+            tool_payload=tool_payload,
+        )
+        failure = self._failure_from_operation(operation, tool_payload)
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="failed" if failure is not None else "completed",
+            progress_summary=operation.message,
+            failure=failure,
+            tool_plan=tool_plan,
+            tool_result_refs=[result.step_id for result in planned_results],
+        )
+        self.task_state_service.set_active_visualization(conversation_key, map_session)
+        visualization_update = VisualizationUpdate(
+            basemap_replacement=turn_contract.requested_basemap,
+            add_layer_ids=list(turn_contract.requested_layers),
+        )
+        self.history_service.append_message(
+            session_id=session_id,
+            role="assistant",
+            content=assistant_message,
+            request_id=request_id,
+            structured_payload={
+                "turn_contract": turn_contract.model_dump(mode="json"),
+                "decision": decision.model_dump(mode="json"),
+                "operation": operation.model_dump(mode="json"),
+                "memory_snapshot": memory_snapshot,
+                "previous_turn_contract": latest_contract,
+                "request_id": request_id,
+            },
+            tool_payload=tool_payload,
+            map_session=map_session.model_dump(mode="json") if map_session else None,
+        )
+        return ChatTurnResponse(
+            request_id=request_id,
+            session_id=session_id,
+            assistant_message=assistant_message,
+            turn_contract=turn_contract,
+            decision=decision,
+            operation=operation,
+            tool_payload=tool_payload,
+            map_session=map_session,
+            memory_snapshot=memory_snapshot,
+            context_usage=context_usage,
+            task_snapshot=self.task_state_service.snapshot(conversation_key),
+            tool_plan=tool_plan,
+            failure_diagnostic=failure,
+            visualization_update=visualization_update,
+        )
+
+    # -------------------------------------------------------------------------
+    async def _build_temperature_clarification_response(
+        self,
+        *,
+        request_id: str,
+        session_id: int,
+        conversation_key: str,
+        task: ConversationTaskRecord,
+        turn_contract,
+        latest_memory: dict[str, Any],
+        context_usage,
+    ) -> ChatTurnResponse:
+        previous_raw = self.task_state_service.snapshot(
+            conversation_key
+        ).active_visualization
+        map_session: MapSession | None = None
+        removed_layers: list[str] = []
+        if isinstance(previous_raw, dict):
+            try:
+                previous = MapSession.model_validate(previous_raw)
+                removed_layers = [
+                    layer_id
+                    for layer_id in previous.overlay_ids
+                    if layer_id
+                    in {
+                        "VIIRS_SNPP_CorrectedReflectance_TrueColor",
+                        "MODIS_Terra_CorrectedReflectance_TrueColor",
+                    }
+                ]
+                retained = [
+                    layer_id
+                    for layer_id in previous.overlay_ids
+                    if layer_id not in removed_layers
+                ]
+                plan = ExecutionPlan(
+                    state="map_search",
+                    mode="map",
+                    action_id=turn_contract.normalized_action.action_id,
+                    basemap_id="osm_default",
+                    overlay_ids=retained,
+                )
+                request = self.request_builder.build_location_search_request(
+                    plan,
+                    previous.resolved_location,
+                )
+                map_session = await self.search_orchestrator.execute(request)
+            except Exception:
+                LOGGER.warning("Could not apply partial follow-up map update", exc_info=True)
+        assistant_message = (
+            "I switched the map to the street basemap. Which temperature do you mean: "
+            "current air temperature at 2 m, daytime land-surface temperature, "
+            "nighttime land-surface temperature, or a mean over a specific period?"
+        )
+        operation = ChatOperationResult(
+            kind="clarification",
+            status="partial",
+            message=assistant_message,
+            map_session=map_session,
+        )
+        decision = PolicyDecision(
+            plan=ExecutionPlan(
+                state="clarify",
+                mode="map",
+                action_id=turn_contract.normalized_action.action_id,
+                basemap_id="osm_default",
+                overlay_ids=list(map_session.overlay_ids) if map_session else [],
+            ),
+            trace=DecisionTrace(
+                steps=[
+                    "follow_up.resolve_active_visualization",
+                    "visualization.replace_satellite_with_street",
+                    "ambiguity.request_temperature_definition",
+                ]
+            ),
+        )
+        self.task_state_service.update_task(
+            conversation_key,
+            task.task_id,
+            status="needs_clarification",
+            blocking_ambiguity="ambiguous_ground_temperature",
+            progress_summary=assistant_message,
+        )
+        self.task_state_service.set_active_visualization(conversation_key, map_session)
+        visualization_update = VisualizationUpdate(
+            basemap_replacement="osm_default",
+            remove_layer_ids=removed_layers,
+        )
+        self.history_service.append_message(
+            session_id=session_id,
+            role="assistant",
+            content=assistant_message,
+            request_id=request_id,
+            structured_payload={
+                "turn_contract": turn_contract.model_dump(mode="json"),
+                "decision": decision.model_dump(mode="json"),
+                "operation": operation.model_dump(mode="json"),
+                "memory_snapshot": latest_memory,
+                "request_id": request_id,
+            },
+            map_session=map_session.model_dump(mode="json") if map_session else None,
+        )
+        return ChatTurnResponse(
+            request_id=request_id,
+            session_id=session_id,
+            assistant_message=assistant_message,
+            turn_contract=turn_contract,
+            decision=decision,
+            operation=operation,
+            map_session=map_session,
+            memory_snapshot=latest_memory,
+            context_usage=context_usage,
+            task_snapshot=self.task_state_service.snapshot(conversation_key),
+            visualization_update=visualization_update,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _merge_conversation_state_memory(
+        latest_memory: dict[str, Any] | None,
+        active_visualization: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        merged = dict(latest_memory or {})
+        if not isinstance(active_visualization, dict):
+            return merged
+        merged["active_visualization"] = active_visualization
+        location = active_visualization.get("resolved_location")
+        if isinstance(location, dict):
+            merged["active_location"] = location
+        return merged
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _failure_from_operation(
+        operation: ChatOperationResult,
+        tool_payload: dict[str, Any] | None,
+    ) -> TaskFailureDetail | None:
+        if operation.status != "failed" and operation.kind != "error":
+            return None
+        failed_result = next(
+            (
+                item
+                for item in (tool_payload or {}).get("tool_results") or []
+                if isinstance(item, dict) and item.get("is_error")
+            ),
+            None,
+        )
+        error_message = operation.message
+        tool_name = None
+        if isinstance(failed_result, dict):
+            tool_name = str(failed_result.get("name") or "") or None
+            error_message = str(failed_result.get("error") or error_message)
+        return TaskFailureDetail(
+            stage="tool_execution" if failed_result else "response_planning",
+            component="agent_pipeline",
+            tool_name=tool_name,
+            sanitized_error=error_message,
+            partial_results_available=operation.status == "partial",
+            recovery_suggestion="Clarify the request or retry after the provider is available.",
+            user_explanation=operation.message,
         )
 
     # -------------------------------------------------------------------------
@@ -627,7 +1169,21 @@ class AgentOrchestrator:
     # -------------------------------------------------------------------------
     @staticmethod
     def _has_parser_runtime_failure(turn_contract) -> bool:
-        return "parser_unavailable" in set(turn_contract.ambiguities or [])
+        if "parser_unavailable" not in set(turn_contract.ambiguities or []):
+            return False
+        if not hasattr(turn_contract, "task_class"):
+            return True
+        return (
+            turn_contract.task_class == "unclear"
+            or turn_contract.normalized_action.action_id == "unknown"
+            or (
+                turn_contract.normalized_action.requires_location
+                and not turn_contract.location_signals
+                and not turn_contract.conversation_context.memory_snapshot.get(
+                    "active_location"
+                )
+            )
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -841,7 +1397,11 @@ class AgentOrchestrator:
             state="map_search",
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
-            basemap_id=basemap_id or self._infer_basemap_id(turn_contract),
+            basemap_id=(
+                turn_contract.requested_basemap
+                or basemap_id
+                or self._infer_basemap_id(turn_contract)
+            ),
             overlay_ids=self._infer_overlay_ids(
                 turn_contract=turn_contract,
                 resolved_location=resolved_location,
@@ -873,6 +1433,8 @@ class AgentOrchestrator:
     # -------------------------------------------------------------------------
     @staticmethod
     def _infer_basemap_id(turn_contract) -> str | None:
+        if turn_contract.requested_basemap:
+            return turn_contract.requested_basemap
         haystack = " ".join(
             [
                 turn_contract.user_text.lower(),
@@ -883,6 +1445,8 @@ class AgentOrchestrator:
         )
         if any(marker in haystack for marker in ("satellite", "imagery", "true color")):
             return "esri_world_imagery"
+        if any(marker in haystack for marker in ("street map", "street maps", "no satellite")):
+            return "osm_default"
         if any(marker in haystack for marker in ("terrain", "elevation", "topography")):
             return "osm_terrain"
         return None

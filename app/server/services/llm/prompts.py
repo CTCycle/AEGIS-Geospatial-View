@@ -147,6 +147,12 @@ Return JSON only with this schema:
 - ambiguities: array of strings
 - disallowed_patterns: array of {pattern_id, reason, matched_text}
 - parser_confidence: 0..1
+- relationship: new_task|follow_up|correction|clarification|qa|simple_chat|failure_inquiry
+- map_target and entity_target
+- requested_layers, requested_basemap, requested_attributes, required_data_sources
+- required_tool_category, tools_needed, direct_response_sufficient, requires_reparse
+- capability_limitations and expected_frontend_update
+- atomic_tasks: array of independently actionable task summaries
 
 Rules:
 1. Always infer location entities from natural language when present.
@@ -158,6 +164,11 @@ Rules:
 7. requested_visualizations must use only canonical ids when relevant:
    satellite, terrain, air_quality, precipitation, poi, traffic, elevation, land_cover, active_fire, weather, aerosol, ozone, solar, noise
 8. When the request is for air quality, prefer air_quality in requested_visualizations and action tags unless the user explicitly requests another theme.
+9. Treat "why did the previous request fail?" as failure_inquiry.
+10. Treat requests that modify the active map as follow_up or correction and preserve unchanged context.
+11. Houses and residential buildings are building features, never amenities or generic POIs.
+12. Satellite view is a basemap preference unless the user explicitly requests an additional satellite data layer.
+13. "Medium temperature at the ground" is ambiguous unless air/surface, day/night, and averaging period are clear.
 """.strip()
 
 ###############################################################################
