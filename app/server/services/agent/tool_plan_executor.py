@@ -16,7 +16,6 @@ from server.services.agent.tool_registry import ToolRegistry
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class ToolPlanExecutor:
 

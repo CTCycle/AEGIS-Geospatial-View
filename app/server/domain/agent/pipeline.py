@@ -35,7 +35,6 @@ SpecialistGroup = Literal[
     "visualization_update",
 ]
 
-
 ###############################################################################
 class TaskFailureDetail(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -50,7 +49,6 @@ class TaskFailureDetail(BaseModel):
     recovery_suggestion: str | None = None
     user_explanation: str
 
-
 ###############################################################################
 class ToolRetryPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -64,7 +62,6 @@ class ToolRetryPolicy(BaseModel):
             "provider_unavailable",
         ]
     )
-
 
 ###############################################################################
 class ToolPlanStep(BaseModel):
@@ -85,7 +82,6 @@ class ToolPlanStep(BaseModel):
     merge_policy: str = "merge_verified_map_or_direct_result"
     required: bool = True
 
-
 ###############################################################################
 class ToolPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -96,7 +92,6 @@ class ToolPlan(BaseModel):
     steps: list[ToolPlanStep] = Field(default_factory=list)
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
-
 
 ###############################################################################
 class ConversationTaskRecord(BaseModel):
@@ -125,7 +120,6 @@ class ConversationTaskRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-
 ###############################################################################
 class ToolResultProvenance(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -135,7 +129,6 @@ class ToolResultProvenance(BaseModel):
     provider: str | None = None
     attempt: int = 1
     elapsed_ms: int = 0
-
 
 ###############################################################################
 class PlannedToolResult(BaseModel):
@@ -149,7 +142,6 @@ class PlannedToolResult(BaseModel):
     validation_error: str | None = None
     provenance: ToolResultProvenance
 
-
 ###############################################################################
 class VisualizationUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -158,7 +150,6 @@ class VisualizationUpdate(BaseModel):
     add_layer_ids: list[str] = Field(default_factory=list)
     remove_layer_ids: list[str] = Field(default_factory=list)
     replace_layer_ids: dict[str, str] = Field(default_factory=dict)
-
 
 ###############################################################################
 class ConversationTaskSnapshot(BaseModel):

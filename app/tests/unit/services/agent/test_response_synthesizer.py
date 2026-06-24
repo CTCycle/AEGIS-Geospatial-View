@@ -7,36 +7,49 @@ from server.services.agent.response_synthesizer import GroundedResponseSynthesiz
 from server.services.llm.types import LLMResult
 
 
+###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test-model"
 
 
+###############################################################################
 class _SettingsRepo:
+
+    # -------------------------------------------------------------------------
     def get_or_create(self) -> _Settings:
         return _Settings()
 
 
+###############################################################################
 class _Provider:
+
+    # -------------------------------------------------------------------------
     def __init__(self, content: str = "**Map ready.**") -> None:
         self.content = content
         self.requests = []
 
+    # -------------------------------------------------------------------------
     def chat(self, request):  # noqa: ANN001
         self.requests.append(request)
         return LLMResult(content=self.content)
 
 
+###############################################################################
 class _Factory:
+
+    # -------------------------------------------------------------------------
     def __init__(self, provider: _Provider) -> None:
         self.provider = provider
 
+    # -------------------------------------------------------------------------
     def get_chat_provider(self, provider: str) -> _Provider:
         assert provider == "test"
         return self.provider
 
 
+###############################################################################
 def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
     provider = _Provider("**Rain layer ready.**\n\n- Current data")
     synthesizer = GroundedResponseSynthesizer(
@@ -67,8 +80,13 @@ def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
     assert "How much rain is there?" in request_text
 
 
+###############################################################################
 def test_synthesizer_falls_back_when_model_fails() -> None:
+
+    ###############################################################################
     class _FailingProvider(_Provider):
+
+        # -------------------------------------------------------------------------
         def chat(self, request):  # noqa: ANN001
             raise RuntimeError("offline")
 
@@ -90,6 +108,7 @@ def test_synthesizer_falls_back_when_model_fails() -> None:
     ) == "Choose a supported time basis."
 
 
+###############################################################################
 def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
     provider = _Provider("This must not be used.")
     synthesizer = GroundedResponseSynthesizer(
