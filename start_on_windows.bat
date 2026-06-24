@@ -227,25 +227,17 @@ pushd "%server_dir%" >nul
 set "uv_extras_flag="
 if /i "%INSTALL_EXTRAS%"=="true" set "uv_extras_flag=--all-extras"
 "%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
-set "sync_ec=!ERRORLEVEL!"
-if not "!sync_ec!"=="0" (
-  "%uv_exe%" sync --python "%python_exe%" %uv_extras_flag%
-  set "sync_ec=!ERRORLEVEL!"
-)
-if not "!sync_ec!"=="0" (
-  set "PYTHONPATH=%app_dir%"
-  "%venv_dir%\Scripts\python.exe" -c "import importlib; import fastapi, sqlalchemy, uvicorn; importlib.import_module('server.app')" >nul 2>&1
-  set "venv_check_ec=!ERRORLEVEL!"
-  set "PYTHONPATH="
+set "sync_ec=%ERRORLEVEL%"
+if not "%sync_ec%"=="0" (
+  echo [WARN] Existing virtual environment may reference a previous repository location. Recreating it.
+  if exist "%venv_dir%" rd /s /q "%venv_dir%"
+  "%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
+  set "sync_ec=%ERRORLEVEL%"
 )
 popd >nul
-if not "!sync_ec!"=="0" (
-  if "!venv_check_ec!"=="0" (
-    echo [WARN] uv sync failed with code !sync_ec!, but the existing backend virtual environment is still usable.
-  ) else (
-    echo [FATAL] uv sync failed with code !sync_ec!.
-    goto error
-  )
+if not "%sync_ec%"=="0" (
+  echo [FATAL] uv sync failed with code %sync_ec%.
+  goto error
 )
 
 > "%env_marker%" echo setup_completed
