@@ -44,13 +44,15 @@ Geospatial API services are composed during application startup and accessed thr
 1. `AgentOrchestrator` loads volatile conversation task and visualization state.
 2. `ParserService` produces structured intent, relationship, entities, layers, visualization changes, and ambiguities.
 3. `ConversationTaskStateService` creates or updates the current task record.
-4. `DeterministicAgentRouter` selects one specialist group.
-5. `DeterministicToolPlanner` creates a typed, deduplicated dependency plan.
-6. `PolicyEngine` restricts native tools and capability IDs to the routed scope.
-7. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
-8. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
-9. Verified results become a map session, direct answer, clarification, or diagnostic response.
-10. Task status, failure details, and active visualization are updated before persistence.
+4. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
+5. `DeterministicAgentRouter` selects one specialist group.
+6. `DeterministicToolPlanner` creates a typed, deduplicated dependency plan.
+7. `PolicyEngine` restricts native tools and capability IDs to the routed scope.
+8. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
+9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
+10. Verified results become a map session, direct answer, clarification, or diagnostic response.
+11. Successful and partial outcomes are passed to the configured agent model for grounded Markdown synthesis; deterministic prose remains the fallback.
+12. Task status, failure details, and active visualization are updated before persistence.
 
 Conversation task state is process-local, keyed by conversation ID or direct-chat
 session ID, and expires after six hours of inactivity. It is not durable user memory.
@@ -99,3 +101,4 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - Async endpoints must avoid blocking CPU-heavy work on the event loop.
 - Run event fanout is in-process in v1, with persisted event replay as the reconnect source of truth.
 - Run cancellation is cooperative and terminal; stale agent results after a version change are persisted as internal diagnostics and discarded from user-visible completion.
+- Agent availability is application-level. Run progress begins with `understanding_request`; creating a run does not restart the agent or emit an `agent_started` event.

@@ -226,17 +226,37 @@ if not exist "%pyproject%" (
 pushd "%server_dir%" >nul
 set "uv_extras_flag="
 if /i "%INSTALL_EXTRAS%"=="true" set "uv_extras_flag=--all-extras"
-"%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
-set "sync_ec=%ERRORLEVEL%"
-if not "%sync_ec%"=="0" (
-  echo [WARN] Existing virtual environment may reference a previous repository location. Recreating it.
-  if exist "%venv_dir%" rd /s /q "%venv_dir%"
-  "%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
-  set "sync_ec=%ERRORLEVEL%"
+
+set "venv_stale="
+if exist "%venv_dir%" (
+  set "venv_home="
+  if exist "%venv_dir%\pyvenv.cfg" (
+    for /f "tokens=1,* delims==" %%A in ('findstr /b /i /c:"home =" "%venv_dir%\pyvenv.cfg" 2^>nul') do (
+      for /f "tokens=* delims= " %%H in ("%%B") do set "venv_home=%%H"
+    )
+  )
+  if not defined venv_home (
+    echo [WARN] Existing virtual environment has no readable interpreter reference.
+  ) else if /i not "!venv_home!"=="%python_dir%" (
+    set "venv_stale=1"
+    echo [INFO] Virtual environment references stale Python location: !venv_home!
+  )
 )
+
+if defined venv_stale (
+  echo [INFO] Recreating virtual environment after repository/runtime relocation.
+  if exist "%venv_dir%" rd /s /q "%venv_dir%"
+)
+
+if exist "%venv_dir%" (
+  "%uv_exe%" sync --locked --no-install-project %uv_extras_flag%
+) else (
+  "%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
+)
+set "sync_ec=%ERRORLEVEL%"
 popd >nul
 if not "%sync_ec%"=="0" (
-  echo [FATAL] uv sync failed with code %sync_ec%.
+  echo [FATAL] uv sync failed with code %sync_ec%. The existing virtual environment was preserved.
   goto error
 )
 

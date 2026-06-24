@@ -492,6 +492,14 @@ export interface TurnParseResult {
   capability_limitations?: string[];
   expected_frontend_update?: string;
   atomic_tasks?: Array<Record<string, JsonValue>>;
+  clarification_plan?: {
+    question: string;
+    reason: string;
+    blocking_fields: string[];
+    options: Array<{ option_id: string; label: string; description?: string | null }>;
+    preserve_valid_results: boolean;
+    apply_visualization_changes: boolean;
+  } | null;
 }
 
 export interface ClarificationRequest {

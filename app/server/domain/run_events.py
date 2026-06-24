@@ -28,7 +28,6 @@ class RunEventVisibility(StrEnum):
 
 ###############################################################################
 class RunProgressStage(StrEnum):
-    AGENT_STARTED = "agent_started"
     UNDERSTANDING_REQUEST = "understanding_request"
     RETRIEVING_INFORMATION = "retrieving_information"
     CALLING_TOOL = "calling_tool"
@@ -42,7 +41,6 @@ class RunProgressStage(StrEnum):
 
 
 RUN_PROGRESS_LABELS: dict[RunProgressStage, str] = {
-    RunProgressStage.AGENT_STARTED: "AEGIS agent started",
     RunProgressStage.UNDERSTANDING_REQUEST: "Understanding the request",
     RunProgressStage.RETRIEVING_INFORMATION: "Searching or retrieving information",
     RunProgressStage.CALLING_TOOL: "Calling a relevant tool",

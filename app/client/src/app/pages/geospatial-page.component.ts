@@ -54,7 +54,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   memorySnapshot: Record<string, unknown> = {};
   contextUsage?: ContextUsage;
   mapSession?: MapSession;
-  status = 'Idle';
+  status = 'Agent ready';
   assistantDraft = '';
   composerDraft = '';
   transcriptScrollTop = 0;
@@ -218,7 +218,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.contextUsage = undefined;
     this.mapSession = undefined;
     this.payload = undefined;
-    this.status = 'Idle';
+    this.status = 'Agent ready';
     this.assistantDraft = '';
     this.composerDraft = '';
     this.transcriptScrollTop = 0;
@@ -309,8 +309,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   private async startAgentRun(message: string, requestNonce: number): Promise<void> {
     this.isLoading = true;
-    this.status = 'AEGIS agent started';
-    this.progressLabel = 'AEGIS agent started';
+    this.status = 'Understanding the request';
+    this.progressStage = 'understanding_request';
+    this.progressLabel = 'Understanding the request';
     this.progressPercent = 18;
     this.messages = [...this.messages, { role: 'user', content: message, kind: 'normal' }];
     this.assistantDraft = '';
@@ -346,8 +347,8 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         error,
         'Could not start this request right now.',
       );
-      this.status = 'Failed';
-      this.progressLabel = 'Failed';
+      this.status = 'Agent ready';
+      this.progressLabel = undefined;
       this.assistantDraft = '';
       this.messages = [...this.messages, { role: 'assistant', content: fallback }];
       this.progressPercent = 0;
@@ -394,8 +395,8 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     }
     try {
       await this.apiClient.cancelAgentRun(this.conversationId, this.activeRunId);
-      this.status = 'Cancelled';
-      this.progressLabel = 'Cancelled';
+      this.status = 'Agent ready';
+      this.progressLabel = undefined;
       this.isLoading = false;
       this.activeRunId = undefined;
       this.closeActiveEventSource();
@@ -491,8 +492,8 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         this.status = 'Request updated';
         break;
       case 'error':
-        this.status = 'Failed';
-        this.progressLabel = 'Failed';
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
         {
           const message = String(event.payload['message'] ?? 'Failed');
           if (this.messages.at(-1)?.content !== message) {
@@ -505,8 +506,8 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         break;
       case 'completed':
         this.isLoading = false;
-        this.status = 'Complete';
-        this.progressLabel = 'Completed';
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
         this.progressPercent = 100;
         this.activeRunId = undefined;
         this.streamState = 'closed';
@@ -515,17 +516,17 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
         break;
       case 'cancelled':
         this.isLoading = false;
-        this.status = 'Cancelled';
-        this.progressLabel = 'Cancelled';
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
         this.activeRunId = undefined;
         this.streamState = 'closed';
         this.closeActiveEventSource();
         break;
       case 'clarification_needed':
         this.isLoading = false;
-        this.status = 'Need more detail';
+        this.status = 'Agent ready';
         this.progressStage = 'waiting_for_clarification';
-        this.progressLabel = 'Waiting for clarification';
+        this.progressLabel = undefined;
         this.activeRunId = undefined;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
@@ -572,7 +573,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.memorySnapshot = result.memory_snapshot ?? {};
     this.contextUsage = result.context_usage ?? undefined;
     this.assistantDraft = '';
-    this.status = this.deriveStatusLabel(result);
+    this.status = 'Agent ready';
     this.progressPercent = 100;
     this.syncState();
     queueMicrotask(() => this.scrollTranscriptToBottom());
@@ -592,7 +593,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
       this.messages = [...this.messages, { role: 'assistant', content: result.assistantMessage }];
     }
     this.composerDraft = '';
-    this.status = result.status ?? 'Complete';
+    this.status = 'Agent ready';
     this.syncState();
     queueMicrotask(() => this.scrollTranscriptToBottom());
     return true;

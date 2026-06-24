@@ -35,6 +35,14 @@ Clarification runs terminate with `clarification_needed`. The event may include 
 partial validated map update, allowing a basemap or layer correction before the
 user answers. Matching assistant/error messages are deduplicated.
 
+The agent is presented as continuously ready for the chat session. Per-run
+progress begins with request understanding and is separate from the persistent
+availability state.
+
+Assistant message strings are rendered as GitHub-style Markdown through the
+shared chat-message component and Angular HTML sanitization. User messages
+remain escaped plain text.
+
 ## Map Rendering
 
 `MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.

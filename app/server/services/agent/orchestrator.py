@@ -15,6 +15,7 @@ from server.domain.extraction.models import LocationSignal
 from server.domain.geographics import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
+from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.conversation_state import (
     ConversationTaskStateService,
 )
@@ -29,6 +30,7 @@ from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
+from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
@@ -62,6 +64,8 @@ class AgentOrchestrator:
         pipeline_router: DeterministicAgentRouter | None = None,
         tool_planner: DeterministicToolPlanner | None = None,
         tool_plan_executor: ToolPlanExecutor | None = None,
+        capability_resolver: CapabilityResolver | None = None,
+        response_synthesizer: GroundedResponseSynthesizer | None = None,
     ) -> None:
         self.search_orchestrator = search_orchestrator
         self.parser_service = parser_service
@@ -92,6 +96,10 @@ class AgentOrchestrator:
         self.tool_planner = tool_planner or DeterministicToolPlanner()
         self.tool_plan_executor = tool_plan_executor or ToolPlanExecutor(
             tool_registry=self.tool_registry
+        )
+        self.capability_resolver = capability_resolver or CapabilityResolver()
+        self.response_synthesizer = response_synthesizer or GroundedResponseSynthesizer(
+            settings_repo=self.settings_repo
         )
 
     # -------------------------------------------------------------------------
@@ -148,6 +156,7 @@ class AgentOrchestrator:
             turn_contract=turn_contract,
             latest_memory=latest_memory,
         )
+        turn_contract = self.capability_resolver.resolve(turn_contract)
         specialist = self.pipeline_router.select_specialist(turn_contract)
         task = self.task_state_service.start_task(
             conversation_key,
@@ -329,8 +338,8 @@ class AgentOrchestrator:
                 failure_diagnostic=failure,
             )
 
-        if "ambiguous_ground_temperature" in turn_contract.ambiguities:
-            return await self._build_temperature_clarification_response(
+        if turn_contract.clarification_plan is not None:
+            return await self._build_partial_clarification_response(
                 request_id=request_id,
                 session_id=session.id,
                 conversation_key=conversation_key,
@@ -341,15 +350,22 @@ class AgentOrchestrator:
             )
 
         if turn_contract.task_class == "general_question" or self._is_capability_question(turn_contract.user_text):
-            assistant_message = self._compose_general_question_message(
+            fallback_message = self._compose_general_question_message(
                 turn_contract.user_text,
                 recent_messages,
             )
             operation = ChatOperationResult(
                 kind="capability_catalog" if self._is_capability_question(turn_contract.user_text) else "direct_answer",
                 status="success",
-                message=assistant_message,
+                message=fallback_message,
             )
+            assistant_message = self.response_synthesizer.synthesize(
+                user_text=turn_contract.user_text,
+                fallback_text=fallback_message,
+                operation=operation,
+                task_status="completed",
+            )
+            operation = operation.model_copy(update={"message": assistant_message})
             self.history_service.append_message(
                 session_id=session.id,
                 role="assistant",
@@ -397,6 +413,27 @@ class AgentOrchestrator:
                 decision_state=preflight_decision.plan.state,
                 assistant_message=assistant_message,
             )
+            if preflight_decision.plan.state == "clarify":
+                assistant_message = self.response_synthesizer.synthesize(
+                    user_text=turn_contract.user_text,
+                    fallback_text=assistant_message,
+                    operation=operation,
+                    clarification_plan={
+                        "question": assistant_message,
+                        "reason": (
+                            preflight_decision.clarification.reason
+                            if preflight_decision.clarification is not None
+                            else "Additional information is required."
+                        ),
+                        "blocking_fields": (
+                            preflight_decision.clarification.missing_fields
+                            if preflight_decision.clarification is not None
+                            else []
+                        ),
+                    },
+                    task_status="needs_clarification",
+                )
+                operation = operation.model_copy(update={"message": assistant_message})
             self.task_state_service.update_task(
                 conversation_key,
                 task.task_id,
@@ -590,6 +627,15 @@ class AgentOrchestrator:
             user_text=turn_contract.user_text,
             is_capability_question=self._is_capability_question(turn_contract.user_text),
         )
+        assistant_message = self.response_synthesizer.synthesize(
+            user_text=turn_contract.user_text,
+            fallback_text=assistant_message,
+            operation=operation,
+            map_session=map_session,
+            direct_result=direct_result,
+            task_status="completed" if operation.status == "success" else "partial",
+        )
+        operation = operation.model_copy(update={"message": assistant_message})
         decision = AgentResponseBuilder.build_final_decision(
             action_id=turn_contract.normalized_action.action_id,
             operation=operation,
@@ -751,6 +797,17 @@ class AgentOrchestrator:
             )
             if any(not result.ok for result in planned_results) and operation.status == "success":
                 operation = operation.model_copy(update={"status": "partial"})
+            assistant_message = self.response_synthesizer.synthesize(
+                user_text=turn_contract.user_text,
+                fallback_text=assistant_message,
+                operation=operation,
+                map_session=map_session,
+                direct_result=direct_result,
+                task_status=(
+                    "completed" if operation.status == "success" else "partial"
+                ),
+            )
+            operation = operation.model_copy(update={"message": assistant_message})
         decision = AgentResponseBuilder.build_final_decision(
             action_id=turn_contract.normalized_action.action_id,
             operation=operation,
@@ -820,7 +877,7 @@ class AgentOrchestrator:
         )
 
     # -------------------------------------------------------------------------
-    async def _build_temperature_clarification_response(
+    async def _build_partial_clarification_response(
         self,
         *,
         request_id: str,
@@ -831,12 +888,20 @@ class AgentOrchestrator:
         latest_memory: dict[str, Any],
         context_usage,
     ) -> ChatTurnResponse:
+        clarification = turn_contract.clarification_plan
+        if not isinstance(clarification, dict):
+            raise ValueError("Partial clarification requires a validated clarification plan.")
         previous_raw = self.task_state_service.snapshot(
             conversation_key
         ).active_visualization
         map_session: MapSession | None = None
         removed_layers: list[str] = []
-        if isinstance(previous_raw, dict):
+        visualization_changes = task.visualization_changes
+        requested_basemap = visualization_changes.get("basemap")
+        if (
+            bool(clarification.get("apply_visualization_changes"))
+            and isinstance(previous_raw, dict)
+        ):
             try:
                 previous = MapSession.model_validate(previous_raw)
                 removed_layers = [
@@ -857,7 +922,11 @@ class AgentOrchestrator:
                     state="map_search",
                     mode="map",
                     action_id=turn_contract.normalized_action.action_id,
-                    basemap_id="osm_default",
+                    basemap_id=(
+                        str(requested_basemap)
+                        if isinstance(requested_basemap, str) and requested_basemap
+                        else previous.basemap_id
+                    ),
                     overlay_ids=retained,
                 )
                 request = self.request_builder.build_location_search_request(
@@ -867,30 +936,41 @@ class AgentOrchestrator:
                 map_session = await self.search_orchestrator.execute(request)
             except Exception:
                 LOGGER.warning("Could not apply partial follow-up map update", exc_info=True)
-        assistant_message = (
-            "I switched the map to the street basemap. Which temperature do you mean: "
-            "current air temperature at 2 m, daytime land-surface temperature, "
-            "nighttime land-surface temperature, or a mean over a specific period?"
+        question = str(clarification.get("question") or "Can you clarify the request?")
+        applied_change = (
+            f"I applied the valid map change to {requested_basemap}. "
+            if map_session is not None and requested_basemap
+            else ""
         )
+        assistant_message = f"{applied_change}{question}"
         operation = ChatOperationResult(
             kind="clarification",
             status="partial",
             message=assistant_message,
             map_session=map_session,
         )
+        assistant_message = self.response_synthesizer.synthesize(
+            user_text=turn_contract.user_text,
+            fallback_text=assistant_message,
+            operation=operation,
+            map_session=map_session,
+            clarification_plan=clarification,
+            task_status="needs_clarification",
+        )
+        operation = operation.model_copy(update={"message": assistant_message})
         decision = PolicyDecision(
             plan=ExecutionPlan(
                 state="clarify",
                 mode="map",
                 action_id=turn_contract.normalized_action.action_id,
-                basemap_id="osm_default",
+                basemap_id=map_session.basemap_id if map_session else None,
                 overlay_ids=list(map_session.overlay_ids) if map_session else [],
             ),
             trace=DecisionTrace(
                 steps=[
                     "follow_up.resolve_active_visualization",
-                    "visualization.replace_satellite_with_street",
-                    "ambiguity.request_temperature_definition",
+                    "clarification.apply_valid_partial_changes",
+                    "clarification.request_blocking_fields",
                 ]
             ),
         )
@@ -898,12 +978,19 @@ class AgentOrchestrator:
             conversation_key,
             task.task_id,
             status="needs_clarification",
-            blocking_ambiguity="ambiguous_ground_temperature",
+            blocking_ambiguity=", ".join(
+                map(str, clarification.get("blocking_fields") or [])
+            )
+            or str(clarification.get("reason") or "clarification_required"),
             progress_summary=assistant_message,
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)
         visualization_update = VisualizationUpdate(
-            basemap_replacement="osm_default",
+            basemap_replacement=(
+                str(requested_basemap)
+                if isinstance(requested_basemap, str) and requested_basemap
+                else None
+            ),
             remove_layer_ids=removed_layers,
         )
         self.history_service.append_message(

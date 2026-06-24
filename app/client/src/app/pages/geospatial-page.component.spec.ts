@@ -13,7 +13,6 @@ describe('pages/geospatial-page.component', () => {
   let errors: jasmine.SpyObj<UserFacingErrorService>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
   let sendChatTurnMock: jasmine.Spy;
-  let fetchCatalogMock: jasmine.Spy;
 
   const makeTurnResponse = (overrides: Record<string, unknown> = {}): ChatTurnResponse => ({
     request_id: 'chat-1',
@@ -40,11 +39,9 @@ describe('pages/geospatial-page.component', () => {
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['toUserFacingError']);
     errors.toUserFacingError.and.returnValue('fallback error');
 
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn', 'fetchCatalog']);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn']);
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
-    fetchCatalogMock = jasmine.createSpy('fetchCatalog').and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
-    apiClient.fetchCatalog.and.callFake(() => fetchCatalogMock());
 
     await TestBed.configureTestingModule({
       imports: [GeospatialPageComponent],
@@ -88,12 +85,12 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'show map';
     await component.sendMessage();
-    expect(component.status).toBe('Complete');
+    expect(component.status).toBe('Agent ready');
     expect(component.messages.at(-1)?.content).toContain('Search executed successfully.');
     expect(component.contextUsagePercent).toBe(6);
   });
 
-  it('clarification responses set Need more detail status', async () => {
+  it('clarification responses return the persistent agent status to ready', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Which location should I use?',
@@ -107,7 +104,7 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'show weather';
     await component.sendMessage();
-    expect(component.status).toBe('Need more detail');
+    expect(component.status).toBe('Agent ready');
     expect(component.messages.at(-1)?.content).toContain('Which location should I use?');
   });
 
@@ -131,7 +128,7 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'what are the coordinates of the colosseum';
     await component.sendMessage();
-    expect(component.status).toBe('Complete');
+    expect(component.status).toBe('Agent ready');
     expect(component.mapSession).toBeUndefined();
     expect(component.messages.at(-1)?.content).toContain('Coordinates: 41.8902, 12.4922');
   });
@@ -177,7 +174,7 @@ describe('pages/geospatial-page.component', () => {
     expect(JSON.stringify(component.payload)).not.toContain('api_key=');
   });
 
-  it('operation-driven failures set Failed status even without reject plan state', async () => {
+  it('operation-driven failures preserve the response and return the agent to ready', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       session_id: 42,
       assistant_message: 'Tool timed out.',
@@ -191,7 +188,7 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'show weather';
     await component.sendMessage();
-    expect(component.status).toBe('Failed');
+    expect(component.status).toBe('Agent ready');
     expect(component.messages.at(-1)?.content).toContain('Tool timed out.');
   });
 
@@ -210,14 +207,14 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.find((entry) => entry.content === 'late response')).toBeUndefined();
   });
 
-  it('error path adds fallback assistant message and Failed status', async () => {
+  it('error path adds fallback assistant message and returns the agent to ready', async () => {
     sendChatTurnMock.and.rejectWith(new Error('boom'));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.composerDraft = 'show map';
     await component.sendMessage();
-    expect(component.status).toBe('Failed');
+    expect(component.status).toBe('Agent ready');
     expect(component.messages.at(-1)?.content).toBe('fallback error');
   });
 
@@ -268,7 +265,7 @@ describe('pages/geospatial-page.component', () => {
         },
       },
     });
-    expect(component.status).toBe('Need more detail');
+    expect(component.status).toBe('Agent ready');
     expect(component.isLoading).toBeFalse();
     expect(component.activeRunId).toBeUndefined();
     expect(component.mapSession?.basemap_id).toBe('osm_default');
@@ -292,6 +289,31 @@ describe('pages/geospatial-page.component', () => {
       payload: { message: 'Provider timed out.' },
     });
     expect(component.messages.length).toBe(1);
+    expect(component.status).toBe('Agent ready');
+  });
+
+  it('starts each request at understanding and returns the persistent agent to ready', async () => {
+    let resolveTurn: (value: ChatTurnResponse) => void;
+    sendChatTurnMock.and.returnValue(
+      new Promise<ChatTurnResponse>((resolve) => {
+        resolveTurn = resolve;
+      }),
+    );
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.status).toBe('Agent ready');
+
+    const pending = component['startAgentRun']('show rain', component.conversationNonce);
+
+    expect(component.status).toBe('Understanding the request');
+    expect(component.progressLabel).toBe('Understanding the request');
+    resolveTurn!(makeTurnResponse({
+      assistant_message: 'Rain ready.',
+      operation: { kind: 'direct_answer', status: 'success', message: 'Rain ready.', warnings: [] },
+    }));
+    await pending;
+    expect(component.status).toBe('Agent ready');
   });
 
   it('startNewChat clears session and map/chat state', () => {
@@ -350,13 +372,16 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.at(-1)?.content).toBe('Map zoomed in.');
   });
 
-  it('answers capability questions from the catalog locally', async () => {
-    fetchCatalogMock.and.resolveTo({
-      capabilities: [],
-      basemaps: [{ id: 'osm_default', name: 'OpenStreetMap', kind: 'basemap', provider: 'fallback', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global', action_tags: [], task_tags: [], metadata: {} }],
-      overlays: [{ id: 'rainviewer_precipitation_radar', name: 'RainViewer Precipitation Radar', kind: 'overlay', provider: 'rainviewer', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: false, coverage: 'global-partial', action_tags: [], task_tags: [], metadata: {} }],
-      tools: [{ id: 'get_weather_forecast', name: 'Weather Forecast', kind: 'tool', provider: 'openmeteo', requires_credentials: false, is_available: true, supports_map: true, supports_direct_text: true, coverage: 'global', action_tags: [], task_tags: [], metadata: {} }],
-    });
+  it('routes capability questions to the agent instead of a prebuilt local response', async () => {
+    sendChatTurnMock.and.resolveTo(makeTurnResponse({
+      assistant_message: '**Capabilities**\n\n- Maps\n- Weather',
+      operation: {
+        kind: 'capability_catalog',
+        status: 'success',
+        message: '**Capabilities**\n\n- Maps\n- Weather',
+        warnings: [],
+      },
+    }));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
@@ -364,8 +389,8 @@ describe('pages/geospatial-page.component', () => {
 
     await component.sendMessage();
 
-    expect(sendChatTurnMock).not.toHaveBeenCalled();
-    expect(component.messages.at(-1)?.content).toContain('Current catalog: 1 map types, 1 layers, and 1 direct tools.');
+    expect(sendChatTurnMock).toHaveBeenCalled();
+    expect(component.messages.at(-1)?.content).toContain('**Capabilities**');
   });
 
 });

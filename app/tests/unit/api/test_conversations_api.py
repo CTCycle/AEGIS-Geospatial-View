@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from server.api.conversations import router as conversations_router
 from server.common.paths import FASTAPI_API_PREFIX
+from server.domain.run_events import RunEventType
 from server.repositories import agent_run_events as event_repo_module
 from server.repositories import agent_runs as run_repo_module
 from server.repositories import agent_steering as steering_repo_module
@@ -53,12 +54,25 @@ class _InMemoryBackend:
 class _FakeRunOrchestrator:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
+    def __init__(self, run_repository: AgentRunRepository, publisher: RunEventPublisher) -> None:
         self.started: list[str] = []
+        self.run_repository = run_repository
+        self.publisher = publisher
 
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
         self.started.append(run_id)
+        run = self.run_repository.get_run(run_id)
+        await self.publisher.publish(
+            conversation_id=run.conversation_id,
+            run_id=run.run_id,
+            run_version=run.active_run_version,
+            type=RunEventType.PROGRESS,
+            payload={
+                "stage": "understanding_request",
+                "label": "Understanding the request",
+            },
+        )
 
 ###############################################################################
 async def _read_first_sse_event(stream: AsyncIterator[str]) -> dict:
@@ -88,7 +102,7 @@ def conversations_api_client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClien
         run_repository=run_repository,
         aggregation_service=aggregation,
         event_publisher=publisher,
-        run_orchestrator=_FakeRunOrchestrator(),  # type: ignore[arg-type]
+        run_orchestrator=_FakeRunOrchestrator(run_repository, publisher),  # type: ignore[arg-type]
     )
     app.state.run_steering_service = RunSteeringService(
         run_repository=run_repository,
@@ -135,7 +149,7 @@ def test_conversation_http_run_stream_and_steering_reach_same_agent_run(
     )
 
     assert first_event["type"] == "progress"
-    assert first_event["payload"]["stage"] == "agent_started"
+    assert first_event["payload"]["stage"] == "understanding_request"
 
     steering_response = client.post(
         f"/api/conversations/{conversation_id}/runs/{run_id}/steering",

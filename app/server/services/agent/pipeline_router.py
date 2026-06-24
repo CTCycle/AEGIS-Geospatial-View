@@ -13,7 +13,7 @@ class DeterministicAgentRouter:
             return "failure_diagnostics"
         if turn.task_class == "general_question":
             return "direct_chat"
-        if "ambiguous_ground_temperature" in turn.ambiguities:
+        if turn.clarification_plan is not None and turn.required_tool_category == "environmental_data":
             return "environmental_data"
         if turn.relationship in {"follow_up", "correction"} and turn.requested_basemap:
             return "visualization_update"
@@ -24,4 +24,3 @@ class DeterministicAgentRouter:
         if turn.location_signals:
             return "map_layers"
         return "place_resolution"
-

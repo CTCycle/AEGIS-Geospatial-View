@@ -45,6 +45,25 @@ class LLMAtomicTask(BaseModel):
     required_layers: list[str] = Field(default_factory=list)
     visualization_changes: dict[str, Any] = Field(default_factory=dict)
 
+
+class LLMClarificationOption(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    option_id: str
+    label: str
+    description: str | None = None
+
+
+class LLMClarificationPlan(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    question: str
+    reason: str
+    blocking_fields: list[str] = Field(default_factory=list)
+    options: list[LLMClarificationOption] = Field(default_factory=list)
+    preserve_valid_results: bool = True
+    apply_visualization_changes: bool = False
+
 ###############################################################################
 class LLMParserExtraction(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -83,3 +102,4 @@ class LLMParserExtraction(BaseModel):
     capability_limitations: list[str] = Field(default_factory=list)
     expected_frontend_update: str = "assistant_message"
     atomic_tasks: list[LLMAtomicTask] = Field(default_factory=list)
+    clarification_plan: LLMClarificationPlan | None = None

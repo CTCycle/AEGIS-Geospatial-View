@@ -159,7 +159,7 @@ export const defaultAppState = (): PersistedAppState => ({
       memorySnapshot: {},
         mapSession: undefined,
         contextUsage: undefined,
-      status: 'Idle',
+      status: 'Agent ready',
       assistantDraft: '',
       composerDraft: '',
       transcriptScrollTop: 0,
