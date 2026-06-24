@@ -108,16 +108,16 @@ class DeepSeekProvider(LLMProvider):
             ]
             kwargs["tool_choice"] = tool_choice or request.tool_choice or "auto"
         if schema and not native_tools:
-            kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "agent_response",
-                    "schema": schema,
-                },
-            }
+            kwargs["response_format"] = {"type": "json_object"}
+            effective_request = replace(
+                effective_request,
+                messages=self._messages_with_json_schema(
+                    effective_request.messages, schema
+                ),
+            )
         response = self._client().chat.completions.create(
             model=request.model,
-            messages=self.normalize_tool_messages(request.messages),
+            messages=self.normalize_tool_messages(effective_request.messages),
             temperature=request.temperature,
             **kwargs,
         )
@@ -161,19 +161,36 @@ class DeepSeekProvider(LLMProvider):
         )
         response = self._client().chat.completions.create(
             model=request.model,
-            messages=self.normalize_tool_messages(request.messages),
+            messages=self.normalize_tool_messages(
+                self._messages_with_json_schema(request.messages, json_schema)
+            ),
             temperature=request.temperature,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "structured_response",
-                    "schema": json_schema,
-                },
-            },
+            response_format={"type": "json_object"},
         )
         content, _ = self._parse_choice(response)
         loaded = json.loads(content or "{}")
-        return loaded if isinstance(loaded, dict) else {}
+        if not isinstance(loaded, dict):
+            return {}
+        validator = getattr(schema, "model_validate", None)
+        if not callable(validator):
+            return loaded
+        validated = validator(loaded)
+        dumper = getattr(validated, "model_dump", None)
+        return dumper(mode="json") if callable(dumper) else loaded
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _messages_with_json_schema(
+        messages: list[dict[str, Any]], schema: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        schema_instruction = (
+            "Return JSON only. The response must match this JSON schema:\n"
+            f"{json.dumps(schema, ensure_ascii=True, separators=(',', ':'))}"
+        )
+        return [
+            *messages,
+            {"role": "system", "content": schema_instruction},
+        ]
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
