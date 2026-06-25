@@ -548,7 +548,7 @@ class AgentOrchestrator:
         )
         deterministic_tools_available = (
             isinstance(self.agent_tool_catalog_service, AgentToolCatalogService)
-            and bool(tool_plan.steps)
+            and (bool(tool_plan.steps) or bool(tool_plan.visualization_update))
             and all(
                 self.tool_registry.has_native_tool(step.tool_name)
                 for step in tool_plan.steps
@@ -843,6 +843,11 @@ class AgentOrchestrator:
             turn_contract=turn_contract,
             latest_memory=latest_memory,
         )
+        if map_session is None and tool_plan.visualization_update:
+            map_session = await self._build_map_session_from_turn_contract(
+                turn_contract,
+                latest_memory,
+            )
         direct_result = self._extract_direct_result_from_tool_results(tool_payload)
         if required_failures and map_session is None and direct_result is None:
             first = required_failures[0]
@@ -912,7 +917,9 @@ class AgentOrchestrator:
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)
         visualization_update = VisualizationUpdate(
-            basemap_replacement=turn_contract.requested_basemap,
+            basemap_replacement=tool_plan.visualization_update.get("basemap_replacement")
+            if isinstance(tool_plan.visualization_update.get("basemap_replacement"), str)
+            else turn_contract.requested_basemap,
             add_layer_ids=list(turn_contract.requested_layers),
         )
         if progress_callback is not None and map_session is not None:

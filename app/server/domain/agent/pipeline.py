@@ -90,6 +90,7 @@ class ToolPlan(BaseModel):
     candidate_tools: list[str] = Field(default_factory=list)
     selected_tools: list[str] = Field(default_factory=list)
     steps: list[ToolPlanStep] = Field(default_factory=list)
+    visualization_update: dict[str, Any] = Field(default_factory=dict)
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
 
