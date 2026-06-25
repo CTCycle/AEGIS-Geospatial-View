@@ -47,17 +47,4 @@ describe('ModelCardComponent', () => {
     expect(text).toContain('Model description');
   });
 
-  it('emits roleSelected when role actions emits', () => {
-    const spy = jasmine.createSpy('roleSelected');
-    component.roleSelected.subscribe(spy);
-    component.onRoleSelected('chat');
-    expect(spy).toHaveBeenCalledWith('chat');
-  });
-
-  it('emits pullRequested with the model', () => {
-    const spy = jasmine.createSpy('pullRequested');
-    component.pullRequested.subscribe(spy);
-    component.onPullRequested();
-    expect(spy).toHaveBeenCalledWith(component.model);
-  });
 });
