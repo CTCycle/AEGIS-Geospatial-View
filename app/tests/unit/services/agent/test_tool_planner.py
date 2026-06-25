@@ -42,10 +42,10 @@ def _turn(
     )
 
 
-def test_location_only_map_uses_deterministic_basemap_execution() -> None:
+def test_location_only_map_uses_deterministic_visualization_update() -> None:
     plan = DeterministicToolPlanner().build_plan(_turn("Show Rome"), "place_resolution")
-    assert [step.capability_id for step in plan.steps] == ["osm_default"]
-    assert plan.steps[0].arguments["arguments"]["latitude"] == 41.9028
+    assert plan.steps == []
+    assert plan.visualization_update == {"basemap_replacement": "osm_default"}
 
 
 def test_layer_plan_contains_location_arguments() -> None:
@@ -70,4 +70,5 @@ def test_basemap_replacement_is_deterministic() -> None:
         _turn("Switch to satellite view", basemap="esri_world_imagery"),
         "visualization_update",
     )
-    assert [step.capability_id for step in plan.steps] == ["esri_world_imagery"]
+    assert plan.steps == []
+    assert plan.visualization_update == {"basemap_replacement": "esri_world_imagery"}

@@ -21,6 +21,7 @@ class DeterministicToolPlanner:
         memory_snapshot: dict | None = None,
     ) -> ToolPlan:
         steps: list[ToolPlanStep] = []
+        visualization_update = self._build_visualization_update(turn)
         capability_ids = self._select_capabilities(turn)
         for index, capability_id in enumerate(capability_ids, start=1):
             steps.append(
@@ -65,6 +66,7 @@ class DeterministicToolPlanner:
             candidate_tools=selected,
             selected_tools=selected,
             steps=steps,
+            visualization_update=visualization_update,
         )
 
     # -------------------------------------------------------------------------
@@ -72,8 +74,6 @@ class DeterministicToolPlanner:
     def _select_capabilities(turn: TurnParseResult) -> list[str]:
         selected: list[str] = []
         text = turn.user_text.casefold()
-        if turn.requested_basemap:
-            selected.append(turn.requested_basemap)
         selected.extend(turn.requested_layers)
         if not turn.requested_layers:
             if "air quality" in text and "forecast" in text:
@@ -86,9 +86,20 @@ class DeterministicToolPlanner:
                 marker in text for marker in ("coordinate", "latitude", "longitude")
             ):
                 selected.append("location_to_coordinates")
-            elif turn.task_class == "map_search" and not turn.requested_basemap:
-                selected.append("osm_default")
         return list(dict.fromkeys(selected))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _build_visualization_update(turn: TurnParseResult) -> dict[str, object]:
+        basemap = turn.requested_basemap
+        if not basemap and turn.task_class == "map_search" and not turn.requested_layers:
+            basemap = "osm_default"
+        update: dict[str, object] = {}
+        if basemap:
+            update["basemap_replacement"] = basemap
+        if turn.requested_layers:
+            update["add_layer_ids"] = list(dict.fromkeys(turn.requested_layers))
+        return update
 
     # -------------------------------------------------------------------------
     @staticmethod
