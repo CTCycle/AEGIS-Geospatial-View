@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 from uuid import uuid4
 
+from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.agent.pipeline import (
     ConversationTaskRecord,
@@ -38,8 +38,6 @@ from server.services.chat.history_service import ChatHistoryService
 from server.services.llm.factory import LLMFactory
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
-
-LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class AgentOrchestrator:
@@ -161,6 +159,18 @@ class AgentOrchestrator:
             latest_memory=latest_memory,
         )
         turn_contract = self.capability_resolver.resolve(turn_contract)
+        LOGGER.info(
+            "chat_turn_parsed request_id=%s conversation_key=%s task=%s action=%s relationship=%s specialist_candidate=%s viewport_scope=%s basemap=%s layers=%s",
+            request_id,
+            conversation_key,
+            turn_contract.task_class,
+            turn_contract.normalized_action.action_id,
+            turn_contract.relationship,
+            self.pipeline_router.select_specialist(turn_contract),
+            turn_contract.viewport_intent.scope if turn_contract.viewport_intent is not None else None,
+            turn_contract.requested_basemap,
+            ",".join(turn_contract.requested_layers) if turn_contract.requested_layers else "-",
+        )
         if progress_callback is not None:
             progress_callback(
                 "parsed",
@@ -179,6 +189,13 @@ class AgentOrchestrator:
             conversation_key,
             turn_contract,
             specialist,
+        )
+        LOGGER.info(
+            "chat_turn_routed request_id=%s conversation_key=%s specialist=%s active_visualization=%s",
+            request_id,
+            conversation_key,
+            specialist,
+            bool(latest_memory.get("active_visualization")) if isinstance(latest_memory, dict) else False,
         )
         context_usage = self.parser_service.last_context_usage
         if self._has_parser_authentication_failure(turn_contract):
@@ -497,6 +514,14 @@ class AgentOrchestrator:
             turn_contract,
             specialist,
             latest_memory,
+        )
+        LOGGER.info(
+            "chat_turn_plan request_id=%s specialist=%s tools=%s steps=%d visualization_update=%s",
+            request_id,
+            specialist,
+            ",".join(tool_plan.selected_tools) if tool_plan.selected_tools else "-",
+            len(tool_plan.steps),
+            tool_plan.visualization_update,
         )
         if progress_callback is not None:
             progress_callback(
@@ -1020,10 +1045,27 @@ class AgentOrchestrator:
                 request = self.request_builder.build_location_search_request(
                     plan,
                     previous.resolved_location,
+                    turn_contract=turn_contract,
+                    active_visualization=previous.model_dump(mode="json"),
                 )
                 map_session = await self.search_orchestrator.execute(request)
-            except Exception:
+            except Exception as exc:
                 LOGGER.warning("Could not apply partial follow-up map update", exc_info=True)
+                failure = TaskFailureDetail(
+                    stage="visualization_update",
+                    component="search_orchestrator",
+                    sanitized_error=str(exc) or "Partial follow-up map update failed.",
+                    partial_results_available=True,
+                    recovery_suggestion="Retry the map refinement or keep the current map view and change only the basemap.",
+                    user_explanation="I could not apply the requested map refinement to the current view.",
+                )
+                self.task_state_service.update_task(
+                    conversation_key,
+                    task.task_id,
+                    status="failed",
+                    failure=failure,
+                    progress_summary="Partial follow-up map update failed.",
+                )
         question = str(clarification.get("question") or "Can you clarify the request?")
         applied_change = (
             f"I applied the valid map change to {requested_basemap}. "
@@ -1433,7 +1475,16 @@ class AgentOrchestrator:
             basemap_id=capability_selection.get("basemap_id"),
             overlay_ids=inferred_overlay_ids,
         )
-        request = self.request_builder.build_location_search_request(plan, resolved_location)
+        request = self.request_builder.build_location_search_request(
+            plan,
+            resolved_location,
+            turn_contract=turn_contract,
+            active_visualization=(
+                latest_memory.get("active_visualization")
+                if isinstance(latest_memory, dict)
+                else None
+            ),
+        )
         return await self.search_orchestrator.execute(request)
 
     # -------------------------------------------------------------------------
@@ -1460,7 +1511,16 @@ class AgentOrchestrator:
             basemap_id=self._infer_basemap_id(turn_contract),
             overlay_ids=inferred_overlay_ids,
         )
-        request = self.request_builder.build_location_search_request(plan, resolved_location)
+        request = self.request_builder.build_location_search_request(
+            plan,
+            resolved_location,
+            turn_contract=turn_contract,
+            active_visualization=(
+                latest_memory.get("active_visualization")
+                if isinstance(latest_memory, dict)
+                else None
+            ),
+        )
         return await self.search_orchestrator.execute(request)
 
     # -------------------------------------------------------------------------
@@ -1583,7 +1643,16 @@ class AgentOrchestrator:
                 existing_overlay_ids=overlay_ids,
             ),
         )
-        request = self.request_builder.build_location_search_request(plan, resolved_location)
+        request = self.request_builder.build_location_search_request(
+            plan,
+            resolved_location,
+            turn_contract=turn_contract,
+            active_visualization=(
+                latest_memory.get("active_visualization")
+                if isinstance(latest_memory, dict)
+                else None
+            ),
+        )
         return await self.search_orchestrator.execute(request)
 
     # -------------------------------------------------------------------------

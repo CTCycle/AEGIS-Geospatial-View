@@ -131,7 +131,7 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - Prefer narrow topic files over large omnibus documents.
 - Update affected docs in the same change set as behavior changes.
 - Include `Last updated: YYYY-MM-DD` whenever a document changes.
-- Remove obsolete docs and QA artifacts from `assets/docs`; keep validation artifacts under root-level `QA/` when they must be preserved.
+- Remove obsolete docs and QA artifacts from `assets/docs`; keep validation artifacts under root-level `assets/QA/` when they must be preserved.
 
 ## Environment Rules
 

@@ -62,7 +62,7 @@ Thumbs.db
 
 # Misc
 .tmp_logs/
-QA/tmp/
+assets/QA/tmp/
 *.lock
 *.log
 *.db

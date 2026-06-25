@@ -66,6 +66,25 @@ class LLMClarificationPlan(BaseModel):
     apply_visualization_changes: bool = False
 
 ###############################################################################
+class LLMViewportIntent(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    scope: Literal[
+        "preserve_current",
+        "building",
+        "street",
+        "neighborhood",
+        "district",
+        "city",
+        "region",
+        "country",
+        "auto",
+    ] = "auto"
+    tighten_relative_to_active: bool = False
+    radius_hint_m: float | None = Field(default=None, gt=0.0)
+    reason: str | None = None
+
+###############################################################################
 class LLMParserExtraction(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -104,3 +123,4 @@ class LLMParserExtraction(BaseModel):
     expected_frontend_update: str = "assistant_message"
     atomic_tasks: list[LLMAtomicTask] = Field(default_factory=list)
     clarification_plan: LLMClarificationPlan | None = None
+    viewport_intent: LLMViewportIntent | None = None

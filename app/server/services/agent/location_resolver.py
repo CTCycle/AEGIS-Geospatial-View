@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
 from server.domain.extraction.models import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
@@ -38,6 +39,10 @@ class LocationResolver:
                     address=active.get("address") if isinstance(active.get("address"), str) else None,
                     source=str(active.get("source") or "memory"),
                     confidence=float(active.get("confidence") or 0.85),
+                    location_type=active.get("location_type") if isinstance(active.get("location_type"), str) else None,
+                    location_class=active.get("location_class") if isinstance(active.get("location_class"), str) else None,
+                    bbox=list(active.get("bbox")) if isinstance(active.get("bbox"), list) else None,
+                    bbox_source=active.get("bbox_source") if isinstance(active.get("bbox_source"), str) else None,
                 )
             return ClarificationRequest(
                 question="Which location should I use?",
@@ -70,6 +75,15 @@ class LocationResolver:
         ):
             return self.build_ambiguity_question(ranked_candidates[:2])
 
+        LOGGER.info(
+            "location_resolved label=%s source=%s confidence=%.3f type=%s class=%s bbox=%s",
+            resolved_candidates[0].label,
+            resolved_candidates[0].source,
+            resolved_candidates[0].confidence,
+            resolved_candidates[0].location_type,
+            resolved_candidates[0].location_class,
+            resolved_candidates[0].bbox,
+        )
         return resolved_candidates[0]
 
     # -------------------------------------------------------------------------
@@ -114,6 +128,7 @@ class LocationResolver:
                 longitude=signal.longitude,
                 source=signal.source,
                 confidence=signal.confidence,
+                location_type=signal.signal_type,
             )
         geocoded = await self.nominatim_service.extract_coordinates(
             address=signal.normalized_value or signal.raw_value,
@@ -129,6 +144,10 @@ class LocationResolver:
             longitude=float(geocoded["lon"]),
             source="geocoder",
             confidence=float(geocoded.get("confidence") or signal.confidence),
+            location_type=str(geocoded.get("selected_result_type") or "") or None,
+            location_class=str(geocoded.get("selected_result_class") or "") or None,
+            bbox=list(geocoded.get("bbox")) if isinstance(geocoded.get("bbox"), list) else None,
+            bbox_source=str(geocoded.get("bbox_source") or "") or None,
         )
 
     # -------------------------------------------------------------------------

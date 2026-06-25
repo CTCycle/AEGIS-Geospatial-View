@@ -27,7 +27,7 @@ Rules:
 7. Stay location-driven geospatial.
 8. Never explain technical implementation details.
 9. Ask for missing information only when genuinely necessary.
-""".strip()
+"""
 
 
 AGENT_ENRICHMENT_PROMPT = """
@@ -51,7 +51,7 @@ Rules:
 4. Extract area-nearby action into location/address fields when phrases like "nearby", "around", "area nearby" are present.
 5. Keep null when information is unknown.
 6. Do not include explanatory text.
-""".strip()
+"""
 
 
 AGENT_DECISION_SYSTEM_PROMPT = """
@@ -102,7 +102,7 @@ Output contract (JSON only):
     "blocking_reason": "string|null"
   }
 }
-""".strip()
+"""
 
 
 AGENT_RESPONSE_PROMPT = """
@@ -126,7 +126,7 @@ Response rules:
 11. Stay location-driven geospatial.
 12. Never explain technical implementation details or expose app internals.
 13. Do not add greetings, progress claims, sources, measurements, or recommendations absent from the evidence.
-""".strip()
+"""
 
 
 PARSER_SYSTEM_PROMPT = """
@@ -154,6 +154,7 @@ Return JSON only with this schema:
 - capability_limitations and expected_frontend_update
 - atomic_tasks: array of independently actionable task summaries
 - clarification_plan: optional {question, reason, blocking_fields, options, preserve_valid_results, apply_visualization_changes}
+- viewport_intent: optional {scope, tighten_relative_to_active, radius_hint_m, reason}
 
 Rules:
 1. Always infer location entities from natural language when present.
@@ -170,8 +171,10 @@ Rules:
 11. Houses and residential buildings are building features, never amenities or generic POIs.
 12. Satellite view is a basemap preference unless the user explicitly requests an additional satellite data layer.
 13. "Medium temperature at the ground" is ambiguous unless air/surface, day/night, and averaging period are clear.
-""".strip()
-
+14. Infer viewport intent from the user's wording when they imply scale or zoom, such as "around", "near", "street level", "much more closely", "zoom in", "entire city", or "whole region".
+15. Use viewport_intent.scope only from: preserve_current, building, street, neighborhood, district, city, region, country, auto.
+16. For basemap-only follow-ups, default viewport_intent.scope to preserve_current unless the user also asks to zoom or widen/narrow the area.
+"""
 ###############################################################################
 def get_agent_extraction_prompt(
     provider: str | None = None, model: str | None = None

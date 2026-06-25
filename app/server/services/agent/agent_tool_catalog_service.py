@@ -312,7 +312,14 @@ class AgentToolCatalogService:
                         context=context,
                     )
                     request = self.request_builder.build_location_search_request(
-                        plan, resolved_location
+                        plan,
+                        resolved_location,
+                        turn_contract=self._parsed_turn(context),
+                        active_visualization=(
+                            context.map_state.get("active_visualization")
+                            if isinstance(context.map_state, dict)
+                            else None
+                        ),
                     )
                     map_session = await self.search_orchestrator.execute(request)
                     return self._map_result(
@@ -349,7 +356,16 @@ class AgentToolCatalogService:
             if isinstance(resolved_location, dict) and resolved_location.get("error"):
                 return resolved_location
             plan = self._build_map_execution_plan(capability_id=capability_id, manifest=manifest, context=context)
-            request = self.request_builder.build_location_search_request(plan, resolved_location)
+            request = self.request_builder.build_location_search_request(
+                plan,
+                resolved_location,
+                turn_contract=self._parsed_turn(context),
+                active_visualization=(
+                    context.map_state.get("active_visualization")
+                    if isinstance(context.map_state, dict)
+                    else None
+                ),
+            )
             map_session = await self.search_orchestrator.execute(request)
             return self._map_result(
                 capability_id=capability_id,
@@ -612,6 +628,16 @@ class AgentToolCatalogService:
                 ),
             )
         return signals
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _parsed_turn(context: AgentExecutionContext | None) -> TurnParseResult | None:
+        if context is None:
+            return None
+        try:
+            return TurnParseResult.model_validate(context.parsed_request)
+        except Exception:
+            return None
 
     # -------------------------------------------------------------------------
     @staticmethod
