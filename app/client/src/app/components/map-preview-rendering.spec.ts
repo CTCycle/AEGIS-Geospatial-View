@@ -1,5 +1,12 @@
 import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
-import { buildStyle, normalizeBounds, recordBooleanEqual, recordNumberEqual } from './map-preview-rendering';
+import { MapOverlayEntry, MapSession } from '../core/types';
+import {
+  addOverlayLayers,
+  buildStyle,
+  normalizeBounds,
+  recordBooleanEqual,
+  recordNumberEqual,
+} from './map-preview-rendering';
 
 describe('map-preview-rendering', () => {
   it('compares boolean records by keys and values', () => {
@@ -27,5 +34,159 @@ describe('map-preview-rendering', () => {
     const style = buildStyle();
     const basemapSource = style.sources['basemap'] as { tiles?: string[] };
     expect(basemapSource.tiles?.[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
+  });
+
+  const renderCases: Array<{
+    mode: string;
+    overlay: Partial<MapOverlayEntry>;
+    sourceType?: string;
+    layerType?: string;
+    status?: 'loaded' | 'metadata-only';
+  }> = [
+    {
+      mode: 'xyz',
+      overlay: { type: 'tile', url: 'https://example.test/{z}/{x}/{y}.png' },
+      sourceType: 'raster',
+      layerType: 'raster',
+    },
+    {
+      mode: 'raster-tile',
+      overlay: { type: 'raster-tile', url: 'https://example.test/{z}/{x}/{y}.png' },
+      sourceType: 'raster',
+      layerType: 'raster',
+    },
+    {
+      mode: 'wms',
+      overlay: { type: 'wms', url: 'https://example.test/wms', layers: 'test' },
+      sourceType: 'raster',
+      layerType: 'raster',
+    },
+    {
+      mode: 'wmts',
+      overlay: {
+        type: 'wmts',
+        url: 'https://example.test/wmts',
+        layer_id: 'test',
+        tile_matrix_set: 'EPSG:3857',
+      },
+      sourceType: 'raster',
+      layerType: 'raster',
+    },
+    {
+      mode: 'geojson',
+      overlay: { type: 'geojson', url: '/test.geojson', data_format: 'GeoJSON' },
+      sourceType: 'geojson',
+      layerType: 'line',
+    },
+    {
+      mode: 'clustered-points',
+      overlay: {
+        type: 'geojson',
+        url: '/test.geojson',
+        data_format: 'GeoJSON',
+        geometry_type: 'Point',
+      },
+      sourceType: 'geojson',
+      layerType: 'circle',
+    },
+    {
+      mode: 'choropleth',
+      overlay: {
+        type: 'geojson',
+        url: '/test.geojson',
+        data_format: 'GeoJSON',
+        geometry_type: 'Polygon',
+      },
+      sourceType: 'geojson',
+      layerType: 'fill',
+    },
+    {
+      mode: 'camera-points',
+      overlay: {
+        type: 'geojson',
+        url: '/cameras.geojson',
+        data_format: 'GeoJSON',
+        geometry_type: 'Point',
+      },
+      sourceType: 'geojson',
+      layerType: 'circle',
+    },
+    {
+      mode: 'vector-tile',
+      overlay: {
+        type: 'vector-tile',
+        tile_url_template: 'https://example.test/{z}/{x}/{y}.pbf',
+        source_layer: 'test',
+      },
+      sourceType: 'vector',
+      layerType: 'fill',
+    },
+    {
+      mode: 'metadata-only',
+      overlay: { type: 'metadata-only' },
+      status: 'metadata-only',
+    },
+  ];
+
+  renderCases.forEach(({ mode, overlay, sourceType, layerType, status = 'loaded' }) => {
+    it(`renders ${mode} descriptors`, () => {
+      const sources: unknown[] = [];
+      const layers: unknown[] = [];
+      const map = {
+        addSource: (_id: string, source: unknown) => sources.push(source),
+        addLayer: (layer: unknown) => layers.push(layer),
+      };
+      const session = {
+        overlays: [{
+          id: `test-${mode}`,
+          label: mode,
+          provider: 'test',
+          rendering_mode: mode,
+          ...overlay,
+        }],
+      } as unknown as MapSession;
+
+      const result = addOverlayLayers(map as never, session);
+
+      expect(result).toEqual([jasmine.objectContaining({ status })]);
+      if (status === 'metadata-only') {
+        expect(sources).toEqual([]);
+        expect(layers).toEqual([]);
+      } else {
+        expect(sources[0]).toEqual(jasmine.objectContaining({ type: sourceType }));
+        expect(layers[0]).toEqual(jasmine.objectContaining({ type: layerType }));
+      }
+    });
+  });
+
+  it('uses canonical render zoom fields and WMS tile templates', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: () => undefined,
+    };
+    const session = {
+      overlays: [{
+        id: 'canonical-wms',
+        label: 'WMS',
+        provider: 'test',
+        type: 'wms',
+        rendering_mode: 'wms',
+        render: {
+          provider: 'test',
+          layer_id: 'layer',
+          rendering_mode: 'wms',
+          source_protocol: 'wms',
+          url: 'https://example.test/wms',
+          min_zoom: 2,
+          max_zoom: 9,
+        },
+      }],
+    } as unknown as MapSession;
+
+    expect(addOverlayLayers(map as never, session)[0].status).toBe('loaded');
+    expect(sources[0]['minzoom']).toBe(2);
+    expect(sources[0]['maxzoom']).toBe(9);
+    expect((sources[0]['tiles'] as string[])[0]).toContain('request=GetMap');
   });
 });

@@ -77,6 +77,7 @@ Unknown or low-confidence classifications normalize to `unknown` before policy s
 - `list_geospatial_capabilities`
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
+- `fetch_geospatial_provider_layers` for explicitly routed and provider-allowlisted discovery only
 
 Catalog responses are deterministic, permission-aware, and capped at 50 items per page.
 

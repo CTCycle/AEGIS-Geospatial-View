@@ -78,15 +78,29 @@ class PolicyEngine:
         map_state: dict[str, Any] | None = None,
     ) -> AgentPolicyConstraints:
         actionable_patterns = self._actionable_disallowed_patterns(parsed_request)
+        provider_ids = [
+            item.strip().lower()
+            for item in parsed_request.required_data_sources
+            if item.strip()
+        ]
+        allowed_tools = [
+            "list_geospatial_capabilities",
+            "describe_geospatial_capability",
+            "execute_geospatial_capability",
+        ]
+        if (
+            parsed_request.required_tool_category == "provider_native_discovery"
+            and provider_ids
+        ):
+            allowed_tools.append("fetch_geospatial_provider_layers")
         return AgentPolicyConstraints(
             requires_location=parsed_request.normalized_action.requires_location,
             blocked_patterns=[item.pattern_id for item in actionable_patterns],
-            allowed_tool_names=[
-                "list_geospatial_capabilities",
-                "describe_geospatial_capability",
-                "execute_geospatial_capability",
-            ],
-            metadata={"map_state": map_state or {}},
+            allowed_tool_names=allowed_tools,
+            metadata={
+                "map_state": map_state or {},
+                "allowed_provider_ids": provider_ids,
+            },
         )
 
     # -------------------------------------------------------------------------

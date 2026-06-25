@@ -260,6 +260,9 @@ export interface MapSession {
     source_layer?: string;
     tile_matrix_set?: string;
     tile_size?: number;
+    min_zoom?: number;
+    max_zoom?: number;
+    // Legacy aliases accepted only while reading older persisted map sessions.
     minzoom?: number;
     wmts_format?: string;
     wmts_style?: string;

@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-06-23
+Last updated: 2026-06-24
 
 ## Local Development Via Launcher
 
@@ -56,5 +56,14 @@ release\tauri\build_with_tauri.bat
 ## Test Execution
 
 ```cmd
+app\tests\run_tests.bat
+```
+
+For bounded backend-only validation without starting local servers or Angular:
+
+```cmd
+set STANDARD_TEST_SKIP_LIVE_SERVERS=true
+set STANDARD_TEST_SKIP_FRONTEND=true
+set STANDARD_TEST_PYTEST_TARGET=app\tests\unit
 app\tests\run_tests.bat
 ```

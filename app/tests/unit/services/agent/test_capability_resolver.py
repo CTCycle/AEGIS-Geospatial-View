@@ -117,3 +117,12 @@ def test_unmatched_semantic_layer_returns_clarification() -> None:
     assert resolved.requested_layers == []
     assert resolved.clarification_plan is not None
     assert "unresolved_geospatial_capability" in resolved.ambiguities
+
+
+###############################################################################
+def test_unknown_underscore_identifier_is_not_treated_as_resolved() -> None:
+    resolved = CapabilityResolver().resolve(
+        _turn("Show a fake Overpass layer", "overpass_fake_layer")
+    )
+    assert resolved.requested_layers == []
+    assert resolved.clarification_plan is not None

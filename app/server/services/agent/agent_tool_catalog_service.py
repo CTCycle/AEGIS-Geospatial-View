@@ -65,6 +65,7 @@ class AgentToolCatalogService:
                 description="List available geospatial capabilities with deterministic pagination and filters.",
                 parameters_json_schema={
                     "type": "object",
+                    "additionalProperties": False,
                     "properties": {
                         "query": {"type": ["string", "null"]},
                         "category": {"type": ["string", "null"]},
@@ -85,6 +86,7 @@ class AgentToolCatalogService:
                 description="Return full manifest metadata and executable argument schema for one capability.",
                 parameters_json_schema={
                     "type": "object",
+                    "additionalProperties": False,
                     "properties": {"capability_id": {"type": "string"}},
                     "required": ["capability_id"],
                 },
@@ -94,6 +96,7 @@ class AgentToolCatalogService:
                 description="Execute a geospatial capability by stable manifest capability_id after schema validation.",
                 parameters_json_schema={
                     "type": "object",
+                    "additionalProperties": False,
                     "properties": {
                         "capability_id": {"type": "string"},
                         "arguments": {"type": "object"},
@@ -106,6 +109,7 @@ class AgentToolCatalogService:
                 description="Fetch normalized provider-native geospatial layers without returning raw provider XML.",
                 parameters_json_schema={
                     "type": "object",
+                    "additionalProperties": False,
                     "properties": {
                         "provider_id": {
                             "type": "string",

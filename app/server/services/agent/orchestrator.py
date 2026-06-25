@@ -113,7 +113,11 @@ class AgentOrchestrator:
         return AgentResponseBuilder.compose_direct_tool_message(tool_id, direct_result)
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback=None,
+    ) -> ChatTurnResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
             "chat_turn_start request_id=%s session_id=%s message_length=%s",
@@ -157,6 +161,19 @@ class AgentOrchestrator:
             latest_memory=latest_memory,
         )
         turn_contract = self.capability_resolver.resolve(turn_contract)
+        if progress_callback is not None:
+            progress_callback(
+                "parsed",
+                {
+                    "request_id": request_id,
+                    "session_id": session.id,
+                    "task_class": turn_contract.task_class,
+                    "action_id": turn_contract.normalized_action.action_id,
+                    "requires_location": turn_contract.normalized_action.requires_location,
+                    "location_signal_count": len(turn_contract.location_signals),
+                    "ambiguities": list(turn_contract.ambiguities),
+                },
+            )
         specialist = self.pipeline_router.select_specialist(turn_contract)
         task = self.task_state_service.start_task(
             conversation_key,
@@ -476,7 +493,21 @@ class AgentOrchestrator:
             )
 
         settings = self.settings_repo.get_or_create()
-        tool_plan = self.tool_planner.build_plan(turn_contract, specialist)
+        tool_plan = self.tool_planner.build_plan(
+            turn_contract,
+            specialist,
+            latest_memory,
+        )
+        if progress_callback is not None:
+            progress_callback(
+                "policy",
+                {
+                    "request_id": request_id,
+                    "session_id": session.id,
+                    "specialist": specialist,
+                    "planned_tools": list(tool_plan.selected_tools),
+                },
+            )
         self.task_state_service.update_task(
             conversation_key,
             task.task_id,
@@ -515,7 +546,15 @@ class AgentOrchestrator:
                 "specialist": specialist,
             },
         )
-        if tool_plan.steps:
+        deterministic_tools_available = (
+            isinstance(self.agent_tool_catalog_service, AgentToolCatalogService)
+            and bool(tool_plan.steps)
+            and all(
+                self.tool_registry.has_native_tool(step.tool_name)
+                for step in tool_plan.steps
+            )
+        )
+        if deterministic_tools_available:
             return await self._execute_planned_turn(
                 request_id=request_id,
                 session_id=session.id,
@@ -527,6 +566,7 @@ class AgentOrchestrator:
                 context_usage=context_usage,
                 native_context=native_context,
                 tool_plan=tool_plan,
+                progress_callback=progress_callback,
             )
         tool_builder = getattr(
             self.agent_tool_catalog_service,
@@ -710,6 +750,7 @@ class AgentOrchestrator:
         context_usage,
         native_context: AgentExecutionContext,
         tool_plan,
+        progress_callback=None,
     ) -> ChatTurnResponse:
         self.task_state_service.update_task(
             conversation_key,
@@ -718,7 +759,38 @@ class AgentOrchestrator:
             progress_summary="Executing validated tool plan.",
             tool_plan=tool_plan,
         )
-        planned_results = await self.tool_plan_executor.execute(tool_plan, native_context)
+        planned_results = await self.tool_plan_executor.execute(
+            tool_plan,
+            native_context,
+            on_tool_started=(
+                lambda step: progress_callback(
+                    "tool_call_started",
+                    {
+                        "request_id": request_id,
+                        "session_id": session_id,
+                        "tool_call_id": step.step_id,
+                        "name": step.tool_name,
+                    },
+                )
+                if progress_callback is not None
+                else None
+            ),
+            on_tool_completed=(
+                lambda result: progress_callback(
+                    "tool_call_completed",
+                    {
+                        "request_id": request_id,
+                        "session_id": session_id,
+                        "tool_call_id": result.step_id,
+                        "name": result.provenance.tool_name,
+                        "ok": result.ok,
+                        "error": result.error_message,
+                    },
+                )
+                if progress_callback is not None
+                else None
+            ),
+        )
         tool_payload = {
             "tool_plan": tool_plan.model_dump(mode="json"),
             "tool_calls": [
@@ -843,6 +915,15 @@ class AgentOrchestrator:
             basemap_replacement=turn_contract.requested_basemap,
             add_layer_ids=list(turn_contract.requested_layers),
         )
+        if progress_callback is not None and map_session is not None:
+            progress_callback(
+                "map_session_created",
+                {
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "map_session": map_session.model_dump(mode="json"),
+                },
+            )
         self.history_service.append_message(
             session_id=session_id,
             role="assistant",

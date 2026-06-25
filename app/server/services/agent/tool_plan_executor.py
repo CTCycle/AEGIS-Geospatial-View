@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 from server.domain.agent.execution import AgentExecutionContext
@@ -28,6 +29,9 @@ class ToolPlanExecutor:
         self,
         plan: ToolPlan,
         context: AgentExecutionContext,
+        *,
+        on_tool_started: Callable[[ToolPlanStep], None] | None = None,
+        on_tool_completed: Callable[[PlannedToolResult], None] | None = None,
     ) -> list[PlannedToolResult]:
         remaining = {step.step_id: step for step in plan.steps}
         completed: dict[str, PlannedToolResult] = {}
@@ -52,7 +56,15 @@ class ToolPlanExecutor:
                     [step.step_id for step in steps],
                 )
                 results = await asyncio.gather(
-                    *[self._execute_step(step, context) for step in steps]
+                    *[
+                        self._execute_step(
+                            step,
+                            context,
+                            on_tool_started=on_tool_started,
+                            on_tool_completed=on_tool_completed,
+                        )
+                        for step in steps
+                    ]
                 )
                 for result in results:
                     completed[result.step_id] = result
@@ -64,7 +76,12 @@ class ToolPlanExecutor:
         self,
         step: ToolPlanStep,
         context: AgentExecutionContext,
+        *,
+        on_tool_started: Callable[[ToolPlanStep], None] | None = None,
+        on_tool_completed: Callable[[PlannedToolResult], None] | None = None,
     ) -> PlannedToolResult:
+        if on_tool_started is not None:
+            on_tool_started(step)
         retryable = set(step.retry_policy.retryable_error_codes)
         for attempt in range(1, step.retry_policy.max_attempts + 1):
             started = time.perf_counter()
@@ -91,7 +108,7 @@ class ToolPlanExecutor:
             data = payload.get("data")
             validation_error = self._validate_result(step, data) if ok else None
             if ok and validation_error is None:
-                return PlannedToolResult(
+                result = PlannedToolResult(
                     step_id=step.step_id,
                     ok=True,
                     data=data if isinstance(data, dict) else {"value": data},
@@ -102,8 +119,11 @@ class ToolPlanExecutor:
                         elapsed_ms=elapsed_ms,
                     ),
                 )
+                if on_tool_completed is not None:
+                    on_tool_completed(result)
+                return result
             if validation_error is not None:
-                return PlannedToolResult(
+                result = PlannedToolResult(
                     step_id=step.step_id,
                     ok=False,
                     validation_error=validation_error,
@@ -116,8 +136,11 @@ class ToolPlanExecutor:
                         elapsed_ms=elapsed_ms,
                     ),
                 )
+                if on_tool_completed is not None:
+                    on_tool_completed(result)
+                return result
             if error_code not in retryable or attempt >= step.retry_policy.max_attempts:
-                return PlannedToolResult(
+                result = PlannedToolResult(
                     step_id=step.step_id,
                     ok=False,
                     error_code=error_code or "tool_execution_error",
@@ -129,6 +152,9 @@ class ToolPlanExecutor:
                         elapsed_ms=elapsed_ms,
                     ),
                 )
+                if on_tool_completed is not None:
+                    on_tool_completed(result)
+                return result
             LOGGER.warning(
                 "tool_plan_step_retry step=%s tool=%s attempt=%s code=%s",
                 step.step_id,
