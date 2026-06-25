@@ -356,6 +356,48 @@ describe('pages/settings-page.component', () => {
     expect(component.statusText).toContain('Selected');
   });
 
+  it('applyAgentModelSelection updates the selected card state before the save completes', async () => {
+    let resolveUpdate: ((value: unknown) => void) | undefined;
+    updateChatSettingsMock.and.returnValue(new Promise((resolve) => {
+      resolveUpdate = resolve;
+    }));
+
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const model = {
+      id: 'gpt-4.1',
+      name: 'gpt-4.1',
+      description: 'agent model',
+      provider: 'openai',
+      capabilities: ['tools', 'structured_output'],
+      supports_tools: true,
+      supports_structured_output: true,
+      metadata: {},
+    };
+
+    const selectionPromise = component.applyAgentModelSelection(model);
+
+    expect(component.isAgentModelSelected(model)).toBeTrue();
+    expect(component.statusText).toContain('Selecting gpt-4.1 as agent model...');
+
+    resolveUpdate?.({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'openai',
+      agent_model_name: 'gpt-4.1',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: {},
+      credential_health: {},
+    });
+    await selectionPromise;
+
+    expect(component.statusText).toContain('Selected gpt-4.1 as agent model');
+  });
+
   it('pulls a missing Ollama model before assigning it', async () => {
     fetchChatModelsMock.and.resolveTo(libraryResponse({
       cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
