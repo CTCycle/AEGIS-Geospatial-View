@@ -133,10 +133,6 @@ class ModelSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     active_provider_mode: ModelProviderMode
-    chat_model_provider: str
-    chat_model_name: str
-    parser_model_provider: str
-    parser_model_name: str
     agent_model_provider: str
     agent_model_name: str
     ollama_url: str
@@ -151,10 +147,6 @@ class ModelSettingsUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     active_provider_mode: ModelProviderMode | None = None
-    chat_model_provider: str | None = None
-    chat_model_name: str | None = None
-    parser_model_provider: str | None = None
-    parser_model_name: str | None = None
     agent_model_provider: str | None = None
     agent_model_name: str | None = None
     ollama_url: str | None = None
@@ -165,10 +157,6 @@ class ModelSettingsUpdateRequest(BaseModel):
 
     # -------------------------------------------------------------------------
     @field_validator(
-        "chat_model_provider",
-        "chat_model_name",
-        "parser_model_provider",
-        "parser_model_name",
         "agent_model_provider",
         "agent_model_name",
         mode="before",

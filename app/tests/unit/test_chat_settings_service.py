@@ -20,6 +20,7 @@ class _SettingsRepo:
             ollama_url="http://localhost:11434",
             openai_base_url=None,
             google_base_url=None,
+            deepseek_base_url=None,
         )
 
 ###############################################################################

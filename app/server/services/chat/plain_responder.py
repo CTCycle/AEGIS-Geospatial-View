@@ -15,7 +15,7 @@ class PlainResponder:
 
     # -------------------------------------------------------------------------
     def respond(self, user_text: str) -> str:
-        provider = self.llm_factory.get_chat_provider(self.provider)
+        provider = self.llm_factory.get_provider(self.provider)
         result = provider.chat(
             LLMRequest(
                 model=self.model,

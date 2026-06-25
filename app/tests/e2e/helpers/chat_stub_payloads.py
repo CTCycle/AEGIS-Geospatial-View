@@ -113,10 +113,6 @@ def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any
 def model_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "local",
-        "chat_model_provider": "ollama",
-        "chat_model_name": "llama3.2",
-        "parser_model_provider": "ollama",
-        "parser_model_name": "llama3.2",
         "agent_model_provider": "ollama",
         "agent_model_name": "llama3.2",
         "ollama_url": "http://localhost:11434",
@@ -177,15 +173,11 @@ def model_catalog_payload() -> dict[str, Any]:
     }
 
 ###############################################################################
-def split_role_settings_payload() -> dict[str, Any]:
+def selected_agent_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "cloud",
-        "chat_model_provider": "openai",
-        "chat_model_name": "gpt-4.1-mini",
-        "parser_model_provider": "google",
-        "parser_model_name": "gemini-2.5-flash",
-        "agent_model_provider": "ollama",
-        "agent_model_name": "llama3.2",
+        "agent_model_provider": "openai",
+        "agent_model_name": "gpt-4.1-mini",
         "ollama_url": "http://localhost:11434",
         "openai_base_url": "https://api.openai.com/v1",
         "google_base_url": "https://generativelanguage.googleapis.com/v1beta",

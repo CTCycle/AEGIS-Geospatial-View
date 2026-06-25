@@ -26,25 +26,67 @@ describe('ModelCardComponent', () => {
       tool_support_source: 'catalog',
       metadata: {},
     };
-    component.settings = {
-      active_provider_mode: 'cloud',
-      chat_model_provider: 'openai',
-      chat_model_name: 'gpt-4.1-mini',
-      parser_model_provider: 'openai',
-      parser_model_name: 'gpt-4.1-mini',
-      agent_model_provider: 'openai',
-      agent_model_name: 'gpt-4.1-mini',
-      ollama_url: 'http://localhost:11434',
-      credentials: {},
-    };
     component.description = 'Model description';
   });
 
-  it('renders model name, provider metadata, and description', () => {
+  it('renders model name and description', () => {
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('gpt-4.1-mini');
     expect(text).toContain('Model description');
   });
 
+  it('emits modelSelected when the selection button is clicked', () => {
+    spyOn(component.modelSelected, 'emit');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('.model-card__select') as HTMLButtonElement;
+    button.click();
+
+    expect(component.modelSelected.emit).toHaveBeenCalledOnceWith(component.model);
+  });
+
+  it('does not emit when disabled', () => {
+    spyOn(component.modelSelected, 'emit');
+    component.disabledReason = 'Agent model requires structured output.';
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('.model-card__select') as HTMLButtonElement;
+    button.click();
+
+    expect(component.modelSelected.emit).not.toHaveBeenCalled();
+    expect(button.disabled).toBeTrue();
+  });
+
+  it('emits pull without selecting the card', () => {
+    spyOn(component.pullRequested, 'emit');
+    spyOn(component.modelSelected, 'emit');
+    component.requiresPull = true;
+    component.model.provider = 'ollama';
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('.model-card__pull') as HTMLButtonElement;
+    button.click();
+
+    expect(component.pullRequested.emit).toHaveBeenCalledWith(component.model);
+    expect(component.modelSelected.emit).not.toHaveBeenCalled();
+  });
+
+  it('keeps selection and pull controls as separate buttons', () => {
+    component.requiresPull = true;
+    component.model.provider = 'ollama';
+    fixture.detectChanges();
+
+    const selection = fixture.nativeElement.querySelector('.model-card__select') as HTMLButtonElement;
+    const pull = fixture.nativeElement.querySelector('.model-card__pull') as HTMLButtonElement;
+
+    expect(selection.contains(pull)).toBeFalse();
+  });
+
+  it('renders selected status', () => {
+    component.isSelected = true;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Selected agent model');
+  });
 });

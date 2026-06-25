@@ -47,10 +47,6 @@ describe('pages/settings-page.component', () => {
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: '',
-      chat_model_name: '',
-      parser_model_provider: '',
-      parser_model_name: '',
       agent_model_provider: '',
       agent_model_name: '',
       ollama_url: 'http://127.0.0.1:11434',
@@ -126,10 +122,6 @@ describe('pages/settings-page.component', () => {
     window.history.replaceState({}, '', '/settings');
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: 'openai',
-      chat_model_name: 'gpt-4.1-mini',
-      parser_model_provider: 'openai',
-      parser_model_name: 'gpt-4.1-mini',
       agent_model_provider: 'openai',
       agent_model_name: 'gpt-4.1-mini',
       ollama_url: 'http://127.0.0.1:11434',
@@ -169,10 +161,6 @@ describe('pages/settings-page.component', () => {
   it('surfaces DeepSeek load failures instead of showing a silent empty state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: 'deepseek',
-      chat_model_name: 'deepseek-chat',
-      parser_model_provider: 'openai',
-      parser_model_name: 'gpt-4.1-mini',
       agent_model_provider: 'deepseek',
       agent_model_name: 'deepseek-chat',
       ollama_url: 'http://127.0.0.1:11434',
@@ -268,10 +256,6 @@ describe('pages/settings-page.component', () => {
     window.history.replaceState({}, '', '/settings');
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: '',
-      chat_model_name: '',
-      parser_model_provider: '',
-      parser_model_name: '',
       agent_model_provider: '',
       agent_model_name: '',
       ollama_url: 'http://127.0.0.1:11434',
@@ -334,8 +318,8 @@ describe('pages/settings-page.component', () => {
     const deepseekModel = fixture.componentInstance.displayedModels.find((model) => model.provider === 'deepseek');
     expect(deepseekModel).toBeDefined();
     expect(fixture.componentInstance.requiresPull(deepseekModel!)).toBeFalse();
-    const stats = fixture.componentInstance.selectedModelStats;
-    expect(stats.every((row) => row.provider !== 'deepseek' || row.local === false)).toBeTrue();
+    const summary = fixture.componentInstance.selectedAgentModelSummary;
+    expect(summary?.provider === 'deepseek' ? summary.installedLocally : true).toBeTrue();
   });
 
   it('provides fallback descriptions for installed local models', async () => {
@@ -353,12 +337,21 @@ describe('pages/settings-page.component', () => {
     expect(fixture.componentInstance.modelDescription(localModel)).toContain('Installed Ollama model');
   });
 
-  it('applyModelSelection updates settings and status text', async () => {
+  it('applyAgentModelSelection updates settings and status text', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    await component.applyModelSelection('chat', component.displayedModels[0]);
+    await component.applyAgentModelSelection({
+      id: 'gpt-4.1',
+      name: 'gpt-4.1',
+      description: 'agent model',
+      provider: 'openai',
+      capabilities: ['tools', 'structured_output'],
+      supports_tools: true,
+      supports_structured_output: true,
+      metadata: {},
+    });
     expect(updateChatSettingsMock).toHaveBeenCalled();
     expect(component.statusText).toContain('Selected');
   });
@@ -381,7 +374,7 @@ describe('pages/settings-page.component', () => {
       sources: { ollama: { ok: true, reachable: true, model_count: 1, message: null } },
     }));
 
-    await component.applyModelSelection('parser', {
+    await component.applyAgentModelSelection({
       id: 'llama3.1',
       name: 'llama3.1',
       description: 'library',
@@ -395,16 +388,12 @@ describe('pages/settings-page.component', () => {
     expect(pullOllamaModelMock).toHaveBeenCalledWith('llama3.1');
     expect(refreshOllamaModelsMock).toHaveBeenCalled();
     expect(updateChatSettingsMock).toHaveBeenCalled();
-    expect(component.statusText).toContain('Selected llama3.1 for parser');
+    expect(component.statusText).toContain('Selected llama3.1 as agent model');
   });
 
-  it('applyModelSelection does not send read-only credential health fields', async () => {
+  it('applyAgentModelSelection does not send read-only credential health fields', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'local',
-      chat_model_provider: 'ollama',
-      chat_model_name: 'llama3.2',
-      parser_model_provider: 'ollama',
-      parser_model_name: 'llama3.2',
       agent_model_provider: 'ollama',
       agent_model_name: 'llama3.2',
       ollama_url: 'http://127.0.0.1:11434',
@@ -418,7 +407,16 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    await fixture.componentInstance.applyModelSelection('chat', fixture.componentInstance.displayedModels[0]);
+    await fixture.componentInstance.applyAgentModelSelection({
+      id: 'llama3.2',
+      name: 'llama3.2',
+      description: 'agent model',
+      provider: 'ollama',
+      capabilities: ['tools', 'structured_output'],
+      supports_tools: true,
+      supports_structured_output: true,
+      metadata: {},
+    });
 
     const payload = updateChatSettingsMock.calls.mostRecent().args[0];
     expect(payload.credential_health).toBeUndefined();
@@ -462,10 +460,6 @@ describe('pages/settings-page.component', () => {
   it('saveOllamaSettings sends a sanitized update payload', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'local',
-      chat_model_provider: 'ollama',
-      chat_model_name: 'llama3.2',
-      parser_model_provider: 'ollama',
-      parser_model_name: 'llama3.2',
       agent_model_provider: 'ollama',
       agent_model_name: 'llama3.2',
       ollama_url: 'http://127.0.0.1:11434',
@@ -491,10 +485,6 @@ describe('pages/settings-page.component', () => {
   it('reports unreadable credential health in API key modal state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: 'openai',
-      chat_model_name: 'gpt-4.1-mini',
-      parser_model_provider: 'openai',
-      parser_model_name: 'gpt-4.1-mini',
       agent_model_provider: 'openai',
       agent_model_name: 'gpt-4.1-mini',
       ollama_url: 'http://127.0.0.1:11434',

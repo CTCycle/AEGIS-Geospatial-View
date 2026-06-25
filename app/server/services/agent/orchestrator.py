@@ -183,7 +183,7 @@ class AgentOrchestrator:
         context_usage = self.parser_service.last_context_usage
         if self._has_parser_authentication_failure(turn_contract):
             assistant_message = (
-                "I could not use the configured parser model because the saved API key was rejected. "
+                "I could not use the configured agent model because the saved API key was rejected. "
                 "Open Model Settings and replace the key before using that cloud model."
             )
             decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
@@ -194,9 +194,9 @@ class AgentOrchestrator:
             )
             failure = TaskFailureDetail(
                 stage="structured_intent_extraction",
-                component="parser_model",
-                sanitized_error="The configured parser credential was rejected.",
-                recovery_suggestion="Replace the saved parser API key in Model Settings.",
+                component="agent_model",
+                sanitized_error="The configured agent credential was rejected.",
+                recovery_suggestion="Replace the saved agent API key in Model Settings.",
                 user_explanation=assistant_message,
             )
             self.task_state_service.update_task(
@@ -243,8 +243,8 @@ class AgentOrchestrator:
             )
         if self._has_parser_runtime_failure(turn_contract):
             assistant_message = (
-                "I could not process this request because the configured parser model is unavailable. "
-                "Open Model Settings, choose an installed model, or refresh/pull the configured Ollama model."
+                "I could not process this request because the configured agent model could not perform structured extraction. "
+                "Open Model Settings, choose an agent model that supports structured output and tool calling, or refresh/pull the configured Ollama model."
             )
             decision = self._build_direct_reject_decision(turn_contract.normalized_action.action_id)
             operation = ChatOperationResult(
@@ -254,9 +254,9 @@ class AgentOrchestrator:
             )
             failure = TaskFailureDetail(
                 stage="structured_intent_extraction",
-                component="parser_model",
-                sanitized_error="The configured parser model is unavailable.",
-                recovery_suggestion="Select an available parser model or restore the configured runtime.",
+                component="agent_model",
+                sanitized_error="The configured agent model could not perform structured extraction.",
+                recovery_suggestion="Open Model Settings, choose an agent model that supports structured output and tool calling, or refresh/pull the configured Ollama model.",
                 user_explanation=assistant_message,
             )
             self.task_state_service.update_task(

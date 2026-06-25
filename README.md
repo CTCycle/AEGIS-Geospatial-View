@@ -125,7 +125,7 @@ Typical tasks here include:
 
 - switching between cloud and local mode
 - searching for available models
-- assigning model roles
+- selecting one agent model for structured extraction, orchestration, tool calling, and chat
 - checking local model connectivity
 - refreshing available local models
 - pulling a model when needed

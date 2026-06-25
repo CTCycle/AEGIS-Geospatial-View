@@ -1,0 +1,25 @@
+<section class="selected-model-summary" aria-label="Selected agent model">
+  @if (isLoading) {
+    <p class="selected-model-summary__empty">Loading selected model...</p>
+  } @else if (!summary) {
+    <p class="selected-model-summary__empty">No agent model selected</p>
+  } @else {
+    <header>
+      <p>Selected agent model</p>
+      <h2>{{ summary.model }}</h2>
+      <span>{{ summary.provider }} · {{ summary.runtimeMode }}</span>
+    </header>
+
+    <dl>
+      <div><dt>Installed locally</dt><dd>{{ boolLabel(summary.installedLocally) }}</dd></div>
+      <div><dt>Tool calling</dt><dd>{{ boolLabel(summary.supportsTools) }}</dd></div>
+      <div><dt>Structured output</dt><dd>{{ boolLabel(summary.supportsStructuredOutput) }}</dd></div>
+      <div><dt>Vision</dt><dd>{{ boolLabel(summary.supportsVision) }}</dd></div>
+      <div><dt>Embeddings</dt><dd>{{ boolLabel(summary.supportsEmbeddings) }}</dd></div>
+      <div><dt>Tool support source</dt><dd>{{ summary.toolSupportSource }}</dd></div>
+      <div class="selected-model-summary__wide"><dt>Capabilities</dt><dd>{{ summary.capabilities.length ? summary.capabilities.join(', ') : 'None reported' }}</dd></div>
+    </dl>
+
+    <p class="selected-model-summary__note">This model is used for structured extraction, orchestration, tool calls, and final responses.</p>
+  }
+</section>

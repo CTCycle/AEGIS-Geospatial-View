@@ -123,10 +123,10 @@ class ParserService:
             provider_name = self.provider
             model_name = self.model
         else:
-            provider_name = self.provider or settings.parser_model_provider
-            model_name = self.model or settings.parser_model_name
+            provider_name = self.provider or settings.agent_model_provider
+            model_name = self.model or settings.agent_model_name
         if provider_name is None or model_name is None:
-            raise LLMConfigurationError("Parser provider and model must be configured.")
+            raise LLMConfigurationError("Agent provider and model must be configured for structured extraction.")
         parser_provider = self.llm_factory.get_provider(provider_name)
         self.last_context_usage = None
         prompt_payload = {

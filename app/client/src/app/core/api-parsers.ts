@@ -457,10 +457,6 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
   }
   return {
     active_provider_mode: (value.active_provider_mode === 'local' ? 'local' : 'cloud'),
-    chat_model_provider: String(value.chat_model_provider ?? ''),
-    chat_model_name: String(value.chat_model_name ?? ''),
-    parser_model_provider: String(value.parser_model_provider ?? ''),
-    parser_model_name: String(value.parser_model_name ?? ''),
     agent_model_provider: String(value.agent_model_provider ?? ''),
     agent_model_name: String(value.agent_model_name ?? ''),
     ollama_url: String(value.ollama_url ?? 'http://127.0.0.1:11434'),

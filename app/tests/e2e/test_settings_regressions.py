@@ -13,7 +13,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
     chat_turn_map_response,
     chat_turn_text_only_response,
     model_catalog_payload,
-    split_role_settings_payload,
+    selected_agent_settings_payload,
 )
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
@@ -131,7 +131,7 @@ def _setup_stub_harness(
         """
     )
 
-    active_settings = dict(settings_payload or split_role_settings_payload())
+    active_settings = dict(settings_payload or selected_agent_settings_payload())
     active_models = models_payload or model_catalog_payload()
     captured_put_payloads = put_payloads if put_payloads is not None else []
     run_turn_payloads: dict[str, dict[str, Any]] = {}
@@ -338,9 +338,9 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(
     )
 
 ###############################################################################
-def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) -> None:
+def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) -> None:
     put_payloads: list[dict[str, Any]] = []
-    expected_initial = split_role_settings_payload()
+    expected_initial = selected_agent_settings_payload()
     _setup_stub_harness(
         page, settings_payload=expected_initial, put_payloads=put_payloads
     )
@@ -353,26 +353,39 @@ def test_role_assignment_updates_only_requested_role(page: Page, base_url: str) 
         .first
     )
     expect(model_card).to_be_visible(timeout=15000)
-    model_card.get_by_role("button", name="Parser").click()
+    selection_button = model_card.get_by_role(
+        "button", name="Select as agent model: gpt-5-mini"
+    )
+    selection_button.focus()
+    page.keyboard.press("Enter")
 
-    expect(page.get_by_text("Selected gpt-5-mini for parser")).to_be_visible(
+    expect(page.get_by_text("Selected gpt-5-mini as agent model")).to_be_visible(
         timeout=15000
     )
+    selected_button = model_card.get_by_role(
+        "button", name="Selected agent model: gpt-5-mini"
+    )
+    expect(selected_button).to_have_attribute("aria-pressed", "true")
+    selected_button.focus()
+    page.keyboard.press("Space")
+    summary = page.get_by_role("complementary", name="Selected agent model")
+    expect(summary.get_by_role("heading", name="gpt-5-mini")).to_be_visible()
+
     assert put_payloads, "Expected PUT /api/chat/settings payload to be captured."
     payload = put_payloads[-1]
-    if "parser_model_provider" not in payload:
+    if "agent_model_provider" not in payload:
         matching_payloads = [
-            item for item in put_payloads if "parser_model_provider" in item
+            item for item in put_payloads if "agent_model_provider" in item
         ]
         assert matching_payloads, f"No model settings payload captured: {put_payloads}"
         payload = matching_payloads[-1]
 
-    assert payload["parser_model_provider"] == "openai"
-    assert payload["parser_model_name"] == "gpt-5-mini"
+    assert payload["agent_model_provider"] == "openai"
+    assert payload["agent_model_name"] == "gpt-5-mini"
     assert "chat_model_provider" not in payload
     assert "chat_model_name" not in payload
-    assert "agent_model_provider" not in payload
-    assert "agent_model_name" not in payload
+    assert "parser_model_provider" not in payload
+    assert "parser_model_name" not in payload
     assert "ollama_url" not in payload
     assert "openai_base_url" not in payload
     assert "google_base_url" not in payload

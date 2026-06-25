@@ -1,25 +1,18 @@
 import {
-  buildModelSelectionPayload,
-  buildSelectedModelStats,
-  canAssignRole,
+  agentSelectionDisabledReason,
+  buildAgentModelSelectionPayload,
+  buildSelectedAgentModelSummary,
+  canSelectAgentModel,
   enrichInstalledOllamaModel,
   mergeModelCard,
   mergeModelCards,
-  MODEL_ROLES,
-  modelRoleLabel,
-  modelRoleStatusLabel,
-  roleDisabledReason,
 } from './model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from './types';
 
 const baseSettings = (): ModelSettingsResponse => ({
   active_provider_mode: 'cloud',
-  chat_model_provider: 'openai',
-  chat_model_name: 'gpt-4.1',
-  parser_model_provider: 'openai',
-  parser_model_name: 'gpt-4.1-mini',
   agent_model_provider: 'google',
-  agent_model_name: 'gemini-2.0-flash',
+  agent_model_name: 'gemini-2.5-flash',
   ollama_url: 'http://127.0.0.1:11434',
   openai_base_url: null,
   google_base_url: null,
@@ -33,8 +26,8 @@ const model = (overrides: Partial<ModelCardDescriptor> = {}): ModelCardDescripto
   description: 'model',
   provider: 'openai',
   capabilities: ['chat'],
-  supports_tools: false,
-  supports_structured_output: false,
+  supports_tools: true,
+  supports_structured_output: true,
   supports_vision: false,
   supports_embeddings: false,
   tool_support_source: 'unknown',
@@ -43,28 +36,6 @@ const model = (overrides: Partial<ModelCardDescriptor> = {}): ModelCardDescripto
 });
 
 describe('model-selection', () => {
-  it('returns assigned roles as model role values', () => {
-    expect(MODEL_ROLES).toEqual(['parser', 'chat', 'agent']);
-    expect(modelRoleLabel('parser')).toBe('Parser');
-    expect(modelRoleStatusLabel('parser')).toBe('parser');
-    const rows = buildSelectedModelStats(baseSettings(), new Set<string>(['gpt-4.1-mini']));
-    expect(rows[0].assignedRoles).toEqual(['parser']);
-    expect(rows[1].assignedRoles).toEqual(['chat']);
-    expect(rows[2].assignedRoles).toEqual(['agent']);
-  });
-
-  it('keeps multiple selected roles grouped under the same model rows', () => {
-    const settings = baseSettings();
-    settings.chat_model_provider = 'openai';
-    settings.chat_model_name = 'shared-model';
-    settings.parser_model_provider = 'openai';
-    settings.parser_model_name = 'shared-model';
-
-    const rows = buildSelectedModelStats(settings, new Set<string>(['shared-model']));
-    expect(rows[0]).toEqual(jasmine.objectContaining({ model: 'shared-model', assignedRoles: ['parser'] }));
-    expect(rows[1]).toEqual(jasmine.objectContaining({ model: 'shared-model', assignedRoles: ['chat'] }));
-  });
-
   it('merges model card groups by provider and id', () => {
     const merged = mergeModelCards(
       [model({ id: 'same', provider: 'openai', description: 'short', capabilities: [] })],
@@ -114,44 +85,48 @@ describe('model-selection', () => {
     expect(metadata['family']).toBe('qwen2.5');
   });
 
-  it('blocks agent assignment without tools', () => {
-    expect(canAssignRole(model({ supports_tools: false }), 'agent')).toBeFalse();
-    expect(roleDisabledReason(model({ supports_tools: false }), 'agent')).toBe('Agent role requires native tool calling.');
+  it('blocks selected agent models without tools or structured output', () => {
+    expect(canSelectAgentModel(model({ supports_tools: false }))).toBeFalse();
+    expect(agentSelectionDisabledReason(model({ supports_tools: false }))).toBe('Agent model requires native tool calling.');
+    expect(canSelectAgentModel(model({ supports_structured_output: false }))).toBeFalse();
+    expect(agentSelectionDisabledReason(model({ supports_structured_output: false }))).toBe('Agent model requires structured output.');
   });
 
-  it('blocks parser assignment without structured output', () => {
-    expect(canAssignRole(model({ supports_structured_output: false }), 'parser')).toBeFalse();
-    expect(roleDisabledReason(model({ supports_structured_output: false }), 'parser')).toBe(
-      'Parser role requires structured output.',
-    );
-  });
-
-  it('rejects invalid role assignments when building payloads', () => {
-    expect(canAssignRole(model(), 'chat')).toBeTrue();
-    expect(() => buildModelSelectionPayload(baseSettings(), 'agent', model({ supports_tools: false }))).toThrowError(
-      'Agent role requires native tool calling.',
-    );
-  });
-
-  it('builds a minimal provider-scoped payload for model selection', () => {
-    const payload = buildModelSelectionPayload(
+  it('builds a single selected-agent payload', () => {
+    const payload = buildAgentModelSelectionPayload(
       baseSettings(),
-      'parser',
-      model({
-        provider: 'deepseek',
-        name: 'deepseek-v4-flash',
-        supports_structured_output: true,
-      }),
+      model({ provider: 'deepseek', name: 'deepseek-chat' }),
     );
 
     expect(payload).toEqual({
       active_provider_mode: 'cloud',
-      parser_model_provider: 'deepseek',
-      parser_model_name: 'deepseek-v4-flash',
+      agent_model_provider: 'deepseek',
+      agent_model_name: 'deepseek-chat',
       credentials: {},
     });
-    expect(payload.chat_model_provider).toBeUndefined();
-    expect(payload.agent_model_provider).toBeUndefined();
     expect(payload.ollama_url).toBeUndefined();
+  });
+
+  it('builds a selected-agent summary with capabilities and local status', () => {
+    const settings = baseSettings();
+    settings.agent_model_provider = 'ollama';
+    settings.agent_model_name = 'llama3.2';
+
+    const summary = buildSelectedAgentModelSummary(
+      settings,
+      new Set<string>(['llama3.2']),
+      [model({ provider: 'ollama', name: 'llama3.2', capabilities: ['tools', 'json'], tool_support_source: 'ollama_probe' })],
+    );
+
+    expect(summary).toEqual(jasmine.objectContaining({
+      model: 'llama3.2',
+      provider: 'ollama',
+      runtimeMode: 'local',
+      installedLocally: true,
+      supportsTools: true,
+      supportsStructuredOutput: true,
+      toolSupportSource: 'ollama_probe',
+    }));
+    expect(summary?.capabilities).toEqual(['tools', 'json']);
   });
 });

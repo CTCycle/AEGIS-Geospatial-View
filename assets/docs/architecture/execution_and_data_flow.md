@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-24
+Last updated: 2026-06-25
 
 ## Layering
 
@@ -42,7 +42,7 @@ Geospatial API services are composed during application startup and accessed thr
 ## Chat Orchestration Pipeline
 
 1. `AgentOrchestrator` loads volatile conversation task and visualization state.
-2. `ParserService` produces structured intent, relationship, entities, layers, visualization changes, and ambiguities.
+2. `ParserService` produces structured intent, relationship, entities, layers, visualization changes, and ambiguities using the selected agent model.
 3. `ConversationTaskStateService` creates or updates the current task record.
 4. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
 5. `DeterministicAgentRouter` selects one specialist group.
@@ -51,7 +51,7 @@ Geospatial API services are composed during application startup and accessed thr
 8. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
 9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
-11. Successful and partial outcomes are passed to the configured agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
+11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
 12. Task status, failure details, and active visualization are updated before persistence.
 
 Conversation task state is process-local, keyed by conversation ID or direct-chat
