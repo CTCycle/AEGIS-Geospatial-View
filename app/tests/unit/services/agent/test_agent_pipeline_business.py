@@ -18,6 +18,7 @@ from server.domain.extraction.models import (
     LocationSignal,
     NormalizedAction,
     TurnParseResult,
+    ViewportIntent,
 )
 from server.domain.geographics import MapSession
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -45,6 +46,7 @@ def _turn(
     entity_target: str | None = None,
     ambiguities: list[str] | None = None,
     clarification_plan: dict[str, Any] | None = None,
+    viewport_intent: ViewportIntent | None = None,
 ) -> TurnParseResult:
     return TurnParseResult(
         user_text=text,
@@ -82,6 +84,7 @@ def _turn(
         requested_basemap=requested_basemap,
         tools_needed=bool(requested_layers),
         clarification_plan=clarification_plan,
+        viewport_intent=viewport_intent,
     )
 
 ###############################################################################
@@ -258,6 +261,7 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
                     "follow-up",
                     relationship="follow_up",
                     requested_basemap="osm_default",
+                    viewport_intent=ViewportIntent(scope="preserve_current"),
                     ambiguities=["temperature_metric_underspecified"],
                     clarification_plan={
                         "question": "Which temperature metric should I use?",
@@ -295,7 +299,47 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
         assert second.map_session.resolved_location.label == "Colosseum, Rome"
         assert second.map_session.basemap_id == "osm_default"
         assert second.map_session.overlay_ids == ["overpass_residential_buildings"]
+        assert second.map_session.viewport.radius_m == first.map_session.viewport.radius_m
         assert "Which temperature metric should I use?" in second.assistant_message
+
+    asyncio.run(_run())
+
+###############################################################################
+def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
+    async def _run() -> None:
+        orchestrator = _orchestrator(
+            [
+                _turn(
+                    "satellite",
+                    requested_basemap="esri_world_imagery",
+                    viewport_intent=ViewportIntent(scope="street"),
+                ),
+                _turn(
+                    "closer",
+                    relationship="follow_up",
+                    viewport_intent=ViewportIntent(
+                        scope="street",
+                        tighten_relative_to_active=True,
+                    ),
+                ),
+            ]
+        )
+        first = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="Show me satellite view around Via Pisa",
+                conversation_id="conv-tighten",
+            )
+        )
+        second = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="I want to see much more closely",
+                conversation_id="conv-tighten",
+            )
+        )
+        assert first.map_session is not None
+        assert second.map_session is not None
+        assert second.map_session.resolved_location.label == first.map_session.resolved_location.label
+        assert second.map_session.viewport.radius_m < first.map_session.viewport.radius_m
 
     asyncio.run(_run())
 

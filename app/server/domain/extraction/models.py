@@ -56,6 +56,25 @@ class DisallowedPattern(BaseModel):
     matched_text: str
 
 ###############################################################################
+class ViewportIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal[
+        "preserve_current",
+        "building",
+        "street",
+        "neighborhood",
+        "district",
+        "city",
+        "region",
+        "country",
+        "auto",
+    ] = "auto"
+    tighten_relative_to_active: bool = False
+    radius_hint_m: float | None = Field(default=None, gt=0.0)
+    reason: str | None = None
+
+###############################################################################
 class TurnParseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -91,4 +110,5 @@ class TurnParseResult(BaseModel):
     expected_frontend_update: str = "assistant_message"
     atomic_tasks: list[dict[str, Any]] = Field(default_factory=list)
     clarification_plan: dict[str, Any] | None = None
+    viewport_intent: ViewportIntent | None = None
     

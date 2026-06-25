@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import suppress
 from collections.abc import AsyncIterator
 
 from server.domain.run_events import RunEvent, RunEventType
@@ -54,9 +55,14 @@ class RunEventStreamService:
                 if event.type in TERMINAL_EVENT_TYPES:
                     break
                 pending_next = asyncio.create_task(iterator.__anext__())
+        except asyncio.CancelledError:
+            return
         finally:
             pending_next.cancel()
-            await iterator.aclose()
+            with suppress(asyncio.CancelledError, StopAsyncIteration, RuntimeError):
+                await pending_next
+            with suppress(RuntimeError):
+                await iterator.aclose()
 
     # -------------------------------------------------------------------------
     @staticmethod

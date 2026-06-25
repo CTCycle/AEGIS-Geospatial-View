@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
+from server.domain.extraction.models import ViewportIntent
 from server.domain.agent.decision import ResolvedLocation
 
 TimeMode = Literal["current", "historical", "forecast"]
@@ -446,6 +447,7 @@ class LocationSearchRequest(BaseModel):
     overlay_ids: list[str] = Field(default_factory=list)
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
+    viewport_intent: ViewportIntent | None = None
 
 ###############################################################################
 class MapSession(BaseModel):

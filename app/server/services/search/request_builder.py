@@ -1,38 +1,77 @@
 from __future__ import annotations
 
+import math
+from typing import Any
+
+from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.domain.extraction.models import NormalizedAction
-from server.domain.geographics import (
-    LocationSearchRequest,
-    PresentationPolicy,
-    ViewportPolicy,
-)
+from server.domain.extraction.models import NormalizedAction, TurnParseResult, ViewportIntent
+from server.domain.geographics import LocationSearchRequest, PresentationPolicy, ViewportPolicy
 
 ###############################################################################
 class RequestBuilder:
+    DEFAULT_RADIUS_M = 2500.0
+    MIN_RADIUS_M = 120.0
+    MAX_RADIUS_M = 250000.0
+    SCOPE_RADII_M = {
+        "building": 180.0,
+        "street": 350.0,
+        "neighborhood": 1200.0,
+        "district": 4000.0,
+        "city": 18000.0,
+        "region": 90000.0,
+        "country": 250000.0,
+        "auto": DEFAULT_RADIUS_M,
+    }
 
     # -------------------------------------------------------------------------
     def build_location_search_request(
         self,
         plan: ExecutionPlan,
         location: ResolvedLocation,
+        *,
+        turn_contract: TurnParseResult | None = None,
+        active_visualization: dict[str, Any] | None = None,
     ) -> LocationSearchRequest:
-        action = NormalizedAction(
-            action_id=plan.action_id,
-            action_label=plan.action_id,
-            task_tags=[],
-            action_tags=[],
+        action = (
+            turn_contract.normalized_action
+            if turn_contract is not None
+            else NormalizedAction(
+                action_id=plan.action_id,
+                action_label=plan.action_id,
+                task_tags=[],
+                action_tags=[],
+            )
         )
+        viewport_intent = turn_contract.viewport_intent if turn_contract is not None else None
         overlays = list(plan.overlay_ids)
-        return LocationSearchRequest(
+        request = LocationSearchRequest(
             resolved_location=location,
             action_id=plan.action_id,
             time_mode="current",
             basemap_id=self.choose_basemap(plan),
             overlay_ids=overlays,
-            viewport=self.build_viewport(location, action),
+            viewport=self.build_viewport(
+                location,
+                action,
+                viewport_intent=viewport_intent,
+                active_visualization=active_visualization,
+            ),
             presentation=self.build_presentation(overlays),
+            viewport_intent=viewport_intent,
         )
+        LOGGER.info(
+            "map_request_built action=%s basemap=%s overlays=%d viewport_scope=%s tighten=%s radius_m=%.1f bbox=%s location_type=%s",
+            request.action_id,
+            request.basemap_id,
+            len(request.overlay_ids),
+            viewport_intent.scope if viewport_intent is not None else None,
+            viewport_intent.tighten_relative_to_active if viewport_intent is not None else None,
+            request.viewport.radius_m,
+            request.viewport.bbox,
+            location.location_type,
+        )
+        return request
 
     # -------------------------------------------------------------------------
     def choose_basemap(self, plan: ExecutionPlan) -> str:
@@ -51,24 +90,39 @@ class RequestBuilder:
         self,
         location: ResolvedLocation,
         action: NormalizedAction,
+        *,
+        viewport_intent: ViewportIntent | None = None,
+        active_visualization: dict[str, Any] | None = None,
     ) -> ViewportPolicy:
-        radius_m = 2500.0
-        action_text = " ".join(
-            [
-                action.action_id,
-                action.action_label,
-                *action.task_tags,
-                *action.action_tags,
-            ]
-        ).lower()
-        if any(marker in action_text for marker in ("exact_address", "exact address", "address")):
-            radius_m = 1000.0
-        elif any(marker in action_text for marker in ("wide", "city", "city_level", "entire city")):
-            radius_m = 25000.0
-        elif any(marker in action_text for marker in ("region", "regional", "country", "island", "province")):
-            radius_m = 100000.0
-        elif action.action_id in {"traffic", "air_quality"}:
-            radius_m = 4500.0
+        current_viewport = self._coerce_active_viewport(active_visualization)
+        if viewport_intent is not None and viewport_intent.scope == "preserve_current" and current_viewport is not None:
+            return current_viewport
+
+        explicit_scope = (
+            viewport_intent.scope
+            if viewport_intent is not None and viewport_intent.scope != "preserve_current"
+            else None
+        )
+        if viewport_intent is not None and viewport_intent.tighten_relative_to_active and current_viewport is not None:
+            tightened = self._tighten_viewport(
+                current_viewport,
+                viewport_intent.radius_hint_m,
+                explicit_scope or "street",
+            )
+            if tightened is not None:
+                return tightened
+
+        scope = explicit_scope or self._scope_from_resolved_location(location) or self._scope_from_action(action)
+        radius_m = viewport_intent.radius_hint_m if viewport_intent and viewport_intent.radius_hint_m else self.SCOPE_RADII_M.get(scope, self.DEFAULT_RADIUS_M)
+        radius_m = self._clamp_radius(radius_m)
+        bbox = self._padded_bbox_for_scope(location.bbox, scope)
+        if bbox is not None:
+            return ViewportPolicy(
+                center_latitude=location.latitude,
+                center_longitude=location.longitude,
+                radius_m=max(radius_m, self._radius_from_bbox(bbox)),
+                bbox=bbox,
+            )
         return ViewportPolicy(
             center_latitude=location.latitude,
             center_longitude=location.longitude,
@@ -86,4 +140,120 @@ class RequestBuilder:
             emphasize_overlays=bool(overlays),
             high_contrast=high_contrast,
             show_legend=bool(overlays),
+        )
+
+    # -------------------------------------------------------------------------
+    def _scope_from_action(self, action: NormalizedAction) -> str:
+        action_text = " ".join(
+            [
+                action.action_id,
+                action.action_label,
+                *action.task_tags,
+                *action.action_tags,
+            ]
+        ).lower()
+        if any(marker in action_text for marker in ("exact_address", "exact address", "address")):
+            return "street"
+        if any(marker in action_text for marker in ("wide", "city", "city_level", "entire city")):
+            return "city"
+        if any(marker in action_text for marker in ("region", "regional", "country", "island", "province")):
+            return "region"
+        if action.action_id in {"traffic", "air_quality"}:
+            return "district"
+        return "auto"
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _scope_from_resolved_location(location: ResolvedLocation) -> str | None:
+        location_type = str(location.location_type or "").lower()
+        location_class = str(location.location_class or "").lower()
+        if location_type in {"house", "building", "residential", "commercial", "address", "street", "road", "pedestrian"}:
+            return "street"
+        if location_class == "highway":
+            return "street"
+        if location_type in {"neighbourhood", "suburb", "quarter"}:
+            return "neighborhood"
+        if location_type in {"city", "town", "village", "municipality"}:
+            return "city"
+        if location_type in {"state", "region", "county", "province"}:
+            return "region"
+        if location_type in {"country"}:
+            return "country"
+        return None
+
+    # -------------------------------------------------------------------------
+    def _tighten_viewport(
+        self,
+        viewport: ViewportPolicy,
+        radius_hint_m: float | None,
+        scope: str,
+    ) -> ViewportPolicy | None:
+        target_radius = radius_hint_m if radius_hint_m is not None else self.SCOPE_RADII_M.get(scope, self.SCOPE_RADII_M["street"])
+        radius_m = min(self._clamp_radius(target_radius), self._clamp_radius(viewport.radius_m * 0.35))
+        if radius_m >= viewport.radius_m:
+            radius_m = self._clamp_radius(viewport.radius_m * 0.5)
+        if radius_m >= viewport.radius_m:
+            return None
+        return ViewportPolicy(
+            center_latitude=viewport.center_latitude,
+            center_longitude=viewport.center_longitude,
+            radius_m=radius_m,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _coerce_active_viewport(active_visualization: dict[str, Any] | None) -> ViewportPolicy | None:
+        if not isinstance(active_visualization, dict):
+            return None
+        viewport = active_visualization.get("viewport")
+        if not isinstance(viewport, dict):
+            return None
+        try:
+            return ViewportPolicy.model_validate(viewport)
+        except Exception:
+            return None
+
+    # -------------------------------------------------------------------------
+    def _padded_bbox_for_scope(
+        self,
+        bbox: list[float] | None,
+        scope: str,
+    ) -> list[float] | None:
+        if not self._is_bbox(bbox):
+            return None
+        if scope not in {"building", "street", "neighborhood", "district"}:
+            return None
+        min_lon, min_lat, max_lon, max_lat = [float(item) for item in bbox]
+        lon_pad_factor = 0.2 if scope in {"building", "street"} else 0.35
+        lat_pad_factor = lon_pad_factor
+        lon_span = max(max_lon - min_lon, 0.0004 if scope in {"building", "street"} else 0.002)
+        lat_span = max(max_lat - min_lat, 0.0003 if scope in {"building", "street"} else 0.0015)
+        lon_pad = lon_span * lon_pad_factor
+        lat_pad = lat_span * lat_pad_factor
+        return [
+            max(-180.0, min_lon - lon_pad),
+            max(-90.0, min_lat - lat_pad),
+            min(180.0, max_lon + lon_pad),
+            min(90.0, max_lat + lat_pad),
+        ]
+
+    # -------------------------------------------------------------------------
+    def _radius_from_bbox(self, bbox: list[float]) -> float:
+        min_lon, min_lat, max_lon, max_lat = [float(item) for item in bbox]
+        center_lat = (min_lat + max_lat) / 2.0
+        lat_radius = ((max_lat - min_lat) / 2.0) * 111_320.0
+        lon_radius = ((max_lon - min_lon) / 2.0) * 111_320.0 * max(abs(math.cos(math.radians(center_lat))), 0.01)
+        return self._clamp_radius(max(lat_radius, lon_radius))
+
+    # -------------------------------------------------------------------------
+    def _clamp_radius(self, radius_m: float) -> float:
+        return max(self.MIN_RADIUS_M, min(float(radius_m), self.MAX_RADIUS_M))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_bbox(value: list[float] | None) -> bool:
+        return (
+            isinstance(value, list)
+            and len(value) == 4
+            and all(isinstance(item, int | float) for item in value)
         )

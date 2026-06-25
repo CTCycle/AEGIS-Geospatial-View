@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 from typing import Literal
 
+from server.common.logger import logger as LOGGER
 from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
     LLMClarificationPlan,
     LLMLocationSignal,
     LLMParserExtraction,
+    LLMViewportIntent,
 )
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
@@ -18,14 +19,13 @@ from server.domain.extraction.models import (
     NormalizedAction,
     TemporalSignal,
     TurnParseResult,
+    ViewportIntent,
 )
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
-
-LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 class ParserService:
@@ -164,6 +164,15 @@ class ParserService:
             extracted.task_class,
             extracted.action_id,
         )
+        LOGGER.info(
+            "parser_extract provider=%s model=%s task=%s action=%s relationship=%s viewport_scope=%s",
+            provider_name,
+            model_name,
+            extracted.task_class,
+            extracted.action_id,
+            extracted.relationship,
+            extracted.viewport_intent.scope if extracted.viewport_intent is not None else None,
+        )
         return extracted
 
     # -------------------------------------------------------------------------
@@ -274,6 +283,10 @@ class ParserService:
                 requires_location=True,
                 location_signals=[location_signal],
                 parser_confidence=0.72,
+                viewport_intent=cls._infer_viewport_intent(
+                    text,
+                    has_active_visualization=False,
+                ),
             )
 
         return LLMParserExtraction(
@@ -430,7 +443,7 @@ class ParserService:
         ):
             task_class = "map_search"
 
-        return TurnParseResult(
+        result = TurnParseResult(
             user_text=user_message,
             conversation_context=ConversationContextSnapshot(
                 recent_messages=normalized_recent,
@@ -462,7 +475,31 @@ class ParserService:
                 if extracted.clarification_plan is not None
                 else None
             ),
+            viewport_intent=(
+                ViewportIntent.model_validate(
+                    extracted.viewport_intent.model_dump(mode="json")
+                )
+                if extracted.viewport_intent is not None
+                else None
+            ),
         )
+        LOGGER.info(
+            "parser_normalized task=%s action=%s relationship=%s locations=%d basemap=%s layers=%d viewport_scope=%s tighten=%s ambiguities=%s",
+            result.task_class,
+            result.normalized_action.action_id,
+            result.relationship,
+            len(result.location_signals),
+            result.requested_basemap,
+            len(result.requested_layers),
+            result.viewport_intent.scope if result.viewport_intent is not None else None,
+            (
+                result.viewport_intent.tighten_relative_to_active
+                if result.viewport_intent is not None
+                else None
+            ),
+            ",".join(result.ambiguities) if result.ambiguities else "-",
+        )
+        return result
 
     # -------------------------------------------------------------------------
     @classmethod
@@ -474,6 +511,10 @@ class ParserService:
     ) -> LLMParserExtraction:
         text = " ".join(user_message.casefold().split())
         updates: dict[str, object] = {}
+        inferred_viewport = cls._infer_viewport_intent(
+            text,
+            has_active_visualization=bool(memory_snapshot.get("active_visualization")),
+        )
 
         if any(marker in text for marker in ("why did", "why has", "why was", "why it failed", "why did it fail")):
             updates.update(
@@ -539,12 +580,27 @@ class ParserService:
 
         if any(marker in text for marker in ("satellite view", "satellite", "imagery")):
             updates["requested_basemap"] = "esri_world_imagery"
-        if any(marker in text for marker in ("street map", "street maps", "no satellite", "without satellite")):
+        if any(
+            marker in text
+            for marker in (
+                "street map",
+                "street maps",
+                "road map",
+                "default map",
+                "no satellite",
+                "without satellite",
+            )
+        ):
             updates.update(
                 requested_basemap="osm_default",
                 relationship="follow_up" if memory_snapshot.get("active_visualization") else extracted.relationship,
                 expected_frontend_update="visualization_update",
             )
+            if inferred_viewport is None and memory_snapshot.get("active_visualization"):
+                inferred_viewport = LLMViewportIntent(
+                    scope="preserve_current",
+                    reason="basemap_only_follow_up",
+                )
 
         ground_temperature = (
             "temperature" in text
@@ -597,7 +653,60 @@ class ParserService:
                 [*extracted.ambiguities, "temperature_metric_underspecified"]
             )
 
+        if inferred_viewport is not None:
+            updates["viewport_intent"] = inferred_viewport
+
         return extracted.model_copy(update=updates)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _infer_viewport_intent(
+        text: str,
+        *,
+        has_active_visualization: bool,
+    ) -> LLMViewportIntent | None:
+        if any(marker in text for marker in ("entire city", "whole city", "city wide", "city-wide")):
+            return LLMViewportIntent(scope="city", reason="explicit_city_extent")
+        if any(marker in text for marker in ("whole region", "entire region", "regional view")):
+            return LLMViewportIntent(scope="region", reason="explicit_region_extent")
+        if any(marker in text for marker in ("whole country", "entire country", "nationwide")):
+            return LLMViewportIntent(scope="country", reason="explicit_country_extent")
+        if any(
+            marker in text
+            for marker in (
+                "much more closely",
+                "more closely",
+                "closer view",
+                "zoom in",
+                "too high as point of view",
+                "too high a point of view",
+                "too zoomed out",
+                "street level",
+            )
+        ):
+            return LLMViewportIntent(
+                scope="street",
+                tighten_relative_to_active=has_active_visualization,
+                reason="explicit_tighter_view",
+            )
+        if any(
+            marker in text
+            for marker in ("around ", "near ", "nearby ", "via ", "at this street", "around via")
+        ):
+            return LLMViewportIntent(scope="street", reason="local_area_request")
+        if has_active_visualization and any(
+            marker in text
+            for marker in (
+                "street map",
+                "street maps",
+                "road map",
+                "default map",
+                "no satellite",
+                "without satellite",
+            )
+        ):
+            return LLMViewportIntent(scope="preserve_current", reason="basemap_only_follow_up")
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod
