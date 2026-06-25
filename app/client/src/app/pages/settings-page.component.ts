@@ -262,7 +262,21 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     const payload = buildAgentModelSelectionPayload(this.settings, model);
+    const previousSettings = this.settings;
+    const previousProviderMode = this.providerMode;
+    const nextProviderMode: ModelProviderMode = model.provider === 'ollama' ? 'local' : 'cloud';
     try {
+      this.settings = {
+        ...this.settings,
+        active_provider_mode: nextProviderMode,
+        agent_model_provider: model.provider,
+        agent_model_name: model.name,
+      };
+      this.providerMode = nextProviderMode;
+      this.statusText = `Selecting ${model.name} as agent model...`;
+      this.syncQueryState();
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
       const updated = await this.saveModelSettings(payload);
       if (this.isDestroyed) {
         return;
@@ -276,7 +290,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) {
         return;
       }
+      this.settings = previousSettings;
+      this.providerMode = previousProviderMode;
       this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} as agent model.`);
+      this.syncQueryState();
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
     }
   }
 

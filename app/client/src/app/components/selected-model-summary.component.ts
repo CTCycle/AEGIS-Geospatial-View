@@ -9,6 +9,9 @@ import { SelectedAgentModelSummary } from '../core/model-selection';
   imports: [CommonModule],
   templateUrl: './selected-model-summary.component.html',
   styleUrl: './selected-model-summary.component.css',
+  host: {
+    style: 'display: flex; flex: 1 1 auto; min-height: 100%;',
+  },
 })
 export class SelectedModelSummaryComponent {
   @Input() summary: SelectedAgentModelSummary | null = null;
