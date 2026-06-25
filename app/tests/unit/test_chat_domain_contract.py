@@ -26,12 +26,13 @@ def test_model_settings_update_request_requires_string_credentials() -> None:
 def test_model_settings_update_request_accepts_valid_payload() -> None:
     payload = ModelSettingsUpdateRequest(
         active_provider_mode="cloud",
-        chat_model_provider="openai",
-        chat_model_name="gpt-4.1-mini",
+        agent_model_provider="openai",
+        agent_model_name="gpt-4.1-mini",
         credentials={"openai": {"api_key": "secret"}},
     )
 
     assert payload.active_provider_mode == "cloud"
+    assert payload.agent_model_provider == "openai"
     assert payload.credentials["openai"]["api_key"] == "secret"
 
 ###############################################################################

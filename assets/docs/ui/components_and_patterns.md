@@ -1,15 +1,14 @@
 # Components And Patterns
 
-Last updated: 2026-06-22
+Last updated: 2026-06-25
 
 ## Reusable Components
 
 - `map-preview.component.*`
-- `model-role-actions.component.*`
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
 - `settings-api-key-field.component.*`
-- `model-stats-panel.component.*`
+- `selected-model-summary.component.*`
 
 ## Interaction States
 

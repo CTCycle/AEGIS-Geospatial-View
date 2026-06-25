@@ -1,0 +1,80 @@
+.selected-model-summary {
+  display: grid;
+  gap: 0.9rem;
+  border: 1px solid #205064;
+  border-radius: 0.5rem;
+  background: #101c23;
+  padding: 1rem;
+  color: #d9e6eb;
+}
+
+.selected-model-summary header {
+  display: grid;
+  gap: 0.2rem;
+  border-bottom: 1px solid #263a45;
+  padding-bottom: 0.75rem;
+}
+
+.selected-model-summary header p,
+.selected-model-summary header h2,
+.selected-model-summary header span,
+.selected-model-summary__empty,
+.selected-model-summary__note {
+  margin: 0;
+}
+
+.selected-model-summary header p {
+  color: #8fb2c0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selected-model-summary header h2 {
+  color: #f0f7fa;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.selected-model-summary header span {
+  color: #9fb5bf;
+  font-size: 0.78rem;
+}
+
+.selected-model-summary dl {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.selected-model-summary dl div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.selected-model-summary dt {
+  color: #8fa6b0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.selected-model-summary dd {
+  margin: 0;
+  color: #d7ebf4;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.selected-model-summary__note,
+.selected-model-summary__empty {
+  color: #a9bac2;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}

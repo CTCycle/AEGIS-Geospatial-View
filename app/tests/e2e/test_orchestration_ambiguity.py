@@ -16,8 +16,8 @@ def _turn(api_context: APIRequestContext, message: str, session_id: int | None =
     assert response.ok, f"Expected 200, got {response.status}"
     body = response.json()
     assistant = str(body.get("assistant_message") or "").lower()
-    if "configured parser model is unavailable" in assistant:
-        pytest.skip("Configured parser model is unavailable for orchestration check.")
+    if "configured agent model" in assistant and "structured extraction" in assistant:
+        pytest.skip("Configured agent model cannot perform structured extraction for orchestration check.")
     return body
 
 ###############################################################################

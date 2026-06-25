@@ -676,10 +676,6 @@ export interface ModelLibraryResponse {
 
 export interface ModelSettingsResponse {
   active_provider_mode: ModelProviderMode;
-  chat_model_provider: string;
-  chat_model_name: string;
-  parser_model_provider: string;
-  parser_model_name: string;
   agent_model_provider: string;
   agent_model_name: string;
   ollama_url: string;
@@ -692,10 +688,6 @@ export interface ModelSettingsResponse {
 
 export interface ModelSettingsUpdateRequest {
   active_provider_mode?: ModelProviderMode;
-  chat_model_provider?: string;
-  chat_model_name?: string;
-  parser_model_provider?: string;
-  parser_model_name?: string;
   agent_model_provider?: string;
   agent_model_name?: string;
   ollama_url?: string;

@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-24
+Last updated: 2026-06-25
 
 ## Route-Level Pages
 
@@ -53,11 +53,12 @@ Reusable component examples include:
 
 - `map-preview.component.*`
 - `chat-message.component.*`
-- `model-role-actions.component.*`
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
 - `settings-api-key-field.component.*`
-- `model-stats-panel.component.*`
+- `selected-model-summary.component.*`
+
+Settings uses card-level model selection for one selected agent model.
 
 ## Routing Rule
 

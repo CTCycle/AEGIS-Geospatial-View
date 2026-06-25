@@ -77,7 +77,7 @@ class GroundedResponseSynthesizer:
             "task_status": task_status,
         }
         try:
-            provider = self.llm_factory.get_chat_provider(
+            provider = self.llm_factory.get_provider(
                 settings.agent_model_provider
             )
             payload = provider.structured_output(

@@ -59,10 +59,6 @@ class ModelSettingsRepository:
         self,
         *,
         active_provider_mode: str,
-        chat_model_provider: str,
-        chat_model_name: str,
-        parser_model_provider: str,
-        parser_model_name: str,
         agent_model_provider: str,
         agent_model_name: str,
         ollama_url: str,
@@ -80,10 +76,10 @@ class ModelSettingsRepository:
                 session.add(record)
 
             record.active_provider_mode = active_provider_mode
-            record.chat_model_provider = chat_model_provider
-            record.chat_model_name = chat_model_name
-            record.parser_model_provider = parser_model_provider
-            record.parser_model_name = parser_model_name
+            record.chat_model_provider = agent_model_provider
+            record.chat_model_name = agent_model_name
+            record.parser_model_provider = agent_model_provider
+            record.parser_model_name = agent_model_name
             record.agent_model_provider = agent_model_provider
             record.agent_model_name = agent_model_name
             record.ollama_url = ollama_url

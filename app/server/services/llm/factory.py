@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
@@ -12,7 +10,6 @@ from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.openai_provider import OpenAIProvider
-from server.services.llm.types import LLMRequest
 
 ###############################################################################
 class LLMFactory:
@@ -86,25 +83,3 @@ class LLMFactory:
                 base_url=settings.deepseek_base_url,
             )
         raise ValueError(f"Unsupported model provider '{provider}'.")
-
-    # -------------------------------------------------------------------------
-    def get_chat_provider(self, provider: str) -> LLMProvider:
-        return _ChatOnlyProvider(self.get_provider(provider))
-
-###############################################################################
-class _ChatOnlyProvider:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, delegate: LLMProvider) -> None:
-        self._delegate = delegate
-        self.provider_name = getattr(delegate, "provider_name", "chat")
-
-    # -------------------------------------------------------------------------
-    def __getattr__(self, item: str):  # noqa: ANN001
-        return getattr(self._delegate, item)
-
-    # -------------------------------------------------------------------------
-    def structured_output(
-        self, request: LLMRequest, schema: type[object]
-    ) -> dict[str, Any]:
-        raise RuntimeError("Structured extraction is forbidden on chat-model path.")

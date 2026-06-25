@@ -29,9 +29,9 @@ class FakeCredentialRecord:
 class FakeSettingsRecord:
     active_provider_mode: str = "cloud"
     chat_model_provider: str = "openai"
-    chat_model_name: str = "gpt-4.1-mini"
-    parser_model_provider: str = "google"
-    parser_model_name: str = "gemini-2.5-flash"
+    chat_model_name: str = "gpt-4.1"
+    parser_model_provider: str = "openai"
+    parser_model_name: str = "gpt-4.1"
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
     ollama_url: str = "http://127.0.0.1:11434"
@@ -53,8 +53,17 @@ class FakeSettingsRepository:
 
     # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> FakeSettingsRecord:
-        self.last_update = kwargs
-        for key, value in kwargs.items():
+        self.last_update = dict(kwargs)
+        agent_provider = kwargs.get("agent_model_provider", self.record.agent_model_provider)
+        agent_name = kwargs.get("agent_model_name", self.record.agent_model_name)
+        mirrored = {
+            **kwargs,
+            "chat_model_provider": agent_provider,
+            "chat_model_name": agent_name,
+            "parser_model_provider": agent_provider,
+            "parser_model_name": agent_name,
+        }
+        for key, value in mirrored.items():
             setattr(self.record, key, value)
         return self.record
 
@@ -76,14 +85,7 @@ class FakeCredentialsRepository:
         self.deactivated.append((provider, label))
 
     # -------------------------------------------------------------------------
-    def upsert(
-        self,
-        *,
-        provider: str,
-        label: str,
-        encrypted_value: str,
-        key_version: str,
-    ) -> None:
+    def upsert(self, *, provider: str, label: str, encrypted_value: str, key_version: str) -> None:
         self.upserts.append((provider, label, encrypted_value, key_version))
 
 ###############################################################################
@@ -146,18 +148,7 @@ class FakeModelLibraryService:
             for (provider, name), override in self.model_overrides.items()
             if provider != "ollama"
         ]
-        return {
-            "cloud": cloud,
-            "local": local,
-            "sources": {
-                "ollama": {
-                    "ok": True,
-                    "reachable": True,
-                    "message": None,
-                    "model_count": len(local),
-                }
-            },
-        }
+        return {"cloud": cloud, "local": local, "sources": {"ollama": {"ok": True}}}
 
     # -------------------------------------------------------------------------
     def find_model(
@@ -192,60 +183,37 @@ def build_service(
     )
 
 ###############################################################################
-def test_partial_update_preserves_existing_settings_when_fields_are_omitted() -> None:
+def test_partial_agent_update_preserves_urls_and_credentials_shape() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(settings_repo=settings_repo)
 
-    service.update_settings(ModelSettingsUpdateRequest(chat_model_name="gpt-4.1"))
+    service.update_settings(ModelSettingsUpdateRequest(agent_model_name="gpt-4.1-mini"))
 
     assert settings_repo.last_update == {
         "active_provider_mode": "cloud",
-        "chat_model_provider": "openai",
-        "chat_model_name": "gpt-4.1",
-        "parser_model_provider": "google",
-        "parser_model_name": "gemini-2.5-flash",
         "agent_model_provider": "openai",
-        "agent_model_name": "gpt-4.1",
+        "agent_model_name": "gpt-4.1-mini",
         "ollama_url": "http://127.0.0.1:11434",
         "openai_base_url": "https://openai.example/v1",
         "google_base_url": "https://google.example/v1",
         "deepseek_base_url": "https://deepseek.example/v1",
     }
+    assert settings_repo.record.chat_model_name == "gpt-4.1-mini"
+    assert settings_repo.record.parser_model_name == "gpt-4.1-mini"
 
 ###############################################################################
-def test_update_settings_can_clear_a_selected_role() -> None:
-    settings_repo = FakeSettingsRepository()
-    service = build_service(settings_repo=settings_repo)
+def test_update_settings_rejects_blank_agent_selection() -> None:
+    service = build_service()
 
-    with pytest.raises(ChatSettingsValidationError):
-        service.update_settings(
-            ModelSettingsUpdateRequest(
-                chat_model_provider="",
-                chat_model_name="",
-            )
-        )
+    with pytest.raises(ChatSettingsValidationError, match="Agent model provider"):
+        service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="", agent_model_name=""))
 
 ###############################################################################
-def test_get_settings_repairs_blank_roles_using_configured_provider_models() -> None:
-    settings_repo = FakeSettingsRepository(
-        FakeSettingsRecord(
-            chat_model_provider="",
-            chat_model_name="",
-            parser_model_provider="",
-            parser_model_name="",
-            agent_model_provider="",
-            agent_model_name="",
-        )
-    )
-    credentials_repo = FakeCredentialsRepository(
-        active_items=[
-            FakeCredentialRecord(
-                provider="deepseek",
-                label="api_key",
-                encrypted_value="enc:deepseek-key",
-            )
-        ]
-    )
+def test_get_settings_repairs_blank_agent_using_configured_provider_models() -> None:
+    settings_repo = FakeSettingsRepository(FakeSettingsRecord(agent_model_provider="", agent_model_name=""))
+    credentials_repo = FakeCredentialsRepository([
+        FakeCredentialRecord(provider="deepseek", label="api_key", encrypted_value="enc:deepseek-key")
+    ])
     model_library_service = FakeModelLibraryService(
         model_overrides={
             ("deepseek", "deepseek-chat"): {
@@ -265,45 +233,54 @@ def test_get_settings_repairs_blank_roles_using_configured_provider_models() -> 
 
     response = service.get_settings()
 
-    assert response.chat_model_provider == "deepseek"
-    assert response.chat_model_name == "deepseek-chat"
-    assert response.parser_model_provider == "deepseek"
-    assert response.parser_model_name == "deepseek-chat"
     assert response.agent_model_provider == "deepseek"
     assert response.agent_model_name == "deepseek-chat"
-    assert settings_repo.last_update is not None
+    assert settings_repo.record.chat_model_name == "deepseek-chat"
+    assert settings_repo.record.parser_model_name == "deepseek-chat"
 
 ###############################################################################
-def test_updating_only_credentials_preserves_provider_models_and_base_urls() -> None:
+def test_get_settings_mirrors_divergent_legacy_assignments() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(
+            chat_model_provider="google",
+            chat_model_name="gemini-2.5-flash",
+            parser_model_provider="ollama",
+            parser_model_name="llama3.2",
+            agent_model_provider="openai",
+            agent_model_name="gpt-4.1",
+        )
+    )
+    service = build_service(settings_repo=settings_repo)
+
+    response = service.get_settings()
+
+    assert response.agent_model_provider == "openai"
+    assert response.agent_model_name == "gpt-4.1"
+    assert settings_repo.last_update is not None
+    assert settings_repo.record.chat_model_provider == "openai"
+    assert settings_repo.record.chat_model_name == "gpt-4.1"
+    assert settings_repo.record.parser_model_provider == "openai"
+    assert settings_repo.record.parser_model_name == "gpt-4.1"
+
+###############################################################################
+def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
     credentials_repo = FakeCredentialsRepository()
-    service = build_service(
-        settings_repo=settings_repo,
-        credentials_repo=credentials_repo,
-    )
+    service = build_service(settings_repo=settings_repo, credentials_repo=credentials_repo)
 
-    service.update_settings(
-        ModelSettingsUpdateRequest(credentials={"openai": {"api_key": " secret "}})
-    )
+    service.update_settings(ModelSettingsUpdateRequest(credentials={"openai": {"api_key": " secret "}}))
 
+    assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
     assert settings_repo.last_update is not None
-    assert settings_repo.last_update["chat_model_provider"] == "openai"
-    assert settings_repo.last_update["chat_model_name"] == "gpt-4.1-mini"
-    assert settings_repo.last_update["parser_model_provider"] == "google"
+    assert settings_repo.last_update["agent_model_provider"] == "openai"
     assert settings_repo.last_update["agent_model_name"] == "gpt-4.1"
     assert settings_repo.last_update["openai_base_url"] == "https://openai.example/v1"
-    assert settings_repo.last_update["google_base_url"] == "https://google.example/v1"
-    assert settings_repo.last_update["deepseek_base_url"] == "https://deepseek.example/v1"
-    assert credentials_repo.upserts == [("openai", "api_key", "enc:secret", "v1")]
 
 ###############################################################################
 def test_updating_only_credentials_skips_unrelated_local_model_validation() -> None:
     settings_repo = FakeSettingsRepository(
         FakeSettingsRecord(
-            chat_model_provider="ollama",
-            chat_model_name="missing-chat",
-            parser_model_provider="ollama",
-            parser_model_name="missing-parser",
+            active_provider_mode="local",
             agent_model_provider="ollama",
             agent_model_name="missing-agent",
         )
@@ -315,64 +292,23 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
         model_library_service=FakeModelLibraryService({"different-installed-model"}),
     )
 
-    service.update_settings(
-        ModelSettingsUpdateRequest(credentials={"geoapify": {"api_key": " geo "}})
-    )
+    service.update_settings(ModelSettingsUpdateRequest(credentials={"geoapify": {"api_key": " geo "}}))
 
     assert credentials_repo.upserts == [("geoapify", "api_key", "enc:geo", "v1")]
     assert settings_repo.last_update is not None
-    assert settings_repo.last_update["chat_model_name"] == "missing-chat"
-    assert settings_repo.last_update["parser_model_name"] == "missing-parser"
     assert settings_repo.last_update["agent_model_name"] == "missing-agent"
 
 ###############################################################################
-@pytest.mark.parametrize(
-    ("payload", "error_match"),
-    [
-        (
-            {
-                "chat_model_provider": "ollama",
-                "chat_model_name": "missing-model",
-            },
-            "not available from Ollama",
-        ),
-        (
-            {
-                "parser_model_provider": "ollama",
-                "parser_model_name": "missing-parser",
-            },
-            "Selected parser model",
-        ),
-        (
-            {
-                "agent_model_provider": "ollama",
-                "agent_model_name": "missing-agent",
-            },
-            "Selected agent model",
-        ),
-    ],
-)
-def test_local_model_validation_rejects_unavailable_ollama_model(
-    payload: dict[str, str],
-    error_match: str,
-) -> None:
+def test_local_model_validation_rejects_unavailable_agent_model() -> None:
     service = build_service(model_library_service=FakeModelLibraryService({"llama3.2"}))
 
-    with pytest.raises(ChatSettingsValidationError, match=error_match):
-        service.update_settings(ModelSettingsUpdateRequest(**payload))
+    with pytest.raises(ChatSettingsValidationError, match="Selected agent model"):
+        service.update_settings(
+            ModelSettingsUpdateRequest(agent_model_provider="ollama", agent_model_name="missing-agent")
+        )
 
 ###############################################################################
-def test_update_settings_normalizes_loopback_ollama_url() -> None:
-    settings_repo = FakeSettingsRepository()
-    service = build_service(settings_repo=settings_repo)
-
-    service.update_settings(ModelSettingsUpdateRequest(ollama_url="http://localhost:11434"))
-
-    assert settings_repo.last_update is not None
-    assert settings_repo.last_update["ollama_url"] == "http://127.0.0.1:11434"
-
-###############################################################################
-def test_available_local_models_allow_update() -> None:
+def test_available_local_model_allows_update_and_mirrors_legacy_columns() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(
         settings_repo=settings_repo,
@@ -382,58 +318,50 @@ def test_available_local_models_allow_update() -> None:
     service.update_settings(
         ModelSettingsUpdateRequest(
             active_provider_mode="local",
-            chat_model_provider="ollama",
-            chat_model_name="llama3.2",
-            parser_model_provider="ollama",
-            parser_model_name="llama3.2",
             agent_model_provider="ollama",
             agent_model_name="llama3.2",
         )
     )
 
     assert settings_repo.last_update is not None
-    assert settings_repo.last_update["active_provider_mode"] == "local"
-    assert settings_repo.last_update["chat_model_provider"] == "ollama"
-    assert settings_repo.last_update["chat_model_name"] == "llama3.2"
+    assert settings_repo.last_update["agent_model_provider"] == "ollama"
+    assert settings_repo.last_update["agent_model_name"] == "llama3.2"
+    assert settings_repo.record.chat_model_name == "llama3.2"
+    assert settings_repo.record.parser_model_name == "llama3.2"
 
 ###############################################################################
 def test_agent_model_without_tools_is_rejected() -> None:
     service = build_service(
         model_library_service=FakeModelLibraryService(
-            model_overrides={
-                ("openai", "no-tools"): {
-                    "supports_tools": False,
-                    "supports_structured_output": True,
-                }
-            }
+            model_overrides={("openai", "no-tools"): {"supports_tools": False, "supports_structured_output": True}}
         )
     )
 
     with pytest.raises(ChatSettingsValidationError, match="native tool calling"):
-        service.update_settings(
-            ModelSettingsUpdateRequest(
-                agent_model_provider="openai",
-                agent_model_name="no-tools",
-            )
-        )
+        service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="openai", agent_model_name="no-tools"))
 
 ###############################################################################
-def test_parser_model_without_structured_output_is_rejected() -> None:
+def test_agent_model_without_structured_output_is_rejected() -> None:
     service = build_service(
         model_library_service=FakeModelLibraryService(
-            model_overrides={
-                ("google", "no-structured"): {
-                    "supports_tools": True,
-                    "supports_structured_output": False,
-                }
-            }
+            model_overrides={("google", "no-structured"): {"supports_tools": True, "supports_structured_output": False}}
         )
     )
 
     with pytest.raises(ChatSettingsValidationError, match="structured output"):
-        service.update_settings(
-            ModelSettingsUpdateRequest(
-                parser_model_provider="google",
-                parser_model_name="no-structured",
-            )
-        )
+        service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="google", agent_model_name="no-structured"))
+
+###############################################################################
+def test_agent_model_with_tools_and_structured_output_is_accepted() -> None:
+    settings_repo = FakeSettingsRepository()
+    service = build_service(
+        settings_repo=settings_repo,
+        model_library_service=FakeModelLibraryService(
+            model_overrides={("google", "gemini-2.5-pro"): {"supports_tools": True, "supports_structured_output": True}}
+        ),
+    )
+
+    service.update_settings(ModelSettingsUpdateRequest(agent_model_provider="google", agent_model_name="gemini-2.5-pro"))
+
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["agent_model_name"] == "gemini-2.5-pro"

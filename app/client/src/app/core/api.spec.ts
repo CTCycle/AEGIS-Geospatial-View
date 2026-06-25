@@ -77,7 +77,7 @@ describe('core/api', () => {
       credential_health: { openai: { api_key: 'unreadable' } },
     });
     expect(parsed.active_provider_mode).toBe('cloud');
-    expect(parsed.chat_model_provider).toBe('');
+    expect(parsed.agent_model_provider).toBe('');
     expect(parsed.ollama_url).toBe('http://127.0.0.1:11434');
     expect(parsed.credentials).toEqual({});
     expect(parsed.credential_health?.openai.api_key).toBe('unreadable');

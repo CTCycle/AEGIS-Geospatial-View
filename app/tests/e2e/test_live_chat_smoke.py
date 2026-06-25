@@ -24,8 +24,8 @@ def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
     if response.status == 200:
         body = response.json()
         assistant = str(body.get("assistant_message") or "").lower()
-        if "configured parser model is unavailable" in assistant:
-            return False, "Configured parser model is unavailable"
+        if "configured agent model" in assistant and "structured extraction" in assistant:
+            return False, "Configured agent model cannot perform structured extraction"
         return True, ""
     if response.status in {400, 502, 503}:
         return False, f"Live provider precondition failed with status {response.status}"

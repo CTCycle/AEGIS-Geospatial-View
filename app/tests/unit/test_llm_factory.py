@@ -9,7 +9,6 @@ from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
-from server.services.llm.types import LLMRequest
 
 ###############################################################################
 class _SettingsRepo:
@@ -169,14 +168,12 @@ def test_get_provider_returns_google_provider_type() -> None:
     assert isinstance(provider, GoogleProvider)
 
 ###############################################################################
-def test_chat_only_provider_blocks_structured_output() -> None:
+def test_get_provider_keeps_structured_output_available_for_ollama() -> None:
     factory = LLMFactory(
         settings_repo=_SettingsRepo(),
         credentials_repo=_CredentialsRepo({}),
         crypto_service=_Crypto(),
     )
-    provider = factory.get_chat_provider("ollama")
-    request = LLMRequest(model="test", messages=[{"role": "user", "content": "x"}])
+    provider = factory.get_provider("ollama")
 
-    with pytest.raises(RuntimeError, match="Structured extraction is forbidden"):
-        provider.structured_output(request, schema=dict)
+    assert isinstance(provider, OllamaProvider)

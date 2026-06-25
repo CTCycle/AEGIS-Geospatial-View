@@ -4,10 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ModelCardComponent } from '../components/model-card.component';
+import { SelectedModelSummaryComponent } from '../components/selected-model-summary.component';
 import { SettingsApiKeyFieldComponent } from '../components/settings-api-key-field.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
-import { ModelStatsPanelComponent } from '../components/model-stats-panel.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
@@ -19,14 +19,14 @@ import {
 } from '../core/chat-settings-update';
 import { CredentialSettingsService } from '../core/credential-settings.service';
 import {
-  ModelRole,
-  SelectedModelStat,
-  buildModelSelectionPayload,
-  buildSelectedModelStats,
+  agentSelectionDisabledReason,
+  buildAgentModelSelectionPayload,
+  buildSelectedAgentModelSummary,
   enrichInstalledOllamaModel,
+  isSelectedAgentModel,
   mergeModelCards,
   modelDisplayDescription,
-  modelRoleStatusLabel,
+  SelectedAgentModelSummary,
 } from '../core/model-selection';
 import {
   ModelCardDescriptor,
@@ -49,7 +49,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
     SettingsApiKeyFieldComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
-    ModelStatsPanelComponent,
+    SelectedModelSummaryComponent,
   ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
@@ -60,10 +60,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly state: PersistedSettingsPageState;
   settings: ModelSettingsResponse = {
     active_provider_mode: 'cloud',
-    chat_model_provider: '',
-    chat_model_name: '',
-    parser_model_provider: '',
-    parser_model_name: '',
     agent_model_provider: '',
     agent_model_name: '',
     ollama_url: 'http://127.0.0.1:11434',
@@ -208,14 +204,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return new Set(this.localModels.map((item) => item.id));
   }
 
-  get selectedModelStats(): SelectedModelStat[] {
-    return buildSelectedModelStats(this.settings, this.localModelIds);
+  get selectedAgentModelSummary(): SelectedAgentModelSummary | null {
+    return buildSelectedAgentModelSummary(
+      this.settings,
+      this.localModelIds,
+      mergeModelCards(this.localModels, this.cloudModels),
+    );
   }
 
   get unavailableAssignedOllamaModels(): string[] {
     const assignedModels = [
-      this.settings.parser_model_provider === 'ollama' ? this.settings.parser_model_name : '',
-      this.settings.chat_model_provider === 'ollama' ? this.settings.chat_model_name : '',
       this.settings.agent_model_provider === 'ollama' ? this.settings.agent_model_name : '',
     ].filter(Boolean);
     return [...new Set(assignedModels.filter((model) => !this.localModelIds.has(model)))];
@@ -256,14 +254,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     await this.ensureProviderModelsLoaded(filter);
   }
 
-  async applyModelSelection(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
+  async applyAgentModelSelection(model: ModelCardDescriptor): Promise<void> {
     if (model.provider === 'ollama' && !this.isInstalledOllamaModel(model)) {
       const pulled = await this.pullLocalModel(model);
       if (!pulled || !this.isInstalledOllamaModel(model)) {
         return;
       }
     }
-    const payload = buildModelSelectionPayload(this.settings, role, model);
+    const payload = buildAgentModelSelectionPayload(this.settings, model);
     try {
       const updated = await this.saveModelSettings(payload);
       if (this.isDestroyed) {
@@ -271,14 +269,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.settings = updated;
       this.providerMode = updated.active_provider_mode;
-      this.statusText = `Selected ${model.name} for ${modelRoleStatusLabel(role)}`;
+      this.statusText = `Selected ${model.name} as agent model`;
       this.syncQueryState();
       this.syncState();
     } catch (error: unknown) {
       if (this.isDestroyed) {
         return;
       }
-      this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} for ${role}.`);
+      this.statusText = this.userFacingErrorService.toUserFacingError(error, `Could not select ${model.name} as agent model.`);
     }
   }
 
@@ -385,8 +383,16 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  onModelRoleSelected(role: ModelRole, model: ModelCardDescriptor): Promise<void> {
-    return this.applyModelSelection(role, model);
+  onModelSelected(model: ModelCardDescriptor): Promise<void> {
+    return this.applyAgentModelSelection(model);
+  }
+
+  isAgentModelSelected(model: ModelCardDescriptor): boolean {
+    return isSelectedAgentModel(this.settings, model);
+  }
+
+  agentModelDisabledReason(model: ModelCardDescriptor): string | null {
+    return this.requiresPull(model) ? null : agentSelectionDisabledReason(model);
   }
 
   closeModal(): void {
@@ -523,9 +529,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private hasSelectedProvider(settings: ModelSettingsResponse, provider: string): boolean {
-    return settings.chat_model_provider === provider
-      || settings.parser_model_provider === provider
-      || settings.agent_model_provider === provider;
+    return settings.agent_model_provider === provider;
   }
 
   private async ensureProviderModelsLoaded(

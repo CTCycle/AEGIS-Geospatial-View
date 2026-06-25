@@ -46,7 +46,7 @@ class _Factory:
         self.provider = provider
 
     # -------------------------------------------------------------------------
-    def get_chat_provider(self, provider: str) -> _Provider:
+    def get_provider(self, provider: str) -> _Provider:
         assert provider == "test"
         return self.provider
 
