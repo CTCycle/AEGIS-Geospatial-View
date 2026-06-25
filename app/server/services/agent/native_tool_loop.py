@@ -270,4 +270,21 @@ class NativeToolLoop:
         allowed = constraints.get("allowed_tool_names")
         if isinstance(allowed, list) and allowed and call.name not in set(map(str, allowed)):
             return f"Tool '{call.name}' is not allowed by policy constraints."
+        if call.name == "execute_geospatial_capability":
+            capability_id = str(call.arguments.get("capability_id") or "")
+            allowed_capabilities = constraints.get("allowed_capability_ids")
+            if (
+                isinstance(allowed_capabilities, list)
+                and allowed_capabilities
+                and capability_id not in set(map(str, allowed_capabilities))
+            ):
+                return f"Capability '{capability_id}' is not allowed by policy constraints."
+        if call.name == "fetch_geospatial_provider_layers":
+            provider_id = str(call.arguments.get("provider_id") or "").lower()
+            allowed_providers = constraints.get("allowed_provider_ids")
+            if (
+                not isinstance(allowed_providers, list)
+                or provider_id not in set(map(str, allowed_providers))
+            ):
+                return f"Provider '{provider_id}' is not allowed by policy constraints."
         return None

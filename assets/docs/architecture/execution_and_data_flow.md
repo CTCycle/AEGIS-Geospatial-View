@@ -51,7 +51,7 @@ Geospatial API services are composed during application startup and accessed thr
 8. `ToolPlanExecutor` applies timeouts, bounded transient retries, validation, and partial-failure tracking.
 9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
-11. Successful and partial outcomes are passed to the configured agent model for grounded Markdown synthesis; deterministic prose remains the fallback.
+11. Successful and partial outcomes are passed to the configured agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
 12. Task status, failure details, and active visualization are updated before persistence.
 
 Conversation task state is process-local, keyed by conversation ID or direct-chat

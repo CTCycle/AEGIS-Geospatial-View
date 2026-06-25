@@ -121,8 +121,7 @@ class CapabilityResolver:
         if exact is not None:
             return layer if self.runtime_registry.is_enabled(layer) else None
         if "_" in layer:
-            return layer
-
+            return None
         normalized = layer.casefold()
         text = f"{turn.user_text} {layer}".casefold()
         if self._is_precipitation_concept(normalized, text):

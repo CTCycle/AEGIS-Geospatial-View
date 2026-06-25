@@ -4,6 +4,8 @@ import json
 import logging
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from server.domain.chat import ChatOperationResult
 from server.domain.geographics import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
@@ -12,6 +14,16 @@ from server.services.llm.prompts import get_agent_response_prompt
 from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
+
+
+###############################################################################
+class GroundedSynthesisResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content: str = Field(min_length=1, max_length=4000)
+    used_evidence_keys: list[str] = Field(min_length=1, max_length=20)
+    warnings: list[str] = Field(default_factory=list, max_length=20)
+
 
 ###############################################################################
 class GroundedResponseSynthesizer:
@@ -68,7 +80,7 @@ class GroundedResponseSynthesizer:
             provider = self.llm_factory.get_chat_provider(
                 settings.agent_model_provider
             )
-            result = provider.chat(
+            payload = provider.structured_output(
                 LLMRequest(
                     model=settings.agent_model_name,
                     temperature=0.35,
@@ -93,12 +105,16 @@ class GroundedResponseSynthesizer:
                         },
                     ],
                     metadata={"purpose": "grounded_agent_response"},
-                )
+                ),
+                GroundedSynthesisResult,
             )
+            result = GroundedSynthesisResult.model_validate(payload)
+            if any(key not in evidence for key in result.used_evidence_keys):
+                raise ValueError("Synthesis referenced evidence keys outside the verified payload.")
         except Exception:
             LOGGER.warning("Grounded response synthesis failed", exc_info=True)
             return fallback_text
-        return (result.content or "").strip() or fallback_text
+        return result.content.strip() or fallback_text
 
     # -------------------------------------------------------------------------
     @staticmethod

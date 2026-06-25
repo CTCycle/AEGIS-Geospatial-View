@@ -1,6 +1,42 @@
 from __future__ import annotations
 
+import asyncio
+
+import pytest
+
+from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.render_descriptors import RenderDescriptorService
+from server.services.search.request_builder import RequestBuilder
+
+
+###############################################################################
+class _CapabilityRegistry:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, capability: dict) -> None:
+        self.capability = capability
+
+    # -------------------------------------------------------------------------
+    def get_capability(self, capability_id: str) -> dict | None:
+        return self.capability if self.capability["id"] == capability_id else None
+
+
+###############################################################################
+def _request():
+    return RequestBuilder().build_location_search_request(
+        ExecutionPlan(
+            state="map_search",
+            action_id="map_search",
+            basemap_id="osm_default",
+            overlay_ids=["test-layer"],
+        ),
+        ResolvedLocation(
+            label="Rome",
+            latitude=41.9,
+            longitude=12.5,
+            confidence=1.0,
+        ),
+    )
 
 ###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
@@ -46,3 +82,86 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     assert "tilecol={x}" in template
     assert "format=image/png" in template
     assert "time=2026-06-18" in template
+
+
+###############################################################################
+@pytest.mark.parametrize(
+    ("rendering_mode", "capability_kind", "capability_type", "metadata"),
+    [
+        ("xyz", "raster-overlay", "tile", {"url": "https://example.test/{z}/{x}/{y}.png"}),
+        (
+            "raster-tile",
+            "raster-overlay",
+            "tile",
+            {"url": "https://example.test/{z}/{x}/{y}.png"},
+        ),
+        ("wms", "raster-overlay", "wms", {"url": "https://example.test/wms", "layers": "x"}),
+        (
+            "wmts",
+            "raster-overlay",
+            "wmts",
+            {
+                "url": "https://example.test/wmts",
+                "layer_id": "x",
+                "tile_matrix_set": "EPSG:3857",
+            },
+        ),
+        ("geojson", "vector-overlay", "geojson", {}),
+        ("clustered-points", "vector-overlay", "geojson", {}),
+        ("choropleth", "vector-overlay", "geojson", {}),
+        (
+            "vector-tile",
+            "vector-overlay",
+            "vector-tile",
+            {"url": "https://example.test/{z}/{x}/{y}.pbf", "layer_id": "x"},
+        ),
+        ("camera-points", "camera-network", "camera-network", {}),
+        ("metadata-only", "analysis-tool", "time-series-insight", {}),
+    ],
+)
+def test_overlay_descriptor_covers_every_declared_rendering_mode(
+    rendering_mode: str,
+    capability_kind: str,
+    capability_type: str,
+    metadata: dict,
+) -> None:
+    capability = {
+        "id": "test-layer",
+        "name": "Test layer",
+        "provider": "test",
+        "type": capability_type,
+        "capabilityKind": capability_kind,
+        "renderingMode": rendering_mode,
+        "metadata": {
+            "source_protocol": rendering_mode,
+            "data_format": "GeoJSON" if rendering_mode in {
+                "geojson",
+                "clustered-points",
+                "choropleth",
+                "camera-points",
+            } else "tile",
+            "geometry_type": "Point" if rendering_mode in {
+                "clustered-points",
+                "camera-points",
+            } else "Polygon",
+            **metadata,
+        },
+    }
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry(capability),  # type: ignore[arg-type]
+    )
+
+    result = asyncio.run(
+        service.build_overlay_descriptor("test-layer", request=_request())
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert descriptor["rendering_mode"] == rendering_mode
+    assert isinstance(warnings, list)
+    if rendering_mode == "metadata-only":
+        assert "url" not in descriptor
+        assert "tile_url_template" not in descriptor
+        assert "render" not in descriptor
+    else:
+        assert descriptor.get("url") or descriptor.get("render")

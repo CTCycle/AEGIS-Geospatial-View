@@ -4,9 +4,6 @@ from dataclasses import dataclass
 
 from server.domain.chat import ChatOperationResult
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
-from server.services.llm.types import LLMResult
-
-
 ###############################################################################
 @dataclass
 class _Settings:
@@ -31,9 +28,14 @@ class _Provider:
         self.requests = []
 
     # -------------------------------------------------------------------------
-    def chat(self, request):  # noqa: ANN001
+    def structured_output(self, request, schema):  # noqa: ANN001
         self.requests.append(request)
-        return LLMResult(content=self.content)
+        assert schema.__name__ == "GroundedSynthesisResult"
+        return {
+            "content": self.content,
+            "used_evidence_keys": ["verified_outcome"],
+            "warnings": [],
+        }
 
 
 ###############################################################################
@@ -87,7 +89,8 @@ def test_synthesizer_falls_back_when_model_fails() -> None:
     class _FailingProvider(_Provider):
 
         # -------------------------------------------------------------------------
-        def chat(self, request):  # noqa: ANN001
+        def structured_output(self, request, schema):  # noqa: ANN001
+            _ = request, schema
             raise RuntimeError("offline")
 
     synthesizer = GroundedResponseSynthesizer(
@@ -130,3 +133,32 @@ def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
 
     assert result == "Credential rejected."
     assert provider.requests == []
+
+
+###############################################################################
+def test_synthesizer_falls_back_on_invalid_structured_output() -> None:
+
+    ###############################################################################
+    class _InvalidProvider(_Provider):
+
+        # -------------------------------------------------------------------------
+        def structured_output(self, request, schema):  # noqa: ANN001
+            self.requests.append(request)
+            return {"content": "", "used_evidence_keys": [], "warnings": []}
+
+    synthesizer = GroundedResponseSynthesizer(
+        settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+        llm_factory=_Factory(_InvalidProvider()),  # type: ignore[arg-type]
+        enabled=True,
+    )
+    operation = ChatOperationResult(
+        kind="direct_answer",
+        status="success",
+        message="Verified fallback.",
+    )
+
+    assert synthesizer.synthesize(
+        user_text="Answer",
+        fallback_text="Verified fallback.",
+        operation=operation,
+    ) == "Verified fallback."
