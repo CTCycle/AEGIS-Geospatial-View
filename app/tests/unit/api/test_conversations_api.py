@@ -112,6 +112,7 @@ def conversations_api_client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClien
     )
     app.state.run_event_stream_service = RunEventStreamService(
         publisher,
+        run_repository=run_repository,
         keep_alive_seconds=0.05,
     )
 
@@ -178,3 +179,28 @@ def test_conversation_http_run_stream_and_steering_reach_same_agent_run(
     assert update_event["run_id"] == run_id
     assert update_event["run_version"] == 2
     assert "public transport stops" in update_event["payload"]["aggregated_request"]
+
+###############################################################################
+def test_conversation_stream_rejects_run_from_different_conversation(
+    conversations_api_client: tuple[TestClient, FastAPI],
+) -> None:
+    client, _app = conversations_api_client
+    first = client.post("/api/conversations", json={"title": "First"})
+    second = client.post("/api/conversations", json={"title": "Second"})
+    assert first.status_code == 201
+    assert second.status_code == 201
+    first_id = first.json()["conversation_id"]
+    second_id = second.json()["conversation_id"]
+
+    run_response = client.post(
+        f"/api/conversations/{first_id}/runs",
+        json={"message": "Map Rome."},
+    )
+    assert run_response.status_code == 202
+    run_id = run_response.json()["run_id"]
+
+    stream_response = client.get(
+        f"/api/conversations/{second_id}/runs/{run_id}/events"
+    )
+
+    assert stream_response.status_code == 404

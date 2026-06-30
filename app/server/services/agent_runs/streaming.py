@@ -6,6 +6,8 @@ from contextlib import suppress
 from collections.abc import AsyncIterator
 
 from server.domain.run_events import RunEvent, RunEventType
+from server.repositories.agent_runs import AgentRunRepository
+from server.services.agent_runs.exceptions import RunNotFoundError
 from server.services.agent_runs.events import RunEventPublisher
 
 
@@ -23,18 +25,31 @@ class RunEventStreamService:
         self,
         event_publisher: RunEventPublisher,
         *,
+        run_repository: AgentRunRepository | None = None,
         keep_alive_seconds: float = 15.0,
     ) -> None:
         self.event_publisher = event_publisher
+        self.run_repository = run_repository
         self.keep_alive_seconds = keep_alive_seconds
+
+    # -------------------------------------------------------------------------
+    def verify_run_access(self, conversation_id: str, run_id: str) -> None:
+        if self.run_repository is None:
+            return
+        snapshot = self.run_repository.get_run(run_id)
+        if snapshot is None or snapshot.conversation_id != conversation_id:
+            raise RunNotFoundError("Run not found for conversation.")
 
     # -------------------------------------------------------------------------
     async def stream_sse(
         self,
         run_id: str,
         *,
+        conversation_id: str | None = None,
         after_event_id: str | None = None,
     ) -> AsyncIterator[str]:
+        if conversation_id is not None:
+            self.verify_run_access(conversation_id, run_id)
         iterator = self.event_publisher.events(run_id, after_event_id=after_event_id)
         pending_next = asyncio.create_task(iterator.__anext__())
         try:

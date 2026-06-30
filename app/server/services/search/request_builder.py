@@ -6,7 +6,12 @@ from typing import Any
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.domain.extraction.models import NormalizedAction, TurnParseResult, ViewportIntent
-from server.domain.geographics import LocationSearchRequest, PresentationPolicy, ViewportPolicy
+from server.domain.geographics import (
+    LocationSearchRequest,
+    PresentationPolicy,
+    ProviderLayerSelection,
+    ViewportPolicy,
+)
 
 ###############################################################################
 class RequestBuilder:
@@ -32,6 +37,7 @@ class RequestBuilder:
         *,
         turn_contract: TurnParseResult | None = None,
         active_visualization: dict[str, Any] | None = None,
+        provider_layer_selections: list[ProviderLayerSelection] | None = None,
     ) -> LocationSearchRequest:
         action = (
             turn_contract.normalized_action
@@ -51,6 +57,7 @@ class RequestBuilder:
             time_mode="current",
             basemap_id=self.choose_basemap(plan),
             overlay_ids=overlays,
+            provider_layer_selections=list(provider_layer_selections or []),
             viewport=self.build_viewport(
                 location,
                 action,

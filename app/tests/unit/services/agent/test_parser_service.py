@@ -119,6 +119,39 @@ def test_parser_service_classifies_direct_query() -> None:
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
 
 ###############################################################################
+def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
+    extracted = LLMParserExtraction.model_validate(
+        {
+            "location_signals": [
+                {
+                    "signal_type": "poi",
+                    "raw_value": "Colosseum",
+                    "normalized_value": "Colosseum",
+                    "confidence": 0.9,
+                },
+                {
+                    "signal_type": "region",
+                    "raw_value": "Lazio",
+                    "normalized_value": "Lazio",
+                    "confidence": 0.8,
+                },
+                {
+                    "signal_type": "street",
+                    "raw_value": "Via Pisa",
+                    "normalized_value": "Via Pisa",
+                    "confidence": 0.8,
+                },
+            ]
+        }
+    )
+
+    assert [signal.signal_type for signal in extracted.location_signals] == [
+        "poi",
+        "region",
+        "street",
+    ]
+
+###############################################################################
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(

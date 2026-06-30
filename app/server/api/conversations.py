@@ -81,10 +81,14 @@ async def stream_agent_run_events(
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     stream_service: RunEventStreamService = Depends(get_run_event_stream_service),
 ) -> StreamingResponse:
-    del conversation_id
+    try:
+        stream_service.verify_run_access(conversation_id, run_id)
+    except RunNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return StreamingResponse(
         stream_service.stream_sse(
             run_id,
+            conversation_id=conversation_id,
             after_event_id=after_event_id or last_event_id,
         ),
         media_type="text/event-stream",

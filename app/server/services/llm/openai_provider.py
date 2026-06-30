@@ -199,7 +199,11 @@ class OpenAIProvider(LLMProvider):
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
-        self._validate_request_capabilities(request)
+        schema_dump = getattr(schema, "model_json_schema", None)
+        request_schema = schema_dump() if callable(schema_dump) else {}
+        self._validate_request_capabilities(
+            replace(request, response_json_schema=request_schema)
+        )
         response = self._client().responses.parse(
             model=request.model,
             input=request.messages,

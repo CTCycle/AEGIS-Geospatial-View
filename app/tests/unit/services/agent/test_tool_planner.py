@@ -61,6 +61,20 @@ def test_layer_plan_contains_location_arguments() -> None:
 
 
 ###############################################################################
+def test_provider_layer_selection_uses_provider_render_tool() -> None:
+    plan = DeterministicToolPlanner().build_plan(
+        _turn("Render the selected GIBS layer over Rome", layers=["gibs:MODIS_Terra_CorrectedReflectance_TrueColor"]),
+        "map_layers",
+    )
+
+    assert [step.tool_name for step in plan.steps] == ["render_geospatial_provider_layer"]
+    assert plan.steps[0].arguments == {
+        "provider_id": "gibs",
+        "layer_id": "MODIS_Terra_CorrectedReflectance_TrueColor",
+    }
+
+
+###############################################################################
 def test_air_quality_forecast_selects_direct_capability() -> None:
     plan = DeterministicToolPlanner().build_plan(
         _turn("Get air quality forecast for Milan", task_class="direct_query"),

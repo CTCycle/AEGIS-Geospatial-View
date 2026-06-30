@@ -283,6 +283,9 @@ export interface MapSession {
     warnings?: string[];
     render?: GeospatialLayerRenderDescriptor | null;
   }>;
+  requested_overlay_ids?: string[];
+  rendered_overlay_ids?: string[];
+  failed_overlays?: Array<{ id: string; reason: string }>;
   compliance_warnings?: string[];
 }
 
@@ -464,7 +467,7 @@ export interface TemporalSignal {
 }
 
 export interface LocationSignal {
-  signal_type: 'address' | 'city' | 'country' | 'coordinates' | 'deictic';
+  signal_type: 'address' | 'city' | 'country' | 'coordinates' | 'deictic' | 'poi' | 'region' | 'street';
   raw_value: string;
   normalized_value?: string | null;
   latitude?: number | null;

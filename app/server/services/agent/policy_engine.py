@@ -93,6 +93,9 @@ class PolicyEngine:
             and provider_ids
         ):
             allowed_tools.append("fetch_geospatial_provider_layers")
+            allowed_tools.append("render_geospatial_provider_layer")
+        if any(":" in layer for layer in parsed_request.requested_layers):
+            allowed_tools.append("render_geospatial_provider_layer")
         return AgentPolicyConstraints(
             requires_location=parsed_request.normalized_action.requires_location,
             blocked_patterns=[item.pattern_id for item in actionable_patterns],
