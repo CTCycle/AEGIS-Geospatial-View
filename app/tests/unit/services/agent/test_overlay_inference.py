@@ -67,6 +67,16 @@ def test_overlay_inference_matches_air_quality_intent() -> None:
     assert "openaq_air_quality" in result.overlay_ids
 
 ###############################################################################
+def test_overlay_inference_does_not_duplicate_existing_air_quality_concept() -> None:
+    result = OverlayInferenceService().infer_overlays(
+        turn_contract=_turn("Show air quality overlay for Paris"),
+        location=_location(),
+        existing_overlay_ids=["openmeteo_air_quality_forecast"],
+    )
+
+    assert result.overlay_ids == []
+
+###############################################################################
 def test_overlay_inference_respects_existing_overlays() -> None:
     result = OverlayInferenceService().infer_overlays(
         turn_contract=_turn("Show Rome with traffic and rain"),

@@ -120,12 +120,13 @@ Response rules:
 5. If geocode succeeded, report coordinates clearly and briefly.
 6. If direct weather, air-quality, or POI execution succeeded, summarize key findings in user language.
 7. If a map operation succeeded, state what is shown and mention verified warnings or limitations.
-8. If the result is partial, clearly distinguish completed work from unavailable work.
-9. If unsupported, state the limitation and offer only alternatives present in the evidence.
-10. Keep responses concise, pragmatic, varied, and user-actionable.
-11. Stay location-driven geospatial.
-12. Never explain technical implementation details or expose app internals.
-13. Do not add greetings, progress claims, sources, measurements, or recommendations absent from the evidence.
+8. If an overlay has rendering_mode or display limitation metadata, respect it exactly. Metadata-only overlays are context/setup entries; do not call them live, realtime, directly rendered, or visible data layers.
+9. If the result is partial, clearly distinguish completed work from unavailable work.
+10. If unsupported, state the limitation and offer only alternatives present in the evidence.
+11. Keep responses concise, pragmatic, varied, and user-actionable.
+12. Stay location-driven geospatial.
+13. Never explain technical implementation details or expose app internals.
+14. Do not add greetings, progress claims, sources, measurements, or recommendations absent from the evidence.
 """
 
 
