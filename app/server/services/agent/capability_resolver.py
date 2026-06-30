@@ -120,10 +120,24 @@ class CapabilityResolver:
         exact = self.capability_registry.get_capability(layer)
         if exact is not None:
             return layer if self.runtime_registry.is_enabled(layer) else None
-        if "_" in layer:
-            return None
         normalized = layer.casefold()
         text = f"{turn.user_text} {layer}".casefold()
+        if self._is_air_quality_concept(normalized, text):
+            if turn.temporal_signal.mode == "forecast" or "forecast" in text:
+                return self._enabled("openmeteo_air_quality_forecast") or self._enabled(
+                    "get_air_quality_forecast"
+                )
+            return (
+                self._enabled("openmeteo_air_quality_forecast")
+                or self._enabled("get_air_quality_forecast")
+                or self._enabled("openaq_air_quality")
+            )
+        if self._is_traffic_concept(normalized, text):
+            return self._enabled("tomtom_traffic_flow") or self._enabled(
+                "tomtom_traffic_incidents"
+            )
+        if "_" in layer:
+            return None
         if self._is_precipitation_concept(normalized, text):
             if turn.temporal_signal.mode == "forecast" or "forecast" in text:
                 return self._enabled("openmeteo_weather_forecast")
@@ -224,6 +238,24 @@ class CapabilityResolver:
         return any(
             marker in f"{layer} {text}"
             for marker in ("precipitation", "rain", "rainfall")
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_air_quality_concept(layer: str, text: str) -> bool:
+        normalized = f"{layer} {text}".replace("_", " ").replace("-", " ")
+        return any(
+            marker in normalized
+            for marker in ("air quality", "pm2 5", "pm25", "pm10", "pollution")
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_traffic_concept(layer: str, text: str) -> bool:
+        normalized = f"{layer} {text}".replace("_", " ").replace("-", " ")
+        return any(
+            marker in normalized
+            for marker in ("traffic", "congestion", "road incidents", "incidents")
         )
 
     # -------------------------------------------------------------------------

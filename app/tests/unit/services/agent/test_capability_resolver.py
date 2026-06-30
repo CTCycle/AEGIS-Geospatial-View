@@ -73,6 +73,24 @@ def test_resolves_forecast_semantics() -> None:
 
 
 ###############################################################################
+def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> None:
+    resolved = CapabilityResolver().resolve(
+        _turn("Show air quality overlay for Paris", "air_quality")
+    )
+    assert resolved.requested_layers == ["openmeteo_air_quality_forecast"]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
+def test_resolves_traffic_semantics_to_enabled_capability() -> None:
+    resolved = CapabilityResolver().resolve(
+        _turn("Show traffic around the Colosseum in Rome", "traffic")
+    )
+    assert resolved.requested_layers == ["tomtom_traffic_flow"]
+    assert resolved.clarification_plan is None
+
+
+###############################################################################
 def test_october_mean_returns_supported_alternatives_instead_of_invalid_id() -> None:
     resolved = CapabilityResolver().resolve(
         _turn(

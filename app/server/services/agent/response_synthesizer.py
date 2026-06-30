@@ -129,6 +129,13 @@ class GroundedResponseSynthesizer:
                 {
                     "id": overlay.get("id"),
                     "label": overlay.get("label") or overlay.get("name"),
+                    "rendering_mode": overlay.get("rendering_mode"),
+                    "source_protocol": overlay.get("source_protocol"),
+                    "display_limitation": (
+                        "metadata/setup context only; do not describe as live rendered map data"
+                        if overlay.get("rendering_mode") == "metadata-only"
+                        else None
+                    ),
                 }
                 for overlay in map_session.overlays
                 if isinstance(overlay, dict)

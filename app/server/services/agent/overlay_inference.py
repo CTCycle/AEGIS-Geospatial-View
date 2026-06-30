@@ -51,7 +51,9 @@ class OverlayInferenceService:
         ]
         haystack = " ".join(part.strip().lower() for part in text_parts if isinstance(part, str))
         explicit_ids = list(existing_overlay_ids)
-        explicit_haystack = " ".join(item.strip().lower() for item in explicit_ids)
+        explicit_haystack = self._normalize_match_text(
+            " ".join(item.strip().lower() for item in explicit_ids)
+        )
         chosen: list[str] = []
         reasons: dict[str, list[str]] = {}
         warnings: list[str] = []
@@ -102,8 +104,8 @@ class OverlayInferenceService:
         for triggers, preferred_ids, reason in mappings:
             if not any(trigger in haystack for trigger in triggers):
                 continue
-            normalized_triggers = tuple(trigger.replace(" ", "") for trigger in triggers)
-            if any(trigger in explicit_haystack.replace(" ", "") for trigger in normalized_triggers):
+            normalized_triggers = tuple(self._normalize_match_text(trigger) for trigger in triggers)
+            if any(trigger in explicit_haystack for trigger in normalized_triggers):
                 continue
             for capability_id in preferred_ids:
                 if capability_id in explicit_ids or capability_id in chosen:
@@ -129,4 +131,13 @@ class OverlayInferenceService:
             overlay_ids=chosen,
             warnings=warnings,
             reasons=reasons,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_match_text(value: str) -> str:
+        return "".join(
+            character
+            for character in value.casefold()
+            if character.isalnum()
         )
