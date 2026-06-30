@@ -40,6 +40,18 @@ class DeterministicToolPlanner:
                     },
                 )
             )
+        for provider_id, layer_id in self._select_provider_layers(turn):
+            steps.append(
+                ToolPlanStep(
+                    step_id=f"step-{len(steps) + 1}",
+                    tool_name="render_geospatial_provider_layer",
+                    reason="Provider-native layer was explicitly selected for rendering.",
+                    arguments={
+                        "provider_id": provider_id,
+                        "layer_id": layer_id,
+                    },
+                )
+            )
         if self._requires_provider_discovery(turn, specialist):
             provider_id = next(
                 (item for item in turn.required_data_sources if item.strip()),
@@ -74,7 +86,9 @@ class DeterministicToolPlanner:
     def _select_capabilities(turn: TurnParseResult) -> list[str]:
         selected: list[str] = []
         text = turn.user_text.casefold()
-        selected.extend(turn.requested_layers)
+        selected.extend(
+            layer_id for layer_id in turn.requested_layers if ":" not in layer_id
+        )
         if not turn.requested_layers:
             if "air quality" in text and "forecast" in text:
                 selected.append("get_air_quality_forecast")
@@ -87,6 +101,18 @@ class DeterministicToolPlanner:
             ):
                 selected.append("location_to_coordinates")
         return list(dict.fromkeys(selected))
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _select_provider_layers(turn: TurnParseResult) -> list[tuple[str, str]]:
+        selections: list[tuple[str, str]] = []
+        for layer in turn.requested_layers:
+            if ":" not in layer:
+                continue
+            provider_id, layer_id = [part.strip() for part in layer.split(":", 1)]
+            if provider_id and layer_id:
+                selections.append((provider_id, layer_id))
+        return list(dict.fromkeys(selections))
 
     # -------------------------------------------------------------------------
     @staticmethod

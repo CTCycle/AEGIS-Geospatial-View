@@ -218,6 +218,26 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     }
 
 ###############################################################################
+def test_openai_structured_output_rejects_unsupported_model_before_api_call(monkeypatch) -> None:
+    _FakeOpenAIClient.instances = []
+    monkeypatch.setattr("server.services.llm.openai_provider.OpenAI", _FakeOpenAIClient)
+    provider = OpenAIProvider(api_key="k")
+
+    provider.list_models = lambda: [
+        SimpleNamespace(provider="openai", name="chat-only", capabilities=["chat"])
+    ]
+
+    request = LLMRequest(model="chat-only", messages=_request().messages)
+    try:
+        provider.structured_output(request, schema=_StructuredPayload)
+    except ValueError as exc:
+        assert "does not support structured output" in str(exc)
+    else:
+        raise AssertionError("structured_output should reject unsupported models")
+
+    assert _FakeOpenAIClient.instances == []
+
+###############################################################################
 def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     _FakeGoogleClient.instances = []
     monkeypatch.setattr("server.services.llm.google_provider.genai.Client", _FakeGoogleClient)
@@ -264,16 +284,29 @@ def test_google_provider_uses_genai_sdk(monkeypatch) -> None:
     }
 
 ###############################################################################
-def test_ollama_provider_langchain_paths(monkeypatch) -> None:
-    _FakeChatModel.instances = []
-    monkeypatch.setattr(
-        "server.services.llm.ollama.ChatOllama",
-        _FakeChatModel,
-    )
-    monkeypatch.setattr(
-        "server.services.llm.ollama.OllamaEmbeddings",
-        _FakeEmbeddings,
-    )
+def test_ollama_provider_http_paths(monkeypatch) -> None:
+    post_calls: list[tuple[str, dict[str, object]]] = []
+    stream_calls: list[tuple[str, dict[str, object]]] = []
+
+    def fake_post(self, path, payload):  # noqa: ANN001
+        post_calls.append((path, payload))
+        if path == "/api/embeddings":
+            return {"embedding": [0.1, 0.2, 0.3]}
+        if payload.get("format"):
+            return {"message": {"content": json.dumps({"answer": "structured"})}}
+        return {"message": {"content": "chat-ok"}, "done_reason": "stop"}
+
+    def fake_stream(self, path, payload):  # noqa: ANN001
+        stream_calls.append((path, payload))
+        return iter(
+            [
+                {"message": {"content": "chunk-1"}},
+                {"message": {"content": "chunk-2"}, "done": True},
+            ]
+        )
+
+    monkeypatch.setattr(OllamaProvider, "_post_json", fake_post)
+    monkeypatch.setattr(OllamaProvider, "_stream_post", fake_stream)
     provider = OllamaProvider(base_url="http://localhost:11434")
 
     response = provider.chat(_request())
@@ -288,6 +321,8 @@ def test_ollama_provider_langchain_paths(monkeypatch) -> None:
         0.2,
         0.3,
     ]
-    assert _FakeChatModel.instances[0].kwargs["num_ctx"] >= 2048
+    assert post_calls[0][0] == "/api/chat"
+    assert stream_calls[0][0] == "/api/chat"
+    assert post_calls[0][1]["options"]["num_ctx"] >= 2048
     assert provider.last_context_usage is not None
     assert provider.last_context_usage["provider"] == "ollama"

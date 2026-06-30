@@ -34,6 +34,7 @@ class LocationSearchOrchestrator:
             payload.basemap_id
         )
         overlays: list[dict[str, object]] = []
+        failed_overlays: list[dict[str, str]] = []
         warnings: list[str] = []
         if (
             isinstance(basemap, dict)
@@ -58,18 +59,49 @@ class LocationSearchOrchestrator:
                 request=payload,
             )
             if overlay_result is None:
+                reason = "not available in the capability catalog"
+                failed_overlays.append({"id": overlay_id, "reason": reason})
                 warnings.append(
-                    f"Overlay '{overlay_id}' is not available in the capability catalog."
+                    f"Overlay '{overlay_id}' is {reason}."
                 )
                 continue
             descriptor, overlay_warnings = overlay_result
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
+        for selection in payload.provider_layer_selections:
+            selection_id = f"{selection.provider_id}:{selection.layer_id}"
+            try:
+                descriptor, overlay_warnings = await self.render_descriptor_service.build_provider_layer_overlay(
+                    provider_id=selection.provider_id,
+                    layer_id=selection.layer_id,
+                    request=payload,
+                )
+            except Exception as exc:  # noqa: BLE001
+                reason = str(exc) or "provider layer could not be rendered"
+                failed_overlays.append({"id": selection_id, "reason": reason})
+                warnings.append(f"Provider layer '{selection_id}' failed: {reason}.")
+                continue
+            if selection.time and isinstance(descriptor.get("render"), dict):
+                descriptor["time"] = selection.time
+                descriptor["render"]["time"] = selection.time
+            if selection.style and isinstance(descriptor.get("render"), dict):
+                descriptor["style"] = selection.style
+                descriptor["render"]["style"] = selection.style
+            if selection.format and isinstance(descriptor.get("render"), dict):
+                descriptor["format"] = selection.format
+                descriptor["render"]["format"] = selection.format
+            overlays.append(descriptor)
+            warnings.extend(overlay_warnings)
+        rendered_overlay_ids = [
+            str(overlay["id"])
+            for overlay in overlays
+            if isinstance(overlay.get("id"), str)
+        ]
         return MapSession(
             session_id=f"map-{int(datetime.now(UTC).timestamp())}",
             resolved_location=payload.resolved_location,
             basemap_id=effective_basemap_id,
-            overlay_ids=list(payload.overlay_ids),
+            overlay_ids=rendered_overlay_ids,
             viewport=payload.viewport,
             center={
                 "latitude": payload.viewport.center_latitude,
@@ -78,6 +110,15 @@ class LocationSearchOrchestrator:
             bounds=payload.viewport.bbox or self._bounds_from_viewport(payload.viewport),
             basemap=basemap,
             overlays=overlays,
+            requested_overlay_ids=[
+                *list(payload.overlay_ids),
+                *[
+                    f"{selection.provider_id}:{selection.layer_id}"
+                    for selection in payload.provider_layer_selections
+                ],
+            ],
+            rendered_overlay_ids=rendered_overlay_ids,
+            failed_overlays=failed_overlays,
             compliance_warnings=warnings,
             payload={
                 "action_id": payload.action_id,

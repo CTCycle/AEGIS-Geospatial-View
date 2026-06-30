@@ -437,6 +437,17 @@ class PresentationPolicy(BaseModel):
     show_legend: bool = True
 
 ###############################################################################
+class ProviderLayerSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_id: str
+    layer_id: str
+    time: str | None = None
+    style: str | None = None
+    format: str | None = None
+    render: dict[str, object] | None = None
+
+###############################################################################
 class LocationSearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -445,6 +456,7 @@ class LocationSearchRequest(BaseModel):
     time_mode: TimeMode = "current"
     basemap_id: str
     overlay_ids: list[str] = Field(default_factory=list)
+    provider_layer_selections: list[ProviderLayerSelection] = Field(default_factory=list)
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
     viewport_intent: ViewportIntent | None = None
@@ -464,6 +476,9 @@ class MapSession(BaseModel):
     bounds: list[float] | None = None
     basemap: dict[str, object] | None = None
     overlays: list[dict[str, object]] = Field(default_factory=list)
+    requested_overlay_ids: list[str] = Field(default_factory=list)
+    rendered_overlay_ids: list[str] = Field(default_factory=list)
+    failed_overlays: list[dict[str, str]] = Field(default_factory=list)
     compliance_warnings: list[str] = Field(default_factory=list)
 
 ###############################################################################

@@ -10,7 +10,7 @@ from server.domain.agent.catalog import (
 from server.domain.agent.decision import ExecutionPlan
 from server.domain.agent.execution import AgentExecutionContext
 from server.domain.extraction.models import LocationSignal, TurnParseResult
-from server.domain.geographics import MapSession
+from server.domain.geographics import MapSession, ProviderLayerSelection
 from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
@@ -133,6 +133,22 @@ class AgentToolCatalogService:
                     "required": ["provider_id"],
                 },
             ),
+            LLMToolDefinition(
+                name="render_geospatial_provider_layer",
+                description="Render one provider-native layer descriptor into a normalized map session overlay.",
+                parameters_json_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "provider_id": {"type": "string"},
+                        "layer_id": {"type": "string"},
+                        "time": {"type": ["string", "null"]},
+                        "style": {"type": ["string", "null"]},
+                        "format": {"type": ["string", "null"]},
+                    },
+                    "required": ["provider_id", "layer_id"],
+                },
+            ),
         ]
         if allowed_capability_ids:
             execute = next(
@@ -156,6 +172,8 @@ class AgentToolCatalogService:
                 registry.register_native_tool(definition, self._execute_tool_handler)
             elif definition.name == "fetch_geospatial_provider_layers":
                 registry.register_native_tool(definition, self._provider_layers_tool_handler)
+            elif definition.name == "render_geospatial_provider_layer":
+                registry.register_native_tool(definition, self._render_provider_layer_tool_handler)
 
     # -------------------------------------------------------------------------
     async def _list_tool_handler(
@@ -200,7 +218,91 @@ class AgentToolCatalogService:
             limit=int(arguments.get("limit") or 50),
             refresh=bool(arguments.get("refresh", False)),
         )
-        return response.model_dump(mode="json")
+        payload = response.model_dump(mode="json")
+        if response.layers and self.search_orchestrator is not None:
+            selected = response.layers[0]
+            render_result = await self._render_provider_layer(
+                {
+                    "provider_id": selected.provider,
+                    "layer_id": selected.layer_id,
+                    "time": selected.default_time,
+                },
+                context,
+            )
+            if render_result.get("ok") is True:
+                payload["selected_layer"] = selected.model_dump(mode="json")
+                payload["map_session"] = render_result.get("map_session")
+                payload["warnings"] = [
+                    *list(payload.get("warnings") or []),
+                    *list(render_result.get("warnings") or []),
+                ]
+        return payload
+
+    # -------------------------------------------------------------------------
+    async def _render_provider_layer_tool_handler(
+        self,
+        arguments: dict[str, Any],
+        context: AgentExecutionContext,
+    ) -> dict[str, Any]:
+        return await self._render_provider_layer(arguments, context)
+
+    # -------------------------------------------------------------------------
+    async def _render_provider_layer(
+        self,
+        arguments: dict[str, Any],
+        context: AgentExecutionContext | None,
+    ) -> GeospatialCapabilityExecutionResult:
+        provider_id = str(arguments["provider_id"])
+        layer_id = str(arguments["layer_id"])
+        capability_id = f"{provider_id}:{layer_id}"
+        if self.search_orchestrator is None:
+            return self._error_result(
+                capability_id=capability_id,
+                arguments=arguments,
+                operation="provider_error",
+                code="provider_error",
+                message="Search orchestrator is not configured for provider layer rendering.",
+            )
+        resolved_location = await self._resolve_location(arguments, context)
+        if isinstance(resolved_location, dict) and resolved_location.get("error"):
+            return resolved_location
+        parsed_request = self._parsed_turn(context)
+        plan = ExecutionPlan(
+            state="map_search",
+            mode="map",
+            action_id=(
+                parsed_request.normalized_action.action_id
+                if parsed_request is not None
+                else "provider_layer_render"
+            ),
+            basemap_id=parsed_request.requested_basemap if parsed_request is not None else None,
+            overlay_ids=[],
+        )
+        request = self.request_builder.build_location_search_request(
+            plan,
+            resolved_location,
+            turn_contract=parsed_request,
+            active_visualization=(
+                context.map_state.get("active_visualization")
+                if context is not None and isinstance(context.map_state, dict)
+                else None
+            ),
+            provider_layer_selections=[
+                ProviderLayerSelection(
+                    provider_id=provider_id,
+                    layer_id=layer_id,
+                    time=arguments.get("time") if isinstance(arguments.get("time"), str) else None,
+                    style=arguments.get("style") if isinstance(arguments.get("style"), str) else None,
+                    format=arguments.get("format") if isinstance(arguments.get("format"), str) else None,
+                )
+            ],
+        )
+        map_session = await self.search_orchestrator.execute(request)
+        return self._map_result(
+            capability_id=capability_id,
+            arguments=arguments,
+            map_session=map_session,
+        )
 
     # -------------------------------------------------------------------------
     def list_geospatial_capabilities(

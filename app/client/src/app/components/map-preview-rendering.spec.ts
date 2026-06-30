@@ -3,6 +3,7 @@ import { MapOverlayEntry, MapSession } from '../core/types';
 import {
   addOverlayLayers,
   buildStyle,
+  isGeoJsonOverlay,
   normalizeBounds,
   recordBooleanEqual,
   recordNumberEqual,
@@ -34,6 +35,21 @@ describe('map-preview-rendering', () => {
     const style = buildStyle();
     const basemapSource = style.sources['basemap'] as { tiles?: string[] };
     expect(basemapSource.tiles?.[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
+  });
+
+  it('treats GeoJSON rendering modes as GeoJSON when descriptor metadata is sparse', () => {
+    const baseOverlay = {
+      id: 'mode-only',
+      label: 'Mode only',
+      provider: 'fixture',
+      type: 'feature-layer',
+      url: '/features.geojson',
+    } as MapOverlayEntry;
+
+    for (const rendering_mode of ['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points']) {
+      expect(isGeoJsonOverlay({ ...baseOverlay, rendering_mode })).toBeTrue();
+    }
+    expect(isGeoJsonOverlay({ ...baseOverlay, rendering_mode: 'camera-points', url: null })).toBeFalse();
   });
 
   const renderCases: Array<{

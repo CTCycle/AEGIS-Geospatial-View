@@ -18,7 +18,16 @@ class LLMTemporalSignal(BaseModel):
 class LLMLocationSignal(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    signal_type: Literal["address", "city", "country", "coordinates", "deictic"] = "address"
+    signal_type: Literal[
+        "address",
+        "city",
+        "country",
+        "coordinates",
+        "deictic",
+        "poi",
+        "region",
+        "street",
+    ] = "address"
     raw_value: str = ""
     normalized_value: str | None = None
     latitude: float | None = None

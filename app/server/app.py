@@ -117,7 +117,10 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
     )
-    run_event_stream_service = RunEventStreamService(run_event_publisher)
+    run_event_stream_service = RunEventStreamService(
+        run_event_publisher,
+        run_repository=run_repository,
+    )
     job_service = BackgroundJobService(
         chat_streaming_service=chat_streaming_service,
         map_search_runner=search_runtime.search_orchestrator.execute,

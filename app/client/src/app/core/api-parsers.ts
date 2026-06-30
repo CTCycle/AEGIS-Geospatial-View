@@ -316,6 +316,15 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
     bounds: Array.isArray(value.bounds) ? value.bounds as number[] : undefined,
     basemap: isRecord(value.basemap) ? value.basemap as MapSession['basemap'] : undefined,
     overlays,
+    requested_overlay_ids: isStringArray(value.requested_overlay_ids) ? value.requested_overlay_ids : undefined,
+    rendered_overlay_ids: isStringArray(value.rendered_overlay_ids)
+      ? value.rendered_overlay_ids
+      : overlays.map((overlay) => overlay.id),
+    failed_overlays: Array.isArray(value.failed_overlays)
+      ? value.failed_overlays.filter((item): item is { id: string; reason: string } => (
+        isRecord(item) && typeof item.id === 'string' && typeof item.reason === 'string'
+      ))
+      : [],
     compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
   };
 };

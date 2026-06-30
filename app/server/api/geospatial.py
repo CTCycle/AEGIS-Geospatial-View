@@ -302,9 +302,12 @@ async def get_geospatial_camera(
     camera_id: str,
     service: GeospatialApiService = Depends(get_geospatial_api_service),
 ) -> GeospatialCameraDetailResponse:
-    return GeospatialCameraDetailResponse.model_validate(
-        await service.get_camera(camera_id)
-    )
+    try:
+        return GeospatialCameraDetailResponse.model_validate(
+            await service.get_camera(camera_id)
+        )
+    except GeospatialApiServiceError as exc:
+        raise_service_http_error(exc)
 
 ###############################################################################
 @router.get(

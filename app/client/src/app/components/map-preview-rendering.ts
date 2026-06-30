@@ -283,12 +283,21 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
 
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
   const overlayType = overlay.type.toLowerCase();
+  const renderingMode = String(overlay.rendering_mode || '').toLowerCase();
   const format = overlay.data_format?.toLowerCase() || '';
   const protocol = overlay.source_protocol?.toLowerCase() || '';
+  const geoJsonRenderingModes = new Set([
+    'geojson',
+    'arcgis-geojson',
+    'clustered-points',
+    'choropleth',
+    'camera-points',
+  ]);
   return Boolean(
     overlay.url
     && (overlayType === 'geojson'
       || overlayType === 'arcgis-geojson'
+      || geoJsonRenderingModes.has(renderingMode)
       || format.includes('geojson')
       || protocol.includes('geojson')),
   );
