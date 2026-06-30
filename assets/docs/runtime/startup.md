@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-06-24
+Last updated: 2026-07-01
 
 ## Local Development Via Launcher
 
@@ -10,6 +10,7 @@ start_on_windows.bat
 ```
 
 The launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds when needed, and starts backend and frontend services.
+
 
 An existing `app\server\.venv` is reused. The launcher recreates it only when
 `pyvenv.cfg` references a different portable Python location, such as after the

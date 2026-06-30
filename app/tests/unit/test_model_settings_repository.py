@@ -5,7 +5,7 @@ import json
 from server.repositories.model_settings import ModelSettingsRepository
 
 ###############################################################################
-def test_update_mirrors_selected_agent_model_into_legacy_columns() -> None:
+def test_update_persists_selected_agent_model() -> None:
     repo = ModelSettingsRepository()
     repo.update(
         active_provider_mode="local",
@@ -17,10 +17,6 @@ def test_update_mirrors_selected_agent_model_into_legacy_columns() -> None:
         deepseek_base_url=None,
     )
     current = repo.get_or_create()
-    assert current.chat_model_provider == "ollama"
-    assert current.chat_model_name == "llama3.2"
-    assert current.parser_model_provider == "ollama"
-    assert current.parser_model_name == "llama3.2"
     assert current.agent_model_provider == "ollama"
     assert current.agent_model_name == "llama3.2"
 

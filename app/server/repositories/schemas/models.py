@@ -118,10 +118,6 @@ class ModelProviderSettingsRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     active_provider_mode: Mapped[str] = mapped_column(String(20), default="cloud")
-    chat_model_provider: Mapped[str] = mapped_column(String(64), default="")
-    chat_model_name: Mapped[str] = mapped_column(String(200), default="")
-    parser_model_provider: Mapped[str] = mapped_column(String(64), default="")
-    parser_model_name: Mapped[str] = mapped_column(String(200), default="")
     agent_model_provider: Mapped[str] = mapped_column(String(64), default="")
     agent_model_name: Mapped[str] = mapped_column(String(200), default="")
     ollama_url: Mapped[str] = mapped_column(

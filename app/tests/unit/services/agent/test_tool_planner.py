@@ -9,6 +9,7 @@ from server.domain.extraction.models import (
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
 
+###############################################################################
 def _turn(
     text: str,
     *,
@@ -42,12 +43,14 @@ def _turn(
     )
 
 
+###############################################################################
 def test_location_only_map_uses_deterministic_visualization_update() -> None:
     plan = DeterministicToolPlanner().build_plan(_turn("Show Rome"), "place_resolution")
     assert plan.steps == []
     assert plan.visualization_update == {"basemap_replacement": "osm_default"}
 
 
+###############################################################################
 def test_layer_plan_contains_location_arguments() -> None:
     plan = DeterministicToolPlanner().build_plan(
         _turn("Show rain radar over Rome", layers=["rainviewer_precipitation_radar"]),
@@ -57,6 +60,7 @@ def test_layer_plan_contains_location_arguments() -> None:
     assert plan.steps[0].arguments["arguments"]["location"] == "Rome"
 
 
+###############################################################################
 def test_air_quality_forecast_selects_direct_capability() -> None:
     plan = DeterministicToolPlanner().build_plan(
         _turn("Get air quality forecast for Milan", task_class="direct_query"),
@@ -65,6 +69,7 @@ def test_air_quality_forecast_selects_direct_capability() -> None:
     assert [step.capability_id for step in plan.steps] == ["get_air_quality_forecast"]
 
 
+###############################################################################
 def test_basemap_replacement_is_deterministic() -> None:
     plan = DeterministicToolPlanner().build_plan(
         _turn("Switch to satellite view", basemap="esri_world_imagery"),
