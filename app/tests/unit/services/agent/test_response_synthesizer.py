@@ -6,12 +6,12 @@ from server.domain.chat import ChatOperationResult
 from server.domain.agent.decision import ResolvedLocation
 from server.domain.geographics import MapSession, ViewportPolicy
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
+
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "test"
     agent_model_name: str = "test-model"
-
 
 ###############################################################################
 class _SettingsRepo:
@@ -19,7 +19,6 @@ class _SettingsRepo:
     # -------------------------------------------------------------------------
     def get_or_create(self) -> _Settings:
         return _Settings()
-
 
 ###############################################################################
 class _Provider:
@@ -39,7 +38,6 @@ class _Provider:
             "warnings": [],
         }
 
-
 ###############################################################################
 class _Factory:
 
@@ -51,7 +49,6 @@ class _Factory:
     def get_provider(self, provider: str) -> _Provider:
         assert provider == "test"
         return self.provider
-
 
 ###############################################################################
 def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
@@ -82,7 +79,6 @@ def test_synthesizer_returns_grounded_markdown_and_bounded_evidence() -> None:
     assert "Verified fallback." in request_text
     assert "Current data only." in request_text
     assert "How much rain is there?" in request_text
-
 
 ###############################################################################
 def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
@@ -134,7 +130,6 @@ def test_synthesizer_evidence_marks_metadata_only_overlays() -> None:
     assert "metadata-only" in request_text
     assert "do not describe as live rendered map data" in request_text
 
-
 ###############################################################################
 def test_synthesizer_falls_back_when_model_fails() -> None:
 
@@ -163,7 +158,6 @@ def test_synthesizer_falls_back_when_model_fails() -> None:
         operation=operation,
     ) == "Choose a supported time basis."
 
-
 ###############################################################################
 def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
     provider = _Provider("This must not be used.")
@@ -186,7 +180,6 @@ def test_synthesizer_does_not_rewrite_failed_or_policy_responses() -> None:
 
     assert result == "Credential rejected."
     assert provider.requests == []
-
 
 ###############################################################################
 def test_synthesizer_falls_back_on_invalid_structured_output() -> None:

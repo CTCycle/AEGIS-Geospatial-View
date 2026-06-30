@@ -212,17 +212,7 @@ class ChatSettingsService:
     def _repair_incomplete_agent_assignment(self, record):
         assignment = self._normalized_agent_assignment(record)
         if assignment["provider"] and assignment["model"]:
-            if self._legacy_assignments_match(
-                record,
-                provider=assignment["provider"],
-                model=assignment["model"],
-            ):
-                return record
-            return self._persist_agent_assignment(
-                record,
-                provider=assignment["provider"],
-                model=assignment["model"],
-            )
+            return record
 
         available_models = self._available_models(
             ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url)
@@ -275,24 +265,6 @@ class ChatSettingsService:
             openai_base_url=getattr(record, "openai_base_url", None),
             google_base_url=getattr(record, "google_base_url", None),
             deepseek_base_url=getattr(record, "deepseek_base_url", None),
-        )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _legacy_assignments_match(
-        record: object,
-        *,
-        provider: str,
-        model: str,
-    ) -> bool:
-        return all(
-            str(getattr(record, field, "") or "").strip() == expected
-            for field, expected in (
-                ("chat_model_provider", provider),
-                ("chat_model_name", model),
-                ("parser_model_provider", provider),
-                ("parser_model_name", model),
-            )
         )
 
     # -------------------------------------------------------------------------

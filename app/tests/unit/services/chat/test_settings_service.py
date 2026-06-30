@@ -28,10 +28,6 @@ class FakeCredentialRecord:
 @dataclass
 class FakeSettingsRecord:
     active_provider_mode: str = "cloud"
-    chat_model_provider: str = "openai"
-    chat_model_name: str = "gpt-4.1"
-    parser_model_provider: str = "openai"
-    parser_model_name: str = "gpt-4.1"
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
     ollama_url: str = "http://127.0.0.1:11434"
@@ -54,16 +50,7 @@ class FakeSettingsRepository:
     # -------------------------------------------------------------------------
     def update(self, **kwargs: Any) -> FakeSettingsRecord:
         self.last_update = dict(kwargs)
-        agent_provider = kwargs.get("agent_model_provider", self.record.agent_model_provider)
-        agent_name = kwargs.get("agent_model_name", self.record.agent_model_name)
-        mirrored = {
-            **kwargs,
-            "chat_model_provider": agent_provider,
-            "chat_model_name": agent_name,
-            "parser_model_provider": agent_provider,
-            "parser_model_name": agent_name,
-        }
-        for key, value in mirrored.items():
+        for key, value in kwargs.items():
             setattr(self.record, key, value)
         return self.record
 
@@ -198,8 +185,6 @@ def test_partial_agent_update_preserves_urls_and_credentials_shape() -> None:
         "google_base_url": "https://google.example/v1",
         "deepseek_base_url": "https://deepseek.example/v1",
     }
-    assert settings_repo.record.chat_model_name == "gpt-4.1-mini"
-    assert settings_repo.record.parser_model_name == "gpt-4.1-mini"
 
 ###############################################################################
 def test_update_settings_rejects_blank_agent_selection() -> None:
@@ -235,32 +220,6 @@ def test_get_settings_repairs_blank_agent_using_configured_provider_models() -> 
 
     assert response.agent_model_provider == "deepseek"
     assert response.agent_model_name == "deepseek-chat"
-    assert settings_repo.record.chat_model_name == "deepseek-chat"
-    assert settings_repo.record.parser_model_name == "deepseek-chat"
-
-###############################################################################
-def test_get_settings_mirrors_divergent_legacy_assignments() -> None:
-    settings_repo = FakeSettingsRepository(
-        FakeSettingsRecord(
-            chat_model_provider="google",
-            chat_model_name="gemini-2.5-flash",
-            parser_model_provider="ollama",
-            parser_model_name="llama3.2",
-            agent_model_provider="openai",
-            agent_model_name="gpt-4.1",
-        )
-    )
-    service = build_service(settings_repo=settings_repo)
-
-    response = service.get_settings()
-
-    assert response.agent_model_provider == "openai"
-    assert response.agent_model_name == "gpt-4.1"
-    assert settings_repo.last_update is not None
-    assert settings_repo.record.chat_model_provider == "openai"
-    assert settings_repo.record.chat_model_name == "gpt-4.1"
-    assert settings_repo.record.parser_model_provider == "openai"
-    assert settings_repo.record.parser_model_name == "gpt-4.1"
 
 ###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
@@ -308,7 +267,7 @@ def test_local_model_validation_rejects_unavailable_agent_model() -> None:
         )
 
 ###############################################################################
-def test_available_local_model_allows_update_and_mirrors_legacy_columns() -> None:
+def test_available_local_model_allows_update() -> None:
     settings_repo = FakeSettingsRepository()
     service = build_service(
         settings_repo=settings_repo,
@@ -326,8 +285,6 @@ def test_available_local_model_allows_update_and_mirrors_legacy_columns() -> Non
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["agent_model_provider"] == "ollama"
     assert settings_repo.last_update["agent_model_name"] == "llama3.2"
-    assert settings_repo.record.chat_model_name == "llama3.2"
-    assert settings_repo.record.parser_model_name == "llama3.2"
 
 ###############################################################################
 def test_agent_model_without_tools_is_rejected() -> None:

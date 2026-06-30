@@ -382,10 +382,6 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
 
     assert payload["agent_model_provider"] == "openai"
     assert payload["agent_model_name"] == "gpt-5-mini"
-    assert "chat_model_provider" not in payload
-    assert "chat_model_name" not in payload
-    assert "parser_model_provider" not in payload
-    assert "parser_model_name" not in payload
     assert "ollama_url" not in payload
     assert "openai_base_url" not in payload
     assert "google_base_url" not in payload

@@ -11,10 +11,6 @@ class _SettingsRepo:
     def get_or_create(self):  # noqa: ANN201
         return SimpleNamespace(
             active_provider_mode="cloud",
-            chat_model_provider="openai",
-            chat_model_name="gpt-4.1-mini",
-            parser_model_provider="openai",
-            parser_model_name="gpt-4.1-mini",
             agent_model_provider="openai",
             agent_model_name="gpt-4.1-mini",
             ollama_url="http://localhost:11434",

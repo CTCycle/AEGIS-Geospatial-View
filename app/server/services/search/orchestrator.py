@@ -9,7 +9,6 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.geospatial.rainviewer import RainViewerService
 
-
 ###############################################################################
 class LocationSearchOrchestrator:
 

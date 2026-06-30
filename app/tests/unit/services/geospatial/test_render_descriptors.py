@@ -8,7 +8,6 @@ from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 class _CapabilityRegistry:
 
@@ -19,7 +18,6 @@ class _CapabilityRegistry:
     # -------------------------------------------------------------------------
     def get_capability(self, capability_id: str) -> dict | None:
         return self.capability if self.capability["id"] == capability_id else None
-
 
 ###############################################################################
 def _request():
@@ -82,7 +80,6 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     assert "tilecol={x}" in template
     assert "format=image/png" in template
     assert "time=2026-06-18" in template
-
 
 ###############################################################################
 @pytest.mark.parametrize(

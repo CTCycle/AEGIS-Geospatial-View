@@ -15,7 +15,6 @@ from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
 
-
 ###############################################################################
 class GroundedSynthesisResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -23,7 +22,6 @@ class GroundedSynthesisResult(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
     used_evidence_keys: list[str] = Field(min_length=1, max_length=20)
     warnings: list[str] = Field(default_factory=list, max_length=20)
-
 
 ###############################################################################
 class GroundedResponseSynthesizer:

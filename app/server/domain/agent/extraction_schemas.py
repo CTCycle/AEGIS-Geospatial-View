@@ -44,7 +44,6 @@ class LLMAtomicTask(BaseModel):
     required_layers: list[str] = Field(default_factory=list)
     visualization_changes: dict[str, Any] = Field(default_factory=dict)
 
-
 ###############################################################################
 class LLMClarificationOption(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -52,7 +51,6 @@ class LLMClarificationOption(BaseModel):
     option_id: str
     label: str
     description: str | None = None
-
 
 ###############################################################################
 class LLMClarificationPlan(BaseModel):

@@ -176,6 +176,7 @@ Rules:
 15. Use viewport_intent.scope only from: preserve_current, building, street, neighborhood, district, city, region, country, auto.
 16. For basemap-only follow-ups, default viewport_intent.scope to preserve_current unless the user also asks to zoom or widen/narrow the area.
 """
+
 ###############################################################################
 def get_agent_extraction_prompt(
     provider: str | None = None, model: str | None = None
