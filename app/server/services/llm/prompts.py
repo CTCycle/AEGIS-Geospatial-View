@@ -125,8 +125,10 @@ Response rules:
 10. If unsupported, state the limitation and offer only alternatives present in the evidence.
 11. Keep responses concise, pragmatic, varied, and user-actionable.
 12. Stay location-driven geospatial.
-13. Never explain technical implementation details or expose app internals.
-14. Do not add greetings, progress claims, sources, measurements, or recommendations absent from the evidence.
+13. Never explain technical implementation details.
+14. Never expose app internals.
+15. Ask for missing information only when genuinely necessary.
+16. Do not add greetings, progress claims, sources, measurements, or recommendations absent from the evidence.
 """
 
 

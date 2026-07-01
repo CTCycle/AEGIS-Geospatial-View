@@ -27,7 +27,6 @@ from server.services.geospatial.api_service import (
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
-from server.services.geospatial.composition import build_geospatial_runtime
 
 router = APIRouter(prefix="/geospatial", tags=["geospatial"])
 
@@ -43,8 +42,10 @@ GEOSPATIAL_ERROR_STATUS = {
 def get_geospatial_api_service(request: Request) -> GeospatialApiService:
     runtime = getattr(request.app.state, "geospatial_runtime", None)
     if runtime is None:
-        runtime = build_geospatial_runtime()
-        request.app.state.geospatial_runtime = runtime
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Geospatial runtime is not initialized.",
+        )
     return runtime.api_service
 
 ###############################################################################

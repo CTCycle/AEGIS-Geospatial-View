@@ -1,0 +1,14 @@
+{
+  "version": 4,
+  "manifest_schema_version": 2,
+  "source_catalog_version": "test",
+  "providers_dir": "providers",
+  "basemaps_dir": "basemaps",
+  "overlays_dir": "overlays",
+  "cameras_dir": "cameras",
+  "transit_dir": "transit",
+  "tools_dir": "tools",
+  "runtime_profiles_file": "runtime_profiles.json",
+  "capability_groups": [],
+  "health_summary": {}
+}

@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-06-25
+Last updated: 2026-07-01
 
 ## Layering
 
@@ -37,7 +37,7 @@ Geospatial routes typically flow:
 - provider/runtime services
 - manifest or database repositories when required
 
-Geospatial API services are composed during application startup and accessed through `app.state.geospatial_runtime`.
+Geospatial API services are composed during application startup and accessed through `app.state.geospatial_runtime`. Routes do not construct a fallback geospatial runtime at request time.
 
 ## Chat Orchestration Pipeline
 
@@ -53,6 +53,12 @@ Geospatial API services are composed during application startup and accessed thr
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
 11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
 12. Task status, failure details, and active visualization are updated before persistence.
+
+`AgentOrchestrator` remains the chat-turn entrypoint, while helper services keep non-routing responsibilities isolated:
+
+- `AgentTurnHistoryService` owns request-id idempotency, prior-message lookup, and conversation-state memory merging.
+- `AgentTurnStateAssembler` owns map-session reconstruction, memory snapshot updates, and partial clarification map-state application.
+- `AgentTurnSupport` owns static fallback helpers for direct rejection, general capability answers, parser-failure classification, and native-tool loop prompt assembly.
 
 Conversation task state is process-local, keyed by conversation ID or direct-chat
 session ID, and expires after six hours of inactivity. It is not durable user memory.

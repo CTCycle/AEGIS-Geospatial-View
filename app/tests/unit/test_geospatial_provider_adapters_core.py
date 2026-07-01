@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.cache import GeospatialCache
+from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.overpass import OverpassRateLimitError, OverpassRequestError
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
@@ -411,8 +411,6 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
 
     def now() -> float:
         return clock
-
-    from server.services.geospatial.cache import GeospatialCache
 
     service = _OpenAQService()
     provider = OpenAQProvider(
