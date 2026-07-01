@@ -21,7 +21,8 @@ app/src-tauri/**/*.zip
 app/src-tauri/**/*.7z
 app/src-tauri/**/*.tar.gz
 release/windows/
-
+assets/QA/**
+.playwright-mcp/
 
 # Environment files (keep templates)
 app/client/*.local
@@ -40,6 +41,7 @@ dist/
 build/
 .coverage
 htmlcov/
+app/server/uv.lock
 
 # Node / JS
 **/node_modules/
@@ -62,7 +64,6 @@ Thumbs.db
 
 # Misc
 .tmp_logs/
-assets/QA/tmp/
 *.lock
 *.log
 *.db
@@ -82,5 +83,3 @@ assets/QA/tmp/
 !app/src-tauri/icons/**
 
 !.gitkeep
-
-
