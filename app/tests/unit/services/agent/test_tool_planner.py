@@ -8,7 +8,6 @@ from server.domain.extraction.models import (
 )
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
-
 ###############################################################################
 def _turn(
     text: str,
@@ -42,13 +41,11 @@ def _turn(
         tools_needed=True,
     )
 
-
 ###############################################################################
 def test_location_only_map_uses_deterministic_visualization_update() -> None:
     plan = DeterministicToolPlanner().build_plan(_turn("Show Rome"), "place_resolution")
     assert plan.steps == []
     assert plan.visualization_update == {"basemap_replacement": "osm_default"}
-
 
 ###############################################################################
 def test_layer_plan_contains_location_arguments() -> None:
@@ -58,7 +55,6 @@ def test_layer_plan_contains_location_arguments() -> None:
     )
     assert plan.steps[0].arguments["capability_id"] == "rainviewer_precipitation_radar"
     assert plan.steps[0].arguments["arguments"]["location"] == "Rome"
-
 
 ###############################################################################
 def test_provider_layer_selection_uses_provider_render_tool() -> None:
@@ -73,7 +69,6 @@ def test_provider_layer_selection_uses_provider_render_tool() -> None:
         "layer_id": "MODIS_Terra_CorrectedReflectance_TrueColor",
     }
 
-
 ###############################################################################
 def test_air_quality_forecast_selects_direct_capability() -> None:
     plan = DeterministicToolPlanner().build_plan(
@@ -81,7 +76,6 @@ def test_air_quality_forecast_selects_direct_capability() -> None:
         "environmental_data",
     )
     assert [step.capability_id for step in plan.steps] == ["get_air_quality_forecast"]
-
 
 ###############################################################################
 def test_basemap_replacement_is_deterministic() -> None:

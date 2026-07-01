@@ -18,7 +18,6 @@ def _load_fernet_from_material(key_material: str) -> Fernet:
         raise RuntimeError("Encryption key material is missing")
     return Fernet(normalized.encode("utf-8"))
 
-
 ###############################################################################
 def _derive_fernet_key(master_key: str) -> str:
     digest = hashlib.sha256(master_key.encode("utf-8")).digest()

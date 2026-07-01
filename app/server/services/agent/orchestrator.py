@@ -38,12 +38,15 @@ from server.services.chat.history_service import ChatHistoryService
 from server.services.llm.factory import LLMFactory
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
+
+###############################################################################
 class AgentOrchestrator:
     _compose_map_session_message = staticmethod(AgentResponseBuilder.compose_map_session_message)
     _compose_direct_tool_message = staticmethod(AgentResponseBuilder.compose_direct_tool_message)
     _compose_general_question_message = staticmethod(AgentTurnSupport.compose_general_question_message)
     _has_parser_runtime_failure = staticmethod(AgentTurnSupport.has_parser_runtime_failure)
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -113,6 +116,8 @@ class AgentOrchestrator:
             history_service=self.history_service,
             task_state_service=self.task_state_service,
         )
+
+    # -------------------------------------------------------------------------
     async def run_turn(
         self,
         payload: ChatTurnRequest,
