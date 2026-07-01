@@ -18,6 +18,15 @@ class ChatStreamingService:
         self.agent_orchestrator = agent_orchestrator
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _emit_progress_event(
+        queue: asyncio.Queue[ChatStreamEvent],
+        event: str,
+        data: dict[str, Any],
+    ) -> None:
+        queue.put_nowait(ChatStreamEvent(event=event, data=data))
+
+    # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
         request_id = payload.request_id or ""
         yield ChatStreamEvent(
@@ -27,14 +36,18 @@ class ChatStreamingService:
         try:
             queue: asyncio.Queue[ChatStreamEvent] = asyncio.Queue()
 
-            def emit(event: str, data: dict[str, Any]) -> None:
-                queue.put_nowait(ChatStreamEvent(event=event, data=data))
-
             supports_progress = "progress_callback" in inspect.signature(
                 self.agent_orchestrator.run_turn
             ).parameters
             task = asyncio.create_task(
-                self.agent_orchestrator.run_turn(payload, progress_callback=emit)
+                self.agent_orchestrator.run_turn(
+                    payload,
+                    progress_callback=lambda event, data: self._emit_progress_event(
+                        queue,
+                        event,
+                        data,
+                    ),
+                )
                 if supports_progress
                 else self.agent_orchestrator.run_turn(payload)
             )

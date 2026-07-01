@@ -22,8 +22,14 @@ from server.services.geospatial.providers.base import (
 )
 
 ###############################################################################
-def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
+def create_started_client() -> TestClient:
     client = TestClient(create_app())
+    client.__enter__()
+    return client
+
+###############################################################################
+def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
+    client = create_started_client()
 
     response = client.get("/api/geospatial/layers/gtfs_realtime/features")
 
@@ -34,7 +40,7 @@ def test_geospatial_transit_features_return_metadata_until_feed_configured() -> 
 
 ###############################################################################
 def test_geospatial_features_reports_missing_credentials_without_500() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/layers/tomtom_traffic_flow/features")
 
@@ -43,7 +49,7 @@ def test_geospatial_features_reports_missing_credentials_without_500() -> None:
 
 ###############################################################################
 def test_geospatial_features_render_contract_still_uses_provider_envelope() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")
 
@@ -89,7 +95,7 @@ def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> 
                 },
             )()
 
-    client = TestClient(create_app())
+    client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
         GeospatialApiService(provider_registry=GeoJsonRegistry())
     )
@@ -133,7 +139,7 @@ def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
                 },
             )()
 
-    client = TestClient(create_app())
+    client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
         GeospatialApiService(provider_registry=SingleFeatureRegistry())
     )
@@ -183,7 +189,7 @@ def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collecti
                 },
             )()
 
-    client = TestClient(create_app())
+    client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
         GeospatialApiService(provider_registry=CameraRegistry())
     )
@@ -219,7 +225,7 @@ def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_
                 },
             )()
 
-    client = TestClient(create_app())
+    client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
         GeospatialApiService(provider_registry=MalformedRegistry())
     )
@@ -232,7 +238,7 @@ def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secret(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/1/2/3.png")
 
@@ -250,7 +256,7 @@ def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeyp
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
     service = GeospatialApiService()
     service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
-    client = TestClient(create_app())
+    client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: service
 
     response = client.get("/api/geospatial/tiles/tomtom_traffic_flow/4/5/6.png")
@@ -262,7 +268,7 @@ def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeyp
 
 ###############################################################################
 def test_geospatial_features_accepts_live_provider_flags_without_500() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get(
         "/api/geospatial/layers/tomtom_traffic_flow/features"
@@ -296,7 +302,7 @@ def test_geospatial_features_map_provider_failures_without_500(
             del provider_id, request
             raise provider_error
 
-    client = TestClient(create_app())
+    client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
         GeospatialApiService(provider_registry=FailingRegistry())
     )
@@ -311,7 +317,7 @@ def test_geospatial_features_map_provider_failures_without_500(
 ###############################################################################
 def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) -> None:
     monkeypatch.delenv("WINDY_WEBCAMS_API_KEY", raising=False)
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/cameras?bbox=12,41,13,42")
 
@@ -320,7 +326,7 @@ def test_geospatial_cameras_report_missing_windy_key_without_500(monkeypatch) ->
 
 ###############################################################################
 def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/cameras/windy_webcams%2Fcamera-1")
 
@@ -333,7 +339,7 @@ def test_geospatial_camera_detail_returns_provider_payload_shape() -> None:
 ###############################################################################
 def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> None:
     monkeypatch.setenv("WINDY_WEBCAMS_API_KEY", "test-key")
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/sources/windy_webcams/credential-status")
 
@@ -346,7 +352,7 @@ def test_geospatial_credential_status_uses_existing_env_pattern(monkeypatch) -> 
 ###############################################################################
 def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/providers/tomtom/account-setup")
 
@@ -371,7 +377,7 @@ def test_optional_provider_credential_status_uses_provider_environment(
     monkeypatch, provider_id: str, env_name: str
 ) -> None:
     monkeypatch.delenv(env_name, raising=False)
-    client = TestClient(create_app())
+    client = create_started_client()
 
     missing = client.get(f"/api/geospatial/sources/{provider_id}/credential-status")
     assert missing.status_code == 200
@@ -385,7 +391,7 @@ def test_optional_provider_credential_status_uses_provider_environment(
 
 ###############################################################################
 def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/providers/account-setup")
 
@@ -408,7 +414,7 @@ def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
 
 ###############################################################################
 def test_account_setup_includes_experimental_automation_support() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/providers/account-setup")
 
@@ -421,7 +427,7 @@ def test_account_setup_includes_experimental_automation_support() -> None:
 
 ###############################################################################
 def test_google_maps_is_manual_only_and_billing_aware() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/providers/account-setup")
 
@@ -438,7 +444,7 @@ def test_google_maps_is_manual_only_and_billing_aware() -> None:
 
 ###############################################################################
 def test_opentripmap_is_unsupported() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/providers/account-setup")
 
@@ -453,7 +459,7 @@ def test_opentripmap_is_unsupported() -> None:
 ###############################################################################
 def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "secret-tomtom-value")
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.get("/api/geospatial/providers/account-setup")
 
@@ -462,7 +468,7 @@ def test_account_setup_response_excludes_secret_values(monkeypatch) -> None:
 
 ###############################################################################
 def test_geospatial_audit_endpoint_passes() -> None:
-    client = TestClient(create_app())
+    client = create_started_client()
 
     response = client.post("/api/geospatial/audit")
 
