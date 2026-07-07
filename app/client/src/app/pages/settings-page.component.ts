@@ -26,6 +26,7 @@ import {
   isSelectedAgentModel,
   mergeModelCards,
   modelDisplayDescription,
+  providerDisplayLabel,
   SelectedAgentModelSummary,
 } from '../core/model-selection';
 import {
@@ -174,22 +175,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   providerLabel(providerKey: string): string {
-    if (providerKey === 'ollama-installed') {
-      return 'ollama · installed';
-    }
-    if (providerKey === 'ollama-library') {
-      return 'ollama · available to pull';
-    }
-    if (providerKey === 'openai') {
-      return 'OpenAI';
-    }
-    if (providerKey === 'google') {
-      return 'Google';
-    }
-    if (providerKey === 'deepseek') {
-      return 'DeepSeek';
-    }
-    return providerKey;
+    return providerDisplayLabel(providerKey);
   }
 
   trackProviderGroup(provider: string): string {

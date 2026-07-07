@@ -6,6 +6,7 @@ import {
   enrichInstalledOllamaModel,
   mergeModelCard,
   mergeModelCards,
+  providerDisplayLabel,
 } from './model-selection';
 import { ModelCardDescriptor, ModelSettingsResponse } from './types';
 
@@ -128,5 +129,12 @@ describe('model-selection', () => {
       toolSupportSource: 'ollama_probe',
     }));
     expect(summary?.capabilities).toEqual(['tools', 'json']);
+  });
+
+  it('formats provider and provider-group labels consistently', () => {
+    expect(providerDisplayLabel('ollama')).toBe('Ollama');
+    expect(providerDisplayLabel('ollama-installed')).toBe('ollama · installed');
+    expect(providerDisplayLabel('openai')).toBe('OpenAI');
+    expect(providerDisplayLabel('custom-provider')).toBe('custom-provider');
   });
 });

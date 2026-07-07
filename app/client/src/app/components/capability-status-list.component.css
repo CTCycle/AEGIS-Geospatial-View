@@ -1,0 +1,48 @@
+:host {
+    display: block;
+}
+
+ul {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.45rem;
+    align-items: center;
+    color: #c5d3d8;
+    font-size: 0.72rem;
+}
+
+strong {
+    color: #56c878;
+    font-size: 0.68rem;
+}
+
+.state-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #56c878;
+}
+
+.state-dot--warn {
+    background: #e6a620;
+}
+
+.state-dot--warn + * + strong {
+    color: #e6a620;
+}
+
+.state-dot--neutral {
+    background: #8fa6b0;
+}
+
+.state-dot--neutral + * + strong {
+    color: #8fa6b0;
+}

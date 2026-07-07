@@ -19,6 +19,7 @@ from server.domain.extraction.models import (
     TurnParseResult,
 )
 from server.domain.geographics import MapSession
+from server.domain.agent.pipeline import ToolPlan
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import AgentToolLoopResult
 from server.services.agent.orchestrator import AgentOrchestrator
@@ -569,6 +570,14 @@ class _SearchOrchestrator:
         )
 
 ###############################################################################
+class _NoResultSearchOrchestrator(_SearchOrchestrator):
+
+    # -------------------------------------------------------------------------
+    async def execute(self, payload):  # noqa: ANN001
+        self.requests.append(payload)
+        return None
+
+###############################################################################
 class _WarningSearchOrchestrator(_SearchOrchestrator):
 
     # -------------------------------------------------------------------------
@@ -667,6 +676,20 @@ class _DirectResultCatalog:
             "error": None,
             "metadata": {},
         }
+
+###############################################################################
+class _VisualizationOnlyPlanner:
+
+    # -------------------------------------------------------------------------
+    def build_plan(self, turn, specialist, memory_snapshot=None):  # noqa: ANN001
+        _ = turn, memory_snapshot
+        return ToolPlan(
+            tool_group=specialist,
+            candidate_tools=[],
+            selected_tools=[],
+            steps=[],
+            visualization_update={"basemap_replacement": "osm_default"},
+        )
 
 ###############################################################################
 def test_orchestrator_uses_verified_tool_map_session() -> None:
@@ -1769,6 +1792,62 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
         assert response.operation.direct_result is not None
         assert response.operation.direct_result["tool_id"] == "location_to_coordinates"
         assert "Coordinates for Rome" in response.assistant_message
+
+    asyncio.run(_run())
+
+###############################################################################
+def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _NoResultSearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="unused",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+            tool_planner=_VisualizationOnlyPlanner(),  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message=(
+                    "Show a basemap of Rome, Italy and summarize the available "
+                    "public geospatial layers."
+                )
+            )
+        )
+
+        assert response.operation is not None
+        assert response.operation.kind == "error"
+        assert response.operation.status == "failed"
+        assert response.map_session is None
+        assert "could not create a map session" in response.operation.message.lower()
+        assert response.assistant_message == response.operation.message
+        assert response.decision.plan.state == "direct_response"
+        assert response.decision.plan.mode is None
+        assert response.memory_snapshot == {}
+        assert search_orchestrator.requests
+        assert native_loop.requests == []
+        assert history.messages[-1]["structured_payload"]["operation"]["status"] == "failed"
+        assert history.messages[-1]["map_session"] is None
 
     asyncio.run(_run())
 
