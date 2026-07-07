@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-25
+Last updated: 2026-07-03
 
 ## Route-Level Pages
 
@@ -22,6 +22,7 @@ Last updated: 2026-06-25
 - Shared contracts: `core/types.ts`
 - Error presentation: `core/user-facing-error.service.ts`
 - Model selection and model list utilities: `core/model-selection.ts`
+- Selected agent readiness checks: `core/agent-readiness.service.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
 
@@ -57,6 +58,7 @@ Reusable component examples include:
 - `settings-modal-shell.component.*`
 - `settings-api-key-field.component.*`
 - `selected-model-summary.component.*`
+- `capability-status-list.component.*`
 
 Settings uses card-level model selection for one selected agent model.
 

@@ -31,6 +31,29 @@ export interface SelectedAgentModelSummary {
   capabilities: string[];
 }
 
+export const providerDisplayLabel = (providerKey: string): string => {
+  const normalized = providerKey.trim().toLowerCase();
+  if (normalized === 'ollama-installed') {
+    return 'ollama · installed';
+  }
+  if (normalized === 'ollama-library') {
+    return 'ollama · available to pull';
+  }
+  if (normalized === 'ollama') {
+    return 'Ollama';
+  }
+  if (normalized === 'openai') {
+    return 'OpenAI';
+  }
+  if (normalized === 'google') {
+    return 'Google';
+  }
+  if (normalized === 'deepseek') {
+    return 'DeepSeek';
+  }
+  return providerKey;
+};
+
 export const isSelectedAgentModel = (
   settings: ModelSettingsResponse,
   model: ModelCardDescriptor,

@@ -1,9 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
+import {
+  CapabilityStatusItem,
+  CapabilityStatusListComponent,
+  CapabilityStatusTone,
+} from '../components/capability-status-list.component';
 import { ChatMessageComponent } from '../components/chat-message.component';
 import { MapPreviewComponent } from '../components/map-preview.component';
+import {
+  AgentReadinessService,
+  AgentReadinessState,
+  INITIAL_AGENT_READINESS_STATE,
+} from '../core/agent-readiness.service';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
@@ -26,11 +36,11 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
 @Component({
   selector: 'app-geospatial-page',
   standalone: true,
-  imports: [CommonModule, ChatMessageComponent, MapPreviewComponent],
+  imports: [CommonModule, CapabilityStatusListComponent, ChatMessageComponent, MapPreviewComponent],
   templateUrl: './geospatial-page.component.html',
   styleUrl: './geospatial-page.component.css',
 })
-export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
+export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('transcript', { static: false }) transcriptRef?: ElementRef<HTMLDivElement>;
   @ViewChild(MapPreviewComponent) mapPreview?: MapPreviewComponent;
 
@@ -58,6 +68,7 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   assistantDraft = '';
   composerDraft = '';
   transcriptScrollTop = 0;
+  agentReadiness = INITIAL_AGENT_READINESS_STATE;
 
   isLoading = false;
   progressPercent = 0;
@@ -75,12 +86,14 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   private currentAssistantMessageId?: string;
   private steeringMutationCounter = 0;
   private reconnectAttempts = 0;
+  private isDestroyed = false;
 
   constructor(
     private readonly router: Router,
     private readonly apiClient: ApiClientService,
     private readonly appStateStore: AppStateStoreService,
     private readonly localCommandService: LocalCommandService,
+    private readonly agentReadinessService: AgentReadinessService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
   ) {
@@ -112,12 +125,17 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     this.transcriptScrollTop = this.chatPageState.chatPanel.transcriptScrollTop;
   }
 
+  ngOnInit(): void {
+    void this.loadAgentStatus();
+  }
+
   ngAfterViewInit(): void {
     this.viewStateSync.restoreWindowScroll(this.chatPageState.scrollY);
     this.viewStateSync.restoreElementScroll(this.transcriptRef?.nativeElement, this.transcriptScrollTop);
   }
 
   ngOnDestroy(): void {
+    this.isDestroyed = true;
     this.closeActiveEventSource();
     this.stopResize();
     this.syncState();
@@ -142,6 +160,9 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
     const alerts: string[] = [];
     const latestAssistantMessage = [...this.messages].reverse().find((entry) => entry.role === 'assistant')?.content?.trim() ?? '';
     const operationMessage = this.lastOperation?.message?.trim() ?? '';
+    if (this.agentReadiness.status !== 'active' && this.agentReadiness.message.trim()) {
+      alerts.push(this.agentReadiness.message.trim());
+    }
     if (this.status === 'Failed') {
       alerts.push('The last request failed before the map session updated.');
     }
@@ -169,6 +190,19 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
 
   get showProgressIndicator(): boolean {
     return this.isLoading;
+  }
+
+  get capabilityStatusItems(): CapabilityStatusItem[] {
+    return [
+      {
+        label: 'Agent online',
+        statusLabel: this.agentReadiness.label,
+        tone: this.agentStatusTone,
+      },
+      { label: 'Satellite Imagery', statusLabel: 'Active', tone: 'ok' },
+      { label: 'Weather Intel', statusLabel: 'Active', tone: 'ok' },
+      { label: 'Optional Keys', statusLabel: 'Disabled', tone: 'warn' },
+    ];
   }
 
   get contextUsagePercent(): number {
@@ -665,6 +699,19 @@ export class GeospatialPageComponent implements AfterViewInit, OnDestroy {
   private closeActiveEventSource(): void {
     this.activeEventSource?.close();
     this.activeEventSource = undefined;
+  }
+
+  private async loadAgentStatus(): Promise<void> {
+    const readiness = await this.agentReadinessService.loadReadiness();
+    if (this.isDestroyed) {
+      return;
+    }
+    this.agentReadiness = readiness;
+    this.syncState();
+  }
+
+  private get agentStatusTone(): CapabilityStatusTone {
+    return this.agentReadiness.status === 'active' ? 'none' : 'warn';
   }
 
   private scrollTranscriptToBottom(): void {

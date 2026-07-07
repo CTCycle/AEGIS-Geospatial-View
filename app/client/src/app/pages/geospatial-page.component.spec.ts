@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { AgentReadinessService } from '../core/agent-readiness.service';
 import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
@@ -12,6 +13,7 @@ describe('pages/geospatial-page.component', () => {
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
+  let agentReadiness: jasmine.SpyObj<AgentReadinessService>;
   let sendChatTurnMock: jasmine.Spy;
 
   const makeTurnResponse = (overrides: Record<string, unknown> = {}): ChatTurnResponse => ({
@@ -42,6 +44,12 @@ describe('pages/geospatial-page.component', () => {
     apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn']);
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
+    agentReadiness = jasmine.createSpyObj<AgentReadinessService>('AgentReadinessService', ['loadReadiness']);
+    agentReadiness.loadReadiness.and.resolveTo({
+      status: 'active',
+      label: 'Active',
+      message: 'gpt-4.1-mini is ready through OpenAI.',
+    });
 
     await TestBed.configureTestingModule({
       imports: [GeospatialPageComponent],
@@ -49,6 +57,7 @@ describe('pages/geospatial-page.component', () => {
         provideRouter([]),
         { provide: ApiClientService, useValue: apiClient },
         { provide: AppStateStoreService, useValue: store },
+        { provide: AgentReadinessService, useValue: agentReadiness },
         { provide: UserFacingErrorService, useValue: errors },
       ],
     }).compileComponents();
@@ -232,6 +241,27 @@ describe('pages/geospatial-page.component', () => {
     component.messages = [{ role: 'assistant', content: 'Tool timed out.' }];
 
     expect(component.activeAlertItems).toContain('Tool timed out.');
+  });
+
+  it('loads typed agent readiness through the core service', async () => {
+    agentReadiness.loadReadiness.and.resolveTo({
+      status: 'needs_attention',
+      label: 'Needs attention',
+      message: 'Selected OpenAI credential needs attention (unreadable).',
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const component = fixture.componentInstance;
+
+    expect(component.agentReadiness.status).toBe('needs_attention');
+    expect(component.capabilityStatusItems[0]).toEqual({
+      label: 'Agent online',
+      statusLabel: 'Needs attention',
+      tone: 'warn',
+    });
+    expect(component.activeAlertItems).toContain('Selected OpenAI credential needs attention (unreadable).');
   });
 
   it('clarification run event applies partial map update and closes the run', () => {

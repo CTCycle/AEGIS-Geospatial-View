@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from server.common.logger import logger as LOGGER
-from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
+from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision, ResolvedLocation
 from server.domain.agent.pipeline import (
     ConversationTaskRecord,
     TaskFailureDetail,
@@ -293,7 +293,7 @@ class AgentTurnStateAssembler:
             turn_contract.location_signals,
             latest_memory or {},
         )
-        if not hasattr(resolved_location, "model_dump"):
+        if not isinstance(resolved_location, ResolvedLocation):
             return None
         inferred_overlay_ids = self.infer_overlay_ids(
             turn_contract=turn_contract,
@@ -329,7 +329,7 @@ class AgentTurnStateAssembler:
             turn_contract.location_signals,
             latest_memory or {},
         )
-        if not hasattr(resolved_location, "model_dump"):
+        if not isinstance(resolved_location, ResolvedLocation):
             return None
         inferred_overlay_ids = self.infer_overlay_ids(
             turn_contract=turn_contract,

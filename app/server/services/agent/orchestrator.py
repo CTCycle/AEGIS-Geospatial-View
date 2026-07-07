@@ -889,6 +889,20 @@ class AgentOrchestrator:
                 status="failed",
                 message=assistant_message,
             )
+        elif (
+            turn_contract.task_class == "map_search"
+            and map_session is None
+            and direct_result is None
+        ):
+            assistant_message = (
+                "I could not create a map session from this request. "
+                "Try a more specific place name or choose an available map layer."
+            )
+            operation = ChatOperationResult(
+                kind="error",
+                status="failed",
+                message=assistant_message,
+            )
         else:
             assistant_message = AgentResponseBuilder.build_verified_assistant_message(
                 "",

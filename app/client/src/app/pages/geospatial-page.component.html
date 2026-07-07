@@ -41,7 +41,7 @@
             <button
               type="button"
               class="primary-button"
-              [attr.aria-label]="isLoading ? 'Send steering update' : 'Send'"
+              [attr.aria-label]="isLoading ? 'Send steering update' : 'Send message'"
               (click)="sendMessage()"
               [disabled]="!composerDraft.trim()"
             >
@@ -78,12 +78,7 @@
         </section>
 
         <section class="rail-capability-card" aria-label="Capability status">
-          <ul>
-            <li><span class="state-dot state-dot--ok"></span> Agent online <strong>Active</strong></li>
-            <li><span class="state-dot state-dot--ok"></span> Satellite Imagery <strong>Active</strong></li>
-            <li><span class="state-dot state-dot--ok"></span> Weather Intel <strong>Active</strong></li>
-            <li><span class="state-dot state-dot--warn"></span> Optional Keys <strong>Disabled</strong></li>
-          </ul>
+          <app-capability-status-list [items]="capabilityStatusItems"></app-capability-status-list>
         </section>
       </div>
     </aside>
