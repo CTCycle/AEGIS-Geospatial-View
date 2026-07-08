@@ -222,6 +222,19 @@ def test_get_settings_repairs_blank_agent_using_configured_provider_models() -> 
     assert response.agent_model_name == "deepseek-chat"
 
 ###############################################################################
+def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(agent_model_provider="", agent_model_name="")
+    )
+    service = build_service(settings_repo=settings_repo)
+
+    response = service.get_settings()
+
+    assert response.agent_model_provider == ""
+    assert response.agent_model_name == ""
+    assert settings_repo.last_update is None
+
+###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
     credentials_repo = FakeCredentialsRepository()

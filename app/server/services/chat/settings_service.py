@@ -223,6 +223,8 @@ class ChatSettingsService:
             active_provider_mode=str(getattr(record, "active_provider_mode", "") or ""),
             available_models=available_models,
         )
+        if repaired is None:
+            return record
         self._validate_agent_assignment(
             agent_model_provider=repaired["provider"],
             agent_model_name=repaired["model"],
@@ -339,7 +341,7 @@ class ChatSettingsService:
         current_model: str,
         active_provider_mode: str,
         available_models: dict[str, list[dict[str, object]]],
-    ) -> dict[str, str]:
+    ) -> dict[str, str] | None:
         provider_preferences: list[str] = []
         if current_provider:
             provider_preferences.append(current_provider)
@@ -361,9 +363,7 @@ class ChatSettingsService:
             )
             if assignment is not None:
                 return assignment
-        raise ChatSettingsValidationError(
-            "No valid configured model assignment is available for the agent model."
-        )
+        return None
 
     # -------------------------------------------------------------------------
     def _select_agent_model(
