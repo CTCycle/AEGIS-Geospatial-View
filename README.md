@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)](./app/server/pyproject.toml)
 [![Angular](https://img.shields.io/badge/Angular-19.2-red?logo=angular&logoColor=white)](./app/client/package.json)
 [![License](https://img.shields.io/github/license/CTCycle/AEGIS-geographics)](./LICENSE)
-[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml)
+[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml?query=branch%3Adevelop)
 
 
 AEGIS Geospatial View is a place-focused workspace built around conversation.

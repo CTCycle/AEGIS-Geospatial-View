@@ -25,10 +25,16 @@ class LLMFactory:
     ) -> None:
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.credentials_repo = credentials_repo or CredentialRepository()
-        self.crypto_service = crypto_service or CredentialEncryptionService()
+        self.crypto_service = crypto_service
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
+
+    # -------------------------------------------------------------------------
+    def _get_crypto_service(self) -> CredentialEncryptionService:
+        if self.crypto_service is None:
+            self.crypto_service = CredentialEncryptionService()
+        return self.crypto_service
 
     # -------------------------------------------------------------------------
     def _resolve_provider_api_key(self, provider: str) -> str:
@@ -46,7 +52,7 @@ class LLMFactory:
                 "Google credentials are not configured. Add a Google/Gemini API key in Settings."
             )
         try:
-            api_key = self.crypto_service.decrypt(credential.encrypted_value)
+            api_key = self._get_crypto_service().decrypt(credential.encrypted_value)
         except ValueError as exc:
             provider_label = (
                 "OpenAI"
