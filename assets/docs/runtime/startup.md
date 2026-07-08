@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-06-04
+Last updated: 2026-07-01
 
 ## Local Development Via Launcher
 
@@ -11,10 +11,19 @@ start_on_windows.bat
 
 The launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds when needed, and starts backend and frontend services.
 
+
+An existing `app\server\.venv` is reused. The launcher recreates it only when
+`pyvenv.cfg` references a different portable Python location, such as after the
+repository or runtime folder is moved. An unrelated dependency-sync failure
+does not delete the environment.
+
+By default the launcher no longer prunes the uv cache on each start. Set `PRUNE_UV_CACHE=true` in `settings\.env` only when you explicitly want to reclaim dependency cache space; pruning can take noticeably longer on Windows.
+
 ## Local Development Manual
 
 ```powershell
 uv sync
+Set-Location app
 uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059
 Set-Location app/client
 npm install
@@ -48,5 +57,14 @@ release\tauri\build_with_tauri.bat
 ## Test Execution
 
 ```cmd
+app\tests\run_tests.bat
+```
+
+For bounded backend-only validation without starting local servers or Angular:
+
+```cmd
+set STANDARD_TEST_SKIP_LIVE_SERVERS=true
+set STANDARD_TEST_SKIP_FRONTEND=true
+set STANDARD_TEST_PYTEST_TARGET=app\tests\unit
 app\tests\run_tests.bat
 ```

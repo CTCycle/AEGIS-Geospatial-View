@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.api.chat import router as chat_router
+from server.api.conversations import router as conversations_router
 from server.api.geospatial import router as geospatial_router
 from server.api.jobs import router as jobs_router
 from server.common.paths import (
@@ -30,16 +31,28 @@ from server.repositories.database.initializer import (
 )
 from server.services.chat.composition import build_chat_runtime
 from server.services.chat.streaming import ChatStreamingService
+from server.services.agent_runs.aggregation import AggregatedRequestService
+from server.services.agent_runs.events import RunEventPublisher
+from server.services.agent_runs.lifecycle import RunLifecycleService
+from server.services.agent_runs.orchestrator import AgentRunOrchestrator
+from server.services.agent_runs.steering import RunSteeringService
+from server.services.agent_runs.streaming import RunEventStreamService
 from server.services.geospatial.composition import build_geospatial_runtime
 from server.services.jobs import BackgroundJobService
+from server.repositories.agent_run_events import AgentRunEventRepository
+from server.repositories.agent_runs import AgentRunRepository
+from server.repositories.agent_steering import AgentSteeringRepository
+from server.repositories.conversations import ConversationRepository
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
+###############################################################################
+def health_check() -> dict[str, str]:
+    return {"status": "ok"}
 
 ###############################################################################
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
-
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -54,11 +67,9 @@ def _resolve_client_file(full_path: str) -> Path | None:
 
     return None
 
-
 ###############################################################################
 def serve_client_root() -> FileResponse:
     return FileResponse(CLIENT_INDEX_FILE_PATH)
-
 
 ###############################################################################
 def serve_client_path(full_path: str) -> FileResponse:
@@ -67,11 +78,9 @@ def serve_client_path(full_path: str) -> FileResponse:
         return FileResponse(client_file)
     return FileResponse(CLIENT_INDEX_FILE_PATH)
 
-
 ###############################################################################
 def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(FASTAPI_DOCS_ENDPOINT)
-
 
 ###############################################################################
 @asynccontextmanager
@@ -87,6 +96,31 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
     geospatial_runtime = build_geospatial_runtime()
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
+    run_event_publisher = RunEventPublisher(AgentRunEventRepository())
+    run_repository = AgentRunRepository()
+    aggregation_service = AggregatedRequestService()
+    run_orchestrator = AgentRunOrchestrator(
+        agent_orchestrator=chat_runtime.agent_orchestrator,
+        run_repository=run_repository,
+        event_publisher=run_event_publisher,
+    )
+    run_lifecycle_service = RunLifecycleService(
+        conversation_repository=ConversationRepository(),
+        run_repository=run_repository,
+        aggregation_service=aggregation_service,
+        event_publisher=run_event_publisher,
+        run_orchestrator=run_orchestrator,
+    )
+    run_steering_service = RunSteeringService(
+        run_repository=run_repository,
+        steering_repository=AgentSteeringRepository(),
+        aggregation_service=aggregation_service,
+        event_publisher=run_event_publisher,
+    )
+    run_event_stream_service = RunEventStreamService(
+        run_event_publisher,
+        run_repository=run_repository,
+    )
     job_service = BackgroundJobService(
         chat_streaming_service=chat_streaming_service,
         map_search_runner=search_runtime.search_orchestrator.execute,
@@ -98,6 +132,9 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.chat_runtime = chat_runtime
     application.state.geospatial_runtime = geospatial_runtime
     application.state.chat_streaming_service = chat_streaming_service
+    application.state.run_lifecycle_service = run_lifecycle_service
+    application.state.run_steering_service = run_steering_service
+    application.state.run_event_stream_service = run_event_stream_service
     application.state.job_service = job_service
 
     chat_runtime.settings_service.get_settings()
@@ -107,14 +144,20 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     yield
     job_service.stop()
 
-
 ###############################################################################
 def create_app() -> FastAPI:
     application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
 
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
+    application.add_api_route(
+        f"{FASTAPI_API_PREFIX}/health",
+        health_check,
+        methods=["GET"],
+        include_in_schema=False,
+    )
 
     if _client_build_available():
         if CLIENT_ASSETS_PATH.is_dir():

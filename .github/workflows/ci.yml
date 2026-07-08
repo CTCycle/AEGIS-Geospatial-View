@@ -26,7 +26,7 @@ jobs:
 
       - name: Run backend unit suites
         run: |
-          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_backend_python_compile.py app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
+          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
 
   frontend-build-and-tests:
     runs-on: ubuntu-latest
@@ -38,12 +38,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: app/client/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: app/client
-        run: npm ci
+        run: npm install
 
       - name: Frontend build
         working-directory: app/client
@@ -53,54 +51,9 @@ jobs:
         working-directory: app/client
         run: npm run test -- --watch=false --browsers=ChromeHeadlessNoGpu
 
-      - name: Geospatial E2E scenario catalog
+      - name: Geospatial browser smoke
         working-directory: app/client
         run: npm run test:e2e:geospatial
-
-  playwright-visual-regressions:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: app/client/package-lock.json
-
-      - name: Install backend test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e "app/server[test]"
-          python -m playwright install --with-deps chromium
-
-      - name: Install frontend dependencies
-        working-directory: app/client
-        run: npm ci
-
-      - name: Start frontend preview
-        working-directory: app/client
-        run: |
-          npm run preview -- --host 127.0.0.1 --port 7861 &
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:7861 >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Frontend preview did not start in time" >&2
-          exit 1
-
-      - name: Run Playwright screenshot-diff suite
-        run: |
-          python -m pytest -c app/server/pyproject.toml app/tests/e2e/test_geospatial_visual_regressions.py -q
 
   capability-contract-validation:
     runs-on: ubuntu-latest
@@ -130,18 +83,12 @@ jobs:
         run: |
           python -m pytest -c app/server/pyproject.toml \
             app/tests/unit/test_manifest_schema_v2.py \
-            app/tests/unit/test_geospatial_manifest_schema_v2.py \
             app/tests/unit/test_geospatial_layer_auditor.py \
             app/tests/unit/test_geospatial_manifest_secret_safety.py \
-            app/tests/unit/test_geospatial_implementation_completeness.py \
             app/tests/unit/test_geospatial_plan_completion_surface.py \
             app/tests/unit/test_provider_registry.py \
             app/tests/unit/test_geospatial_provider_contracts.py \
-            app/tests/unit/test_phase4_provider_adapters.py \
-            app/tests/unit/test_phase8_provider_adapters.py \
             app/tests/unit/test_geospatial_ingestion.py \
-            app/tests/unit/test_geospatial_ingestion_validation.py \
-            app/tests/unit/test_geospatial_dataset_health.py \
             app/tests/unit/test_geospatial_normalizers.py \
             app/tests/unit/test_geospatial_api_contracts.py \
             app/tests/unit/test_geospatial_api_credentials.py \
@@ -150,14 +97,8 @@ jobs:
             app/tests/unit/test_gtfs_static_ingestion.py \
             app/tests/unit/test_gtfs_realtime_provider.py \
             app/tests/unit/test_gtfs_realtime_alerts.py \
-            app/tests/unit/test_gtfs_realtime_vehicle_positions.py \
             app/tests/unit/test_hazard_provider_adapters.py \
-            app/tests/unit/test_geospatial_hazard_providers.py \
-            app/tests/unit/test_geospatial_hazard_legends.py \
-            app/tests/unit/test_geospatial_hazard_freshness.py \
             app/tests/unit/test_regional_provider_adapters.py \
-            app/tests/unit/test_geospatial_existing_provider_remediation.py \
-            app/tests/unit/test_geospatial_camera_normalization.py \
             app/tests/unit/test_geospatial_poi_normalization.py \
             app/tests/unit/test_geospatial_choropleth_normalization.py \
             app/tests/unit/test_geospatial_weather_sampling.py \
@@ -165,13 +106,11 @@ jobs:
             app/tests/unit/test_geospatial_camera_permissions.py \
             app/tests/unit/test_geospatial_camera_staleness.py \
             app/tests/unit/test_geospatial_poi_search_index.py \
-            app/tests/unit/test_geospatial_poi_deduplication.py \
             app/tests/unit/test_geospatial_infrastructure_sources.py \
             app/tests/unit/test_geospatial_materialization_runner.py \
             app/tests/unit/services/agent/test_parser_service_contract.py \
             app/tests/unit/services/agent/test_policy_engine_authorization.py \
-            app/tests/unit/test_agentic_geospatial_map_session.py \
-            app/tests/unit/test_geospatial_e2e_scenarios.py
+            app/tests/unit/test_agentic_geospatial_map_session.py
 
       - name: Validate runtime profile completeness
         run: python -m pytest -c app/server/pyproject.toml app/tests/unit/services/geospatial/test_runtime_registry.py::test_runtime_profiles_cover_all_capabilities

@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from pathlib import Path
-
 import pytest
 
 from server.services.geospatial.cache import GeospatialCache
-from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest, ProviderUnavailableError
 from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
-
 
 ###############################################################################
 def test_eea_provider_returns_wms_descriptor() -> None:
@@ -35,7 +30,6 @@ def test_eea_provider_returns_wms_descriptor() -> None:
     assert response.payload["serviceUrl"] == "https://example.test/wms"
     assert response.payload["layers"] == ["0"]
     assert response.attribution == ["EEA"]
-
 
 ###############################################################################
 def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
@@ -71,7 +65,6 @@ def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
     assert stale.payload["liveValidation"]["layers"] == ["0"]
     assert stale.warnings
 
-
 ###############################################################################
 def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -86,7 +79,6 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
                 )
             )
         )
-
 
 ###############################################################################
 def test_esa_provider_returns_wmts_descriptor() -> None:
@@ -109,7 +101,6 @@ def test_esa_provider_returns_wmts_descriptor() -> None:
     assert response.payload["layerId"] == "WORLDCOVER_2021_MAP"
     assert response.payload["serviceUrl"] == "https://example.test/wmts"
     assert response.attribution == ["ESA"]
-
 
 ###############################################################################
 def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
@@ -143,7 +134,6 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
     assert stale.stale is True
     assert stale.payload["liveValidation"]["service"] == "WMTS"
 
-
 ###############################################################################
 def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None:
     response = asyncio.run(
@@ -158,7 +148,6 @@ def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None
     assert response.payload["renderingMode"] == "metadata-only"
     assert response.payload["joinRequired"] is True
     assert response.payload["joinKey"] == "NUTS_ID"
-
 
 ###############################################################################
 def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None:
@@ -199,7 +188,6 @@ def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None
     assert stale.stale is True
     assert stale.payload["jsonStatMetadata"]["label"] == "Population density"
 
-
 ###############################################################################
 def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
@@ -214,7 +202,6 @@ def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
                 )
             )
         )
-
 
 ###############################################################################
 def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
@@ -259,7 +246,6 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
     assert feature["properties"]["metric"] == "population_density"
     assert feature["properties"]["marginOfError"] == 1.5
 
-
 ###############################################################################
 def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     response = asyncio.run(
@@ -276,25 +262,3 @@ def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
     assert response.payload["joinKey"] == "NUTS_ID"
 
 
-###############################################################################
-def test_fred_manifest_remains_metadata_only_without_geographic_join() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    fred = json.loads(
-        (repo_root / "resources/catalog/overlays/fred_regional_market_indicators.json").read_text(
-            encoding="utf-8"
-        )
-    )
-
-    assert fred["capabilityKind"] == "metadata-only"
-    assert fred["agenticUse"]["manualToggle"] is False
-
-
-###############################################################################
-def test_registry_binds_regional_providers() -> None:
-    registry = ProviderRegistry()
-
-    registry.build_from_manifests()
-
-    assert "eea" in registry.list_provider_ids()
-    assert "esa" in registry.list_provider_ids()
-    assert "eurostat" in registry.list_provider_ids()

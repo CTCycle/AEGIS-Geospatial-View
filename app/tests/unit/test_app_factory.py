@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 import server.app as app_module
 from server.common.paths import FASTAPI_API_PREFIX
 
-
 ###############################################################################
 def _settings():  # noqa: ANN202
     return SimpleNamespace(
@@ -17,7 +16,6 @@ def _settings():  # noqa: ANN202
         credential_master_key="dev-key",
         credential_key_version="v1",
     )
-
 
 ###############################################################################
 def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
@@ -29,11 +27,9 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
         maintenance_service=SimpleNamespace(),
     )
 
-
 ###############################################################################
 def _build_geospatial_runtime() -> SimpleNamespace:
     return SimpleNamespace(api_service=object())
-
 
 ###############################################################################
 def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
@@ -52,7 +48,6 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     assert f"{FASTAPI_API_PREFIX}/chat/turn" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}" in route_paths
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
-
 
 ###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:

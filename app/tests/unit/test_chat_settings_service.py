@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 from server.services.chat.settings_service import ChatSettingsService
 
-
 ###############################################################################
 class _SettingsRepo:
 
@@ -12,17 +11,13 @@ class _SettingsRepo:
     def get_or_create(self):  # noqa: ANN201
         return SimpleNamespace(
             active_provider_mode="cloud",
-            chat_model_provider="openai",
-            chat_model_name="gpt-4.1-mini",
-            parser_model_provider="openai",
-            parser_model_name="gpt-4.1-mini",
             agent_model_provider="openai",
             agent_model_name="gpt-4.1-mini",
             ollama_url="http://localhost:11434",
             openai_base_url=None,
             google_base_url=None,
+            deepseek_base_url=None,
         )
-
 
 ###############################################################################
 class _CredentialsRepo:
@@ -42,7 +37,6 @@ class _CredentialsRepo:
             ),
         ]
 
-
 ###############################################################################
 class _Crypto:
 
@@ -51,7 +45,6 @@ class _Crypto:
         if encrypted_value == "broken":
             raise ValueError("bad key")
         return "secret"
-
 
 ###############################################################################
 def test_settings_response_reports_credential_health() -> None:

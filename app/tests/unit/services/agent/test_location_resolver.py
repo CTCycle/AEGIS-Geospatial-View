@@ -5,7 +5,6 @@ import asyncio
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.extraction.models import LocationSignal
 
-
 ###############################################################################
 def test_location_resolver_uses_coordinates_without_geocoder() -> None:
     resolver = LocationResolver()
@@ -27,7 +26,6 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
         assert result.longitude == 12.5
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_location_resolver_prefers_specific_city_signal_over_country() -> None:

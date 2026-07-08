@@ -1,2 +1,5 @@
-<header class="chat-message__role">{{ message.role }}</header>
-<p class="chat-message__content">{{ message.content }}</p>
+@if (message.role === 'assistant') {
+  <div class="chat-message__content chat-message__content--markdown" [innerHTML]="assistantHtml"></div>
+} @else {
+  <p class="chat-message__content">{{ message.content }}</p>
+}

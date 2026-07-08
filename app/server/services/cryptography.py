@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+
 from cryptography.fernet import Fernet, InvalidToken
 
 from server.domain.crypto import EncryptedSecret
@@ -8,7 +11,6 @@ from server.repositories.credential_material import (
     CredentialEncryptionMaterialRepository,
 )
 
-
 ###############################################################################
 def _load_fernet_from_material(key_material: str) -> Fernet:
     normalized = str(key_material or "").strip()
@@ -16,6 +18,10 @@ def _load_fernet_from_material(key_material: str) -> Fernet:
         raise RuntimeError("Encryption key material is missing")
     return Fernet(normalized.encode("utf-8"))
 
+###############################################################################
+def _derive_fernet_key(master_key: str) -> str:
+    digest = hashlib.sha256(master_key.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest).decode("utf-8")
 
 ###############################################################################
 class CredentialEncryptionService:
@@ -23,8 +29,21 @@ class CredentialEncryptionService:
     # -------------------------------------------------------------------------
     def __init__(
         self,
+        master_key: str | None = None,
+        key_version: int | str | None = None,
         material_repo: CredentialEncryptionMaterialRepository | None = None,
     ) -> None:
+        if master_key is not None:
+            normalized_key = str(master_key).strip()
+            if not normalized_key:
+                raise RuntimeError("Encryption key material is missing")
+            self._material_repo = material_repo
+            self._material = EncryptedSecret(
+                value=_derive_fernet_key(normalized_key),
+                key_version=key_version if key_version is not None else "v1",
+            )
+            self._fernet = _load_fernet_from_material(self._material.value)
+            return
         self._material_repo = material_repo or CredentialEncryptionMaterialRepository()
         self._material = self._material_repo.get_active_material(DEFAULT_KEY_PURPOSE)
         if self._material is None:
@@ -51,10 +70,18 @@ class CredentialEncryptionService:
 
     # -------------------------------------------------------------------------
     def decrypt_with_key_version(
-        self, encrypted_value: str, key_version: int
+        self, encrypted_value: str, key_version: int | str
     ) -> str:
         if key_version == self._material.key_version:
             return self.decrypt(encrypted_value)
+        if not isinstance(self._material_repo, CredentialEncryptionMaterialRepository):
+            raise ValueError(
+                f"Encryption material for version {key_version} is not available."
+            )
+        if not isinstance(key_version, int):
+            raise ValueError(
+                f"Encryption material for version {key_version} is not available."
+            )
         material = self._material_repo.get_material_by_version(key_version)
         if material is None:
             raise ValueError(

@@ -5,7 +5,6 @@ import asyncio
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
 
-
 ###############################################################################
 class _OpenMeteoService:
 
@@ -34,7 +33,6 @@ class _OpenMeteoService:
             "hourly_preview": [{"pm2_5": 8, "pm10": 12}],
             "attribution": "Data from Open-Meteo",
         }
-
 
 ###############################################################################
 def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:

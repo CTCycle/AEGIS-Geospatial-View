@@ -58,6 +58,12 @@ class LocationMemoryService:
             "country": resolved_location.country,
             "city": resolved_location.city,
             "address": resolved_location.address,
+            "location_type": resolved_location.location_type,
+            "location_class": resolved_location.location_class,
+            "bbox": list(resolved_location.bbox) if isinstance(resolved_location.bbox, list) else None,
+            "bbox_source": resolved_location.bbox_source,
+            "source": resolved_location.source,
+            "confidence": resolved_location.confidence,
             "action_id": action.action_id,
         }
         slots = [entry for entry in slots if not isinstance(entry, dict) or entry.get("label") != resolved_location.label]

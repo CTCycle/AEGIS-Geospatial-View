@@ -15,7 +15,6 @@ from server.repositories.schemas import (
     ReferenceGibsTileMatrixSetRecord,
 )
 
-
 ###############################################################################
 class ReferenceCatalogRepository:
 

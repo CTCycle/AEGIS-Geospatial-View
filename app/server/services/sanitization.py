@@ -75,7 +75,6 @@ class LocationSanitizationService:
             "query": query,
         }
 
-
 ###############################################################################
 def build_location_sanitization_service(
     database: DatabaseBackend,

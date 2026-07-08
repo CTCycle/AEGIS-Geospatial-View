@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.domain.geospatial.registry import AttributionEntry
 
-
 ###############################################################################
 class AttributionService:
 

@@ -11,7 +11,6 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
-
 ###############################################################################
 class OpenMeteoProvider(GeospatialProvider):
     provider_id = "openmeteo"

@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from server.common.time import utc_now
 from server.domain.agent.decision import PolicyDecision
+from server.domain.agent.pipeline import (
+    ConversationTaskSnapshot,
+    TaskFailureDetail,
+    ToolPlan,
+    VisualizationUpdate,
+)
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
 
@@ -30,6 +36,7 @@ class ChatTurnRequest(BaseModel):
     message: str
     datetime: str | None = None
     request_id: str | None = None
+    conversation_id: str | None = None
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -53,6 +60,7 @@ class ChatOperationResult(BaseModel):
         "clarification",
         "rejection",
         "error",
+        "failure_diagnostic",
     ]
     status: Literal["success", "partial", "failed"]
     message: str
@@ -74,6 +82,10 @@ class ChatTurnResponse(BaseModel):
     map_session: MapSession | None = None
     memory_snapshot: dict[str, Any] = Field(default_factory=dict)
     context_usage: ContextUsageResponse | None = None
+    task_snapshot: ConversationTaskSnapshot | None = None
+    tool_plan: ToolPlan | None = None
+    failure_diagnostic: TaskFailureDetail | None = None
+    visualization_update: VisualizationUpdate | None = None
 
 ###############################################################################
 class ChatStreamEvent(BaseModel):
@@ -108,14 +120,19 @@ class ModelCardDescriptor(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 ###############################################################################
+class ModelLibrarySourceStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    reachable: bool | None = None
+    message: str | None = None
+    model_count: int | None = None
+
+###############################################################################
 class ModelSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     active_provider_mode: ModelProviderMode
-    chat_model_provider: str
-    chat_model_name: str
-    parser_model_provider: str
-    parser_model_name: str
     agent_model_provider: str
     agent_model_name: str
     ollama_url: str
@@ -130,10 +147,6 @@ class ModelSettingsUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     active_provider_mode: ModelProviderMode | None = None
-    chat_model_provider: str | None = None
-    chat_model_name: str | None = None
-    parser_model_provider: str | None = None
-    parser_model_name: str | None = None
     agent_model_provider: str | None = None
     agent_model_name: str | None = None
     ollama_url: str | None = None
@@ -141,6 +154,18 @@ class ModelSettingsUpdateRequest(BaseModel):
     google_base_url: str | None = None
     deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+    # -------------------------------------------------------------------------
+    @field_validator(
+        "agent_model_provider",
+        "agent_model_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_model_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -163,6 +188,7 @@ class ModelLibraryResponse(BaseModel):
 
     cloud: list[ModelCardDescriptor] = Field(default_factory=list)
     local: list[ModelCardDescriptor] = Field(default_factory=list)
+    sources: dict[str, ModelLibrarySourceStatus] = Field(default_factory=dict)
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):

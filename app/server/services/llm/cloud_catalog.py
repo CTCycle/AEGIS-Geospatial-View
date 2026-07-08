@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.llm.types import ModelDescriptor
 
-
 ###############################################################################
 def get_cloud_model_catalog() -> list[ModelDescriptor]:
     return [

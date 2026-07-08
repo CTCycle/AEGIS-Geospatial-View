@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 ###############################################################################
 def ensure_test_artifact_dirs(artifact_root: Path, test_id: str) -> dict[str, Path]:
     screenshot_dir = artifact_root / "screenshots" / test_id
@@ -20,14 +19,12 @@ def ensure_test_artifact_dirs(artifact_root: Path, test_id: str) -> dict[str, Pa
         "reports": reports_dir,
     }
 
-
 ###############################################################################
 def write_snapshot(page: Any, screenshot_dir: Path, name: str) -> Path:
     filename = name if name.lower().endswith(".png") else f"{name}.png"
     target = screenshot_dir / filename
     page.screenshot(path=str(target), full_page=True)
     return target
-
 
 ###############################################################################
 def write_http_capture(
@@ -48,13 +45,11 @@ def write_http_capture(
     )
     return target
 
-
 ###############################################################################
 def write_log_tail(logs_dir: Path, test_id: str, log_tail: str) -> Path:
     target = logs_dir / f"{test_id}.backend.tail.log"
     target.write_text(log_tail or "", encoding="utf-8")
     return target
-
 
 ###############################################################################
 def write_report(

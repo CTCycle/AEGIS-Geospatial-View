@@ -5,7 +5,6 @@ import asyncio
 from server.services.geospatial.live_validator import validate_live_geospatial_sources
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
-
 ###############################################################################
 class _LiveValidationRegistry:
 
@@ -28,7 +27,6 @@ class _LiveValidationRegistry:
             provider_id=provider_id,
             payload=payload,
         )
-
 
 ###############################################################################
 def test_live_validator_runs_public_provider_checks_with_injected_registry() -> None:

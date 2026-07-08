@@ -17,11 +17,9 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jte8AAAAASUVORK5CYII="
 )
 
-
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
     route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
-
 
 ###############################################################################
 def _models_payload() -> dict[str, Any]:
@@ -39,7 +37,6 @@ def _models_payload() -> dict[str, Any]:
         "local": [],
     }
 
-
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
     payload = chat_turn_map_response(7001, "Search executed successfully.")
@@ -48,7 +45,6 @@ def _turn_payload() -> dict[str, Any]:
     payload["map_session"]["overlay_ids"] = []
     payload["tool_payload"] = {"execution": "map_search", "selected_overlay_ids": []}
     return payload
-
 
 ###############################################################################
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
@@ -82,7 +78,6 @@ def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
         re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"), handle_osm_proxy
     )
 
-
 ###############################################################################
 def _collect_console_errors(page: Page) -> list[str]:
     errors: list[str] = []
@@ -93,7 +88,6 @@ def _collect_console_errors(page: Page) -> list[str]:
 
     page.on("console", capture)
     return errors
-
 
 ###############################################################################
 def _assert_no_render_blockers(errors: list[str]) -> None:
@@ -110,7 +104,6 @@ def _assert_no_render_blockers(errors: list[str]) -> None:
         )
     ]
     assert not blockers, f"Render-blocking console errors detected: {blockers}"
-
 
 ###############################################################################
 def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
@@ -129,7 +122,6 @@ def test_chat_success_immediately_mounts_map_and_limits_tile_zoom(
     assert requested_zooms, "Expected raster tile requests for map rendering"
     assert max(requested_zooms) <= 19
     _assert_no_render_blockers(errors)
-
 
 ###############################################################################
 def test_refresh_restores_rendered_map_without_console_errors(

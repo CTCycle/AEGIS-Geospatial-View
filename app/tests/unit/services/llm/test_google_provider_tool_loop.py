@@ -5,7 +5,6 @@ import pytest
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -18,7 +17,6 @@ def _tool() -> LLMToolDefinition:
         },
     )
 
-
 ###############################################################################
 def test_google_converts_aegis_tools_into_declarations() -> None:
     assert GoogleProvider.tool_to_google_schema(_tool()) == {
@@ -30,7 +28,6 @@ def test_google_converts_aegis_tools_into_declarations() -> None:
             "required": ["capability_id"],
         },
     }
-
 
 ###############################################################################
 def test_google_parses_function_calls() -> None:
@@ -56,7 +53,6 @@ def test_google_parses_function_calls() -> None:
 
     assert calls[0].name == "describe_geospatial_capability"
     assert calls[0].arguments == {"capability_id": "rain"}
-
 
 ###############################################################################
 def test_google_converts_tool_results_to_function_responses() -> None:
@@ -84,7 +80,6 @@ def test_google_converts_tool_results_to_function_responses() -> None:
             ],
         }
     ]
-
 
 ###############################################################################
 def test_google_rejects_tools_plus_response_schema() -> None:

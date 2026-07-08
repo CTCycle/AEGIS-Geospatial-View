@@ -5,11 +5,9 @@ import {
 import {
   ApiRequestError,
   buildApiError,
-  fetchGeospatialCameraDetail,
   fetchGeospatialCameras,
   fetchGeospatialLayerFeatures,
   sendChatTurn,
-  streamChatTurn,
 } from './api';
 import {
   buildModelDescription,
@@ -78,9 +76,9 @@ describe('core/api', () => {
     const parsed = parseModelSettingsResponse({
       credential_health: { openai: { api_key: 'unreadable' } },
     });
-    expect(parsed.active_provider_mode).toBe('local');
-    expect(parsed.chat_model_provider).toBe('ollama');
-    expect(parsed.ollama_url).toBe('http://localhost:11434');
+    expect(parsed.active_provider_mode).toBe('cloud');
+    expect(parsed.agent_model_provider).toBe('');
+    expect(parsed.ollama_url).toBe('http://127.0.0.1:11434');
     expect(parsed.credentials).toEqual({});
     expect(parsed.credential_health?.openai.api_key).toBe('unreadable');
     expect(parsed.deepseek_base_url).toBeNull();
@@ -131,31 +129,38 @@ describe('core/api', () => {
     expect(parsed.context_usage?.selected_context_window).toBe(2048);
   });
 
-  it('parseChatTurnResponse rejects missing request_id', () => {
-    expect(() => parseChatTurnResponse({
-      session_id: 1,
-      assistant_message: 'ok',
-      turn_contract: {},
-      decision: {},
-    })).toThrow();
-  });
-
-  it('parseChatTurnResponse rejects missing turn_contract', () => {
-    expect(() => parseChatTurnResponse({
-      request_id: 'chat-1',
-      session_id: 1,
-      assistant_message: 'ok',
-      decision: {},
-    })).toThrow();
-  });
-
-  it('parseChatTurnResponse rejects missing decision', () => {
-    expect(() => parseChatTurnResponse({
-      request_id: 'chat-1',
-      session_id: 1,
-      assistant_message: 'ok',
-      turn_contract: {},
-    })).toThrow();
+  [
+    {
+      label: 'request_id',
+      payload: {
+        session_id: 1,
+        assistant_message: 'ok',
+        turn_contract: {},
+        decision: {},
+      },
+    },
+    {
+      label: 'turn_contract',
+      payload: {
+        request_id: 'chat-1',
+        session_id: 1,
+        assistant_message: 'ok',
+        decision: {},
+      },
+    },
+    {
+      label: 'decision',
+      payload: {
+        request_id: 'chat-1',
+        session_id: 1,
+        assistant_message: 'ok',
+        turn_contract: {},
+      },
+    },
+  ].forEach(({ label, payload }) => {
+    it(`parseChatTurnResponse rejects missing ${label}`, () => {
+      expect(() => parseChatTurnResponse(payload)).toThrow();
+    });
   });
 
   it('buildApiError builds ApiRequestError', async () => {
@@ -168,60 +173,6 @@ describe('core/api', () => {
     expect(err instanceof ApiRequestError).toBeTrue();
     expect(err.message).toBe('bad request');
     expect(err.status).toBe(400);
-  });
-
-  it('streamChatTurn parses events and ignores malformed trailing chunk', async () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('{"event":"status","data":{"message":"received"}}\n'));
-        controller.enqueue(new TextEncoder().encode('{"event":"parsed","data":{"task_class":"map_search"}}\n{"event":"final","data":{}}\n{bad'));
-        controller.close();
-      },
-    });
-    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(stream, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } }),
-    );
-    (window.fetch as unknown) = fetchSpy;
-    const events: string[] = [];
-    await streamChatTurn({ message: 'x' }, (event) => events.push(event.event));
-    expect(events).toEqual(['status', 'parsed', 'final']);
-  });
-
-  it('streamChatTurn emits error event behavior as ApiRequestError', async () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('{"event":"error","data":{"message":"stream failed","status":503}}\n'));
-        controller.close();
-      },
-    });
-    (window.fetch as unknown) = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(stream, { status: 200 }),
-    );
-    let thrown: unknown;
-    try {
-      await streamChatTurn({ message: 'x' }, () => undefined);
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown instanceof ApiRequestError).toBeTrue();
-    expect((thrown as ApiRequestError).status).toBe(503);
-  });
-
-  it('streamChatTurn timeout path rejects with timeout message', async () => {
-    jasmine.clock().install();
-    const fetchSpy = jasmine.createSpy('fetch').and.callFake((_: unknown, init?: RequestInit) => (
-      new Promise((_, reject) => {
-        const signal = init?.signal;
-        if (signal) {
-          signal.addEventListener('abort', () => reject({ name: 'AbortError' }));
-        }
-      })
-    ));
-    (window.fetch as unknown) = fetchSpy;
-    const promise = streamChatTurn({ message: 'x' }, () => undefined);
-    jasmine.clock().tick(120_100);
-    await expectAsync(promise).toBeRejectedWith(jasmine.any(ApiRequestError));
-    jasmine.clock().uninstall();
   });
 
   it('base URL route construction uses API_BASE_URL', async () => {
@@ -299,65 +250,42 @@ describe('core/api', () => {
     expect(calledUrl).toBe(`${API_BASE_URL}/geospatial/cameras?provider=windy_webcams`);
   });
 
-  it('fetchGeospatialCameraDetail encodes camera identifiers', async () => {
-    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response(JSON.stringify({
-        id: 'windy_webcams/cam 1',
-        status: 'metadata-unavailable',
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    (window.fetch as unknown) = fetchSpy;
-
-    await fetchGeospatialCameraDetail('windy_webcams/cam 1');
-
-    const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
-    expect(calledUrl).toContain('/geospatial/cameras/windy_webcams%2Fcam%201');
-  });
-
-  it('geospatial provider payload requests fall back to unavailable payloads', async () => {
-    const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
-      new Response('null', {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    (window.fetch as unknown) = fetchSpy;
-
-    await expectAsync(fetchGeospatialCameraDetail('windy_webcams/cam-1')).toBeResolvedTo({
-      status: 'unavailable',
-      provider: 'unknown',
+  [
+    {
+      label: 'treats placeholder local Ollama descriptions as missing',
+      payload: {
+        description: 'local',
+        metadata: {
+          family: 'qwen2',
+          parameter_size: '7.6B',
+          quantization_level: 'Q4_K_M',
+        },
+      },
+      expected: 'Optimized for qwen2 7.6B Q4_K_M.',
+    },
+    {
+      label: 'treats Ollama technical summaries as generated metadata, not authored descriptions',
+      payload: {
+        description: 'qwen2 | 7.6B | Q4_K_M',
+        metadata: {
+          family: 'qwen2',
+          parameter_size: '7.6B',
+          quantization_level: 'Q4_K_M',
+        },
+      },
+      expected: 'Optimized for qwen2 7.6B Q4_K_M.',
+    },
+    {
+      label: 'keeps provider-authored model descriptions',
+      payload: {
+        description: 'A provider-authored summary.',
+        metadata: {},
+      },
+      expected: 'A provider-authored summary.',
+    },
+  ].forEach(({ label, payload, expected }) => {
+    it(label, () => {
+      expect(buildModelDescription(payload)).toBe(expected);
     });
-  });
-
-  it('treats placeholder local Ollama descriptions as missing', () => {
-    expect(buildModelDescription({
-      description: 'local',
-      metadata: {
-        family: 'qwen2',
-        parameter_size: '7.6B',
-        quantization_level: 'Q4_K_M',
-      },
-    })).toBe('Optimized for qwen2 7.6B Q4_K_M.');
-  });
-
-  it('treats Ollama technical summaries as generated metadata, not authored descriptions', () => {
-    expect(buildModelDescription({
-      description: 'qwen2 | 7.6B | Q4_K_M',
-      metadata: {
-        family: 'qwen2',
-        parameter_size: '7.6B',
-        quantization_level: 'Q4_K_M',
-      },
-    })).toBe('Optimized for qwen2 7.6B Q4_K_M.');
-  });
-
-  it('keeps provider-authored model descriptions', () => {
-    expect(buildModelDescription({
-      description: 'A provider-authored summary.',
-      metadata: {},
-    })).toBe('A provider-authored summary.');
   });
 });

@@ -11,7 +11,6 @@ from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
 
-
 ###############################################################################
 class RenderDescriptorService:
 
@@ -115,13 +114,13 @@ class RenderDescriptorService:
             rendering_mode or ("metadata-only" if is_point_insight else ""),
         )
         render = self._build_render_descriptor(rendering_mode, resolved_url, metadata)
-        descriptor.update(
-            {
-                "url": resolved_url,
-                "tile_url_template": render.get("tile_url_template") if render else None,
-                "render": render,
-            }
-        )
+        if resolved_url is not None:
+            descriptor["url"] = resolved_url
+        if render is not None:
+            descriptor["render"] = render
+            tile_url_template = render.get("tile_url_template")
+            if tile_url_template is not None:
+                descriptor["tile_url_template"] = tile_url_template
         for key in (
             "layers",
             "layer_id",

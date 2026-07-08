@@ -19,6 +19,7 @@ from server.domain.extraction.models import (
     TurnParseResult,
 )
 from server.domain.geographics import MapSession
+from server.domain.agent.pipeline import ToolPlan
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import AgentToolLoopResult
 from server.services.agent.orchestrator import AgentOrchestrator
@@ -26,19 +27,16 @@ from server.services.agent.policy_engine import AgentPolicyConstraints
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
-
 ###############################################################################
 @dataclass
 class _Session:
     id: int = 7
-
 
 ###############################################################################
 @dataclass
 class _Settings:
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
-
 
 ###############################################################################
 class _HistoryRepo:
@@ -67,7 +65,6 @@ class _HistoryRepo:
     # -------------------------------------------------------------------------
     def get_latest_memory_snapshot(self, session_id: int) -> dict[str, Any]:
         return self.latest_memory
-
 
 ###############################################################################
 class _Parser:
@@ -107,7 +104,6 @@ class _Parser:
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _DeicticParser(_Parser):
 
@@ -136,7 +132,6 @@ class _DeicticParser(_Parser):
             ambiguities=["missing_location", "deictic_without_memory"],
             parser_confidence=0.9,
         )
-
 
 ###############################################################################
 class _ParisParser(_Parser):
@@ -175,7 +170,6 @@ class _ParisParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _ZurichParser(_Parser):
 
@@ -212,7 +206,6 @@ class _ZurichParser(_Parser):
             ),
             parser_confidence=0.9,
         )
-
 
 ###############################################################################
 class _TimesSquareParser(_Parser):
@@ -251,7 +244,6 @@ class _TimesSquareParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _CoordinateParser(_Parser):
 
@@ -289,7 +281,6 @@ class _CoordinateParser(_Parser):
             parser_confidence=0.95,
         )
 
-
 ###############################################################################
 class _MemoryMapParser(_Parser):
 
@@ -325,7 +316,6 @@ class _MemoryMapParser(_Parser):
             ambiguities=["missing_location", "deictic_without_memory"],
             parser_confidence=0.9,
         )
-
 
 ###############################################################################
 class _DirectToolParser(_Parser):
@@ -364,7 +354,6 @@ class _DirectToolParser(_Parser):
             parser_confidence=0.9,
         )
 
-
 ###############################################################################
 class _LocationResolver:
 
@@ -397,7 +386,6 @@ class _LocationResolver:
             confidence=signal.confidence,
         )
 
-
 ###############################################################################
 class _Policy:
 
@@ -417,7 +405,6 @@ class _Policy:
     def evaluate_preflight(self, turn):
         self.preflight_calls += 1
         return None
-
 
 ###############################################################################
 class _ClarifyingPolicy(_Policy):
@@ -439,7 +426,6 @@ class _ClarifyingPolicy(_Policy):
             trace=DecisionTrace(steps=["clarify"]),
         )
 
-
 ###############################################################################
 class _RejectingPolicy(_Policy):
 
@@ -459,7 +445,6 @@ class _RejectingPolicy(_Policy):
             ),
             trace=DecisionTrace(steps=["reject"]),
         )
-
 
 ###############################################################################
 class _Catalog:
@@ -519,7 +504,6 @@ class _Catalog:
             "metadata": {},
         }
 
-
 ###############################################################################
 class _FallbackCatalog:
 
@@ -539,7 +523,6 @@ class _FallbackCatalog:
         _ = arguments, context
         return {"items": []}
 
-
 ###############################################################################
 class _NativeLoop:
 
@@ -553,14 +536,12 @@ class _NativeLoop:
         self.requests.append(request)
         return self.result
 
-
 ###############################################################################
 class _SettingsRepo:
 
     # -------------------------------------------------------------------------
     def get_or_create(self) -> _Settings:
         return _Settings()
-
 
 ###############################################################################
 class _SearchOrchestrator:
@@ -588,6 +569,13 @@ class _SearchOrchestrator:
             bounds=[12.0, 41.0, 13.0, 42.0],
         )
 
+###############################################################################
+class _NoResultSearchOrchestrator(_SearchOrchestrator):
+
+    # -------------------------------------------------------------------------
+    async def execute(self, payload):  # noqa: ANN001
+        self.requests.append(payload)
+        return None
 
 ###############################################################################
 class _WarningSearchOrchestrator(_SearchOrchestrator):
@@ -607,7 +595,6 @@ class _WarningSearchOrchestrator(_SearchOrchestrator):
         if warnings:
             session.compliance_warnings = warnings
         return session
-
 
 ###############################################################################
 class _FailingCatalog:
@@ -646,7 +633,6 @@ class _FailingCatalog:
             "error": {"code": "provider_error", "message": "Upstream provider failed."},
             "metadata": {},
         }
-
 
 ###############################################################################
 class _DirectResultCatalog:
@@ -691,6 +677,19 @@ class _DirectResultCatalog:
             "metadata": {},
         }
 
+###############################################################################
+class _VisualizationOnlyPlanner:
+
+    # -------------------------------------------------------------------------
+    def build_plan(self, turn, specialist, memory_snapshot=None):  # noqa: ANN001
+        _ = turn, memory_snapshot
+        return ToolPlan(
+            tool_group=specialist,
+            candidate_tools=[],
+            selected_tools=[],
+            steps=[],
+            visualization_update={"basemap_replacement": "osm_default"},
+        )
 
 ###############################################################################
 def test_orchestrator_uses_verified_tool_map_session() -> None:
@@ -755,7 +754,6 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
     async def _run() -> None:
@@ -812,7 +810,6 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> None:
     async def _run() -> None:
@@ -864,7 +861,6 @@ def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> 
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap() -> None:
     async def _run() -> None:
@@ -907,7 +903,6 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
         assert response.map_session.overlay_ids == []
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session() -> None:
@@ -952,7 +947,6 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainviewer() -> None:
     async def _run() -> None:
@@ -994,7 +988,6 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -> None:
     async def _run() -> None:
@@ -1033,7 +1026,6 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
         assert response.map_session.overlay_ids == ["openaq_air_quality"]
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning() -> None:
@@ -1077,7 +1069,6 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
         assert "Missing credential" in response.map_session.compliance_warnings[0]
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
@@ -1210,7 +1201,6 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
         assert response.map_session.overlay_ids == ["traffic_overlay", "rain_overlay"]
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_order() -> None:
@@ -1349,7 +1339,6 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() -> None:
     async def _run() -> None:
@@ -1418,7 +1407,6 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() -> None:
     async def _run() -> None:
@@ -1477,7 +1465,6 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
         assert response.map_session.overlay_ids == ["tomtom_traffic_flow"]
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_updates_active_location_when_user_switches_places() -> None:
@@ -1546,7 +1533,6 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_without_clarification() -> None:
     async def _run() -> None:
@@ -1595,7 +1581,6 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
         assert response.decision.plan.state != "clarify"
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
@@ -1674,7 +1659,6 @@ def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_returns_clarification_operation_for_preflight_question() -> None:
     async def _run() -> None:
@@ -1713,7 +1697,6 @@ def test_orchestrator_returns_clarification_operation_for_preflight_question() -
 
     asyncio.run(_run())
 
-
 ###############################################################################
 def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
     async def _run() -> None:
@@ -1751,7 +1734,6 @@ def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
         assert "policy constraints" in response.operation.message.lower()
 
     asyncio.run(_run())
-
 
 ###############################################################################
 def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool() -> None:
@@ -1813,6 +1795,61 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
 
     asyncio.run(_run())
 
+###############################################################################
+def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session() -> None:
+    async def _run() -> None:
+        policy = _Policy()
+        history = _HistoryRepo()
+        search_orchestrator = _NoResultSearchOrchestrator()
+        native_loop = _NativeLoop(
+            AgentToolLoopResult(
+                final_text="unused",
+                tool_calls=[],
+                tool_results=[],
+                iterations=0,
+                stopped_reason="final",
+            )
+        )
+        orchestrator = AgentOrchestrator(
+            search_orchestrator=search_orchestrator,  # type: ignore[arg-type]
+            parser_service=_Parser(),  # type: ignore[arg-type]
+            location_memory_service=LocationMemoryService(),
+            policy_engine=policy,  # type: ignore[arg-type]
+            tool_registry=ToolRegistry(),
+            request_builder=__import__(
+                "server.services.search.request_builder",
+                fromlist=["RequestBuilder"],
+            ).RequestBuilder(),
+            native_tool_loop=native_loop,  # type: ignore[arg-type]
+            settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+            history_repo=history,  # type: ignore[arg-type]
+            tool_planner=_VisualizationOnlyPlanner(),  # type: ignore[arg-type]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message=(
+                    "Show a basemap of Rome, Italy and summarize the available "
+                    "public geospatial layers."
+                )
+            )
+        )
+
+        assert response.operation is not None
+        assert response.operation.kind == "error"
+        assert response.operation.status == "failed"
+        assert response.map_session is None
+        assert "could not create a map session" in response.operation.message.lower()
+        assert response.assistant_message == response.operation.message
+        assert response.decision.plan.state == "direct_response"
+        assert response.decision.plan.mode is None
+        assert response.memory_snapshot == {}
+        assert search_orchestrator.requests
+        assert native_loop.requests == []
+        assert history.messages[-1]["structured_payload"]["operation"]["status"] == "failed"
+        assert history.messages[-1]["map_session"] is None
+
+    asyncio.run(_run())
 
 ###############################################################################
 def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:

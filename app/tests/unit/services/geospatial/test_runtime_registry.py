@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class _CredentialRepo:
 
@@ -17,14 +16,12 @@ class _CredentialRepo:
             return object()
         return None
 
-
 ###############################################################################
 def test_runtime_registry_reads_profiles() -> None:
     registry = RuntimeRegistry()
     snapshot = registry.build_snapshot()
     assert "osm_default" in snapshot.profiles
     assert registry.is_enabled("osm_default")
-
 
 ###############################################################################
 def test_runtime_profiles_cover_all_capabilities() -> None:
@@ -39,7 +36,6 @@ def test_runtime_profiles_cover_all_capabilities() -> None:
     missing = sorted(capability_id for capability_id in all_capability_ids if capability_id not in runtime_profiles)
     assert not missing
 
-
 ###############################################################################
 def test_key_required_providers_are_unavailable_without_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
@@ -50,7 +46,6 @@ def test_key_required_providers_are_unavailable_without_saved_credentials(monkey
     assert not registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "missing_credentials"
     assert not registry.credentials_present("geoapify_osm")
-
 
 ###############################################################################
 def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:

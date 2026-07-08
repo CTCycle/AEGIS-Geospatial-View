@@ -13,7 +13,6 @@ from server.repositories.database.orm_table_operations import (
     SqlAlchemyTableOperationsMixin,
 )
 
-
 ###############################################################################
 class PostgresRepository(SqlAlchemyTableOperationsMixin):
     warn_on_missing_table = False

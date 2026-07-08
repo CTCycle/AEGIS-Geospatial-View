@@ -20,6 +20,19 @@ const DEFAULT_CHAT_PANEL_RATIO = 0.3;
 
 export interface PersistedChatPanelState {
   sessionId?: number;
+  conversationId?: string;
+  activeRunId?: string;
+  activeRunVersion?: number;
+  lastRunEventId?: string;
+  streamState?: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'failed';
+  progressStage?: string;
+  progressLabel?: string;
+  steeringMessages?: Array<{
+    content: string;
+    createdAt: string;
+    runVersion?: number;
+  }>;
+  seenRunEventIds?: string[];
   conversationNonce: number;
   messages: ChatMessage[];
   lastDecision?: PolicyDecision;
@@ -71,6 +84,8 @@ const isPersistedChatMessage = (value: unknown): value is ChatMessage => (
   && isChatRole(value.role)
   && typeof value.content === 'string'
   && (value.created_at === undefined || typeof value.created_at === 'string')
+  && (value.kind === undefined || value.kind === 'normal' || value.kind === 'steering' || value.kind === 'system_progress')
+  && (value.runVersion === undefined || typeof value.runVersion === 'number')
 );
 
 const parseBooleanRecord = (value: unknown): Record<string, boolean> => {
@@ -107,6 +122,8 @@ const parsePersistedMessages = (value: unknown): ChatMessage[] => {
       role: entry.role,
       content: entry.content,
       created_at: typeof entry.created_at === 'string' ? entry.created_at : undefined,
+      kind: entry.kind,
+      runVersion: entry.runVersion,
     }));
 };
 
@@ -126,6 +143,15 @@ export const defaultAppState = (): PersistedAppState => ({
     payload: undefined,
     chatPanel: {
       sessionId: undefined,
+      conversationId: undefined,
+      activeRunId: undefined,
+      activeRunVersion: undefined,
+      lastRunEventId: undefined,
+      streamState: 'idle',
+      progressStage: undefined,
+      progressLabel: undefined,
+      steeringMessages: [],
+      seenRunEventIds: [],
       conversationNonce: 1,
       messages: [],
       lastDecision: undefined,
@@ -133,7 +159,7 @@ export const defaultAppState = (): PersistedAppState => ({
       memorySnapshot: {},
         mapSession: undefined,
         contextUsage: undefined,
-      status: 'Idle',
+      status: 'Agent ready',
       assistantDraft: '',
       composerDraft: '',
       transcriptScrollTop: 0,
@@ -266,6 +292,35 @@ export const loadPersistedAppState = (): PersistedAppState => {
           sessionId: typeof parsed.chatPage.chatPanel.sessionId === 'number'
             ? parsed.chatPage.chatPanel.sessionId
             : undefined,
+          conversationId: typeof parsed.chatPage.chatPanel.conversationId === 'string'
+            ? parsed.chatPage.chatPanel.conversationId
+            : undefined,
+          activeRunId: typeof parsed.chatPage.chatPanel.activeRunId === 'string'
+            ? parsed.chatPage.chatPanel.activeRunId
+            : undefined,
+          activeRunVersion: typeof parsed.chatPage.chatPanel.activeRunVersion === 'number'
+            ? parsed.chatPage.chatPanel.activeRunVersion
+            : undefined,
+          lastRunEventId: typeof parsed.chatPage.chatPanel.lastRunEventId === 'string'
+            ? parsed.chatPage.chatPanel.lastRunEventId
+            : undefined,
+          streamState: typeof parsed.chatPage.chatPanel.streamState === 'string'
+            ? parsed.chatPage.chatPanel.streamState as PersistedChatPanelState['streamState']
+            : 'idle',
+          progressStage: typeof parsed.chatPage.chatPanel.progressStage === 'string'
+            ? parsed.chatPage.chatPanel.progressStage
+            : undefined,
+          progressLabel: typeof parsed.chatPage.chatPanel.progressLabel === 'string'
+            ? parsed.chatPage.chatPanel.progressLabel
+            : undefined,
+          steeringMessages: Array.isArray(parsed.chatPage.chatPanel.steeringMessages)
+            ? parsed.chatPage.chatPanel.steeringMessages
+                .filter((entry) => isRecord(entry) && typeof entry.content === 'string' && typeof entry.createdAt === 'string')
+                .slice(-20) as PersistedChatPanelState['steeringMessages']
+            : [],
+          seenRunEventIds: Array.isArray(parsed.chatPage.chatPanel.seenRunEventIds)
+            ? parsed.chatPage.chatPanel.seenRunEventIds.filter((entry) => typeof entry === 'string').slice(-100)
+            : [],
           conversationNonce: typeof parsed.chatPage.chatPanel.conversationNonce === 'number'
             ? parsed.chatPage.chatPanel.conversationNonce
             : 1,

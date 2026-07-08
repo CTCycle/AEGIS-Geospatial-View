@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)](./app/server/pyproject.toml)
 [![Angular](https://img.shields.io/badge/Angular-19.2-red?logo=angular&logoColor=white)](./app/client/package.json)
 [![License](https://img.shields.io/github/license/CTCycle/AEGIS-geographics)](./LICENSE)
-[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml)
+[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml?query=branch%3Adevelop)
 
 
 AEGIS Geospatial View is a place-focused workspace built around conversation.
@@ -125,7 +125,7 @@ Typical tasks here include:
 
 - switching between cloud and local mode
 - searching for available models
-- assigning model roles
+- selecting one agent model for structured extraction, orchestration, tool calling, and chat
 - checking local model connectivity
 - refreshing available local models
 - pulling a model when needed
@@ -181,6 +181,12 @@ The repository is split into a few broad areas:
 - `app/resources` for local data and supporting files
 - `app/tests` for automated checks
 - `settings` for environment-specific configuration
+
+## Desktop Artifact Hygiene
+
+`app/src-tauri` is a versioned source area. Keep source code, Tauri configuration, Cargo metadata, capabilities, and icons there. Do not commit generated desktop build output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, or `app/src-tauri/gen`.
+
+Windows installers, portable `.exe` exports, and other packaged desktop artifacts belong in `release/windows` only as generated release output. They should be published through GitHub release artifacts and workflow uploads, not tracked in Git.
 
 ## License
 

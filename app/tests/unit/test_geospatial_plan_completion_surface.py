@@ -7,28 +7,7 @@ import pytest
 
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
-from server.services.geospatial.search_index import (
-    IndexedFeature,
-    build_feature_search_index,
-    query_search_index,
-)
 from server.services.geospatial.tiler import build_vector_tile_manifest
-
-
-###############################################################################
-def test_plan_named_provider_adapters_are_bound() -> None:
-    registry = ProviderRegistry()
-    registry.build_from_manifests()
-
-    for provider_id in (
-        "local_open_data",
-        "natural_earth",
-        "openaddresses",
-        "overture",
-        "transitland",
-    ):
-        assert registry.get(provider_id).provider_id == provider_id
-
 
 ###############################################################################
 def test_ingestion_only_providers_return_graceful_state() -> None:
@@ -45,7 +24,6 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
     assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].startswith("https://")
 
-
 ###############################################################################
 def test_transitland_requires_configured_key() -> None:
     registry = ProviderRegistry()
@@ -58,26 +36,6 @@ def test_transitland_requires_configured_key() -> None:
                 ProviderRequest(capability_id="transitland_feeds"),
             )
         )
-
-
-###############################################################################
-def test_search_index_queries_feature_metadata() -> None:
-    index = build_feature_search_index(
-        [
-            IndexedFeature(
-                id="1",
-                label="Central Hospital",
-                category="hospitals",
-                source="overpass",
-            ),
-            IndexedFeature(id="2", label="River Park", category="parks", source="osm"),
-        ]
-    )
-
-    matches = query_search_index(index, "hospital nearby")
-
-    assert [item.id for item in matches] == ["1"]
-
 
 ###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:

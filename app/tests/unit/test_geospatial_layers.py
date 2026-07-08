@@ -6,7 +6,6 @@ from server.services.geospatial.layers import (
     build_geospatial_layer_catalog,
 )
 
-
 ###############################################################################
 def test_geospatial_layer_catalog_comes_from_reference_entries() -> None:
     service = LayerProviderService(
@@ -28,13 +27,11 @@ def test_geospatial_layer_catalog_comes_from_reference_entries() -> None:
     assert entry.label == "Active Fires (MODIS, Daily)"
     assert entry.provider_name == "MODIS_Combined_Thermal_Anomalies_All"
 
-
 ###############################################################################
 def test_geospatial_layer_service_without_catalog_has_no_entries() -> None:
     service = LayerProviderService()
 
     assert service.list_options() == {}
-
 
 ###############################################################################
 def test_build_geospatial_layer_catalog_uses_reference_repository(monkeypatch) -> None:

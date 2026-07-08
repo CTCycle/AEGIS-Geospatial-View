@@ -1,18 +1,24 @@
 # Agentic Search
 
-Last updated: 2026-06-06
+Last updated: 2026-06-24
 
 ## Summary
 
 The chat workflow separates structured parsing from provider-native tool calling:
 
-1. `ParserService` emits evidence-oriented `TurnParseResult`.
-2. `PolicyEngine` adds constraints, authorization checks, and audit metadata.
-3. `AgentToolCatalogService` exposes stable geospatial catalog tools.
-4. `NativeToolLoop` sends those tools to the selected provider through native tool-calling APIs.
-5. The model decides exact tool names and arguments.
-6. `ToolRegistry` executes exact emitted tool names and returns structured tool-result messages.
-7. The loop continues until final text or a production limit is reached.
+1. `ParserService` emits evidence-oriented `TurnParseResult`, including prompt relationship, entity/layer targets, basemap changes, ambiguities, and frontend update type.
+2. A volatile task ledger records the supervised task and follow-up relationship.
+3. Semantic layer concepts are resolved against enabled manifest metadata before planning.
+4. Deterministic routing selects a narrow specialist group.
+5. A typed tool plan fixes capability IDs, arguments, dependencies, timeouts, retries, validation, and merge behavior before execution.
+6. `PolicyEngine` restricts both tool names and executable capability IDs.
+7. Known capabilities execute through `ToolPlanExecutor`; catalog discovery uses the bounded native tool loop.
+8. Verified results update the map, task status, and structured diagnostics.
+9. The configured agent model converts only those verified results into concise Markdown, with deterministic text retained as fallback.
+
+Residential-building requests use `overpass_residential_buildings`; amenities
+remain separate. Satellite language selects the imagery basemap unless the user
+explicitly requests an imagery data layer.
 
 No legacy routing compatibility is preserved.
 
@@ -28,8 +34,26 @@ No legacy routing compatibility is preserved.
 - ambiguities
 - disallowed patterns
 - parser confidence
+- task relationship and atomic tasks
+- map/entity targets, requested layers, basemap, and attributes
+- tool requirement/category and expected frontend update
+- capability limitations and parser-recursion signal
+- an optional generic clarification plan describing blocking fields, choices, and whether valid visualization changes may be applied before clarification
 
 It does not contain provider-specific tool schemas, concrete executable tool names, or final map payloads.
+
+## Capability Resolution
+
+Parser output may contain semantic concepts such as `precipitation`; only
+manifest IDs may enter an executable tool plan. Exact enabled IDs are preserved.
+Semantic concepts are ranked against capability names, descriptions, keywords,
+planner hints, rendering modes, and temporal compatibility.
+
+Current radar requests prefer `rainviewer_precipitation_radar`, rainfall-rate
+requests prefer `IMERG_Precipitation_Rate`, and forecast requests prefer
+`openmeteo_weather_forecast`. Historical monthly precipitation means are not
+available in the current catalog, so those requests produce a structured
+clarification with supported current and forecast alternatives.
 
 ## Stable Action Catalog
 
@@ -53,6 +77,7 @@ Unknown or low-confidence classifications normalize to `unknown` before policy s
 - `list_geospatial_capabilities`
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
+- `fetch_geospatial_provider_layers` for explicitly routed and provider-allowlisted discovery only
 
 Catalog responses are deterministic, permission-aware, and capped at 50 items per page.
 
@@ -91,6 +116,7 @@ Stable high-level fields:
 - `clarification`
 - `rejection`
 - `error`
+- `failure_diagnostic`
 
 `operation.status` values:
 
@@ -107,3 +133,8 @@ Current behavior:
 - parser, provider, validation, and timeout failures return `operation.kind = "error"`
 
 `tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.
+
+`assistant_message` is Markdown-capable user-facing text. The response model is
+grounded with the verified operation, map summary, direct result, warnings,
+clarification requirements, and task state. It must not invent facts or expose
+internal identifiers.

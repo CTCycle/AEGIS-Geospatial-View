@@ -7,7 +7,6 @@ from server.domain.chat import (
 )
 from server.services.chat.maintenance_service import ChatMaintenanceService
 
-
 ###############################################################################
 def test_maintenance_service_delegates_to_ollama_provider() -> None:
     provider_calls: list[tuple[str, str | None]] = []

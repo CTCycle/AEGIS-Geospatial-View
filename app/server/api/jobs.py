@@ -17,11 +17,9 @@ from server.services.jobs import BackgroundJobService
 
 router = APIRouter(prefix=JOBS_ROUTER_PREFIX, tags=["jobs"])
 
-
 ###############################################################################
 def get_job_service(request: Request) -> BackgroundJobService:
     return request.app.state.job_service
-
 
 ###############################################################################
 @router.get(JOBS_JOB_ROUTE, response_model=BackgroundJobStatusResponse, status_code=status.HTTP_200_OK)
@@ -33,7 +31,6 @@ async def get_job(
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}")
     return job
-
 
 ###############################################################################
 @router.get(
@@ -49,7 +46,6 @@ async def get_job_events(
     if events is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job not found: {job_id}")
     return events
-
 
 ###############################################################################
 @router.post(

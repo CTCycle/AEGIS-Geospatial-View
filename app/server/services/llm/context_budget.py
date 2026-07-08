@@ -10,7 +10,6 @@ MIN_OLLAMA_CONTEXT_WINDOW = 2048
 CONTEXT_HEADROOM_TOKENS = 512
 CONTEXT_WINDOW_STEP = 512
 
-
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, str]]) -> int:
     total = 0
@@ -21,7 +20,6 @@ def estimate_message_tokens(messages: list[dict[str, str]]) -> int:
         # plus a small per-message role/formatting overhead.
         total += max(1, math.ceil((len(role) + len(content)) / 4)) + 4
     return max(total, 1)
-
 
 ###############################################################################
 def resolve_model_context_limit(model: str) -> int:
@@ -46,7 +44,6 @@ def resolve_model_context_limit(model: str) -> int:
             return limit
     return DEFAULT_MODEL_CONTEXT_LIMIT
 
-
 ###############################################################################
 def compute_ollama_context_usage(request: LLMRequest) -> ContextUsage:
     estimated = estimate_message_tokens(request.messages)
@@ -63,7 +60,6 @@ def compute_ollama_context_usage(request: LLMRequest) -> ContextUsage:
         provider="ollama",
         model=request.model,
     )
-
 
 ###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:

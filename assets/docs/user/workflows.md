@@ -1,6 +1,6 @@
 # Workflows
 
-Last updated: 2026-06-02
+Last updated: 2026-06-25
 
 ## Core Journeys
 
@@ -46,4 +46,4 @@ Last updated: 2026-06-02
 - manifest-backed geodata overview
 - session persistence within the same tab
 - optional provider-key workflows
-- configurable model roles
+- one selectable agent model for extraction, orchestration, tools, and responses

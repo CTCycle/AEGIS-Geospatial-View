@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.domain.extraction.models import NormalizedAction
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.extraction.models import NormalizedAction, ViewportIntent
 from server.services.search.request_builder import RequestBuilder
-
 
 ###############################################################################
 def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
@@ -18,14 +17,20 @@ def test_request_builder_uses_wide_radius_for_city_level_intent() -> None:
         ),
     )
 
-    assert viewport.radius_m == 25000.0
-
+    assert viewport.radius_m == 18000.0
 
 ###############################################################################
 def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
     builder = RequestBuilder()
     viewport = builder.build_viewport(
-        ResolvedLocation(label="1600 Pennsylvania Avenue", latitude=38.8976387, longitude=-77.0365528),
+        ResolvedLocation(
+            label="1600 Pennsylvania Avenue",
+            latitude=38.8976387,
+            longitude=-77.0365528,
+            location_type="house",
+            location_class="building",
+            bbox=[-77.0370, 38.8972, -77.0362, 38.8980],
+        ),
         NormalizedAction(
             action_id="show_exact_address_map",
             action_label="Show exact address map",
@@ -34,20 +39,99 @@ def test_request_builder_uses_tighter_radius_for_exact_address_intent() -> None:
         ),
     )
 
-    assert viewport.radius_m == 1000.0
-
+    assert viewport.radius_m <= 350.0
+    assert viewport.bbox is not None
 
 ###############################################################################
-def test_request_builder_plan_path_preserves_city_scale_hint() -> None:
-    request = RequestBuilder().build_location_search_request(
-        ExecutionPlan(
-            state="map_search",
-            mode="map",
-            action_id="show_city_map_berlin",
-            basemap_id="osm_default",
-            overlay_ids=[],
+def test_request_builder_prefers_explicit_viewport_intent_over_generic_defaults() -> None:
+    builder = RequestBuilder()
+    viewport = builder.build_viewport(
+        ResolvedLocation(label="Genoa", latitude=44.4056, longitude=8.9463),
+        NormalizedAction(
+            action_id="map_search",
+            action_label="General map request",
+            task_tags=["map"],
+            action_tags=[],
         ),
-        ResolvedLocation(label="Berlin", latitude=52.5173885, longitude=13.3951309),
+        viewport_intent=ViewportIntent(scope="street", reason="local_area_request"),
     )
 
-    assert request.viewport.radius_m == 25000.0
+    assert viewport.radius_m == 350.0
+
+###############################################################################
+def test_request_builder_tightens_relative_to_active_viewport() -> None:
+    builder = RequestBuilder()
+    viewport = builder.build_viewport(
+        ResolvedLocation(label="Genoa", latitude=44.4056, longitude=8.9463),
+        NormalizedAction(
+            action_id="map_search",
+            action_label="General map request",
+            task_tags=["map"],
+            action_tags=[],
+        ),
+        viewport_intent=ViewportIntent(
+            scope="street",
+            tighten_relative_to_active=True,
+            reason="explicit_tighter_view",
+        ),
+        active_visualization={
+            "viewport": {
+                "center_latitude": 44.4056,
+                "center_longitude": 8.9463,
+                "radius_m": 2500.0,
+            }
+        },
+    )
+
+    assert viewport.radius_m < 2500.0
+    assert viewport.radius_m <= 875.0
+
+###############################################################################
+def test_request_builder_uses_geocoder_bbox_when_parser_intent_is_absent() -> None:
+    builder = RequestBuilder()
+    viewport = builder.build_viewport(
+        ResolvedLocation(
+            label="Via Pisa, Genoa",
+            latitude=44.4056,
+            longitude=8.9463,
+            location_type="road",
+            location_class="highway",
+            bbox=[8.9448, 44.4049, 8.9474, 44.4061],
+        ),
+        NormalizedAction(
+            action_id="map_search",
+            action_label="General map request",
+            task_tags=["map"],
+            action_tags=[],
+        ),
+    )
+
+    assert viewport.bbox is not None
+    assert viewport.radius_m <= 400.0
+
+###############################################################################
+def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up() -> None:
+    builder = RequestBuilder()
+    viewport = builder.build_viewport(
+        ResolvedLocation(label="Genoa", latitude=44.4056, longitude=8.9463),
+        NormalizedAction(
+            action_id="map_search",
+            action_label="General map request",
+            task_tags=["map"],
+            action_tags=[],
+        ),
+        viewport_intent=ViewportIntent(scope="preserve_current", reason="basemap_only_follow_up"),
+        active_visualization={
+            "viewport": {
+                "center_latitude": 44.4056,
+                "center_longitude": 8.9463,
+                "radius_m": 640.0,
+                "bbox": [8.94, 44.40, 8.95, 44.41],
+            }
+        },
+    )
+
+    assert viewport.radius_m == 640.0
+    assert viewport.bbox == [8.94, 44.4, 8.95, 44.41]
+
+

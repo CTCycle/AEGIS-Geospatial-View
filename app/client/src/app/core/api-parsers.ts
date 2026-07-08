@@ -5,12 +5,11 @@ import {
   GeospatialProviderAccountSetup,
   GeospatialProviderAccountSetupListResponse,
   GeospatialProviderLayerDescriptor,
-  GeospatialProviderLayerResponse,
-  GeospatialProviderLayersResponse,
   JsonValue,
   MapOverlayEntry,
   MapSession,
   ModelCardDescriptor,
+  ModelLibraryResponse,
   ModelSettingsResponse,
 } from './types';
 import { isRecord, isStringArray } from './type-guards';
@@ -317,6 +316,15 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
     bounds: Array.isArray(value.bounds) ? value.bounds as number[] : undefined,
     basemap: isRecord(value.basemap) ? value.basemap as MapSession['basemap'] : undefined,
     overlays,
+    requested_overlay_ids: isStringArray(value.requested_overlay_ids) ? value.requested_overlay_ids : undefined,
+    rendered_overlay_ids: isStringArray(value.rendered_overlay_ids)
+      ? value.rendered_overlay_ids
+      : overlays.map((overlay) => overlay.id),
+    failed_overlays: Array.isArray(value.failed_overlays)
+      ? value.failed_overlays.filter((item): item is { id: string; reason: string } => (
+        isRecord(item) && typeof item.id === 'string' && typeof item.reason === 'string'
+      ))
+      : [],
     compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
   };
 };
@@ -344,47 +352,6 @@ const parseProviderLayerDescriptor = (value: unknown): GeospatialProviderLayerDe
     render: normalizeLayerRenderDescriptor(value.render),
     attribution: isStringArray(value.attribution) ? value.attribution : [],
     warnings: isStringArray(value.warnings) ? value.warnings : [],
-  };
-};
-
-export const parseGeospatialProviderLayers = (
-  value: unknown,
-): GeospatialProviderLayersResponse => {
-  const record = isRecord(value) ? value : {};
-  return {
-    provider: String(record.provider ?? ''),
-    layers: Array.isArray(record.layers)
-      ? record.layers.map(parseProviderLayerDescriptor).filter((item): item is GeospatialProviderLayerDescriptor => item !== null)
-      : [],
-    warnings: isStringArray(record.warnings) ? record.warnings : [],
-  };
-};
-
-export const parseGeospatialProviderLayer = (
-  value: unknown,
-): GeospatialProviderLayerResponse => {
-  const record = isRecord(value) ? value : {};
-  const layer = parseProviderLayerDescriptor(record.layer);
-  return {
-    provider: String(record.provider ?? layer?.provider ?? ''),
-    layer: layer ?? {
-      provider: String(record.provider ?? ''),
-      layer_id: '',
-      title: '',
-      rendering_mode: 'metadata-only',
-      source_protocol: 'provider-api',
-      data_format: '',
-      geometry_type: '',
-      queryable: false,
-      crs: [],
-      formats: [],
-      styles: [],
-      tile_matrix_sets: [],
-      render: null,
-      attribution: [],
-      warnings: ['Provider layer response was empty or malformed.'],
-    },
-    warnings: isStringArray(record.warnings) ? record.warnings : [],
   };
 };
 
@@ -450,6 +417,27 @@ export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
     });
 };
 
+export const parseModelLibrarySources = (
+  input: unknown,
+): ModelLibraryResponse['sources'] => {
+  if (!isRecord(input)) {
+    return {};
+  }
+  const sources: ModelLibraryResponse['sources'] = {};
+  Object.entries(input).forEach(([key, value]) => {
+    if (!isRecord(value)) {
+      return;
+    }
+    sources[key] = {
+      ok: Boolean(value.ok),
+      reachable: typeof value.reachable === 'boolean' ? value.reachable : null,
+      message: typeof value.message === 'string' ? value.message : null,
+      model_count: typeof value.model_count === 'number' ? value.model_count : null,
+    };
+  });
+  return sources;
+};
+
 export const parseCatalogResponse = (value: unknown): CatalogResponse => {
   if (!isRecord(value)) {
     throw new Error('Unexpected catalog response format');
@@ -477,14 +465,10 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     throw new Error('Unexpected settings response format');
   }
   return {
-    active_provider_mode: (value.active_provider_mode === 'cloud' ? 'cloud' : 'local'),
-    chat_model_provider: String(value.chat_model_provider ?? 'ollama'),
-    chat_model_name: String(value.chat_model_name ?? ''),
-    parser_model_provider: String(value.parser_model_provider ?? 'ollama'),
-    parser_model_name: String(value.parser_model_name ?? ''),
-    agent_model_provider: String(value.agent_model_provider ?? 'ollama'),
+    active_provider_mode: (value.active_provider_mode === 'local' ? 'local' : 'cloud'),
+    agent_model_provider: String(value.agent_model_provider ?? ''),
     agent_model_name: String(value.agent_model_name ?? ''),
-    ollama_url: String(value.ollama_url ?? 'http://localhost:11434'),
+    ollama_url: String(value.ollama_url ?? 'http://127.0.0.1:11434'),
     openai_base_url: typeof value.openai_base_url === 'string' ? value.openai_base_url : null,
     google_base_url: typeof value.google_base_url === 'string' ? value.google_base_url : null,
     deepseek_base_url: typeof value.deepseek_base_url === 'string' ? value.deepseek_base_url : null,
@@ -519,5 +503,13 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
     map_session: normalizeMapSession(value.map_session),
     memory_snapshot: isRecord(value.memory_snapshot) ? value.memory_snapshot as Record<string, JsonValue> : {},
     context_usage: parseContextUsage(value.context_usage),
+    task_snapshot: isRecord(value.task_snapshot) ? value.task_snapshot as unknown as ChatTurnResponse['task_snapshot'] : undefined,
+    tool_plan: isRecord(value.tool_plan) ? value.tool_plan as unknown as ChatTurnResponse['tool_plan'] : undefined,
+    failure_diagnostic: isRecord(value.failure_diagnostic)
+      ? value.failure_diagnostic as unknown as ChatTurnResponse['failure_diagnostic']
+      : undefined,
+    visualization_update: isRecord(value.visualization_update)
+      ? value.visualization_update as unknown as ChatTurnResponse['visualization_update']
+      : undefined,
   };
 };

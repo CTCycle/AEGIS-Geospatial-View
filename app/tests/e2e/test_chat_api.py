@@ -3,36 +3,30 @@ from __future__ import annotations
 import json
 
 import pytest
-from playwright.sync_api import APIRequestContext
-
+from playwright.sync_api import APIRequestContext, Error as PlaywrightError
 
 ###############################################################################
 def _post(api_context: APIRequestContext, path: str, payload: dict):
     return api_context.post(path, data=payload)
 
-
 ###############################################################################
 def _get(api_context: APIRequestContext, path: str):
     return api_context.get(path)
 
-
 ###############################################################################
 def _put(api_context: APIRequestContext, path: str, payload: dict):
     return api_context.put(path, data=payload)
-
 
 ###############################################################################
 def _require_provider_or_skip(response) -> None:  # noqa: ANN001
     if response.status in {400, 502, 503}:
         pytest.skip(f"Providers unavailable for this check ({response.status}).")
 
-
 ###############################################################################
-def _require_parser_or_skip(body: dict) -> None:
+def _require_agent_extraction_or_skip(body: dict) -> None:
     assistant_text = str(body.get("assistant_message") or "").lower()
-    if "configured parser model is unavailable" in assistant_text:
-        pytest.skip("Configured parser model is unavailable for this check.")
-
+    if "configured agent model" in assistant_text and "structured extraction" in assistant_text:
+        pytest.skip("Configured agent model cannot perform structured extraction for this check.")
 
 ###############################################################################
 def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) -> None:
@@ -49,14 +43,14 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
 
     update_payload = {
         **base_body,
-        "parser_model_provider": "ollama",
-        "parser_model_name": "llama3.2",
+        "agent_model_provider": "ollama",
+        "agent_model_name": "llama3.2",
         "ollama_url": base_body.get("ollama_url", "http://localhost:11434"),
         "credentials": {"openai": {"api_key": "sk-test-value"}},
     }
     updated = _put(api_context, "/api/chat/settings", update_payload)
     if updated.status == 422:
-        pytest.skip("Requested local parser model is unavailable for this check.")
+        pytest.skip("Requested local agent model is unavailable for this check.")
     assert updated.ok
     updated_body = updated.json()
     assert updated_body["credentials"]["openai"]["api_key"] is True
@@ -67,7 +61,6 @@ def test_chat_settings_crud_and_prefix_parity(api_context: APIRequestContext) ->
 
     restored = _put(api_context, "/api/chat/settings", base_body)
     assert restored.ok
-
 
 ###############################################################################
 def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) -> None:
@@ -81,7 +74,6 @@ def test_chat_settings_invalid_payload_handling(api_context: APIRequestContext) 
         body = response.json()
         assert "active_provider_mode" in body
 
-
 ###############################################################################
 def test_chat_models_with_prefix_parity(
     api_context: APIRequestContext,
@@ -94,7 +86,6 @@ def test_chat_models_with_prefix_parity(
     assert isinstance(base_body.get("cloud"), list)
     assert isinstance(base_body.get("local"), list)
     assert set(base_body.keys()) == set(prefixed_body.keys())
-
 
 ###############################################################################
 def test_chat_turn_stream_event_order_and_contract_parity(
@@ -154,7 +145,6 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     _require_provider_or_skip(prefixed_stream)
     assert prefixed_stream.ok
 
-
 ###############################################################################
 def test_chat_turn_coordinate_lookup_and_follow_up(
     api_context: APIRequestContext,
@@ -167,7 +157,7 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(geocode_response)
     assert geocode_response.ok
     geocode_body = geocode_response.json()
-    _require_parser_or_skip(geocode_body)
+    _require_agent_extraction_or_skip(geocode_body)
     assert geocode_body.get("map_session") is None
     assistant_text = str(geocode_body.get("assistant_message") or "").lower()
     assert (
@@ -185,12 +175,11 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     _require_provider_or_skip(unsupported)
     assert unsupported.ok
     unsupported_body = unsupported.json()
-    _require_parser_or_skip(unsupported_body)
+    _require_agent_extraction_or_skip(unsupported_body)
     if unsupported_body.get("decision", {}).get("plan", {}).get("state") == "clarify":
         return
     assistant = str(unsupported_body.get("assistant_message") or "").lower()
     assert "weather" in assistant or "forecast" in assistant or "clarify" in assistant
-
 
 ###############################################################################
 def test_ollama_refresh_pull_health(api_context: APIRequestContext) -> None:

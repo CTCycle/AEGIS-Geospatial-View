@@ -9,7 +9,6 @@ from server.services.geospatial.providers.base import (
 )
 from server.services.geospatial.pvgis import PVGISError, PVGISService
 
-
 ###############################################################################
 class PVGISProvider(GeospatialProvider):
     provider_id = "pvgis"

@@ -33,7 +33,6 @@ GIBS_WMTS_REST_BASE_URL = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
 GIBS_WMS_BASE_URL = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi"
 GIBS_USER_AGENT = {"User-Agent": "AEGIS/1.0"}
 
-
 ###############################################################################
 @dataclass
 class ParsedGIBSLayer:
@@ -47,7 +46,6 @@ class ParsedGIBSLayer:
     time_extent: str | None = None
     default_time: str | None = None
     tile_matrix_sets: set[str] = field(default_factory=set)
-
 
 ###############################################################################
 class NASAGIBSProvider(GeospatialProvider):

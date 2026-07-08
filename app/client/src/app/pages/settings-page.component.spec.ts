@@ -11,6 +11,12 @@ import { SettingsPageComponent } from './settings-page.component';
 @Component({ template: '' })
 class TestRouteComponent {}
 
+const libraryResponse = (overrides: Partial<{ cloud: unknown[]; local: unknown[]; sources: Record<string, unknown> }> = {}) => ({
+  cloud: overrides.cloud ?? [],
+  local: overrides.local ?? [],
+  sources: overrides.sources ?? { ollama: { ok: true, reachable: true, model_count: 0, message: null } },
+});
+
 describe('pages/settings-page.component', () => {
   let router: Router;
   let store: jasmine.SpyObj<AppStateStoreService>;
@@ -40,24 +46,21 @@ describe('pages/settings-page.component', () => {
       'pullOllamaModel',
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo({
-      active_provider_mode: 'local',
-      chat_model_provider: 'ollama',
-      chat_model_name: 'llama3.2',
-      parser_model_provider: 'ollama',
-      parser_model_name: 'llama3.2',
-      agent_model_provider: 'ollama',
-      agent_model_name: 'llama3.2',
-      ollama_url: 'http://localhost:11434',
+      active_provider_mode: 'cloud',
+      agent_model_provider: '',
+      agent_model_name: '',
+      ollama_url: 'http://127.0.0.1:11434',
       openai_base_url: null,
       google_base_url: null,
       deepseek_base_url: null,
       credentials: {},
       credential_health: {},
     });
-    fetchChatModelsMock = jasmine.createSpy('fetchChatModels').and.resolveTo({
+    fetchChatModelsMock = jasmine.createSpy('fetchChatModels').and.resolveTo(libraryResponse({
       cloud: [{ id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', description: 'cloud', provider: 'openai', capabilities: [], metadata: {} }],
       local: [{ id: 'llama3.2', name: 'llama3.2', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
-    });
+      sources: { ollama: { ok: true, reachable: true, model_count: 1, message: null } },
+    }));
     updateChatSettingsMock = jasmine.createSpy('updateChatSettings').and.callFake(async (payload) => payload as never);
     checkOllamaHealthMock = jasmine.createSpy('checkOllamaHealth').and.resolveTo({ ok: true, detail: 'ok' });
     refreshOllamaModelsMock = jasmine.createSpy('refreshOllamaModels').and.resolveTo({});
@@ -119,13 +122,9 @@ describe('pages/settings-page.component', () => {
     window.history.replaceState({}, '', '/settings');
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: 'openai',
-      chat_model_name: 'gpt-4.1-mini',
-      parser_model_provider: 'openai',
-      parser_model_name: 'gpt-4.1-mini',
       agent_model_provider: 'openai',
       agent_model_name: 'gpt-4.1-mini',
-      ollama_url: 'http://localhost:11434',
+      ollama_url: 'http://127.0.0.1:11434',
       openai_base_url: null,
       google_base_url: null,
       deepseek_base_url: null,
@@ -134,14 +133,19 @@ describe('pages/settings-page.component', () => {
     });
     fetchChatModelsMock.and.callFake(async (provider?: string) => (
       provider === 'deepseek'
-        ? {
+        ? libraryResponse({
           cloud: [{ id: 'deepseek-v4-flash', name: 'deepseek-v4-flash', description: 'deepseek', provider: 'deepseek', capabilities: ['tools', 'structured_output'], supports_tools: true, supports_structured_output: true, metadata: {} }],
           local: [{ id: 'llama3.2', name: 'llama3.2', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
-        }
-        : {
+          sources: {
+            ollama: { ok: true, reachable: true, model_count: 1, message: null },
+            deepseek: { ok: true, model_count: 1, message: null },
+          },
+        })
+        : libraryResponse({
           cloud: [{ id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', description: 'cloud', provider: 'openai', capabilities: [], metadata: {} }],
           local: [{ id: 'llama3.2', name: 'llama3.2', description: 'local', provider: 'ollama', capabilities: [], metadata: {} }],
-        }
+          sources: { ollama: { ok: true, reachable: true, model_count: 1, message: null } },
+        })
     ));
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
@@ -152,6 +156,47 @@ describe('pages/settings-page.component', () => {
 
     expect(fetchChatModelsMock).toHaveBeenCalledWith('deepseek');
     expect(fixture.componentInstance.displayedModels.some((model) => model.provider === 'deepseek')).toBeTrue();
+  });
+
+  it('surfaces DeepSeek load failures instead of showing a silent empty state', async () => {
+    fetchChatSettingsMock.and.resolveTo({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'deepseek',
+      agent_model_name: 'deepseek-chat',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: { deepseek: { api_key: true } },
+      credential_health: { deepseek: { api_key: 'healthy' } },
+    });
+    fetchChatModelsMock.and.callFake(async (provider?: string) => (
+      provider === 'deepseek'
+        ? libraryResponse({
+          cloud: [],
+          local: [],
+          sources: {
+            ollama: { ok: false, reachable: false, model_count: 0, message: 'Unable to reach Ollama.' },
+            deepseek: { ok: false, model_count: 0, message: 'Could not load DeepSeek models right now.' },
+          },
+        })
+        : libraryResponse({
+          cloud: [{ id: 'gpt-4.1-mini', name: 'gpt-4.1-mini', description: 'cloud', provider: 'openai', capabilities: [], metadata: {} }],
+          local: [],
+          sources: { ollama: { ok: false, reachable: false, model_count: 0, message: 'Unable to reach Ollama.' } },
+        })
+    ));
+
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.setProviderFilter('deepseek');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.deepSeekLoadFailed).toBeTrue();
+    expect(fixture.componentInstance.statusText).toContain('Could not load DeepSeek models right now.');
+    expect(fixture.nativeElement.textContent).toContain('DeepSeek models could not be loaded.');
   });
 
   it('keeps the All provider filter active after the initial model load', async () => {
@@ -170,9 +215,18 @@ describe('pages/settings-page.component', () => {
     expect(fixture.componentInstance.displayedModels.length).toBeGreaterThan(0);
   });
 
+  it('does not show an unavailable Ollama assignment warning when nothing is selected', async () => {
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.unavailableAssignedOllamaModels).toEqual([]);
+    expect(fixture.nativeElement.textContent).not.toContain('Assigned local model unavailable.');
+  });
+
   it('keeps richer Ollama library descriptions for installed models', async () => {
     window.history.replaceState({}, '', '/settings');
-    fetchChatModelsMock.and.resolveTo({
+    fetchChatModelsMock.and.resolveTo(libraryResponse({
       cloud: [{
         id: 'gemma4',
         name: 'gemma4',
@@ -189,12 +243,83 @@ describe('pages/settings-page.component', () => {
         capabilities: [],
         metadata: { quantization: 'Q4_K_M' },
       }],
-    });
+      sources: { ollama: { ok: true, reachable: true, model_count: 1, message: null } },
+    }));
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const model = fixture.componentInstance.displayedModels.find((item) => item.id === 'gemma4:31b');
     expect(model?.description).toContain('Detailed library description');
+  });
+
+  it('does not treat cloud DeepSeek models as local when names overlap', async () => {
+    window.history.replaceState({}, '', '/settings');
+    fetchChatSettingsMock.and.resolveTo({
+      active_provider_mode: 'cloud',
+      agent_model_provider: '',
+      agent_model_name: '',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: { deepseek: { api_key: true } },
+      credential_health: { deepseek: { api_key: 'healthy' } },
+    });
+    fetchChatModelsMock.and.callFake(async (provider?: string) => (
+      provider === 'deepseek'
+        ? libraryResponse({
+          cloud: [{
+            id: 'deepseek-chat',
+            name: 'deepseek-chat',
+            description: 'cloud deepseek',
+            provider: 'deepseek',
+            capabilities: ['tools', 'structured_output'],
+            supports_tools: true,
+            supports_structured_output: true,
+            metadata: {},
+          }],
+          local: [{
+            id: 'deepseek-chat',
+            name: 'deepseek-chat',
+            description: 'local',
+            provider: 'ollama',
+            capabilities: ['tools', 'structured_output'],
+            supports_tools: true,
+            supports_structured_output: true,
+            metadata: {},
+          }],
+          sources: {
+            ollama: { ok: true, reachable: true, model_count: 1, message: null },
+            deepseek: { ok: true, model_count: 1, message: null },
+          },
+        })
+        : libraryResponse({
+          cloud: [],
+          local: [{
+            id: 'deepseek-chat',
+            name: 'deepseek-chat',
+            description: 'local',
+            provider: 'ollama',
+            capabilities: ['tools', 'structured_output'],
+            supports_tools: true,
+            supports_structured_output: true,
+            metadata: {},
+          }],
+          sources: { ollama: { ok: true, reachable: true, model_count: 1, message: null } },
+        })
+    ));
+
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await fixture.componentInstance.setProviderFilter('deepseek');
+    await fixture.whenStable();
+
+    const deepseekModel = fixture.componentInstance.displayedModels.find((model) => model.provider === 'deepseek');
+    expect(deepseekModel).toBeDefined();
+    expect(fixture.componentInstance.requiresPull(deepseekModel!)).toBeFalse();
+    const summary = fixture.componentInstance.selectedAgentModelSummary;
+    expect(summary?.provider === 'deepseek' ? summary.installedLocally : true).toBeTrue();
   });
 
   it('provides fallback descriptions for installed local models', async () => {
@@ -212,33 +337,86 @@ describe('pages/settings-page.component', () => {
     expect(fixture.componentInstance.modelDescription(localModel)).toContain('Installed Ollama model');
   });
 
-  it('applyModelSelection updates settings and status text', async () => {
+  it('applyAgentModelSelection updates settings and status text', async () => {
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    await component.applyModelSelection('chat', component.displayedModels[0]);
+    await component.applyAgentModelSelection({
+      id: 'gpt-4.1',
+      name: 'gpt-4.1',
+      description: 'agent model',
+      provider: 'openai',
+      capabilities: ['tools', 'structured_output'],
+      supports_tools: true,
+      supports_structured_output: true,
+      metadata: {},
+    });
     expect(updateChatSettingsMock).toHaveBeenCalled();
     expect(component.statusText).toContain('Selected');
   });
 
+  it('applyAgentModelSelection updates the selected card state before the save completes', async () => {
+    let resolveUpdate: ((value: unknown) => void) | undefined;
+    updateChatSettingsMock.and.returnValue(new Promise((resolve) => {
+      resolveUpdate = resolve;
+    }));
+
+    const fixture = TestBed.createComponent(SettingsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const model = {
+      id: 'gpt-4.1',
+      name: 'gpt-4.1',
+      description: 'agent model',
+      provider: 'openai',
+      capabilities: ['tools', 'structured_output'],
+      supports_tools: true,
+      supports_structured_output: true,
+      metadata: {},
+    };
+
+    const selectionPromise = component.applyAgentModelSelection(model);
+
+    expect(component.isAgentModelSelected(model)).toBeTrue();
+    expect(component.statusText).toContain('Selecting gpt-4.1 as agent model...');
+
+    resolveUpdate?.({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'openai',
+      agent_model_name: 'gpt-4.1',
+      ollama_url: 'http://127.0.0.1:11434',
+      openai_base_url: null,
+      google_base_url: null,
+      deepseek_base_url: null,
+      credentials: {},
+      credential_health: {},
+    });
+    await selectionPromise;
+
+    expect(component.statusText).toContain('Selected gpt-4.1 as agent model');
+  });
+
   it('pulls a missing Ollama model before assigning it', async () => {
-    fetchChatModelsMock.and.resolveTo({
+    fetchChatModelsMock.and.resolveTo(libraryResponse({
       cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
       local: [],
-    });
+      sources: { ollama: { ok: true, reachable: true, model_count: 0, message: null } },
+    }));
     const fixture = TestBed.createComponent(SettingsPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     const component = fixture.componentInstance;
     component.setProviderFilter('ollama');
 
-    fetchChatModelsMock.and.resolveTo({
+    fetchChatModelsMock.and.resolveTo(libraryResponse({
       cloud: [{ id: 'llama3.1', name: 'llama3.1', description: 'library', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
       local: [{ id: 'llama3.1', name: 'llama3.1', description: 'local', provider: 'ollama', capabilities: ['structured_output', 'tools'], supports_tools: true, supports_structured_output: true, metadata: {} }],
-    });
+      sources: { ollama: { ok: true, reachable: true, model_count: 1, message: null } },
+    }));
 
-    await component.applyModelSelection('parser', {
+    await component.applyAgentModelSelection({
       id: 'llama3.1',
       name: 'llama3.1',
       description: 'library',
@@ -252,19 +430,15 @@ describe('pages/settings-page.component', () => {
     expect(pullOllamaModelMock).toHaveBeenCalledWith('llama3.1');
     expect(refreshOllamaModelsMock).toHaveBeenCalled();
     expect(updateChatSettingsMock).toHaveBeenCalled();
-    expect(component.statusText).toContain('Selected llama3.1 for parser');
+    expect(component.statusText).toContain('Selected llama3.1 as agent model');
   });
 
-  it('applyModelSelection does not send read-only credential health fields', async () => {
+  it('applyAgentModelSelection does not send read-only credential health fields', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'local',
-      chat_model_provider: 'ollama',
-      chat_model_name: 'llama3.2',
-      parser_model_provider: 'ollama',
-      parser_model_name: 'llama3.2',
       agent_model_provider: 'ollama',
       agent_model_name: 'llama3.2',
-      ollama_url: 'http://localhost:11434',
+      ollama_url: 'http://127.0.0.1:11434',
       openai_base_url: null,
       google_base_url: null,
       deepseek_base_url: null,
@@ -275,7 +449,16 @@ describe('pages/settings-page.component', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    await fixture.componentInstance.applyModelSelection('chat', fixture.componentInstance.displayedModels[0]);
+    await fixture.componentInstance.applyAgentModelSelection({
+      id: 'llama3.2',
+      name: 'llama3.2',
+      description: 'agent model',
+      provider: 'ollama',
+      capabilities: ['tools', 'structured_output'],
+      supports_tools: true,
+      supports_structured_output: true,
+      metadata: {},
+    });
 
     const payload = updateChatSettingsMock.calls.mostRecent().args[0];
     expect(payload.credential_health).toBeUndefined();
@@ -319,13 +502,9 @@ describe('pages/settings-page.component', () => {
   it('saveOllamaSettings sends a sanitized update payload', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'local',
-      chat_model_provider: 'ollama',
-      chat_model_name: 'llama3.2',
-      parser_model_provider: 'ollama',
-      parser_model_name: 'llama3.2',
       agent_model_provider: 'ollama',
       agent_model_name: 'llama3.2',
-      ollama_url: 'http://localhost:11434',
+      ollama_url: 'http://127.0.0.1:11434',
       openai_base_url: null,
       google_base_url: null,
       deepseek_base_url: null,
@@ -348,13 +527,9 @@ describe('pages/settings-page.component', () => {
   it('reports unreadable credential health in API key modal state', async () => {
     fetchChatSettingsMock.and.resolveTo({
       active_provider_mode: 'cloud',
-      chat_model_provider: 'openai',
-      chat_model_name: 'gpt-4.1-mini',
-      parser_model_provider: 'openai',
-      parser_model_name: 'gpt-4.1-mini',
       agent_model_provider: 'openai',
       agent_model_name: 'gpt-4.1-mini',
-      ollama_url: 'http://localhost:11434',
+      ollama_url: 'http://127.0.0.1:11434',
       openai_base_url: null,
       google_base_url: null,
       deepseek_base_url: null,
@@ -422,7 +597,7 @@ describe('pages/settings-page.component', () => {
     component.setSearchText('gpt');
     await fixture.whenStable();
     expect(window.location.pathname).toBe('/settings');
-    expect(window.location.search).toBe('?q=gpt');
+    expect(window.location.search).toBe('?q=gpt&mode=cloud');
     expect(store.updateSettingsPage).toHaveBeenCalled();
   });
 
