@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 
 import { ApiClientService } from '../core/api-client.service';
@@ -8,7 +8,8 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { SettingsPageComponent } from './settings-page.component';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class TestRouteComponent {}
 
 const libraryResponse = (overrides: Partial<{ cloud: unknown[]; local: unknown[]; sources: Record<string, unknown> }> = {}) => ({

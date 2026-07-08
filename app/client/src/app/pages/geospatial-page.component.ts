@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 
 import {
@@ -38,6 +38,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
   standalone: true,
   imports: [CommonModule, CapabilityStatusListComponent, ChatMessageComponent, MapPreviewComponent],
   templateUrl: './geospatial-page.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './geospatial-page.component.css',
 })
 export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy {

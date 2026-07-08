@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -53,6 +53,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
     SelectedModelSummaryComponent,
   ],
   templateUrl: './settings-page.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './settings-page.component.css',
 })
 export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {

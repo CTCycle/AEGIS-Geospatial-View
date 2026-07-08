@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 
 import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
@@ -21,6 +21,7 @@ const EMPTY_CATALOG: CatalogResponse = {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './capabilities-page.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './capabilities-page.component.css',
 })
 export class CapabilitiesPageComponent implements OnInit {
