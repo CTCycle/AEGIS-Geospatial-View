@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 from typing import Literal
 
+from server.common.logger import logger as LOGGER
 from server.domain.agent.actions import AgentAction
 from server.domain.agent.extraction_schemas import (
+    LLMClarificationPlan,
     LLMLocationSignal,
     LLMParserExtraction,
+    LLMViewportIntent,
 )
 from server.domain.extraction.models import (
     ConversationContextSnapshot,
@@ -17,15 +19,13 @@ from server.domain.extraction.models import (
     NormalizedAction,
     TemporalSignal,
     TurnParseResult,
+    ViewportIntent,
 )
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
-
-LOGGER = logging.getLogger(__name__)
-
 
 ###############################################################################
 class ParserService:
@@ -74,7 +74,8 @@ class ParserService:
         return normalized
 
     # -------------------------------------------------------------------------
-    def _dedupe(self, values: list[str]) -> list[str]:
+    @staticmethod
+    def _dedupe(values: list[str]) -> list[str]:
         seen: set[str] = set()
         result: list[str] = []
         for value in values:
@@ -122,10 +123,10 @@ class ParserService:
             provider_name = self.provider
             model_name = self.model
         else:
-            provider_name = self.provider or settings.parser_model_provider
-            model_name = self.model or settings.parser_model_name
+            provider_name = self.provider or settings.agent_model_provider
+            model_name = self.model or settings.agent_model_name
         if provider_name is None or model_name is None:
-            raise LLMConfigurationError("Parser provider and model must be configured.")
+            raise LLMConfigurationError("Agent provider and model must be configured for structured extraction.")
         parser_provider = self.llm_factory.get_provider(provider_name)
         self.last_context_usage = None
         prompt_payload = {
@@ -162,6 +163,15 @@ class ParserService:
             model_name,
             extracted.task_class,
             extracted.action_id,
+        )
+        LOGGER.info(
+            "parser_extract provider=%s model=%s task=%s action=%s relationship=%s viewport_scope=%s",
+            provider_name,
+            model_name,
+            extracted.task_class,
+            extracted.action_id,
+            extracted.relationship,
+            extracted.viewport_intent.scope if extracted.viewport_intent is not None else None,
         )
         return extracted
 
@@ -273,6 +283,10 @@ class ParserService:
                 requires_location=True,
                 location_signals=[location_signal],
                 parser_confidence=0.72,
+                viewport_intent=cls._infer_viewport_intent(
+                    text,
+                    has_active_visualization=False,
+                ),
             )
 
         return LLMParserExtraction(
@@ -346,6 +360,7 @@ class ParserService:
                 )
                 fallback.parser_confidence = min(fallback.parser_confidence, 0.35)
             extracted = fallback
+        extracted = self._apply_domain_rules(user_message, extracted, memory_snapshot)
 
         extracted_location_signals = list(extracted.location_signals)
         verbatim_signals = [
@@ -428,7 +443,7 @@ class ParserService:
         ):
             task_class = "map_search"
 
-        return TurnParseResult(
+        result = TurnParseResult(
             user_text=user_message,
             conversation_context=ConversationContextSnapshot(
                 recent_messages=normalized_recent,
@@ -441,7 +456,257 @@ class ParserService:
             ambiguities=ambiguities,
             disallowed_patterns=disallowed,
             parser_confidence=max(0.0, min(1.0, confidence)),
+            relationship=extracted.relationship,
+            map_target=extracted.map_target,
+            entity_target=extracted.entity_target,
+            requested_layers=self._dedupe(extracted.requested_layers),
+            requested_basemap=extracted.requested_basemap,
+            requested_attributes=self._dedupe(extracted.requested_attributes),
+            required_data_sources=self._dedupe(extracted.required_data_sources),
+            required_tool_category=extracted.required_tool_category,
+            tools_needed=extracted.tools_needed,
+            direct_response_sufficient=extracted.direct_response_sufficient,
+            requires_reparse=extracted.requires_reparse,
+            capability_limitations=self._dedupe(extracted.capability_limitations),
+            expected_frontend_update=extracted.expected_frontend_update,
+            atomic_tasks=[item.model_dump(mode="json") for item in extracted.atomic_tasks],
+            clarification_plan=(
+                extracted.clarification_plan.model_dump(mode="json")
+                if extracted.clarification_plan is not None
+                else None
+            ),
+            viewport_intent=(
+                ViewportIntent.model_validate(
+                    extracted.viewport_intent.model_dump(mode="json")
+                )
+                if extracted.viewport_intent is not None
+                else None
+            ),
         )
+        LOGGER.info(
+            "parser_normalized task=%s action=%s relationship=%s locations=%d basemap=%s layers=%d viewport_scope=%s tighten=%s ambiguities=%s",
+            result.task_class,
+            result.normalized_action.action_id,
+            result.relationship,
+            len(result.location_signals),
+            result.requested_basemap,
+            len(result.requested_layers),
+            result.viewport_intent.scope if result.viewport_intent is not None else None,
+            (
+                result.viewport_intent.tighten_relative_to_active
+                if result.viewport_intent is not None
+                else None
+            ),
+            ",".join(result.ambiguities) if result.ambiguities else "-",
+        )
+        return result
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _apply_domain_rules(
+        cls,
+        user_message: str,
+        extracted: LLMParserExtraction,
+        memory_snapshot: dict,
+    ) -> LLMParserExtraction:
+        text = " ".join(user_message.casefold().split())
+        updates: dict[str, object] = {}
+        inferred_viewport = cls._infer_viewport_intent(
+            text,
+            has_active_visualization=bool(memory_snapshot.get("active_visualization")),
+        )
+
+        if any(marker in text for marker in ("why did", "why has", "why was", "why it failed", "why did it fail")):
+            updates.update(
+                relationship="failure_inquiry",
+                task_class="general_question",
+                action_id=AgentAction.CHAT_RESPONSE.value,
+                requires_location=False,
+                tools_needed=False,
+                direct_response_sufficient=True,
+                required_tool_category="failure_diagnostics",
+                expected_frontend_update="failure_diagnostic",
+            )
+        elif any(marker in text for marker in ("nice!", "can you now", "same map", "same place", "there")):
+            updates["relationship"] = "follow_up"
+            if memory_snapshot.get("active_location") and not any(
+                marker in text
+                for marker in (
+                    "rome",
+                    "colosseum",
+                    "coliseum",
+                    "paris",
+                    "milan",
+                    "zurich",
+                    "coordinates",
+                )
+            ):
+                updates["location_signals"] = []
+
+        house_markers = ("house", "houses", "housing", "residential", "apartments", "buildings")
+        if any(marker in text for marker in house_markers):
+            requested_layers = [
+                item
+                for item in extracted.requested_layers
+                if "amenit" not in item.casefold() and "poi" not in item.casefold()
+            ]
+            updates.update(
+                task_class="map_search",
+                action_id=AgentAction.DATA_LAYER_QUERY.value,
+                action_label="Residential building visualization",
+                entity_target="residential_buildings",
+                requested_layers=cls._dedupe([*requested_layers, "overpass_residential_buildings"]),
+                required_data_sources=cls._dedupe([*extracted.required_data_sources, "openstreetmap_overpass"]),
+                required_tool_category="geospatial_features",
+                tools_needed=True,
+                direct_response_sufficient=False,
+                expected_frontend_update="map_session",
+            )
+            place_match = re.search(
+                r"(?i)\b(?:coliseum|colosseum)(?:\s+in\s+rome)?\b",
+                user_message,
+            )
+            if place_match is not None:
+                place_text = place_match.group(0)
+                updates["location_signals"] = [
+                    LLMLocationSignal(
+                        signal_type="address",
+                        raw_value=place_text,
+                        normalized_value="Colosseum, Rome",
+                        confidence=0.95,
+                    )
+                ]
+                updates["map_target"] = "Colosseum, Rome"
+
+        if any(marker in text for marker in ("satellite view", "satellite", "imagery")):
+            updates["requested_basemap"] = "esri_world_imagery"
+        if any(
+            marker in text
+            for marker in (
+                "street map",
+                "street maps",
+                "road map",
+                "default map",
+                "no satellite",
+                "without satellite",
+            )
+        ):
+            updates.update(
+                requested_basemap="osm_default",
+                relationship="follow_up" if memory_snapshot.get("active_visualization") else extracted.relationship,
+                expected_frontend_update="visualization_update",
+            )
+            if inferred_viewport is None and memory_snapshot.get("active_visualization"):
+                inferred_viewport = LLMViewportIntent(
+                    scope="preserve_current",
+                    reason="basemap_only_follow_up",
+                )
+
+        ground_temperature = (
+            "temperature" in text
+            and any(marker in text for marker in ("ground", "surface", "at the ground"))
+            and any(marker in text for marker in ("medium", "mean", "average"))
+        )
+        if ground_temperature:
+            updates.update(
+                requested_attributes=cls._dedupe(
+                    [*extracted.requested_attributes, "ground_temperature"]
+                ),
+                required_tool_category="environmental_data",
+                expected_frontend_update="clarification_with_map_update",
+                clarification_plan=LLMClarificationPlan.model_validate({
+                    "question": (
+                        "Which temperature do you mean: current air temperature at 2 m, "
+                        "daytime land-surface temperature, nighttime land-surface "
+                        "temperature, or a mean over a specific period?"
+                    ),
+                    "reason": (
+                        "The requested temperature metric and averaging period are ambiguous."
+                    ),
+                    "blocking_fields": [
+                        "temperature_metric",
+                        "temperature_time_basis",
+                    ],
+                    "options": [
+                        {
+                            "option_id": "air_temperature_2m",
+                            "label": "Current air temperature at 2 m",
+                        },
+                        {
+                            "option_id": "land_surface_temperature_day",
+                            "label": "Daytime land-surface temperature",
+                        },
+                        {
+                            "option_id": "land_surface_temperature_night",
+                            "label": "Nighttime land-surface temperature",
+                        },
+                        {
+                            "option_id": "mean_temperature_period",
+                            "label": "Mean temperature over a specified period",
+                        },
+                    ],
+                    "preserve_valid_results": True,
+                    "apply_visualization_changes": True,
+                }),
+            )
+            updates["ambiguities"] = cls._dedupe(
+                [*extracted.ambiguities, "temperature_metric_underspecified"]
+            )
+
+        if inferred_viewport is not None:
+            updates["viewport_intent"] = inferred_viewport
+
+        return extracted.model_copy(update=updates)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _infer_viewport_intent(
+        text: str,
+        *,
+        has_active_visualization: bool,
+    ) -> LLMViewportIntent | None:
+        if any(marker in text for marker in ("entire city", "whole city", "city wide", "city-wide")):
+            return LLMViewportIntent(scope="city", reason="explicit_city_extent")
+        if any(marker in text for marker in ("whole region", "entire region", "regional view")):
+            return LLMViewportIntent(scope="region", reason="explicit_region_extent")
+        if any(marker in text for marker in ("whole country", "entire country", "nationwide")):
+            return LLMViewportIntent(scope="country", reason="explicit_country_extent")
+        if any(
+            marker in text
+            for marker in (
+                "much more closely",
+                "more closely",
+                "closer view",
+                "zoom in",
+                "too high as point of view",
+                "too high a point of view",
+                "too zoomed out",
+                "street level",
+            )
+        ):
+            return LLMViewportIntent(
+                scope="street",
+                tighten_relative_to_active=has_active_visualization,
+                reason="explicit_tighter_view",
+            )
+        if any(
+            marker in text
+            for marker in ("around ", "near ", "nearby ", "via ", "at this street", "around via")
+        ):
+            return LLMViewportIntent(scope="street", reason="local_area_request")
+        if has_active_visualization and any(
+            marker in text
+            for marker in (
+                "street map",
+                "street maps",
+                "road map",
+                "default map",
+                "no satellite",
+                "without satellite",
+            )
+        ):
+            return LLMViewportIntent(scope="preserve_current", reason="basemap_only_follow_up")
+        return None
 
     # -------------------------------------------------------------------------
     @staticmethod

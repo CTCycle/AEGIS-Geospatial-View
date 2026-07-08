@@ -3,14 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ToolLoopStarted:
     provider: str
     model: str
     tool_count: int
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -19,13 +17,11 @@ class ToolCallRequested:
     iteration: int
     arguments: dict[str, Any] = field(default_factory=dict)
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ToolCallAuthorized:
     tool_name: str
     iteration: int
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -33,7 +29,6 @@ class ToolCallRejected:
     tool_name: str
     iteration: int
     reason: str
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -44,7 +39,6 @@ class ToolCallExecuted:
     success: bool
     error_code: str | None = None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ToolLoopCompleted:
@@ -52,7 +46,6 @@ class ToolLoopCompleted:
     model: str
     iterations: int
     stopped_reason: str
-
 
 ###############################################################################
 @dataclass(frozen=True)

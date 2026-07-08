@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.geospatial.capability_registry import CapabilityRegistry
 
-
 ###############################################################################
 def test_capability_registry_loads_tools() -> None:
     registry = CapabilityRegistry()

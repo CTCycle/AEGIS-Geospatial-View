@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 from collections.abc import AsyncIterator
 from http import HTTPStatus
 from typing import Any
@@ -16,6 +18,15 @@ class ChatStreamingService:
         self.agent_orchestrator = agent_orchestrator
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _emit_progress_event(
+        queue: asyncio.Queue[ChatStreamEvent],
+        event: str,
+        data: dict[str, Any],
+    ) -> None:
+        queue.put_nowait(ChatStreamEvent(event=event, data=data))
+
+    # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
         request_id = payload.request_id or ""
         yield ChatStreamEvent(
@@ -23,20 +34,43 @@ class ChatStreamingService:
             data={"message": "received", "request_id": request_id},
         )
         try:
-            result = await self.agent_orchestrator.run_turn(payload)
-            yield ChatStreamEvent(event="parsed", data=self._build_parsed_payload(result))
-            yield ChatStreamEvent(event="policy", data=self._build_policy_payload(result))
-            for event in self._build_tool_lifecycle_events(result):
-                yield event
-            if result.map_session is not None:
-                yield ChatStreamEvent(
-                    event="map_session_created",
-                    data={
-                        "request_id": result.request_id,
-                        "session_id": result.session_id,
-                        "map_session": result.map_session.model_dump(mode="json"),
-                    },
+            queue: asyncio.Queue[ChatStreamEvent] = asyncio.Queue()
+
+            supports_progress = "progress_callback" in inspect.signature(
+                self.agent_orchestrator.run_turn
+            ).parameters
+            task = asyncio.create_task(
+                self.agent_orchestrator.run_turn(
+                    payload,
+                    progress_callback=lambda event, data: self._emit_progress_event(
+                        queue,
+                        event,
+                        data,
+                    ),
                 )
+                if supports_progress
+                else self.agent_orchestrator.run_turn(payload)
+            )
+            while not task.done() or not queue.empty():
+                try:
+                    yield await asyncio.wait_for(queue.get(), timeout=0.05)
+                except TimeoutError:
+                    continue
+            result = await task
+            if not supports_progress:
+                yield ChatStreamEvent(event="parsed", data=self._build_parsed_payload(result))
+                yield ChatStreamEvent(event="policy", data=self._build_policy_payload(result))
+                for event in self._build_tool_lifecycle_events(result):
+                    yield event
+                if result.map_session is not None:
+                    yield ChatStreamEvent(
+                        event="map_session_created",
+                        data={
+                            "request_id": result.request_id,
+                            "session_id": result.session_id,
+                            "map_session": result.map_session.model_dump(mode="json"),
+                        },
+                    )
             yield ChatStreamEvent(
                 event="final",
                 data=self._serialize_chat_turn_response(result),
@@ -91,7 +125,6 @@ class ChatStreamingService:
             "state": response.decision.plan.state,
             "mode": response.decision.plan.mode,
             "action_id": response.decision.plan.action_id,
-            "trace_steps": list(response.decision.trace.steps),
             "has_clarification": response.decision.clarification is not None,
         }
 
@@ -129,7 +162,6 @@ class ChatStreamingService:
                         "session_id": response.session_id,
                         "tool_call_id": tool_call_id,
                         "name": tool_call.get("name"),
-                        "arguments": tool_call.get("arguments"),
                     },
                 )
             )
@@ -146,7 +178,6 @@ class ChatStreamingService:
                         "name": tool_result.get("name") or tool_call.get("name"),
                         "ok": bool(not tool_result.get("is_error")),
                         "error": tool_result.get("error"),
-                        "content": tool_result.get("content"),
                     },
                 )
             )

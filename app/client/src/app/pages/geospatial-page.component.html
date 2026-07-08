@@ -36,15 +36,14 @@
               [value]="composerDraft"
               (input)="onComposerInput($event)"
               (keydown)="onComposerKeydown($event)"
-              [disabled]="isLoading"
               placeholder="Ask for a location, map data, or coordinates for a place."
             ></textarea>
             <button
               type="button"
               class="primary-button"
-              aria-label="Send"
+              [attr.aria-label]="isLoading ? 'Send steering update' : 'Send message'"
               (click)="sendMessage()"
-              [disabled]="isLoading || !composerDraft.trim()"
+              [disabled]="!composerDraft.trim()"
             >
               <span class="sr-only">Send message</span>
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
@@ -54,6 +53,16 @@
                 />
               </svg>
             </button>
+            @if (isLoading && conversationId && activeRunId) {
+              <button
+                type="button"
+                class="secondary-button"
+                aria-label="Cancel active run"
+                (click)="cancelActiveRun()"
+              >
+                Cancel
+              </button>
+            }
           </div>
         </section>
 
@@ -69,12 +78,7 @@
         </section>
 
         <section class="rail-capability-card" aria-label="Capability status">
-          <ul>
-            <li><span class="state-dot state-dot--ok"></span> Agent online <strong>Active</strong></li>
-            <li><span class="state-dot state-dot--ok"></span> Satellite Imagery <strong>Active</strong></li>
-            <li><span class="state-dot state-dot--ok"></span> Weather Intel <strong>Active</strong></li>
-            <li><span class="state-dot state-dot--warn"></span> Optional Keys <strong>Disabled</strong></li>
-          </ul>
+          <app-capability-status-list [items]="capabilityStatusItems"></app-capability-status-list>
         </section>
       </div>
     </aside>
@@ -141,7 +145,7 @@
       @if (isLoading) {
         <span class="chat-progress-spinner" aria-hidden="true"></span>
       }
-      <span>{{ progressPercent }}%</span>
+      <span>{{ progressLabel || status }}</span>
     </div>
     }
   </div>

@@ -16,7 +16,6 @@ from server.services.geospatial.providers.base import (
     ProviderUnavailableError,
 )
 
-
 ###############################################################################
 class OpenAQProvider(GeospatialProvider):
     provider_id = "openaq"

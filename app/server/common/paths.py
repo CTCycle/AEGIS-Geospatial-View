@@ -19,7 +19,7 @@ CLIENT_ASSETS_PATH = CLIENT_DIST_PATH / "assets"
 CLIENT_INDEX_FILE_PATH = CLIENT_DIST_PATH / "index.html"
 CONFIGURATIONS_FILE = SETTING_PATH / "configurations.json"
 
-
+###############################################################################
 def resolve_runtime_data_root() -> Path:
     override = os.getenv("AEGIS_RUNTIME_DATA_DIR", "").strip()
     if override:
@@ -32,7 +32,7 @@ def resolve_runtime_data_root() -> Path:
 
     return ROOT_DIR / ".runtime"
 
-
+###############################################################################
 def resolve_database_file_path() -> Path:
     return resolve_runtime_data_root() / DATABASE_FILENAME
 
@@ -60,3 +60,10 @@ CHAT_SETTINGS_ROUTE = "/settings"
 CHAT_OLLAMA_REFRESH_ROUTE = "/models/ollama/refresh"
 CHAT_OLLAMA_PULL_ROUTE = "/models/ollama/pull"
 CHAT_OLLAMA_HEALTH_ROUTE = "/models/ollama/health"
+CONVERSATIONS_ROUTER_PREFIX = "/conversations"
+CONVERSATIONS_ROOT_ROUTE = ""
+CONVERSATION_RUNS_ROUTE = "/{conversation_id}/runs"
+
+CONVERSATION_RUN_EVENTS_ROUTE = "/{conversation_id}/runs/{run_id}/events"
+CONVERSATION_RUN_STEERING_ROUTE = "/{conversation_id}/runs/{run_id}/steering"
+CONVERSATION_RUN_CANCEL_ROUTE = "/{conversation_id}/runs/{run_id}/cancel"

@@ -6,7 +6,6 @@ from server.services.geospatial.composition import (
     build_geospatial_runtime,
 )
 
-
 ###############################################################################
 def test_build_geospatial_runtime_reuses_shared_services() -> None:
     runtime = build_geospatial_runtime()

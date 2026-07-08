@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 ###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:
     for value in values:
@@ -19,14 +18,12 @@ def _pick_first_non_empty(*values: str | None) -> str | None:
             return stripped
     return None
 
-
 ###############################################################################
 def _normalize_host(raw_host: str | None, default_host: str) -> str:
     host = (raw_host or default_host).strip() or default_host
     if host in {"0.0.0.0", "::", "[::]"}:
         return "127.0.0.1"
     return host
-
 
 ###############################################################################
 def _build_base_url(
@@ -58,20 +55,17 @@ API_BASE_URL = _pick_first_non_empty(
     BACKEND_URL_FALLBACK,
 )
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def base_url() -> str:
     """Returns the base URL of the UI."""
     return UI_BASE_URL
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     """Returns the base URL of the API."""
     return API_BASE_URL
-
 
 ###############################################################################
 @pytest.fixture
@@ -84,7 +78,6 @@ def api_context(playwright):
     yield context
     context.dispose()
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def artifact_root() -> Path:
@@ -94,18 +87,15 @@ def artifact_root() -> Path:
         (root / child).mkdir(parents=True, exist_ok=True)
     return root
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def backend_log_path(artifact_root: Path) -> Path:
     return artifact_root / "logs" / "backend.log"
 
-
 ###############################################################################
 @pytest.fixture(scope="session")
 def frontend_log_path(artifact_root: Path) -> Path:
     return artifact_root / "logs" / "frontend.log"
-
 
 ###############################################################################
 @pytest.fixture
@@ -115,7 +105,6 @@ def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
     target = artifact_root / "screenshots" / f"{test_file}__{name}"
     target.mkdir(parents=True, exist_ok=True)
     return target
-
 
 ###############################################################################
 @pytest.fixture
@@ -127,7 +116,6 @@ def save_snapshot(snapshot_dir: Path):
         return target
 
     return _save
-
 
 ###############################################################################
 @pytest.fixture

@@ -14,7 +14,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class NOAAProvider(GeospatialProvider):
     provider_id = "noaa"
@@ -107,7 +106,6 @@ class NOAAProvider(GeospatialProvider):
             },
             attribution=["NOAA CO-OPS"],
         )
-
 
 ###############################################################################
 def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:

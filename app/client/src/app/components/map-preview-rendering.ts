@@ -197,7 +197,9 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
     const layerId = `overlay-layer-${overlay.id}`;
     const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
     const sourceBounds = normalizeOverlayBounds(overlay.bounds);
-    const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
+    const renderingMode = String(
+      overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
+    ).toLowerCase();
     try {
       if (renderingMode === 'metadata-only' || overlay.type === 'metadata-only') {
         statuses.push({
@@ -281,12 +283,21 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
 
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
   const overlayType = overlay.type.toLowerCase();
+  const renderingMode = String(overlay.rendering_mode || '').toLowerCase();
   const format = overlay.data_format?.toLowerCase() || '';
   const protocol = overlay.source_protocol?.toLowerCase() || '';
+  const geoJsonRenderingModes = new Set([
+    'geojson',
+    'arcgis-geojson',
+    'clustered-points',
+    'choropleth',
+    'camera-points',
+  ]);
   return Boolean(
     overlay.url
     && (overlayType === 'geojson'
       || overlayType === 'arcgis-geojson'
+      || geoJsonRenderingModes.has(renderingMode)
       || format.includes('geojson')
       || protocol.includes('geojson')),
   );
@@ -449,13 +460,15 @@ const addRasterOverlayLayer = (
   } = {
     type: 'raster',
     tiles,
-    tileSize: overlay.tile_size || 256,
+    tileSize: overlay.render?.tile_size || overlay.tile_size || 256,
   };
-  if (typeof overlay.minzoom === 'number') {
-    (rasterSource as { minzoom?: number }).minzoom = overlay.minzoom;
+  const minZoom = overlay.render?.min_zoom ?? overlay.min_zoom ?? overlay.minzoom;
+  const maxZoom = overlay.render?.max_zoom ?? overlay.max_zoom ?? overlay.maxzoom;
+  if (typeof minZoom === 'number') {
+    (rasterSource as { minzoom?: number }).minzoom = minZoom;
   }
-  if (typeof overlay.maxzoom === 'number') {
-    rasterSource.maxzoom = overlay.maxzoom;
+  if (typeof maxZoom === 'number') {
+    rasterSource.maxzoom = maxZoom;
   }
   if (sourceBounds) {
     rasterSource.bounds = sourceBounds;

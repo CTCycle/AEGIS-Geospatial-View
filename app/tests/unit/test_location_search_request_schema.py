@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from server.domain.geographics import LocationSearchRequest
 
-
 ###############################################################################
 def _base_payload() -> dict[str, object]:
     return {
@@ -25,7 +24,6 @@ def _base_payload() -> dict[str, object]:
         },
     }
 
-
 ###############################################################################
 def test_accepts_canonical_request_fields() -> None:
     request = LocationSearchRequest.model_validate(
@@ -33,6 +31,11 @@ def test_accepts_canonical_request_fields() -> None:
             **_base_payload(),
             "basemap_id": "osm_default",
             "overlay_ids": ["openaq_air_quality"],
+            "viewport_intent": {
+                "scope": "street",
+                "tighten_relative_to_active": False,
+                "reason": "local_area_request",
+            },
             "presentation": {
                 "emphasize_overlays": True,
                 "high_contrast": False,
@@ -43,7 +46,8 @@ def test_accepts_canonical_request_fields() -> None:
     assert request.basemap_id == "osm_default"
     assert request.overlay_ids == ["openaq_air_quality"]
     assert request.resolved_location.city == "Rome"
-
+    assert request.viewport_intent is not None
+    assert request.viewport_intent.scope == "street"
 
 ###############################################################################
 @pytest.mark.parametrize(

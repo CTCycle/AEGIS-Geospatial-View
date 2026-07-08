@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-06-10
+Last updated: 2026-06-22
 
 ## Relational Storage
 
@@ -30,6 +30,7 @@ Schema initialization is handled by `app/server/repositories/database/initialize
 Core relational storage covers:
 
 - chat sessions and messages
+- conversations, agent runs, steering messages, and ordered run events
 - model provider settings
 - encrypted model credentials (backed by auto-seeded Fernet key material)
 - manifest embedding records
@@ -69,3 +70,4 @@ Core relational storage covers:
 - TTL: 6 hours
 - Tab ownership guard: `localStorage` heartbeat keys
 - Implementation: `app/client/src/app/core/app-state.ts`
+- Chat panel state persists the active conversation/run IDs, latest run event ID, stream state, concise progress label, and a bounded set of seen run event IDs for duplicate protection.

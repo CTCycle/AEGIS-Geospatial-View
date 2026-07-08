@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,7 +15,6 @@ class ConversationContextSnapshot(BaseModel):
     session_id: int | None = None
     recent_messages: list[dict[str, str]] = Field(default_factory=list)
     memory_snapshot: dict[str, object] = Field(default_factory=dict)
-
 
 ###############################################################################
 class LocationSignal(BaseModel):
@@ -57,6 +56,25 @@ class DisallowedPattern(BaseModel):
     matched_text: str
 
 ###############################################################################
+class ViewportIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal[
+        "preserve_current",
+        "building",
+        "street",
+        "neighborhood",
+        "district",
+        "city",
+        "region",
+        "country",
+        "auto",
+    ] = "auto"
+    tighten_relative_to_active: bool = False
+    radius_hint_m: float | None = Field(default=None, gt=0.0)
+    reason: str | None = None
+
+###############################################################################
 class TurnParseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -69,4 +87,28 @@ class TurnParseResult(BaseModel):
     ambiguities: list[str] = Field(default_factory=list)
     disallowed_patterns: list[DisallowedPattern] = Field(default_factory=list)
     parser_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    relationship: Literal[
+        "new_task",
+        "follow_up",
+        "correction",
+        "clarification",
+        "qa",
+        "simple_chat",
+        "failure_inquiry",
+    ] = "new_task"
+    map_target: str | None = None
+    entity_target: str | None = None
+    requested_layers: list[str] = Field(default_factory=list)
+    requested_basemap: str | None = None
+    requested_attributes: list[str] = Field(default_factory=list)
+    required_data_sources: list[str] = Field(default_factory=list)
+    required_tool_category: str | None = None
+    tools_needed: bool = False
+    direct_response_sufficient: bool = False
+    requires_reparse: bool = False
+    capability_limitations: list[str] = Field(default_factory=list)
+    expected_frontend_update: str = "assistant_message"
+    atomic_tasks: list[dict[str, Any]] = Field(default_factory=list)
+    clarification_plan: dict[str, Any] | None = None
+    viewport_intent: ViewportIntent | None = None
     

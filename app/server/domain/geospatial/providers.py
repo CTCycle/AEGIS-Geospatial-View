@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ProviderRequest:
@@ -13,7 +12,6 @@ class ProviderRequest:
     zoom: int | None = None
     time: datetime | None = None
     params: dict[str, Any] = field(default_factory=dict)
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -25,7 +23,6 @@ class ProviderResponse:
     warnings: list[str] = field(default_factory=list)
     stale: bool = False
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-
 
 ###############################################################################
 @dataclass(frozen=True)

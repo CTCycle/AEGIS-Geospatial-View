@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 
-
 ###############################################################################
 async def execute(plan: ExecutionPlan, location: ResolvedLocation) -> dict[str, object]:
     _ = plan

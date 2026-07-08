@@ -53,6 +53,7 @@
                 <input
                   type="password"
                   autocomplete="off"
+                  [attr.aria-label]="provider.name + ' API key'"
                   [placeholder]="provider.placeholder"
                   [(ngModel)]="drafts[provider.id]"
                   [name]="provider.id + '_api_key'"
@@ -136,6 +137,7 @@
         <input
           type="password"
           autocomplete="off"
+          [attr.aria-label]="'Generated API key for ' + setup.name"
           [placeholder]="setup.keyFormatHint || 'Paste generated API key'"
           [(ngModel)]="signupKeyInput"
           name="guided_signup_api_key"

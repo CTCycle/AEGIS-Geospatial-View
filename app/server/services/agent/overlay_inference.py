@@ -7,14 +7,12 @@ from server.domain.extraction.models import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class OverlayInferenceResult:
     overlay_ids: list[str]
     warnings: list[str]
     reasons: dict[str, list[str]]
-
 
 ###############################################################################
 class OverlayInferenceService:
@@ -53,7 +51,9 @@ class OverlayInferenceService:
         ]
         haystack = " ".join(part.strip().lower() for part in text_parts if isinstance(part, str))
         explicit_ids = list(existing_overlay_ids)
-        explicit_haystack = " ".join(item.strip().lower() for item in explicit_ids)
+        explicit_haystack = self._normalize_match_text(
+            " ".join(item.strip().lower() for item in explicit_ids)
+        )
         chosen: list[str] = []
         reasons: dict[str, list[str]] = {}
         warnings: list[str] = []
@@ -73,11 +73,6 @@ class OverlayInferenceService:
                 ("air quality", "pollution", "pm2.5", "pm10", "aqi"),
                 ("openaq_air_quality", "openmeteo_air_quality_forecast"),
                 "Matched air-quality intent from request text or action metadata.",
-            ),
-            (
-                ("satellite", "imagery", "true color"),
-                ("VIIRS_SNPP_CorrectedReflectance_TrueColor",),
-                "Matched satellite or imagery intent from request text or action metadata.",
             ),
             (
                 ("terrain", "elevation", "topography"),
@@ -109,8 +104,8 @@ class OverlayInferenceService:
         for triggers, preferred_ids, reason in mappings:
             if not any(trigger in haystack for trigger in triggers):
                 continue
-            normalized_triggers = tuple(trigger.replace(" ", "") for trigger in triggers)
-            if any(trigger in explicit_haystack.replace(" ", "") for trigger in normalized_triggers):
+            normalized_triggers = tuple(self._normalize_match_text(trigger) for trigger in triggers)
+            if any(trigger in explicit_haystack for trigger in normalized_triggers):
                 continue
             for capability_id in preferred_ids:
                 if capability_id in explicit_ids or capability_id in chosen:
@@ -136,4 +131,13 @@ class OverlayInferenceService:
             overlay_ids=chosen,
             warnings=warnings,
             reasons=reasons,
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_match_text(value: str) -> str:
+        return "".join(
+            character
+            for character in value.casefold()
+            if character.isalnum()
         )

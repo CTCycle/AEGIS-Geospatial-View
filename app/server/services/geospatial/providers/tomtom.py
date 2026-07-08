@@ -17,7 +17,6 @@ from server.services.geospatial.providers.http import (
     fetch_json_url,
 )
 
-
 ###############################################################################
 class TomTomProvider(GeospatialProvider):
     provider_id = "tomtom"
@@ -109,7 +108,6 @@ class TomTomProvider(GeospatialProvider):
             message="TomTom accepted the supplied API key.",
         )
 
-
 ###############################################################################
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
     if kind == "basic":
@@ -121,7 +119,6 @@ def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> st
         "https://api.tomtom.com/traffic/map/4/tile/flow/"
         f"absolute/relative0/{z}/{x}/{y}.png?key={api_key}"
     )
-
 
 ###############################################################################
 def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
@@ -139,7 +136,6 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
         "timeValidityFilter": str(request.params.get("timeValidityFilter") or "present"),
     }
     return f"https://api.tomtom.com/traffic/services/5/incidentDetails?{urlencode(params)}"
-
 
 ###############################################################################
 def _normalize_incidents(payload: object) -> list[dict[str, object]]:
@@ -188,7 +184,6 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
         )
     return features
 
-
 ###############################################################################
 def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
     if not isinstance(geometry, dict):
@@ -204,7 +199,6 @@ def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
         return None
     return float(longitude), float(latitude)
 
-
 ###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
     if not isinstance(value, list) or not value:
@@ -213,14 +207,12 @@ def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
         return value[0], value[1]
     return _first_coordinate_pair(value[0])
 
-
 ###############################################################################
 def _first_event_description(events: list[object]) -> str | None:
     for event in events:
         if isinstance(event, dict) and event.get("description"):
             return str(event["description"])
     return None
-
 
 ###############################################################################
 def _incident_category(value: object) -> str:

@@ -1,13 +1,13 @@
 # Experience And Accessibility
 
-Last updated: 2026-06-02
+Last updated: 2026-06-25
 
 ## Core User Journeys
 
 - Ask a geospatial question, receive an assistant response, and inspect map session output.
 - Review geodata to understand layers, tools, providers, and access constraints.
 - Open Access configurations to add optional provider keys.
-- Open model settings to manage provider and role assignments.
+- Open model settings to choose the agent model and manage provider credentials.
 
 ## Interaction Rules
 

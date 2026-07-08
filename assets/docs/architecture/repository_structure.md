@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-06-10
+Last updated: 2026-07-01
 
 ## Purpose
 
@@ -65,6 +65,7 @@ Key backend directories under `app/server`:
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
+  The agent orchestration area now includes focused helpers such as `turn_history.py`, `turn_state_assembler.py`, and `turn_support.py` to keep `AgentOrchestrator` under the repository Python size constraint without changing the public chat-turn contract.
 
 ## Frontend Areas
 

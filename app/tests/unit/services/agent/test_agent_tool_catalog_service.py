@@ -20,7 +20,6 @@ from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 class _CapabilityRegistry:
 
@@ -104,7 +103,6 @@ class _CapabilityRegistry:
     def get_capability(self, capability_id: str):
         return next((item for item in self.capabilities if item["id"] == capability_id), None)
 
-
 ###############################################################################
 class _RuntimeRegistry:
 
@@ -126,7 +124,6 @@ class _RuntimeRegistry:
             "tomtom_traffic_flow": {"map"},
         }
         return mode in supported.get(capability_id, set())
-
 
 ###############################################################################
 class _LocationResolver:
@@ -150,7 +147,6 @@ class _LocationResolver:
             source=signal.source,
             confidence=signal.confidence or 0.9,
         )
-
 
 ###############################################################################
 class _SearchOrchestrator:
@@ -178,7 +174,6 @@ class _SearchOrchestrator:
             bounds=[12.0, 41.0, 13.0, 42.0],
         )
 
-
 ###############################################################################
 class _ToolRegistry:
 
@@ -194,7 +189,6 @@ class _ToolRegistry:
     # -------------------------------------------------------------------------
     def get_handler(self, tool_id: str):  # noqa: ARG002
         return object()
-
 
 ###############################################################################
 def _context() -> AgentExecutionContext:
@@ -237,7 +231,6 @@ def _context() -> AgentExecutionContext:
         },
     )
 
-
 ###############################################################################
 def _direct_context() -> AgentExecutionContext:
     return AgentExecutionContext(
@@ -279,7 +272,6 @@ def _direct_context() -> AgentExecutionContext:
         },
     )
 
-
 ###############################################################################
 def _service() -> AgentToolCatalogService:
     runtime_registry = _RuntimeRegistry()
@@ -298,7 +290,6 @@ def _service() -> AgentToolCatalogService:
         policy_engine=policy_engine,
     )
 
-
 ###############################################################################
 def test_catalog_builds_stable_native_tools() -> None:
     service = _service()
@@ -308,8 +299,8 @@ def test_catalog_builds_stable_native_tools() -> None:
         "describe_geospatial_capability",
         "execute_geospatial_capability",
         "fetch_geospatial_provider_layers",
+        "render_geospatial_provider_layer",
     ]
-
 
 ###############################################################################
 def test_catalog_pagination_is_deterministic() -> None:
@@ -319,13 +310,11 @@ def test_catalog_pagination_is_deterministic() -> None:
     assert first["items"][0]["id"] == "coordinates_tool"
     assert second["items"][0]["id"] == "tomtom_traffic_flow"
 
-
 ###############################################################################
 def test_capability_description_includes_executable_schema() -> None:
     service = _service()
     descriptor = service.describe_geospatial_capability("coordinates_tool")
     assert descriptor["argument_schema"]["required"] == ["location"]
-
 
 ###############################################################################
 def test_execute_rejects_invalid_nested_arguments() -> None:
@@ -342,7 +331,6 @@ def test_execute_rejects_invalid_nested_arguments() -> None:
     assert result["error"] is not None
     assert "bbox" in result["error"]["message"]
 
-
 ###############################################################################
 def test_execute_map_capability_returns_real_map_session() -> None:
     result = asyncio.run(
@@ -357,7 +345,6 @@ def test_execute_map_capability_returns_real_map_session() -> None:
     assert result["operation"] == "map_session_created"
     assert result["map_session"] is not None
     assert result["map_session"]["resolved_location"]["label"] == "Rome"
-
 
 ###############################################################################
 def test_execute_direct_capability_returns_direct_result() -> None:
@@ -374,7 +361,6 @@ def test_execute_direct_capability_returns_direct_result() -> None:
     assert result["direct_result"] is not None
     assert result["direct_result"]["tool_id"] == "coordinates_tool"
 
-
 ###############################################################################
 def test_execute_returns_missing_credentials_without_fake_success() -> None:
     result = asyncio.run(
@@ -389,7 +375,6 @@ def test_execute_returns_missing_credentials_without_fake_success() -> None:
     assert result["operation"] == "missing_credentials"
     assert result["error"] is not None
     assert result["error"]["code"] == "missing_credentials"
-
 
 ###############################################################################
 def test_execute_rejects_direct_only_capability_for_map_request() -> None:
@@ -406,11 +391,11 @@ def test_execute_rejects_direct_only_capability_for_map_request() -> None:
     assert result["error"] is not None
     assert result["error"]["code"] == "unsupported_capability"
 
-
 ###############################################################################
 def test_catalog_tools_register_with_tool_registry() -> None:
     registry = ToolRegistry()
     _service().register_with(registry)
     assert registry.has_native_tool("list_geospatial_capabilities")
     assert registry.has_native_tool("fetch_geospatial_provider_layers")
-    assert len(registry.list_native_tools()) == 4
+    assert registry.has_native_tool("render_geospatial_provider_layer")
+    assert len(registry.list_native_tools()) == 5

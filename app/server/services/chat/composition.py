@@ -20,7 +20,6 @@ from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCach
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ChatRuntime:
@@ -28,7 +27,6 @@ class ChatRuntime:
     model_library_service: ChatModelLibraryService
     maintenance_service: ChatMaintenanceService
     agent_orchestrator: AgentOrchestrator
-
 
 ###############################################################################
 def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatRuntime:
@@ -57,16 +55,20 @@ def build_chat_runtime(search_orchestrator: LocationSearchOrchestrator) -> ChatR
         runtime_registry=runtime_registry,
     )
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
+    request_builder = RequestBuilder()
     agent_tool_catalog_service = AgentToolCatalogService(
         capability_registry=search_orchestrator.capability_registry,
         runtime_registry=runtime_registry,
+        search_orchestrator=search_orchestrator,
+        request_builder=request_builder,
+        location_resolver=location_resolver,
+        tool_registry=tool_registry,
         policy_engine=policy_engine,
     )
     native_tool_loop = NativeToolLoop(
         provider_factory=llm_factory,
         tool_registry=tool_registry,
     )
-    request_builder = RequestBuilder()
 
     return ChatRuntime(
         settings_service=settings_service,

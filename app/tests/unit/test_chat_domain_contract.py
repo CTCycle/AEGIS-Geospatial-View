@@ -4,7 +4,6 @@ from pydantic import ValidationError
 
 from server.domain.chat import ModelSettingsUpdateRequest
 
-
 ###############################################################################
 def test_model_settings_update_request_forbids_unknown_fields() -> None:
     try:
@@ -13,7 +12,6 @@ def test_model_settings_update_request_forbids_unknown_fields() -> None:
         pass
     else:
         raise AssertionError("Expected ValidationError for unknown field")
-
 
 ###############################################################################
 def test_model_settings_update_request_requires_string_credentials() -> None:
@@ -24,19 +22,18 @@ def test_model_settings_update_request_requires_string_credentials() -> None:
     else:
         raise AssertionError("Expected ValidationError for non-string credential value")
 
-
 ###############################################################################
 def test_model_settings_update_request_accepts_valid_payload() -> None:
     payload = ModelSettingsUpdateRequest(
         active_provider_mode="cloud",
-        chat_model_provider="openai",
-        chat_model_name="gpt-4.1-mini",
+        agent_model_provider="openai",
+        agent_model_name="gpt-4.1-mini",
         credentials={"openai": {"api_key": "secret"}},
     )
 
     assert payload.active_provider_mode == "cloud"
+    assert payload.agent_model_provider == "openai"
     assert payload.credentials["openai"]["api_key"] == "secret"
-
 
 ###############################################################################
 def test_model_settings_update_request_rejects_invalid_base_urls() -> None:

@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-06-02
+Last updated: 2026-06-22
 
 ## Overview
 
@@ -23,12 +23,14 @@ Older schema payloads are invalidated and discarded.
 Persisted chat state includes:
 
 - `sessionId`
+- `conversationId`, `activeRunId`, `activeRunVersion`, and `lastRunEventId`
 - `conversationNonce`
 - `messages`
 - `lastDecision`
 - `memorySnapshot`
 - `mapSession`
 - status and composer/transcript UI state
+- bounded run event duplicate-protection state
 
 Persisted map UI state includes:
 

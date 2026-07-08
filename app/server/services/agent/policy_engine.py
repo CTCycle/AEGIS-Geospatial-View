@@ -18,7 +18,6 @@ from server.services.agent.location_resolver import LocationResolver
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class PolicyEngine:
 
@@ -79,15 +78,32 @@ class PolicyEngine:
         map_state: dict[str, Any] | None = None,
     ) -> AgentPolicyConstraints:
         actionable_patterns = self._actionable_disallowed_patterns(parsed_request)
+        provider_ids = [
+            item.strip().lower()
+            for item in parsed_request.required_data_sources
+            if item.strip()
+        ]
+        allowed_tools = [
+            "list_geospatial_capabilities",
+            "describe_geospatial_capability",
+            "execute_geospatial_capability",
+        ]
+        if (
+            parsed_request.required_tool_category == "provider_native_discovery"
+            and provider_ids
+        ):
+            allowed_tools.append("fetch_geospatial_provider_layers")
+            allowed_tools.append("render_geospatial_provider_layer")
+        if any(":" in layer for layer in parsed_request.requested_layers):
+            allowed_tools.append("render_geospatial_provider_layer")
         return AgentPolicyConstraints(
             requires_location=parsed_request.normalized_action.requires_location,
             blocked_patterns=[item.pattern_id for item in actionable_patterns],
-            allowed_tool_names=[
-                "list_geospatial_capabilities",
-                "describe_geospatial_capability",
-                "execute_geospatial_capability",
-            ],
-            metadata={"map_state": map_state or {}},
+            allowed_tool_names=allowed_tools,
+            metadata={
+                "map_state": map_state or {},
+                "allowed_provider_ids": provider_ids,
+            },
         )
 
     # -------------------------------------------------------------------------
@@ -154,6 +170,18 @@ class PolicyEngine:
                 allowed=False,
                 reason=f"Unknown geospatial capability '{capability_id}'.",
                 metadata={"code": "unsupported_capability"},
+            )
+
+        allowed_capability_ids = constraints.get("allowed_capability_ids")
+        if (
+            isinstance(allowed_capability_ids, list)
+            and allowed_capability_ids
+            and capability_id not in set(map(str, allowed_capability_ids))
+        ):
+            return ToolAuthorizationResult(
+                allowed=False,
+                reason=f"Capability '{capability_id}' is outside the routed specialist scope.",
+                metadata={"code": "tool_rejected"},
             )
 
         runtime_registry = self.runtime_registry

@@ -19,7 +19,6 @@ from server.services.llm.types import (
     ModelDescriptor,
 )
 
-
 ###############################################################################
 class _OllamaLibraryParser(HTMLParser):
 
@@ -66,7 +65,6 @@ class _OllamaLibraryParser(HTMLParser):
         self._active_model = None
         self._chunks = []
 
-
 ###############################################################################
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
@@ -81,6 +79,7 @@ class OllamaProvider(LLMProvider):
         self.base_url = base_url.rstrip("/")
         self.tool_capability_cache = tool_capability_cache or OllamaToolCapabilityCache()
         self.last_context_usage: dict[str, Any] | None = None
+        self.last_list_models_error: str | None = None
 
     # -------------------------------------------------------------------------
     def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -130,8 +129,10 @@ class OllamaProvider(LLMProvider):
     def list_models(self) -> list[ModelDescriptor]:
         try:
             payload = self._get_json("/api/tags")
-        except Exception:
+        except Exception as exc:
+            self.last_list_models_error = str(exc) or f"Unable to reach Ollama at {self.base_url}."
             return []
+        self.last_list_models_error = None
         models: list[ModelDescriptor] = []
         for item in payload.get("models", []):
             if not isinstance(item, dict):

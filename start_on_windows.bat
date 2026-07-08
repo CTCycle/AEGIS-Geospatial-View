@@ -172,6 +172,7 @@ set "UI_HOST=127.0.0.1"
 set "UI_PORT=8001"
 set "RELOAD=false"
 set "OPTIONAL_DEPENDENCIES=false"
+set "PRUNE_UV_CACHE=false"
 
 if exist "%DOTENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%DOTENV%") do (
@@ -225,26 +226,38 @@ if not exist "%pyproject%" (
 pushd "%server_dir%" >nul
 set "uv_extras_flag="
 if /i "%INSTALL_EXTRAS%"=="true" set "uv_extras_flag=--all-extras"
-"%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
-set "sync_ec=!ERRORLEVEL!"
-if not "!sync_ec!"=="0" (
-  "%uv_exe%" sync --python "%python_exe%" %uv_extras_flag%
-  set "sync_ec=!ERRORLEVEL!"
-)
-if not "!sync_ec!"=="0" (
-  set "PYTHONPATH=%app_dir%"
-  "%venv_dir%\Scripts\python.exe" -c "import importlib; import fastapi, sqlalchemy, uvicorn; importlib.import_module('server.app')" >nul 2>&1
-  set "venv_check_ec=!ERRORLEVEL!"
-  set "PYTHONPATH="
-)
-popd >nul
-if not "!sync_ec!"=="0" (
-  if "!venv_check_ec!"=="0" (
-    echo [WARN] uv sync failed with code !sync_ec!, but the existing backend virtual environment is still usable.
-  ) else (
-    echo [FATAL] uv sync failed with code !sync_ec!.
-    goto error
+
+set "venv_stale="
+if exist "%venv_dir%" (
+  set "venv_home="
+  if exist "%venv_dir%\pyvenv.cfg" (
+    for /f "tokens=1,* delims==" %%A in ('findstr /b /i /c:"home =" "%venv_dir%\pyvenv.cfg" 2^>nul') do (
+      for /f "tokens=* delims= " %%H in ("%%B") do set "venv_home=%%H"
+    )
   )
+  if not defined venv_home (
+    echo [WARN] Existing virtual environment has no readable interpreter reference.
+  ) else if /i not "!venv_home!"=="%python_dir%" (
+    set "venv_stale=1"
+    echo [INFO] Virtual environment references stale Python location: !venv_home!
+  )
+)
+
+if defined venv_stale (
+  echo [INFO] Recreating virtual environment after repository/runtime relocation.
+  if exist "%venv_dir%" rd /s /q "%venv_dir%"
+)
+
+if exist "%venv_dir%" (
+  "%uv_exe%" sync --locked --no-install-project %uv_extras_flag%
+) else (
+  "%uv_exe%" sync --python "%python_exe%" --locked --no-install-project %uv_extras_flag%
+)
+set "sync_ec=%ERRORLEVEL%"
+popd >nul
+if not "%sync_ec%"=="0" (
+  echo [FATAL] uv sync failed with code %sync_ec%. The existing virtual environment was preserved.
+  goto error
 )
 
 > "%env_marker%" echo setup_completed
@@ -253,8 +266,12 @@ echo [SUCCESS] Environment setup complete.
 REM ============================================================================
 REM == Step 5: Prune uv cache
 REM ============================================================================
-echo [STEP 5/5] Pruning uv cache
-if exist "%UV_CACHE_DIR%" rd /s /q "%UV_CACHE_DIR%" >nul 2>&1 || echo [WARN] Could not delete cache dir quickly.
+if /i "!PRUNE_UV_CACHE!"=="true" (
+  echo [STEP 5/5] Pruning uv cache
+  if exist "%UV_CACHE_DIR%" rd /s /q "%UV_CACHE_DIR%" >nul 2>&1 || echo [WARN] Could not delete cache dir quickly.
+) else (
+  echo [STEP 5/5] Skipping uv cache prune. Set PRUNE_UV_CACHE=true to prune.
+)
 
 if not exist "%FRONTEND_DIR%\node_modules" (
   echo [STEP] Installing frontend dependencies...
@@ -299,7 +316,7 @@ if not exist "%python_exe%" (
 )
 
 set "reuse_backend="
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '!BACKEND_BASE_URL!/api/health' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {}; exit 1" >nul 2>&1
 if !errorlevel! equ 0 (
   set "reuse_backend=1"
   echo [INFO] Reusing existing backend at !BACKEND_BASE_URL!.
@@ -355,11 +372,11 @@ REM ============================================================================
 :backend_wait
 echo [WAIT] Waiting for backend readiness at !BACKEND_BASE_URL!...
 for /L %%i in (1,1,60) do (
-  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$base='!BACKEND_BASE_URL!'; $paths=@('/api/health','/health','/docs','/'); foreach ($p in $paths) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri ($base + $p) -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {} }; exit 1" >nul 2>&1
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -UseBasicParsing -Uri '!BACKEND_BASE_URL!/api/health' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300) { exit 0 } } catch {}; exit 1" >nul 2>&1
   if !errorlevel! equ 0 goto :backend_ready_check
   timeout /t 1 /nobreak >nul 2>&1
 )
-echo [FATAL] Backend did not become ready at !BACKEND_BASE_URL! (checked /api/health, /health, /docs, /).
+echo [FATAL] Backend did not become ready at !BACKEND_BASE_URL! (checked /api/health).
 goto error
 :backend_ready_check
 

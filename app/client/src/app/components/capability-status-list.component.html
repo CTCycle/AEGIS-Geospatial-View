@@ -1,0 +1,14 @@
+<ul>
+  @for (item of items; track trackStatusItem($index, item)) {
+    <li>
+      <span
+        class="state-dot"
+        [class.state-dot--ok]="item.tone === 'ok'"
+        [class.state-dot--warn]="item.tone === 'warn'"
+        [class.state-dot--neutral]="item.tone === 'none'"
+      ></span>
+      {{ item.label }}
+      <strong>{{ item.statusLabel }}</strong>
+    </li>
+  }
+</ul>

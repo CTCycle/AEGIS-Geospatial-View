@@ -6,7 +6,6 @@ from server.services.geospatial.search_index import (
     query_search_index,
 )
 
-
 ###############################################################################
 def test_geospatial_poi_search_index_matches_labels_categories_and_sources() -> None:
     index = build_feature_search_index(

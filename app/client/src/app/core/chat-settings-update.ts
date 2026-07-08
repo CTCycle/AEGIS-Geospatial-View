@@ -11,10 +11,6 @@ export const buildSettingsUpdateBase = (
   settings: ModelSettingsResponse,
 ): ModelSettingsUpdateRequest => ({
   active_provider_mode: settings.active_provider_mode,
-  chat_model_provider: settings.chat_model_provider,
-  chat_model_name: settings.chat_model_name,
-  parser_model_provider: settings.parser_model_provider,
-  parser_model_name: settings.parser_model_name,
   agent_model_provider: settings.agent_model_provider,
   agent_model_name: settings.agent_model_name,
   ollama_url: settings.ollama_url,

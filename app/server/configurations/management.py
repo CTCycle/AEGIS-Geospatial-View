@@ -13,13 +13,11 @@ from server.configurations.settings import (
     build_database_payload_from_env,
 )
 
-
 ###############################################################################
 def _ensure_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
         return dict(value)
     return {}
-
 
 ###############################################################################
 def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
@@ -35,7 +33,6 @@ def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
         "rainviewer": _ensure_mapping(raw_payload.get("rainviewer")),
         "gibs": _ensure_mapping(raw_payload.get("gibs")),
     }
-
 
 ###############################################################################
 class ConfigurationManager:

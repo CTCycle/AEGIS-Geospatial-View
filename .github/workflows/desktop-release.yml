@@ -1,0 +1,89 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  windows-desktop:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Prepare runtime layout for packaging
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Copy-Item 'settings/.env.local.tauri.example' 'settings/.env' -Force
+
+          $pythonRuntime = $env:pythonLocation
+          if ([string]::IsNullOrWhiteSpace($pythonRuntime) -or -not (Test-Path $pythonRuntime)) {
+            throw "setup-python did not expose pythonLocation."
+          }
+
+          $nodeExe = (Get-Command node).Source
+          $npmCmd = (Get-Command npm).Source
+          $uvExe = (Get-Command uv).Source
+
+          $nodeRuntime = Split-Path -Parent $nodeExe
+          $uvRuntime = Split-Path -Parent $uvExe
+
+          New-Item -ItemType Directory -Force -Path 'runtimes/python', 'runtimes/nodejs', 'runtimes/uv' | Out-Null
+
+          robocopy $pythonRuntime 'runtimes/python' /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS
+          if ($LASTEXITCODE -ge 8) { throw "Robocopy failed while copying Python runtime." }
+
+          robocopy $nodeRuntime 'runtimes/nodejs' /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS
+          if ($LASTEXITCODE -ge 8) { throw "Robocopy failed while copying Node runtime." }
+
+          robocopy $uvRuntime 'runtimes/uv' /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NC /NS
+          if ($LASTEXITCODE -ge 8) { throw "Robocopy failed while copying uv runtime." }
+
+          if (-not (Test-Path 'runtimes/python/python.exe')) { throw 'Packaged Python runtime is missing python.exe.' }
+          if (-not (Test-Path 'runtimes/nodejs/node.exe')) { throw 'Packaged Node runtime is missing node.exe.' }
+          if (-not (Test-Path 'runtimes/nodejs/npm.cmd')) { throw 'Packaged Node runtime is missing npm.cmd.' }
+          if (-not (Test-Path 'runtimes/uv/uv.exe')) { throw 'Packaged uv runtime is missing uv.exe.' }
+
+      - name: Build desktop artifacts
+        shell: cmd
+        run: release\tauri\build_with_tauri.bat
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop-artifacts
+          path: release/windows/**
+          if-no-files-found: error
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/windows/installers/**
+            release/windows/portable/**
+            release/windows/README.txt

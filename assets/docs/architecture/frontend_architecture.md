@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-06-19
+Last updated: 2026-07-03
 
 ## Route-Level Pages
 
@@ -22,8 +22,27 @@ Last updated: 2026-06-19
 - Shared contracts: `core/types.ts`
 - Error presentation: `core/user-facing-error.service.ts`
 - Model selection and model list utilities: `core/model-selection.ts`
+- Selected agent readiness checks: `core/agent-readiness.service.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
+
+## Agent Run Interaction
+
+`GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, creates one active run, and opens an `EventSource` stream. Additional composer submissions while the run is active are sent as steering updates and rendered as compact refinements rather than independent tasks.
+
+The page tracks the last run event ID and ignores duplicate event IDs so reconnect replay can be applied without duplicating assistant or progress output.
+
+Clarification runs terminate with `clarification_needed`. The event may include a
+partial validated map update, allowing a basemap or layer correction before the
+user answers. Matching assistant/error messages are deduplicated.
+
+The agent is presented as continuously ready for the chat session. Per-run
+progress begins with request understanding and is separate from the persistent
+availability state.
+
+Assistant message strings are rendered as GitHub-style Markdown through the
+shared chat-message component and Angular HTML sanitization. User messages
+remain escaped plain text.
 
 ## Map Rendering
 
@@ -35,11 +54,13 @@ Reusable component examples include:
 
 - `map-preview.component.*`
 - `chat-message.component.*`
-- `model-role-actions.component.*`
 - `settings-icon-action.component.*`
 - `settings-modal-shell.component.*`
 - `settings-api-key-field.component.*`
-- `model-stats-panel.component.*`
+- `selected-model-summary.component.*`
+- `capability-status-list.component.*`
+
+Settings uses card-level model selection for one selected agent model.
 
 ## Routing Rule
 

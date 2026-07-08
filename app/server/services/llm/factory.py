@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.cryptography import CredentialEncryptionService
@@ -12,7 +10,6 @@ from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.openai_provider import OpenAIProvider
-from server.services.llm.types import LLMRequest
 
 ###############################################################################
 class LLMFactory:
@@ -28,10 +25,16 @@ class LLMFactory:
     ) -> None:
         self.settings_repo = settings_repo or ModelSettingsRepository()
         self.credentials_repo = credentials_repo or CredentialRepository()
-        self.crypto_service = crypto_service or CredentialEncryptionService()
+        self.crypto_service = crypto_service
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
+
+    # -------------------------------------------------------------------------
+    def _get_crypto_service(self) -> CredentialEncryptionService:
+        if self.crypto_service is None:
+            self.crypto_service = CredentialEncryptionService()
+        return self.crypto_service
 
     # -------------------------------------------------------------------------
     def _resolve_provider_api_key(self, provider: str) -> str:
@@ -49,7 +52,7 @@ class LLMFactory:
                 "Google credentials are not configured. Add a Google/Gemini API key in Settings."
             )
         try:
-            api_key = self.crypto_service.decrypt(credential.encrypted_value)
+            api_key = self._get_crypto_service().decrypt(credential.encrypted_value)
         except ValueError as exc:
             provider_label = (
                 "OpenAI"
@@ -86,25 +89,3 @@ class LLMFactory:
                 base_url=settings.deepseek_base_url,
             )
         raise ValueError(f"Unsupported model provider '{provider}'.")
-
-    # -------------------------------------------------------------------------
-    def get_chat_provider(self, provider: str) -> LLMProvider:
-        return _ChatOnlyProvider(self.get_provider(provider))
-
-###############################################################################
-class _ChatOnlyProvider:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, delegate: LLMProvider) -> None:
-        self._delegate = delegate
-        self.provider_name = getattr(delegate, "provider_name", "chat")
-
-    # -------------------------------------------------------------------------
-    def __getattr__(self, item: str):  # noqa: ANN001
-        return getattr(self._delegate, item)
-
-    # -------------------------------------------------------------------------
-    def structured_output(
-        self, request: LLMRequest, schema: type[object]
-    ) -> dict[str, Any]:
-        raise RuntimeError("Structured extraction is forbidden on chat-model path.")

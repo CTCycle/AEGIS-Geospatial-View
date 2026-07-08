@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.services.chat.history_buffer import ChatHistoryBuffer
 
-
 ###############################################################################
 class _HistoryRepoStub:
 
@@ -21,7 +20,6 @@ class _HistoryRepoStub:
         self.calls += 1
         return self.messages[-limit:]
 
-
 ###############################################################################
 def test_history_buffer_hydrates_once_and_reuses_cache() -> None:
     repo = _HistoryRepoStub()
@@ -30,7 +28,6 @@ def test_history_buffer_hydrates_once_and_reuses_cache() -> None:
     second = buffer.get_or_hydrate(7)
     assert first == second
     assert repo.calls == 1
-
 
 ###############################################################################
 def test_history_buffer_appends_and_trims() -> None:

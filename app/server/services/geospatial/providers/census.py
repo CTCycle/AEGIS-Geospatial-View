@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
-
 ###############################################################################
 class CensusProvider(ArcGISRestProvider):
     provider_id = "census"

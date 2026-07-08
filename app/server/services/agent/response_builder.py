@@ -6,7 +6,6 @@ from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDec
 from server.domain.chat import ChatOperationResult
 from server.domain.geographics import MapSession
 
-
 ###############################################################################
 class AgentResponseBuilder:
 
@@ -154,9 +153,10 @@ class AgentResponseBuilder:
             tool_payload=tool_payload,
         )
         if map_session is not None:
+            map_status = cls._map_session_status(map_session)
             return ChatOperationResult(
                 kind="map_session",
-                status="success",
+                status=map_status,
                 message=assistant_message,
                 warnings=warnings,
                 map_session=map_session,
@@ -191,6 +191,18 @@ class AgentResponseBuilder:
             message=assistant_message,
             warnings=warnings,
         )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _map_session_status(map_session: MapSession) -> str:
+        requested = list(map_session.requested_overlay_ids or map_session.overlay_ids)
+        if map_session.failed_overlays and not map_session.overlay_ids:
+            return "failed"
+        if map_session.failed_overlays:
+            return "partial"
+        if requested and not map_session.overlay_ids:
+            return "failed"
+        return "success"
 
     # -------------------------------------------------------------------------
     @staticmethod

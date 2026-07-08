@@ -50,13 +50,11 @@ class AgentToolResult(BaseModel):
     result: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class ToolError:
     code: str
     message: str
-
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -76,7 +74,6 @@ class ToolExecutionEnvelope:
             else {"code": self.error.code, "message": self.error.message},
             "metadata": self.metadata,
         }
-
 
 ###############################################################################
 @dataclass(frozen=True)

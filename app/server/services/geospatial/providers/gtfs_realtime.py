@@ -18,7 +18,6 @@ from server.services.geospatial.providers.http import (
     fetch_bytes_url,
 )
 
-
 ###############################################################################
 class GTFSRealtimeProvider(GeospatialProvider):
     provider_id = "gtfs_realtime"

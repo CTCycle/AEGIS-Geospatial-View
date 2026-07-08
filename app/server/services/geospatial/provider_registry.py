@@ -7,6 +7,7 @@ from time import monotonic
 from typing import Any
 
 from server.domain.geographics import GeospatialProviderLayerDescriptor
+from server.domain.geospatial.providers import ProviderExecutionPolicy
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import (
@@ -98,19 +99,13 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     ),
 }
 
-
 ###############################################################################
 class ProviderRegistryError(Exception):
     """Base provider registry error."""
 
-
 ###############################################################################
 class ProviderNotRegisteredError(ProviderRegistryError):
     """Raised when no provider is registered for a provider id."""
-
-
-from server.domain.geospatial.providers import ProviderExecutionPolicy
-
 
 ###############################################################################
 class ProviderRegistry:

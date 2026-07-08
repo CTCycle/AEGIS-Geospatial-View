@@ -23,6 +23,12 @@ set "FRONTEND_UNIT_PHASE=SKIPPED"
 set "FRONTEND_E2E_PHASE=SKIPPED"
 set "STARTED_BACKEND=0"
 set "STARTED_FRONTEND=0"
+set "SKIP_LIVE_SERVERS=0"
+set "SKIP_FRONTEND=0"
+if /i "%STANDARD_TEST_SKIP_LIVE_SERVERS%"=="true" set "SKIP_LIVE_SERVERS=1"
+if "%STANDARD_TEST_SKIP_LIVE_SERVERS%"=="1" set "SKIP_LIVE_SERVERS=1"
+if /i "%STANDARD_TEST_SKIP_FRONTEND%"=="true" set "SKIP_FRONTEND=1"
+if "%STANDARD_TEST_SKIP_FRONTEND%"=="1" set "SKIP_FRONTEND=1"
 
 if exist "%SETTINGS_ENV%" (
   for /f "usebackq tokens=* delims=" %%L in ("%SETTINGS_ENV%") do (
@@ -79,6 +85,7 @@ if not "%STANDARD_TEST_PYTEST_TARGET%"=="" set "PYTEST_TARGET=%STANDARD_TEST_PYT
 set "NEED_FRONTEND=1"
 echo %PYTEST_TARGET% | findstr /I "\\e2e" >nul 2>&1
 if not errorlevel 1 set "NEED_FRONTEND=1"
+if "%SKIP_FRONTEND%"=="1" set "NEED_FRONTEND=0"
 
 
 echo.
@@ -90,6 +97,8 @@ echo [INFO] Backend URL : %APP_TEST_BACKEND_URL%
 echo [INFO] Frontend URL: %APP_TEST_FRONTEND_URL%
 echo [INFO] Target      : %PYTEST_TARGET%
 echo.
+
+if "%SKIP_LIVE_SERVERS%"=="1" goto run_pytests
 
 set "LIVE_SERVER_PHASE=PASS"
 curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
@@ -132,6 +141,7 @@ if "%NEED_FRONTEND%"=="1" (
   )
 )
 
+:run_pytests
 echo [STEP] Running Python tests...
 "%PYTHON_CMD%" -m pytest "%PYTEST_TARGET%" -v --tb=short %*
 if errorlevel 1 (

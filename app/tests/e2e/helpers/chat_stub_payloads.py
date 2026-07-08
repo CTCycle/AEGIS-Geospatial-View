@@ -4,8 +4,13 @@ from typing import Any
 
 
 ROME_MAP_SESSION = {
+    "session_id": "rome-map-session",
+    "resolved_location": {"label": "Rome, Italy", "latitude": 41.9028, "longitude": 12.4964},
     "center": {"latitude": 41.9028, "longitude": 12.4964},
     "bounds": [12.3, 41.8, 12.7, 42.0],
+    "basemap_id": "osm_default",
+    "overlay_ids": ["openaq_air_quality"],
+    "viewport": {"center_latitude": 41.9028, "center_longitude": 12.4964, "radius_m": 5000},
     "basemap": {
         "id": "osm_default",
         "label": "OpenStreetMap",
@@ -28,7 +33,6 @@ ROME_MAP_SESSION = {
     "compliance_warnings": ["Demo alert summary for documented session."],
 }
 
-
 ###############################################################################
 def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
     return {
@@ -49,7 +53,6 @@ def _chat_turn_contract(message: str = "stub request") -> dict[str, Any]:
         "parser_confidence": 1.0,
     }
 
-
 ###############################################################################
 def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     return {
@@ -60,7 +63,6 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
         },
         "trace": {"steps": ["stub"]},
     }
-
 
 ###############################################################################
 def chat_turn_map_response(
@@ -81,7 +83,6 @@ def chat_turn_map_response(
         },
     }
 
-
 ###############################################################################
 def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
     return {
@@ -96,7 +97,6 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
         },
     }
 
-
 ###############################################################################
 def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
     return {
@@ -109,15 +109,10 @@ def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any
         "tool_payload": {"execution": "location_to_coordinates"},
     }
 
-
 ###############################################################################
 def model_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "local",
-        "chat_model_provider": "ollama",
-        "chat_model_name": "llama3.2",
-        "parser_model_provider": "ollama",
-        "parser_model_name": "llama3.2",
         "agent_model_provider": "ollama",
         "agent_model_name": "llama3.2",
         "ollama_url": "http://localhost:11434",
@@ -125,7 +120,6 @@ def model_settings_payload() -> dict[str, Any]:
         "google_base_url": None,
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": False}},
     }
-
 
 ###############################################################################
 def model_catalog_payload() -> dict[str, Any]:
@@ -136,7 +130,9 @@ def model_catalog_payload() -> dict[str, Any]:
                 "name": "gpt-5-mini",
                 "description": "Low-latency OpenAI cloud model.",
                 "provider": "openai",
-                "capabilities": ["chat", "tool_use"],
+                "capabilities": ["chat", "tools", "structured_output"],
+                "supports_tools": True,
+                "supports_structured_output": True,
                 "metadata": {"tier": "mini"},
             },
             {
@@ -176,23 +172,17 @@ def model_catalog_payload() -> dict[str, Any]:
         ],
     }
 
-
 ###############################################################################
-def split_role_settings_payload() -> dict[str, Any]:
+def selected_agent_settings_payload() -> dict[str, Any]:
     return {
         "active_provider_mode": "cloud",
-        "chat_model_provider": "openai",
-        "chat_model_name": "gpt-4.1-mini",
-        "parser_model_provider": "google",
-        "parser_model_name": "gemini-2.5-flash",
-        "agent_model_provider": "ollama",
-        "agent_model_name": "llama3.2",
+        "agent_model_provider": "openai",
+        "agent_model_name": "gpt-4.1-mini",
         "ollama_url": "http://localhost:11434",
         "openai_base_url": "https://api.openai.com/v1",
         "google_base_url": "https://generativelanguage.googleapis.com/v1beta",
         "credentials": {"openai": {"api_key": False}, "google": {"api_key": True}},
     }
-
 
 ###############################################################################
 def chat_stream_events(

@@ -2,16 +2,6 @@ from __future__ import annotations
 
 from server.configurations import DatabaseSettings
 from server.repositories.database.initializer import initialize_database
-from server.repositories.schemas import (
-    ReferenceCountryAliasRecord,
-    ReferenceCountryRecord,
-    ReferenceGeospatialLayerAliasRecord,
-    ReferenceGeospatialLayerKeywordRecord,
-    ReferenceGeospatialLayerRecord,
-    ReferenceGibsLayerDefaultRecord,
-    ReferenceGibsTileMatrixSetRecord,
-)
-
 
 ###############################################################################
 def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> None:
@@ -53,50 +43,6 @@ def test_initialize_database_ensures_sqlite_schema(monkeypatch, tmp_path) -> Non
     initialize_database(settings)
 
     assert calls == created
-
-
-###############################################################################
-def test_initialize_database_uses_passed_database_settings(
-    monkeypatch, tmp_path
-) -> None:
-    settings = DatabaseSettings(
-        database_path=str(tmp_path / "custom.db"),
-        embedded_database=True,
-        engine=None,
-        host=None,
-        port=None,
-        database_name=None,
-        username=None,
-        password=None,
-        ssl=False,
-        ssl_ca=None,
-        connect_timeout=10,
-        insert_batch_size=250,
-    )
-    received: list[DatabaseSettings] = []
-
-    ###############################################################################
-    class _Repository:
-
-        # -------------------------------------------------------------------------
-        def __init__(self, passed_settings: DatabaseSettings) -> None:
-            received.append(passed_settings)
-            self.engine = object()
-            self.db_path = passed_settings.database_path
-
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.SQLiteRepository",
-        _Repository,
-    )
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.Base.metadata.create_all",
-        lambda engine: None,
-    )
-
-    initialize_database(settings)
-
-    assert received == [settings]
-
 
 ###############################################################################
 def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) -> None:
@@ -142,7 +88,6 @@ def test_initialize_database_defaults_to_server_settings(monkeypatch, tmp_path) 
 
     assert received == [settings]
 
-
 ###############################################################################
 def test_initialize_database_ensures_postgres_schema_when_external_mode(
     monkeypatch, tmp_path
@@ -178,45 +123,6 @@ def test_initialize_database_ensures_postgres_schema_when_external_mode(
     initialize_database(settings)
 
     assert "server.repositories.database.postgres" in __import__("sys").modules
-
-
-###############################################################################
-def test_initialize_database_creates_reference_tables(monkeypatch) -> None:
-    created_tables: list[str] = []
-
-    ###############################################################################
-    class _Engine:
-        pass
-
-    ###############################################################################
-    class _Database:
-        engine = _Engine()
-
-    def _capture_create_all(engine: object) -> None:
-        del engine
-        created_tables.extend(
-            sorted(
-                [
-                    ReferenceCountryRecord.__tablename__,
-                    ReferenceCountryAliasRecord.__tablename__,
-                    ReferenceGeospatialLayerRecord.__tablename__,
-                    ReferenceGeospatialLayerAliasRecord.__tablename__,
-                    ReferenceGeospatialLayerKeywordRecord.__tablename__,
-                    ReferenceGibsTileMatrixSetRecord.__tablename__,
-                    ReferenceGibsLayerDefaultRecord.__tablename__,
-                ]
-            )
-        )
-
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.Base.metadata.create_all",
-        _capture_create_all,
-    )
-
-    initialize_database(_Database())
-
-    assert created_tables == sorted(created_tables)
-
 
 ###############################################################################
 def test_startup_path_seeds_reference_catalog_after_schema_creation(

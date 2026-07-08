@@ -4,7 +4,6 @@ from server.services.geospatial.endpoint_validation import EndpointValidationSer
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 class _NoCredentials:
 
@@ -22,7 +21,6 @@ REQUIRED_TRAIT_FIELDS = {
     "auth_mode",
     "rate_limit_notes",
 }
-
 
 ###############################################################################
 def test_all_manifest_entries_expose_source_traits() -> None:
@@ -45,7 +43,6 @@ def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypat
 
     assert runtime.provider_health("openaq_air_quality") == "missing_credentials"
     assert runtime.provider_health("fred_regional_market_indicators") == "missing_credentials"
-
 
 ###############################################################################
 def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None:

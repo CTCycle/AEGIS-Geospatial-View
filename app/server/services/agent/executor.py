@@ -3,14 +3,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-
 ###############################################################################
 def infer_datetime(action_payload: dict[str, Any]) -> str:
     value = action_payload.get("datetime_inference")
     if isinstance(value, str) and value.strip():
         return value
     return datetime.now(UTC).isoformat()
-
 
 ###############################################################################
 def requires_follow_up(action_payload: dict[str, Any]) -> bool:

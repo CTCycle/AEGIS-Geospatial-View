@@ -41,22 +41,25 @@ const globalApiBase = typeof window !== 'undefined'
 export const API_BASE_URL = normalizeApiBaseUrl(globalApiBase || computeDefaultApiBaseUrl());
 export const API_GEOSPATIAL_CAPABILITIES_PATH = '/geospatial/capabilities';
 export const API_GEOSPATIAL_LAYERS_PATH = '/geospatial/layers';
-export const API_GEOSPATIAL_PROVIDER_LAYERS_PATH = (providerId: string): string =>
-  `/geospatial/providers/${encodeURIComponent(providerId)}/layers`;
-export const API_GEOSPATIAL_PROVIDER_LAYER_PATH = (providerId: string, layerId: string): string =>
-  `/geospatial/providers/${encodeURIComponent(providerId)}/layers/${encodeURIComponent(layerId)}`;
 export const API_GEOSPATIAL_CAMERAS_PATH = '/geospatial/cameras';
-export const API_GEOSPATIAL_AUDIT_PATH = '/geospatial/audit';
 export const API_GEOSPATIAL_SOURCE_CREDENTIAL_STATUS_PATH = (providerId: string): string =>
   `/geospatial/sources/${encodeURIComponent(providerId)}/credential-status`;
 export const API_GEOSPATIAL_PROVIDER_ACCOUNT_SETUP_PATH = '/geospatial/providers/account-setup';
 export const API_CHAT_TURN_PATH = '/chat/turn';
-export const API_CHAT_STREAM_PATH = '/chat/stream';
 export const API_CHAT_MODELS_PATH = '/chat/models';
 export const API_CHAT_SETTINGS_PATH = '/chat/settings';
 export const API_OLLAMA_REFRESH_PATH = '/chat/models/ollama/refresh';
 export const API_OLLAMA_PULL_PATH = '/chat/models/ollama/pull';
 export const API_OLLAMA_HEALTH_PATH = '/chat/models/ollama/health';
+export const API_CONVERSATIONS_PATH = '/conversations';
+export const API_CONVERSATION_RUNS_PATH = (conversationId: string): string =>
+  `/conversations/${encodeURIComponent(conversationId)}/runs`;
+export const API_CONVERSATION_RUN_EVENTS_PATH = (conversationId: string, runId: string): string =>
+  `/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/events`;
+export const API_CONVERSATION_RUN_STEERING_PATH = (conversationId: string, runId: string): string =>
+  `/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/steering`;
+export const API_CONVERSATION_RUN_CANCEL_PATH = (conversationId: string, runId: string): string =>
+  `/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/cancel`;
 
 export const DEFAULT_OVERLAY_OPACITY = 0.65;
 export const DEFAULT_WMS_LAYER_ID = '0';

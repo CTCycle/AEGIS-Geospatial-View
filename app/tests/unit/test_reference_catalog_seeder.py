@@ -16,7 +16,6 @@ from server.repositories.schemas import (
 )
 from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
 
-
 ###############################################################################
 def _build_database(tmp_path: Path) -> SQLiteRepository:
     repository = SQLiteRepository(
@@ -38,7 +37,6 @@ def _build_database(tmp_path: Path) -> SQLiteRepository:
     initialize_database(repository)
     return repository
 
-
 ###############################################################################
 def test_fresh_sqlite_database_creates_reference_tables(tmp_path: Path) -> None:
     repository = _build_database(tmp_path)
@@ -47,7 +45,6 @@ def test_fresh_sqlite_database_creates_reference_tables(tmp_path: Path) -> None:
     assert repository.count_records(ReferenceGeospatialLayerRecord) == 0
     assert repository.count_records(ReferenceGibsTileMatrixSetRecord) == 0
     assert repository.count_records(ReferenceGibsLayerDefaultRecord) == 0
-
 
 ###############################################################################
 def test_first_seed_inserts_all_reference_rows(tmp_path: Path) -> None:
@@ -66,7 +63,6 @@ def test_first_seed_inserts_all_reference_rows(tmp_path: Path) -> None:
     assert repository.count_records(ReferenceGeospatialLayerKeywordRecord) > 0
     assert repository.count_records(ReferenceGibsTileMatrixSetRecord) > 0
     assert repository.count_records(ReferenceGibsLayerDefaultRecord) > 0
-
 
 ###############################################################################
 def test_second_seed_does_not_insert_duplicates(tmp_path: Path) -> None:
@@ -104,7 +100,6 @@ def test_second_seed_does_not_insert_duplicates(tmp_path: Path) -> None:
         "layer_defaults": repository.count_records(ReferenceGibsLayerDefaultRecord),
     }
 
-
 ###############################################################################
 def test_country_seeding_is_skipped_when_reference_countries_populated(
     tmp_path: Path,
@@ -117,7 +112,6 @@ def test_country_seeding_is_skipped_when_reference_countries_populated(
     result = ReferenceCatalogSeeder(repository).seed_if_needed()
 
     assert result.countries_seeded is False
-
 
 ###############################################################################
 def test_layer_seeding_is_skipped_when_reference_layers_populated(
@@ -139,7 +133,6 @@ def test_layer_seeding_is_skipped_when_reference_layers_populated(
 
     assert result.geospatial_layers_seeded is False
 
-
 ###############################################################################
 def test_tile_matrix_seeding_is_skipped_when_table_populated(tmp_path: Path) -> None:
     repository = _build_database(tmp_path)
@@ -155,7 +148,6 @@ def test_tile_matrix_seeding_is_skipped_when_table_populated(tmp_path: Path) -> 
     result = ReferenceCatalogSeeder(repository).seed_if_needed()
 
     assert result.gibs_tile_matrix_sets_seeded is False
-
 
 ###############################################################################
 def test_layer_default_seeding_is_skipped_when_table_populated(tmp_path: Path) -> None:

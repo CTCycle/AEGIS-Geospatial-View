@@ -7,7 +7,6 @@ from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.rainviewer import RainViewerRequestError
 
-
 ###############################################################################
 class _Clock:
 
@@ -18,7 +17,6 @@ class _Clock:
     # -------------------------------------------------------------------------
     def __call__(self) -> float:
         return self.value
-
 
 ###############################################################################
 class _RainViewerService:
@@ -44,7 +42,6 @@ class _RainViewerService:
             raise RainViewerRequestError("offline")
         return self.payload
 
-
 ###############################################################################
 def test_rainviewer_provider_returns_resolved_raster_tile_payload() -> None:
     service = _RainViewerService()
@@ -58,7 +55,6 @@ def test_rainviewer_provider_returns_resolved_raster_tile_payload() -> None:
     assert response.payload["renderingMode"] == "raster-tile"
     assert response.payload["tileUrl"] == "https://tiles.test/{z}/{x}/{y}.png"
     assert response.stale is False
-
 
 ###############################################################################
 def test_rainviewer_provider_uses_stale_cache_when_refresh_fails() -> None:
@@ -89,7 +85,6 @@ def test_rainviewer_provider_uses_stale_cache_when_refresh_fails() -> None:
     assert response.payload["tileUrl"] == "https://stale.test/{z}/{x}/{y}.png"
     assert response.warnings
 
-
 ###############################################################################
 def test_rainviewer_provider_returns_empty_state_when_no_cache_exists() -> None:
     provider = RainViewerProvider(service=_RainViewerService(fail=True))  # type: ignore[arg-type]
@@ -101,7 +96,6 @@ def test_rainviewer_provider_returns_empty_state_when_no_cache_exists() -> None:
     assert response.payload["status"] == "empty"
     assert response.payload["tileUrl"] is None
     assert response.warnings
-
 
 ###############################################################################
 def test_rainviewer_provider_returns_empty_state_for_malformed_payload() -> None:
@@ -116,7 +110,6 @@ def test_rainviewer_provider_returns_empty_state_for_malformed_payload() -> None
     assert response.payload["status"] == "empty"
     assert response.payload["frameCount"] == 0
     assert "usable radar tile frame" in response.warnings[0]
-
 
 ###############################################################################
 def test_rainviewer_provider_uses_stale_cache_when_payload_is_malformed() -> None:
@@ -146,7 +139,6 @@ def test_rainviewer_provider_uses_stale_cache_when_payload_is_malformed() -> Non
     assert response.stale is True
     assert response.payload["tileUrl"] == "https://stale.test/{z}/{x}/{y}.png"
 
-
 ###############################################################################
 def test_rainviewer_provider_caches_successful_metadata_for_five_minutes() -> None:
     service = _RainViewerService()
@@ -158,7 +150,6 @@ def test_rainviewer_provider_caches_successful_metadata_for_five_minutes() -> No
 
     assert first.payload == second.payload
     assert service.calls == 1
-
 
 ###############################################################################
 def test_rainviewer_provider_handles_timeout_like_service_failure() -> None:

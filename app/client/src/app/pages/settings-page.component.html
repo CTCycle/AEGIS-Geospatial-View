@@ -1,7 +1,7 @@
 <div class="settings-page">
   <header class="settings-page__header">
     <div class="settings-page__heading">
-      <p>Select AEGIS models across cloud providers and local Ollama, then assign parser, chat, and agent duties.</p>
+      <p>Select one AEGIS agent model across cloud providers and local Ollama. The selected model handles structured extraction, orchestration, tool calling, and chat.</p>
     </div>
     <div class="settings-page__header-actions">
       <app-settings-icon-action
@@ -30,9 +30,18 @@
       <section class="settings-page__warning" role="status" aria-live="polite">
         <span class="settings-page__warning-badge">Needs attention</span>
         <span class="settings-page__warning-copy">
-          <strong>Assigned local model unavailable.</strong>
+          <strong>Selected local model unavailable.</strong>
           {{ unavailableAssignedOllamaModels.join(', ') }} {{ unavailableAssignedOllamaModels.length === 1 ? 'is' : 'are' }}
-          selected but not installed in Ollama. Pull the model or assign an installed local model before using the workspace.
+          selected but not installed in Ollama. Pull the model or select an installed local model before using the workspace.
+        </span>
+      </section>
+    }
+    @if (deepSeekLoadFailed) {
+      <section class="settings-page__warning" role="status" aria-live="polite">
+        <span class="settings-page__warning-badge">DeepSeek</span>
+        <span class="settings-page__warning-copy">
+          <strong>DeepSeek models could not be loaded.</strong>
+          {{ deepSeekFailureMessage }}
         </span>
       </section>
     }
@@ -80,10 +89,15 @@
               <h2>Loading model catalog</h2>
               <p>Fetching model assignments and provider metadata.</p>
             </section>
+          } @else if (providerFilter === 'deepseek' && isLoadingDeepSeekModels) {
+            <section class="settings-empty-state" aria-live="polite">
+              <h2>Loading DeepSeek models</h2>
+              <p>Fetching the live DeepSeek catalog from the configured provider account.</p>
+            </section>
           } @else if (!hasDisplayedModels) {
             <section class="settings-empty-state" aria-live="polite">
-              <h2>No models match this filter</h2>
-              <p>Adjust the provider tabs or search query to show available models.</p>
+              <h2>{{ deepSeekLoadFailed ? 'DeepSeek models unavailable' : 'No models match this filter' }}</h2>
+              <p>{{ deepSeekLoadFailed ? deepSeekFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
             </section>
           } @else {
             @for (provider of providerKeys; track trackProviderGroup(provider)) {
@@ -99,11 +113,12 @@
                     <article
                       appModelCard
                       [model]="model"
-                      [settings]="settings"
                       [description]="modelDescription(model)"
-                      [isLocal]="localModelIds.has(model.id)"
+                      [isLocal]="model.provider === 'ollama' && localModelIds.has(model.id)"
                       [requiresPull]="requiresPull(model)"
-                      (roleSelected)="onModelRoleSelected($event, model)"
+                      [isSelected]="isAgentModelSelected(model)"
+                      [disabledReason]="agentModelDisabledReason(model)"
+                      (modelSelected)="onModelSelected(model)"
                       (pullRequested)="pullLocalModel($event)"
                     ></article>
                   }
@@ -114,8 +129,8 @@
         </div>
       </section>
 
-      <aside class="settings-page__right-column" aria-label="Model statistics">
-        <app-model-stats-panel [rows]="selectedModelStats" [isLoading]="isLoadingModels"></app-model-stats-panel>
+      <aside class="settings-page__right-column" aria-label="Selected agent model">
+        <app-selected-model-summary [summary]="selectedAgentModelSummary" [isLoading]="isLoadingModels"></app-selected-model-summary>
       </aside>
     </div>
     <footer class="settings-page__status">{{ visibleStatusText }}</footer>
@@ -149,7 +164,7 @@
             label="DeepSeek"
             inputName="deepseek_api_key"
             placeholder="sk-..."
-            hint="Used to discover DeepSeek models and run chat, parser, and agent roles through the DeepSeek API."
+            hint="Used to discover DeepSeek models and run the selected agent model through the DeepSeek API."
             [value]="deepseekKey"
             [configured]="deepSeekConfigured()"
             [credentialHealth]="deepSeekCredentialHealth()"

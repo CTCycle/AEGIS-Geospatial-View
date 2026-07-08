@@ -9,12 +9,10 @@ from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
-
 ###############################################################################
 @dataclass(frozen=True)
 class GeospatialRuntime:
     api_service: GeospatialApiService
-
 
 ###############################################################################
 def build_geospatial_runtime() -> GeospatialRuntime:

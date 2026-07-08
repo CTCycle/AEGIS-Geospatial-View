@@ -15,7 +15,6 @@ from server.services.geospatial.providers.openchargemap import OpenChargeMapProv
 from server.services.geospatial.providers.opentripmap import OpenTripMapProvider
 from server.services.geospatial.providers.ourairports import OurAirportsProvider
 
-
 ###############################################################################
 def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
     with pytest.raises(ProviderAuthError):
@@ -40,7 +39,6 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
     assert "tourism-key" in response.payload["featuresUrl"]
     assert "kinds=museums" in response.payload["featuresUrl"]
 
-
 ###############################################################################
 def test_openchargemap_supports_optional_key() -> None:
     response = asyncio.run(
@@ -62,7 +60,6 @@ def test_openchargemap_supports_optional_key() -> None:
 
     assert "openchargemap" in response.payload["featuresUrl"]
     assert "charge-key" in keyed.payload["featuresUrl"]
-
 
 ###############################################################################
 def test_nrel_requires_key_for_afdc_descriptor() -> None:
@@ -87,7 +84,6 @@ def test_nrel_requires_key_for_afdc_descriptor() -> None:
     assert "nrel-key" in response.payload["featuresUrl"]
     assert "alt-fuel-stations" in response.payload["featuresUrl"]
 
-
 ###############################################################################
 def test_ourairports_returns_source_ready_descriptor() -> None:
     response = asyncio.run(
@@ -96,7 +92,6 @@ def test_ourairports_returns_source_ready_descriptor() -> None:
 
     assert response.payload["status"] == "source-ready"
     assert response.payload["downloadUrl"].endswith("airports.csv")
-
 
 ###############################################################################
 def test_opentripmap_live_fetch_normalizes_geojson() -> None:
@@ -126,7 +121,6 @@ def test_opentripmap_live_fetch_normalizes_geojson() -> None:
     assert response.payload["featureCount"] == 1
     assert response.payload["features"][0]["category"] == "tourism"
 
-
 ###############################################################################
 def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     async def fetcher(url, headers):
@@ -145,7 +139,6 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
 
     assert response.payload["features"] == []
     assert response.payload["featureCount"] == 0
-
 
 ###############################################################################
 def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
@@ -177,7 +170,6 @@ def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
     assert response.payload["featureCount"] == 1
     assert response.payload["features"][0]["category"] == "ev_charging"
 
-
 ###############################################################################
 def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
     async def fetcher(url, headers):
@@ -192,7 +184,6 @@ def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
                 )
             )
         )
-
 
 ###############################################################################
 def test_optional_live_provider_uses_stale_cache_on_failure() -> None:

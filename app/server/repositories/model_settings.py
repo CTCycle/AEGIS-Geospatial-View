@@ -14,7 +14,6 @@ from server.common.time import utc_now_naive
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
-
 ###############################################################################
 class ModelSettingsRepository:
 
@@ -38,10 +37,6 @@ class ModelSettingsRepository:
 
             record = ModelProviderSettingsRecord(
                 active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
-                chat_model_provider=DEFAULT_MODEL_PROVIDER,
-                chat_model_name=DEFAULT_MODEL_NAME,
-                parser_model_provider=DEFAULT_MODEL_PROVIDER,
-                parser_model_name=DEFAULT_MODEL_NAME,
                 agent_model_provider=DEFAULT_MODEL_PROVIDER,
                 agent_model_name=DEFAULT_MODEL_NAME,
                 ollama_url=OLLAMA_DEFAULT_HOST,
@@ -60,10 +55,6 @@ class ModelSettingsRepository:
         self,
         *,
         active_provider_mode: str,
-        chat_model_provider: str,
-        chat_model_name: str,
-        parser_model_provider: str,
-        parser_model_name: str,
         agent_model_provider: str,
         agent_model_name: str,
         ollama_url: str,
@@ -81,10 +72,6 @@ class ModelSettingsRepository:
                 session.add(record)
 
             record.active_provider_mode = active_provider_mode
-            record.chat_model_provider = chat_model_provider
-            record.chat_model_name = chat_model_name
-            record.parser_model_provider = parser_model_provider
-            record.parser_model_name = parser_model_name
             record.agent_model_provider = agent_model_provider
             record.agent_model_name = agent_model_name
             record.ollama_url = ollama_url
