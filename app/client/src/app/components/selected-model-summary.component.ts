@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 
 import { SelectedAgentModelSummary } from '../core/model-selection';
 
@@ -9,6 +9,7 @@ import { SelectedAgentModelSummary } from '../core/model-selection';
   imports: [CommonModule],
   templateUrl: './selected-model-summary.component.html',
   styleUrl: './selected-model-summary.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   host: {
     style: 'display: flex; flex: 1 1 auto; min-height: 100%;',
   },

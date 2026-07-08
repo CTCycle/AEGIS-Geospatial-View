@@ -10,6 +10,7 @@ import {
   Output,
   SimpleChanges,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import maplibregl, { Map } from 'maplibre-gl';
 
@@ -38,6 +39,7 @@ import {
   standalone: true,
   imports: [OverlayControlsComponent],
   templateUrl: './map-preview.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './map-preview.component.css',
 })
 export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy {

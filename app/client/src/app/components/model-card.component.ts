@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 import { ModelCardDescriptor } from '../core/types';
 
@@ -7,6 +7,7 @@ import { ModelCardDescriptor } from '../core/types';
   standalone: true,
   templateUrl: './model-card.component.html',
   styleUrl: './model-card.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   host: {
     class: 'model-card',
     '[class.model-card--local]': 'isLocal',

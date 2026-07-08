@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 import { CameraFeature } from '../core/types';
@@ -6,6 +6,7 @@ import { CameraFeature } from '../core/types';
 @Component({
   selector: 'app-camera-popup',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './camera-popup.component.html',
 })
 export class CameraPopupComponent {

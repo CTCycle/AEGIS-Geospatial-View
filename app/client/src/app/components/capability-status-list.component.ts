@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 
 export type CapabilityStatusTone = 'ok' | 'warn' | 'none';
 
@@ -14,6 +14,7 @@ export interface CapabilityStatusItem {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './capability-status-list.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './capability-status-list.component.css',
 })
 export class CapabilityStatusListComponent {

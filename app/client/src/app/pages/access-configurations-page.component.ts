@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
@@ -22,6 +22,7 @@ interface GeoProviderAccess {
   standalone: true,
   imports: [CommonModule, FormsModule, SettingsModalShellComponent],
   templateUrl: './access-configurations-page.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './access-configurations-page.component.css',
 })
 export class AccessConfigurationsPageComponent implements OnInit {

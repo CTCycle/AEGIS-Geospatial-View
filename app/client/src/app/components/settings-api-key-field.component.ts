@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 type CredentialHealth = 'healthy' | 'unreadable' | string | null;
@@ -7,6 +7,7 @@ type CredentialHealth = 'healthy' | 'unreadable' | string | null;
   selector: 'app-settings-api-key-field',
   standalone: true,
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './settings-api-key-field.component.html',
 })
 export class SettingsApiKeyFieldComponent {

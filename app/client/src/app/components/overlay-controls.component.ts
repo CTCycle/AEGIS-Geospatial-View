@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 import { DEFAULT_OVERLAY_OPACITY } from '../core/constants';
 import {
@@ -12,6 +12,7 @@ import {
   selector: 'app-overlay-controls',
   standalone: true,
   templateUrl: './overlay-controls.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './overlay-controls.component.css',
 })
 export class OverlayControlsComponent {
