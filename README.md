@@ -3,6 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)](./app/server/pyproject.toml)
 [![Angular](https://img.shields.io/badge/Angular-19.2-red?logo=angular&logoColor=white)](./app/client/package.json)
 [![License](https://img.shields.io/github/license/CTCycle/AEGIS-geographics)](./LICENSE)
+[![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
 [![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml?query=branch%3Adevelop)
 
 
