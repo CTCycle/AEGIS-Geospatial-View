@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, ChangeDetectionStrategy } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import {
@@ -97,6 +97,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     private readonly agentReadinessService: AgentReadinessService,
     private readonly userFacingErrorService: UserFacingErrorService,
     private readonly viewStateSync: ViewStateSyncService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {
     this.chatPageState = this.appStateStore.getChatPage();
     this.payload = this.chatPageState.payload;
@@ -709,6 +710,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.agentReadiness = readiness;
     this.syncState();
+    this.changeDetectorRef.detectChanges();
   }
 
   private get agentStatusTone(): CapabilityStatusTone {

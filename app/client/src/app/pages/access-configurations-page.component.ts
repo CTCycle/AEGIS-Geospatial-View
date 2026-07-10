@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
@@ -42,10 +42,12 @@ export class AccessConfigurationsPageComponent implements OnInit {
   constructor(
     private readonly apiClient: ApiClientService,
     private readonly credentialSettingsService: CredentialSettingsService,
+    private readonly changeDetectorRef: ChangeDetectorRef,
   ) {}
 
   async ngOnInit(): Promise<void> {
     await Promise.all([this.loadSettings(), this.loadProviderAccountSetups()]);
+    this.changeDetectorRef.detectChanges();
   }
 
   configured(provider: GeoProviderId): boolean {
@@ -72,6 +74,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
     if (await this.persistCredential(provider, value)) {
       this.drafts[provider] = '';
       this.statusText = `${this.providerName(provider)} key saved. Provider access has not been validated.`;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -82,6 +85,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
     if (await this.persistCredential(provider, '')) {
       this.drafts[provider] = '';
       this.statusText = `${this.providerName(provider)} key cleared. Optional capabilities are disabled.`;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -152,6 +156,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
       this.isSignupModalOpen = false;
       this.selectedProviderAccountSetup = undefined;
       this.statusText = `${setup.name} key saved. Provider access has not been validated.`;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -187,6 +192,7 @@ export class AccessConfigurationsPageComponent implements OnInit {
       return false;
     } finally {
       this.isSaving = false;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
