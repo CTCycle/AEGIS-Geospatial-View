@@ -14,6 +14,8 @@ class AgentTurnSupport:
         turn_contract: Any,
         memory_snapshot: dict[str, Any],
         constraints: Any,
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         return [
             {
@@ -31,6 +33,8 @@ class AgentTurnSupport:
                     "Parsed request:\n"
                     f"{turn_contract.model_dump_json()}\n\n"
                     f"Map memory:\n{memory_snapshot}\n\n"
+                    f"Active conversation instructions:\n{active_instructions or []}\n\n"
+                    f"Current task state:\n{task_snapshot or {}}\n\n"
                     f"Policy constraints:\n{constraints}"
                 ),
             },

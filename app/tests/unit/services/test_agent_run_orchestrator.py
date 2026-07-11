@@ -78,6 +78,14 @@ class _FakeEventPublisher:
         self.events.append(kwargs)
 
 ###############################################################################
+class _FakeConversationContextRepository:
+
+    # -------------------------------------------------------------------------
+    def resolve_chat_session_id(self, conversation_id: str) -> int:
+        assert conversation_id == "conv_1"
+        return 1
+
+###############################################################################
 def _snapshot() -> AgentRunSnapshot:
     return AgentRunSnapshot(
         conversation_id="conv_1",
@@ -137,6 +145,7 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         agent_orchestrator=_FakeAgentOrchestrator(_failed_response()),  # type: ignore[arg-type]
         run_repository=repository,  # type: ignore[arg-type]
         event_publisher=publisher,  # type: ignore[arg-type]
+        conversation_context_repository=_FakeConversationContextRepository(),  # type: ignore[arg-type]
     )
 
     asyncio.run(orchestrator.execute_run("run_1"))

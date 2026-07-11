@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-06-22
+Last updated: 2026-07-11
 
 ## Relational Storage
 
@@ -31,10 +31,19 @@ Core relational storage covers:
 
 - chat sessions and messages
 - conversations, agent runs, steering messages, and ordered run events
+- one-to-one conversation contexts linking each conversation to its internal chat session
 - model provider settings
 - encrypted model credentials (backed by auto-seeded Fernet key material)
 - manifest embedding records
 - seeded geospatial reference data
+
+`conversation_contexts.conversation_id` is the canonical run-history isolation key.
+The linked `chat_session_id` remains an internal storage identifier. Conversation and
+chat-session creation occur in one transaction; older conversations receive a link
+on first access.
+
+The context row also stores active directives, task and memory snapshots, an
+incremental summary with its source boundary, and an optimistic context revision.
 
 ## Encryption Material
 
@@ -65,9 +74,9 @@ Core relational storage covers:
 
 ## Frontend Persistence
 
-- Storage key: `aegis:webapp-state:v3`
+- Storage key: `aegis:webapp-state:v4`
 - Storage type: `sessionStorage`
 - TTL: 6 hours
 - Tab ownership guard: `localStorage` heartbeat keys
 - Implementation: `app/client/src/app/core/app-state.ts`
-- Chat panel state persists the active conversation/run IDs, latest run event ID, stream state, concise progress label, and a bounded set of seen run event IDs for duplicate protection.
+- Chat state persists the conversation ID, context revision, task snapshot, active run IDs, and stream diagnostics. Internal numeric chat-session IDs are not frontend state.

@@ -15,6 +15,7 @@ from server.domain.agent.execution import (
 )
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.factory import LLMFactory
+from server.services.llm.context_budget import prepare_request
 from server.services.llm.types import (
     LLMRequest,
     LLMToolCall,
@@ -43,15 +44,43 @@ class NativeToolLoop:
         self.max_parallel_tool_calls = max_parallel_tool_calls
         self.max_tool_result_chars = max_tool_result_chars
         self.tool_timeout_seconds = tool_timeout_seconds
+        self.last_context_usages: list[dict[str, Any]] = []
 
     # -------------------------------------------------------------------------
     async def run(self, request: AgentToolLoopRequest) -> AgentToolLoopResult:
         provider = self.provider_factory.get_provider(request.provider)
         messages = list(request.messages)
+        working_state = {
+            "role": "system",
+            "content": "WORKING_STATE (replaceable): "
+            + json.dumps(
+                {
+                    "parsed_request": request.context.parsed_request,
+                    "map_state": request.context.map_state,
+                    "policy_constraints": request.context.policy_constraints,
+                    "completed_tool_results": [],
+                },
+                default=str,
+            ),
+        }
+        messages.insert(1, working_state)
         all_calls: list[LLMToolCall] = []
         all_results: list[LLMToolResult] = []
+        self.last_context_usages = []
 
         for iteration in range(1, self.max_iterations + 1):
+            working_state["content"] = "WORKING_STATE (replaceable): " + json.dumps(
+                {
+                    "parsed_request": request.context.parsed_request,
+                    "map_state": request.context.map_state,
+                    "policy_constraints": request.context.policy_constraints,
+                    "completed_tool_results": [
+                        {"tool": result.name, "ok": not result.is_error, "error": result.error}
+                        for result in all_results
+                    ],
+                },
+                default=str,
+            )
             LOGGER.info(
                 "tool_loop_started provider=%s model=%s iteration=%s",
                 request.provider,
@@ -59,7 +88,7 @@ class NativeToolLoop:
                 iteration,
             )
             try:
-                response = provider.chat(
+                llm_request = prepare_request(
                     LLMRequest(
                         model=request.model,
                         provider=request.provider,
@@ -70,8 +99,15 @@ class NativeToolLoop:
                         metadata={"max_tokens": request.max_tokens}
                         if request.max_tokens is not None
                         else {},
-                    )
+                    ),
+                    provider=request.provider,
                 )
+                messages = list(llm_request.messages)
+                working_state = messages[1]
+                response = provider.chat(llm_request)
+                usage = getattr(provider, "last_context_usage", None)
+                if isinstance(usage, dict):
+                    self.last_context_usages.append(dict(usage))
             except Exception as exc:
                 LOGGER.exception("tool_loop_failed provider=%s model=%s", request.provider, request.model)
                 return AgentToolLoopResult(

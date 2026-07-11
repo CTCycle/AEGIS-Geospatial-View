@@ -10,6 +10,7 @@ from server.domain.llm.types import (
     LLMToolResult,
     LLMToolResultMessage,
     ModelDescriptor,
+    ModelContextProfile,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "LLMToolResult",
     "LLMToolResultMessage",
     "ModelDescriptor",
+    "ModelContextProfile",
 ]

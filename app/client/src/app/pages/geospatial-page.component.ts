@@ -28,6 +28,7 @@ import {
   ChatRole,
   ChatTurnResponse,
   ContextUsage,
+  ConversationTaskSnapshot,
   RunEvent,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
@@ -50,8 +51,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   isToolbarCollapsed = false;
   mapState = { overlayVisibility: {}, overlayOpacity: {} } as PersistedChatPageState['mapState'];
 
-  sessionId?: number;
   conversationId?: string;
+  contextRevision?: number;
+  taskSnapshot?: ConversationTaskSnapshot;
   activeRunId?: string;
   activeRunVersion?: number;
   lastRunEventId?: string;
@@ -105,8 +107,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.isToolbarCollapsed = this.chatPageState.isToolbarCollapsed;
     this.mapState = this.chatPageState.mapState;
 
-    this.sessionId = this.chatPageState.chatPanel.sessionId;
     this.conversationId = this.chatPageState.chatPanel.conversationId;
+    this.contextRevision = this.chatPageState.chatPanel.contextRevision;
+    this.taskSnapshot = this.chatPageState.chatPanel.taskSnapshot;
     this.activeRunId = this.chatPageState.chatPanel.activeRunId;
     this.activeRunVersion = this.chatPageState.chatPanel.activeRunVersion;
     this.lastRunEventId = this.chatPageState.chatPanel.lastRunEventId;
@@ -236,8 +239,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   startNewChat(): void {
-    this.sessionId = undefined;
     this.conversationId = undefined;
+    this.contextRevision = undefined;
+    this.taskSnapshot = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
     this.lastRunEventId = undefined;
@@ -355,8 +359,12 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
     try {
       if (!this.supportsRunTransport()) {
+        const conversation = this.conversationId
+          ? { conversation_id: this.conversationId }
+          : await this.apiClient.createConversation({ title: message.slice(0, 120) });
+        this.conversationId = conversation.conversation_id;
         const result = await this.apiClient.sendChatTurn({
-          session_id: this.sessionId,
+          conversation_id: conversation.conversation_id,
           message,
         });
         this.isLoading = false;
@@ -574,6 +582,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private applyRunCompletionPayload(payload: Record<string, unknown>): void {
+    const revision = typeof payload['context_revision'] === 'number'
+      ? payload['context_revision']
+      : undefined;
+    if (revision !== undefined && this.contextRevision !== undefined && revision < this.contextRevision) {
+      return;
+    }
+    this.contextRevision = revision ?? this.contextRevision;
+    this.taskSnapshot = (payload['task_snapshot'] as ConversationTaskSnapshot | undefined)
+      ?? this.taskSnapshot;
     const mapSession = normalizeMapSession(payload['map_session']);
     if (mapSession) {
       this.handleMapSession(mapSession);
@@ -594,9 +611,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (requestNonce !== this.conversationNonce) {
       return;
     }
-    if (result.session_id > 0) {
-      this.sessionId = result.session_id;
-    }
+    this.contextRevision = result.context_revision ?? this.contextRevision;
+    this.taskSnapshot = result.task_snapshot ?? this.taskSnapshot;
     this.messages = [...this.messages, { role: 'assistant', content: result.assistant_message }];
 
     const operation = result.operation;
@@ -652,8 +668,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       isToolbarCollapsed: this.isToolbarCollapsed,
       payload: this.payload,
       chatPanel: {
-        sessionId: this.sessionId,
         conversationId: this.conversationId,
+        contextRevision: this.contextRevision,
+        taskSnapshot: this.taskSnapshot,
         activeRunId: this.activeRunId,
         activeRunVersion: this.activeRunVersion,
         lastRunEventId: this.lastRunEventId,

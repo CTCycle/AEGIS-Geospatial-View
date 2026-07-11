@@ -202,6 +202,18 @@ class _SettingsRepo:
         return _Settings()
 
 ###############################################################################
+class _ConversationContexts:
+    def __init__(self) -> None:
+        self._sessions: dict[str, int] = {}
+
+    def resolve_chat_session_id(self, conversation_id: str) -> int:
+        return self._sessions.setdefault(conversation_id, len(self._sessions) + 1)
+
+    def validate_session(self, conversation_id: str, chat_session_id: int) -> None:
+        if self.resolve_chat_session_id(conversation_id) != chat_session_id:
+            raise ValueError("Chat session does not belong to conversation.")
+
+###############################################################################
 def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
     search = _Search()
     registry = ToolRegistry(runtime_registry=RuntimeRegistry())
@@ -232,6 +244,7 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
         history_repo=_History(),  # type: ignore[arg-type]
         task_state_service=ConversationTaskStateService(),
+        conversation_context_repository=_ConversationContexts(),  # type: ignore[arg-type]
     )
 
 ###############################################################################

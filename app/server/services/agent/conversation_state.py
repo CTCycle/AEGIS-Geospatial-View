@@ -142,6 +142,30 @@ class ConversationTaskStateService:
             self._states.pop(conversation_key, None)
 
     # -------------------------------------------------------------------------
+    def hydrate(self, conversation_key: str, payload: dict[str, Any] | None) -> None:
+        if not payload:
+            return
+        snapshot = ConversationTaskSnapshot.model_validate(payload)
+        with self._lock:
+            sequence = max(
+                (
+                    int(task.task_id.removeprefix("task-"))
+                    for task in snapshot.tasks
+                    if task.task_id.removeprefix("task-").isdigit()
+                ),
+                default=0,
+            )
+            self._states[conversation_key] = _ConversationState(
+                sequence=sequence,
+                tasks=[task.model_copy(deep=True) for task in snapshot.tasks],
+                active_visualization=snapshot.active_visualization,
+            )
+
+    # -------------------------------------------------------------------------
+    def serialize(self, conversation_key: str) -> dict[str, Any]:
+        return self.snapshot(conversation_key).model_dump(mode="json")
+
+    # -------------------------------------------------------------------------
     def _get_state(self, conversation_key: str) -> _ConversationState:
         now = utc_now()
         expired = [

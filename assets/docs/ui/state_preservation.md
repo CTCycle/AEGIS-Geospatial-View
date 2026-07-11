@@ -1,10 +1,10 @@
 # State Preservation
 
-Last updated: 2026-06-22
+Last updated: 2026-07-11
 
 ## Overview
 
-The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v3` with a 6-hour TTL.
+The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v4` with a 6-hour TTL.
 
 Older schema payloads are invalidated and discarded.
 
@@ -22,8 +22,7 @@ Older schema payloads are invalidated and discarded.
 
 Persisted chat state includes:
 
-- `sessionId`
-- `conversationId`, `activeRunId`, `activeRunVersion`, and `lastRunEventId`
+- `conversationId`, `contextRevision`, `taskSnapshot`, `activeRunId`, `activeRunVersion`, and `lastRunEventId`
 - `conversationNonce`
 - `messages`
 - `lastDecision`
@@ -47,6 +46,9 @@ State is restored only when:
 - payload shape remains valid
 
 Otherwise the app falls back to `defaultAppState()`.
+
+Late completion payloads with older context revisions are discarded. Numeric
+backend chat-session identifiers are neither restored nor transmitted.
 
 ## Tab Isolation And Clear Behavior
 

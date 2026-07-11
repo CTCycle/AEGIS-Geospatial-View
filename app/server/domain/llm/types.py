@@ -14,6 +14,19 @@ class ModelDescriptor:
 
 ###############################################################################
 @dataclass(frozen=True)
+class ModelContextProfile:
+    provider: str
+    model: str
+    context_window_tokens: int
+    maximum_output_tokens: int
+    default_output_reserve: int
+    tokenizer_strategy: str = "chars_per_token_4"
+    supports_context_caching: bool = False
+    supports_server_compaction: bool = False
+    metadata_source: str = "catalog"
+
+###############################################################################
+@dataclass(frozen=True)
 class LLMRequest:
     model: str
     messages: list[dict[str, Any]]
@@ -84,6 +97,11 @@ class ContextUsage:
     usage_percent: float
     provider: str
     model: str
+    reserved_output_tokens: int = 0
+    tool_schema_tokens: int = 0
+    response_schema_tokens: int = 0
+    safety_margin_tokens: int = 512
+    usage_source: str = "estimated"
 
     # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
@@ -94,4 +112,9 @@ class ContextUsage:
             "usage_percent": self.usage_percent,
             "provider": self.provider,
             "model": self.model,
+            "reserved_output_tokens": self.reserved_output_tokens,
+            "tool_schema_tokens": self.tool_schema_tokens,
+            "response_schema_tokens": self.response_schema_tokens,
+            "safety_margin_tokens": self.safety_margin_tokens,
+            "usage_source": self.usage_source,
         }

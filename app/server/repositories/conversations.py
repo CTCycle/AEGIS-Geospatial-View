@@ -6,7 +6,12 @@ from uuid import uuid4
 from sqlalchemy import select
 
 from server.repositories.database.backend import get_database
-from server.repositories.schemas.models import Base, ConversationRecord
+from server.repositories.schemas.models import (
+    Base,
+    ChatSessionRecord,
+    ConversationContextRecord,
+    ConversationRecord,
+)
 
 ###############################################################################
 class ConversationRepository:
@@ -30,6 +35,16 @@ class ConversationRepository:
                 title=title.strip() if isinstance(title, str) and title.strip() else None,
             )
             session.add(record)
+            session.flush()
+            chat_session = ChatSessionRecord(title=record.title, status="active")
+            session.add(chat_session)
+            session.flush()
+            session.add(
+                ConversationContextRecord(
+                    conversation_id=record.id,
+                    chat_session_id=chat_session.id,
+                )
+            )
             session.commit()
             session.refresh(record)
             return record

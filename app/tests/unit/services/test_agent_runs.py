@@ -14,10 +14,12 @@ from server.repositories import agent_run_events as event_repo_module
 from server.repositories import agent_runs as run_repo_module
 from server.repositories import agent_steering as steering_repo_module
 from server.repositories import conversations as conversation_repo_module
+from server.repositories import conversation_context as context_repo_module
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
+from server.repositories.conversation_context import ConversationContextRepository
 from server.repositories.schemas.models import Base
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
@@ -64,11 +66,13 @@ def run_repositories(monkeypatch: pytest.MonkeyPatch):
     Base.metadata.create_all(backend.engine)
     database = _DatabaseHandle(backend)
     monkeypatch.setattr(conversation_repo_module, "get_database", lambda: database)
+    monkeypatch.setattr(context_repo_module, "get_database", lambda: database)
     monkeypatch.setattr(run_repo_module, "get_database", lambda: database)
     monkeypatch.setattr(steering_repo_module, "get_database", lambda: database)
     monkeypatch.setattr(event_repo_module, "get_database", lambda: database)
     return {
         "conversations": ConversationRepository(),
+        "contexts": ConversationContextRepository(),
         "runs": AgentRunRepository(),
         "steering": AgentSteeringRepository(),
         "events": AgentRunEventRepository(),
@@ -151,6 +155,61 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
             )
         )
     assert first.state == "pending"
+
+###############################################################################
+def test_conversation_creation_atomically_links_distinct_chat_sessions(
+    run_repositories,
+) -> None:
+    conversations = run_repositories["conversations"]
+    contexts = run_repositories["contexts"]
+    first = conversations.create_conversation("Rome")
+    second = conversations.create_conversation("Milan")
+
+    first_session = contexts.resolve_chat_session_id(first.id)
+    second_session = contexts.resolve_chat_session_id(second.id)
+
+    assert first_session != second_session
+    contexts.validate_session(first.id, first_session)
+    with pytest.raises(ValueError, match="does not belong"):
+        contexts.validate_session(second.id, first_session)
+
+###############################################################################
+def test_legacy_conversation_is_lazily_linked_once(run_repositories) -> None:
+    contexts = run_repositories["contexts"]
+    with contexts._session_factory() as session:  # noqa: SLF001
+        from server.repositories.schemas.models import ConversationRecord
+
+        session.add(ConversationRecord(id="conv_legacy", title="Legacy"))
+        session.commit()
+
+    first = contexts.resolve_chat_session_id("conv_legacy")
+    second = contexts.resolve_chat_session_id("conv_legacy")
+
+    assert first == second
+
+###############################################################################
+def test_conversation_context_state_survives_repository_restart(run_repositories) -> None:
+    conversation = run_repositories["conversations"].create_conversation("Persistent")
+    contexts = run_repositories["contexts"]
+    initial = contexts.read_state(conversation.id)
+    revision = contexts.write_state(
+        conversation.id,
+        expected_revision=initial["context_revision"],
+        active_instructions=[{"directive_id": "dir_1", "status": "active"}],
+        task_snapshot={"conversation_key": conversation.id, "tasks": []},
+        memory_snapshot={"active_location": {"label": "Rome"}},
+    )
+    restarted = ConversationContextRepository()
+    hydrated = restarted.read_state(conversation.id)
+    assert hydrated["context_revision"] == revision
+    assert hydrated["active_instructions"][0]["directive_id"] == "dir_1"
+    assert hydrated["memory_snapshot"]["active_location"]["label"] == "Rome"
+    with pytest.raises(ValueError, match="revision conflict"):
+        restarted.write_state(
+            conversation.id,
+            expected_revision=initial["context_revision"],
+            task_snapshot={"conversation_key": conversation.id, "tasks": []},
+        )
 
 ###############################################################################
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:

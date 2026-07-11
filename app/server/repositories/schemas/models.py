@@ -225,6 +225,36 @@ class ConversationRecord(Base):
     )
 
 ###############################################################################
+class ConversationContextRecord(Base):
+    __tablename__ = "conversation_contexts"
+
+    conversation_id: Mapped[str] = mapped_column(
+        String(80),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    chat_session_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    context_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    active_instructions_json: Mapped[str | None] = mapped_column(Text)
+    task_snapshot_json: Mapped[str | None] = mapped_column(Text)
+    memory_snapshot_json: Mapped[str | None] = mapped_column(Text)
+    conversation_summary_json: Mapped[str | None] = mapped_column(Text)
+    summary_through_turn_index: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+###############################################################################
 class AgentRunRecord(Base):
     __tablename__ = "agent_runs"
 

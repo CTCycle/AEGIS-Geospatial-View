@@ -3,6 +3,7 @@ import {
   ChatMessage,
   ChatRole,
   ContextUsage,
+  ConversationTaskSnapshot,
   MapSession,
   ModelProviderMode,
   OverlayStateChange,
@@ -11,7 +12,7 @@ import {
 } from './types';
 import { isRecord } from './type-guards';
 
-export const APP_STATE_STORAGE_KEY = 'aegis:webapp-state:v3';
+export const APP_STATE_STORAGE_KEY = 'aegis:webapp-state:v4';
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
@@ -19,8 +20,9 @@ const TAB_HEARTBEAT_TTL_MS = 15000;
 const DEFAULT_CHAT_PANEL_RATIO = 0.3;
 
 export interface PersistedChatPanelState {
-  sessionId?: number;
   conversationId?: string;
+  contextRevision?: number;
+  taskSnapshot?: ConversationTaskSnapshot;
   activeRunId?: string;
   activeRunVersion?: number;
   lastRunEventId?: string;
@@ -142,8 +144,9 @@ export const defaultAppState = (): PersistedAppState => ({
     isToolbarCollapsed: false,
     payload: undefined,
     chatPanel: {
-      sessionId: undefined,
       conversationId: undefined,
+      contextRevision: undefined,
+      taskSnapshot: undefined,
       activeRunId: undefined,
       activeRunVersion: undefined,
       lastRunEventId: undefined,
@@ -289,11 +292,14 @@ export const loadPersistedAppState = (): PersistedAppState => {
       }
       if (isRecord(parsed.chatPage.chatPanel)) {
         next.chatPage.chatPanel = {
-          sessionId: typeof parsed.chatPage.chatPanel.sessionId === 'number'
-            ? parsed.chatPage.chatPanel.sessionId
-            : undefined,
           conversationId: typeof parsed.chatPage.chatPanel.conversationId === 'string'
             ? parsed.chatPage.chatPanel.conversationId
+            : undefined,
+          contextRevision: typeof parsed.chatPage.chatPanel.contextRevision === 'number'
+            ? parsed.chatPage.chatPanel.contextRevision
+            : undefined,
+          taskSnapshot: isRecord(parsed.chatPage.chatPanel.taskSnapshot)
+            ? parsed.chatPage.chatPanel.taskSnapshot as unknown as ConversationTaskSnapshot
             : undefined,
           activeRunId: typeof parsed.chatPage.chatPanel.activeRunId === 'string'
             ? parsed.chatPage.chatPanel.activeRunId

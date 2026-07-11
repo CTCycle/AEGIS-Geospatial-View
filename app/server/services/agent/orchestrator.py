@@ -11,12 +11,16 @@ from server.domain.agent.pipeline import (
 )
 from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
 from server.repositories.model_settings import ModelSettingsRepository
+from server.repositories.conversation_context import ConversationContextRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.conversation_state import (
     ConversationTaskStateService,
 )
 from server.services.agent.location_memory import LocationMemoryService
+from server.services.agent.instruction_state import ConversationInstructionService
+from server.services.agent.context_assembler import AgentContextAssembler
+from server.domain.agent.context import ConversationDirective
 from server.services.agent.native_tool_loop import (
     AgentExecutionContext,
     AgentToolLoopRequest,
@@ -62,6 +66,7 @@ class AgentOrchestrator:
         settings_repo: ModelSettingsRepository | None = None,
         history_service: ChatHistoryService | None = None,
         history_repo: ChatHistoryService | None = None,
+        conversation_context_repository: ConversationContextRepository | None = None,
         task_state_service: ConversationTaskStateService | None = None,
         pipeline_router: DeterministicAgentRouter | None = None,
         tool_planner: DeterministicToolPlanner | None = None,
@@ -93,7 +98,13 @@ class AgentOrchestrator:
             tool_registry=self.tool_registry,
         )
         self.history_service = history_service or history_repo or ChatHistoryService()
+        self.conversation_context_repository = conversation_context_repository
         self.task_state_service = task_state_service or ConversationTaskStateService()
+        self.instruction_state_service = ConversationInstructionService()
+        self._active_directives: dict[str, list[ConversationDirective]] = {}
+        self.context_assembler = AgentContextAssembler()
+        self._context_packages: dict[str, Any] = {}
+        self._persisted_context_state: dict[str, dict[str, Any]] = {}
         self.pipeline_router = pipeline_router or DeterministicAgentRouter()
         self.tool_planner = tool_planner or DeterministicToolPlanner()
         self.tool_plan_executor = tool_plan_executor or ToolPlanExecutor(
@@ -123,6 +134,96 @@ class AgentOrchestrator:
         payload: ChatTurnRequest,
         progress_callback=None,
     ) -> ChatTurnResponse:
+        conversation_id = payload.conversation_id
+        repository = self.conversation_context_repository
+        persisted: dict[str, Any] | None = None
+        directives: list[ConversationDirective] = []
+        if conversation_id is not None:
+            if repository is None:
+                repository = ConversationContextRepository()
+                self.conversation_context_repository = repository
+            if hasattr(repository, "read_state"):
+                persisted = repository.read_state(conversation_id)
+                self._persisted_context_state[conversation_id] = persisted
+                self.task_state_service.hydrate(
+                    conversation_id, persisted.get("task_snapshot")
+                )
+                directives = [
+                    ConversationDirective.model_validate(item)
+                    for item in persisted.get("active_instructions", [])
+                ]
+                directives = self.instruction_state_service.apply_user_message(
+                    directives,
+                    payload.message,
+                    len(
+                        self.history_service.list_recent_messages(
+                            repository.resolve_chat_session_id(conversation_id),
+                            limit=10_000,
+                        )
+                    )
+                    + 1,
+                )
+                self._active_directives[conversation_id] = directives
+        response = await self._run_turn(payload, progress_callback)
+        response = self._with_phase_usage(response)
+        if conversation_id is not None and repository is not None and persisted is not None:
+            revision = repository.write_state(
+                conversation_id,
+                expected_revision=int(persisted["context_revision"]),
+                active_instructions=[item.model_dump(mode="json") for item in directives],
+                task_snapshot=self.task_state_service.serialize(conversation_id),
+                memory_snapshot=response.memory_snapshot,
+                conversation_summary=(
+                    self._context_packages[conversation_id].conversation_summary
+                    if conversation_id in self._context_packages
+                    else None
+                ),
+                summary_through_turn_index=(
+                    self._context_packages[conversation_id].summarized_through_turn_index
+                    if conversation_id in self._context_packages
+                    else None
+                ),
+            )
+            response = response.model_copy(update={"context_revision": revision})
+        return response
+
+    # -------------------------------------------------------------------------
+    def _with_phase_usage(self, response: ChatTurnResponse) -> ChatTurnResponse:
+        phases: dict[str, dict[str, Any]] = {}
+        if response.context_usage is not None:
+            phases["parser"] = response.context_usage.model_dump(mode="json", exclude={"phases"})
+        loop_usages = getattr(self.native_tool_loop, "last_context_usages", [])
+        if loop_usages:
+            phases["native_loop"] = {
+                "iterations": loop_usages,
+                "estimated_input_tokens": sum(int(item.get("estimated_input_tokens") or 0) for item in loop_usages),
+            }
+        synthesis = getattr(self.response_synthesizer, "last_context_usage", None)
+        if isinstance(synthesis, dict):
+            phases["synthesis"] = synthesis
+        if response.context_usage is None or not phases:
+            return response
+        inputs = [
+            int(item.get("estimated_input_tokens") or 0)
+            for item in phases.values()
+            if isinstance(item, dict)
+        ]
+        usage = response.context_usage.model_copy(
+            update={
+                "phases": phases,
+                "peak_request_tokens": max(inputs, default=0),
+                "total_input_tokens": sum(inputs),
+                "total_output_tokens": 0,
+            }
+        )
+        return response.model_copy(update={"context_usage": usage})
+
+    # -------------------------------------------------------------------------
+    async def _run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback=None,
+    ) -> ChatTurnResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
             "chat_turn_start request_id=%s session_id=%s message_length=%s",
@@ -130,7 +231,23 @@ class AgentOrchestrator:
             payload.session_id,
             len(payload.message),
         )
-        session = self.history_service.upsert_session(payload.session_id, title=payload.title)
+        if payload.conversation_id is not None:
+            context_repository = self.conversation_context_repository
+            if context_repository is None:
+                context_repository = ConversationContextRepository()
+                self.conversation_context_repository = context_repository
+            canonical_session_id = context_repository.resolve_chat_session_id(payload.conversation_id)
+            if payload.session_id is not None:
+                context_repository.validate_session(
+                    payload.conversation_id, payload.session_id
+                )
+            session = self.history_service.upsert_session(
+                canonical_session_id, title=payload.title
+            )
+        else:
+            session = self.history_service.upsert_session(
+                payload.session_id, title=payload.title
+            )
         existing_response = self.turn_history_service.load_existing_response(session.id, request_id)
         if existing_response is not None:
             return existing_response
@@ -146,7 +263,12 @@ class AgentOrchestrator:
                 request_id=request_id,
             )
 
-        recent_messages = self.history_service.list_recent_messages(session.id, limit=12)
+        recent_messages = self.history_service.list_recent_messages(session.id, limit=200)
+        for index in range(len(recent_messages) - 1, -1, -1):
+            message = recent_messages[index]
+            if message.get("role") == "user" and message.get("content") == payload.message:
+                recent_messages.pop(index)
+                break
         latest_contract = self.history_service.get_latest_turn_contract(session.id)
         latest_memory = self.history_service.get_latest_memory_snapshot(session.id)
         conversation_key = payload.conversation_id or f"session:{session.id}"
@@ -156,11 +278,40 @@ class AgentOrchestrator:
             state_before.active_visualization,
         )
 
-        turn_contract = self.parser_service.parse_turn(
-            user_message=payload.message,
-            memory_snapshot=latest_memory,
-            conversation_messages=recent_messages,
+        settings = self.settings_repo.get_or_create()
+        context_package = self.context_assembler.assemble(
+            provider=settings.agent_model_provider,
+            model=settings.agent_model_name,
+            current_user_message=payload.message,
+            messages=recent_messages,
+            directives=self.instruction_state_service.active(
+                self._active_directives.get(conversation_key, [])
+            ),
+            task_state=state_before.model_dump(mode="json"),
+            map_memory=latest_memory,
+            prior_summary=(
+                self._persisted_context_state.get(conversation_key, {}).get(
+                    "conversation_summary"
+                )
+            ),
         )
+        self._context_packages[conversation_key] = context_package
+        recent_messages = context_package.recent_messages
+
+        parser_kwargs = {
+            "user_message": payload.message,
+            "memory_snapshot": latest_memory,
+            "conversation_messages": recent_messages,
+        }
+        if isinstance(self.parser_service, ParserService):
+            parser_kwargs["active_instructions"] = [
+                item.model_dump(mode="json")
+                for item in self.instruction_state_service.active(
+                    self._active_directives.get(conversation_key, [])
+                )
+            ]
+            parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
+        turn_contract = self.parser_service.parse_turn(**parser_kwargs)
         turn_contract = self.turn_history_service.merge_memory_location_signals(
             turn_contract=turn_contract,
             latest_memory=latest_memory,
@@ -618,6 +769,13 @@ class AgentOrchestrator:
                     turn_contract=turn_contract,
                     memory_snapshot=latest_memory,
                     constraints=constraints,
+                    active_instructions=[
+                        item.model_dump(mode="json")
+                        for item in self.instruction_state_service.active(
+                            self._active_directives.get(conversation_key, [])
+                        )
+                    ],
+                    task_snapshot=self.task_state_service.serialize(conversation_key),
                 ),
                 tools=native_tools,
                 temperature=0.2,
@@ -706,6 +864,13 @@ class AgentOrchestrator:
             map_session=map_session,
             direct_result=direct_result,
             task_status="completed" if operation.status == "success" else "partial",
+            active_instructions=[
+                item.model_dump(mode="json")
+                for item in self.instruction_state_service.active(
+                    self._active_directives.get(conversation_key, [])
+                )
+            ],
+            task_snapshot=self.task_state_service.serialize(conversation_key),
         )
         operation = operation.model_copy(update={"message": assistant_message})
         decision = AgentResponseBuilder.build_final_decision(
@@ -929,6 +1094,13 @@ class AgentOrchestrator:
                 task_status=(
                     "completed" if operation.status == "success" else "partial"
                 ),
+                active_instructions=[
+                    item.model_dump(mode="json")
+                    for item in self.instruction_state_service.active(
+                        self._active_directives.get(conversation_key, [])
+                    )
+                ],
+                task_snapshot=self.task_state_service.serialize(conversation_key),
             )
             operation = operation.model_copy(update={"message": assistant_message})
         decision = AgentResponseBuilder.build_final_decision(

@@ -115,7 +115,15 @@ class ParserService:
         return any(self._contains_verbatim_span(user_message, term) for term in quoted_terms)
 
     # -------------------------------------------------------------------------
-    def _extract_turn(self, *, user_message: str, memory_snapshot: dict, recent_messages: list[dict[str, str]]) -> LLMParserExtraction:
+    def _extract_turn(
+        self,
+        *,
+        user_message: str,
+        memory_snapshot: dict,
+        recent_messages: list[dict[str, str]],
+        active_instructions: list[dict] | None = None,
+        task_snapshot: dict | None = None,
+    ) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
             settings = self.settings_repo.get_or_create()
@@ -133,6 +141,8 @@ class ParserService:
             "user_message": user_message,
             "memory_snapshot": memory_snapshot,
             "recent_messages": recent_messages[-6:],
+            "active_instructions": active_instructions or [],
+            "task_snapshot": task_snapshot,
         }
         request = LLMRequest(
             model=model_name,
@@ -322,6 +332,8 @@ class ParserService:
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        active_instructions: list[dict] | None = None,
+        task_snapshot: dict | None = None,
     ) -> TurnParseResult:
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
@@ -330,6 +342,8 @@ class ParserService:
                 user_message=user_message,
                 memory_snapshot=memory_snapshot,
                 recent_messages=normalized_recent,
+                active_instructions=active_instructions,
+                task_snapshot=task_snapshot,
             )
         except LLMConfigurationError:
             raise

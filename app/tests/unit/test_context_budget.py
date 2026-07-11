@@ -5,6 +5,7 @@ from server.services.llm.context_budget import (
     compute_context_usage,
     compute_ollama_context_usage,
     resolve_model_context_limit,
+    prepare_request,
 )
 from server.services.llm.types import LLMRequest
 
@@ -44,3 +45,17 @@ def test_cloud_context_usage_does_not_select_local_window() -> None:
     assert usage.selected_context_window is None
     assert usage.provider == "openai"
     assert usage.estimated_input_tokens > 0
+
+###############################################################################
+def test_prepare_request_compacts_old_history_and_preserves_current_input() -> None:
+    request = LLMRequest(
+        model="unknown-small",
+        messages=[
+            {"role": "system", "content": "system"},
+            *[{"role": "user", "content": "x" * 2000} for _ in range(20)],
+            {"role": "user", "content": "CURRENT"},
+        ],
+    )
+    prepared = prepare_request(request, provider="test")
+    assert len(prepared.messages) < len(request.messages)
+    assert prepared.messages[-1]["content"] == "CURRENT"
