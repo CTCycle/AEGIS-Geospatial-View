@@ -1,15 +1,14 @@
 # Startup
 
-Last updated: 2026-07-01
+Last updated: 2026-07-11
 
 ## Local Development Via Launcher
 
-```cmd
-copy /Y settings\.env.local.example settings\.env
-start_on_windows.bat
+```powershell
+.\start_on_windows.ps1
 ```
 
-The launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds when needed, and starts backend and frontend services.
+The interactive launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds the frontend, initializes the database, runs tests, clears caches and logs, and starts backend and frontend services. On first launch it copies `settings/.env.example` to `settings/.env`.
 
 
 An existing `app\server\.venv` is reused. The launcher recreates it only when
@@ -17,7 +16,7 @@ An existing `app\server\.venv` is reused. The launcher recreates it only when
 repository or runtime folder is moved. An unrelated dependency-sync failure
 does not delete the environment.
 
-By default the launcher no longer prunes the uv cache on each start. Set `PRUNE_UV_CACHE=true` in `settings\.env` only when you explicitly want to reclaim dependency cache space; pruning can take noticeably longer on Windows.
+Launching preserves the uv cache. Use menu option 2 to install or update dependencies and prune it, or menu option 6 to clear caches without reinstalling.
 
 ## Local Development Manual
 
@@ -45,14 +44,6 @@ Working path:
 - Run frontend Angular commands outside the sandbox when using Codex on Windows.
 - The same project build succeeds once the command is executed with elevated or unsandboxed permissions.
 - Backend FastAPI startup is not affected by this specific issue.
-
-## Desktop Packaging
-
-```cmd
-copy /Y settings\.env.local.tauri.example settings\.env
-start_on_windows.bat
-release\tauri\build_with_tauri.bat
-```
 
 ## Test Execution
 

@@ -161,16 +161,15 @@ For more help, see:
 
 ## For Local Setup
 
-If you are setting the project up locally, the repository includes platform-specific startup and packaging scripts.
+If you are setting the project up locally, the repository includes a Windows launcher for setup, maintenance, and startup.
 
 The shortest path on Windows is:
 
-```cmd
-copy /Y settings\.env.local.example settings\.env
-start_on_windows.bat
+```powershell
+.\start_on_windows.ps1
 ```
 
-For other platforms and for packaging details, use the startup and maintenance scripts already included in the repository. The technical documentation under `assets/docs` covers the deeper setup and runtime behavior.
+On first launch, the script creates `settings/.env` from `settings/.env.example`. The technical documentation under `assets/docs` covers manual setup and deeper runtime behavior.
 
 ## Project Contents
 
@@ -178,16 +177,9 @@ The repository is split into a few broad areas:
 
 - `app/server` for the backend
 - `app/client` for the frontend webapp
-- `app/src-tauri` for the desktop shell and packaging config
 - `app/resources` for local data and supporting files
 - `app/tests` for automated checks
 - `settings` for environment-specific configuration
-
-## Desktop Artifact Hygiene
-
-`app/src-tauri` is a versioned source area. Keep source code, Tauri configuration, Cargo metadata, capabilities, and icons there. Do not commit generated desktop build output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, or `app/src-tauri/gen`.
-
-Windows installers, portable `.exe` exports, and other packaged desktop artifacts belong in `release/windows` only as generated release output. They should be published through GitHub release artifacts and workflow uploads, not tracked in Git.
 
 ## License
 

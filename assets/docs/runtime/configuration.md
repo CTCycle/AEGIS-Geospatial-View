@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-06-06
+Last updated: 2026-07-11
 
 ## Environment File
 
@@ -15,6 +15,7 @@ Common keys include:
 - `UI_PORT`
 - `RELOAD`
 - `OPTIONAL_DEPENDENCIES`
+- `BACKEND_VISIBLE`
 - `EMBEDDED_DATABASE`
 - `DATABASE_URL`
 - `DATABASE_ENGINE`
@@ -48,18 +49,10 @@ for the embedded SQLite database. When unset, the embedded database defaults to
 `%TEMP%/AEGIS Geospatial View/database.db` on Windows and
 `<repo>/.runtime/database.db` elsewhere.
 
-## Profile Differences
+## Local Profile
 
-### Development Profile
-
-Source template: `settings/.env.local.example`
+Source template: `settings/.env.example`
 
 - `OPTIONAL_DEPENDENCIES=true`
-- intended for local web workflow
-
-### Tauri Profile
-
-Source template: `settings/.env.local.tauri.example`
-
-- `OPTIONAL_DEPENDENCIES=false`
-- intended for deterministic desktop packaging
+- `BACKEND_VISIBLE=false` keeps the backend terminal hidden; set it to `true` to show backend logs in a dedicated terminal
+- intended for the local web workflow

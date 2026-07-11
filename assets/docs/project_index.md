@@ -1,6 +1,6 @@
 # Project Overview
 
-Last updated: 2026-06-02
+Last updated: 2026-07-11
 
 ## Purpose
 
@@ -52,11 +52,11 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 - `runtime/modes.md`
   Supported runtime modes and their operational differences.
 - `runtime/startup.md`
-  Launcher, manual startup, test, and packaging commands.
+  Launcher, manual startup, and test commands.
 - `runtime/configuration.md`
   Environment variables, settings files, and profile differences.
 - `runtime/deployment.md`
-  Packaging outputs, interoperability, and runtime constraints.
+  Local distribution, interoperability, and runtime constraints.
 
 ### Geospatial
 
@@ -137,4 +137,4 @@ This file is the root index for `assets/docs`. Read it first, then open the smal
 
 - Windows is the default operating environment.
 - Keep PowerShell and CMD examples aligned with actual repo entry points.
-- Document environment-specific constraints when they affect runtime, validation, or packaging.
+- Document environment-specific constraints when they affect runtime or validation.
