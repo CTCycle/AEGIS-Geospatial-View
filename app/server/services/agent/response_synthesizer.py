@@ -41,6 +41,7 @@ class GroundedResponseSynthesizer:
             if enabled is None
             else enabled
         )
+        self.last_context_usage: dict[str, Any] | None = None
 
     # -------------------------------------------------------------------------
     def synthesize(
@@ -53,6 +54,8 @@ class GroundedResponseSynthesizer:
         direct_result: dict[str, Any] | None = None,
         clarification_plan: dict[str, Any] | None = None,
         task_status: str | None = None,
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
     ) -> str:
         if operation.kind in {"error", "rejection"} or operation.status == "failed":
             return fallback_text
@@ -73,7 +76,10 @@ class GroundedResponseSynthesizer:
             "direct_result": self._bounded_value(direct_result),
             "clarification": self._bounded_value(clarification_plan),
             "task_status": task_status,
+            "active_conversation_instructions": active_instructions or [],
+            "task_snapshot": self._bounded_value(task_snapshot),
         }
+        self.last_context_usage = None
         try:
             provider = self.llm_factory.get_provider(
                 settings.agent_model_provider
@@ -107,6 +113,8 @@ class GroundedResponseSynthesizer:
                 GroundedSynthesisResult,
             )
             result = GroundedSynthesisResult.model_validate(payload)
+            usage = getattr(provider, "last_context_usage", None)
+            self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
             if any(key not in evidence for key in result.used_evidence_keys):
                 raise ValueError("Synthesis referenced evidence keys outside the verified payload.")
         except Exception:

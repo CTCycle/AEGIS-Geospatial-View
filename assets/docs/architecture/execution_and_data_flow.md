@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-07-01
+Last updated: 2026-07-11
 
 ## Layering
 
@@ -60,8 +60,19 @@ Geospatial API services are composed during application startup and accessed thr
 - `AgentTurnStateAssembler` owns map-session reconstruction, memory snapshot updates, and partial clarification map-state application.
 - `AgentTurnSupport` owns static fallback helpers for direct rejection, general capability answers, parser-failure classification, and native-tool loop prompt assembly.
 
-Conversation task state is process-local, keyed by conversation ID or direct-chat
-session ID, and expires after six hours of inactivity. It is not durable user memory.
+Conversation task state is keyed by conversation ID, hydrated from the durable
+conversation-context snapshot before each run, and persisted with optimistic
+revision checking after each completed turn.
+
+Run-based chat history is isolated by `conversation_id`. Each conversation owns one
+durable `conversation_contexts` row that resolves its internal numeric chat session;
+every run reuses that session. Numeric session IDs are internal and are validated
+against the conversation before a turn can use them. Existing conversation rows are
+linked lazily on first access without selecting a global or recently used session.
+
+Every model phase receives freshly assembled conversation directives, task state,
+map memory, summarized older turns, recent verbatim turns, verified tool outcomes,
+and policy constraints. The current user message is supplied exactly once.
 
 ## Geospatial Capability Pipeline
 

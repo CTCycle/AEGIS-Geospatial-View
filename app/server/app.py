@@ -43,6 +43,7 @@ from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
+from server.repositories.conversation_context import ConversationContextRepository
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
@@ -103,6 +104,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
         agent_orchestrator=chat_runtime.agent_orchestrator,
         run_repository=run_repository,
         event_publisher=run_event_publisher,
+        conversation_context_repository=ConversationContextRepository(),
     )
     run_lifecycle_service = RunLifecycleService(
         conversation_repository=ConversationRepository(),

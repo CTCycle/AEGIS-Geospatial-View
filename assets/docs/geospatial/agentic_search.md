@@ -1,13 +1,13 @@
 # Agentic Search
 
-Last updated: 2026-06-24
+Last updated: 2026-07-11
 
 ## Summary
 
 The chat workflow separates structured parsing from provider-native tool calling:
 
 1. `ParserService` emits evidence-oriented `TurnParseResult`, including prompt relationship, entity/layer targets, basemap changes, ambiguities, and frontend update type.
-2. A volatile task ledger records the supervised task and follow-up relationship.
+2. A durable conversation task ledger records the supervised task and follow-up relationship.
 3. Semantic layer concepts are resolved against enabled manifest metadata before planning.
 4. Deterministic routing selects a narrow specialist group.
 5. A typed tool plan fixes capability IDs, arguments, dependencies, timeouts, retries, validation, and merge behavior before execution.
@@ -21,6 +21,13 @@ remain separate. Satellite language selects the imagery basemap unless the user
 explicitly requests an imagery data layer.
 
 No legacy routing compatibility is preserved.
+
+## Conversation Context
+
+`conversation_id` isolates history, directives, tasks, map memory, summaries, and
+tool outcomes. Explicit durable instructions enter a structured directive ledger;
+later conflicts supersede earlier directives. Context is rebuilt for the selected
+model using declared input/output limits, schema overhead, and safety margin.
 
 ## Parser Contract
 

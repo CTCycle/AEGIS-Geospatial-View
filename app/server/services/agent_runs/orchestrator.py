@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
 from server.repositories.agent_runs import AgentRunRepository
+from server.repositories.conversation_context import ConversationContextRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
 
@@ -16,10 +17,12 @@ class AgentRunOrchestrator:
         agent_orchestrator: AgentOrchestrator,
         run_repository: AgentRunRepository,
         event_publisher: RunEventPublisher,
+        conversation_context_repository: ConversationContextRepository,
     ) -> None:
         self.agent_orchestrator = agent_orchestrator
         self.run_repository = run_repository
         self.event_publisher = event_publisher
+        self.conversation_context_repository = conversation_context_repository
 
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
@@ -32,8 +35,12 @@ class AgentRunOrchestrator:
         snapshot = self.run_repository.mark_started(run_id)
         await self._publish_progress(snapshot, RunProgressStage.UNDERSTANDING_REQUEST)
         try:
+            chat_session_id = self.conversation_context_repository.resolve_chat_session_id(
+                snapshot.conversation_id
+            )
             response = await self.agent_orchestrator.run_turn(
                 ChatTurnRequest(
+                    session_id=chat_session_id,
                     message=snapshot.aggregated_request,
                     request_id=run_id,
                     title=snapshot.original_request[:120],
@@ -153,6 +160,7 @@ class AgentRunOrchestrator:
                 "visualization_update": response.visualization_update.model_dump(mode="json")
                 if response.visualization_update is not None
                 else None,
+                "context_revision": response.context_revision,
             },
         )
 

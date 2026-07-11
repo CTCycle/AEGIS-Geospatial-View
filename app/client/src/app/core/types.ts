@@ -406,7 +406,7 @@ export interface AgentRunCancelResponse {
 }
 
 export interface ChatTurnRequest {
-  session_id?: number;
+  conversation_id: string;
   title?: string;
   message: string;
   datetime?: string;
@@ -420,6 +420,15 @@ export interface ContextUsage {
   usage_percent: number;
   provider: string;
   model: string;
+  reserved_output_tokens?: number;
+  tool_schema_tokens?: number;
+  response_schema_tokens?: number;
+  safety_margin_tokens?: number;
+  usage_source?: string;
+  phases?: Record<string, unknown>;
+  peak_request_tokens?: number | null;
+  total_input_tokens?: number | null;
+  total_output_tokens?: number | null;
 }
 
 export interface NormalizedAction {
@@ -618,7 +627,6 @@ export interface VisualizationUpdate {
 
 export interface ChatTurnResponse {
   request_id: string;
-  session_id: number;
   assistant_message: string;
   turn_contract: TurnParseResult;
   decision: PolicyDecision;
@@ -631,6 +639,7 @@ export interface ChatTurnResponse {
   tool_plan?: ToolPlan | null;
   failure_diagnostic?: TaskFailureDetail | null;
   visualization_update?: VisualizationUpdate | null;
+  context_revision?: number | null;
 }
 
 export type ChatStreamEventType =

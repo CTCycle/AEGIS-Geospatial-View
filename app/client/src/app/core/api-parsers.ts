@@ -494,7 +494,6 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
 
   return {
     request_id: requireString(value.request_id, 'request_id'),
-    session_id: requireNumber(value.session_id, 'session_id'),
     assistant_message: requireString(value.assistant_message, 'assistant_message'),
     turn_contract: requireRecord(value.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],
     decision: requireRecord(value.decision, 'decision') as unknown as ChatTurnResponse['decision'],
@@ -510,6 +509,9 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
       : undefined,
     visualization_update: isRecord(value.visualization_update)
       ? value.visualization_update as unknown as ChatTurnResponse['visualization_update']
+      : undefined,
+    context_revision: typeof value.context_revision === 'number'
+      ? value.context_revision
       : undefined,
   };
 };
