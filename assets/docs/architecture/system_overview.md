@@ -1,10 +1,10 @@
 # System Overview
 
-Last updated: 2026-06-10
+Last updated: 2026-07-11
 
 ## Scope
 
-This branch describes the implemented system across `app/`, `settings/`, and `release/`.
+This branch describes the implemented system across `app/` and `settings/`.
 
 ## Application Shape
 
@@ -22,8 +22,7 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 - Frontend bootstrap: `app/client/src/main.ts`
 - Frontend root component: `app/client/src/app/app.component.ts`
 - Frontend routes: `app/client/src/app/app.routes.ts`
-- Desktop packaging config: `app/src-tauri/tauri.conf.json`
-- Windows packaging script: `release/tauri/build_with_tauri.bat`
+- Windows launcher: `start_on_windows.ps1`
 
 ## Backend Startup Behavior
 
@@ -38,7 +37,7 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 - runs startup validation
 - optionally syncs vectors
 
-`create_app()` mounts API routers under `/api`, serves the packaged SPA when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
+`create_app()` mounts API routers under `/api`, serves the built SPA when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
 
 ## External Integrations
 

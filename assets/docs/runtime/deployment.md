@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-06-23
+Last updated: 2026-07-11
 
 ## Backend Persistence
 
@@ -13,35 +13,14 @@ Last updated: 2026-06-23
 
 - Frontend communicates with backend through `/api`.
 - Development proxying is configured by `app/client/proxy.conf.cjs`.
-- Desktop runtime bundles frontend dist and backend/runtime resources into the Tauri package.
+- The Windows launcher runs the backend and frontend preview as local processes.
 
 ## Operational Constraints
 
 - Background jobs are in-process and do not survive backend restart.
 - Cancellation is cooperative.
-- Desktop packaging is Windows-focused.
 - External providers influence runtime reliability based on network and credential state.
 
 ## Distribution Notes
 
-### Web Or Local Distribution
-
-Current scripts optimize for local execution, not a standalone server deployment bundle.
-
-### Desktop Distribution
-
-Build through `release/tauri/build_with_tauri.bat`.
-
-`app/src-tauri` is versioned as source/config only. Keep `Cargo.toml`, `Cargo.lock`, `build.rs`, `tauri.conf.json`, `src/`, `capabilities/`, and `icons/` in Git. Do not commit generated output from `app/src-tauri/target`, `app/src-tauri/bundle`, `app/src-tauri/bundle-src`, `app/src-tauri/gen`, or packaged desktop binaries.
-
-Artifacts are exported to:
-
-- `release/windows/installers`
-- `release/windows/portable`
-
-Portable exports contain:
-
-- `aegis-desktop.exe`
-- `runtime/` with the bundled backend, settings, database seed, catalog, and embedded runtimes required at startup
-
-Publish desktop binaries as release artifacts or workflow uploads only. Do not commit `release/windows` output or packaged desktop installers back into the repository.
+Current scripts optimize for local execution, not a standalone server distribution bundle. Use `start_on_windows.ps1` for the supported Windows workflow or the manual commands in `runtime/startup.md`.

@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-07-01
+Last updated: 2026-07-11
 
 ## Purpose
 
@@ -18,11 +18,6 @@ AEGIS Geospatial View/
     resources/
       catalog/
       database.db
-    src-tauri/
-      gen/
-      icons/
-      src/
-      target/
     scripts/
     server/
       api/
@@ -39,13 +34,11 @@ AEGIS Geospatial View/
       run_tests.bat
   settings/
     .env
-    .env.local.example
-    .env.local.tauri.example
+    .env.example
     configurations.json
-  start_on_windows.bat
-  setup_and_maintenance.bat
-  release/
-    tauri/
+  scripts/
+    launcher/
+  start_on_windows.ps1
   README.md
 ```
 

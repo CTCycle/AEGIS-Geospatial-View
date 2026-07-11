@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-06-02
+Last updated: 2026-07-11
 
 ## Supported Modes
 
@@ -8,16 +8,8 @@ Last updated: 2026-06-02
 
 - Backend: FastAPI
 - Frontend: Angular dev or preview server
-- Primary launcher: `start_on_windows.bat`
+- Primary launcher: `start_on_windows.ps1`
 - Portable runtimes are expected under `runtimes/`
-
-### Desktop Runtime And Packaging
-
-- Tauri config: `app/src-tauri/tauri.conf.json`
-- Build pipeline: `release/tauri/build_with_tauri.bat`
-- Output folders:
-  - `release/windows/installers`
-  - `release/windows/portable`
 
 ### Automated Test Runtime
 
@@ -32,4 +24,4 @@ Last updated: 2026-06-02
 ## Not Implemented
 
 - No first-class Docker deployment files
-- No Linux or macOS desktop packaging pipeline in repo scripts
+- No Linux or macOS launcher is included
