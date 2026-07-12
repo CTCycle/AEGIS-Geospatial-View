@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 ## Environment File
 
@@ -15,7 +15,7 @@ Common keys include:
 - `UI_PORT`
 - `RELOAD`
 - `OPTIONAL_DEPENDENCIES`
-- `BACKEND_VISIBLE`
+- `BACKEND_LOGS_VISIBLE`
 - `EMBEDDED_DATABASE`
 - `DATABASE_URL`
 - `DATABASE_ENGINE`
@@ -54,5 +54,5 @@ for the embedded SQLite database. When unset, the embedded database defaults to
 Source template: `settings/.env.example`
 
 - `OPTIONAL_DEPENDENCIES=true`
-- `BACKEND_VISIBLE=false` keeps the backend terminal hidden; set it to `true` to show backend logs in a dedicated terminal
+- `BACKEND_LOGS_VISIBLE=true` shows backend logs in a dedicated terminal; when absent, the launcher defaults to `true`
 - intended for the local web workflow
