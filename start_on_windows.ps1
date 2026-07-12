@@ -165,7 +165,7 @@ function Import-EnvironmentFile {
         UI_PORT = '8001'
         RELOAD = 'false'
         OPTIONAL_DEPENDENCIES = 'false'
-        BACKEND_VISIBLE = 'false'
+        BACKEND_LOGS_VISIBLE = 'true'
     }
     foreach ($entry in $defaults.GetEnumerator()) {
         [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
@@ -366,13 +366,12 @@ function Invoke-LaunchApplication {
 
     Write-Status RUN "Launching backend ($backendModule)"
     $backendProcess = $null
-    if ($env:BACKEND_VISIBLE -ieq 'true') {
+    if ($env:BACKEND_LOGS_VISIBLE -ieq 'true') {
         $quotedArguments = $backendArguments | ForEach-Object {
             if ($_ -match '\s') { '"{0}"' -f ($_ -replace '"', '""') } else { $_ }
         }
         $backendCommand = 'cd /d "{0}" && "{1}" {2}' -f $backendWorkingDirectory, $venvPython, ($quotedArguments -join ' ')
-        $startCommand = '/d /c start "Backend" cmd /c "{0}"' -f ($backendCommand -replace '"', '""')
-        Start-Process -FilePath 'cmd.exe' -ArgumentList $startCommand -WindowStyle Hidden -Wait
+        $backendProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/d', '/k', $backendCommand) -WorkingDirectory $backendWorkingDirectory -WindowStyle Normal -PassThru
     }
     else {
         $backendProcess = Start-Process -FilePath $venvPython -ArgumentList $backendArguments -WorkingDirectory $backendWorkingDirectory -WindowStyle Hidden -PassThru
@@ -385,7 +384,7 @@ function Invoke-LaunchApplication {
     Write-Status OK 'Backend health check passed.'
 
     Write-Status RUN 'Launching frontend preview'
-    $frontendProcess = Start-Process -FilePath $NpmCmd -ArgumentList @('run', 'preview', '--', '--host', $env:UI_HOST, '--port', "$uiPort", '--strictPort') -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
+    $frontendProcess = Start-Process -FilePath $NpmCmd -ArgumentList @('run', 'preview', '--', '--host', $env:UI_HOST, '--port', "$uiPort") -WorkingDirectory $ClientDir -WindowStyle Hidden -PassThru
     if (-not (Wait-HttpHealth -Uri $uiUri -TimeoutSeconds 60 -IntervalSeconds 1)) {
         throw "Frontend preview did not become ready within 60 seconds at $uiUri."
     }
@@ -538,7 +537,7 @@ while ($true) {
         switch ($selection) {
             '1' {
                 Invoke-LaunchApplication
-                return
+                exit 0
             }
             '2' { Invoke-InstallOrUpdate }
             '3' { Invoke-InitializeDatabase }
