@@ -34,6 +34,7 @@ class AgentRunRepository:
                 aggregated_request=aggregated_request,
                 active_run_version=1,
                 state=AgentRunState.PENDING.value,
+                active_slot=1,
             )
             session.add(record)
             session.commit()
@@ -72,6 +73,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             record = self._require_run(session, run_id)
             record.state = AgentRunState.CANCELLED.value
+            record.active_slot = None
             record.cancel_requested_at = record.cancel_requested_at or datetime.now(UTC)
             record.completed_at = record.completed_at or datetime.now(UTC)
             session.commit()
@@ -110,6 +112,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             record = self._require_run(session, run_id)
             record.state = AgentRunState.COMPLETED.value
+            record.active_slot = None
             record.completed_at = datetime.now(UTC)
             session.commit()
             session.refresh(record)
@@ -120,6 +123,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             record = self._require_run(session, run_id)
             record.state = AgentRunState.FAILED.value
+            record.active_slot = None
             record.error_code = code
             record.error_message = message
             record.completed_at = datetime.now(UTC)

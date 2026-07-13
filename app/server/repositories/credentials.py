@@ -23,16 +23,18 @@ class CredentialRepository:
         key_version: int,
     ) -> ModelCredentialRecord:
         with self._session_factory() as session:
+            label_key = label.strip().casefold()
             statement = (
                 select(ModelCredentialRecord)
                 .where(ModelCredentialRecord.provider == provider)
-                .where(ModelCredentialRecord.label == label)
+                .where(ModelCredentialRecord.label_key == label_key)
             )
             record = session.execute(statement).scalars().first()
             if record is None:
                 record = ModelCredentialRecord(
                     provider=provider,
                     label=label,
+                    label_key=label_key,
                     encrypted_value=encrypted_value,
                     key_version=key_version,
                     is_active=True,
@@ -41,6 +43,7 @@ class CredentialRepository:
             else:
                 record.encrypted_value = encrypted_value
                 record.key_version = key_version
+                record.label_key = label_key
                 record.is_active = True
                 record.updated_at = utc_now_naive()
             session.commit()
@@ -64,7 +67,7 @@ class CredentialRepository:
             statement = (
                 select(ModelCredentialRecord)
                 .where(ModelCredentialRecord.provider == provider)
-                .where(ModelCredentialRecord.label == label)
+                .where(ModelCredentialRecord.label_key == label.strip().casefold())
                 .where(ModelCredentialRecord.is_active.is_(True))
             )
             record = session.execute(statement).scalars().first()
@@ -80,7 +83,7 @@ class CredentialRepository:
             statement = (
                 select(ModelCredentialRecord)
                 .where(ModelCredentialRecord.provider == provider)
-                .where(ModelCredentialRecord.label == label)
+                .where(ModelCredentialRecord.label_key == label.strip().casefold())
                 .where(ModelCredentialRecord.is_active.is_(True))
             )
             return session.execute(statement).scalars().first()
@@ -91,7 +94,7 @@ class CredentialRepository:
             statement = (
                 select(ModelCredentialRecord)
                 .where(ModelCredentialRecord.provider == provider)
-                .where(ModelCredentialRecord.label == label)
+                .where(ModelCredentialRecord.label_key == label.strip().casefold())
                 .where(ModelCredentialRecord.is_active.is_(True))
             )
             record = session.execute(statement).scalars().first()
