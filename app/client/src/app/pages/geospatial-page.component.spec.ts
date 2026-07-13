@@ -17,8 +17,8 @@ describe('pages/geospatial-page.component', () => {
   let sendChatTurnMock: jasmine.Spy;
 
   const makeTurnResponse = (overrides: Record<string, unknown> = {}): ChatTurnResponse => ({
+    conversation_id: 'conv-1',
     request_id: 'chat-1',
-    session_id: 1,
     assistant_message: 'ok',
     turn_contract: {
       user_text: 'x',

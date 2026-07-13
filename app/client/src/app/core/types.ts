@@ -626,6 +626,7 @@ export interface VisualizationUpdate {
 }
 
 export interface ChatTurnResponse {
+  conversation_id: string;
   request_id: string;
   assistant_message: string;
   turn_contract: TurnParseResult;

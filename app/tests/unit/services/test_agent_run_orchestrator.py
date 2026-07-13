@@ -94,7 +94,7 @@ def _snapshot() -> AgentRunSnapshot:
 def _failed_response() -> ChatTurnResponse:
     return ChatTurnResponse(
         request_id="run_1",
-        session_id="conv_1",
+        conversation_id="conv_1",
         assistant_message="Parser unavailable.",
         turn_contract={
             "task_class": "general_question",
