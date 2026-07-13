@@ -2,10 +2,12 @@ from server.services.agent.context_assembler import AgentContextAssembler
 from server.services.agent.instruction_state import ConversationInstructionService
 
 
+###############################################################################
 def _messages(count: int) -> list[dict]:
     return [{"id": i, "turn_index": i, "role": "user" if i % 2 else "assistant", "content": f"message {i} " + "x" * 500} for i in range(1, count + 1)]
 
 
+###############################################################################
 def test_small_model_compacts_more_than_long_context_model() -> None:
     assembler = AgentContextAssembler()
     messages = _messages(80)
@@ -18,6 +20,7 @@ def test_small_model_compacts_more_than_long_context_model() -> None:
     assert small.omitted_message_ids
 
 
+###############################################################################
 def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     service = ConversationInstructionService()
     first = service.apply_user_message([], "For this conversation, always use satellite imagery.", 1)
@@ -28,6 +31,7 @@ def test_durable_instruction_is_scoped_and_deduplicated() -> None:
     assert service.active([]) == []
 
 
+###############################################################################
 def test_later_conflicting_instruction_supersedes_prior_directive() -> None:
     service = ConversationInstructionService()
     directives = service.apply_user_message([], "From now on, use satellite imagery.", 1)

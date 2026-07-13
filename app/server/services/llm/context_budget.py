@@ -24,6 +24,7 @@ def estimate_message_tokens(messages: list[dict[str, str]]) -> int:
         total += max(1, math.ceil((len(role) + len(content)) / 4)) + 4
     return max(total, 1)
 
+###############################################################################
 def estimate_json_tokens(value: object) -> int:
     if value is None:
         return 0
@@ -96,6 +97,7 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         response_schema_tokens=schema_tokens,
     )
 
+###############################################################################
 def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:
     profile = get_model_context_profile(provider, request.model)
     limit = profile.context_window_tokens if profile else resolve_model_context_limit(request.model)
