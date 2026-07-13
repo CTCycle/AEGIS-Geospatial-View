@@ -91,7 +91,7 @@ class ChatTurnResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     request_id: str
-    session_id: str
+    conversation_id: str
     assistant_message: str
     turn_contract: TurnParseResult
     decision: PolicyDecision

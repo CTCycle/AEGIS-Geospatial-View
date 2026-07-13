@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from server.domain.steering import SteeringMessageRecord
 from server.repositories.database.backend import get_database
-from server.repositories.schemas.models import AgentSteeringMessageRecord, Base
+from server.repositories.schemas.models import AgentRunRecord, AgentSteeringMessageRecord, Base
 
 ###############################################################################
 class AgentSteeringRepository:
@@ -41,6 +41,48 @@ class AgentSteeringRepository:
             session.commit()
             session.refresh(record)
             return self._to_domain(record)
+
+    def append_and_update_run(
+        self,
+        *,
+        run_id: str,
+        content: str,
+        client_mutation_id: str | None,
+        run_version: int,
+        aggregated_request: str,
+    ) -> tuple[SteeringMessageRecord, int, str]:
+        """Persist the steering mutation and its run version in one transaction."""
+        with self._session_factory() as session:
+            run = session.scalar(
+                select(AgentRunRecord)
+                .where(AgentRunRecord.id == run_id)
+                .with_for_update()
+            )
+            if run is None:
+                raise ValueError("Run not found.")
+            if client_mutation_id:
+                existing = session.scalar(
+                    select(AgentSteeringMessageRecord).where(
+                        AgentSteeringMessageRecord.run_id == run_id,
+                        AgentSteeringMessageRecord.client_mutation_id == client_mutation_id,
+                    )
+                )
+                if existing is not None:
+                    return self._to_domain(existing), run.active_run_version, run.aggregated_request
+            record = AgentSteeringMessageRecord(
+                id=f"steer_{uuid4().hex}",
+                run_id=run_id,
+                run_version=run_version,
+                content=content,
+                client_mutation_id=client_mutation_id,
+            )
+            run.aggregated_request = aggregated_request
+            run.active_run_version = run_version
+            run.state = "updating"
+            session.add(record)
+            session.commit()
+            session.refresh(record)
+            return self._to_domain(record), run_version, aggregated_request
 
     # -------------------------------------------------------------------------
     def list_steering_messages(self, run_id: str) -> list[SteeringMessageRecord]:

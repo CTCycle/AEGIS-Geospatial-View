@@ -640,7 +640,7 @@ class AgentOrchestrator:
             )
             return ChatTurnResponse(
                 request_id=request_id,
-                session_id=conversation_id,
+                conversation_id=conversation_id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=preflight_decision,
@@ -1154,7 +1154,7 @@ class AgentOrchestrator:
         )
         return ChatTurnResponse(
             request_id=request_id,
-            session_id=session_id,
+            conversation_id=session_id,
             assistant_message=assistant_message,
             turn_contract=turn_contract,
             decision=decision,

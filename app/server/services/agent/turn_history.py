@@ -38,7 +38,7 @@ class AgentTurnHistoryService:
             return None
         response_payload = {
             "request_id": request_id,
-            "session_id": conversation_id,
+            "conversation_id": conversation_id,
             "assistant_message": existing.get("content") or "",
             "turn_contract": payload.get("turn_contract"),
             "decision": payload.get("decision"),

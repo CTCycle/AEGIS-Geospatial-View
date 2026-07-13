@@ -67,7 +67,7 @@ class ChatStreamingService:
                         event="map_session_created",
                         data={
                             "request_id": result.request_id,
-                            "session_id": result.session_id,
+                            "conversation_id": result.conversation_id,
                             "map_session": result.map_session.model_dump(mode="json"),
                         },
                     )
@@ -108,7 +108,7 @@ class ChatStreamingService:
     def _build_parsed_payload(response: ChatTurnResponse) -> dict[str, Any]:
         return {
             "request_id": response.request_id,
-            "session_id": response.session_id,
+            "conversation_id": response.conversation_id,
             "task_class": response.turn_contract.task_class,
             "action_id": response.turn_contract.normalized_action.action_id,
             "requires_location": response.turn_contract.normalized_action.requires_location,
@@ -121,7 +121,7 @@ class ChatStreamingService:
     def _build_policy_payload(response: ChatTurnResponse) -> dict[str, Any]:
         return {
             "request_id": response.request_id,
-            "session_id": response.session_id,
+            "conversation_id": response.conversation_id,
             "state": response.decision.plan.state,
             "mode": response.decision.plan.mode,
             "action_id": response.decision.plan.action_id,
@@ -159,7 +159,7 @@ class ChatStreamingService:
                     event="tool_call_started",
                     data={
                         "request_id": response.request_id,
-                        "session_id": response.session_id,
+                        "conversation_id": response.conversation_id,
                         "tool_call_id": tool_call_id,
                         "name": tool_call.get("name"),
                     },
@@ -173,7 +173,7 @@ class ChatStreamingService:
                     event="tool_call_completed",
                     data={
                         "request_id": response.request_id,
-                        "session_id": response.session_id,
+                        "conversation_id": response.conversation_id,
                         "tool_call_id": tool_call_id,
                         "name": tool_result.get("name") or tool_call.get("name"),
                         "ok": bool(not tool_result.get("is_error")),
@@ -187,7 +187,7 @@ class ChatStreamingService:
     @staticmethod
     def _serialize_chat_turn_response(response: ChatTurnResponse) -> dict[str, Any]:
         return {
-            "session_id": response.session_id,
+            "conversation_id": response.conversation_id,
             "request_id": response.request_id,
             "assistant_message": response.assistant_message,
             "turn_contract": response.turn_contract.model_dump(mode="json"),
