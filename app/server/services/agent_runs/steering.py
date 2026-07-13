@@ -53,22 +53,26 @@ class RunSteeringService:
                 state=snapshot.state,
             )
         next_version = snapshot.active_run_version + 1
-        steering = self.steering_repository.append_steering_message(
-            run_id,
-            payload.message,
-            payload.client_mutation_id,
-            next_version,
-        )
         messages = [item.content for item in self.steering_repository.list_steering_messages(run_id)]
+        messages.append(payload.message)
         aggregate = self.aggregation_service.build_aggregated_request(
             snapshot.original_request,
             messages,
         )
-        updated = self.run_repository.update_aggregated_request(run_id, aggregate, next_version)
+        steering, run_version, aggregate = self.steering_repository.append_and_update_run(
+            run_id=run_id,
+            content=payload.message,
+            client_mutation_id=payload.client_mutation_id,
+            run_version=next_version,
+            aggregated_request=aggregate,
+        )
+        updated = self.run_repository.get_run(run_id)
+        if updated is None:
+            raise RunNotFoundError("Run not found.")
         await self.event_publisher.publish(
             conversation_id=conversation_id,
             run_id=run_id,
-            run_version=updated.active_run_version,
+            run_version=run_version,
             type=RunEventType.REQUEST_UPDATED,
             payload={
                 "stage": RunProgressStage.REQUEST_UPDATED.value,
@@ -81,7 +85,7 @@ class RunSteeringService:
             conversation_id=conversation_id,
             run_id=run_id,
             steering_id=steering.steering_id,
-            run_version=updated.active_run_version,
+            run_version=run_version,
             aggregated_request=aggregate,
             state=updated.state,
         )
