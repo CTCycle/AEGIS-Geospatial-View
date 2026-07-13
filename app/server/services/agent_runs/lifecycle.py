@@ -64,8 +64,12 @@ class RunLifecycleService:
         if active is not None and active.state not in TERMINAL_RUN_STATES:
             raise RunConflictError("Conversation already has an active run.")
         aggregate = self.aggregation_service.build_aggregated_request(payload.message, [])
-        run = self.run_repository.create_run(conversation_id, payload.message, aggregate)
-        self.conversation_repository.set_active_run(conversation_id, run.run_id)
+        try:
+            run = self.run_repository.create_run(conversation_id, payload.message, aggregate)
+        except ValueError as exc:
+            if "active run" in str(exc):
+                raise RunConflictError(str(exc)) from exc
+            raise
         task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -90,7 +94,6 @@ class RunLifecycleService:
         if snapshot is None or snapshot.conversation_id != conversation_id:
             raise RunNotFoundError("Run not found.")
         cancelled = self.run_repository.request_cancel(run_id)
-        self.conversation_repository.set_active_run(conversation_id, None)
         await self.event_publisher.publish(
             conversation_id=conversation_id,
             run_id=run_id,

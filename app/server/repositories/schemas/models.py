@@ -28,9 +28,11 @@ from server.common.constants import (
 )
 from server.repositories.database.types import PortableJSON
 
+
 ###############################################################################
 class Base(DeclarativeBase):
     pass
+
 
 ###############################################################################
 class ReferenceCountryRecord(Base):
@@ -48,6 +50,7 @@ class ReferenceCountryRecord(Base):
         ),
     )
 
+
 ###############################################################################
 class ReferenceCountryAliasRecord(Base):
     __tablename__ = REFERENCE_COUNTRY_ALIASES_TABLE_NAME
@@ -62,6 +65,7 @@ class ReferenceCountryAliasRecord(Base):
 
     __table_args__ = (Index("ix_reference_country_aliases_iso2", "iso2"),)
 
+
 ###############################################################################
 class ReferenceGeospatialLayerRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
@@ -70,6 +74,7 @@ class ReferenceGeospatialLayerRecord(Base):
     display_name: Mapped[str] = mapped_column(String(256), nullable=False)
     group: Mapped[str] = mapped_column(String(64), nullable=False)
     provider: Mapped[str | None] = mapped_column(String(64))
+
 
 ###############################################################################
 class ReferenceGeospatialLayerAliasRecord(Base):
@@ -89,6 +94,7 @@ class ReferenceGeospatialLayerAliasRecord(Base):
     __table_args__ = (
         Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),
     )
+
 
 ###############################################################################
 class ReferenceGeospatialLayerKeywordRecord(Base):
@@ -110,6 +116,7 @@ class ReferenceGeospatialLayerKeywordRecord(Base):
         UniqueConstraint("layer_id", "keyword_key", name="ux_reference_layer_keyword"),
     )
 
+
 ###############################################################################
 class ReferenceGibsTileMatrixSetRecord(Base):
     __tablename__ = REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME
@@ -122,6 +129,7 @@ class ReferenceGibsTileMatrixSetRecord(Base):
         ),
     )
 
+
 ###############################################################################
 class ReferenceGibsLayerDefaultRecord(Base):
     __tablename__ = REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME
@@ -129,6 +137,7 @@ class ReferenceGibsLayerDefaultRecord(Base):
     layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
     native_resolution_m: Mapped[float | None] = mapped_column(Float)
     date_fallback_days: Mapped[int | None] = mapped_column(Integer)
+
 
 ###############################################################################
 class ModelProviderSettingsRecord(Base):
@@ -159,6 +168,7 @@ class ModelProviderSettingsRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+
 ###############################################################################
 class CredentialEncryptionMaterial(Base):
     __tablename__ = "credential_encryption_materials"
@@ -186,6 +196,7 @@ class CredentialEncryptionMaterial(Base):
             name="ck_credential_material_active_slot",
         ),
     )
+
 
 ###############################################################################
 class ModelCredentialRecord(Base):
@@ -220,56 +231,40 @@ class ModelCredentialRecord(Base):
         ),
     )
 
-###############################################################################
-class ChatSessionRecord(Base):
-    __tablename__ = "chat_sessions"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    title: Mapped[str | None] = mapped_column(String(200))
-    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-    last_map_session_json: Mapped[str | None] = mapped_column(Text)
-    next_message_sequence: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
 
 ###############################################################################
 class ChatMessageRecord(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+    conversation_id: Mapped[str] = mapped_column(
+        String(80),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
     )
     turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
     request_id: Mapped[str | None] = mapped_column(String(160))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    structured_payload_json: Mapped[str | None] = mapped_column(Text)
-    tool_payload_json: Mapped[str | None] = mapped_column(Text)
-    map_session_json: Mapped[str | None] = mapped_column(Text)
+    structured_payload: Mapped[object | None] = mapped_column(PortableJSON)
+    tool_payload: Mapped[object | None] = mapped_column(PortableJSON)
+    map_session: Mapped[object | None] = mapped_column(PortableJSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
     __table_args__ = (
-        UniqueConstraint("session_id", "turn_index", name="ux_chat_messages_sequence"),
+        UniqueConstraint("conversation_id", "turn_index", name="ux_chat_messages_sequence"),
         UniqueConstraint(
-            "session_id", "role", "request_id", name="ux_chat_messages_request"
+            "conversation_id", "role", "request_id", name="ux_chat_messages_request"
         ),
         Index(
-            "ix_chat_messages_session_role_sequence", "session_id", "role", "turn_index"
+            "ix_chat_messages_conversation_role_sequence", "conversation_id", "role", "turn_index"
         ),
         CheckConstraint(
             "turn_index >= 0", name="ck_chat_messages_sequence_nonnegative"
         ),
     )
+
 
 ###############################################################################
 class ConversationRecord(Base):
@@ -278,44 +273,22 @@ class ConversationRecord(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     owner_user_id: Mapped[str | None] = mapped_column(String(120))
     title: Mapped[str | None] = mapped_column(String(200))
-    active_run_id: Mapped[str | None] = mapped_column(String(80))
+    context_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    active_instructions: Mapped[object | None] = mapped_column(PortableJSON)
+    task_snapshot: Mapped[object | None] = mapped_column(PortableJSON)
+    memory_snapshot: Mapped[object | None] = mapped_column(PortableJSON)
+    conversation_summary: Mapped[object | None] = mapped_column(PortableJSON)
+    summary_through_turn_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_message_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
 
 ###############################################################################
-class ConversationContextRecord(Base):
-    __tablename__ = "conversation_contexts"
-
-    conversation_id: Mapped[str] = mapped_column(
-        String(80),
-        ForeignKey("conversations.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    chat_session_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-    )
-    context_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    active_instructions_json: Mapped[str | None] = mapped_column(Text)
-    task_snapshot_json: Mapped[str | None] = mapped_column(Text)
-    memory_snapshot_json: Mapped[str | None] = mapped_column(Text)
-    conversation_summary_json: Mapped[str | None] = mapped_column(Text)
-    summary_through_turn_index: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-
 ###############################################################################
 class AgentRunRecord(Base):
     __tablename__ = "agent_runs"
@@ -356,6 +329,7 @@ class AgentRunRecord(Base):
         ),
     )
 
+
 ###############################################################################
 class AgentSteeringMessageRecord(Base):
     __tablename__ = "agent_steering_messages"
@@ -378,6 +352,7 @@ class AgentSteeringMessageRecord(Base):
         ),
         UniqueConstraint("run_id", "run_version", name="ux_agent_steering_version"),
     )
+
 
 ###############################################################################
 class AgentRunEventRecord(Base):

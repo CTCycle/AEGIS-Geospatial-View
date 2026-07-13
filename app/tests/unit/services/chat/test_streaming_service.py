@@ -72,7 +72,7 @@ def chat_response(
 ) -> ChatTurnResponse:
     return ChatTurnResponse(
         request_id=payload.request_id or "chat-req",
-        session_id=7,
+        conversation_id="conv-7",
         assistant_message="hello world",
         turn_contract=turn_contract(),
         decision=policy_decision(),
@@ -197,7 +197,7 @@ def test_stream_turn_final_assistant_event_emits_final_payload() -> None:
         "policy",
         "final",
     ]
-    assert events[-1].data["session_id"] == 7
+    assert events[-1].data["conversation_id"] == "conv-7"
     assert (
         events[-1].data["turn_contract"]["normalized_action"]["action_id"] == "weather"
     )
