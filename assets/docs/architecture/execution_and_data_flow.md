@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-07-11
+Last updated: 2026-07-13
 
 ## Layering
 
@@ -64,11 +64,11 @@ Conversation task state is keyed by conversation ID, hydrated from the durable
 conversation-context snapshot before each run, and persisted with optimistic
 revision checking after each completed turn.
 
-Run-based chat history is isolated by `conversation_id`. Each conversation owns one
-durable `conversation_contexts` row that resolves its internal numeric chat session;
-every run reuses that session. Numeric session IDs are internal and are validated
-against the conversation before a turn can use them. Existing conversation rows are
-linked lazily on first access without selecting a global or recently used session.
+Run-based chat history is isolated by `conversation_id`. Each conversation owns its
+context revision, active instructions, task snapshot, memory snapshot, summary state,
+message sequence, and active-run relationship directly. Runs and events carry the
+conversation identity explicitly, and request/mutation access is validated against
+that conversation. There is no global or recently used chat session to resolve.
 
 Every model phase receives freshly assembled conversation directives, task state,
 map memory, summarized older turns, recent verbatim turns, verified tool outcomes,
