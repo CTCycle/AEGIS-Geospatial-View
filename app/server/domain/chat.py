@@ -31,7 +31,6 @@ class ChatMessage(BaseModel):
 class ChatTurnRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    session_id: int | None = None
     title: str | None = None
     message: str
     datetime: str | None = None
