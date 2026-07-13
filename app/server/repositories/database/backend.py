@@ -16,6 +16,9 @@ class AEGISDatabase:
     def __init__(self) -> None:
         self.settings = get_server_settings().database
         self.backend = self._build_backend()
+        ensure_schema = getattr(self.backend, "ensure_schema", None)
+        if callable(ensure_schema):
+            ensure_schema()
 
     # -------------------------------------------------------------------------
     def _build_backend(self) -> DatabaseBackend:

@@ -46,9 +46,14 @@ class ReferenceCatalogSeeder:
             return False
         with self.database.session() as session:
             session.add_all(
-                ReferenceCountryRecord(iso2=item.iso2, name=item.name)
+                ReferenceCountryRecord(
+                    iso2=item.iso2,
+                    name=item.name,
+                    name_key=item.name.strip().casefold(),
+                )
                 for item in catalog.countries
             )
+            session.flush()
             session.add_all(
                 ReferenceCountryAliasRecord(
                     alias_key=item.alias.strip().casefold(),
@@ -74,6 +79,7 @@ class ReferenceCatalogSeeder:
                 )
                 for item in catalog.geospatial_layers
             )
+            session.flush()
             session.add_all(
                 ReferenceGeospatialLayerAliasRecord(
                     alias_key=alias.strip().casefold(),

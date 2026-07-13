@@ -40,6 +40,11 @@ class DatabaseSettings:
     ssl_ca: str | None
     connect_timeout: int
     insert_batch_size: int
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+    database_pool_recycle_seconds: int = 1800
+    sqlite_busy_timeout_ms: int = 5000
+    sqlite_wal_enabled: bool = True
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -157,6 +162,11 @@ class JsonDatabaseSettings(BaseModel):
     ssl_ca: str | None = None
     connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
     insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
+    database_pool_size: int = Field(default=5, ge=1)
+    database_max_overflow: int = Field(default=10, ge=0)
+    database_pool_recycle_seconds: int = Field(default=1800, ge=0)
+    sqlite_busy_timeout_ms: int = Field(default=5000, ge=1)
+    sqlite_wal_enabled: bool = True
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -525,6 +535,11 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
             ssl_ca=None,
             connect_timeout=DEFAULT_DB_CONNECT_TIMEOUT,
             insert_batch_size=db.insert_batch_size,
+            database_pool_size=db.database_pool_size,
+            database_max_overflow=db.database_max_overflow,
+            database_pool_recycle_seconds=db.database_pool_recycle_seconds,
+            sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
+            sqlite_wal_enabled=db.sqlite_wal_enabled,
         )
 
     return DatabaseSettings(
@@ -540,6 +555,11 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         ssl_ca=db.ssl_ca,
         connect_timeout=db.connect_timeout,
         insert_batch_size=db.insert_batch_size,
+        database_pool_size=db.database_pool_size,
+        database_max_overflow=db.database_max_overflow,
+        database_pool_recycle_seconds=db.database_pool_recycle_seconds,
+        sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
+        sqlite_wal_enabled=db.sqlite_wal_enabled,
     )
 
 ###############################################################################

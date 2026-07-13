@@ -101,15 +101,38 @@ def _services(run_repositories):
 ###############################################################################
 def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     service = AggregatedRequestService()
-    aggregate = service.build_aggregated_request("Map Rome", ["focus parks", "use satellite"])
+    aggregate = service.build_aggregated_request(
+        "Map Rome", ["focus parks", "use satellite"]
+    )
 
-    assert aggregate == service.build_aggregated_request("Map Rome", ["focus parks", "use satellite"])
+    assert aggregate == service.build_aggregated_request(
+        "Map Rome", ["focus parks", "use satellite"]
+    )
     assert "1. focus parks" in aggregate
     assert "2. use satellite" in aggregate
 
 ###############################################################################
-def test_event_repository_replay_orders_and_filters_visibility(run_repositories) -> None:
+def test_event_repository_replay_orders_and_filters_visibility(
+    run_repositories,
+) -> None:
     repo = run_repositories["events"]
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        from server.repositories.schemas.models import (
+            AgentRunRecord,
+            ConversationRecord,
+        )
+
+        session.add(ConversationRecord(id="conv_1", title="Events"))
+        session.add(
+            AgentRunRecord(
+                id="run_1",
+                conversation_id="conv_1",
+                original_request="events",
+                aggregated_request="events",
+                active_slot=1,
+            )
+        )
+        session.commit()
     visible = RunEventCreate(
         conversation_id="conv_1",
         run_id="run_1",
@@ -188,7 +211,9 @@ def test_legacy_conversation_is_lazily_linked_once(run_repositories) -> None:
     assert first == second
 
 ###############################################################################
-def test_conversation_context_state_survives_repository_restart(run_repositories) -> None:
+def test_conversation_context_state_survives_repository_restart(
+    run_repositories,
+) -> None:
     conversation = run_repositories["conversations"].create_conversation("Persistent")
     contexts = run_repositories["contexts"]
     initial = contexts.read_state(conversation.id)
@@ -226,14 +251,18 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
         steering.steer(
             conversation.conversation_id,
             run.run_id,
-            SteeringMessageRequest(message="Focus on environmental layers.", client_mutation_id="m1"),
+            SteeringMessageRequest(
+                message="Focus on environmental layers.", client_mutation_id="m1"
+            ),
         )
     )
     duplicate = asyncio.run(
         steering.steer(
             conversation.conversation_id,
             run.run_id,
-            SteeringMessageRequest(message="Focus on environmental layers.", client_mutation_id="m1"),
+            SteeringMessageRequest(
+                message="Focus on environmental layers.", client_mutation_id="m1"
+            ),
         )
     )
 

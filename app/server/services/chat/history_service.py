@@ -97,11 +97,6 @@ class ChatHistoryService:
         role: str,
         request_id: str,
     ) -> dict[str, Any] | None:
-        messages = self.repo.list_messages(session_id=session_id)
-        for msg in messages:
-            if msg.get("role") != role:
-                continue
-            payload = msg.get("structured_payload")
-            if isinstance(payload, dict) and payload.get("request_id") == request_id:
-                return msg
-        return None
+        return self.repo.find_message_by_request_id(
+            session_id=session_id, role=role, request_id=request_id
+        )

@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, select, update
 
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import (
@@ -43,6 +43,7 @@ class ChatHistoryRepository:
             "id": row.id,
             "session_id": row.session_id,
             "turn_index": row.turn_index,
+            "request_id": row.request_id,
             "role": row.role,
             "content": row.content,
             "structured_payload": _from_json_payload(row.structured_payload_json),
@@ -105,15 +106,21 @@ class ChatHistoryRepository:
         map_session: Any = None,
     ) -> ChatMessageRecord:
         with self._session_factory() as session:
-            count_statement = (
-                select(func.count())
-                .select_from(ChatMessageRecord)
-                .where(ChatMessageRecord.session_id == session_id)
+            sequence_statement = (
+                update(ChatSessionRecord)
+                .where(ChatSessionRecord.id == session_id)
+                .values(
+                    next_message_sequence=ChatSessionRecord.next_message_sequence + 1
+                )
+                .returning(ChatSessionRecord.next_message_sequence)
             )
-            turn_index = int(session.scalar(count_statement) or 0)
+            turn_index = session.scalar(sequence_statement)
+            if turn_index is None:
+                raise ValueError("Chat session not found.")
             message = ChatMessageRecord(
                 session_id=session_id,
                 turn_index=turn_index,
+                request_id=request_id,
                 role=role,
                 content=content,
                 structured_payload_json=_to_json_payload(
@@ -193,6 +200,24 @@ class ChatHistoryRepository:
         return self._to_message_dict(row)
 
     # -------------------------------------------------------------------------
+    def find_message_by_request_id(
+        self, *, session_id: int, role: str, request_id: str
+    ) -> dict[str, Any] | None:
+        with self._session_factory() as session:
+            row = (
+                session.execute(
+                    select(ChatMessageRecord).where(
+                        ChatMessageRecord.session_id == session_id,
+                        ChatMessageRecord.role == role,
+                        ChatMessageRecord.request_id == request_id,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+        return self._to_message_dict(row) if row is not None else None
+
+    # -------------------------------------------------------------------------
     def list_messages(self, *, session_id: int) -> list[dict[str, Any]]:
         with self._session_factory() as session:
             statement = (
@@ -202,5 +227,3 @@ class ChatHistoryRepository:
             )
             rows = session.execute(statement).scalars().all()
             return [self._to_message_dict(row) for row in rows]
-
-

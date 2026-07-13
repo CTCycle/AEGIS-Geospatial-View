@@ -5,7 +5,6 @@ from uuid import uuid4
 
 from server.domain.agent.context import ConversationDirective
 
-
 ###############################################################################
 class ConversationInstructionService:
     _DURABLE_MARKERS = re.compile(
@@ -31,12 +30,16 @@ class ConversationInstructionService:
             original_user_text=text,
             source_turn_index=source_turn_index,
         )
+        if any(
+            item.status == "active" and item.normalized_text == normalized
+            for item in result
+        ):
+            return result
         for item in result:
             if item.status == "active" and self._conflicts(item.normalized_text, normalized):
                 item.status = "superseded"
                 item.superseding_directive_id = directive.directive_id
-        if not any(item.status == "active" and item.normalized_text == normalized for item in result):
-            result.append(directive)
+        result.append(directive)
         return result
 
     # -------------------------------------------------------------------------

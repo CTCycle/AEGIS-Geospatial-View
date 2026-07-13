@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
 
-
 ###############################################################################
 class ConversationDirective(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -19,7 +18,6 @@ class ConversationDirective(BaseModel):
     status: Literal["active", "superseded", "revoked"] = "active"
     superseding_directive_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
-
 
 ###############################################################################
 class AgentContextPackage(BaseModel):

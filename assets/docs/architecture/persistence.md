@@ -25,6 +25,13 @@ storage directory is required.
 
 Schema initialization is handled by `app/server/repositories/database/initializer.py`.
 
+The shared SQLAlchemy engine configuration is implemented in
+`app/server/repositories/database/engine.py`. SQLite connections enable foreign
+keys, WAL mode, `busy_timeout`, and `synchronous=NORMAL`; external databases use
+pre-ping and bounded pooling. Existing local SQLite files receive additive
+column/index upgrades from `SQLiteRepository.ensure_schema()` before startup
+seeding.
+
 ## Core Stored Domains
 
 Core relational storage covers:
@@ -36,6 +43,11 @@ Core relational storage covers:
 - encrypted model credentials (backed by auto-seeded Fernet key material)
 - manifest embedding records
 - seeded geospatial reference data
+
+Message and run-event sequencing is allocated atomically from the owning row,
+and request/mutation identity, active-run slots, credential logical keys, and
+encryption-material versions are protected by database constraints. Context
+revision writes use a conditional update and fail on stale revisions.
 
 `conversation_contexts.conversation_id` is the canonical run-history isolation key.
 The linked `chat_session_id` remains an internal storage identifier. Conversation and
