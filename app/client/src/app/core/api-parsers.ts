@@ -493,6 +493,7 @@ export const parseChatTurnResponse = (value: unknown): ChatTurnResponse => {
   }
 
   return {
+    conversation_id: requireString(value.conversation_id, 'conversation_id'),
     request_id: requireString(value.request_id, 'request_id'),
     assistant_message: requireString(value.assistant_message, 'assistant_message'),
     turn_contract: requireRecord(value.turn_contract, 'turn_contract') as unknown as ChatTurnResponse['turn_contract'],

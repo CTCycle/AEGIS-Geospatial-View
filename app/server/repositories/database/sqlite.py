@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import inspect, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
@@ -15,6 +14,7 @@ from server.repositories.schemas import Base
 
 
 # [SQLITE DATABASE]
+
 
 ###############################################################################
 class SQLiteRepository(SqlAlchemyTableOperationsMixin):
@@ -34,78 +34,6 @@ class SQLiteRepository(SqlAlchemyTableOperationsMixin):
     # -------------------------------------------------------------------------
     def ensure_schema(self) -> None:
         Base.metadata.create_all(self.engine)
-        self._upgrade_legacy_schema()
-
-    # -------------------------------------------------------------------------
-    def _upgrade_legacy_schema(self) -> None:
-        """Add columns introduced by persistence hardening to existing local DBs."""
-        additions = {
-            "reference_countries": {"name_key": "TEXT NOT NULL DEFAULT ''"},
-            "model_credentials": {
-                "label_key": "TEXT NOT NULL DEFAULT ''",
-                "encryption_material_id": "INTEGER",
-            },
-            "credential_encryption_materials": {"active_slot": "INTEGER"},
-            "chat_sessions": {"next_message_sequence": "INTEGER NOT NULL DEFAULT 0"},
-            "chat_messages": {"request_id": "TEXT"},
-            "agent_runs": {
-                "client_request_id": "TEXT",
-                "active_slot": "INTEGER",
-                "next_event_sequence": "INTEGER NOT NULL DEFAULT 0",
-            },
-        }
-        inspector = inspect(self.engine)
-        with self.engine.begin() as connection:
-            for table_name, columns in additions.items():
-                existing = {
-                    column["name"] for column in inspector.get_columns(table_name)
-                }
-                for column_name, definition in columns.items():
-                    if column_name not in existing:
-                        connection.execute(
-                            text(
-                                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
-                            )
-                        )
-
-            connection.execute(
-                text(
-                    "UPDATE reference_countries SET name_key = lower(trim(name)) "
-                    "WHERE name_key = ''"
-                )
-            )
-            connection.execute(
-                text(
-                    "UPDATE model_credentials SET label_key = lower(trim(label)) "
-                    "WHERE label_key = ''"
-                )
-            )
-            connection.execute(
-                text(
-                    "UPDATE chat_sessions SET next_message_sequence = "
-                    "COALESCE((SELECT max(turn_index) FROM chat_messages "
-                    "WHERE chat_messages.session_id = chat_sessions.id), 0) "
-                    "WHERE next_message_sequence = 0"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_model_credentials_logical_key "
-                    "ON model_credentials(provider, label_key)"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_chat_messages_sequence "
-                    "ON chat_messages(session_id, turn_index)"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_chat_messages_request_lookup "
-                    "ON chat_messages(session_id, role, request_id)"
-                )
-            )
 
     # -------------------------------------------------------------------------
     def _insert_statement(

@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-06-24
+Last updated: 2026-07-13
 
 ## Mounting
 
@@ -85,7 +85,7 @@ Defined in `app/server/api/chat.py`:
 High-level fields:
 
 - `request_id`
-- `session_id`
+- `conversation_id`
 - `assistant_message`
 - `turn_contract`
 - `decision`

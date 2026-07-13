@@ -23,11 +23,11 @@ class AgentTurnHistoryService:
     # -------------------------------------------------------------------------
     def load_existing_response(
         self,
-        session_id: int,
+        conversation_id: str,
         request_id: str,
     ) -> ChatTurnResponse | None:
         existing = self.find_history_message_by_request_id(
-            session_id=session_id,
+            conversation_id=conversation_id,
             role="assistant",
             request_id=request_id,
         )
@@ -38,7 +38,7 @@ class AgentTurnHistoryService:
             return None
         response_payload = {
             "request_id": request_id,
-            "session_id": session_id,
+            "conversation_id": conversation_id,
             "assistant_message": existing.get("content") or "",
             "turn_contract": payload.get("turn_contract"),
             "decision": payload.get("decision"),
@@ -54,7 +54,7 @@ class AgentTurnHistoryService:
     def find_history_message_by_request_id(
         self,
         *,
-        session_id: int,
+        conversation_id: str,
         role: str,
         request_id: str,
     ) -> dict[str, Any] | None:
@@ -62,7 +62,7 @@ class AgentTurnHistoryService:
         if finder is None:
             return None
         return finder(
-            session_id=session_id,
+            conversation_id=conversation_id,
             role=role,
             request_id=request_id,
         )

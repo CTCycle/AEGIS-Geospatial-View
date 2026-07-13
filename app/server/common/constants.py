@@ -41,7 +41,6 @@ COMMON_FOLIUM_MAPS = {
     "Esri OceanBasemap": "Ocean Basemap",
 }
 
-CHAT_SESSIONS_TABLE = "chat_sessions"
 REFERENCE_COUNTRIES_TABLE_NAME = "reference_countries"
 REFERENCE_COUNTRY_ALIASES_TABLE_NAME = "reference_country_aliases"
 REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME = "reference_geospatial_layers"

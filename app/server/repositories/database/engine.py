@@ -7,7 +7,6 @@ from sqlalchemy.orm import sessionmaker
 from server.configurations import DatabaseSettings
 
 
-###############################################################################
 def build_engine(settings: DatabaseSettings) -> Engine:
     if settings.embedded_database:
         engine = create_engine(
@@ -46,7 +45,6 @@ def build_engine(settings: DatabaseSettings) -> Engine:
     )
 
 
-###############################################################################
 def build_session_factory(engine: Engine):
     return sessionmaker(
         bind=engine, autoflush=False, expire_on_commit=False, future=True

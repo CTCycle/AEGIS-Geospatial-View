@@ -86,8 +86,8 @@ describe('core/api', () => {
 
   it('parseChatTurnResponse accepts valid backend response', () => {
     const parsed = parseChatTurnResponse({
+      conversation_id: 'conv-abc',
       request_id: 'chat-abc',
-      session_id: 12,
       assistant_message: 'done',
       turn_contract: {
         user_text: 'show weather',
@@ -123,7 +123,7 @@ describe('core/api', () => {
       },
     });
     expect(parsed.request_id).toBe('chat-abc');
-    expect(parsed.session_id).toBe(12);
+    expect(parsed.conversation_id).toBe('conv-abc');
     expect(parsed.assistant_message).toBe('done');
     expect(parsed.operation?.kind).toBe('direct_answer');
     expect(parsed.context_usage?.selected_context_window).toBe(2048);

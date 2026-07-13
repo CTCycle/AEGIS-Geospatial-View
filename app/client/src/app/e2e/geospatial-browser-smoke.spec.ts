@@ -47,8 +47,8 @@ describe('e2e/geospatial browser smoke', () => {
   };
 
   const mockedMapResponse: ChatTurnResponse = {
+    conversation_id: 'conv-browser-smoke',
     request_id: 'browser-smoke-1',
-    session_id: 101,
     assistant_message: 'Rendered a mocked geospatial session.',
     turn_contract: {
       user_text: 'show mocked map',

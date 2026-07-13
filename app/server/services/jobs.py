@@ -74,7 +74,7 @@ class BackgroundJobService:
         job = self._create_job(
             job_type="chat_turn",
             request_id=request_id,
-            session_id=payload.session_id,
+            session_id=None,
             input_json=payload.model_copy(update={"request_id": request_id}).model_dump(mode="json"),
         )
         return self._to_create_response(job, "Chat job queued")
@@ -98,7 +98,6 @@ class BackgroundJobService:
             input_json={
                 "request_id": resolved_request_id,
                 "parent_job_id": parent_job_id,
-                "session_id": session_id,
                 "map_request": payload.model_dump(mode="json"),
             },
         )
