@@ -14,7 +14,6 @@ from server.repositories.schemas.models import (
     ConversationRecord,
 )
 
-
 ###############################################################################
 class ConversationContextRepository:
 

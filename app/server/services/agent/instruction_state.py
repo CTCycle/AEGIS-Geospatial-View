@@ -6,12 +6,14 @@ from uuid import uuid4
 from server.domain.agent.context import ConversationDirective
 
 
+###############################################################################
 class ConversationInstructionService:
     _DURABLE_MARKERS = re.compile(
         r"\b(for this conversation|from now on|always|unless i request|do not|don't|keep answers?)\b",
         re.IGNORECASE,
     )
 
+    # -------------------------------------------------------------------------
     def apply_user_message(
         self,
         directives: list[ConversationDirective],
@@ -37,10 +39,12 @@ class ConversationInstructionService:
             result.append(directive)
         return result
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def active(directives: list[ConversationDirective]) -> list[ConversationDirective]:
         return [item for item in directives if item.status == "active"]
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _conflicts(existing: str, incoming: str) -> bool:
         topics = ("concise", "brief", "satellite", "traffic", "basemap", "imagery")

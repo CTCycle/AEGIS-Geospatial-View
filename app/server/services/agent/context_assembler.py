@@ -7,7 +7,10 @@ from server.services.llm.cloud_catalog import get_model_context_profile
 from server.services.llm.context_budget import estimate_json_tokens
 
 
+###############################################################################
 class AgentContextAssembler:
+
+    # -------------------------------------------------------------------------
     def assemble(
         self,
         *,

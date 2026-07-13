@@ -14,6 +14,7 @@ MODEL_CONTEXT_PROFILES = {
     ("google", "gemini-2.0-flash"): ModelContextProfile("google", "gemini-2.0-flash", 1_048_576, 8_192, 4_096, metadata_source="google_models_api"),
 }
 
+###############################################################################
 def get_model_context_profile(provider: str, model: str) -> ModelContextProfile | None:
     return MODEL_CONTEXT_PROFILES.get((provider.strip().lower(), model.strip().lower()))
 

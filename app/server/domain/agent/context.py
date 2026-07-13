@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from server.common.time import utc_now
 
 
+###############################################################################
 class ConversationDirective(BaseModel):
     model_config = ConfigDict(extra="forbid")
     directive_id: str
@@ -20,6 +21,7 @@ class ConversationDirective(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+###############################################################################
 class AgentContextPackage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     current_user_message: str
