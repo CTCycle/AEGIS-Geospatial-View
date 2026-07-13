@@ -14,6 +14,7 @@ from server.repositories.schemas import (
     ReferenceGibsTileMatrixSetRecord,
 )
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ReferenceSeedResult:
@@ -22,9 +23,9 @@ class ReferenceSeedResult:
     gibs_tile_matrix_sets_seeded: bool
     gibs_layer_defaults_seeded: bool
 
+
 ###############################################################################
 class ReferenceCatalogSeeder:
-
     # -------------------------------------------------------------------------
     def __init__(self, database: DatabaseBackend) -> None:
         self.database = database
@@ -46,9 +47,14 @@ class ReferenceCatalogSeeder:
             return False
         with self.database.session() as session:
             session.add_all(
-                ReferenceCountryRecord(iso2=item.iso2, name=item.name)
+                ReferenceCountryRecord(
+                    iso2=item.iso2,
+                    name=item.name,
+                    name_key=item.name.strip().casefold(),
+                )
                 for item in catalog.countries
             )
+            session.flush()
             session.add_all(
                 ReferenceCountryAliasRecord(
                     alias_key=item.alias.strip().casefold(),
@@ -74,6 +80,7 @@ class ReferenceCatalogSeeder:
                 )
                 for item in catalog.geospatial_layers
             )
+            session.flush()
             session.add_all(
                 ReferenceGeospatialLayerAliasRecord(
                     alias_key=alias.strip().casefold(),

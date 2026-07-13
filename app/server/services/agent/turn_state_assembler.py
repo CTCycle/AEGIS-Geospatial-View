@@ -181,7 +181,7 @@ class AgentTurnStateAssembler:
             remove_layer_ids=removed_layers,
         )
         self.history_service.append_message(
-            session_id=session_id,
+            conversation_id=session_id,
             role="assistant",
             content=assistant_message,
             request_id=request_id,

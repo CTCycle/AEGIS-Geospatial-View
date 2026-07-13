@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import sqlalchemy
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
 
 from server.configurations import DatabaseSettings, get_server_settings
 from server.repositories.database.orm_table_operations import (
     SqlAlchemyTableOperationsMixin,
 )
+from server.repositories.database.engine import build_engine, build_session_factory
 from server.repositories.schemas import Base
 
 
 # [SQLITE DATABASE]
+
 
 ###############################################################################
 class SQLiteRepository(SqlAlchemyTableOperationsMixin):
@@ -26,10 +26,8 @@ class SQLiteRepository(SqlAlchemyTableOperationsMixin):
         db_path = Path(self.settings.database_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db_path = str(db_path)
-        self.engine: Engine = sqlalchemy.create_engine(
-            f"sqlite:///{self.db_path}", echo=False, future=True
-        )
-        self.session_factory = sessionmaker(bind=self.engine, future=True)
+        self.engine: Engine = build_engine(self.settings)
+        self.session_factory = build_session_factory(self.engine)
         self.session = self.session_factory
         self.insert_batch_size = self.settings.insert_batch_size
 
