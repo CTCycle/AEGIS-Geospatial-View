@@ -9,13 +9,16 @@ from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
 
+
 ###############################################################################
 class AEGISDatabase:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.settings = get_server_settings().database
         self.backend = self._build_backend()
+        ensure_schema = getattr(self.backend, "ensure_schema", None)
+        if callable(ensure_schema):
+            ensure_schema()
 
     # -------------------------------------------------------------------------
     def _build_backend(self) -> DatabaseBackend:
@@ -50,6 +53,7 @@ class AEGISDatabase:
     # -------------------------------------------------------------------------
     def count_records(self, model: type[Base]) -> int:
         return self.backend.count_records(model)
+
 
 ###############################################################################
 @cache

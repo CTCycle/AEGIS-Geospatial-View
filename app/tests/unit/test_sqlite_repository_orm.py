@@ -4,10 +4,7 @@ from pathlib import Path
 
 from server.configurations import DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
-from server.common.constants import (
-    CHAT_SESSIONS_TABLE,
-    REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME,
-)
+from server.common.constants import REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
 
 ###############################################################################
 def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
@@ -71,7 +68,7 @@ def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
     assert by_id["layer-2"]["display_name"] == "Two"
 
 ###############################################################################
-def test_upsert_omits_null_autoincrement_primary_key(tmp_path) -> None:
+def test_upsert_handles_canonical_conversation_key(tmp_path) -> None:
     repository = SQLiteRepository(
         DatabaseSettings(
             database_path=str(tmp_path / "database.db"),
@@ -93,21 +90,18 @@ def test_upsert_omits_null_autoincrement_primary_key(tmp_path) -> None:
     repository.upsert_into_database(
         [
             {
-                "id": None,
-                "title": "Current session",
-                "status": "active",
-                "last_map_session_json": "{}",
+                "id": "conv_test",
+                "title": "Current conversation",
             }
         ],
-        CHAT_SESSIONS_TABLE,
+        "conversations",
     )
 
-    rows = repository.load_from_database(CHAT_SESSIONS_TABLE)
-    assert repository.count_rows(CHAT_SESSIONS_TABLE) == 1
+    rows = repository.load_from_database("conversations")
+    assert repository.count_rows("conversations") == 1
     assert len(rows) == 1
-    assert isinstance(rows[0]["id"], int)
-    assert rows[0]["title"] == "Current session"
-    assert rows[0]["status"] == "active"
+    assert rows[0]["id"] == "conv_test"
+    assert rows[0]["title"] == "Current conversation"
 
 ###############################################################################
 def test_repository_creates_parent_directory_for_database_path(tmp_path) -> None:

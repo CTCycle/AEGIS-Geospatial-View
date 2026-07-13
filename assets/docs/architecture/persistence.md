@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-07-11
+Last updated: 2026-07-13
 
 ## Relational Storage
 
@@ -25,25 +25,32 @@ storage directory is required.
 
 Schema initialization is handled by `app/server/repositories/database/initializer.py`.
 
+The shared SQLAlchemy engine configuration is implemented in
+`app/server/repositories/database/engine.py`. SQLite connections enable foreign
+keys, WAL mode, `busy_timeout`, and `synchronous=NORMAL`; external databases use
+pre-ping and bounded pooling. Schema creation is identical across SQLite and
+PostgreSQL and is covered by the persistence conformance suite.
+
+The canonical schema contains 15 tables. Conversations own their context
+state, message history, message sequence, and active-run relationship directly;
+there are no `chat_sessions` or `conversation_contexts` tables.
+
 ## Core Stored Domains
 
 Core relational storage covers:
 
-- chat sessions and messages
+- conversations and messages
 - conversations, agent runs, steering messages, and ordered run events
-- one-to-one conversation contexts linking each conversation to its internal chat session
 - model provider settings
 - encrypted model credentials (backed by auto-seeded Fernet key material)
 - manifest embedding records
 - seeded geospatial reference data
 
-`conversation_contexts.conversation_id` is the canonical run-history isolation key.
-The linked `chat_session_id` remains an internal storage identifier. Conversation and
-chat-session creation occur in one transaction; older conversations receive a link
-on first access.
-
-The context row also stores active directives, task and memory snapshots, an
-incremental summary with its source boundary, and an optimistic context revision.
+Message and run-event sequencing is allocated atomically from the owning row,
+and request/mutation identity, active-run slots, credential logical keys, and
+encryption-material versions are protected by database constraints. Conversation
+context revision writes use a conditional update and fail on stale revisions.
+Payload columns use portable SQLAlchemy JSON values on both backends.
 
 ## Encryption Material
 

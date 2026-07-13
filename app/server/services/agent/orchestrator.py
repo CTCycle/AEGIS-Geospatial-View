@@ -11,7 +11,7 @@ from server.domain.agent.pipeline import (
 )
 from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
 from server.repositories.model_settings import ModelSettingsRepository
-from server.repositories.conversation_context import ConversationContextRepository
+from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.agent.conversation_state import (
@@ -66,7 +66,7 @@ class AgentOrchestrator:
         settings_repo: ModelSettingsRepository | None = None,
         history_service: ChatHistoryService | None = None,
         history_repo: ChatHistoryService | None = None,
-        conversation_context_repository: ConversationContextRepository | None = None,
+        conversation_repository: ConversationRepository | None = None,
         task_state_service: ConversationTaskStateService | None = None,
         pipeline_router: DeterministicAgentRouter | None = None,
         tool_planner: DeterministicToolPlanner | None = None,
@@ -98,7 +98,7 @@ class AgentOrchestrator:
             tool_registry=self.tool_registry,
         )
         self.history_service = history_service or history_repo or ChatHistoryService()
-        self.conversation_context_repository = conversation_context_repository
+        self.conversation_repository = conversation_repository
         self.task_state_service = task_state_service or ConversationTaskStateService()
         self.instruction_state_service = ConversationInstructionService()
         self._active_directives: dict[str, list[ConversationDirective]] = {}
@@ -135,13 +135,13 @@ class AgentOrchestrator:
         progress_callback=None,
     ) -> ChatTurnResponse:
         conversation_id = payload.conversation_id
-        repository = self.conversation_context_repository
+        repository = self.conversation_repository
         persisted: dict[str, Any] | None = None
         directives: list[ConversationDirective] = []
         if conversation_id is not None:
             if repository is None:
-                repository = ConversationContextRepository()
-                self.conversation_context_repository = repository
+                repository = ConversationRepository()
+                self.conversation_repository = repository
             if hasattr(repository, "read_state"):
                 persisted = repository.read_state(conversation_id)
                 self._persisted_context_state[conversation_id] = persisted
@@ -157,7 +157,7 @@ class AgentOrchestrator:
                     payload.message,
                     len(
                         self.history_service.list_recent_messages(
-                            repository.resolve_chat_session_id(conversation_id),
+                            conversation_id,
                             limit=10_000,
                         )
                     )
@@ -226,52 +226,39 @@ class AgentOrchestrator:
     ) -> ChatTurnResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
-            "chat_turn_start request_id=%s session_id=%s message_length=%s",
+            "chat_turn_start request_id=%s conversation_id=%s message_length=%s",
             request_id,
-            payload.session_id,
+            payload.conversation_id,
             len(payload.message),
         )
         if payload.conversation_id is not None:
-            context_repository = self.conversation_context_repository
-            if context_repository is None:
-                context_repository = ConversationContextRepository()
-                self.conversation_context_repository = context_repository
-            canonical_session_id = context_repository.resolve_chat_session_id(payload.conversation_id)
-            if payload.session_id is not None:
-                context_repository.validate_session(
-                    payload.conversation_id, payload.session_id
-                )
-            session = self.history_service.upsert_session(
-                canonical_session_id, title=payload.title
-            )
+            conversation_id = payload.conversation_id
         else:
-            session = self.history_service.upsert_session(
-                payload.session_id, title=payload.title
-            )
-        existing_response = self.turn_history_service.load_existing_response(session.id, request_id)
+            raise ValueError("conversation_id is required for chat turns.")
+        existing_response = self.turn_history_service.load_existing_response(conversation_id, request_id)
         if existing_response is not None:
             return existing_response
         if self.turn_history_service.find_history_message_by_request_id(
-            session_id=session.id,
+            conversation_id=conversation_id,
             role="user",
             request_id=request_id,
         ) is None:
             self.history_service.append_message(
-                session_id=session.id,
+                conversation_id=conversation_id,
                 role="user",
                 content=payload.message,
                 request_id=request_id,
             )
 
-        recent_messages = self.history_service.list_recent_messages(session.id, limit=200)
+        recent_messages = self.history_service.list_recent_messages(conversation_id, limit=200)
         for index in range(len(recent_messages) - 1, -1, -1):
             message = recent_messages[index]
             if message.get("role") == "user" and message.get("content") == payload.message:
                 recent_messages.pop(index)
                 break
-        latest_contract = self.history_service.get_latest_turn_contract(session.id)
-        latest_memory = self.history_service.get_latest_memory_snapshot(session.id)
-        conversation_key = payload.conversation_id or f"session:{session.id}"
+        latest_contract = self.history_service.get_latest_turn_contract(conversation_id)
+        latest_memory = self.history_service.get_latest_memory_snapshot(conversation_id)
+        conversation_key = conversation_id
         state_before = self.task_state_service.snapshot(conversation_key)
         latest_memory = self.turn_history_service.merge_conversation_state_memory(
             latest_memory,
@@ -334,7 +321,7 @@ class AgentOrchestrator:
                 "parsed",
                 {
                     "request_id": request_id,
-                    "session_id": session.id,
+                    "conversation_id": conversation_id,
                     "task_class": turn_contract.task_class,
                     "action_id": turn_contract.normalized_action.action_id,
                     "requires_location": turn_contract.normalized_action.requires_location,
@@ -382,7 +369,7 @@ class AgentOrchestrator:
                 progress_summary="Intent extraction failed.",
             )
             self.history_service.append_message(
-                session_id=session.id,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=assistant_message,
                 request_id=request_id,
@@ -400,11 +387,11 @@ class AgentOrchestrator:
             LOGGER.info(
                 "chat_turn_parser_authentication_failed request_id=%s session_id=%s",
                 request_id,
-                session.id,
+                conversation_id,
             )
             return ChatTurnResponse(
                 request_id=request_id,
-                session_id=session.id,
+                conversation_id=conversation_id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=decision,
@@ -442,7 +429,7 @@ class AgentOrchestrator:
                 progress_summary="Intent extraction failed.",
             )
             self.history_service.append_message(
-                session_id=session.id,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=assistant_message,
                 request_id=request_id,
@@ -460,11 +447,11 @@ class AgentOrchestrator:
             LOGGER.info(
                 "chat_turn_parser_unavailable request_id=%s session_id=%s",
                 request_id,
-                session.id,
+                conversation_id,
             )
             return ChatTurnResponse(
                 request_id=request_id,
-                session_id=session.id,
+                conversation_id=conversation_id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=decision,
@@ -503,7 +490,7 @@ class AgentOrchestrator:
                 progress_summary="Explained the latest captured failure.",
             )
             self.history_service.append_message(
-                session_id=session.id,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=assistant_message,
                 request_id=request_id,
@@ -517,7 +504,7 @@ class AgentOrchestrator:
             )
             return ChatTurnResponse(
                 request_id=request_id,
-                session_id=session.id,
+                conversation_id=conversation_id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=decision,
@@ -531,7 +518,7 @@ class AgentOrchestrator:
         if turn_contract.clarification_plan is not None:
             return await self.turn_state_assembler.build_partial_clarification_response(
                 request_id=request_id,
-                session_id=session.id,
+                conversation_id=conversation_id,
                 conversation_key=conversation_key,
                 task=task,
                 turn_contract=turn_contract,
@@ -557,7 +544,7 @@ class AgentOrchestrator:
             )
             operation = operation.model_copy(update={"message": assistant_message})
             self.history_service.append_message(
-                session_id=session.id,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=assistant_message,
                 request_id=request_id,
@@ -580,7 +567,7 @@ class AgentOrchestrator:
             )
             return ChatTurnResponse(
                 request_id=request_id,
-                session_id=session.id,
+                conversation_id=conversation_id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=AgentTurnSupport.build_direct_reject_decision(turn_contract.normalized_action.action_id),
@@ -636,7 +623,7 @@ class AgentOrchestrator:
                 progress_summary=assistant_message,
             )
             self.history_service.append_message(
-                session_id=session.id,
+                conversation_id=conversation_id,
                 role="assistant",
                 content=assistant_message,
                 request_id=request_id,
@@ -653,7 +640,7 @@ class AgentOrchestrator:
             )
             return ChatTurnResponse(
                 request_id=request_id,
-                session_id=session.id,
+                session_id=conversation_id,
                 assistant_message=assistant_message,
                 turn_contract=turn_contract,
                 decision=preflight_decision,
@@ -684,7 +671,7 @@ class AgentOrchestrator:
                 "policy",
                 {
                     "request_id": request_id,
-                    "session_id": session.id,
+                    "conversation_id": conversation_id,
                     "specialist": specialist,
                     "planned_tools": list(tool_plan.selected_tools),
                 },
@@ -702,7 +689,7 @@ class AgentOrchestrator:
         )
         native_context = AgentExecutionContext(
             request_id=request_id,
-            session_id=str(session.id),
+            session_id=conversation_id,
             parsed_request=turn_contract.model_dump(mode="json"),
             map_state=latest_memory if isinstance(latest_memory, dict) else {},
             policy_constraints={
@@ -738,7 +725,7 @@ class AgentOrchestrator:
         if deterministic_tools_available:
             return await self._execute_planned_turn(
                 request_id=request_id,
-                session_id=session.id,
+                conversation_id=conversation_id,
                 conversation_key=conversation_key,
                 task=task,
                 turn_contract=turn_contract,
@@ -895,7 +882,7 @@ class AgentOrchestrator:
         self.task_state_service.set_active_visualization(conversation_key, map_session)
 
         self.history_service.append_message(
-            session_id=session.id,
+            conversation_id=conversation_id,
             role="assistant",
             content=assistant_message,
             request_id=request_id,
@@ -912,14 +899,14 @@ class AgentOrchestrator:
         )
 
         LOGGER.info(
-            "chat_turn_complete request_id=%s session_id=%s state=%s",
+            "chat_turn_complete request_id=%s conversation_id=%s state=%s",
             request_id,
-            session.id,
+            conversation_id,
             decision.plan.state,
         )
         return ChatTurnResponse(
             request_id=request_id,
-            session_id=session.id,
+            conversation_id=conversation_id,
             assistant_message=assistant_message,
             turn_contract=turn_contract,
             decision=decision,
@@ -1150,7 +1137,7 @@ class AgentOrchestrator:
                 },
             )
         self.history_service.append_message(
-            session_id=session_id,
+            conversation_id=session_id,
             role="assistant",
             content=assistant_message,
             request_id=request_id,

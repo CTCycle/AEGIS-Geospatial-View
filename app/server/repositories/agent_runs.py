@@ -5,11 +5,13 @@ from uuid import uuid4
 
 from server.domain.agent_runs import AgentRunSnapshot, AgentRunState
 from server.repositories.database.backend import get_database
+from sqlalchemy import select
+
 from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
+
 
 ###############################################################################
 class AgentRunRepository:
-
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend
@@ -27,6 +29,14 @@ class AgentRunRepository:
             conversation = session.get(ConversationRecord, conversation_id)
             if conversation is None:
                 raise ValueError("Conversation not found.")
+            active = session.scalar(
+                select(AgentRunRecord.id).where(
+                    AgentRunRecord.conversation_id == conversation_id,
+                    AgentRunRecord.active_slot == 1,
+                )
+            )
+            if active is not None:
+                raise ValueError("Conversation already has an active run.")
             record = AgentRunRecord(
                 id=f"run_{uuid4().hex}",
                 conversation_id=conversation_id,
@@ -34,6 +44,7 @@ class AgentRunRepository:
                 aggregated_request=aggregated_request,
                 active_run_version=1,
                 state=AgentRunState.PENDING.value,
+                active_slot=1,
             )
             session.add(record)
             session.commit()
@@ -52,10 +63,14 @@ class AgentRunRepository:
         conversation_id: str,
     ) -> AgentRunSnapshot | None:
         with self._session_factory() as session:
-            conversation = session.get(ConversationRecord, conversation_id)
-            if conversation is None or not conversation.active_run_id:
+            if session.get(ConversationRecord, conversation_id) is None:
                 return None
-            record = session.get(AgentRunRecord, conversation.active_run_id)
+            record = session.scalar(
+                select(AgentRunRecord).where(
+                    AgentRunRecord.conversation_id == conversation_id,
+                    AgentRunRecord.active_slot == 1,
+                )
+            )
             return self._to_snapshot(record) if record is not None else None
 
     # -------------------------------------------------------------------------
@@ -72,6 +87,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             record = self._require_run(session, run_id)
             record.state = AgentRunState.CANCELLED.value
+            record.active_slot = None
             record.cancel_requested_at = record.cancel_requested_at or datetime.now(UTC)
             record.completed_at = record.completed_at or datetime.now(UTC)
             session.commit()
@@ -110,6 +126,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             record = self._require_run(session, run_id)
             record.state = AgentRunState.COMPLETED.value
+            record.active_slot = None
             record.completed_at = datetime.now(UTC)
             session.commit()
             session.refresh(record)
@@ -120,6 +137,7 @@ class AgentRunRepository:
         with self._session_factory() as session:
             record = self._require_run(session, run_id)
             record.state = AgentRunState.FAILED.value
+            record.active_slot = None
             record.error_code = code
             record.error_message = message
             record.completed_at = datetime.now(UTC)

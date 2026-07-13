@@ -25,6 +25,7 @@ from server.common.constants import (
 )
 from server.common.paths import resolve_database_file_path
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class DatabaseSettings:
@@ -40,6 +41,12 @@ class DatabaseSettings:
     ssl_ca: str | None
     connect_timeout: int
     insert_batch_size: int
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+    database_pool_recycle_seconds: int = 1800
+    sqlite_busy_timeout_ms: int = 5000
+    sqlite_wal_enabled: bool = True
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -47,6 +54,7 @@ class NominatimSettings:
     base_url: str
     user_agent: str
     timeout: float
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -58,6 +66,7 @@ class GeospatialSettings:
     min_lon: float
     max_mercator_extent: float
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class MapSettings:
@@ -65,10 +74,12 @@ class MapSettings:
     render_delay_s: float
     tiles: str
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class JobsSettings:
     polling_interval: float
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -76,6 +87,7 @@ class ChatRuntimeSettings:
     max_history_messages: int
     parser_certainty_threshold: float
     parser_max_retries: int
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -86,6 +98,7 @@ class OpenMeteoSettings:
     timeout: float
     cache_ttl_s: float
     min_call_interval_s: float
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -98,6 +111,7 @@ class OverpassSettings:
     default_radius_m: float
     default_limit: int
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class RainViewerSettings:
@@ -109,6 +123,7 @@ class RainViewerSettings:
     tile_color_scheme: int
     tile_smooth: int
     tile_snow: int
+
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -130,6 +145,7 @@ class GIBSSettings:
     layer_sync_user_agent: str
     layer_sync_timeout: float
 
+
 ###############################################################################
 @dataclass(frozen=True)
 class ServerSettings:
@@ -144,6 +160,7 @@ class ServerSettings:
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
 
+
 ###############################################################################
 class JsonDatabaseSettings(BaseModel):
     embedded_database: bool = True
@@ -157,6 +174,11 @@ class JsonDatabaseSettings(BaseModel):
     ssl_ca: str | None = None
     connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
     insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
+    database_pool_size: int = Field(default=5, ge=1)
+    database_max_overflow: int = Field(default=10, ge=0)
+    database_pool_recycle_seconds: int = Field(default=1800, ge=0)
+    sqlite_busy_timeout_ms: int = Field(default=5000, ge=1)
+    sqlite_wal_enabled: bool = True
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -176,11 +198,13 @@ class JsonDatabaseSettings(BaseModel):
         text = str(value).strip() if value is not None else ""
         return text or "postgresql+psycopg"
 
+
 ###############################################################################
 class JsonNominatimSettings(BaseModel):
     base_url: str = NOMINATIM_SEARCH_URL
     user_agent: str = DEFAULT_NOMINATIM_USER_AGENT
     timeout: float = Field(default=10.0, ge=1.0)
+
 
 ###############################################################################
 class JsonGeospatialSettings(BaseModel):
@@ -191,21 +215,25 @@ class JsonGeospatialSettings(BaseModel):
     min_lon: float = -180.0
     max_mercator_extent: float = 20037508.3427892
 
+
 ###############################################################################
 class JsonMapSettings(BaseModel):
     default_size_m: float = Field(default=500.0, ge=1.0)
     render_delay_s: float = Field(default=1.0, ge=0.0)
     tiles: str = "OpenStreetMap"
 
+
 ###############################################################################
 class JsonJobsSettings(BaseModel):
     polling_interval: float = 1.0
+
 
 ###############################################################################
 class JsonChatRuntimeSettings(BaseModel):
     max_history_messages: int = Field(default=12, ge=1, le=100)
     parser_certainty_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
     parser_max_retries: int = Field(default=2, ge=0, le=5)
+
 
 ###############################################################################
 class JsonOpenMeteoSettings(BaseModel):
@@ -215,6 +243,7 @@ class JsonOpenMeteoSettings(BaseModel):
     timeout: float = Field(default=15.0, ge=1.0)
     cache_ttl_s: float = Field(default=600.0, ge=30.0)
     min_call_interval_s: float = Field(default=0.15, ge=0.05)
+
 
 ###############################################################################
 class JsonOverpassSettings(BaseModel):
@@ -226,6 +255,7 @@ class JsonOverpassSettings(BaseModel):
     default_radius_m: float = Field(default=2500.0, ge=100.0)
     default_limit: int = Field(default=30, ge=1, le=200)
 
+
 ###############################################################################
 class JsonRainViewerSettings(BaseModel):
     metadata_url: str = "https://api.rainviewer.com/public/weather-maps.json"
@@ -236,6 +266,7 @@ class JsonRainViewerSettings(BaseModel):
     tile_color_scheme: int = Field(default=2, ge=0, le=6)
     tile_smooth: int = Field(default=1, ge=0, le=1)
     tile_snow: int = Field(default=1, ge=0, le=1)
+
 
 ###############################################################################
 class JsonGIBSSettings(BaseModel):
@@ -285,6 +316,7 @@ class JsonGIBSSettings(BaseModel):
                 normalized[k] = v
         return normalized
 
+
 ###############################################################################
 def _read_env_text(name: str) -> str | None:
     value = os.getenv(name)
@@ -292,6 +324,7 @@ def _read_env_text(name: str) -> str | None:
         return None
     text = value.strip()
     return text or None
+
 
 ###############################################################################
 def _read_env_int(name: str) -> int | None:
@@ -302,6 +335,7 @@ def _read_env_int(name: str) -> int | None:
         return int(value)
     except ValueError as exc:
         raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
+
 
 ###############################################################################
 def _read_env_bool(name: str) -> bool | None:
@@ -315,6 +349,7 @@ def _read_env_bool(name: str) -> bool | None:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise RuntimeError(f"Invalid boolean value for {name}: {value}")
+
 
 ###############################################################################
 def _database_payload_from_url(database_url: str) -> dict[str, Any]:
@@ -340,6 +375,7 @@ def _database_payload_from_url(database_url: str) -> dict[str, Any]:
         if parsed.password is not None
         else None,
     }
+
 
 ###############################################################################
 def build_database_payload_from_env() -> dict[str, Any]:
@@ -377,6 +413,7 @@ def build_database_payload_from_env() -> dict[str, Any]:
 
     return payload
 
+
 ###############################################################################
 def build_database_settings() -> DatabaseSettings:
     try:
@@ -384,6 +421,7 @@ def build_database_settings() -> DatabaseSettings:
     except ValidationError as exc:
         raise RuntimeError(f"Invalid database settings: {exc}") from exc
     return _to_database_settings(db)
+
 
 ###############################################################################
 class AppSettings(BaseSettings):
@@ -508,6 +546,7 @@ class AppSettings(BaseSettings):
             ),
         )
 
+
 ###############################################################################
 def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
     database_file_path = resolve_database_file_path()
@@ -525,6 +564,11 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
             ssl_ca=None,
             connect_timeout=DEFAULT_DB_CONNECT_TIMEOUT,
             insert_batch_size=db.insert_batch_size,
+            database_pool_size=db.database_pool_size,
+            database_max_overflow=db.database_max_overflow,
+            database_pool_recycle_seconds=db.database_pool_recycle_seconds,
+            sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
+            sqlite_wal_enabled=db.sqlite_wal_enabled,
         )
 
     return DatabaseSettings(
@@ -540,7 +584,13 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         ssl_ca=db.ssl_ca,
         connect_timeout=db.connect_timeout,
         insert_batch_size=db.insert_batch_size,
+        database_pool_size=db.database_pool_size,
+        database_max_overflow=db.database_max_overflow,
+        database_pool_recycle_seconds=db.database_pool_recycle_seconds,
+        sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
+        sqlite_wal_enabled=db.sqlite_wal_enabled,
     )
+
 
 ###############################################################################
 def _normalize_upper_key_mapping(
@@ -555,6 +605,7 @@ def _normalize_upper_key_mapping(
         if k and v:
             normalized[k] = v
     return normalized or dict(fallback)
+
 
 ###############################################################################
 def _normalize_key_mapping(

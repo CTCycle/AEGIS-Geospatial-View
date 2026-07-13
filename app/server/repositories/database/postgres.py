@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import urllib.parse
 from typing import Any
 
-import sqlalchemy
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
 
 from server.configurations import DatabaseSettings
 from server.repositories.database.orm_table_operations import (
     SqlAlchemyTableOperationsMixin,
 )
+from server.repositories.database.engine import build_engine, build_session_factory
+
 
 ###############################################################################
 class PostgresRepository(SqlAlchemyTableOperationsMixin):
@@ -28,28 +27,11 @@ class PostgresRepository(SqlAlchemyTableOperationsMixin):
                 "Database username must be provided for external database."
             )
 
-        port = settings.port or 5432
-        engine_name = settings.engine
-        if engine_name != "postgresql+psycopg":
+        if settings.engine != "postgresql+psycopg":
             raise ValueError(f"Unsupported database engine: {settings.engine}")
-        password = settings.password or ""
-        connect_args: dict[str, Any] = {"connect_timeout": settings.connect_timeout}
-        if settings.ssl:
-            connect_args["sslmode"] = "require"
-            if settings.ssl_ca:
-                connect_args["sslrootcert"] = settings.ssl_ca
-
-        safe_username = urllib.parse.quote_plus(settings.username)
-        safe_password = urllib.parse.quote_plus(password)
         self.db_path: str | None = None
-        self.engine: Engine = sqlalchemy.create_engine(
-            f"{engine_name}://{safe_username}:{safe_password}@{settings.host}:{port}/{settings.database_name}",
-            echo=False,
-            future=True,
-            connect_args=connect_args,
-            pool_pre_ping=True,
-        )
-        self.session_factory = sessionmaker(bind=self.engine, future=True)
+        self.engine: Engine = build_engine(settings)
+        self.session_factory = build_session_factory(self.engine)
         self.session = self.session_factory
         self.insert_batch_size = settings.insert_batch_size
 
