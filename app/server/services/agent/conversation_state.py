@@ -180,4 +180,3 @@ class ConversationTaskStateService:
         return state
 
 
-TASK_STATE_SERVICE = ConversationTaskStateService()

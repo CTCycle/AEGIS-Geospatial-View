@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
@@ -193,7 +193,7 @@ async def get_layer_geojson(
     live: bool = Query(default=False),
     incidents: bool = Query(default=False),
     service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await service.get_layer_geojson(
             layer_id,
@@ -283,7 +283,7 @@ async def get_geospatial_cameras_geojson(
     provider: str | None = Query(default=None),
     camera_type: str | None = Query(default=None),
     service: GeospatialApiService = Depends(get_geospatial_api_service),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await service.list_cameras_geojson(
             bbox=bbox,

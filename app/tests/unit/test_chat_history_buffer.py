@@ -15,7 +15,7 @@ class _HistoryRepoStub:
 
     # -------------------------------------------------------------------------
     def list_recent_messages(
-        self, session_id: int, limit: int
+        self, conversation_id: str, limit: int
     ) -> list[dict[str, object]]:
         self.calls += 1
         return self.messages[-limit:]
@@ -24,8 +24,8 @@ class _HistoryRepoStub:
 def test_history_buffer_hydrates_once_and_reuses_cache() -> None:
     repo = _HistoryRepoStub()
     buffer = ChatHistoryBuffer(history_repo=repo, max_messages=3)
-    first = buffer.get_or_hydrate(7)
-    second = buffer.get_or_hydrate(7)
+    first = buffer.get_or_hydrate("conversation-7")
+    second = buffer.get_or_hydrate("conversation-7")
     assert first == second
     assert repo.calls == 1
 
@@ -33,9 +33,9 @@ def test_history_buffer_hydrates_once_and_reuses_cache() -> None:
 def test_history_buffer_appends_and_trims() -> None:
     repo = _HistoryRepoStub()
     buffer = ChatHistoryBuffer(history_repo=repo, max_messages=2)
-    buffer.get_or_hydrate(11)
-    buffer.append(11, {"role": "user", "content": "third"})
-    recent = buffer.list_recent(11)
+    buffer.get_or_hydrate("conversation-11")
+    buffer.append("conversation-11", {"role": "user", "content": "third"})
+    recent = buffer.list_recent("conversation-11")
     assert len(recent) == 2
     assert recent[0]["content"] == "second"
     assert recent[1]["content"] == "third"

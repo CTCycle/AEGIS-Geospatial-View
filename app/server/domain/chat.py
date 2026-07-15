@@ -35,7 +35,7 @@ class ChatTurnRequest(BaseModel):
     message: str
     datetime: str | None = None
     request_id: str | None = None
-    conversation_id: str | None = None
+    conversation_id: str
 
 ###############################################################################
 class ContextUsageResponse(BaseModel):
@@ -47,15 +47,6 @@ class ContextUsageResponse(BaseModel):
     usage_percent: float
     provider: str
     model: str
-    reserved_output_tokens: int = 0
-    tool_schema_tokens: int = 0
-    response_schema_tokens: int = 0
-    safety_margin_tokens: int = 512
-    usage_source: str = "estimated"
-    phases: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    peak_request_tokens: int | None = None
-    total_input_tokens: int | None = None
-    total_output_tokens: int | None = None
     reserved_output_tokens: int = 0
     tool_schema_tokens: int = 0
     response_schema_tokens: int = 0
@@ -103,7 +94,6 @@ class ChatTurnResponse(BaseModel):
     tool_plan: ToolPlan | None = None
     failure_diagnostic: TaskFailureDetail | None = None
     visualization_update: VisualizationUpdate | None = None
-    context_revision: int | None = None
     context_revision: int | None = None
 
 ###############################################################################

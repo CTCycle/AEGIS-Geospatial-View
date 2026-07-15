@@ -125,7 +125,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     )
     job_service = BackgroundJobService(
         chat_streaming_service=chat_streaming_service,
-        map_search_runner=search_runtime.search_orchestrator.execute,
         polling_interval=settings.jobs.polling_interval,
     )
     job_service.start()

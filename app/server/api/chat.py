@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from typing import Annotated
-from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
@@ -57,17 +56,10 @@ def _stream_event(event: ChatStreamEvent) -> str:
     return json.dumps(event.model_dump(mode="json")) + "\n"
 
 ###############################################################################
-def _ensure_request_id(payload: ChatTurnRequest) -> ChatTurnRequest:
-    if payload.request_id:
-        return payload
-    return payload.model_copy(update={"request_id": f"chat-{uuid4().hex[:12]}"})
-
-###############################################################################
 async def _serialize_chat_event_stream(
     streaming_service: ChatStreamingService,
     payload: ChatTurnRequest,
 ) -> AsyncIterator[str]:
-    payload = _ensure_request_id(payload)
     async for event in streaming_service.stream_turn(payload):
         yield _stream_event(event)
 
@@ -81,7 +73,6 @@ async def create_chat_job(
     payload: ChatTurnRequest,
     job_service: BackgroundJobService = Depends(get_job_service),
 ) -> BackgroundJobCreateResponse:
-    payload = _ensure_request_id(payload)
     return job_service.create_chat_job(payload)
 
 ###############################################################################
@@ -94,7 +85,6 @@ async def chat_turn(
     payload: ChatTurnRequest,
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ChatTurnResponse:
-    payload = _ensure_request_id(payload)
     try:
         return await runtime.agent_orchestrator.run_turn(payload)
     except LLMConfigurationError as exc:

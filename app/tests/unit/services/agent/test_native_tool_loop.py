@@ -62,7 +62,7 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
         registry = ToolRegistry()
 
         async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
-            return {"echo": arguments["q"], "session": context.session_id}
+            return {"echo": arguments["q"], "conversation": context.conversation_id}
 
         registry.register_native_tool(_tool(), handler)
         loop = NativeToolLoop(provider_factory=_Factory(provider), tool_registry=registry)
@@ -73,7 +73,7 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
                 messages=[{"role": "user", "content": "lookup Rome"}],
                 tools=registry.list_native_tools(),
                 temperature=0,
-                context=AgentExecutionContext(session_id="s1"),
+                context=AgentExecutionContext(conversation_id="s1"),
             )
         )
         assert result.final_text == "done"

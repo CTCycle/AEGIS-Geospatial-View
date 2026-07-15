@@ -64,7 +64,7 @@ class ParserService:
             normalized.append(
                 {
                     "id": self._to_text(item.get("id")),
-                    "session_id": self._to_text(item.get("session_id")),
+                    "conversation_id": self._to_text(item.get("conversation_id")),
                     "turn_index": self._to_text(item.get("turn_index")),
                     "role": self._to_text(item.get("role")),
                     "content": self._to_text(item.get("content")),
