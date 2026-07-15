@@ -160,7 +160,7 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
         conversation_messages=[
             {
                 "id": 515,
-                "session_id": 217,
+                "conversation_id": "conversation-217",
                 "turn_index": 0,
                 "role": "assistant",
                 "content": None,
@@ -171,7 +171,7 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
     recent = result.conversation_context.recent_messages
     assert len(recent) == 1
     assert recent[0]["id"] == "515"
-    assert recent[0]["session_id"] == "217"
+    assert recent[0]["conversation_id"] == "conversation-217"
     assert recent[0]["turn_index"] == "0"
     assert recent[0]["content"] == ""
 

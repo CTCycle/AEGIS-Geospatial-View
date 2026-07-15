@@ -12,7 +12,6 @@ TemporalMode = Literal["current", "historical", "forecast", "none"]
 class ConversationContextSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    session_id: int | None = None
     recent_messages: list[dict[str, str]] = Field(default_factory=list)
     memory_snapshot: dict[str, object] = Field(default_factory=dict)
 

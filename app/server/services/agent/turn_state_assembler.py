@@ -51,7 +51,7 @@ class AgentTurnStateAssembler:
         self,
         *,
         request_id: str,
-        session_id: int,
+        conversation_id: str,
         conversation_key: str,
         task: ConversationTaskRecord,
         turn_contract: Any,
@@ -181,7 +181,7 @@ class AgentTurnStateAssembler:
             remove_layer_ids=removed_layers,
         )
         self.history_service.append_message(
-            conversation_id=session_id,
+            conversation_id=conversation_id,
             role="assistant",
             content=assistant_message,
             request_id=request_id,
@@ -196,7 +196,7 @@ class AgentTurnStateAssembler:
         )
         return ChatTurnResponse(
             request_id=request_id,
-            conversation_id=session_id,
+            conversation_id=conversation_id,
             assistant_message=assistant_message,
             turn_contract=turn_contract,
             decision=decision,

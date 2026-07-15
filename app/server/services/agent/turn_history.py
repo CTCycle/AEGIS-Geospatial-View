@@ -58,10 +58,7 @@ class AgentTurnHistoryService:
         role: str,
         request_id: str,
     ) -> dict[str, Any] | None:
-        finder = getattr(self.history_service, "find_message_by_request_id", None)
-        if finder is None:
-            return None
-        return finder(
+        return self.history_service.find_message_by_request_id(
             conversation_id=conversation_id,
             role=role,
             request_id=request_id,

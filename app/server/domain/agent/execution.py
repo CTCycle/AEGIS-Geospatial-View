@@ -10,7 +10,7 @@ from server.domain.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResul
 @dataclass(frozen=True)
 class AgentExecutionContext:
     request_id: str | None = None
-    session_id: str | None = None
+    conversation_id: str | None = None
     parsed_request: Any | None = None
     map_state: dict[str, Any] = field(default_factory=dict)
     policy_constraints: dict[str, Any] = field(default_factory=dict)

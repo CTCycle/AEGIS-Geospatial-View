@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Layering
 
@@ -106,14 +106,13 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 
 ### Threaded
 
-- Long-running chat and map jobs use one in-memory `BackgroundJobService` worker and a shared job/event contract.
-- Map job execution uses the current location-search orchestrator from the shared background job worker.
+- Long-running chat jobs use one in-memory `BackgroundJobService` worker and a shared job/event contract.
 - Cancellation is cooperative through `stop_requested`.
 
 ## Runtime Constraints
 
 - Job state is process-local and memory-backed.
-- `app/server/services/jobs.py` defines the single in-memory `BackgroundJobService` used for chat and map jobs.
+- `app/server/services/jobs.py` defines the single in-memory `BackgroundJobService` used for chat jobs.
 - Distributed or high-concurrency workloads would require an external queue/worker model.
 - Async endpoints must avoid blocking CPU-heavy work on the event loop.
 - Run event fanout is in-process in v1, with persisted event replay as the reconnect source of truth.

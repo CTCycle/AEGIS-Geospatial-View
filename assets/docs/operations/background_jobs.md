@@ -1,17 +1,16 @@
 # Background Jobs
 
-Last updated: 2026-06-17
+Last updated: 2026-07-14
 
 ## Scope
 
-AEGIS uses one internal in-memory background job system for asynchronous chat and map work.
+AEGIS uses one internal in-memory background job system for asynchronous chat work.
 
 ## Components
 
 - `BackgroundJobService`
 - `BackgroundJobWorker`
 - `chat_turn` jobs
-- `map_fetch` jobs
 
 ## Lifecycle
 
@@ -47,7 +46,7 @@ Important fields include:
 
 - One worker thread claims queued jobs and dispatches by `job_type`.
 - Chat jobs stream lifecycle events from the orchestrator into a shared event model.
-- Map jobs execute the current location-search pipeline used by chat/tool orchestration.
+- Chat job requests require a `conversation_id`; the worker never creates or infers one.
 - Missing-job failures are translated into HTTP 404 by the API layer.
 
 ## Cancellation And Constraints

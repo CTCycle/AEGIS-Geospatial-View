@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-BackgroundJobType = Literal["chat_turn", "map_fetch"]
+BackgroundJobType = Literal["chat_turn"]
 BackgroundJobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 BackgroundJobEventType = Literal[
     "queued",
@@ -51,7 +51,6 @@ class BackgroundJobStatusResponse(BaseModel):
     status: BackgroundJobStatus
     request_id: str
     parent_job_id: str | None = None
-    session_id: int | None = None
     priority: int = 0
     progress_percent: int | None = None
     status_message: str | None = None
@@ -92,7 +91,6 @@ class BackgroundJob:
     request_id: str
     input_json: dict[str, Any]
     parent_job_id: str | None = None
-    session_id: int | None = None
     status: str = "queued"
     priority: int = 0
     progress_percent: int | None = 0

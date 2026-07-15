@@ -2,9 +2,19 @@ from __future__ import annotations
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from server.configurations import DatabaseSettings
+
+
+def configure_sqlite_connection(dbapi_connection: object, settings: DatabaseSettings) -> None:
+    cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+    cursor.execute("PRAGMA foreign_keys=ON")
+    if settings.sqlite_wal_enabled:
+        cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms}")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
 
 
 def build_engine(settings: DatabaseSettings) -> Engine:
@@ -19,15 +29,13 @@ def build_engine(settings: DatabaseSettings) -> Engine:
             pool_pre_ping=True,
         )
 
-        @event.listens_for(engine, "connect")
-        def _configure_sqlite(dbapi_connection, _connection_record) -> None:  # noqa: ANN001
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            if settings.sqlite_wal_enabled:
-                cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms}")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.close()
+        event.listen(
+            engine,
+            "connect",
+            lambda dbapi_connection, _connection_record: configure_sqlite_connection(
+                dbapi_connection, settings
+            ),
+        )
 
         return engine
 
@@ -45,7 +53,7 @@ def build_engine(settings: DatabaseSettings) -> Engine:
     )
 
 
-def build_session_factory(engine: Engine):
+def build_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(
         bind=engine, autoflush=False, expire_on_commit=False, future=True
     )

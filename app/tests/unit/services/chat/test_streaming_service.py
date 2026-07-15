@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import ast
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from typing import Any
 from pathlib import Path
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
@@ -86,7 +87,16 @@ def chat_response(
 class ToolStatusAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        progress_callback("parsed", {"request_id": payload.request_id})
+        progress_callback("policy", {"request_id": payload.request_id})
+        progress_callback("tool_call_started", {"name": "execute_geospatial_capability"})
+        progress_callback("tool_call_completed", {"name": "execute_geospatial_capability", "ok": True})
+        progress_callback("map_session_created", {"map_session": {"resolved_location": {"label": "Rome"}}})
         return chat_response(
             payload,
             tool_payload={
@@ -140,7 +150,13 @@ class ToolStatusAgentOrchestrator:
 class FinalMessageAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
+        progress_callback("parsed", {"request_id": payload.request_id})
+        progress_callback("policy", {"request_id": payload.request_id})
         return chat_response(
             payload,
             operation=ChatOperationResult(
@@ -154,20 +170,28 @@ class FinalMessageAgentOrchestrator:
 class ConfigurationErrorAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
         raise LLMConfigurationError("provider unavailable")
 
 ###############################################################################
 class UnexpectedErrorAgentOrchestrator:
 
     # -------------------------------------------------------------------------
-    async def run_turn(self, payload: ChatTurnRequest) -> ChatTurnResponse:
+    async def run_turn(
+        self,
+        payload: ChatTurnRequest,
+        progress_callback: Callable[[str, dict[str, Any]], None],
+    ) -> ChatTurnResponse:
         raise RuntimeError("boom")
 
 ###############################################################################
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
-    payload = ChatTurnRequest(message="hi", request_id="chat-123")
+    payload = ChatTurnRequest(conversation_id="test-conversation", message="hi", request_id="chat-123")
     return asyncio.run(collect_stream_events(service.stream_turn(payload)))
 
 ###############################################################################

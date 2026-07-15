@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 from collections.abc import AsyncIterator
 from http import HTTPStatus
 from typing import Any
@@ -36,9 +35,6 @@ class ChatStreamingService:
         try:
             queue: asyncio.Queue[ChatStreamEvent] = asyncio.Queue()
 
-            supports_progress = "progress_callback" in inspect.signature(
-                self.agent_orchestrator.run_turn
-            ).parameters
             task = asyncio.create_task(
                 self.agent_orchestrator.run_turn(
                     payload,
@@ -48,8 +44,6 @@ class ChatStreamingService:
                         data,
                     ),
                 )
-                if supports_progress
-                else self.agent_orchestrator.run_turn(payload)
             )
             while not task.done() or not queue.empty():
                 try:
@@ -57,20 +51,6 @@ class ChatStreamingService:
                 except TimeoutError:
                     continue
             result = await task
-            if not supports_progress:
-                yield ChatStreamEvent(event="parsed", data=self._build_parsed_payload(result))
-                yield ChatStreamEvent(event="policy", data=self._build_policy_payload(result))
-                for event in self._build_tool_lifecycle_events(result):
-                    yield event
-                if result.map_session is not None:
-                    yield ChatStreamEvent(
-                        event="map_session_created",
-                        data={
-                            "request_id": result.request_id,
-                            "conversation_id": result.conversation_id,
-                            "map_session": result.map_session.model_dump(mode="json"),
-                        },
-                    )
             yield ChatStreamEvent(
                 event="final",
                 data=self._serialize_chat_turn_response(result),

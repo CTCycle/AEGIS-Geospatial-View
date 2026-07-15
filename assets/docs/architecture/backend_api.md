@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Mounting
 
@@ -59,11 +59,11 @@ Defined in `app/server/api/geospatial.py`:
 Defined in `app/server/api/chat.py`:
 
 - `POST /api/chat/turn`
-  Executes a chat turn and returns the structured result.
+  Executes a chat turn and returns the structured result. `conversation_id` is required.
 - `POST /api/chat/jobs`
-  Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`.
+  Starts an asynchronous chat turn and returns `BackgroundJobCreateResponse`. `conversation_id` is required.
 - `POST /api/chat/stream`
-  Streams NDJSON chat events.
+  Streams NDJSON chat events. `conversation_id` is required.
 - `GET /api/chat/models`
   Returns available cloud and local models.
   Optional query: `provider=deepseek` to fetch the live DeepSeek model catalog using the saved DeepSeek API key.
@@ -138,6 +138,9 @@ Supported event names:
 - `error`
 
 `final` carries the full serialized `ChatTurnResponse`, including `operation`.
+
+Planned tool execution, aggregation, synthesis, persistence, progress events,
+and final response construction are owned by `PlannedTurnExecutionService`.
 
 ## Conversation Run Routes
 

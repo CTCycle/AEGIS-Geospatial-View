@@ -15,7 +15,6 @@ from server.common.constants import (
     JOB_STATUS_SUCCEEDED,
 )
 from server.domain.chat import ChatTurnRequest
-from server.domain.geographics import LocationSearchRequest
 from server.domain.jobs import (
     BackgroundJob,
     BackgroundJobCreateResponse,
@@ -38,11 +37,9 @@ class BackgroundJobService:
         self,
         *,
         chat_streaming_service: ChatStreamingService,
-        map_search_runner,
         polling_interval: float = 1.0,
     ) -> None:
         self._chat_streaming_service = chat_streaming_service
-        self._map_search_runner = map_search_runner
         self._polling_interval = polling_interval
         self._jobs: dict[str, BackgroundJob] = {}
         self._job_ids_by_request_id: dict[str, str] = {}
@@ -74,34 +71,9 @@ class BackgroundJobService:
         job = self._create_job(
             job_type="chat_turn",
             request_id=request_id,
-            session_id=None,
             input_json=payload.model_copy(update={"request_id": request_id}).model_dump(mode="json"),
         )
         return self._to_create_response(job, "Chat job queued")
-
-    # -------------------------------------------------------------------------
-    def create_map_job(
-        self,
-        payload: LocationSearchRequest,
-        *,
-        request_id: str | None = None,
-        parent_job_id: str | None = None,
-        session_id: int | None = None,
-    ) -> BackgroundJobCreateResponse:
-        resolved_request_id = request_id or f"map-{uuid4().hex[:12]}"
-        job = self._create_job(
-            job_type="map_fetch",
-            request_id=resolved_request_id,
-            session_id=session_id,
-            parent_job_id=parent_job_id,
-            max_attempts=2,
-            input_json={
-                "request_id": resolved_request_id,
-                "parent_job_id": parent_job_id,
-                "map_request": payload.model_dump(mode="json"),
-            },
-        )
-        return self._to_create_response(job, "Map fetch job queued")
 
     # -------------------------------------------------------------------------
     def _create_job(
@@ -110,7 +82,6 @@ class BackgroundJobService:
         job_type: str,
         request_id: str,
         input_json: dict[str, Any],
-        session_id: int | None = None,
         parent_job_id: str | None = None,
         max_attempts: int = 1,
     ) -> BackgroundJob:
@@ -123,7 +94,6 @@ class BackgroundJobService:
                 job_type=job_type,
                 request_id=request_id,
                 input_json=input_json,
-                session_id=session_id,
                 parent_job_id=parent_job_id,
                 max_attempts=max_attempts,
             )
@@ -213,9 +183,6 @@ class BackgroundJobService:
         if job.job_type == "chat_turn":
             await self._execute_chat_job(job)
             return
-        if job.job_type == "map_fetch":
-            await self._execute_map_job(job)
-            return
         self._fail_job(job.job_id, {"message": f"Unsupported job type: {job.job_type}"})
 
     # -------------------------------------------------------------------------
@@ -262,32 +229,6 @@ class BackgroundJobService:
                 "chat_turn_response": final_response,
                 "operation": operation,
                 "map_session": final_response.get("map_session"),
-            },
-        )
-
-    # -------------------------------------------------------------------------
-    async def _execute_map_job(self, job: BackgroundJob) -> None:
-        payload = LocationSearchRequest.model_validate(job.input_json["map_request"])
-        self._heartbeat(job.job_id, 25, "Fetching map data")
-        if self._is_cancel_requested(job.job_id):
-            self._cancel_running_job(job.job_id)
-            return
-        map_session = await self._map_search_runner(payload)
-        warnings = list(map_session.compliance_warnings or [])
-        self._record_stream_event(
-            job.job_id,
-            "map_session",
-            {"map_session": map_session.model_dump(mode="json"), "warnings": warnings},
-        )
-        self._complete_job(
-            job.job_id,
-            {
-                "map_session": map_session.model_dump(mode="json"),
-                "warnings": warnings,
-                "layer_results": [
-                    {"overlay_id": overlay_id, "status": "loaded", "message": ""}
-                    for overlay_id in map_session.overlay_ids
-                ],
             },
         )
 
@@ -396,7 +337,6 @@ class BackgroundJobService:
             status=job.status,
             request_id=job.request_id,
             parent_job_id=job.parent_job_id,
-            session_id=job.session_id,
             priority=job.priority,
             progress_percent=job.progress_percent,
             status_message=job.status_message,

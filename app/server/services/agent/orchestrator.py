@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.pipeline import (
-    ConversationTaskRecord,
     TaskFailureDetail,
-    VisualizationUpdate,
 )
 from server.domain.chat import ChatOperationResult, ChatTurnRequest, ChatTurnResponse
 from server.repositories.model_settings import ModelSettingsRepository
@@ -34,6 +33,7 @@ from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 from server.services.agent.turn_history import AgentTurnHistoryService
 from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
+from server.services.agent.planned_turn_execution import PlannedTurnExecutionService
 from server.services.agent.turn_support import AgentTurnSupport
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
@@ -65,7 +65,6 @@ class AgentOrchestrator:
         overlay_inference_service: OverlayInferenceService | None = None,
         settings_repo: ModelSettingsRepository | None = None,
         history_service: ChatHistoryService | None = None,
-        history_repo: ChatHistoryService | None = None,
         conversation_repository: ConversationRepository | None = None,
         task_state_service: ConversationTaskStateService | None = None,
         pipeline_router: DeterministicAgentRouter | None = None,
@@ -97,8 +96,8 @@ class AgentOrchestrator:
             provider_factory=LLMFactory(settings_repo=self.settings_repo),
             tool_registry=self.tool_registry,
         )
-        self.history_service = history_service or history_repo or ChatHistoryService()
-        self.conversation_repository = conversation_repository
+        self.history_service = history_service or ChatHistoryService()
+        self.conversation_repository = conversation_repository or ConversationRepository()
         self.task_state_service = task_state_service or ConversationTaskStateService()
         self.instruction_state_service = ConversationInstructionService()
         self._active_directives: dict[str, list[ConversationDirective]] = {}
@@ -127,46 +126,42 @@ class AgentOrchestrator:
             history_service=self.history_service,
             task_state_service=self.task_state_service,
         )
+        self.planned_turn_execution_service = PlannedTurnExecutionService(
+            tool_plan_executor=self.tool_plan_executor,
+            task_state_service=self.task_state_service,
+            turn_state_assembler=self.turn_state_assembler,
+            response_synthesizer=self.response_synthesizer,
+            instruction_state_service=self.instruction_state_service,
+            active_directives=self._active_directives,
+            history_service=self.history_service,
+        )
 
     # -------------------------------------------------------------------------
     async def run_turn(
         self,
         payload: ChatTurnRequest,
-        progress_callback=None,
+        progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> ChatTurnResponse:
         conversation_id = payload.conversation_id
         repository = self.conversation_repository
         persisted: dict[str, Any] | None = None
         directives: list[ConversationDirective] = []
-        if conversation_id is not None:
-            if repository is None:
-                repository = ConversationRepository()
-                self.conversation_repository = repository
-            if hasattr(repository, "read_state"):
-                persisted = repository.read_state(conversation_id)
-                self._persisted_context_state[conversation_id] = persisted
-                self.task_state_service.hydrate(
-                    conversation_id, persisted.get("task_snapshot")
-                )
-                directives = [
-                    ConversationDirective.model_validate(item)
-                    for item in persisted.get("active_instructions", [])
-                ]
-                directives = self.instruction_state_service.apply_user_message(
-                    directives,
-                    payload.message,
-                    len(
-                        self.history_service.list_recent_messages(
-                            conversation_id,
-                            limit=10_000,
-                        )
-                    )
-                    + 1,
-                )
-                self._active_directives[conversation_id] = directives
+        persisted = repository.read_state(conversation_id)
+        self._persisted_context_state[conversation_id] = persisted
+        self.task_state_service.hydrate(conversation_id, persisted.get("task_snapshot"))
+        directives = [
+            ConversationDirective.model_validate(item)
+            for item in persisted.get("active_instructions", [])
+        ]
+        directives = self.instruction_state_service.apply_user_message(
+            directives,
+            payload.message,
+            len(self.history_service.list_recent_messages(conversation_id, limit=10_000)) + 1,
+        )
+        self._active_directives[conversation_id] = directives
         response = await self._run_turn(payload, progress_callback)
         response = self._with_phase_usage(response)
-        if conversation_id is not None and repository is not None and persisted is not None:
+        if persisted is not None:
             revision = repository.write_state(
                 conversation_id,
                 expected_revision=int(persisted["context_revision"]),
@@ -222,7 +217,7 @@ class AgentOrchestrator:
     async def _run_turn(
         self,
         payload: ChatTurnRequest,
-        progress_callback=None,
+        progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> ChatTurnResponse:
         request_id = payload.request_id or f"chat-{uuid4().hex[:12]}"
         LOGGER.info(
@@ -231,10 +226,7 @@ class AgentOrchestrator:
             payload.conversation_id,
             len(payload.message),
         )
-        if payload.conversation_id is not None:
-            conversation_id = payload.conversation_id
-        else:
-            raise ValueError("conversation_id is required for chat turns.")
+        conversation_id = payload.conversation_id
         existing_response = self.turn_history_service.load_existing_response(conversation_id, request_id)
         if existing_response is not None:
             return existing_response
@@ -385,7 +377,7 @@ class AgentOrchestrator:
                 map_session=None,
             )
             LOGGER.info(
-                "chat_turn_parser_authentication_failed request_id=%s session_id=%s",
+                "chat_turn_parser_authentication_failed request_id=%s conversation_id=%s",
                 request_id,
                 conversation_id,
             )
@@ -445,7 +437,7 @@ class AgentOrchestrator:
                 map_session=None,
             )
             LOGGER.info(
-                "chat_turn_parser_unavailable request_id=%s session_id=%s",
+                "chat_turn_parser_unavailable request_id=%s conversation_id=%s",
                 request_id,
                 conversation_id,
             )
@@ -689,7 +681,7 @@ class AgentOrchestrator:
         )
         native_context = AgentExecutionContext(
             request_id=request_id,
-            session_id=conversation_id,
+            conversation_id=conversation_id,
             parsed_request=turn_contract.model_dump(mode="json"),
             map_state=latest_memory if isinstance(latest_memory, dict) else {},
             policy_constraints={
@@ -723,7 +715,7 @@ class AgentOrchestrator:
             )
         )
         if deterministic_tools_available:
-            return await self._execute_planned_turn(
+            return await self.planned_turn_execution_service.execute(
                 request_id=request_id,
                 conversation_id=conversation_id,
                 conversation_key=conversation_key,
@@ -919,254 +911,4 @@ class AgentOrchestrator:
             tool_plan=tool_plan,
             failure_diagnostic=failure,
         )
-
-    # -------------------------------------------------------------------------
-    async def _execute_planned_turn(
-        self,
-        *,
-        request_id: str,
-        session_id: int,
-        conversation_key: str,
-        task: ConversationTaskRecord,
-        turn_contract,
-        latest_memory: dict[str, Any],
-        latest_contract: dict[str, Any] | None,
-        context_usage,
-        native_context: AgentExecutionContext,
-        tool_plan,
-        progress_callback=None,
-    ) -> ChatTurnResponse:
-        self.task_state_service.update_task(
-            conversation_key,
-            task.task_id,
-            status="in_progress",
-            progress_summary="Executing validated tool plan.",
-            tool_plan=tool_plan,
-        )
-        planned_results = await self.tool_plan_executor.execute(
-            tool_plan,
-            native_context,
-            on_tool_started=(
-                lambda step: progress_callback(
-                    "tool_call_started",
-                    {
-                        "request_id": request_id,
-                        "session_id": session_id,
-                        "tool_call_id": step.step_id,
-                        "name": step.tool_name,
-                    },
-                )
-                if progress_callback is not None
-                else None
-            ),
-            on_tool_completed=(
-                lambda result: progress_callback(
-                    "tool_call_completed",
-                    {
-                        "request_id": request_id,
-                        "session_id": session_id,
-                        "tool_call_id": result.step_id,
-                        "name": result.provenance.tool_name,
-                        "ok": result.ok,
-                        "error": result.error_message,
-                    },
-                )
-                if progress_callback is not None
-                else None
-            ),
-        )
-        tool_payload = {
-            "tool_plan": tool_plan.model_dump(mode="json"),
-            "tool_calls": [
-                {
-                    "id": result.step_id,
-                    "name": result.provenance.tool_name,
-                    "arguments": next(
-                        step.arguments
-                        for step in tool_plan.steps
-                        if step.step_id == result.step_id
-                    ),
-                }
-                for result in planned_results
-            ],
-            "tool_results": [
-                {
-                    "tool_call_id": result.step_id,
-                    "name": result.provenance.tool_name,
-                    "content": {
-                        "ok": result.ok,
-                        "data": result.data,
-                        "error": (
-                            {
-                                "code": result.error_code,
-                                "message": result.error_message,
-                            }
-                            if not result.ok
-                            else None
-                        ),
-                    },
-                    "is_error": not result.ok,
-                    "error": result.error_message,
-                    "provenance": result.provenance.model_dump(mode="json"),
-                }
-                for result in planned_results
-            ],
-            "iterations": 1,
-            "stopped_reason": "planned_execution",
-        }
-        required_failures = [
-            result
-            for result in planned_results
-            if not result.ok
-            and next(
-                step.required for step in tool_plan.steps if step.step_id == result.step_id
-            )
-        ]
-        map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
-            tool_payload=tool_payload,
-            turn_contract=turn_contract,
-            latest_memory=latest_memory,
-        )
-        if map_session is None and tool_plan.visualization_update:
-            map_session = await self.turn_state_assembler.build_map_session_from_turn_contract(
-                turn_contract,
-                latest_memory,
-            )
-        direct_result = self.turn_state_assembler.extract_direct_result_from_tool_results(tool_payload)
-        if required_failures and map_session is None and direct_result is None:
-            first = required_failures[0]
-            assistant_message = first.error_message or "The required geospatial tool failed."
-            operation = ChatOperationResult(
-                kind="error",
-                status="failed",
-                message=assistant_message,
-            )
-        elif (
-            turn_contract.task_class == "map_search"
-            and map_session is None
-            and direct_result is None
-        ):
-            assistant_message = (
-                "I could not create a map session from this request. "
-                "Try a more specific place name or choose an available map layer."
-            )
-            operation = ChatOperationResult(
-                kind="error",
-                status="failed",
-                message=assistant_message,
-            )
-        else:
-            assistant_message = AgentResponseBuilder.build_verified_assistant_message(
-                "",
-                map_session=map_session,
-                direct_result=direct_result,
-                tool_payload=tool_payload,
-            )
-            operation = AgentResponseBuilder.build_verified_operation_result(
-                assistant_message=assistant_message,
-                map_session=map_session,
-                direct_result=direct_result,
-                tool_payload=tool_payload,
-                user_text=turn_contract.user_text,
-                is_capability_question=False,
-            )
-            if any(not result.ok for result in planned_results) and operation.status == "success":
-                operation = operation.model_copy(update={"status": "partial"})
-            assistant_message = self.response_synthesizer.synthesize(
-                user_text=turn_contract.user_text,
-                fallback_text=assistant_message,
-                operation=operation,
-                map_session=map_session,
-                direct_result=direct_result,
-                task_status=(
-                    "completed" if operation.status == "success" else "partial"
-                ),
-                active_instructions=[
-                    item.model_dump(mode="json")
-                    for item in self.instruction_state_service.active(
-                        self._active_directives.get(conversation_key, [])
-                    )
-                ],
-                task_snapshot=self.task_state_service.serialize(conversation_key),
-            )
-            operation = operation.model_copy(update={"message": assistant_message})
-        decision = AgentResponseBuilder.build_final_decision(
-            action_id=turn_contract.normalized_action.action_id,
-            operation=operation,
-            trace_steps=[
-                "1.parse_structured_request",
-                "2.update_conversation_task",
-                "3.route_specialist",
-                "4.build_tool_plan",
-                "5.execute_dependency_levels",
-                "6.validate_tool_results",
-                "7.build_frontend_payload",
-            ],
-        )
-        memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
-            turn_contract=turn_contract,
-            latest_memory=latest_memory,
-            map_session=map_session,
-            direct_result=direct_result,
-            tool_payload=tool_payload,
-        )
-        failure = self.turn_state_assembler.failure_from_operation(operation, tool_payload)
-        self.task_state_service.update_task(
-            conversation_key,
-            task.task_id,
-            status="failed" if failure is not None else "completed",
-            progress_summary=operation.message,
-            failure=failure,
-            tool_plan=tool_plan,
-            tool_result_refs=[result.step_id for result in planned_results],
-        )
-        self.task_state_service.set_active_visualization(conversation_key, map_session)
-        visualization_update = VisualizationUpdate(
-            basemap_replacement=tool_plan.visualization_update.get("basemap_replacement")
-            if isinstance(tool_plan.visualization_update.get("basemap_replacement"), str)
-            else turn_contract.requested_basemap,
-            add_layer_ids=list(turn_contract.requested_layers),
-        )
-        if progress_callback is not None and map_session is not None:
-            progress_callback(
-                "map_session_created",
-                {
-                    "request_id": request_id,
-                    "session_id": session_id,
-                    "map_session": map_session.model_dump(mode="json"),
-                },
-            )
-        self.history_service.append_message(
-            conversation_id=session_id,
-            role="assistant",
-            content=assistant_message,
-            request_id=request_id,
-            structured_payload={
-                "turn_contract": turn_contract.model_dump(mode="json"),
-                "decision": decision.model_dump(mode="json"),
-                "operation": operation.model_dump(mode="json"),
-                "memory_snapshot": memory_snapshot,
-                "previous_turn_contract": latest_contract,
-                "request_id": request_id,
-            },
-            tool_payload=tool_payload,
-            map_session=map_session.model_dump(mode="json") if map_session else None,
-        )
-        return ChatTurnResponse(
-            request_id=request_id,
-            conversation_id=session_id,
-            assistant_message=assistant_message,
-            turn_contract=turn_contract,
-            decision=decision,
-            operation=operation,
-            tool_payload=tool_payload,
-            map_session=map_session,
-            memory_snapshot=memory_snapshot,
-            context_usage=context_usage,
-            task_snapshot=self.task_state_service.snapshot(conversation_key),
-            tool_plan=tool_plan,
-            failure_diagnostic=failure,
-            visualization_update=visualization_update,
-        )
-
 

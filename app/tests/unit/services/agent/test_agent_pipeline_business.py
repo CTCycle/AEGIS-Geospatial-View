@@ -176,6 +176,20 @@ class _History:
     def append_message(self, **kwargs):  # noqa: ANN003
         self.messages.append(kwargs)
 
+    def find_message_by_request_id(
+        self, *, conversation_id: str, role: str, request_id: str
+    ) -> dict[str, Any] | None:
+        return next(
+            (
+                message
+                for message in self.messages
+                if message.get("conversation_id") == conversation_id
+                and message.get("role") == role
+                and message.get("request_id") == request_id
+            ),
+            None,
+        )
+
     # -------------------------------------------------------------------------
     def list_recent_messages(self, session_id, limit):  # noqa: ANN001
         return []
@@ -251,7 +265,7 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         request_builder=request_builder,
         agent_tool_catalog_service=catalog,
         settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
-        history_repo=_History(),  # type: ignore[arg-type]
+        history_service=_History(),  # type: ignore[arg-type]
         task_state_service=ConversationTaskStateService(),
         conversation_repository=_ConversationRepository(),  # type: ignore[arg-type]
     )
