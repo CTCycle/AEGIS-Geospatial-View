@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-07-12
+Last updated: 2026-07-16
 
 ## Environment File
 
@@ -16,6 +16,7 @@ Common keys include:
 - `RELOAD`
 - `OPTIONAL_DEPENDENCIES`
 - `BACKEND_LOGS_VISIBLE`
+- `always_rebuild`
 - `EMBEDDED_DATABASE`
 - `DATABASE_URL`
 - `DATABASE_ENGINE`
