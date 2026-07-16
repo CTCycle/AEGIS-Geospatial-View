@@ -133,7 +133,7 @@ describe('core/api', () => {
     {
       label: 'request_id',
       payload: {
-        session_id: 1,
+        conversation_id: 'conv-1',
         assistant_message: 'ok',
         turn_contract: {},
         decision: {},
@@ -143,7 +143,7 @@ describe('core/api', () => {
       label: 'turn_contract',
       payload: {
         request_id: 'chat-1',
-        session_id: 1,
+        conversation_id: 'conv-1',
         assistant_message: 'ok',
         decision: {},
       },
@@ -152,7 +152,7 @@ describe('core/api', () => {
       label: 'decision',
       payload: {
         request_id: 'chat-1',
-        session_id: 1,
+        conversation_id: 'conv-1',
         assistant_message: 'ok',
         turn_contract: {},
       },
@@ -179,7 +179,7 @@ describe('core/api', () => {
     const fetchSpy = jasmine.createSpy('fetch').and.resolveTo(
       new Response(JSON.stringify({
         request_id: 'chat-1',
-        session_id: 1,
+        conversation_id: 'conv-1',
         assistant_message: 'ok',
         turn_contract: {},
         decision: {},
@@ -191,7 +191,7 @@ describe('core/api', () => {
       }),
     );
     (window.fetch as unknown) = fetchSpy;
-    await sendChatTurn({ message: 'hello' });
+    await sendChatTurn({ conversation_id: 'conv-1', message: 'hello' });
     expect(fetchSpy).toHaveBeenCalled();
     const calledUrl = fetchSpy.calls.mostRecent().args[0] as string;
     expect(calledUrl).toBe(`${API_BASE_URL}${API_CHAT_TURN_PATH}`);

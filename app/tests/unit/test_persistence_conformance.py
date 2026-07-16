@@ -113,6 +113,9 @@ def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> N
 def test_conversation_allows_one_active_run_by_constraint(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_run", title="Runs"))
+        session.commit()
+
+    with backend.session() as session:
         session.add(
             AgentRunRecord(
                 id="run-1",
