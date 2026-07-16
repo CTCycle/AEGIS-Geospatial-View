@@ -166,6 +166,7 @@ function Import-EnvironmentFile {
         RELOAD = 'false'
         OPTIONAL_DEPENDENCIES = 'false'
         BACKEND_LOGS_VISIBLE = 'true'
+        always_rebuild = 'true'
     }
     foreach ($entry in $defaults.GetEnumerator()) {
         [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
@@ -252,6 +253,10 @@ function Ensure-PortableRuntimes {
 }
 
 function Sync-Dependencies {
+    param(
+        [bool]$BuildFrontend = $true
+    )
+
     Write-Status STEP 'Installing Python dependencies with uv'
     $uvArguments = @('sync', '--python', $PythonExe, '--locked', '--no-install-project')
     if ($env:OPTIONAL_DEPENDENCIES -ieq 'true') {
@@ -281,10 +286,12 @@ function Sync-Dependencies {
             throw "npm dependency installation failed with exit code $LASTEXITCODE."
         }
 
-        Write-Status STEP 'Building frontend'
-        & $NpmCmd run build
-        if ($LASTEXITCODE -ne 0) {
-            throw "Frontend build failed with exit code $LASTEXITCODE."
+        if ($BuildFrontend) {
+            Write-Status STEP 'Building frontend'
+            & $NpmCmd run build
+            if ($LASTEXITCODE -ne 0) {
+                throw "Frontend build failed with exit code $LASTEXITCODE."
+            }
         }
     }
     finally {
@@ -332,7 +339,7 @@ function Invoke-LaunchApplication {
     Import-EnvironmentFile
     Set-LauncherEnvironment
     Ensure-PortableRuntimes
-    Sync-Dependencies
+    Sync-Dependencies -BuildFrontend ($env:always_rebuild -ieq 'true')
 
     $fastApiPort = [int]$env:FASTAPI_PORT
     $uiPort = [int]$env:UI_PORT
