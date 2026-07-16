@@ -41,7 +41,8 @@ describe('pages/geospatial-page.component', () => {
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['toUserFacingError']);
     errors.toUserFacingError.and.returnValue('fallback error');
 
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['sendChatTurn']);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['createConversation', 'sendChatTurn']);
+    apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-1', title: 'test' });
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
     agentReadiness = jasmine.createSpyObj<AgentReadinessService>('AgentReadinessService', ['loadReadiness']);
@@ -76,7 +77,6 @@ describe('pages/geospatial-page.component', () => {
 
   it('sendMessage happy path updates status and appends assistant', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Search executed successfully.',
       operation: { kind: 'direct_answer', status: 'success', message: 'Search executed successfully.', warnings: [] },
       map_session: null,
@@ -101,7 +101,6 @@ describe('pages/geospatial-page.component', () => {
 
   it('clarification responses return the persistent agent status to ready', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Which location should I use?',
       operation: { kind: 'clarification', status: 'partial', message: 'Which location should I use?', warnings: [] },
       decision: { plan: { state: 'clarify', action_id: 'weather', overlay_ids: [] } },
@@ -119,7 +118,6 @@ describe('pages/geospatial-page.component', () => {
 
   it('direct tool payload responses render as assistant message without map session', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Coordinates: 41.8902, 12.4922',
       operation: {
         kind: 'direct_answer',
@@ -185,7 +183,6 @@ describe('pages/geospatial-page.component', () => {
 
   it('operation-driven failures preserve the response and return the agent to ready', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
-      session_id: 42,
       assistant_message: 'Tool timed out.',
       operation: { kind: 'error', status: 'failed', message: 'Tool timed out.', warnings: [] },
       decision: { plan: { state: 'direct_response', action_id: 'weather', overlay_ids: [] } },
@@ -211,7 +208,7 @@ describe('pages/geospatial-page.component', () => {
     component.composerDraft = 'first';
     const sendPromise = component.sendMessage();
     component.startNewChat();
-    resolveTurn!(makeTurnResponse({ session_id: 7, assistant_message: 'late response', map_session: null }));
+    resolveTurn!(makeTurnResponse({ assistant_message: 'late response', map_session: null }));
     await sendPromise;
     expect(component.messages.find((entry) => entry.content === 'late response')).toBeUndefined();
   });
@@ -346,11 +343,11 @@ describe('pages/geospatial-page.component', () => {
     expect(component.status).toBe('Agent ready');
   });
 
-  it('startNewChat clears session and map/chat state', () => {
+  it('startNewChat clears conversation and map/chat state', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    component.sessionId = 7;
+    component.conversationId = 'conv-1';
     component.messages = [{ role: 'assistant', content: 'x' }];
     component.composerDraft = 'draft';
     component.payload = {
@@ -372,7 +369,7 @@ describe('pages/geospatial-page.component', () => {
       model: 'llama3.2',
     };
     component.startNewChat();
-    expect(component.sessionId).toBeUndefined();
+    expect(component.conversationId).toBeUndefined();
     expect(component.messages.length).toBe(0);
     expect(component.composerDraft).toBe('');
     expect(component.payload).toBeUndefined();
