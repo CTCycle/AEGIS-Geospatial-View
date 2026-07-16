@@ -15,7 +15,6 @@ from server.repositories.schemas import Base
 
 # [SQLITE DATABASE]
 
-
 ###############################################################################
 class SQLiteRepository(SqlAlchemyTableOperationsMixin):
     warn_on_missing_table = True

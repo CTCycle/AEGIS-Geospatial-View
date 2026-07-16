@@ -25,13 +25,12 @@ from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 
-
 ###############################################################################
 class _DatabaseHandle:
+
     # -------------------------------------------------------------------------
     def __init__(self, backend) -> None:
         self.backend = backend
-
 
 ###############################################################################
 class _InMemoryBackend:
@@ -47,9 +46,9 @@ class _InMemoryBackend:
         )
         self.session = sessionmaker(bind=self.engine, future=True)
 
-
 ###############################################################################
 class _FakeRunOrchestrator:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.started: list[str] = []
@@ -57,7 +56,6 @@ class _FakeRunOrchestrator:
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
         self.started.append(run_id)
-
 
 ###############################################################################
 @pytest.fixture()
@@ -75,7 +73,6 @@ def run_repositories(monkeypatch: pytest.MonkeyPatch):
         "steering": AgentSteeringRepository(),
         "events": AgentRunEventRepository(),
     }
-
 
 ###############################################################################
 def _services(run_repositories):
@@ -97,7 +94,6 @@ def _services(run_repositories):
     )
     return lifecycle, steering, publisher, fake_orchestrator
 
-
 ###############################################################################
 def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     service = AggregatedRequestService()
@@ -110,7 +106,6 @@ def test_aggregated_request_is_deterministic_and_preserves_order() -> None:
     )
     assert "1. focus parks" in aggregate
     assert "2. use satellite" in aggregate
-
 
 ###############################################################################
 def test_event_repository_replay_orders_and_filters_visibility(
@@ -159,7 +154,6 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert [event.event_id for event in replay] == [second.event_id]
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
-
 ###############################################################################
 def test_create_run_rejects_second_active_run(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
@@ -180,7 +174,6 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
             )
         )
     assert first.state == "pending"
-
 
 ###############################################################################
 def test_conversation_context_state_survives_repository_restart(
@@ -206,7 +199,6 @@ def test_conversation_context_state_survives_repository_restart(
             expected_revision=initial["context_revision"],
             task_snapshot={"conversation_key": conversation.id, "tasks": []},
         )
-
 
 ###############################################################################
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
@@ -242,7 +234,6 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
     assert first.run_version == 2
     assert duplicate.steering_id == first.steering_id
     assert duplicate.run_version == 2
-
 
 ###############################################################################
 def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) -> None:

@@ -78,7 +78,6 @@ class _FakeEventPublisher:
         self.events.append(kwargs)
 
 ###############################################################################
-###############################################################################
 def _snapshot() -> AgentRunSnapshot:
     return AgentRunSnapshot(
         conversation_id="conv_1",

@@ -9,9 +9,9 @@ from sqlalchemy import select
 
 from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
 
-
 ###############################################################################
 class AgentRunRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend

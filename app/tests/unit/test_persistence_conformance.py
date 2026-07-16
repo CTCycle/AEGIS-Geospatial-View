@@ -17,6 +17,7 @@ from server.repositories.schemas.models import (
 )
 
 
+###############################################################################
 def _sqlite_settings(path: Path) -> DatabaseSettings:
     return DatabaseSettings(
         database_path=str(path),
@@ -34,6 +35,7 @@ def _sqlite_settings(path: Path) -> DatabaseSettings:
     )
 
 
+###############################################################################
 @pytest.fixture(params=["sqlite", "postgres"])
 def backend(request: pytest.FixtureRequest, tmp_path: Path):
     if request.param == "sqlite":
@@ -64,6 +66,7 @@ def backend(request: pytest.FixtureRequest, tmp_path: Path):
     Base.metadata.drop_all(repository.engine)
 
 
+###############################################################################
 def test_canonical_schema_has_fifteen_tables_and_no_legacy_tables(backend) -> None:
     tables = set(inspect(backend.engine).get_table_names())
     assert len(tables) == 15
@@ -74,6 +77,7 @@ def test_canonical_schema_has_fifteen_tables_and_no_legacy_tables(backend) -> No
     }
 
 
+###############################################################################
 def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_conformance", title="Conformance"))
@@ -105,6 +109,7 @@ def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> N
         assert conversation.next_message_sequence == 1
 
 
+###############################################################################
 def test_conversation_allows_one_active_run_by_constraint(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_run", title="Runs"))

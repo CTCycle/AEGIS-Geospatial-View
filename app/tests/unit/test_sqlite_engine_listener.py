@@ -4,25 +4,35 @@ from server.configurations import DatabaseSettings
 from server.repositories.database.engine import configure_sqlite_connection
 
 
+###############################################################################
 class _Cursor:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.statements: list[str] = []
 
+    # -------------------------------------------------------------------------
     def execute(self, statement: str) -> None:
         self.statements.append(statement)
 
+    # -------------------------------------------------------------------------
     def close(self) -> None:
         return None
 
 
+###############################################################################
 class _Connection:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.cursor_instance = _Cursor()
 
+    # -------------------------------------------------------------------------
     def cursor(self) -> _Cursor:
         return self.cursor_instance
 
 
+###############################################################################
 def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
     settings = DatabaseSettings(
         database_path="test.db",
