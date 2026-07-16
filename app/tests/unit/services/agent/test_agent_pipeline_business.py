@@ -176,6 +176,7 @@ class _History:
     def append_message(self, **kwargs):  # noqa: ANN003
         self.messages.append(kwargs)
 
+    # -------------------------------------------------------------------------
     def find_message_by_request_id(
         self, *, conversation_id: str, role: str, request_id: str
     ) -> dict[str, Any] | None:

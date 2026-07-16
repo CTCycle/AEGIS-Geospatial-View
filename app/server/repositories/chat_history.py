@@ -9,12 +9,16 @@ from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import Base, ChatMessageRecord, ConversationRecord
 
 
+###############################################################################
 class ChatHistoryRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend
         Base.metadata.create_all(backend.engine)
         self._session_factory = backend.session
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _to_message_dict(row: ChatMessageRecord) -> dict[str, Any]:
         return {
@@ -30,6 +34,7 @@ class ChatHistoryRepository:
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
 
+    # -------------------------------------------------------------------------
     def append_message(
         self,
         *,
@@ -69,6 +74,7 @@ class ChatHistoryRepository:
             session.refresh(message)
             return message
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _with_request_id(structured_payload: Any, request_id: str | None) -> Any:
         if request_id is None:
@@ -81,11 +87,13 @@ class ChatHistoryRepository:
             return payload
         return structured_payload
 
+    # -------------------------------------------------------------------------
     def _last_assistant_payload(self, conversation_id: str) -> dict[str, Any] | None:
         row = self.get_last_assistant_message(conversation_id)
         payload = row.get("structured_payload") if row else None
         return payload if isinstance(payload, dict) else None
 
+    # -------------------------------------------------------------------------
     def list_recent_messages(self, conversation_id: str, limit: int) -> list[dict[str, Any]]:
         with self._session_factory() as session:
             statement = (
@@ -97,6 +105,7 @@ class ChatHistoryRepository:
             rows = list(reversed(session.execute(statement).scalars().all()))
         return [self._to_message_dict(row) for row in rows]
 
+    # -------------------------------------------------------------------------
     def get_last_assistant_message(self, conversation_id: str) -> dict[str, Any] | None:
         with self._session_factory() as session:
             row = session.execute(
@@ -110,6 +119,7 @@ class ChatHistoryRepository:
             ).scalars().first()
         return self._to_message_dict(row) if row is not None else None
 
+    # -------------------------------------------------------------------------
     def find_message_by_request_id(
         self, *, conversation_id: str, role: str, request_id: str
     ) -> dict[str, Any] | None:
@@ -123,6 +133,7 @@ class ChatHistoryRepository:
             ).scalars().first()
         return self._to_message_dict(row) if row is not None else None
 
+    # -------------------------------------------------------------------------
     def list_messages(self, *, conversation_id: str) -> list[dict[str, Any]]:
         with self._session_factory() as session:
             rows = session.execute(

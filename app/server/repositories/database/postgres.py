@@ -11,7 +11,6 @@ from server.repositories.database.orm_table_operations import (
 )
 from server.repositories.database.engine import build_engine, build_session_factory
 
-
 ###############################################################################
 class PostgresRepository(SqlAlchemyTableOperationsMixin):
     warn_on_missing_table = False

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from server.configurations import DatabaseSettings
 
 
+###############################################################################
 def configure_sqlite_connection(dbapi_connection: object, settings: DatabaseSettings) -> None:
     cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
     cursor.execute("PRAGMA foreign_keys=ON")
@@ -17,6 +18,7 @@ def configure_sqlite_connection(dbapi_connection: object, settings: DatabaseSett
     cursor.close()
 
 
+###############################################################################
 def build_engine(settings: DatabaseSettings) -> Engine:
     if settings.embedded_database:
         engine = create_engine(
@@ -53,6 +55,7 @@ def build_engine(settings: DatabaseSettings) -> Engine:
     )
 
 
+###############################################################################
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(
         bind=engine, autoflush=False, expire_on_commit=False, future=True

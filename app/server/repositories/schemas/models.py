@@ -28,11 +28,9 @@ from server.common.constants import (
 )
 from server.repositories.database.types import PortableJSON
 
-
 ###############################################################################
 class Base(DeclarativeBase):
     pass
-
 
 ###############################################################################
 class ReferenceCountryRecord(Base):
@@ -50,7 +48,6 @@ class ReferenceCountryRecord(Base):
         ),
     )
 
-
 ###############################################################################
 class ReferenceCountryAliasRecord(Base):
     __tablename__ = REFERENCE_COUNTRY_ALIASES_TABLE_NAME
@@ -65,7 +62,6 @@ class ReferenceCountryAliasRecord(Base):
 
     __table_args__ = (Index("ix_reference_country_aliases_iso2", "iso2"),)
 
-
 ###############################################################################
 class ReferenceGeospatialLayerRecord(Base):
     __tablename__ = REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
@@ -74,7 +70,6 @@ class ReferenceGeospatialLayerRecord(Base):
     display_name: Mapped[str] = mapped_column(String(256), nullable=False)
     group: Mapped[str] = mapped_column(String(64), nullable=False)
     provider: Mapped[str | None] = mapped_column(String(64))
-
 
 ###############################################################################
 class ReferenceGeospatialLayerAliasRecord(Base):
@@ -94,7 +89,6 @@ class ReferenceGeospatialLayerAliasRecord(Base):
     __table_args__ = (
         Index("ix_reference_geospatial_layer_aliases_layer_id", "layer_id"),
     )
-
 
 ###############################################################################
 class ReferenceGeospatialLayerKeywordRecord(Base):
@@ -116,7 +110,6 @@ class ReferenceGeospatialLayerKeywordRecord(Base):
         UniqueConstraint("layer_id", "keyword_key", name="ux_reference_layer_keyword"),
     )
 
-
 ###############################################################################
 class ReferenceGibsTileMatrixSetRecord(Base):
     __tablename__ = REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME
@@ -129,7 +122,6 @@ class ReferenceGibsTileMatrixSetRecord(Base):
         ),
     )
 
-
 ###############################################################################
 class ReferenceGibsLayerDefaultRecord(Base):
     __tablename__ = REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME
@@ -137,7 +129,6 @@ class ReferenceGibsLayerDefaultRecord(Base):
     layer_id: Mapped[str] = mapped_column(String(256), primary_key=True)
     native_resolution_m: Mapped[float | None] = mapped_column(Float)
     date_fallback_days: Mapped[int | None] = mapped_column(Integer)
-
 
 ###############################################################################
 class ModelProviderSettingsRecord(Base):
@@ -168,7 +159,6 @@ class ModelProviderSettingsRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-
 ###############################################################################
 class CredentialEncryptionMaterial(Base):
     __tablename__ = "credential_encryption_materials"
@@ -196,7 +186,6 @@ class CredentialEncryptionMaterial(Base):
             name="ck_credential_material_active_slot",
         ),
     )
-
 
 ###############################################################################
 class ModelCredentialRecord(Base):
@@ -231,7 +220,6 @@ class ModelCredentialRecord(Base):
         ),
     )
 
-
 ###############################################################################
 class ChatMessageRecord(Base):
     __tablename__ = "chat_messages"
@@ -265,7 +253,6 @@ class ChatMessageRecord(Base):
         ),
     )
 
-
 ###############################################################################
 class ConversationRecord(Base):
     __tablename__ = "conversations"
@@ -287,8 +274,6 @@ class ConversationRecord(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-
-###############################################################################
 ###############################################################################
 class AgentRunRecord(Base):
     __tablename__ = "agent_runs"
@@ -329,7 +314,6 @@ class AgentRunRecord(Base):
         ),
     )
 
-
 ###############################################################################
 class AgentSteeringMessageRecord(Base):
     __tablename__ = "agent_steering_messages"
@@ -352,7 +336,6 @@ class AgentSteeringMessageRecord(Base):
         ),
         UniqueConstraint("run_id", "run_version", name="ux_agent_steering_version"),
     )
-
 
 ###############################################################################
 class AgentRunEventRecord(Base):

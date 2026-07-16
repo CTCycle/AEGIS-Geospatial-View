@@ -10,12 +10,16 @@ from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import Base, ConversationRecord
 
 
+###############################################################################
 class ConversationRepository:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend
         Base.metadata.create_all(backend.engine)
         self._session_factory = backend.session
 
+    # -------------------------------------------------------------------------
     def create_conversation(
         self, title: str | None, owner_user_id: str | None = None
     ) -> ConversationRecord:
@@ -30,10 +34,12 @@ class ConversationRepository:
             session.refresh(record)
             return record
 
+    # -------------------------------------------------------------------------
     def get_conversation(self, conversation_id: str) -> ConversationRecord | None:
         with self._session_factory() as session:
             return session.get(ConversationRecord, conversation_id)
 
+    # -------------------------------------------------------------------------
     def read_state(self, conversation_id: str) -> dict[str, Any]:
         record = self._require(conversation_id)
         return {
@@ -45,6 +51,7 @@ class ConversationRepository:
             "summary_through_turn_index": record.summary_through_turn_index,
         }
 
+    # -------------------------------------------------------------------------
     def write_state(
         self,
         conversation_id: str,
@@ -84,6 +91,7 @@ class ConversationRepository:
             session.commit()
             return int(revision)
 
+    # -------------------------------------------------------------------------
     def verify_conversation_access(
         self, conversation_id: str, owner_user_id: str | None = None
     ) -> ConversationRecord:
@@ -92,10 +100,12 @@ class ConversationRepository:
             raise PermissionError("Conversation access denied.")
         return record
 
+    # -------------------------------------------------------------------------
     def list_conversations(self) -> list[ConversationRecord]:
         with self._session_factory() as session:
             return list(session.execute(select(ConversationRecord)).scalars().all())
 
+    # -------------------------------------------------------------------------
     def _require(self, conversation_id: str) -> ConversationRecord:
         record = self.get_conversation(conversation_id)
         if record is None:

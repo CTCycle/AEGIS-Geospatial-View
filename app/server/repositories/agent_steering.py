@@ -42,6 +42,7 @@ class AgentSteeringRepository:
             session.refresh(record)
             return self._to_domain(record)
 
+    # -------------------------------------------------------------------------
     def append_and_update_run(
         self,
         *,

@@ -13,9 +13,9 @@ from server.domain.run_events import (
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import AgentRunEventRecord, AgentRunRecord, Base
 
-
 ###############################################################################
 class AgentRunEventRepository:
+
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         backend = get_database().backend

@@ -20,7 +20,10 @@ from server.services.chat.history_service import ChatHistoryService
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
 
+###############################################################################
 class PlannedTurnExecutionService:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -40,6 +43,7 @@ class PlannedTurnExecutionService:
         self.active_directives = active_directives
         self.history_service = history_service
 
+    # -------------------------------------------------------------------------
     async def execute(
         self,
         *,

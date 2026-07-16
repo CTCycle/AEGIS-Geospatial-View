@@ -47,6 +47,7 @@ class _HistoryRepo:
         self.latest_memory = latest_memory or {}
         self.context_revision = 0
 
+    # -------------------------------------------------------------------------
     def read_state(self, conversation_id: str) -> dict[str, Any]:
         return {
             "context_revision": self.context_revision,
@@ -54,6 +55,7 @@ class _HistoryRepo:
             "task_snapshot": None,
         }
 
+    # -------------------------------------------------------------------------
     def write_state(self, conversation_id: str, **kwargs: Any) -> int:
         self.context_revision += 1
         return self.context_revision
@@ -66,6 +68,7 @@ class _HistoryRepo:
     def append_message(self, **kwargs: Any) -> None:
         self.messages.append(kwargs)
 
+    # -------------------------------------------------------------------------
     def find_message_by_request_id(
         self, *, conversation_id: str, role: str, request_id: str
     ) -> dict[str, Any] | None:
