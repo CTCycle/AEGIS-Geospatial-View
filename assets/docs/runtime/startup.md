@@ -10,7 +10,7 @@ Last updated: 2026-07-16
 
 The interactive launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds the frontend, initializes the database, runs tests, clears caches and logs, and starts backend and frontend services. On first launch it copies `settings/.env.example` to `settings/.env`.
 
-Set `always_rebuild=false` in `settings/.env` to skip the frontend build during
+Set `ALWAYS_REBUILD=false` in `settings/.env` to skip the frontend build during
 application startup. The default is `true`.
 
 `BACKEND_LOGS_VISIBLE=true` (the default when absent) starts backend logs in a
