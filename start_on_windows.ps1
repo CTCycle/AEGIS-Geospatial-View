@@ -166,7 +166,7 @@ function Import-EnvironmentFile {
         RELOAD = 'false'
         OPTIONAL_DEPENDENCIES = 'false'
         BACKEND_LOGS_VISIBLE = 'true'
-        always_rebuild = 'true'
+        ALWAYS_REBUILD = 'true'
     }
     foreach ($entry in $defaults.GetEnumerator()) {
         [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
@@ -339,7 +339,7 @@ function Invoke-LaunchApplication {
     Import-EnvironmentFile
     Set-LauncherEnvironment
     Ensure-PortableRuntimes
-    Sync-Dependencies -BuildFrontend ($env:always_rebuild -ieq 'true')
+    Sync-Dependencies -BuildFrontend ($env:ALWAYS_REBUILD -ieq 'true')
 
     $fastApiPort = [int]$env:FASTAPI_PORT
     $uiPort = [int]$env:UI_PORT
