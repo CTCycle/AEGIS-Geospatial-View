@@ -510,25 +510,61 @@ function Uninstall-Application {
 
 function Wait-ForMenuReturn {
     Write-Host ''
-    Write-Host 'Press any key to return to menu...'
+    Write-Host '  Press any key to return to the menu...' -ForegroundColor DarkGray
     [Console]::ReadKey($true) | Out-Null
 }
 
-while ($true) {
+function Write-MenuRule {
+    param([string]$Character = '-')
+
+    Write-Host "  $($Character * 57)" -ForegroundColor DarkCyan
+}
+
+function Write-MenuOption {
+    param(
+        [Parameter(Mandatory)][string]$Number,
+        [Parameter(Mandatory)][string]$Label,
+        [Parameter(Mandatory)][string]$Description,
+        [switch]$Destructive,
+        [switch]$Exit
+    )
+
+    $numberColor = if ($Destructive) { 'Yellow' } elseif ($Exit) { 'DarkGray' } else { 'Cyan' }
+    $labelColor = if ($Destructive) { 'Yellow' } elseif ($Exit) { 'Gray' } else { 'White' }
+    Write-Host "  [$Number] " -ForegroundColor $numberColor -NoNewline
+    Write-Host $Label.PadRight(31) -ForegroundColor $labelColor -NoNewline
+    Write-Host $Description -ForegroundColor DarkGray
+}
+
+function Show-LauncherMenu {
     Clear-Host
-    Write-Host '========================================='
-    Write-Host '    AEGIS -- Geospatial View'
-    Write-Host '========================================='
-    Write-Host '1.  Launch application'
-    Write-Host '2.  Install / update dependencies'
-    Write-Host '3.  Initialize database'
-    Write-Host '4.  Run test suite'
-    Write-Host '5.  Remove logs'
-    Write-Host '6.  Clear cache'
-    Write-Host '7.  Uninstall application'
-    Write-Host '8.  Exit'
-    Write-Host '========================================='
-    $selection = (Read-Host 'Select an option (1-8)').Trim()
+    Write-Host ''
+    Write-MenuRule
+    Write-Host '  AEGIS' -ForegroundColor Cyan -NoNewline
+    Write-Host '  /  GEOSPATIAL VIEW' -ForegroundColor White
+    Write-Host '  Local application control center' -ForegroundColor DarkGray
+    Write-MenuRule
+    Write-Host ''
+    Write-Host '  APPLICATION' -ForegroundColor DarkCyan
+    Write-MenuOption -Number '1' -Label 'Launch application' -Description 'Start local services'
+    Write-MenuOption -Number '2' -Label 'Install / update dependencies' -Description 'Sync and build'
+    Write-MenuOption -Number '3' -Label 'Initialize database' -Description 'Reseed catalogs'
+    Write-Host ''
+    Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
+    Write-MenuOption -Number '4' -Label 'Run test suite' -Description 'Validate installation'
+    Write-MenuOption -Number '5' -Label 'Remove logs' -Description 'Clear application logs'
+    Write-MenuOption -Number '6' -Label 'Clear cache' -Description 'Remove Python and uv caches'
+    Write-MenuOption -Number '7' -Label 'Uninstall application' -Description 'Remove local dependencies' -Destructive
+    Write-Host ''
+    Write-MenuRule
+    Write-MenuOption -Number '8' -Label 'Exit' -Description 'Close launcher' -Exit
+    Write-MenuRule
+    Write-Host ''
+}
+
+while ($true) {
+    Show-LauncherMenu
+    $selection = (Read-Host '  Select an option (1-8)').Trim()
 
     if ($selection -notmatch '^[1-8]$') {
         Write-Status WARN 'Invalid option. Enter a number from 1 to 8.'
