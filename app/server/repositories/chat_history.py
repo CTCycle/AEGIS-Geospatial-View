@@ -8,7 +8,6 @@ from sqlalchemy import desc, select, update
 from server.repositories.database.backend import get_database
 from server.repositories.schemas.models import Base, ChatMessageRecord, ConversationRecord
 
-
 ###############################################################################
 class ChatHistoryRepository:
 

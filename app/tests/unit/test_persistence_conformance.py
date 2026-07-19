@@ -16,7 +16,6 @@ from server.repositories.schemas.models import (
     ConversationRecord,
 )
 
-
 ###############################################################################
 def _sqlite_settings(path: Path) -> DatabaseSettings:
     return DatabaseSettings(
@@ -33,7 +32,6 @@ def _sqlite_settings(path: Path) -> DatabaseSettings:
         connect_timeout=10,
         insert_batch_size=100,
     )
-
 
 ###############################################################################
 @pytest.fixture(params=["sqlite", "postgres"])
@@ -65,7 +63,6 @@ def backend(request: pytest.FixtureRequest, tmp_path: Path):
     yield repository
     Base.metadata.drop_all(repository.engine)
 
-
 ###############################################################################
 def test_canonical_schema_has_fifteen_tables_and_no_legacy_tables(backend) -> None:
     tables = set(inspect(backend.engine).get_table_names())
@@ -75,7 +72,6 @@ def test_canonical_schema_has_fifteen_tables_and_no_legacy_tables(backend) -> No
         column["name"]
         for column in inspect(backend.engine).get_columns("conversations")
     }
-
 
 ###############################################################################
 def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> None:
@@ -107,7 +103,6 @@ def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> N
         conversation = session.get(ConversationRecord, "conv_conformance")
         assert conversation is not None
         assert conversation.next_message_sequence == 1
-
 
 ###############################################################################
 def test_conversation_allows_one_active_run_by_constraint(backend) -> None:
