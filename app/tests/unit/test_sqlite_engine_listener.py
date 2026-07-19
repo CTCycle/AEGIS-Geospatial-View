@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.configurations import DatabaseSettings
 from server.repositories.database.engine import configure_sqlite_connection
 
-
 ###############################################################################
 class _Cursor:
 
@@ -19,7 +18,6 @@ class _Cursor:
     def close(self) -> None:
         return None
 
-
 ###############################################################################
 class _Connection:
 
@@ -30,7 +28,6 @@ class _Connection:
     # -------------------------------------------------------------------------
     def cursor(self) -> _Cursor:
         return self.cursor_instance
-
 
 ###############################################################################
 def test_sqlite_connection_listener_applies_expected_pragmas() -> None:

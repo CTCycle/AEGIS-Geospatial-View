@@ -6,7 +6,6 @@ from sqlalchemy import JSON
 from sqlalchemy.engine import Dialect
 from sqlalchemy.types import DateTime, TypeDecorator
 
-
 ###############################################################################
 class UTCDateTime(TypeDecorator[datetime]):
     """Store UTC consistently and return timezone-aware values on every backend."""
@@ -30,7 +29,6 @@ class UTCDateTime(TypeDecorator[datetime]):
         if value is None:
             return None
         return (value if value.tzinfo else value.replace(tzinfo=UTC)).astimezone(UTC)
-
 
 ###############################################################################
 class PortableJSON(TypeDecorator[object]):

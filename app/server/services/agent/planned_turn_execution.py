@@ -19,7 +19,6 @@ from server.services.chat.history_service import ChatHistoryService
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
-
 ###############################################################################
 class PlannedTurnExecutionService:
 

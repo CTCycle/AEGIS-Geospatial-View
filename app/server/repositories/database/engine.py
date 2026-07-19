@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from server.configurations import DatabaseSettings
 
-
 ###############################################################################
 def configure_sqlite_connection(dbapi_connection: object, settings: DatabaseSettings) -> None:
     cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
@@ -16,7 +15,6 @@ def configure_sqlite_connection(dbapi_connection: object, settings: DatabaseSett
     cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms}")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
-
 
 ###############################################################################
 def build_engine(settings: DatabaseSettings) -> Engine:
@@ -53,7 +51,6 @@ def build_engine(settings: DatabaseSettings) -> Engine:
         pool_recycle=settings.database_pool_recycle_seconds,
         connect_args={"connect_timeout": settings.connect_timeout},
     )
-
 
 ###############################################################################
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:
