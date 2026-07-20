@@ -1,6 +1,6 @@
 # System Overview
 
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 ## Scope
 
@@ -10,7 +10,7 @@ This branch describes the implemented system across `app/` and `settings/`.
 
 AEGIS Geospatial View is a two-tier application:
 
-- Frontend: Angular 19 standalone SPA in `app/client/src`
+- Frontend: Angular 22 standalone SPA in `app/client/src`
 - Backend: FastAPI application in `app/server`
 
 The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace.

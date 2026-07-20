@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 ## Purpose
 
@@ -81,6 +81,8 @@ Key frontend directories under `app/client/src/app`:
 - `basemaps/*.json`
 - `overlays/*.json`
 - `tools/*.json`
+- `cameras/*.json`
+- `transit/*.json`
 - `reference/*.json`
 
 ## Tests

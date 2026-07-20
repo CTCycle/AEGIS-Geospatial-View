@@ -1,10 +1,10 @@
 # TypeScript
 
-Last updated: 2026-06-02
+Last updated: 2026-07-20
 
 ## Baseline
 
-- Angular 19 standalone architecture
+- Angular 22 standalone architecture
 - TypeScript strict mode
 - Shared frontend contracts live in `app/client/src/app/core/types.ts`
 - Backend calls route through `app/client/src/app/core/api.ts`
