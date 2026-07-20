@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-07-16
+Last updated: 2026-07-20
 
 ## Local Development Via Launcher
 
@@ -8,7 +8,15 @@ Last updated: 2026-07-16
 .\start_on_windows.ps1
 ```
 
-The interactive launcher installs or updates portable runtimes, syncs backend dependencies, installs frontend dependencies, builds the frontend, initializes the database, runs tests, clears caches and logs, and starts backend and frontend services. On first launch it copies `settings/.env.example` to `settings/.env`.
+The interactive launcher installs or updates portable Python, uv, and Node.js
+runtimes; synchronizes backend and frontend dependencies; optionally builds the
+frontend; initializes or reseeds the database; runs tests; removes logs; clears
+caches; and starts backend and frontend services. On first launch it copies
+`settings/.env.example` to `settings/.env`.
+
+The menu provides: launch application, install/update dependencies, initialize
+the database, run the test suite, remove logs, clear caches, uninstall local
+dependencies, and exit.
 
 Set `ALWAYS_REBUILD=false` in `settings/.env` to skip the frontend build during
 application startup. The default is `true`.
@@ -39,7 +47,7 @@ npm run start -- --host 127.0.0.1 --port 4512
 
 ## Codex And Sandbox Note
 
-On Windows inside the Codex workspace sandbox, Angular 19 frontend commands that depend on `esbuild` may fail with `spawn EPERM` even when `node`, `npm`, and `esbuild.exe` are present and executable.
+On Windows inside the Codex workspace sandbox, Angular 22 frontend commands that depend on `esbuild` may fail with `spawn EPERM` even when `node`, `npm`, and `esbuild.exe` are present and executable.
 
 Observed behavior:
 

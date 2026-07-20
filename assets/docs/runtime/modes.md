@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 ## Supported Modes
 
@@ -18,6 +18,7 @@ Last updated: 2026-07-11
 
 ### Browser Validation Tooling
 
+- The frontend pins Node.js `22.23.1` in `app/client/.nvmrc`.
 - Codex browser automation requires Node.js `>=22.22.0`
 - When the active `node` is older, use available browser tooling or point `NODE_REPL_NODE_PATH` at a compatible runtime
 

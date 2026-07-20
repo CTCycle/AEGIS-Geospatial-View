@@ -1,19 +1,22 @@
 # Deployment
 
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 ## Backend Persistence
 
 - SQLite and PostgreSQL are both supported.
 - Database mode is controlled by `settings/.env` or runtime environment variables.
 - `EMBEDDED_DATABASE` switches between SQLite and PostgreSQL.
-- SQLite resolves to `app/resources/database.db`.
+- Embedded SQLite resolves to `%TEMP%/AEGIS Geospatial View/database.db` on
+  Windows and `<repo>/.runtime/database.db` elsewhere.
+- Set `AEGIS_RUNTIME_DATA_DIR` to override the embedded database directory.
 
 ## Interoperability
 
 - Frontend communicates with backend through `/api`.
 - Development proxying is configured by `app/client/proxy.conf.cjs`.
-- The Windows launcher runs the backend and frontend preview as local processes.
+- The Windows launcher runs the backend and frontend preview as local processes
+  using the portable runtimes under `runtimes/`.
 
 ## Operational Constraints
 
