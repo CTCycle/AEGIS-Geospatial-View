@@ -30,7 +30,7 @@ $PythonArchiveName = "python-$PythonVersion-embed-amd64.zip"
 $PythonArchiveUri = "https://www.python.org/ftp/python/$PythonVersion/$PythonArchiveName"
 $UvAmd64Uri = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
 $UvArm64Uri = 'https://github.com/astral-sh/uv/releases/latest/download/uv-aarch64-pc-windows-msvc.zip'
-$NodeVersion = '22.12.0'
+$NodeVersion = '22.23.1'
 $NodeArchiveName = "node-v$NodeVersion-win-x64.zip"
 $NodeArchiveUri = "https://nodejs.org/dist/v$NodeVersion/$NodeArchiveName"
 
@@ -258,7 +258,10 @@ function Sync-Dependencies {
     )
 
     Write-Status STEP 'Installing Python dependencies with uv'
-    $uvArguments = @('sync', '--python', $PythonExe, '--locked', '--no-install-project')
+    $uvArguments = @('sync', '--python', $PythonExe, '--no-install-project')
+    if (Test-Path -LiteralPath (Join-Path $ServerDir 'uv.lock')) {
+        $uvArguments += '--locked'
+    }
     if ($env:OPTIONAL_DEPENDENCIES -ieq 'true') {
         $uvArguments += '--all-extras'
     }
@@ -495,14 +498,11 @@ function Uninstall-Application {
         }
     }
 
-    @(
-        (Join-Path $ClientDir 'package-lock.json'),
-        (Join-Path $ServerDir 'uv.lock'),
-        (Join-Path $RootDir 'uv.lock')
-    ) | ForEach-Object {
-        if (Test-Path -LiteralPath $_) {
-            Remove-Item -LiteralPath $_ -Force
-        }
+    # Keep dependency lockfiles: install/update uses them for reproducible restores.
+    New-Item -ItemType Directory -Path $RuntimesDir -Force | Out-Null
+    $runtimeKeepFile = Join-Path $RuntimesDir '.gitkeep'
+    if (-not (Test-Path -LiteralPath $runtimeKeepFile)) {
+        New-Item -ItemType File -Path $runtimeKeepFile -Force | Out-Null
     }
     Remove-PythonCaches
     Write-Status SUCCESS 'Application dependencies and generated caches uninstalled. Settings and user data were preserved.'
@@ -511,6 +511,9 @@ function Uninstall-Application {
 function Wait-ForMenuReturn {
     Write-Host ''
     Write-Host '  Press any key to return to the menu...' -ForegroundColor DarkGray
+    if ([Console]::IsInputRedirected) {
+        return
+    }
     [Console]::ReadKey($true) | Out-Null
 }
 
