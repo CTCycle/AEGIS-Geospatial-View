@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -24,7 +24,7 @@ from server.common.paths import (
 )
 from server.configurations import get_server_settings
 from server.repositories.credential_material import seed_credential_encryption_material
-from server.repositories.database import get_database
+from server.repositories.database import build_database_backend
 from server.repositories.database.initializer import (
     initialize_database,
     seed_reference_catalog,
@@ -42,7 +42,7 @@ from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
-from server.repositories.conversations import ConversationRepository
+from server.repositories.credentials import CredentialRepository
 from server.services.search.composition import build_search_runtime
 from server.services.startup_validation import run_startup_validations
 
@@ -84,21 +84,21 @@ def redirect_root_to_docs() -> RedirectResponse:
 
 ###############################################################################
 @asynccontextmanager
-async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
+async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_server_settings()
-    database = get_database()
+    database = build_database_backend(settings.database)
 
-    initialize_database(database.backend)
-    seed_credential_encryption_material()
-    seed_reference_catalog(database.backend)
+    initialize_database(database)
+    seed_credential_encryption_material(database)
+    seed_reference_catalog(database)
 
     search_runtime = build_search_runtime()
-    chat_runtime = build_chat_runtime(search_runtime.search_orchestrator)
-    geospatial_runtime = build_geospatial_runtime()
+    chat_runtime = build_chat_runtime(search_runtime.search_orchestrator, database)
+    geospatial_runtime = build_geospatial_runtime(database)
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
-    run_event_publisher = RunEventPublisher(AgentRunEventRepository())
-    run_repository = AgentRunRepository()
-    conversation_repository = ConversationRepository()
+    run_event_publisher = RunEventPublisher(AgentRunEventRepository(database))
+    run_repository = AgentRunRepository(database)
+    conversation_repository = chat_runtime.conversation_repository
     aggregation_service = AggregatedRequestService()
     run_orchestrator = AgentRunOrchestrator(
         agent_orchestrator=chat_runtime.agent_orchestrator,
@@ -107,7 +107,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
         conversation_repository=conversation_repository,
     )
     run_lifecycle_service = RunLifecycleService(
-        conversation_repository=ConversationRepository(),
+        conversation_repository=conversation_repository,
         run_repository=run_repository,
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
@@ -115,7 +115,7 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     )
     run_steering_service = RunSteeringService(
         run_repository=run_repository,
-        steering_repository=AgentSteeringRepository(),
+        steering_repository=AgentSteeringRepository(database),
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
     )
@@ -127,8 +127,6 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
         chat_streaming_service=chat_streaming_service,
         polling_interval=settings.jobs.polling_interval,
     )
-    job_service.start()
-
     application.state.search_runtime = search_runtime
     application.state.chat_runtime = chat_runtime
     application.state.geospatial_runtime = geospatial_runtime
@@ -138,12 +136,14 @@ async def app_lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.run_event_stream_service = run_event_stream_service
     application.state.job_service = job_service
 
-    chat_runtime.settings_service.get_settings()
-
-    run_startup_validations()
-
-    yield
-    job_service.stop()
+    try:
+        job_service.start()
+        chat_runtime.settings_service.get_settings()
+        run_startup_validations(CredentialRepository(database))
+        yield
+    finally:
+        job_service.stop()
+        await run_lifecycle_service.shutdown()
 
 ###############################################################################
 def create_app() -> FastAPI:

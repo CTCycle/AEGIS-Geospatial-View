@@ -11,19 +11,15 @@ from server.common.constants import (
     OLLAMA_DEFAULT_HOST,
 )
 from server.common.time import utc_now_naive
-from server.repositories.database.backend import get_database
+from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
 ###############################################################################
 class ModelSettingsRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        ensure_schema = getattr(backend, "ensure_schema", None)
-        if callable(ensure_schema):
-            ensure_schema()
-        self._session_factory = backend.session
+    def __init__(self, database: DatabaseBackend) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     def get_or_create(self) -> ModelProviderSettingsRecord:

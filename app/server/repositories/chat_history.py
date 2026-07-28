@@ -5,17 +5,15 @@ from typing import Any
 
 from sqlalchemy import desc, select, update
 
-from server.repositories.database.backend import get_database
-from server.repositories.schemas.models import Base, ChatMessageRecord, ConversationRecord
+from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.schemas.models import ChatMessageRecord, ConversationRecord
 
 ###############################################################################
 class ChatHistoryRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        Base.metadata.create_all(backend.engine)
-        self._session_factory = backend.session
+    def __init__(self, database: DatabaseBackend) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -5,17 +5,15 @@ from uuid import uuid4
 from sqlalchemy import select
 
 from server.domain.steering import SteeringMessageRecord
-from server.repositories.database.backend import get_database
-from server.repositories.schemas.models import AgentRunRecord, AgentSteeringMessageRecord, Base
+from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.schemas.models import AgentRunRecord, AgentSteeringMessageRecord
 
 ###############################################################################
 class AgentSteeringRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        Base.metadata.create_all(backend.engine)
-        self._session_factory = backend.session
+    def __init__(self, database: DatabaseBackend) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     def append_steering_message(

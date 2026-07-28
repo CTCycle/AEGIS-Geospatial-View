@@ -86,15 +86,15 @@ class GeospatialApiService:
     def __init__(
         self,
         *,
-        catalog_service: GeospatialCatalogService | None = None,
-        manifest_loader: GeospatialManifestLoader | None = None,
-        runtime_registry: RuntimeRegistry | None = None,
-        provider_registry: ProviderRegistry | None = None,
+        catalog_service: GeospatialCatalogService,
+        manifest_loader: GeospatialManifestLoader,
+        runtime_registry: RuntimeRegistry,
+        provider_registry: ProviderRegistry,
     ) -> None:
-        self.catalog_service = catalog_service or GeospatialCatalogService()
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
-        self.runtime_registry = runtime_registry or RuntimeRegistry()
-        self.provider_registry = provider_registry or ProviderRegistry()
+        self.catalog_service = catalog_service
+        self.manifest_loader = manifest_loader
+        self.runtime_registry = runtime_registry
+        self.provider_registry = provider_registry
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:

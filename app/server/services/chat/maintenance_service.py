@@ -33,17 +33,13 @@ class ChatMaintenanceService:
         self,
         *,
         get_ollama_url: Callable[[], str],
-        model_library_service: ChatModelLibraryService | None = None,
-        ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
+        model_library_service: ChatModelLibraryService,
+        ollama_tool_capability_cache: OllamaToolCapabilityCache,
         ollama_provider_factory: OllamaProviderFactory = create_ollama_provider,
     ) -> None:
         self.get_ollama_url = get_ollama_url
-        self.model_library_service = model_library_service or ChatModelLibraryService(
-            ollama_tool_capability_cache=ollama_tool_capability_cache
-        )
-        self.ollama_tool_capability_cache = (
-            ollama_tool_capability_cache or OllamaToolCapabilityCache()
-        )
+        self.model_library_service = model_library_service
+        self.ollama_tool_capability_cache = ollama_tool_capability_cache
         self.ollama_provider_factory = ollama_provider_factory
 
     # -------------------------------------------------------------------------

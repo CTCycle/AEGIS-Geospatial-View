@@ -95,7 +95,7 @@ class ConversationTaskStateService:
         progress_summary: str | None = None,
         blocking_ambiguity: str | None = None,
         failure: TaskFailureDetail | None = None,
-        tool_plan=None,
+        tool_plan: dict[str, Any] | None = None,
         tool_result_refs: list[str] | None = None,
     ) -> ConversationTaskRecord:
         with self._lock:

@@ -5,8 +5,12 @@ Provides fixtures for Playwright page objects and API client.
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
+from server.configurations import DatabaseSettings
+from server.repositories.database.initializer import initialize_database
+from server.repositories.database.sqlite import SQLiteRepository
 
 ###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:
@@ -54,6 +58,36 @@ API_BASE_URL = _pick_first_non_empty(
     os.getenv("API_BASE_URL"),
     BACKEND_URL_FALLBACK,
 )
+
+###############################################################################
+class _SnapshotSaver:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, snapshot_dir: Path) -> None:
+        self.snapshot_dir = snapshot_dir
+
+    # -------------------------------------------------------------------------
+    def __call__(self, page: Any, name: str) -> Path:
+        filename = name if name.lower().endswith(".png") else f"{name}.png"
+        target = self.snapshot_dir / filename
+        page.screenshot(path=str(target), full_page=True)
+        return target
+
+###############################################################################
+class _BackendLogTailReader:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, backend_log_path: Path) -> None:
+        self.backend_log_path = backend_log_path
+
+    # -------------------------------------------------------------------------
+    def __call__(self, lines: int = 200) -> str:
+        if not self.backend_log_path.exists():
+            return ""
+        content = self.backend_log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
+        return "\n".join(content[-max(1, lines) :])
 
 ###############################################################################
 @pytest.fixture(scope="session")
@@ -108,24 +142,32 @@ def snapshot_dir(request: pytest.FixtureRequest, artifact_root: Path) -> Path:
 
 ###############################################################################
 @pytest.fixture
-def save_snapshot(snapshot_dir: Path):
-    def _save(page, name: str) -> Path:  # noqa: ANN001
-        filename = name if name.lower().endswith(".png") else f"{name}.png"
-        target = snapshot_dir / filename
-        page.screenshot(path=str(target), full_page=True)
-        return target
-
-    return _save
+def save_snapshot(snapshot_dir: Path) -> _SnapshotSaver:
+    return _SnapshotSaver(snapshot_dir)
 
 ###############################################################################
 @pytest.fixture
-def read_backend_log_tail(backend_log_path: Path):
-    def _read(lines: int = 200) -> str:
-        if not backend_log_path.exists():
-            return ""
-        content = backend_log_path.read_text(
-            encoding="utf-8", errors="replace"
-        ).splitlines()
-        return "\n".join(content[-max(1, lines) :])
+def read_backend_log_tail(backend_log_path: Path) -> _BackendLogTailReader:
+    return _BackendLogTailReader(backend_log_path)
 
-    return _read
+###############################################################################
+@pytest.fixture
+def sqlite_backend(tmp_path: Path) -> SQLiteRepository:
+    backend = SQLiteRepository(
+        DatabaseSettings(
+            database_path=str(tmp_path / "database.db"),
+            embedded_database=True,
+            engine=None,
+            host=None,
+            port=None,
+            database_name=None,
+            username=None,
+            password=None,
+            ssl=False,
+            ssl_ca=None,
+            connect_timeout=10,
+            insert_batch_size=100,
+        )
+    )
+    initialize_database(backend)
+    return backend

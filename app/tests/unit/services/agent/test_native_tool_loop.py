@@ -9,7 +9,26 @@ from server.services.agent.native_tool_loop import (
     NativeToolLoop,
 )
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
+
+###############################################################################
+class _Credentials:
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN001
+        _ = provider, label
+        return None
+
+###############################################################################
+def _registry() -> ToolRegistry:
+    return ToolRegistry(
+        runtime_registry=RuntimeRegistry(
+            manifest_loader=GeospatialManifestLoader(),
+            credentials_repo=_Credentials(),  # type: ignore[arg-type]
+        )
+    )
 
 ###############################################################################
 def _tool(name: str = "lookup") -> LLMToolDefinition:
@@ -59,7 +78,7 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
                 LLMResult(content="done"),
             ]
         )
-        registry = ToolRegistry()
+        registry = _registry()
 
         async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
             return {"echo": arguments["q"], "conversation": context.conversation_id}
@@ -94,7 +113,7 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
                 LLMResult(content="handled"),
             ]
         )
-        registry = ToolRegistry()
+        registry = _registry()
 
         async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
             return arguments
@@ -127,7 +146,7 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
                 for index in range(3)
             ]
         )
-        registry = ToolRegistry()
+        registry = _registry()
 
         async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
             return arguments
@@ -164,7 +183,7 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
                 LLMResult(content="handled"),
             ]
         )
-        registry = ToolRegistry()
+        registry = _registry()
 
         async def handler(arguments: dict[str, Any], context: AgentExecutionContext) -> dict[str, Any]:
             raise AssertionError("policy-rejected tool must not execute")

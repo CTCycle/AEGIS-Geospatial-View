@@ -64,6 +64,15 @@ class AgentRunCreateResponse(BaseModel):
     stream_url: str
 
 ###############################################################################
+class AgentRunCreateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str
+    run_id: str
+    run_version: int
+    state: AgentRunState
+
+###############################################################################
 class AgentRunSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

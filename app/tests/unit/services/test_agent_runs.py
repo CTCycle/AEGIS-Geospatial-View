@@ -10,27 +10,16 @@ from sqlalchemy.pool import StaticPool
 from server.domain.agent_runs import AgentRunCreateRequest
 from server.domain.run_events import RunEventCreate, RunEventType, RunEventVisibility
 from server.domain.steering import SteeringMessageRequest
-from server.repositories import agent_run_events as event_repo_module
-from server.repositories import agent_runs as run_repo_module
-from server.repositories import agent_steering as steering_repo_module
-from server.repositories import conversations as conversation_repo_module
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
-from server.repositories.schemas.models import Base
+from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
-
-###############################################################################
-class _DatabaseHandle:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, backend) -> None:
-        self.backend = backend
 
 ###############################################################################
 class _InMemoryBackend:
@@ -59,19 +48,14 @@ class _FakeRunOrchestrator:
 
 ###############################################################################
 @pytest.fixture()
-def run_repositories(monkeypatch: pytest.MonkeyPatch):
+def run_repositories() -> dict[str, object]:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
-    database = _DatabaseHandle(backend)
-    monkeypatch.setattr(conversation_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(run_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(steering_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(event_repo_module, "get_database", lambda: database)
     return {
-        "conversations": ConversationRepository(),
-        "runs": AgentRunRepository(),
-        "steering": AgentSteeringRepository(),
-        "events": AgentRunEventRepository(),
+        "conversations": ConversationRepository(backend),
+        "runs": AgentRunRepository(backend),
+        "steering": AgentSteeringRepository(backend),
+        "events": AgentRunEventRepository(backend),
     }
 
 ###############################################################################
@@ -113,11 +97,6 @@ def test_event_repository_replay_orders_and_filters_visibility(
 ) -> None:
     repo = run_repositories["events"]
     with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
-        from server.repositories.schemas.models import (
-            AgentRunRecord,
-            ConversationRecord,
-        )
-
         session.add(ConversationRecord(id="conv_1", title="Events"))
         session.add(
             AgentRunRecord(
@@ -257,3 +236,29 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
                 SteeringMessageRequest(message="No, map Milan."),
             )
         )
+
+###############################################################################
+def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
+    run_repositories,
+) -> None:
+    async def _run() -> None:
+        lifecycle, _, _, _ = _services(run_repositories)
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def long_running() -> None:
+            started.set()
+            await release.wait()
+
+        long_task = asyncio.create_task(long_running())
+        completed_task = asyncio.create_task(asyncio.sleep(0))
+        lifecycle._tasks.update({long_task, completed_task})  # noqa: SLF001
+        await started.wait()
+        await completed_task
+
+        await lifecycle.shutdown()
+
+        assert long_task.cancelled()
+        assert not lifecycle._tasks  # noqa: SLF001
+
+    asyncio.run(_run())

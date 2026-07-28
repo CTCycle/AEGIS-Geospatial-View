@@ -99,7 +99,6 @@ def _failed_response() -> ChatTurnResponse:
             "task_class": "general_question",
             "user_text": "Map Rome",
             "conversation_context": {
-                "conversation_id": "conv_1",
                 "recent_messages": [],
                 "memory_snapshot": {},
             },

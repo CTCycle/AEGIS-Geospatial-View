@@ -8,6 +8,7 @@ from server.domain.extraction.models import (
 )
 from server.services.agent.capability_resolver import CapabilityResolver
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -34,8 +35,30 @@ def _turn(
     )
 
 ###############################################################################
+class _Credentials:
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN001
+        _ = provider, label
+        return None
+
+###############################################################################
+def _runtime() -> RuntimeRegistry:
+    return RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_Credentials(),  # type: ignore[arg-type]
+    )
+
+###############################################################################
+def _resolver() -> CapabilityResolver:
+    return CapabilityResolver(
+        capability_registry=CapabilityRegistry(),
+        runtime_registry=_runtime(),
+    )
+
+###############################################################################
 def test_preserves_enabled_exact_capability_id() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show precipitation rate", "IMERG_Precipitation_Rate")
     )
     assert resolved.requested_layers == ["IMERG_Precipitation_Rate"]
@@ -43,21 +66,21 @@ def test_preserves_enabled_exact_capability_id() -> None:
 
 ###############################################################################
 def test_resolves_precipitation_radar_semantics() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show current rain radar over Paris", "precipitation")
     )
     assert resolved.requested_layers == ["rainviewer_precipitation_radar"]
 
 ###############################################################################
 def test_resolves_precipitation_rate_semantics() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show precipitation intensity over Paris", "precipitation")
     )
     assert resolved.requested_layers == ["IMERG_Precipitation_Rate"]
 
 ###############################################################################
 def test_resolves_forecast_semantics() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn(
             "Show the rain forecast over Paris",
             "precipitation",
@@ -68,7 +91,7 @@ def test_resolves_forecast_semantics() -> None:
 
 ###############################################################################
 def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show air quality overlay for Paris", "air_quality")
     )
     assert resolved.requested_layers == ["openmeteo_air_quality_forecast"]
@@ -76,7 +99,7 @@ def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> No
 
 ###############################################################################
 def test_resolves_traffic_semantics_to_enabled_capability() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show traffic around the Colosseum in Rome", "traffic")
     )
     assert resolved.requested_layers == ["tomtom_traffic_flow"]
@@ -84,7 +107,7 @@ def test_resolves_traffic_semantics_to_enabled_capability() -> None:
 
 ###############################################################################
 def test_october_mean_returns_supported_alternatives_instead_of_invalid_id() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn(
             "Can you now show Tour Eiffel area with rain level in October (mean value)",
             "precipitation",
@@ -98,7 +121,7 @@ def test_october_mean_returns_supported_alternatives_instead_of_invalid_id() -> 
     assert "unsupported_historical_precipitation_mean" in resolved.ambiguities
 
 ###############################################################################
-class _DisabledRuntimeRegistry(RuntimeRegistry):
+class _DisabledRuntimeRegistry:
 
     # -------------------------------------------------------------------------
     def is_enabled(self, capability_id: str) -> bool:
@@ -118,7 +141,7 @@ def test_disabled_exact_capability_is_not_planned() -> None:
 
 ###############################################################################
 def test_unmatched_semantic_layer_returns_clarification() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show a completely fictional atmospheric index", "fictional")
     )
     assert resolved.requested_layers == []
@@ -127,7 +150,7 @@ def test_unmatched_semantic_layer_returns_clarification() -> None:
 
 ###############################################################################
 def test_unknown_underscore_identifier_is_not_treated_as_resolved() -> None:
-    resolved = CapabilityResolver().resolve(
+    resolved = _resolver().resolve(
         _turn("Show a fake Overpass layer", "overpass_fake_layer")
     )
     assert resolved.requested_layers == []

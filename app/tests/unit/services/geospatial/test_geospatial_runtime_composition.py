@@ -7,8 +7,8 @@ from server.services.geospatial.composition import (
 )
 
 ###############################################################################
-def test_build_geospatial_runtime_reuses_shared_services() -> None:
-    runtime = build_geospatial_runtime()
+def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None:
+    runtime = build_geospatial_runtime(sqlite_backend)
 
     assert isinstance(runtime, GeospatialRuntime)
     assert isinstance(runtime.api_service, GeospatialApiService)

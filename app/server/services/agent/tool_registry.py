@@ -20,8 +20,8 @@ NativeToolHandler = Callable[[dict[str, Any], Any], Awaitable[Any]]
 class ToolRegistry:
 
     # -------------------------------------------------------------------------
-    def __init__(self, *, runtime_registry: RuntimeRegistry | None = None) -> None:
-        self.runtime_registry = runtime_registry or RuntimeRegistry()
+    def __init__(self, *, runtime_registry: RuntimeRegistry) -> None:
+        self.runtime_registry = runtime_registry
         self._handlers: dict[str, ToolHandler] = {}
         self._native_tools: dict[str, RegisteredNativeTool] = {}
 

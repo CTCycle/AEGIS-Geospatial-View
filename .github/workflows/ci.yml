@@ -24,6 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e "app/server[test]"
 
+      - name: Run backend static analysis
+        run: |
+          ruff check app/server app/tests
+          pyright --project app/server/pyproject.toml
+
       - name: Run backend unit suites
         run: |
           python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py

@@ -27,15 +27,15 @@ class ChatSettingsService:
     def __init__(
         self,
         *,
-        settings_repo: ModelSettingsRepository | None = None,
-        credentials_repo: CredentialRepository | None = None,
-        crypto_service: CredentialEncryptionService | None = None,
-        model_library_service: ChatModelLibraryService | None = None,
+        settings_repo: ModelSettingsRepository,
+        credentials_repo: CredentialRepository,
+        crypto_service: CredentialEncryptionService,
+        model_library_service: ChatModelLibraryService,
     ) -> None:
-        self.settings_repo = settings_repo or ModelSettingsRepository()
-        self.credentials_repo = credentials_repo or CredentialRepository()
-        self.crypto_service = crypto_service or CredentialEncryptionService()
-        self.model_library_service = model_library_service or ChatModelLibraryService()
+        self.settings_repo = settings_repo
+        self.credentials_repo = credentials_repo
+        self.crypto_service = crypto_service
+        self.model_library_service = model_library_service
 
     # -------------------------------------------------------------------------
     def get_settings(self) -> ModelSettingsResponse:

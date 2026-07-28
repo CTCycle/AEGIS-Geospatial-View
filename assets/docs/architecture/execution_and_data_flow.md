@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-07-20
+Last updated: 2026-07-28
 
 ## Layering
 
@@ -17,6 +17,11 @@ AEGIS uses these main backend layers:
 - API routes translate service exceptions into HTTP responses.
 - Services do not import FastAPI.
 - Repositories remain the persistence boundary.
+- `app/server/app.py` is the sole composition root: it builds settings,
+  persistence, repositories, and services, then stores the composed runtimes
+  on `app.state`.
+- Stateful dependencies are explicit constructor arguments. The shared
+  conversation repository is passed to both chat and run-lifecycle services.
 - `app/server/repositories/database/contracts.py` defines the shared database backend contract.
 - `domain/` holds request, response, and domain contracts.
 - Runtime job state is owned by `app/server/services/jobs.py`.
@@ -53,6 +58,11 @@ Geospatial API services are composed during application startup and accessed thr
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
 11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
 12. Task status, failure details, and active visualization are updated before persistence.
+
+Direct responses (parser failures, capability questions, failure inquiries, and
+preflight rejection/clarification) are handled by
+`DirectTurnResponseService`. The orchestrator delegates these branches while
+retaining the normal tool execution path.
 
 `AgentOrchestrator` remains the chat-turn entrypoint, while helper services keep non-routing responsibilities isolated:
 
@@ -118,3 +128,8 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - Run event fanout is in-process in v1, with persisted event replay as the reconnect source of truth.
 - Run cancellation is cooperative and terminal; stale agent results after a version change are persisted as internal diagnostics and discarded from user-visible completion.
 - Agent availability is application-level. Run progress begins with `understanding_request`; creating a run does not restart the agent or emit an `agent_started` event.
+- `RunLifecycleService.create_run()` returns a transport-neutral
+  `AgentRunCreateResult`; the HTTP route adds the SSE `stream_url` when it
+  constructs the API response.
+- Application shutdown cancels tracked lifecycle tasks and awaits them before
+  the FastAPI lifespan exits, including startup-failure paths.

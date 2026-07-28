@@ -34,18 +34,16 @@ class RuntimeRegistry:
     def __init__(
         self,
         *,
-        manifest_loader: GeospatialManifestLoader | None = None,
-        credentials_repo: CredentialRepository | None = None,
+        manifest_loader: GeospatialManifestLoader,
+        credentials_repo: CredentialRepository,
     ) -> None:
-        self.manifest_loader = manifest_loader or GeospatialManifestLoader()
+        self.manifest_loader = manifest_loader
         self._credentials_repo = credentials_repo
         self._snapshot: RuntimeRegistrySnapshot | None = None
 
     # -------------------------------------------------------------------------
     @property
     def credentials_repo(self) -> CredentialRepository:
-        if self._credentials_repo is None:
-            self._credentials_repo = CredentialRepository()
         return self._credentials_repo
 
     # -------------------------------------------------------------------------

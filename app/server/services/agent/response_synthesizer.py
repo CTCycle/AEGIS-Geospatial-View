@@ -30,12 +30,12 @@ class GroundedResponseSynthesizer:
     def __init__(
         self,
         *,
-        settings_repo: ModelSettingsRepository | None = None,
-        llm_factory: LLMFactory | None = None,
+        settings_repo: ModelSettingsRepository,
+        llm_factory: LLMFactory,
         enabled: bool | None = None,
     ) -> None:
-        self.settings_repo = settings_repo or ModelSettingsRepository()
-        self.llm_factory = llm_factory or LLMFactory(settings_repo=self.settings_repo)
+        self.settings_repo = settings_repo
+        self.llm_factory = llm_factory
         self.enabled = (
             isinstance(self.settings_repo, ModelSettingsRepository)
             if enabled is None

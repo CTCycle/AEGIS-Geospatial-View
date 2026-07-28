@@ -69,6 +69,17 @@ class _ChatStreamingFailureStub:
         )
 
 ###############################################################################
+class _UnexpectedFailureStub:
+
+    # -------------------------------------------------------------------------
+    async def stream_turn(self, payload: ChatTurnRequest):
+        _ = payload
+        raise RuntimeError(
+            "api-key=sk-test https://provider.invalid/v1 C:\\private\\settings.env"
+        )
+        yield  # pragma: no cover
+
+###############################################################################
 def _build_service() -> BackgroundJobService:
     return BackgroundJobService(
         chat_streaming_service=_ChatStreamingStub(),
@@ -125,3 +136,24 @@ def test_worker_fails_chat_job_when_final_operation_failed() -> None:
     assert status.status == JOB_STATUS_FAILED
     assert status.error_json is not None
     assert status.error_json["operation"]["status"] == "failed"
+
+###############################################################################
+def test_worker_sanitizes_unexpected_exception_details() -> None:
+    service = BackgroundJobService(
+        chat_streaming_service=_UnexpectedFailureStub(),
+        polling_interval=1.0,
+    )
+    service.start()
+    created = service.create_chat_job(
+        ChatTurnRequest(conversation_id="test-conversation", message="hello", request_id="req-5")
+    )
+    deadline = time.time() + 2
+    status = service.get_job(created.job_id)
+    while status is not None and status.status not in {JOB_STATUS_FAILED, JOB_STATUS_CANCELLED} and time.time() < deadline:
+        time.sleep(0.05)
+        status = service.get_job(created.job_id)
+    service.stop()
+
+    assert status is not None
+    assert status.status == JOB_STATUS_FAILED
+    assert status.error_json == {"message": "Unexpected job failure"}

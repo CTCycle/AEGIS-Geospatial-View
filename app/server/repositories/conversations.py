@@ -6,17 +6,15 @@ from uuid import uuid4
 
 from sqlalchemy import select, update
 
-from server.repositories.database.backend import get_database
-from server.repositories.schemas.models import Base, ConversationRecord
+from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.schemas.models import ConversationRecord
 
 ###############################################################################
 class ConversationRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        Base.metadata.create_all(backend.engine)
-        self._session_factory = backend.session
+    def __init__(self, database: DatabaseBackend) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     def create_conversation(

@@ -18,13 +18,13 @@ class LLMFactory:
     def __init__(
         self,
         *,
-        settings_repo: ModelSettingsRepository | None = None,
-        credentials_repo: CredentialRepository | None = None,
-        crypto_service: CredentialEncryptionService | None = None,
+        settings_repo: ModelSettingsRepository,
+        credentials_repo: CredentialRepository,
+        crypto_service: CredentialEncryptionService,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
     ) -> None:
-        self.settings_repo = settings_repo or ModelSettingsRepository()
-        self.credentials_repo = credentials_repo or CredentialRepository()
+        self.settings_repo = settings_repo
+        self.credentials_repo = credentials_repo
         self.crypto_service = crypto_service
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
@@ -32,8 +32,6 @@ class LLMFactory:
 
     # -------------------------------------------------------------------------
     def _get_crypto_service(self) -> CredentialEncryptionService:
-        if self.crypto_service is None:
-            self.crypto_service = CredentialEncryptionService()
         return self.crypto_service
 
     # -------------------------------------------------------------------------

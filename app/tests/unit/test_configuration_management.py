@@ -27,7 +27,7 @@ def test_configuration_manager_loads_blocks_and_values(tmp_path: Path) -> None:
     _write_json(
         config_file,
         {
-            "maps": {"tiles": "CartoDB Positron"},
+            "map": {"tiles": "CartoDB Positron"},
             "jobs": {"polling_interval": 2.5},
         },
     )

@@ -16,6 +16,11 @@ from server.services.geospatial.api_service import (
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
 )
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.provider_registry import ProviderRegistry
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.providers.base import (
     ProviderRateLimitError,
     ProviderTimeoutError,
@@ -26,6 +31,30 @@ def create_started_client() -> TestClient:
     client = TestClient(create_app())
     client.__enter__()
     return client
+
+###############################################################################
+class _NoCredentials:
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN201
+        return None
+
+###############################################################################
+def _build_api_service(provider_registry) -> GeospatialApiService:  # noqa: ANN001
+    manifest_loader = GeospatialManifestLoader()
+    runtime_registry = RuntimeRegistry(
+        manifest_loader=manifest_loader,
+        credentials_repo=_NoCredentials(),  # type: ignore[arg-type]
+    )
+    return GeospatialApiService(
+        catalog_service=GeospatialCatalogService(
+            capability_registry=CapabilityRegistry(manifest_loader=manifest_loader),
+            runtime_registry=runtime_registry,
+        ),
+        manifest_loader=manifest_loader,
+        runtime_registry=runtime_registry,
+        provider_registry=provider_registry,
+    )
 
 ###############################################################################
 def test_geospatial_transit_features_return_metadata_until_feed_configured() -> None:
@@ -97,7 +126,7 @@ def test_geospatial_geojson_render_endpoint_returns_raw_feature_collection() -> 
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
-        GeospatialApiService(provider_registry=GeoJsonRegistry())
+        _build_api_service(GeoJsonRegistry())
     )
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
@@ -141,7 +170,7 @@ def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
-        GeospatialApiService(provider_registry=SingleFeatureRegistry())
+        _build_api_service(SingleFeatureRegistry())
     )
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
@@ -191,7 +220,7 @@ def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collecti
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
-        GeospatialApiService(provider_registry=CameraRegistry())
+        _build_api_service(CameraRegistry())
     )
 
     response = client.get("/api/geospatial/cameras.geojson?bbox=12,41,13,42")
@@ -227,7 +256,7 @@ def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
-        GeospatialApiService(provider_registry=MalformedRegistry())
+        _build_api_service(MalformedRegistry())
     )
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
@@ -254,7 +283,7 @@ def test_geospatial_tile_proxy_fetches_manifest_backed_credentialed_tile(monkeyp
         return b"tile-binary"
 
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-secret-forbidden")
-    service = GeospatialApiService()
+    service = _build_api_service(ProviderRegistry(manifest_loader=GeospatialManifestLoader()))
     service._fetch_binary_url = fake_fetch_binary_url  # type: ignore[method-assign]
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: service
@@ -304,7 +333,7 @@ def test_geospatial_features_map_provider_failures_without_500(
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
-        GeospatialApiService(provider_registry=FailingRegistry())
+        _build_api_service(FailingRegistry())
     )
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/features?live=true")

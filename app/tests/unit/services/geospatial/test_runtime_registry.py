@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -18,7 +19,10 @@ class _CredentialRepo:
 
 ###############################################################################
 def test_runtime_registry_reads_profiles() -> None:
-    registry = RuntimeRegistry()
+    registry = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    )
     snapshot = registry.build_snapshot()
     assert "osm_default" in snapshot.profiles
     assert registry.is_enabled("osm_default")
@@ -32,7 +36,10 @@ def test_runtime_profiles_cover_all_capabilities() -> None:
         *(str(item.get("id")) for item in capabilities.overlays),
         *(str(item.get("id")) for item in capabilities.tools),
     }
-    runtime_profiles = RuntimeRegistry().build_snapshot().profiles
+    runtime_profiles = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    ).build_snapshot().profiles
     missing = sorted(capability_id for capability_id in all_capability_ids if capability_id not in runtime_profiles)
     assert not missing
 
@@ -40,7 +47,10 @@ def test_runtime_profiles_cover_all_capabilities() -> None:
 def test_key_required_providers_are_unavailable_without_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
     monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
-    registry = RuntimeRegistry(credentials_repo=_CredentialRepo(False))  # type: ignore[arg-type]
+    registry = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(False),
+    )  # type: ignore[arg-type]
     registry.build_snapshot()
 
     assert not registry.credentials_present("tomtom_traffic_flow")
@@ -51,7 +61,10 @@ def test_key_required_providers_are_unavailable_without_saved_credentials(monkey
 def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
     monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
-    registry = RuntimeRegistry(credentials_repo=_CredentialRepo(True))  # type: ignore[arg-type]
+    registry = RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_CredentialRepo(True),
+    )  # type: ignore[arg-type]
     registry.build_snapshot()
 
     assert registry.credentials_present("tomtom_traffic_flow")

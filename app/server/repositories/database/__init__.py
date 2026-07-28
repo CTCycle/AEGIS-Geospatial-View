@@ -1,33 +1,13 @@
-from __future__ import annotations
-
-from importlib import import_module
-from typing import Any
-
-###############################################################################
-def __getattr__(name: str) -> Any:
-    modules = {
-        "AEGISDatabase": ("backend", "AEGISDatabase"),
-        "get_database": ("backend", "get_database"),
-        "DatabaseBackend": ("contracts", "DatabaseBackend"),
-        "initialize_database": ("initializer", "initialize_database"),
-        "initialize_sqlite_database": ("initializer", "initialize_sqlite_database"),
-        "PostgresRepository": ("postgres", "PostgresRepository"),
-        "SQLiteRepository": ("sqlite", "SQLiteRepository"),
-    }
-    if name not in modules:
-        raise AttributeError(name)
-    module_name, attribute = modules[name]
-    value = getattr(import_module(f"{__name__}.{module_name}"), attribute)
-    globals()[name] = value
-    return value
-
+from server.repositories.database.backend import build_database_backend
+from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.initializer import initialize_database
+from server.repositories.database.postgres import PostgresRepository
+from server.repositories.database.sqlite import SQLiteRepository
 
 __all__ = [
-    "AEGISDatabase",
     "DatabaseBackend",
-    "get_database",
+    "build_database_backend",
     "initialize_database",
-    "initialize_sqlite_database",
     "PostgresRepository",
     "SQLiteRepository",
 ]

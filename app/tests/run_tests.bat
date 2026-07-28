@@ -69,15 +69,9 @@ if exist "%RUNTIME_NPM%" (
   set "NPM_CMD=npm"
 )
 
-set "UVICORN_APP=app.server.app:app"
-set "BACKEND_WORKDIR=%PROJECT_ROOT%"
-set "PYTHONPATH=%PROJECT_ROOT%;%APP_DIR%"
-"%PYTHON_CMD%" -c "import importlib; importlib.import_module('app.server.app')" >nul 2>&1
-if errorlevel 1 (
-  set "UVICORN_APP=server.app:app"
-  set "BACKEND_WORKDIR=%SERVER_DIR%"
-  set "PYTHONPATH=%APP_DIR%"
-)
+set "UVICORN_APP=server.app:app"
+set "BACKEND_WORKDIR=%APP_DIR%"
+set "PYTHONPATH=%APP_DIR%"
 
 set "PYTEST_TARGET=%TESTS_DIR%"
 if not "%STANDARD_TEST_PYTEST_TARGET%"=="" set "PYTEST_TARGET=%STANDARD_TEST_PYTEST_TARGET%"

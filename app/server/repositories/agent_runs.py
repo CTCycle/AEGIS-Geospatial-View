@@ -4,19 +4,17 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from server.domain.agent_runs import AgentRunSnapshot, AgentRunState
-from server.repositories.database.backend import get_database
+from server.repositories.database.contracts import DatabaseBackend
 from sqlalchemy import select
 
-from server.repositories.schemas.models import AgentRunRecord, Base, ConversationRecord
+from server.repositories.schemas.models import AgentRunRecord, ConversationRecord
 
 ###############################################################################
 class AgentRunRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        backend = get_database().backend
-        Base.metadata.create_all(backend.engine)
-        self._session_factory = backend.session
+    def __init__(self, database: DatabaseBackend) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     def create_run(

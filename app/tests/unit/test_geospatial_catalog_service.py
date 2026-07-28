@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
@@ -18,8 +20,13 @@ class _CredentialRepo:
 
 ###############################################################################
 def _service_with_credentials(present: bool) -> GeospatialCatalogService:
+    manifest_loader = GeospatialManifestLoader()
     return GeospatialCatalogService(
-        runtime_registry=RuntimeRegistry(credentials_repo=_CredentialRepo(present)),  # type: ignore[arg-type]
+        capability_registry=CapabilityRegistry(manifest_loader=manifest_loader),
+        runtime_registry=RuntimeRegistry(
+            manifest_loader=manifest_loader,
+            credentials_repo=_CredentialRepo(present),  # type: ignore[arg-type]
+        ),
     )
 
 ###############################################################################

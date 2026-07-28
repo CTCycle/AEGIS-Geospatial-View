@@ -14,10 +14,6 @@ from sqlalchemy.pool import StaticPool
 from server.api.conversations import router as conversations_router
 from server.common.paths import FASTAPI_API_PREFIX
 from server.domain.run_events import RunEventType
-from server.repositories import agent_run_events as event_repo_module
-from server.repositories import agent_runs as run_repo_module
-from server.repositories import agent_steering as steering_repo_module
-from server.repositories import conversations as conversation_repo_module
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
@@ -28,13 +24,6 @@ from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.streaming import RunEventStreamService
-
-###############################################################################
-class _DatabaseHandle:
-
-    # -------------------------------------------------------------------------
-    def __init__(self, backend: object) -> None:
-        self.backend = backend
 
 ###############################################################################
 class _InMemoryBackend:
@@ -86,19 +75,14 @@ async def _read_first_sse_event(stream: AsyncIterator[str]) -> dict:
 def conversations_api_client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, FastAPI]:
     backend = _InMemoryBackend()
     Base.metadata.create_all(backend.engine)
-    database = _DatabaseHandle(backend)
-    monkeypatch.setattr(conversation_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(run_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(steering_repo_module, "get_database", lambda: database)
-    monkeypatch.setattr(event_repo_module, "get_database", lambda: database)
 
-    publisher = RunEventPublisher(AgentRunEventRepository())
-    run_repository = AgentRunRepository()
+    publisher = RunEventPublisher(AgentRunEventRepository(backend))
+    run_repository = AgentRunRepository(backend)
     aggregation = AggregatedRequestService()
     app = FastAPI()
     app.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
     app.state.run_lifecycle_service = RunLifecycleService(
-        conversation_repository=ConversationRepository(),
+        conversation_repository=ConversationRepository(backend),
         run_repository=run_repository,
         aggregation_service=aggregation,
         event_publisher=publisher,
@@ -106,7 +90,7 @@ def conversations_api_client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClien
     )
     app.state.run_steering_service = RunSteeringService(
         run_repository=run_repository,
-        steering_repository=AgentSteeringRepository(),
+        steering_repository=AgentSteeringRepository(backend),
         aggregation_service=aggregation,
         event_publisher=publisher,
     )

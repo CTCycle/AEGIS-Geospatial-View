@@ -4,16 +4,20 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.repositories.credentials import CredentialRepository
 
 ###############################################################################
-def run_startup_validations() -> None:
+def run_startup_validations(credentials_repo: CredentialRepository) -> None:
     loader = GeospatialManifestLoader()
     loader.load_all()
 
     capability_registry = CapabilityRegistry(manifest_loader=loader)
     capability_registry.load_capabilities()
 
-    runtime_registry = RuntimeRegistry(manifest_loader=loader)
+    runtime_registry = RuntimeRegistry(
+        manifest_loader=loader,
+        credentials_repo=credentials_repo,
+    )
     runtime_registry.build_snapshot()
 
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
