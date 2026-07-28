@@ -49,13 +49,20 @@ class _OllamaProviderUnavailableStub:
         return []
 
 ###############################################################################
+def _build_service() -> ChatModelLibraryService:
+    return ChatModelLibraryService(
+        provider_factory=_ProviderFactoryStub(_DeepSeekProviderStub([])),
+        ollama_unavailable_ttl_s=30.0,
+    )
+
+###############################################################################
 def test_list_models_reports_ollama_unreachable_without_dropping_cloud_catalog(monkeypatch) -> None:
     monkeypatch.setattr(
         model_library_module,
         "OllamaProvider",
         _OllamaProviderUnavailableStub,
     )
-    service = ChatModelLibraryService(ollama_unavailable_ttl_s=30.0)
+    service = _build_service()
 
     response = service.list_models(ollama_url="http://localhost:11434")
 
@@ -72,7 +79,7 @@ def test_list_models_caches_ollama_unavailable_result(monkeypatch) -> None:
         "OllamaProvider",
         _OllamaProviderUnavailableStub,
     )
-    service = ChatModelLibraryService(ollama_unavailable_ttl_s=30.0)
+    service = _build_service()
 
     first = service.list_models(ollama_url="http://localhost:11434")
     second = service.list_models(ollama_url="http://localhost:11434")

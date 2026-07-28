@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
+
 from server.repositories.schemas import Base
 
 ###############################################################################
 class DatabaseBackend(Protocol):
     db_path: str | None
-    engine: Any
-    session: Any
+    engine: Engine
+    session: sessionmaker[Session]
 
     # -------------------------------------------------------------------------
     def load_from_database(self, table_name: str) -> list[dict[str, Any]]: ...

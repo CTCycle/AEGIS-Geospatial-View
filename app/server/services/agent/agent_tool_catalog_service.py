@@ -31,23 +31,23 @@ class AgentToolCatalogService:
         *,
         capability_registry: CapabilityRegistry | None = None,
         manifest_loader: GeospatialManifestLoader | None = None,
-        runtime_registry: RuntimeRegistry | None = None,
+        runtime_registry: RuntimeRegistry,
         search_orchestrator: LocationSearchOrchestrator | None = None,
         request_builder: RequestBuilder | None = None,
         location_resolver: LocationResolver | None = None,
         tool_registry: ToolRegistry | None = None,
         policy_engine: PolicyEngine | None = None,
-        geospatial_api_service: GeospatialApiService | None = None,
+        geospatial_api_service: GeospatialApiService,
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
-        self.runtime_registry = runtime_registry or RuntimeRegistry()
+        self.runtime_registry = runtime_registry
         self.search_orchestrator = search_orchestrator
         self.request_builder = request_builder or RequestBuilder()
         self.location_resolver = location_resolver or LocationResolver()
         self.tool_registry = tool_registry
         self.policy_engine = policy_engine
-        self.geospatial_api_service = geospatial_api_service or GeospatialApiService()
+        self.geospatial_api_service = geospatial_api_service
 
     # -------------------------------------------------------------------------
     def build_native_tools(

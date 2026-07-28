@@ -21,11 +21,11 @@ class OverlayInferenceService:
     def __init__(
         self,
         *,
-        capability_registry: CapabilityRegistry | None = None,
-        runtime_registry: RuntimeRegistry | None = None,
+        capability_registry: CapabilityRegistry,
+        runtime_registry: RuntimeRegistry,
     ) -> None:
-        self.capability_registry = capability_registry or CapabilityRegistry()
-        self.runtime_registry = runtime_registry or RuntimeRegistry()
+        self.capability_registry = capability_registry
+        self.runtime_registry = runtime_registry
 
     # -------------------------------------------------------------------------
     def infer_overlays(

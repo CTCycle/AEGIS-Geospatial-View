@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-07-20
+Last updated: 2026-07-28
 
 ## Purpose
 
@@ -56,9 +56,19 @@ Key backend directories under `app/server`:
   Request/response contracts and domain models.
 - `repositories/`
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
+- `repositories/database/`
+  Canonical `DatabaseBackend` contract, SQLite/PostgreSQL implementations, and
+  the explicit startup initializer.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
-  The agent orchestration area now includes focused helpers such as `turn_history.py`, `turn_state_assembler.py`, and `turn_support.py` to keep `AgentOrchestrator` under the repository Python size constraint without changing the public chat-turn contract.
+  The agent orchestration area includes focused helpers such as
+  `direct_turn_response.py`, `turn_history.py`, `turn_state_assembler.py`, and
+  `turn_support.py` to keep `AgentOrchestrator` under the repository Python
+  size constraint without changing the public chat-turn contract.
+- `app.py`
+  Sole composition root. It constructs the database backend, initializes the
+  schema, wires explicit repository/service dependencies, and owns lifecycle
+  shutdown.
 
 ## Frontend Areas
 

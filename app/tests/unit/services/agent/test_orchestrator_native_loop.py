@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 from server.domain.agent.decision import (
@@ -20,11 +21,20 @@ from server.domain.extraction.models import (
 )
 from server.domain.geographics import MapSession
 from server.domain.agent.pipeline import ToolPlan
+from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
+from server.services.agent.capability_resolver import CapabilityResolver
+from server.services.agent.conversation_state import ConversationTaskStateService
+from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import AgentToolLoopResult
+from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.policy_engine import AgentPolicyConstraints
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.search.request_builder import RequestBuilder
 from server.services.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
 ###############################################################################
@@ -553,6 +563,13 @@ class _FallbackCatalog:
         return {"items": []}
 
 ###############################################################################
+class _NoOpCatalog:
+
+    # -------------------------------------------------------------------------
+    def register_with(self, registry: ToolRegistry) -> None:
+        _ = registry
+
+###############################################################################
 class _NativeLoop:
 
     # -------------------------------------------------------------------------
@@ -571,6 +588,82 @@ class _SettingsRepo:
     # -------------------------------------------------------------------------
     def get_or_create(self) -> _Settings:
         return _Settings()
+
+###############################################################################
+class _Credentials:
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN001
+        _ = provider, label
+        return None
+
+###############################################################################
+class _ResponseSynthesizer:
+
+    # -------------------------------------------------------------------------
+    def synthesize(self, *, fallback_text: str, **_: Any) -> str:
+        return fallback_text
+
+###############################################################################
+def _test_tool_registry() -> ToolRegistry:
+    return ToolRegistry(
+        runtime_registry=RuntimeRegistry(
+            manifest_loader=GeospatialManifestLoader(),
+            credentials_repo=_Credentials(),  # type: ignore[arg-type]
+        )
+    )
+
+###############################################################################
+def _test_agent_tool_catalog(
+    *,
+    search_orchestrator: Any,
+    policy: Any,
+    tool_registry: ToolRegistry,
+) -> AgentToolCatalogService:
+    return AgentToolCatalogService(
+        capability_registry=CapabilityRegistry(),
+        manifest_loader=GeospatialManifestLoader(),
+        runtime_registry=tool_registry.runtime_registry,
+        search_orchestrator=search_orchestrator,
+        request_builder=RequestBuilder(),
+        location_resolver=policy.location_resolver,
+        tool_registry=tool_registry,
+        policy_engine=policy,
+        geospatial_api_service=SimpleNamespace(),  # type: ignore[arg-type]
+    )
+
+###############################################################################
+_ProductionAgentOrchestrator = AgentOrchestrator
+
+###############################################################################
+def _build_test_orchestrator(**kwargs: Any) -> AgentOrchestrator:
+    history_service = kwargs["history_service"]
+    tool_registry = kwargs["tool_registry"]
+    capability_registry = CapabilityRegistry()
+    runtime_registry = tool_registry.runtime_registry
+    task_state = ConversationTaskStateService()
+    synthesizer = _ResponseSynthesizer()
+    kwargs.update(
+        task_state_service=task_state,
+        overlay_inference_service=OverlayInferenceService(
+            capability_registry=capability_registry,
+            runtime_registry=runtime_registry,
+        ),
+        capability_resolver=CapabilityResolver(
+            capability_registry=capability_registry,
+            runtime_registry=runtime_registry,
+        ),
+        response_synthesizer=synthesizer,
+        direct_turn_response_service=DirectTurnResponseService(
+            task_state_service=task_state,
+            history_service=history_service,
+            response_synthesizer=synthesizer,  # type: ignore[arg-type]
+        ),
+    )
+    return _ProductionAgentOrchestrator(**kwargs)
+
+###############################################################################
+AgentOrchestrator = _build_test_orchestrator
 
 ###############################################################################
 class _SearchOrchestrator:
@@ -756,11 +849,8 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -815,15 +905,13 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
+            tool_planner=_VisualizationOnlyPlanner(),  # type: ignore[arg-type]
         )
 
         response = await orchestrator.run_turn(ChatTurnRequest(conversation_id="test-conversation", message="show Rome"))
@@ -871,11 +959,8 @@ def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> 
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -910,11 +995,8 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -953,11 +1035,8 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -996,11 +1075,8 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
             parser_service=_ZurichParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1037,11 +1113,8 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
             parser_service=_ParisParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1076,11 +1149,8 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
             parser_service=_TimesSquareParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1213,11 +1283,8 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=_Policy(),  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_MultiOverlayCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1336,11 +1403,8 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=_Policy(),  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_SelectionCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1410,11 +1474,8 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
             parser_service=_DeicticParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1473,11 +1534,8 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
             parser_service=_MemoryMapParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1538,11 +1596,8 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
             parser_service=_ParisParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1582,11 +1637,8 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
             parser_service=_CoordinateParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FallbackCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1665,11 +1717,8 @@ def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_FailingCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1698,11 +1747,8 @@ def test_orchestrator_returns_clarification_operation_for_preflight_question() -
             parser_service=_DeicticParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=_NativeLoop(  # type: ignore[arg-type]
                 AgentToolLoopResult(
                     final_text="unused",
@@ -1736,11 +1782,8 @@ def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=_NativeLoop(  # type: ignore[arg-type]
                 AgentToolLoopResult(
                     final_text="unused",
@@ -1800,11 +1843,8 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
             parser_service=_DirectToolParser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_DirectResultCatalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
@@ -1830,6 +1870,7 @@ def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session(
         policy = _Policy()
         history = _HistoryRepo()
         search_orchestrator = _NoResultSearchOrchestrator()
+        tool_registry = _test_tool_registry()
         native_loop = _NativeLoop(
             AgentToolLoopResult(
                 final_text="unused",
@@ -1844,12 +1885,14 @@ def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session(
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=tool_registry,
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
+            agent_tool_catalog_service=_test_agent_tool_catalog(
+                search_orchestrator=search_orchestrator,
+                policy=policy,
+                tool_registry=tool_registry,
+            ),
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
             history_service=history, conversation_repository=history,  # type: ignore[arg-type]
             tool_planner=_VisualizationOnlyPlanner(),  # type: ignore[arg-type]
@@ -1922,11 +1965,8 @@ def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
             parser_service=_Parser(),  # type: ignore[arg-type]
             location_memory_service=LocationMemoryService(),
             policy_engine=policy,  # type: ignore[arg-type]
-            tool_registry=ToolRegistry(),
-            request_builder=__import__(
-                "server.services.search.request_builder",
-                fromlist=["RequestBuilder"],
-            ).RequestBuilder(),
+            tool_registry=_test_tool_registry(),
+            request_builder=RequestBuilder(),
             native_tool_loop=native_loop,  # type: ignore[arg-type]
             agent_tool_catalog_service=_Catalog(),  # type: ignore[arg-type]
             settings_repo=_SettingsRepo(),  # type: ignore[arg-type]

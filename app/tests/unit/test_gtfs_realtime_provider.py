@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 
+from google.transit import gtfs_realtime_pb2
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 
@@ -41,8 +42,6 @@ def test_gtfs_realtime_provider_normalizes_trip_updates_alerts_and_vehicles() ->
 
 ###############################################################################
 def test_gtfs_realtime_provider_fetches_configured_protobuf_feed_url() -> None:
-    from google.transit import gtfs_realtime_pb2
-
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.header.gtfs_realtime_version = "2.0"
     feed.header.timestamp = int(datetime.now(UTC).timestamp())

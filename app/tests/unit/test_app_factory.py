@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import pytest
 
 import server.app as app_module
 from server.common.paths import FASTAPI_API_PREFIX
@@ -21,6 +22,7 @@ def _settings():  # noqa: ANN202
 def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
     return SimpleNamespace(
         agent_orchestrator=object(),
+        conversation_repository=object(),
         settings_service=SimpleNamespace(
             get_settings=lambda: call_order.append("settings_service.get_settings")
         ),
@@ -30,6 +32,22 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
 ###############################################################################
 def _build_geospatial_runtime() -> SimpleNamespace:
     return SimpleNamespace(api_service=object())
+
+###############################################################################
+class _LifecycleStub:
+
+    # -------------------------------------------------------------------------
+    def __init__(self, call_order: list[str]) -> None:
+        self.call_order = call_order
+
+    # -------------------------------------------------------------------------
+    async def shutdown(self) -> None:
+        self.call_order.append("run_lifecycle.shutdown")
+
+###############################################################################
+def _response_schema_ref(schema: dict, path: str, method: str, status_code: str) -> str:
+    response = schema["paths"][path][method]["responses"][status_code]
+    return response["content"]["application/json"]["schema"]["$ref"]
 
 ###############################################################################
 def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
@@ -50,6 +68,37 @@ def test_create_app_exposes_expected_entrypoint(monkeypatch) -> None:
     assert f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}/cancel" in route_paths
 
 ###############################################################################
+def test_openapi_declares_stable_response_models(monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
+
+    schema = app_module.create_app().openapi()
+
+    assert schema["openapi"]
+    assert _response_schema_ref(
+        schema, f"{FASTAPI_API_PREFIX}/conversations", "post", "201"
+    ) == "#/components/schemas/ConversationCreateResponse"
+    assert _response_schema_ref(
+        schema,
+        f"{FASTAPI_API_PREFIX}/conversations/{{conversation_id}}/runs",
+        "post",
+        "202",
+    ) == "#/components/schemas/AgentRunCreateResponse"
+    assert _response_schema_ref(
+        schema, f"{FASTAPI_API_PREFIX}/chat/settings", "get", "200"
+    ) == "#/components/schemas/ModelSettingsResponse"
+    assert _response_schema_ref(
+        schema, f"{FASTAPI_API_PREFIX}/chat/models", "get", "200"
+    ) == "#/components/schemas/ModelLibraryResponse"
+    assert _response_schema_ref(
+        schema, f"{FASTAPI_API_PREFIX}/jobs/{{job_id}}", "get", "200"
+    ) == "#/components/schemas/BackgroundJobStatusResponse"
+    assert _response_schema_ref(
+        schema, f"{FASTAPI_API_PREFIX}/geospatial/capabilities", "get", "200"
+    ) == "#/components/schemas/GeospatialCatalogResponse"
+    stream_schema = schema["paths"][f"{FASTAPI_API_PREFIX}/chat/stream"]["post"]["responses"]["200"]
+    assert "$ref" not in str(stream_schema)
+
+###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     call_order: list[str] = []
     search_runtime = SimpleNamespace(
@@ -63,20 +112,20 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
-    monkeypatch.setattr(
-        app_module,
-        "get_database",
-        lambda: SimpleNamespace(backend=SimpleNamespace()),
-    )
+    monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
     monkeypatch.setattr(app_module, "initialize_database", lambda backend: call_order.append("initialize_database"))
-    monkeypatch.setattr(app_module, "seed_credential_encryption_material", lambda: call_order.append("seed_credential_encryption_material"))
+    monkeypatch.setattr(app_module, "seed_credential_encryption_material", lambda database: call_order.append("seed_credential_encryption_material"))
     monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: call_order.append("build_search_runtime") or search_runtime)
-    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator: call_order.append("build_chat_runtime") or chat_runtime)
-    monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda: call_order.append("build_geospatial_runtime") or geospatial_runtime)
+    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database: call_order.append("build_chat_runtime") or chat_runtime)
+    monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: call_order.append("build_geospatial_runtime") or geospatial_runtime)
+    monkeypatch.setattr(app_module, "AgentRunEventRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "AgentRunRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "AgentSteeringRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "CredentialRepository", lambda database: object())
     monkeypatch.setattr(app_module, "BackgroundJobService", lambda **kwargs: job_service)
     monkeypatch.setattr(app_module, "ChatStreamingService", lambda orchestrator: object())
-    monkeypatch.setattr(app_module, "run_startup_validations", lambda: call_order.append("run_startup_validations"))
+    monkeypatch.setattr(app_module, "run_startup_validations", lambda credentials_repo: call_order.append("run_startup_validations"))
     monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
 
     created = app_module.create_app()
@@ -97,4 +146,49 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "settings_service.get_settings",
         "run_startup_validations",
         "job_service.stop",
+    ]
+
+###############################################################################
+def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:
+    call_order: list[str] = []
+    search_runtime = SimpleNamespace(search_orchestrator=SimpleNamespace())
+    chat_runtime = _build_chat_runtime(call_order)
+    lifecycle = _LifecycleStub(call_order)
+    geospatial_runtime = _build_geospatial_runtime()
+    job_service = SimpleNamespace(
+        start=lambda: call_order.append("job_service.start"),
+        stop=lambda: call_order.append("job_service.stop"),
+    )
+
+    monkeypatch.setattr(app_module, "get_server_settings", _settings)
+    monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
+    monkeypatch.setattr(app_module, "initialize_database", lambda backend: None)
+    monkeypatch.setattr(app_module, "seed_credential_encryption_material", lambda database: None)
+    monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
+    monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
+    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database: chat_runtime)
+    monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: geospatial_runtime)
+    monkeypatch.setattr(app_module, "AgentRunEventRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "AgentRunRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "AgentSteeringRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "CredentialRepository", lambda database: object())
+    monkeypatch.setattr(app_module, "RunLifecycleService", lambda **kwargs: lifecycle)
+    monkeypatch.setattr(app_module, "BackgroundJobService", lambda **kwargs: job_service)
+    monkeypatch.setattr(app_module, "ChatStreamingService", lambda orchestrator: object())
+    monkeypatch.setattr(
+        app_module,
+        "run_startup_validations",
+        lambda credentials_repo: (_ for _ in ()).throw(RuntimeError("startup failure")),
+    )
+    monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
+
+    with pytest.raises(RuntimeError, match="startup failure"):
+        with TestClient(app_module.create_app()):
+            pass
+
+    assert call_order == [
+        "job_service.start",
+        "settings_service.get_settings",
+        "job_service.stop",
+        "run_lifecycle.shutdown",
     ]

@@ -1,60 +1,12 @@
 from __future__ import annotations
 
-from functools import cache
-from typing import Any
-
-from server.configurations import get_server_settings
+from server.configurations import DatabaseSettings
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
-from server.repositories.schemas import Base
 
 ###############################################################################
-class AEGISDatabase:
-
-    # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        self.settings = get_server_settings().database
-        self.backend = self._build_backend()
-        ensure_schema = getattr(self.backend, "ensure_schema", None)
-        if callable(ensure_schema):
-            ensure_schema()
-
-    # -------------------------------------------------------------------------
-    def _build_backend(self) -> DatabaseBackend:
-        if self.settings.embedded_database:
-            return SQLiteRepository(self.settings)
-
-        return PostgresRepository(self.settings)
-
-    # -------------------------------------------------------------------------
-    @property
-    def db_path(self) -> str | None:
-        return getattr(self.backend, "db_path", None)
-
-    # -------------------------------------------------------------------------
-    def load_from_database(self, table_name: str) -> list[dict[str, Any]]:
-        return self.backend.load_from_database(table_name)
-
-    # -------------------------------------------------------------------------
-    def upsert_into_database(
-        self, records: list[dict[str, Any]], table_name: str
-    ) -> None:
-        self.backend.upsert_into_database(records, table_name)
-
-    # -------------------------------------------------------------------------
-    def count_rows(self, table_name: str) -> int:
-        return self.backend.count_rows(table_name)
-
-    # -------------------------------------------------------------------------
-    def list_columns(self, table_name: str) -> list[str]:
-        return self.backend.list_columns(table_name)
-
-    # -------------------------------------------------------------------------
-    def count_records(self, model: type[Base]) -> int:
-        return self.backend.count_records(model)
-
-###############################################################################
-@cache
-def get_database() -> AEGISDatabase:
-    return AEGISDatabase()
+def build_database_backend(settings: DatabaseSettings) -> DatabaseBackend:
+    if settings.embedded_database:
+        return SQLiteRepository(settings)
+    return PostgresRepository(settings)

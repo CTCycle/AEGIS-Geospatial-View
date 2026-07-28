@@ -52,6 +52,9 @@ def test_settings_response_reports_credential_health() -> None:
         settings_repo=_SettingsRepo(),
         credentials_repo=_CredentialsRepo(),
         crypto_service=_Crypto(),
+        model_library_service=SimpleNamespace(
+            normalize_ollama_url=lambda value: value,
+        ),
     )
 
     response = service.get_settings()

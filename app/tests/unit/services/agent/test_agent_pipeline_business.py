@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 from server.domain.agent.decision import ResolvedLocation
@@ -23,8 +24,11 @@ from server.domain.extraction.models import (
 from server.domain.geographics import MapSession
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.conversation_state import ConversationTaskStateService
+from server.services.agent.capability_resolver import CapabilityResolver
+from server.services.agent.direct_turn_response import DirectTurnResponseService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
@@ -32,6 +36,7 @@ from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.llm.types import LLMToolDefinition
 from server.services.search.request_builder import RequestBuilder
 
@@ -217,6 +222,35 @@ class _SettingsRepo:
         return _Settings()
 
 ###############################################################################
+class _Credentials:
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN001
+        _ = provider, label
+        return None
+
+###############################################################################
+class _NativeLoop:
+
+    # -------------------------------------------------------------------------
+    async def run(self, request):  # noqa: ANN001
+        raise AssertionError("deterministic business tests must not use the native loop")
+
+###############################################################################
+class _ResponseSynthesizer:
+
+    # -------------------------------------------------------------------------
+    def synthesize(self, *, fallback_text: str, **_: Any) -> str:
+        return fallback_text
+
+###############################################################################
+def _runtime() -> RuntimeRegistry:
+    return RuntimeRegistry(
+        manifest_loader=GeospatialManifestLoader(),
+        credentials_repo=_Credentials(),  # type: ignore[arg-type]
+    )
+
+###############################################################################
 class _ConversationRepository:
 
     # -------------------------------------------------------------------------
@@ -240,23 +274,28 @@ class _ConversationRepository:
 ###############################################################################
 def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
     search = _Search()
-    registry = ToolRegistry(runtime_registry=RuntimeRegistry())
+    runtime = _runtime()
+    registry = ToolRegistry(runtime_registry=runtime)
     resolver = _Resolver()
     policy = PolicyEngine(
         location_resolver=resolver,  # type: ignore[arg-type]
         capability_registry=search.capability_registry,
-        runtime_registry=RuntimeRegistry(),
+        runtime_registry=runtime,
     )
     request_builder = RequestBuilder()
     catalog = AgentToolCatalogService(
         capability_registry=search.capability_registry,
-        runtime_registry=RuntimeRegistry(),
+        runtime_registry=runtime,
         search_orchestrator=search,  # type: ignore[arg-type]
         request_builder=request_builder,
         location_resolver=resolver,  # type: ignore[arg-type]
         tool_registry=registry,
         policy_engine=policy,
+        geospatial_api_service=SimpleNamespace(),  # type: ignore[arg-type]
     )
+    state = ConversationTaskStateService()
+    history = _History()
+    synthesizer = _ResponseSynthesizer()
     return AgentOrchestrator(
         search_orchestrator=search,  # type: ignore[arg-type]
         parser_service=_SequenceParser(turns),  # type: ignore[arg-type]
@@ -266,9 +305,24 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         request_builder=request_builder,
         agent_tool_catalog_service=catalog,
         settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
-        history_service=_History(),  # type: ignore[arg-type]
-        task_state_service=ConversationTaskStateService(),
+        history_service=history,  # type: ignore[arg-type]
+        task_state_service=state,
         conversation_repository=_ConversationRepository(),  # type: ignore[arg-type]
+        native_tool_loop=_NativeLoop(),  # type: ignore[arg-type]
+        overlay_inference_service=OverlayInferenceService(
+            capability_registry=search.capability_registry,
+            runtime_registry=runtime,
+        ),
+        capability_resolver=CapabilityResolver(
+            capability_registry=search.capability_registry,
+            runtime_registry=runtime,
+        ),
+        response_synthesizer=synthesizer,  # type: ignore[arg-type]
+        direct_turn_response_service=DirectTurnResponseService(
+            task_state_service=state,
+            history_service=history,  # type: ignore[arg-type]
+            response_synthesizer=synthesizer,  # type: ignore[arg-type]
+        ),
     )
 
 ###############################################################################
@@ -432,7 +486,7 @@ def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
 ###############################################################################
 def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() -> None:
     async def _run() -> None:
-        registry = ToolRegistry()
+        registry = ToolRegistry(runtime_registry=_runtime())
         order: list[str] = []
 
         async def handler(arguments, context):  # noqa: ANN001
@@ -485,7 +539,7 @@ def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() ->
 ###############################################################################
 def test_tool_output_validation_rejects_wrong_capability() -> None:
     async def _run() -> None:
-        registry = ToolRegistry()
+        registry = ToolRegistry(runtime_registry=_runtime())
 
         async def handler(arguments, context):  # noqa: ANN001
             return {"ok": True, "capability_id": "wrong"}

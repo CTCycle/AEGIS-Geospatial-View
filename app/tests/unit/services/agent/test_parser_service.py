@@ -109,7 +109,7 @@ class _ConfigErrorFactoryStub:
 
 ###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
-    parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
+    parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
         user_message="What are the coordinates of the Colosseum in Rome?",
         memory_snapshot={},
@@ -153,7 +153,7 @@ def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
 
 ###############################################################################
 def test_parser_service_normalizes_recent_messages_to_strings() -> None:
-    parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
+    parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
         user_message="Where am I?",
         memory_snapshot={"active_location": None},
@@ -179,6 +179,7 @@ def test_parser_service_normalizes_recent_messages_to_strings() -> None:
 def test_parser_service_does_not_hide_configuration_errors() -> None:
     parser = ParserService(
         llm_factory=_ConfigErrorFactoryStub(),
+        settings_repo=object(),
         provider="openai",
         model="gpt-4.1-mini",
     )
@@ -199,7 +200,7 @@ def test_parser_prompt_enforces_multilingual_and_verbatim_location_rules() -> No
 
 ###############################################################################
 def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
-    parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
+    parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
         user_message="اعرض جودة الهواء في القاهرة على الخريطة.",
         memory_snapshot={},
@@ -210,7 +211,7 @@ def test_parser_service_drops_non_verbatim_location_hallucinations() -> None:
 
 ###############################################################################
 def test_parser_service_does_not_create_heuristic_location_fallbacks() -> None:
-    parser = ParserService(llm_factory=_FactoryStub(), provider="openai", model="gpt-4.1-mini")
+    parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
         user_message="No model location around Rome",
         memory_snapshot={},

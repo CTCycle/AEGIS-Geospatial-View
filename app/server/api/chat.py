@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 
@@ -38,6 +39,7 @@ from server.services.jobs import BackgroundJobService
 from server.services.llm.errors import LLMConfigurationError
 
 router = APIRouter(prefix=CHAT_ROUTER_PREFIX, tags=["chat"])
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 def get_chat_runtime(request: Request) -> ChatRuntime:
@@ -129,11 +131,14 @@ def get_models(
             detail=str(exc),
         ) from exc
     except Exception as exc:
-        if cloud_provider is None:
-            raise
+        LOGGER.exception("Failed to load cloud model catalog")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc) or f"Could not load {cloud_provider} models.",
+            detail=(
+                f"Could not load {cloud_provider} models."
+                if cloud_provider is not None
+                else "Could not load cloud models."
+            ),
         ) from exc
 
 ###############################################################################
@@ -200,9 +205,10 @@ def pull_ollama_model(
             detail=str(exc),
         ) from exc
     except Exception as exc:
+        LOGGER.exception("Ollama model pull failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(exc) or "Ollama pull failed",
+            detail="Ollama pull failed.",
         ) from exc
 
 ###############################################################################

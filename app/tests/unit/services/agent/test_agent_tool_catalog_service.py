@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from typing import Any
 
 from server.domain.agent.decision import ResolvedLocation
@@ -288,6 +289,7 @@ def _service() -> AgentToolCatalogService:
         location_resolver=_LocationResolver(),  # type: ignore[arg-type]
         tool_registry=_ToolRegistry(),  # type: ignore[arg-type]
         policy_engine=policy_engine,
+        geospatial_api_service=SimpleNamespace(),  # type: ignore[arg-type]
     )
 
 ###############################################################################
@@ -393,7 +395,7 @@ def test_execute_rejects_direct_only_capability_for_map_request() -> None:
 
 ###############################################################################
 def test_catalog_tools_register_with_tool_registry() -> None:
-    registry = ToolRegistry()
+    registry = ToolRegistry(runtime_registry=_RuntimeRegistry())  # type: ignore[arg-type]
     _service().register_with(registry)
     assert registry.has_native_tool("list_geospatial_capabilities")
     assert registry.has_native_tool("fetch_geospatial_provider_layers")

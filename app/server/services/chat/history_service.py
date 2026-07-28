@@ -8,8 +8,8 @@ from server.repositories.chat_history import ChatHistoryRepository
 class ChatHistoryService:
 
     # -------------------------------------------------------------------------
-    def __init__(self, repo: ChatHistoryRepository | None = None) -> None:
-        self.repo = repo or ChatHistoryRepository()
+    def __init__(self, repo: ChatHistoryRepository) -> None:
+        self.repo = repo
 
     # -------------------------------------------------------------------------
     def append_message(self, **kwargs: Any) -> None:

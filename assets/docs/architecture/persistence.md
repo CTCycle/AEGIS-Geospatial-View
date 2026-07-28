@@ -1,10 +1,10 @@
 # Persistence
 
-Last updated: 2026-07-20
+Last updated: 2026-07-28
 
 ## Relational Storage
 
-- Runtime selector: `app/server/repositories/database/backend.py`
+- Runtime selector: `app/server/repositories/database/backend.py` (`build_database_backend`)
 - SQLite mode: `EMBEDDED_DATABASE=true`
 - PostgreSQL mode: `EMBEDDED_DATABASE=false`
 - SQLite implementation: `sqlite.py`
@@ -23,7 +23,10 @@ repository tree:
 Override this location with `AEGIS_RUNTIME_DATA_DIR` when an explicit runtime
 storage directory is required.
 
-Schema initialization is handled by `app/server/repositories/database/initializer.py`.
+Schema initialization is handled once by the application composition root in
+`app/server/app.py`, through `app/server/repositories/database/initializer.py`.
+Repositories receive the already-built `DatabaseBackend`; they never create
+tables, infer schema, or resolve a database singleton themselves.
 
 The shared SQLAlchemy engine configuration is implemented in
 `app/server/repositories/database/engine.py`. SQLite connections enable foreign
@@ -59,6 +62,10 @@ Payload columns use portable SQLAlchemy JSON values on both backends.
 - Key material is managed by `app/server/repositories/credential_material.py` (`CredentialEncryptionMaterialRepository`).
 - Encryption/decryption is handled by `app/server/services/cryptography.py` (`CredentialEncryptionService`).
 - No encryption key lives in source code, `.env`, or settings files.
+
+The application creates one database backend per process and injects it into
+repositories and startup services. There is no legacy database facade,
+cached database accessor, or compatibility import path.
 
 ## Reference Catalog Policy
 

@@ -35,7 +35,8 @@ test = [
     "pytest>=8.0",
     "pytest-asyncio>=0.25",
     "pytest-playwright>=0.5.0",
-    "ruff==0.15.9"
+    "ruff==0.15.9",
+    "pyright>=1.1.390,<2"
 ]
 geospatial-ingestion = [
     "duckdb>=1.4.0",
@@ -51,5 +52,25 @@ packages = ["server", "scripts"]
 [tool.pytest.ini_options]
 pythonpath = [".", ".."]
 asyncio_mode = "auto"
+
+[tool.pyright]
+include = [
+    "app.py",
+    "api/conversations.py",
+    "domain/agent_runs.py",
+    "repositories/database/backend.py",
+    "repositories/database/contracts.py",
+    "repositories/database/initializer.py",
+    "services/agent/direct_turn_response.py",
+    "services/agent_runs/lifecycle.py",
+    "services/chat/composition.py",
+    "services/geospatial/composition.py",
+]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+extraPaths = [".."]
+venvPath = "."
+venv = ".venv"
 
 

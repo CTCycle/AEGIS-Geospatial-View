@@ -29,15 +29,13 @@ class ChatModelLibraryService:
         self,
         *,
         ollama_tool_capability_cache: OllamaToolCapabilityCache | None = None,
-        provider_factory: LLMFactory | None = None,
+        provider_factory: LLMFactory,
         ollama_unavailable_ttl_s: float = 20.0,
     ) -> None:
         self.ollama_tool_capability_cache = (
             ollama_tool_capability_cache or OllamaToolCapabilityCache()
         )
-        self.provider_factory = provider_factory or LLMFactory(
-            ollama_tool_capability_cache=self.ollama_tool_capability_cache
-        )
+        self.provider_factory = provider_factory
         self.ollama_unavailable_ttl_s = ollama_unavailable_ttl_s
         self._ollama_unavailable_cache: dict[str, _CachedOllamaFailure] = {}
 

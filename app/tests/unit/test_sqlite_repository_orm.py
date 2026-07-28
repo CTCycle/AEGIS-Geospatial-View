@@ -4,6 +4,7 @@ from pathlib import Path
 
 from server.configurations import DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.database.initializer import initialize_database
 from server.common.constants import REFERENCE_GEOSPATIAL_LAYERS_TABLE_NAME
 
 ###############################################################################
@@ -24,7 +25,7 @@ def test_upsert_adds_new_rows_and_updates_existing_rows(tmp_path) -> None:
             insert_batch_size=2,
         )
     )
-    repository.ensure_schema()
+    initialize_database(repository)
 
     repository.upsert_into_database(
         [
@@ -85,7 +86,7 @@ def test_upsert_handles_canonical_conversation_key(tmp_path) -> None:
             insert_batch_size=2,
         )
     )
-    repository.ensure_schema()
+    initialize_database(repository)
 
     repository.upsert_into_database(
         [

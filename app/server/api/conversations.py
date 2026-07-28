@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 from fastapi.responses import StreamingResponse
 
 from server.common.paths import (
+    FASTAPI_API_PREFIX,
     CONVERSATION_RUN_CANCEL_ROUTE,
     CONVERSATION_RUN_EVENTS_ROUTE,
     CONVERSATION_RUN_STEERING_ROUTE,
@@ -40,6 +41,13 @@ def get_run_event_stream_service(request: Request) -> RunEventStreamService:
     return request.app.state.run_event_stream_service
 
 ###############################################################################
+def _run_stream_url(conversation_id: str, run_id: str) -> str:
+    return FASTAPI_API_PREFIX + CONVERSATIONS_ROUTER_PREFIX + CONVERSATION_RUN_EVENTS_ROUTE.format(
+        conversation_id=conversation_id,
+        run_id=run_id,
+    )
+
+###############################################################################
 @router.post(
     CONVERSATIONS_ROOT_ROUTE,
     response_model=ConversationCreateResponse,
@@ -63,7 +71,11 @@ async def create_agent_run(
     lifecycle_service: RunLifecycleService = Depends(get_run_lifecycle_service),
 ) -> AgentRunCreateResponse:
     try:
-        return await lifecycle_service.create_run(conversation_id, payload)
+        result = await lifecycle_service.create_run(conversation_id, payload)
+        return AgentRunCreateResponse(
+            **result.model_dump(),
+            stream_url=_run_stream_url(result.conversation_id, result.run_id),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except RunConflictError as exc:

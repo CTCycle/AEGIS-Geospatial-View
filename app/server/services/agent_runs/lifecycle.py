@@ -2,15 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
-from server.common.paths import (
-    FASTAPI_API_PREFIX,
-    CONVERSATIONS_ROUTER_PREFIX,
-    CONVERSATION_RUN_EVENTS_ROUTE,
-)
 from server.domain.agent_runs import (
     AgentRunCancelResponse,
     AgentRunCreateRequest,
-    AgentRunCreateResponse,
+    AgentRunCreateResult,
     AgentRunState,
     ConversationCreateResponse,
     TERMINAL_RUN_STATES,
@@ -58,7 +53,7 @@ class RunLifecycleService:
         self,
         conversation_id: str,
         payload: AgentRunCreateRequest,
-    ) -> AgentRunCreateResponse:
+    ) -> AgentRunCreateResult:
         self.conversation_repository.verify_conversation_access(conversation_id, None)
         active = self.run_repository.get_active_run_for_conversation(conversation_id)
         if active is not None and active.state not in TERMINAL_RUN_STATES:
@@ -73,20 +68,22 @@ class RunLifecycleService:
         task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
-        return AgentRunCreateResponse(
+        return AgentRunCreateResult(
             conversation_id=conversation_id,
             run_id=run.run_id,
             run_version=run.active_run_version,
             state=run.state,
-            stream_url=(
-                FASTAPI_API_PREFIX
-                + CONVERSATIONS_ROUTER_PREFIX
-                + CONVERSATION_RUN_EVENTS_ROUTE.format(
-                conversation_id=conversation_id,
-                run_id=run.run_id,
-                )
-            ),
         )
+
+    # -------------------------------------------------------------------------
+    async def shutdown(self) -> None:
+        tasks = set(self._tasks)
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._tasks.clear()
 
     # -------------------------------------------------------------------------
     async def cancel_run(self, conversation_id: str, run_id: str) -> AgentRunCancelResponse:

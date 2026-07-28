@@ -34,13 +34,13 @@ class ParserService:
     def __init__(
         self,
         *,
-        llm_factory: LLMFactory | None = None,
-        settings_repo: ModelSettingsRepository | None = None,
+        llm_factory: LLMFactory,
+        settings_repo: ModelSettingsRepository,
         provider: str | None = None,
         model: str | None = None,
     ) -> None:
-        self.llm_factory = llm_factory or LLMFactory()
-        self.settings_repo = settings_repo or ModelSettingsRepository()
+        self.llm_factory = llm_factory
+        self.settings_repo = settings_repo
         self.provider = provider
         self.model = model
         self.last_context_usage: dict[str, object] | None = None

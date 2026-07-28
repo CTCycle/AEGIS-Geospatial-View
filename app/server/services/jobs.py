@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 import time
 from datetime import UTC, datetime
@@ -24,6 +25,8 @@ from server.domain.jobs import (
     JobCancelResponse,
 )
 from server.services.chat.streaming import ChatStreamingService
+
+LOGGER = logging.getLogger(__name__)
 
 ###############################################################################
 def _utc_now() -> datetime:
@@ -145,8 +148,9 @@ class BackgroundJobService:
                 continue
             try:
                 asyncio.run(self._execute_job(claimed))
-            except Exception as exc:  # noqa: BLE001
-                self._fail_job(claimed.job_id, {"message": str(exc) or "Unexpected job failure"})
+            except Exception:  # noqa: BLE001
+                LOGGER.exception("Unexpected background job failure")
+                self._fail_job(claimed.job_id, {"message": "Unexpected job failure"})
 
     # -------------------------------------------------------------------------
     def _claim_next_job(self) -> BackgroundJob | None:

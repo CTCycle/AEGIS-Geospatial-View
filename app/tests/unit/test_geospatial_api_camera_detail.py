@@ -5,12 +5,40 @@ from fastapi.testclient import TestClient
 from server.api import geospatial
 from server.app import create_app
 from server.services.geospatial.api_service import GeospatialApiService
+from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.manifest_loader import GeospatialManifestLoader
+from server.services.geospatial.runtime_registry import RuntimeRegistry
 
 ###############################################################################
 def create_started_client() -> TestClient:
     client = TestClient(create_app())
     client.__enter__()
     return client
+
+###############################################################################
+class _NoCredentials:
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN201
+        return None
+
+###############################################################################
+def _service_dependencies() -> dict[str, object]:
+    manifest_loader = GeospatialManifestLoader()
+    runtime_registry = RuntimeRegistry(
+        manifest_loader=manifest_loader,
+        credentials_repo=_NoCredentials(),  # type: ignore[arg-type]
+    )
+    return {
+        "catalog_service": GeospatialCatalogService(
+            capability_registry=CapabilityRegistry(manifest_loader=manifest_loader),
+            runtime_registry=runtime_registry,
+        ),
+        "manifest_loader": manifest_loader,
+        "runtime_registry": runtime_registry,
+        "provider_registry": object(),
+    }
 
 ###############################################################################
 def test_camera_detail_uses_provider_backed_lookup() -> None:
@@ -42,7 +70,7 @@ def test_camera_detail_uses_provider_backed_lookup() -> None:
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = (
-        lambda: CameraService()
+        lambda: CameraService(**_service_dependencies())
     )
 
     response = client.get("/api/geospatial/cameras/windy_webcams%2Fcamera-1")
@@ -70,7 +98,7 @@ def test_camera_detail_preserves_safe_fallback_without_provider_data() -> None:
 
     client = create_started_client()
     client.app.dependency_overrides[geospatial.get_geospatial_api_service] = (
-        lambda: MissingCredentialService()
+        lambda: MissingCredentialService(**_service_dependencies())
     )
 
     response = client.get("/api/geospatial/cameras/windy%2Fcamera-1")

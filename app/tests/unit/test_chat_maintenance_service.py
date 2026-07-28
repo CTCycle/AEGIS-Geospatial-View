@@ -6,6 +6,15 @@ from server.domain.chat import (
     OllamaRefreshResponse,
 )
 from server.services.chat.maintenance_service import ChatMaintenanceService
+from server.services.chat.model_library import ChatModelLibraryService
+from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+
+###############################################################################
+class _UnusedProviderFactory:
+
+    # -------------------------------------------------------------------------
+    def get_provider(self, provider: str):  # noqa: ANN201
+        raise AssertionError(f"Unexpected provider lookup: {provider}")
 
 ###############################################################################
 def test_maintenance_service_delegates_to_ollama_provider() -> None:
@@ -51,6 +60,10 @@ def test_maintenance_service_delegates_to_ollama_provider() -> None:
             return {"ok": True, "detail": "healthy"}
     service = ChatMaintenanceService(
         get_ollama_url=lambda: "http://localhost:11434",
+        model_library_service=ChatModelLibraryService(
+            provider_factory=_UnusedProviderFactory()
+        ),
+        ollama_tool_capability_cache=OllamaToolCapabilityCache(),
         ollama_provider_factory=lambda base_url, _cache: _Provider(base_url=base_url),
     )
 

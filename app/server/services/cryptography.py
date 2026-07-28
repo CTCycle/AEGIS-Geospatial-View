@@ -44,7 +44,11 @@ class CredentialEncryptionService:
             )
             self._fernet = _load_fernet_from_material(self._material.value)
             return
-        self._material_repo = material_repo or CredentialEncryptionMaterialRepository()
+        if material_repo is None:
+            raise RuntimeError(
+                "A credential encryption material repository is required for database-backed encryption."
+            )
+        self._material_repo = material_repo
         self._material = self._material_repo.get_active_material(DEFAULT_KEY_PURPOSE)
         if self._material is None:
             raise RuntimeError(

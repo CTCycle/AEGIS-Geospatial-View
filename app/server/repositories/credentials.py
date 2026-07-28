@@ -3,15 +3,15 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from server.common.time import utc_now_naive
-from server.repositories.database.backend import get_database
+from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.schemas.models import ModelCredentialRecord
 
 ###############################################################################
 class CredentialRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self) -> None:
-        self._session_factory = get_database().backend.session
+    def __init__(self, database: DatabaseBackend) -> None:
+        self._session_factory = database.session
 
     # -------------------------------------------------------------------------
     def upsert(

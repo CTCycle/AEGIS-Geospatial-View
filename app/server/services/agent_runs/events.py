@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from server.domain.run_events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
 from server.repositories.agent_run_events import AgentRunEventRepository
@@ -20,11 +20,11 @@ class RunEventPublisher:
     # -------------------------------------------------------------------------
     def __init__(
         self,
-        event_repository: AgentRunEventRepository | None = None,
+        event_repository: AgentRunEventRepository,
         *,
         subscriber_queue_size: int = 100,
     ) -> None:
-        self.event_repository = event_repository or AgentRunEventRepository()
+        self.event_repository = event_repository
         self.subscriber_queue_size = subscriber_queue_size
         self._subscribers: dict[str, set[asyncio.Queue[RunEvent | None]]] = defaultdict(set)
         self._lock = asyncio.Lock()
@@ -37,7 +37,7 @@ class RunEventPublisher:
         run_id: str,
         run_version: int,
         type: RunEventType,
-        payload: dict,
+        payload: dict[str, Any],
         visibility: RunEventVisibility = RunEventVisibility.USER,
     ) -> RunEvent:
         event = self.event_repository.append_event(
