@@ -26,6 +26,7 @@ from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
 from server.services.geospatial.providers.fema import FEMAProvider
+from server.services.geospatial.providers.fred import FREDProvider
 from server.services.geospatial.providers.geoapify import GeoapifyProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
@@ -75,6 +76,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "usgs": USGSProvider,
     "noaa": NOAAProvider,
     "fema": FEMAProvider,
+    "fred": lambda: FREDProvider(api_key=os.getenv("FRED_API_KEY")),
     "nasa_firms": lambda: NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY")),
     "opentripmap": lambda: OpenTripMapProvider(
         api_key=os.getenv("OPENTRIPMAP_API_KEY")
