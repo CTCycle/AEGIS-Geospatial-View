@@ -164,8 +164,16 @@ def _placeholder_statuses(source: str) -> list[str]:
 ###############################################################################
 def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
     metadata = manifest.metadata if isinstance(manifest.metadata, dict) else {}
-    return manifest.capability_kind == CapabilityKind.BASEMAP and bool(
+    if manifest.capability_kind != CapabilityKind.BASEMAP:
+        return False
+    # Raster XYZ basemaps expose a tile URL, while MapLibre vector basemaps
+    # expose a style document. Both are concrete render-time fetch paths.
+    return bool(
         str(metadata.get("tile_url") or "").strip()
+        or (
+            manifest.rendering_mode.value == "vector-tile"
+            and str(metadata.get("style_url") or "").strip()
+        )
     )
 
 ###############################################################################

@@ -32,6 +32,10 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `windy_webcams.py`
 - `mobility_database.py`
 
+MapLibre style basemap providers such as OpenFreeMap are rendering-only
+providers. They do not require a backend adapter; their concrete fetch path is
+the public style document consumed by the frontend renderer.
+
 ## Response Contract
 
 Adapters return normalized `ProviderResponse` objects with:

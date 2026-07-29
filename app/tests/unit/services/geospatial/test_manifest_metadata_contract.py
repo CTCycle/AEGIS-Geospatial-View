@@ -61,3 +61,10 @@ def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None
     esa_url = service.build_validation_url(overlays["esa_worldcover"])
     assert esa_url is not None
     assert "GetCapabilities" in esa_url
+
+    basemaps = {item["id"]: item for item in payload["basemaps"]}
+    openfreemap_url = service.build_validation_url(basemaps["openfreemap_liberty"])
+    assert openfreemap_url == "https://tiles.openfreemap.org/styles/liberty"
+    osm_url = service.build_validation_url(basemaps["osm_default"])
+    assert osm_url is not None
+    assert osm_url.endswith("/6/33/23.png")

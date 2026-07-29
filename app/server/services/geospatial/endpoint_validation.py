@@ -26,12 +26,16 @@ class EndpointValidationService:
             or metadata.get("url_template")
             or metadata.get("tile_url")
             or metadata.get("tile_url_template")
+            or metadata.get("style_url")
         )
         if not isinstance(raw_url, str) or not raw_url.strip():
             return None
         url = raw_url.strip().replace("{bbox}", sample_bbox)
         url = url.replace("{lat}", "41.9028").replace("{lon}", "12.4964")
+        url = url.replace("{z}", "6").replace("{x}", "33").replace("{y}", "23")
         if "{api_key}" in url:
+            return None
+        if "{" in url or "}" in url:
             return None
         manifest_type = str(manifest.get("type") or "").lower()
         if manifest_type in {"wms", "wmts"} and "request=" not in url.lower():

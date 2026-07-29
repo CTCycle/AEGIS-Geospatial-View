@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any, Callable
 
 from server.domain.geospatial.providers import ProviderRequest
@@ -43,6 +44,35 @@ PUBLIC_LIVE_CHECKS = (
             capability_id="openmeteo_weather_forecast",
             bbox=(12.45, 41.88, 12.55, 41.92),
         ),
+    ),
+    LiveCheck(
+        provider_id="overpass",
+        request=ProviderRequest(
+            capability_id="get_nearby_poi",
+            params={
+                "latitude": 41.9028,
+                "longitude": 12.4964,
+                "radius_m": 250,
+                "amenity_tags": ["cafe"],
+                "limit": 3,
+            },
+        ),
+        required_feature_count=1,
+    ),
+    LiveCheck(
+        provider_id="rainviewer",
+        request=ProviderRequest(
+            capability_id="rainviewer_precipitation_radar",
+        ),
+        required_feature_count=1,
+    ),
+    LiveCheck(
+        provider_id="pvgis",
+        request=ProviderRequest(
+            capability_id="pvgis_solar_potential",
+            bbox=(12.45, 41.88, 12.55, 41.93),
+        ),
+        required_feature_count=1,
     ),
 )
 
@@ -165,6 +195,15 @@ async def _run_check(
     try:
         response = await registry.fetch(check.provider_id, check.request)
         count = _feature_count(response.payload)
+        payload_error = response.payload.get("error")
+        if payload_error:
+            return LiveValidationCheckResult(
+                provider_id=check.provider_id,
+                capability_id=check.request.capability_id,
+                status="failed",
+                message=f"Provider returned an error payload: {payload_error}",
+                feature_count=count,
+            )
         if check.required_feature_count is not None and count < check.required_feature_count:
             return LiveValidationCheckResult(
                 provider_id=check.provider_id,
@@ -212,6 +251,10 @@ def _feature_count(payload: dict[str, Any]) -> int:
             value = summary.get(key)
             if isinstance(value, int):
                 return value
+    if isinstance(payload.get("frameCount"), int):
+        return payload["frameCount"]
+    if payload.get("yearlyKwhPerKwpEstimate") is not None:
+        return 1
     return 0
 
 ###############################################################################
@@ -231,13 +274,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Return non-zero on live validation failures.",
     )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write the machine-readable validation report to this path.",
+    )
     args = parser.parse_args(argv)
     report = asyncio.run(
         validate_live_geospatial_sources(
             include_credentialed=args.include_credentialed,
         )
     )
-    print(_format_report(report))
+    formatted = _format_report(report)
+    print(formatted)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(formatted + "\n", encoding="utf-8")
     return 0 if report.ok or not args.strict else 1
 
 
