@@ -80,7 +80,17 @@ class ToolArgumentBuilder:
         turn: TurnParseResult,
         memory_snapshot: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        arguments = self.build_location_arguments(turn, memory_snapshot)
+        location_capabilities = {
+            "get_air_quality_forecast",
+            "get_nearby_poi",
+            "get_weather_forecast",
+            "location_to_coordinates",
+        }
+        arguments = (
+            self.build_location_arguments(turn, memory_snapshot)
+            if capability_id in location_capabilities
+            else self.build_bbox_arguments(turn, memory_snapshot)
+        )
         arguments.update(self.build_temporal_arguments(turn))
         if capability_id == "get_nearby_poi":
             arguments["query"] = turn.entity_target or turn.user_text

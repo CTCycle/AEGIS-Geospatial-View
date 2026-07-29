@@ -94,9 +94,11 @@ class DeterministicToolPlanner:
                 selected.append("get_air_quality_forecast")
             elif "weather" in text or ("forecast" in text and "rain" in text):
                 selected.append("get_weather_forecast")
-            elif any(marker in text for marker in ("nearby", "poi", "amenities")):
+
+            if any(marker in text for marker in ("nearby", "poi", "amenities")):
                 selected.append("get_nearby_poi")
-            elif turn.task_class == "direct_query" and any(
+
+            if turn.task_class == "direct_query" and any(
                 marker in text for marker in ("coordinate", "latitude", "longitude")
             ):
                 selected.append("location_to_coordinates")

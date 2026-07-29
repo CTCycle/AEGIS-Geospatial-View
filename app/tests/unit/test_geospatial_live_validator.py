@@ -24,6 +24,12 @@ class _LiveValidationRegistry:
             payload = {"features": [{"id": "quake-1"}]}
         elif provider_id == "openmeteo":
             payload = {"current": {"temperature": 20}, "features": []}
+        elif provider_id == "overpass":
+            payload = {"features": [{"id": "poi-1"}]}
+        elif provider_id == "rainviewer":
+            payload = {"frameCount": 5, "tileUrl": "https://example.test/{z}/{x}/{y}.png"}
+        elif provider_id == "pvgis":
+            payload = {"yearlyKwhPerKwpEstimate": 1200.0}
         else:
             payload = {}
         return ProviderResponse(
@@ -39,11 +45,21 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
     )
 
     assert report.ok, report.model_dump()
-    assert [result.status for result in report.results] == ["passed", "passed", "passed"]
+    assert [result.status for result in report.results] == [
+        "passed",
+        "passed",
+        "passed",
+        "passed",
+        "passed",
+        "passed",
+    ]
     assert {result.provider_id for result in report.results} == {
         "nominatim",
         "usgs",
         "openmeteo",
+        "overpass",
+        "rainviewer",
+        "pvgis",
     }
 
 
@@ -54,3 +70,26 @@ def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
 
     assert result.status == "skipped"
     assert "GEOAPIFY_API_KEY" in (result.message or "")
+
+
+def test_live_validator_rejects_error_payloads() -> None:
+    class _ErrorRegistry(_LiveValidationRegistry):
+        async def fetch(self, provider_id: str, request: ProviderRequest) -> ProviderResponse:
+            return ProviderResponse(
+                capability_id=request.capability_id,
+                provider_id=provider_id,
+                payload={"error": "upstream unavailable"},
+            )
+
+    result = asyncio.run(
+        _run_check(
+            _ErrorRegistry(),
+            CREDENTIAL_LIVE_CHECKS[0].__class__(
+                provider_id="pvgis",
+                request=ProviderRequest(capability_id="pvgis_solar_potential"),
+            ),
+        )
+    )
+
+    assert result.status == "failed"
+    assert "upstream unavailable" in (result.message or "")

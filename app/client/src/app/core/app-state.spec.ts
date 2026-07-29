@@ -1,11 +1,12 @@
 import {
+  APP_STATE_STORAGE_KEY,
   defaultAppState,
   loadPersistedAppState,
   persistAppState,
 } from './app-state';
 
 describe('core/app-state', () => {
-  const storageKey = 'aegis:webapp-state:v3';
+  const storageKey = APP_STATE_STORAGE_KEY;
   const tabKey = 'aegis:webapp-tab-id:v1';
   const heartbeatPrefix = 'aegis:webapp-tab-heartbeat:v1:';
 

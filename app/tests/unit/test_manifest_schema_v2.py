@@ -22,7 +22,7 @@ def test_all_geospatial_manifests_pass_schema_v2_audit() -> None:
 
 ###############################################################################
 def test_manifest_loader_rejects_missing_schema_v2_fields() -> None:
-    manifests = Path("app/tests/artifacts/tmp_manifest_schema_v2")
+    manifests = Path(__file__).resolve().parents[2] / "artifacts" / "tmp_manifest_schema_v2"
     if manifests.exists():
         shutil.rmtree(manifests)
     basemaps = manifests / "basemaps"
