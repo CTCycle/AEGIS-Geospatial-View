@@ -257,6 +257,22 @@ def test_parser_domain_rules_preserve_view_for_street_map_basemap_only_follow_up
     assert extracted.viewport_intent.scope == "preserve_current"
 
 ###############################################################################
+def test_parser_domain_rules_select_openfreemap_styles() -> None:
+    liberty = ParserService._apply_domain_rules(
+        "Show a street map using OpenFreeMap Liberty",
+        LLMParserExtraction(),
+        {},
+    )
+    positron = ParserService._apply_domain_rules(
+        "Use the clean OpenFreeMap Positron style",
+        LLMParserExtraction(),
+        {},
+    )
+
+    assert liberty.requested_basemap == "openfreemap_liberty"
+    assert positron.requested_basemap == "openfreemap_positron"
+
+###############################################################################
 def test_parser_domain_rules_infer_city_scale_viewport_intent() -> None:
     extracted = ParserService._apply_domain_rules(
         "show the entire city",

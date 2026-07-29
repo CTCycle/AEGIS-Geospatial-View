@@ -57,13 +57,12 @@ CREDENTIAL_LIVE_CHECKS = (
         credential_env="WINDY_WEBCAMS_API_KEY",
     ),
     LiveCheck(
-        provider_id="transitland",
+        provider_id="mobility_database",
         request=ProviderRequest(
-            capability_id="transitland_feeds",
+            capability_id="mobility_database_feeds",
             bbox=(-74.1, 40.6, -73.7, 40.9),
             params={"query": "MTA", "limit": 10},
         ),
-        credential_env="TRANSITLAND_API_KEY",
     ),
 )
 

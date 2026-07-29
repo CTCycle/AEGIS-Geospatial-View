@@ -380,7 +380,6 @@ class AgentResponseBuilder:
             "GEOAPIFY_API_KEY": "Geoapify API key",
             "WINDY_WEBCAMS_API_KEY": "Windy Webcams API key",
             "osm_default": "OpenStreetMap",
-            "tomtom_basic": "TomTom Basic",
             "tomtom_traffic_flow": "TomTom Traffic Flow",
             "windy_webcams": "Windy Webcams",
         }
@@ -397,7 +396,6 @@ class AgentResponseBuilder:
             return "the default basemap"
         known_names = {
             "osm_default": "OpenStreetMap",
-            "tomtom_basic": "TomTom Basic",
             "tomtom_traffic_flow": "TomTom Traffic Flow",
         }
         if value in known_names:

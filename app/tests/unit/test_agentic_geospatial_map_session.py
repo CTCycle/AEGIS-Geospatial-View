@@ -163,7 +163,7 @@ def test_agentic_geospatial_provider_layer_selection_flows_into_map_session() ->
     assert session.failed_overlays == []
 
 ###############################################################################
-def test_agentic_geospatial_map_session_keeps_credential_warnings() -> None:
+def test_agentic_geospatial_map_session_uses_public_openfreemap_basemap() -> None:
     location = ResolvedLocation(
         label="Rome",
         latitude=41.9,
@@ -173,15 +173,15 @@ def test_agentic_geospatial_map_session_keeps_credential_warnings() -> None:
     plan = ExecutionPlan(
         state="map_search",
         action_id="traffic",
-        basemap_id="tomtom_basic",
+        basemap_id="openfreemap_liberty",
         overlay_ids=["tomtom_traffic_flow"],
     )
     request = RequestBuilder().build_location_search_request(plan, location)
 
     session = _run_async(LocationSearchOrchestrator().execute(request))
 
-    assert session.basemap_id == "osm_default"
-    assert any("provider API key is required" in item for item in session.compliance_warnings)
+    assert session.basemap_id == "openfreemap_liberty"
+    assert not any("provider API key is required" in item for item in session.compliance_warnings)
 
 ###############################################################################
 def test_agentic_geospatial_map_session_never_serializes_provider_api_keys(monkeypatch) -> None:

@@ -37,6 +37,27 @@ def _request():
     )
 
 ###############################################################################
+def test_render_descriptor_service_exposes_configurable_openfreemap_style(monkeypatch) -> None:
+    monkeypatch.setenv("OPENFREEMAP_STYLE_BASE_URL", "https://maps.internal.example")
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry({
+            "id": "openfreemap_liberty",
+            "name": "OpenFreeMap Liberty",
+            "provider": "openfreemap",
+            "metadata": {
+                "label": "OpenFreeMap Liberty",
+                "style_url": "https://tiles.openfreemap.org/styles/liberty",
+                "attribution": "OpenFreeMap",
+            },
+        }),
+    )
+
+    result = asyncio.run(service.build_basemap_descriptor("openfreemap_liberty"))
+
+    assert result is not None
+    assert result["style_url"] == "https://maps.internal.example/styles/liberty"
+
+###############################################################################
 def test_render_descriptor_service_builds_complete_wms_template() -> None:
     template = RenderDescriptorService.build_wms_tile_template(
         url="https://example.test/wms",

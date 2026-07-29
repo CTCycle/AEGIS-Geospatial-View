@@ -17,7 +17,7 @@ describe('e2e/geospatial browser smoke', () => {
   // Keep this catalog aligned with the production manifest audit's required browser scenarios.
   const documentedBrowserCoverageIds = [
     'esri_world_imagery',
-    'geoapify_osm',
+    'openfreemap_liberty',
     'osm_dark',
     'osm_terrain',
     'census_cartographic_boundaries',

@@ -47,20 +47,6 @@ class GeoapifyProvider(GeospatialProvider):
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         if not self.api_key:
             raise ProviderAuthError("Geoapify API key is required.")
-        if "osm" in request.capability_id:
-            return ProviderResponse(
-                capability_id=request.capability_id,
-                provider_id=self.provider_id,
-                payload={
-                    "renderingMode": "raster-tile",
-                    "tileUrl": (
-                        "https://maps.geoapify.com/v1/tile/osm-bright/"
-                        f"{{z}}/{{x}}/{{y}}.png?apiKey={self.api_key}"
-                    ),
-                    "credentialPolicy": "server-side-or-existing-browser-key-only",
-                },
-                attribution=["Geoapify, OpenStreetMap contributors"],
-            )
         if request.params.get("live"):
             cache_key = _cache_key(request)
             cached = self.cache.get(cache_key)

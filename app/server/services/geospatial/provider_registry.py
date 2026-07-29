@@ -48,7 +48,7 @@ from server.services.geospatial.providers.overture import OvertureProvider
 from server.services.geospatial.providers.pvgis import PVGISProvider
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
 from server.services.geospatial.providers.tomtom import TomTomProvider
-from server.services.geospatial.providers.transitland import TransitlandProvider
+from server.services.geospatial.providers.mobility_database import MobilityDatabaseProvider
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
@@ -90,9 +90,7 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "overture": OvertureProvider,
     "openaddresses": OpenAddressesProvider,
     "local_open_data": LocalOpenDataProvider,
-    "transitland": lambda: TransitlandProvider(
-        api_key=os.getenv("TRANSITLAND_API_KEY")
-    ),
+    "mobility_database": MobilityDatabaseProvider,
     "nominatim": NominatimProvider,
     "mapillary": lambda: MapillaryProvider(
         access_token=os.getenv("MAPILLARY_ACCESS_TOKEN")

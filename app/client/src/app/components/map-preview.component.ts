@@ -264,7 +264,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     const map = new maplibregl.Map({
       container: this.mapContainerRef.nativeElement,
-      style: buildStyle(this.mapSession),
+      style: this.mapSession?.basemap?.style_url || buildStyle(this.mapSession),
       center: [longitude, latitude],
       zoom: 12,
     });

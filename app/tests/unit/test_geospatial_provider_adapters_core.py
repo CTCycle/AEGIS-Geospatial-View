@@ -463,7 +463,7 @@ def test_tomtom_and_geoapify_require_keys_before_emitting_urls() -> None:
         )
     with pytest.raises(ProviderAuthError):
         asyncio.run(
-            GeoapifyProvider().fetch(ProviderRequest(capability_id="geoapify_osm"))
+            GeoapifyProvider().fetch(ProviderRequest(capability_id="geoapify_amenities"))
         )
 
 ###############################################################################
@@ -532,14 +532,15 @@ def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch
         registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
     )
     geoapify = asyncio.run(
-        registry.fetch("geoapify", ProviderRequest(capability_id="geoapify_osm"))
+        registry.fetch("geoapify", ProviderRequest(capability_id="geoapify_amenities"))
     )
 
     assert tomtom.payload["tileUrl"] == (
         "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
     )
     assert "tomtom-test" not in str(tomtom.payload)
-    assert "geoapify-test" in str(geoapify.payload["tileUrl"])
+    assert geoapify.payload["featuresEndpoint"] == "/api/geospatial/layers/geoapify_amenities/features"
+    assert "geoapify-test" not in str(geoapify.payload)
 
 ###############################################################################
 def test_geoapify_provider_normalizes_live_places() -> None:

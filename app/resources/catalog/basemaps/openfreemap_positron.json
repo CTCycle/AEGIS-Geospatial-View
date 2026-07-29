@@ -1,0 +1,75 @@
+{
+  "id": "openfreemap_positron",
+  "name": "OpenFreeMap Positron",
+  "provider": "openfreemap",
+  "type": "style",
+  "description": "OpenFreeMap Positron light vector basemap for clean presentation maps.",
+  "capabilities": ["style"],
+  "coverage": "global",
+  "metadata": {
+    "label": "OpenFreeMap Positron",
+    "style_url": "https://tiles.openfreemap.org/styles/positron",
+    "attribution": "OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+    "requires_key": false,
+    "keywords": ["light", "clean", "presentation", "positron"],
+    "map_type_tags": ["street", "vector", "light"],
+    "action_tags": ["presentation", "clean_layout"],
+    "task_tags": ["places", "urban"],
+    "coverage_scope": "global",
+    "temporal_behavior": "static style with periodically refreshed tiles",
+    "constraints": "public service without a contractual SLA; self-hosting is supported",
+    "official_docs_url": "https://openfreemap.org/quick_start/",
+    "source_protocol": "maplibre-style",
+    "data_format": "MapLibre Style JSON",
+    "geometry_type": "vector-tile",
+    "queryable": false,
+    "endpoint_health": "validated-by-sampled-health-check",
+    "auth_mode": "none",
+    "rate_limit_notes": "public service; configure a self-hosted style endpoint for dependable production operation",
+    "retrieval_mode": "direct",
+    "openlayers_compatible": false,
+    "last_validated": "2026-07-29"
+  },
+  "version": 2,
+  "last_modified": "2026-07-29T00:00:00+00:00",
+  "capabilityKind": "basemap",
+  "renderingMode": "vector-tile",
+  "sourceOfficialDocs": ["https://openfreemap.org/quick_start/"],
+  "license": {
+    "name": "OpenFreeMap © OpenMapTiles © OpenStreetMap contributors",
+    "url": "https://openfreemap.org/tos/",
+    "attributionRequired": true,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "yes"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": true,
+    "plannerHints": ["presentation", "clean_layout", "places", "urban", "light"],
+    "requiredUserAction": [],
+    "avoidWhen": ["general chat", "no geographic context"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-07-29",
+    "knownLimitations": ["Public instance has no contractual SLA."]
+  },
+  "cachePolicy": {
+    "mode": "none",
+    "ttlSeconds": 0,
+    "staleWhileRevalidateSeconds": 0
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": null,
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "vector-tile"
+  }
+}

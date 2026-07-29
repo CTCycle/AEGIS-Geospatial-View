@@ -3,9 +3,8 @@
   "name": "TomTom",
   "provider": "tomtom",
   "type": "provider",
-  "description": "TomTom map and traffic tiles (API key required).",
+  "description": "TomTom traffic services (API key required).",
   "capabilities": [
-    "tile",
     "traffic"
   ],
   "coverage": "global",
@@ -14,13 +13,11 @@
     "commercial_notes": "Commercial use allowed under TomTom terms.",
     "warning_level": "medium",
     "keywords": [
-      "tile",
       "traffic",
       "tomtom",
       "tomtom"
     ],
     "action_tags": [
-      "tile",
       "traffic"
     ],
     "task_tags": [

@@ -14,7 +14,6 @@ Common keys include:
 - `UI_HOST`
 - `UI_PORT`
 - `RELOAD`
-- `OPTIONAL_DEPENDENCIES`
 - `BACKEND_LOGS_VISIBLE`
 - `ALWAYS_REBUILD`
 - `EMBEDDED_DATABASE`
@@ -54,6 +53,5 @@ for the embedded SQLite database. When unset, the embedded database defaults to
 
 Source template: `settings/.env.example`
 
-- `OPTIONAL_DEPENDENCIES=true`
 - `BACKEND_LOGS_VISIBLE=true` shows backend logs in a dedicated terminal; when absent, the launcher defaults to `true`
 - intended for the local web workflow

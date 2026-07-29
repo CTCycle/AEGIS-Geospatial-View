@@ -244,6 +244,7 @@ export interface MapSession {
     label?: string;
     provider?: string;
     tile_url?: string | null;
+    style_url?: string | null;
     attribution?: string;
   };
   overlays?: Array<{

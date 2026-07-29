@@ -1,6 +1,6 @@
 # Capability Catalog
 
-Last updated: 2026-06-02
+Last updated: 2026-07-29
 
 ## Purpose
 
@@ -12,14 +12,16 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | --- | --- | --- |
 | `eea` | EU/EEA environmental overlays | public |
 | `esa` | WorldCover land-use context | public |
-| `geoapify` | optional OSM-derived basemap and amenities | credentialed |
+| `geoapify` | optional OSM-derived amenities | credentialed |
 | `gibs` | satellite and earth-observation layers | public |
 | `openaq` | air-quality station observations | credentialed |
 | `openmeteo` | weather and air-quality forecasts | public |
 | `overpass` | OpenStreetMap POI queries | public |
 | `pvgis` | solar irradiation and photovoltaic estimates | public |
 | `rainviewer` | precipitation radar tiles | public |
-| `tomtom` | optional road basemap and live traffic | credentialed |
+| `tomtom` | optional live traffic | credentialed |
+| `openfreemap` | public MapLibre basemap styles | public |
+| `mobility_database` | local GTFS and GTFS-Realtime feed metadata catalog | public |
 | `census` | U.S. geometry and demographic joins | public with optional key for some APIs |
 | `eurostat` | EU/EEA demographic and market indicators | public |
 | `fred` | U.S. economic and market indicators | credentialed |
@@ -32,8 +34,8 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `osm_dark` | high-contrast dark basemap | public |
 | `osm_terrain` | terrain-oriented context | public |
 | `esri_world_imagery` | satellite imagery context | public |
-| `geoapify_osm` | polished OSM Bright variant | credentialed |
-| `tomtom_basic` | optional road and transport basemap | credentialed |
+| `openfreemap_liberty` | public Liberty vector basemap | public |
+| `openfreemap_positron` | public Positron light vector basemap | public |
 
 ## Layers
 
@@ -55,6 +57,7 @@ Representative implemented layers include:
 - `openmeteo_air_quality_forecast`
 - `openmeteo_weather_forecast`
 - `overpass_poi_amenities`
+- `overture_maps_places`
 - `pvgis_solar`
 - `rainviewer_precipitation_radar`
 - `SRTM_Color_Index`
@@ -64,6 +67,7 @@ Representative implemented layers include:
 - `census_tigerweb_hydrography`
 - `census_tigerweb_demographics`
 - `openmeteo_pressure_humidity_wind`
+- `mobility_database_feeds`
 - `fred_regional_market_indicators`
 - `eurostat_regional_demographics`
 - `eurostat_housing_market`

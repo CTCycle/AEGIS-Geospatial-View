@@ -1,6 +1,14 @@
 # Public And Optional Sources
 
-Last updated: 2026-06-19
+Last updated: 2026-07-29
+
+## Canonical POI path
+
+Overture Places is the primary bulk POI source after local ingestion into the configured GeoJSON index (`AEGIS_OVERTURE_PLACES_INDEX`). Interactive requests are bounded by bounding box, category, query, and limit. Overpass can be requested as an augmentation source with `augment_overpass=true`; results are normalized and deduplicated through the shared POI model.
+
+Geoapify amenities and OpenTripMap tourism POIs remain available while representative-location parity benchmarks are incomplete. Removal requires the benchmark report to meet its recall, precision, completeness, and duplicate-rate thresholds.
+
+Run `python -m server.services.geospatial.poi_benchmark --baseline <provider-payload.json> --candidate <overture-or-overpass-payload.json> --output assets/QA/poi_parity_report.json` against captured representative-location payloads. The command returns success only when all configured parity thresholds pass.
 
 ## Public Sources
 
@@ -56,7 +64,7 @@ Use for EU or EEA environmental noise layers.
 
 ### Geoapify
 
-Use for optional polished basemaps and amenities.
+Use for optional amenities overlays; OpenFreeMap and native OpenStreetMap styles provide the public basemap path.
 
 - Configure `GEOAPIFY_API_KEY` or Access credentials.
 - Review Places API quotas and pricing.
@@ -64,7 +72,7 @@ Use for optional polished basemaps and amenities.
 
 ### TomTom
 
-Use for optional road basemap and traffic flow layers.
+Use for optional traffic flow and incident layers; it is no longer a basic basemap source.
 
 - Configure `TOMTOM_API_KEY` or Access credentials.
 - Coverage and refresh cadence vary by region.
@@ -90,7 +98,8 @@ Use for tourism-oriented points of interest.
 
 Use for EV charging station discovery.
 
-- Configure `OPENCHARGEMAP_API_KEY` when deployment volume or endpoint policy requires it.
+- Hosted requests require `OPENCHARGEMAP_API_KEY`; anonymous hosted access is not treated as reliable.
+- Prototype local snapshots with `AEGIS_OCM_SNAPSHOT_PATH` for bounded, keyless reads.
 - Bound requests by viewport, radius, and result count.
 - Cache station metadata and degrade gracefully on stale or empty results.
 
@@ -99,6 +108,7 @@ Use for EV charging station discovery.
 Use for U.S. alternative fuel station discovery.
 
 - Configure `NREL_API_KEY` or Access credentials.
+- Prototype official current-data snapshots with `AEGIS_AFDC_SNAPSHOT_PATH`; keep the hosted API credential-gated until freshness and schema parity are validated.
 - Use bounded searches only.
 - Keep fuel type, access, and station status visible in normalized metadata.
 

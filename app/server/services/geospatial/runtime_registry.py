@@ -26,7 +26,6 @@ class RuntimeRegistry:
         "opentripmap": "OPENTRIPMAP_API_KEY",
         "sentinel_hub": "SENTINEL_HUB_CLIENT_ID",
         "tomtom": "TOMTOM_API_KEY",
-        "transitland": "TRANSITLAND_API_KEY",
         "windy_webcams": "WINDY_WEBCAMS_API_KEY",
     }
 

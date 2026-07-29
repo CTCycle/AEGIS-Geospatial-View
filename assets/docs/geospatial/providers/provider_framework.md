@@ -29,6 +29,7 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `tomtom.py`
 - `usgs.py`
 - `windy_webcams.py`
+- `mobility_database.py`
 
 ## Response Contract
 
@@ -55,6 +56,7 @@ These methods return normalized provider layer descriptors. NASA GIBS parses WMS
 - 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced as safe payloads without leaking credentials.
 - Hazard providers include legends and freshness labels where applicable.
 - Local open-data camera templates read configured JSON source URLs or files through `LOCAL_OPEN_DATA_SOURCES`.
+- Mobility Database discovery reads a local CSV snapshot and refreshes it from the public catalog only when the snapshot is missing or explicitly requested; each feed's authentication and license metadata is preserved.
 - Provider adapters must not return credentials or raw capability XML to frontend API responses.
 
 ## Dataset Processing Boundary

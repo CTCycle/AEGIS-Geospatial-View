@@ -12,7 +12,7 @@ from server.services.geospatial.providers.base import (
     safe_request_params,
 )
 from server.services.geospatial.providers.nominatim import NominatimProvider
-from server.services.geospatial.providers.transitland import TransitlandProvider
+from server.services.geospatial.providers.mobility_database import MobilityDatabaseProvider
 
 ###############################################################################
 class _FeatureOnlyProvider:
@@ -98,35 +98,19 @@ def test_nominatim_provider_geocodes_live_contract_payload() -> None:
     assert response.payload["results"][0]["latitude"] == 41.8933
 
 ###############################################################################
-def test_transitland_provider_queries_bounded_feed_discovery() -> None:
-    calls: list[tuple[str, dict[str, str] | None]] = []
-
-    async def fetcher(url: str, headers: dict[str, str] | None = None):
-        calls.append((url, headers))
-        return {
-            "feeds": [
-                {
-                    "id": "f-test",
-                    "name": "Example Transit",
-                    "urls": {
-                        "static_current": "https://agency.example/gtfs.zip",
-                        "realtime_alerts": "https://agency.example/alerts.pb",
-                    },
-                }
-            ]
-        }
-
+def test_mobility_database_provider_searches_local_snapshot(tmp_path) -> None:
+    catalog = tmp_path / "feeds.csv"
+    catalog.write_text(
+        "mdb_source_id,provider,name,urls.latest,urls.license,urls.authentication_type\n"
+        "f-test,Example Transit,Example Transit,https://agency.example/gtfs.zip,https://agency.example/license,1\n",
+        encoding="utf-8",
+    )
     response = asyncio.run(
-        TransitlandProvider(api_key="transitland-test", fetcher=fetcher).fetch(
-            ProviderRequest(
-                capability_id="transitland_feeds",
-                bbox=(-1.0, 2.0, 3.0, 4.0),
-                params={"query": "Example"},
-            )
+        MobilityDatabaseProvider(catalog_path=catalog).fetch(
+            ProviderRequest(capability_id="mobility_database_feeds", params={"query": "Example"})
         )
     )
 
-    assert "bbox=-1.0%2C2.0%2C3.0%2C4.0" in calls[0][0]
-    assert calls[0][1] == {"apikey": "transitland-test", "Accept": "application/json"}
     assert response.payload["feedCount"] == 1
     assert response.payload["feeds"][0]["staticFeedUrl"].endswith("gtfs.zip")
+    assert response.payload["feeds"][0]["authentication"]["required"] is True

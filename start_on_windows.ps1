@@ -164,7 +164,6 @@ function Import-EnvironmentFile {
         UI_HOST = '127.0.0.1'
         UI_PORT = '8001'
         RELOAD = 'false'
-        OPTIONAL_DEPENDENCIES = 'false'
         BACKEND_LOGS_VISIBLE = 'true'
         ALWAYS_REBUILD = 'true'
     }
@@ -254,7 +253,9 @@ function Ensure-PortableRuntimes {
 
 function Sync-Dependencies {
     param(
-        [bool]$BuildFrontend = $true
+        [bool]$BuildFrontend = $true,
+        [ValidateSet('Standard', 'Development')]
+        [string]$InstallationType = 'Standard'
     )
 
     Write-Status STEP 'Installing Python dependencies with uv'
@@ -262,7 +263,7 @@ function Sync-Dependencies {
     if (Test-Path -LiteralPath (Join-Path $ServerDir 'uv.lock')) {
         $uvArguments += '--locked'
     }
-    if ($env:OPTIONAL_DEPENDENCIES -ieq 'true') {
+    if ($InstallationType -eq 'Development') {
         $uvArguments += '--all-extras'
     }
     Push-Location $ServerDir
@@ -300,6 +301,40 @@ function Sync-Dependencies {
     finally {
         Pop-Location
     }
+}
+
+function Test-DependenciesReady {
+    $frontendPackage = Join-Path $ClientDir 'package.json'
+    $frontendLock = Join-Path $ClientDir 'package-lock.json'
+    $frontendModules = Join-Path $ClientDir 'node_modules'
+    $frontendInstallState = Join-Path $frontendModules '.package-lock.json'
+    $frontendRunner = Join-Path $frontendModules '@angular/cli/bin/ng.js'
+    $backendEntrypoint = Join-Path $ServerDir 'app.py'
+    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+
+    if (-not (Test-Path -LiteralPath $PythonExe) -or
+        -not (Test-Path -LiteralPath $UvExe) -or
+        -not (Test-Path -LiteralPath $NodeExe) -or
+        -not (Test-Path -LiteralPath $NpmCmd) -or
+        -not (Test-Path -LiteralPath $venvPython) -or
+        -not (Test-Path -LiteralPath $backendEntrypoint) -or
+        -not (Test-Path -LiteralPath $frontendPackage) -or
+        -not (Test-Path -LiteralPath $frontendLock) -or
+        -not (Test-Path -LiteralPath $frontendInstallState) -or
+        -not (Test-Path -LiteralPath $frontendRunner)) {
+        return $false
+    }
+
+    & $PythonExe --version *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & $UvExe --version *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & $NodeExe --version *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & $venvPython -c 'import fastapi, uvicorn' *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+
+    return $true
 }
 
 function Get-PortListenerPids {
@@ -341,8 +376,14 @@ function Get-BrowserHost {
 function Invoke-LaunchApplication {
     Import-EnvironmentFile
     Set-LauncherEnvironment
-    Ensure-PortableRuntimes
-    Sync-Dependencies -BuildFrontend ($env:ALWAYS_REBUILD -ieq 'true')
+    if (-not (Test-DependenciesReady)) {
+        Write-Status STEP 'Required application environments are missing or unusable; installing dependencies.'
+        Ensure-PortableRuntimes
+        Sync-Dependencies -BuildFrontend ($env:ALWAYS_REBUILD -ieq 'true') -InstallationType 'Standard'
+    }
+    else {
+        Write-Status OK 'Application environments are ready; skipped dependency installation.'
+    }
 
     $fastApiPort = [int]$env:FASTAPI_PORT
     $uiPort = [int]$env:UI_PORT
@@ -412,14 +453,24 @@ function Invoke-LaunchApplication {
 }
 
 function Invoke-InstallOrUpdate {
+    $installationType = Read-InstallationType
     Import-EnvironmentFile
     Set-LauncherEnvironment
     Ensure-PortableRuntimes
-    Sync-Dependencies
+    Sync-Dependencies -InstallationType $installationType
     if (Test-Path -LiteralPath $UvCacheDir) {
         Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
     }
     Write-Status SUCCESS 'Dependencies installed, frontend built, and uv cache pruned.'
+}
+
+function Read-InstallationType {
+    $selection = (Read-Host 'Installation type [1=Development, 2=Standard]').Trim()
+    switch ($selection) {
+        '1' { return 'Development' }
+        '2' { return 'Standard' }
+        default { throw 'Invalid installation type. Enter 1 for Development or 2 for Standard.' }
+    }
 }
 
 function Invoke-InitializeDatabase {

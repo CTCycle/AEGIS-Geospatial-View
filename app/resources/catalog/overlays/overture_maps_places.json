@@ -37,11 +37,11 @@
     "endpoint_health": "partial",
     "auth_mode": "none",
     "official_docs_url": "https://docs.overturemaps.org/",
-    "last_validated": "2026-05-11",
+    "last_validated": "2026-07-29",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
   "version": 1,
-  "last_modified": "2026-05-11T00:00:00+00:00",
+  "last_modified": "2026-07-29T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "clustered-points",
   "sourceOfficialDocs": [
@@ -59,7 +59,7 @@
     "required": false
   },
   "agenticUse": {
-    "defaultEnabled": false,
+    "defaultEnabled": true,
     "manualToggle": false,
     "plannerHints": [
       "overture",
@@ -79,9 +79,9 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
+    "lastAudited": "2026-07-29",
     "knownLimitations": [
-      "Parquet processing requires optional ingestion dependencies."
+      "Interactive queries require an ingested local GeoJSON index; Overpass augmentation is bounded and optional."
     ]
   },
   "cachePolicy": {

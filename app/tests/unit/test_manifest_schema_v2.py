@@ -101,5 +101,5 @@ def test_loaded_manifests_expose_v2_capability_kinds() -> None:
     assert any(item["capabilityKind"] == "metadata-only" for item in overlays)
     assert any(item["renderingMode"] == "clustered-points" for item in overlays)
     assert {item["id"] for item in transit}.issuperset(
-        {"gtfs_static", "gtfs_realtime", "transitland_feeds"}
+        {"gtfs_static", "gtfs_realtime", "mobility_database_feeds"}
     )
