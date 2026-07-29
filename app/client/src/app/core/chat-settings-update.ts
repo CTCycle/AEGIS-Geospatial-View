@@ -1,11 +1,17 @@
 import { ModelSettingsResponse, ModelSettingsUpdateRequest } from './types';
 
-export type CloudCredentialProvider = 'openai' | 'google' | 'deepseek';
+export type CloudCredentialProvider = 'openai' | 'google' | 'deepseek' | 'opencode' | 'opencode-go';
 export type ModelProviderFilter = 'all' | 'ollama' | CloudCredentialProvider;
 export type ApiKeyValidationErrors = Partial<Record<CloudCredentialProvider, string>>;
 export type CloudCredentialDrafts = Record<CloudCredentialProvider, string>;
 
-export const CLOUD_CREDENTIAL_PROVIDERS: readonly CloudCredentialProvider[] = ['openai', 'google', 'deepseek'];
+export const CLOUD_CREDENTIAL_PROVIDERS: readonly CloudCredentialProvider[] = [
+  'openai',
+  'google',
+  'deepseek',
+  'opencode',
+  'opencode-go',
+];
 
 export const buildSettingsUpdateBase = (
   settings: ModelSettingsResponse,

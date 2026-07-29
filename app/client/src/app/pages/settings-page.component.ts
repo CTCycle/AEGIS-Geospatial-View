@@ -40,6 +40,14 @@ import {
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
 
+type DynamicCloudProvider = 'deepseek' | 'opencode' | 'opencode-go';
+
+const DYNAMIC_CLOUD_PROVIDERS: readonly DynamicCloudProvider[] = [
+  'deepseek',
+  'opencode',
+  'opencode-go',
+];
+
 @Component({
   selector: 'app-settings-page',
   standalone: true,
@@ -80,19 +88,23 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   statusText: string;
   isLoadingModels = false;
   isRefreshingOllama = false;
-  isLoadingDeepSeekModels = false;
+  isLoadingDynamicProviderModels = false;
 
   isKeysModalOpen = false;
   isOllamaModalOpen = false;
   openaiKey = '';
   googleKey = '';
   deepseekKey = '';
+  opencodeKey = '';
+  opencodeGoKey = '';
   ollamaUrlDraft = 'http://127.0.0.1:11434';
   keysModalStatusText = '';
   ollamaModalStatusText = '';
   keyValidationErrors: ApiKeyValidationErrors = {};
   ollamaStatus: ModelLibrarySourceStatus | null = null;
   deepseekStatus: ModelLibrarySourceStatus | null = null;
+  opencodeStatus: ModelLibrarySourceStatus | null = null;
+  opencodeGoStatus: ModelLibrarySourceStatus | null = null;
 
   providerFilter: ModelProviderFilter = 'all';
   private isDestroyed = false;
@@ -228,6 +240,36 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.deepseekStatus?.message || 'Could not load DeepSeek models right now.';
   }
 
+  get dynamicProvider(): DynamicCloudProvider | null {
+    if (this.isDynamicCloudProvider(this.providerFilter)) {
+      return this.providerFilter;
+    }
+    if (this.isDynamicCloudProvider(this.settings.agent_model_provider)) {
+      return this.settings.agent_model_provider;
+    }
+    return null;
+  }
+
+  get dynamicProviderStatus(): ModelLibrarySourceStatus | null {
+    const provider = this.dynamicProvider;
+    if (provider === 'deepseek') return this.deepseekStatus;
+    if (provider === 'opencode') return this.opencodeStatus;
+    if (provider === 'opencode-go') return this.opencodeGoStatus;
+    return null;
+  }
+
+  get dynamicProviderLabel(): string {
+    return this.dynamicProvider ? providerDisplayLabel(this.dynamicProvider) : 'Cloud provider';
+  }
+
+  get dynamicProviderLoadFailed(): boolean {
+    return this.dynamicProviderStatus !== null && !this.dynamicProviderStatus.ok;
+  }
+
+  get dynamicProviderFailureMessage(): string {
+    return this.dynamicProviderStatus?.message || `Could not load ${this.dynamicProviderLabel} models right now.`;
+  }
+
   setSearchText(value: string): void {
     this.searchText = value;
     this.syncQueryState();
@@ -288,7 +330,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async saveKeys(): Promise<void> {
     this.keyValidationErrors = this.validateKeyInputs();
-    if (this.keyValidationErrors.openai || this.keyValidationErrors.google || this.keyValidationErrors.deepseek) {
+    if (Object.keys(this.keyValidationErrors).length > 0) {
       this.keysModalStatusText = 'Fix the highlighted API key fields before saving.';
       return;
     }
@@ -298,15 +340,17 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         openai: this.openaiKey,
         google: this.googleKey,
         deepseek: this.deepseekKey,
+        opencode: this.opencodeKey,
+        'opencode-go': this.opencodeGoKey,
       });
       this.settings = updated;
       this.openaiKey = '';
       this.googleKey = '';
       this.deepseekKey = '';
+      this.opencodeKey = '';
+      this.opencodeGoKey = '';
       await this.ensureProviderModelsLoaded(
-        this.providerFilter === 'deepseek' || this.hasSelectedProvider(updated, 'deepseek')
-          ? 'deepseek'
-          : 'all',
+        this.dynamicProviderForSettings(updated) ?? 'all',
         true,
       );
       this.statusText = 'API keys saved';
@@ -431,6 +475,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return Boolean(this.settings.credentials['deepseek']?.['api_key']);
   }
 
+  opencodeConfigured(): boolean {
+    return Boolean(this.settings.credentials.opencode?.['api_key']);
+  }
+
+  opencodeGoConfigured(): boolean {
+    return Boolean(this.settings.credentials['opencode-go']?.['api_key']);
+  }
+
   openAiCredentialHealth(): string | null {
     return this.credentialHealth('openai');
   }
@@ -441,6 +493,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   deepSeekCredentialHealth(): string | null {
     return this.credentialHealth('deepseek');
+  }
+
+  opencodeCredentialHealth(): string | null {
+    return this.credentialHealth('opencode');
+  }
+
+  opencodeGoCredentialHealth(): string | null {
+    return this.credentialHealth('opencode-go');
   }
 
   requiresPull(model: ModelCardDescriptor): boolean {
@@ -483,6 +543,19 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return errors;
   }
 
+  private isDynamicCloudProvider(value: string): value is DynamicCloudProvider {
+    return DYNAMIC_CLOUD_PROVIDERS.includes(value as DynamicCloudProvider);
+  }
+
+  private dynamicProviderForSettings(settings: ModelSettingsResponse): DynamicCloudProvider | null {
+    if (this.isDynamicCloudProvider(this.providerFilter)) {
+      return this.providerFilter;
+    }
+    return this.isDynamicCloudProvider(settings.agent_model_provider)
+      ? settings.agent_model_provider
+      : null;
+  }
+
   private async loadData(): Promise<void> {
     this.isLoadingModels = true;
     this.statusText = 'Loading model settings';
@@ -492,11 +565,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.apiClient.fetchChatSettings(),
         this.apiClient.fetchChatModels(),
       ]);
-      const needsDeepSeekLibrary = this.shouldLoadDeepSeekModels(nextSettings);
+      const dynamicProvider = this.dynamicProviderForSettings(nextSettings);
       let modelLibrary = baseLibrary;
-      if (needsDeepSeekLibrary) {
-        const deepseekLibrary = await this.apiClient.fetchChatModels('deepseek');
-        modelLibrary = this.mergeModelLibraries(baseLibrary, deepseekLibrary);
+      if (dynamicProvider) {
+        const dynamicLibrary = await this.apiClient.fetchChatModels(dynamicProvider);
+        modelLibrary = this.mergeModelLibraries(baseLibrary, dynamicLibrary, dynamicProvider);
       }
       if (this.isDestroyed) {
         return;
@@ -505,11 +578,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.providerMode = nextSettings.active_provider_mode;
       this.ollamaUrlDraft = nextSettings.ollama_url;
       this.applyModelLibrary(modelLibrary);
-      const deepSeekRequestedButFailed = needsDeepSeekLibrary && modelLibrary.sources.deepseek?.ok === false;
-      if (deepSeekRequestedButFailed) {
-        this.statusText = modelLibrary.sources.deepseek?.message || 'Could not load DeepSeek models right now.';
+      const dynamicProviderFailed = dynamicProvider && modelLibrary.sources[dynamicProvider]?.ok === false;
+      if (dynamicProviderFailed) {
+        this.statusText = modelLibrary.sources[dynamicProvider]?.message || `Could not load ${providerDisplayLabel(dynamicProvider)} models right now.`;
       }
-      if (this.statusText === 'Loading model settings' && !deepSeekRequestedButFailed) {
+      if (this.statusText === 'Loading model settings' && !dynamicProviderFailed) {
         this.statusText = 'Ready';
       }
       this.syncQueryState();
@@ -529,36 +602,29 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private shouldLoadDeepSeekModels(settings: ModelSettingsResponse): boolean {
-    return this.providerFilter === 'deepseek'
-      || this.hasSelectedProvider(settings, 'deepseek');
-  }
-
-  private hasSelectedProvider(settings: ModelSettingsResponse, provider: string): boolean {
-    return settings.agent_model_provider === provider;
-  }
-
   private async ensureProviderModelsLoaded(
     provider: ModelProviderFilter,
     forceRefresh = false,
   ): Promise<void> {
-    if (provider !== 'deepseek') {
+    if (!this.isDynamicCloudProvider(provider)) {
       return;
     }
-    if (!this.deepSeekConfigured()) {
-      this.statusText = 'Add a DeepSeek API key to load DeepSeek models.';
-      this.deepseekStatus = { ok: false, message: 'Add a DeepSeek API key to load DeepSeek models.' };
+    const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
+    const label = providerDisplayLabel(provider);
+    if (!configured) {
+      this.statusText = `Add a ${label} API key to load ${label} models.`;
+      this.setDynamicProviderStatus(provider, { ok: false, message: this.statusText });
       this.syncState();
       return;
     }
-    if (!forceRefresh && this.cloudModels.some((model) => model.provider === 'deepseek')) {
+    if (!forceRefresh && this.cloudModels.some((model) => model.provider === provider)) {
       return;
     }
-    this.isLoadingDeepSeekModels = true;
-    this.statusText = 'Loading DeepSeek models';
+    this.isLoadingDynamicProviderModels = true;
+    this.statusText = `Loading ${label} models`;
     this.syncState();
     try {
-      const modelLibrary = await this.apiClient.fetchChatModels('deepseek');
+      const modelLibrary = await this.apiClient.fetchChatModels(provider);
       if (this.isDestroyed) {
         return;
       }
@@ -568,11 +634,13 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         sources: {
           ...(this.ollamaStatus ? { ollama: this.ollamaStatus } : {}),
           ...(this.deepseekStatus ? { deepseek: this.deepseekStatus } : {}),
+          ...(this.opencodeStatus ? { opencode: this.opencodeStatus } : {}),
+          ...(this.opencodeGoStatus ? { 'opencode-go': this.opencodeGoStatus } : {}),
         },
-      }, modelLibrary));
-      this.statusText = modelLibrary.sources.deepseek?.ok === false
-        ? (modelLibrary.sources.deepseek.message || 'Could not load DeepSeek models right now.')
-        : 'DeepSeek models loaded';
+      }, modelLibrary, provider));
+      this.statusText = modelLibrary.sources[provider]?.ok === false
+        ? (modelLibrary.sources[provider].message || `Could not load ${label} models right now.`)
+        : `${label} models loaded`;
       this.syncState();
     } catch (error: unknown) {
       if (this.isDestroyed) {
@@ -580,14 +648,14 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.statusText = this.userFacingErrorService.toUserFacingError(
         error,
-        'Could not load DeepSeek models right now.',
+        `Could not load ${label} models right now.`,
       );
       this.syncState();
     } finally {
       if (this.isDestroyed) {
         return;
       }
-      this.isLoadingDeepSeekModels = false;
+      this.isLoadingDynamicProviderModels = false;
     }
   }
 
@@ -600,26 +668,35 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.localModels = modelLibrary.local.map((model) => enrichInstalledOllamaModel(model, modelLibrary.cloud));
     this.ollamaStatus = modelLibrary.sources.ollama ?? null;
     this.deepseekStatus = modelLibrary.sources.deepseek ?? null;
-    if (this.providerFilter === 'deepseek' && this.deepseekStatus && !this.deepseekStatus.ok) {
-      this.statusText = this.deepseekStatus.message || 'Could not load DeepSeek models right now.';
-    }
+    this.opencodeStatus = modelLibrary.sources.opencode ?? null;
+    this.opencodeGoStatus = modelLibrary.sources['opencode-go'] ?? null;
   }
 
   private mergeModelLibraries(
     baseLibrary: ModelLibraryResponse,
-    deepseekLibrary: ModelLibraryResponse,
+    dynamicLibrary: ModelLibraryResponse,
+    provider: DynamicCloudProvider,
   ): ModelLibraryResponse {
     return {
       cloud: mergeModelCards(
-        baseLibrary.cloud.filter((model) => model.provider !== 'deepseek'),
-        deepseekLibrary.cloud,
+        baseLibrary.cloud.filter((model) => model.provider !== provider),
+        dynamicLibrary.cloud,
       ),
-      local: deepseekLibrary.local.length ? deepseekLibrary.local : baseLibrary.local,
+      local: dynamicLibrary.local.length ? dynamicLibrary.local : baseLibrary.local,
       sources: {
         ...baseLibrary.sources,
-        ...deepseekLibrary.sources,
+        ...dynamicLibrary.sources,
       },
     };
+  }
+
+  private setDynamicProviderStatus(
+    provider: DynamicCloudProvider,
+    status: ModelLibrarySourceStatus,
+  ): void {
+    if (provider === 'deepseek') this.deepseekStatus = status;
+    if (provider === 'opencode') this.opencodeStatus = status;
+    if (provider === 'opencode-go') this.opencodeGoStatus = status;
   }
 
   private syncQueryState(): void {

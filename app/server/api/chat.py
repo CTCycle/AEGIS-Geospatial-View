@@ -33,6 +33,7 @@ from server.domain.chat import (
 )
 from server.domain.jobs import BackgroundJobCreateResponse
 from server.services.chat.composition import ChatRuntime
+from server.services.chat.model_library import DYNAMIC_CLOUD_PROVIDERS
 from server.services.chat.settings_service import ChatSettingsValidationError
 from server.services.chat.streaming import ChatStreamingService
 from server.services.jobs import BackgroundJobService
@@ -118,7 +119,13 @@ def get_models(
     provider: str | None = Query(default=None),
     runtime: ChatRuntime = Depends(get_chat_runtime),
 ) -> ModelLibraryResponse:
-    cloud_provider = "deepseek" if provider == "deepseek" else None
+    requested_provider = provider if isinstance(provider, str) else None
+    if requested_provider is not None and requested_provider not in DYNAMIC_CLOUD_PROVIDERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported dynamic cloud provider '{requested_provider}'.",
+        )
+    cloud_provider = requested_provider
     try:
         response = runtime.model_library_service.list_models(
             ollama_url=runtime.settings_service.get_ollama_url(),

@@ -245,7 +245,7 @@ export const openRunEventSource = (
 };
 
 export const fetchChatModels = async (
-  provider?: 'deepseek',
+  provider?: 'deepseek' | 'opencode' | 'opencode-go',
 ): Promise<ModelLibraryResponse> => {
   const suffix = provider ? `?provider=${encodeURIComponent(provider)}` : '';
   const data = await executeApiRequest(`${API_BASE_URL}${API_CHAT_MODELS_PATH}${suffix}`, {

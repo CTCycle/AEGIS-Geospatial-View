@@ -105,7 +105,7 @@ export class ApiClientService {
     return openRunEventSource(conversationId, runId, afterEventId);
   }
 
-  fetchChatModels(provider?: 'deepseek'): Promise<ModelLibraryResponse> {
+  fetchChatModels(provider?: 'deepseek' | 'opencode' | 'opencode-go'): Promise<ModelLibraryResponse> {
     return fetchChatModels(provider);
   }
 

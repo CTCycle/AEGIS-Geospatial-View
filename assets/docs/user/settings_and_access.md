@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-06-25
+Last updated: 2026-07-29
 
 ## Access Configuration
 
@@ -15,8 +15,9 @@ The Access page is for optional geospatial provider keys such as Geoapify and To
 5. Ensure the selected model supports tool calling and structured output.
 6. For local mode, manage Ollama URL, check connection, refresh models, or pull a model.
 7. Save credentials or Ollama settings if needed, then return to chat.
-8. When `DeepSeek` is selected in model filters or as the agent model, AEGIS loads the available DeepSeek models from the configured DeepSeek account.
-9. If the DeepSeek catalog cannot be loaded, Settings keeps the DeepSeek filter active and shows the provider-specific error instead of a generic empty-state message.
+8. When `DeepSeek`, `OpenCode Zen`, or `OpenCode Go` is selected in model filters or as the agent model, AEGIS loads the compatible models from the configured provider account.
+9. OpenCode catalogs expose only models backed by the provider's OpenAI-compatible chat-completions endpoint, which is the protocol used for AEGIS tools, streaming, and structured output.
+10. If a dynamic cloud catalog cannot be loaded, Settings keeps its provider filter active and shows the provider-specific error instead of a generic empty-state message.
 
 ## User-Facing Controls
 
@@ -35,5 +36,5 @@ The Access page is for optional geospatial provider keys such as Geoapify and To
 
 - provider mode toggle
 - model search bar and provider filters
-- API key modal for supported cloud providers, including a dedicated DeepSeek key section
+- API key modal for supported cloud providers, including dedicated DeepSeek, OpenCode Zen, and OpenCode Go key sections
 - Ollama modal for URL, health, refresh, and model pull. The default local loopback URL is `http://127.0.0.1:11434`.
