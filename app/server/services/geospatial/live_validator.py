@@ -48,6 +48,39 @@ PUBLIC_LIVE_CHECKS = (
 
 CREDENTIAL_LIVE_CHECKS = (
     LiveCheck(
+        provider_id="geoapify",
+        request=ProviderRequest(
+            capability_id="geoapify_amenities",
+            bbox=(12.45, 41.88, 12.55, 41.93),
+            params={"live": True, "categories": "catering.restaurant", "limit": 10},
+        ),
+        credential_env="GEOAPIFY_API_KEY",
+    ),
+    LiveCheck(
+        provider_id="tomtom",
+        request=ProviderRequest(
+            capability_id="tomtom_incidents",
+            bbox=(12.45, 41.88, 12.55, 41.93),
+            params={"incidents": True},
+        ),
+        credential_env="TOMTOM_API_KEY",
+    ),
+    LiveCheck(
+        provider_id="opentripmap",
+        request=ProviderRequest(
+            capability_id="opentripmap_tourism_pois",
+            params={
+                "live": True,
+                "latitude": 41.9028,
+                "longitude": 12.4964,
+                "radius_m": 2500,
+                "kinds": "interesting_places",
+                "limit": 10,
+            },
+        ),
+        credential_env="OPENTRIPMAP_API_KEY",
+    ),
+    LiveCheck(
         provider_id="windy_webcams",
         request=ProviderRequest(
             capability_id="windy_webcams",
@@ -55,6 +88,37 @@ CREDENTIAL_LIVE_CHECKS = (
             params={"live": True},
         ),
         credential_env="WINDY_WEBCAMS_API_KEY",
+    ),
+    LiveCheck(
+        provider_id="openaq",
+        request=ProviderRequest(
+            capability_id="openaq_air_quality",
+            params={
+                "live": True,
+                "latitude": 41.9028,
+                "longitude": 12.4964,
+                "radius_m": 25000,
+                "pollutants": ["pm25", "pm10", "no2"],
+            },
+        ),
+        credential_env="OPENAQ_API_KEY",
+    ),
+    LiveCheck(
+        provider_id="fred",
+        request=ProviderRequest(
+            capability_id="fred_regional_market_indicators",
+            params={"live": True, "search_text": "housing rent income", "limit": 10},
+        ),
+        credential_env="FRED_API_KEY",
+    ),
+    LiveCheck(
+        provider_id="nasa_firms",
+        request=ProviderRequest(
+            capability_id="nasa_firms_active_fires",
+            bbox=(12.0, 41.5, 13.0, 42.2),
+            params={"live": True},
+        ),
+        credential_env="NASA_API_KEY",
     ),
     LiveCheck(
         provider_id="mobility_database",
@@ -91,7 +155,7 @@ async def validate_live_geospatial_sources(
 async def _run_check(
     registry: ProviderRegistry, check: LiveCheck
 ) -> LiveValidationCheckResult:
-    if check.credential_env and not os.getenv(check.credential_env):
+    if check.credential_env and not os.getenv(check.credential_env, "").strip():
         return LiveValidationCheckResult(
             provider_id=check.provider_id,
             capability_id=check.request.capability_id,
@@ -140,6 +204,8 @@ def _feature_count(payload: dict[str, Any]) -> int:
         return len(payload["results"])
     if isinstance(payload.get("feeds"), list):
         return len(payload["feeds"])
+    if isinstance(payload.get("series"), list):
+        return len(payload["series"])
     summary = payload.get("summary")
     if isinstance(summary, dict):
         for key in ("vehicleCount", "alertCount", "stopCount", "routeCount"):

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from server.services.geospatial.live_validator import validate_live_geospatial_sources
+from server.services.geospatial.live_validator import (
+    CREDENTIAL_LIVE_CHECKS,
+    _run_check,
+    validate_live_geospatial_sources,
+)
 from server.services.geospatial.providers.base import ProviderRequest, ProviderResponse
 
 ###############################################################################
@@ -41,3 +45,12 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
         "usgs",
         "openmeteo",
     }
+
+
+def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
+    monkeypatch.setenv("GEOAPIFY_API_KEY", "   ")
+
+    result = asyncio.run(_run_check(_LiveValidationRegistry(), CREDENTIAL_LIVE_CHECKS[0]))
+
+    assert result.status == "skipped"
+    assert "GEOAPIFY_API_KEY" in (result.message or "")
