@@ -42,7 +42,7 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
 ###############################################################################
 def test_openchargemap_supports_optional_key() -> None:
     response = asyncio.run(
-        OpenChargeMapProvider().fetch(
+        OpenChargeMapProvider(api_key="charge-key").fetch(
             ProviderRequest(
                 capability_id="openchargemap_ev_charging",
                 params={"latitude": 41.9, "longitude": 12.5},
@@ -129,7 +129,7 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
         return []
 
     response = asyncio.run(
-        OpenChargeMapProvider(fetcher=fetcher).fetch(
+        OpenChargeMapProvider(api_key="charge-key", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="openchargemap_ev_charging",
                 params={"latitude": 41.9, "longitude": 12.5, "live": True},
@@ -198,7 +198,7 @@ def test_optional_live_provider_uses_stale_cache_on_failure() -> None:
 
     clock = {"now": 0.0}
     cache = GeospatialCache(clock=lambda: clock["now"])
-    provider = OpenChargeMapProvider(fetcher=fetcher, cache=cache)
+    provider = OpenChargeMapProvider(api_key="charge-key", fetcher=fetcher, cache=cache)
     request = ProviderRequest(
         capability_id="openchargemap_ev_charging",
         params={"latitude": 41.9, "longitude": 12.5, "live": True},

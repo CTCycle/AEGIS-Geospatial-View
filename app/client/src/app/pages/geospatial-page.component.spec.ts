@@ -299,6 +299,29 @@ describe('pages/geospatial-page.component', () => {
     expect(component.mapSession?.resolved_location.label).toBe('Colosseum, Rome');
   });
 
+  it('refreshes the visible progress state when a run event arrives', () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.isLoading = true;
+    component.progressLabel = 'Understanding the request';
+    fixture.detectChanges();
+
+    component['handleRunEvent']({
+      event_id: 'event-progress',
+      sequence: 1,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      run_version: 1,
+      type: 'progress',
+      timestamp: new Date().toISOString(),
+      visibility: 'user',
+      payload: { stage: 'rendering_map', label: 'Rendering map...' },
+    });
+
+    expect(fixture.nativeElement.textContent).toContain('Rendering map...');
+  });
+
   it('does not duplicate an assistant message when the matching error event arrives', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();

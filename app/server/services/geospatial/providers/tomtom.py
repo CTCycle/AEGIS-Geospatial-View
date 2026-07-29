@@ -23,7 +23,6 @@ class TomTomProvider(GeospatialProvider):
     flow_proxy_template = (
         "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
     )
-    basemap_proxy_template = "/api/geospatial/proxy/tomtom/basic/{z}/{x}/{y}.png"
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -51,15 +50,12 @@ class TomTomProvider(GeospatialProvider):
                 },
                 attribution=["TomTom"],
             )
-        tile_url = self.flow_proxy_template
-        if "basic" in request.capability_id:
-            tile_url = self.basemap_proxy_template
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={
                 "renderingMode": "raster-tile",
-                "tileUrl": tile_url,
+                "tileUrl": self.flow_proxy_template,
                 "credentialPolicy": "server-side-only",
             },
             attribution=["TomTom"],
@@ -110,11 +106,6 @@ class TomTomProvider(GeospatialProvider):
 
 ###############################################################################
 def build_tomtom_tile_url(kind: str, z: int, x: int, y: int, api_key: str) -> str:
-    if kind == "basic":
-        return (
-            "https://api.tomtom.com/map/1/tile/basic/main/"
-            f"{z}/{x}/{y}.png?key={api_key}"
-        )
     return (
         "https://api.tomtom.com/traffic/map/4/tile/flow/"
         f"absolute/relative0/{z}/{x}/{y}.png?key={api_key}"

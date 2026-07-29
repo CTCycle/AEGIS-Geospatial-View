@@ -437,7 +437,6 @@ def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
         "openchargemap",
         "opentripmap",
         "tomtom",
-        "transitland",
         "windy_webcams",
     }
 

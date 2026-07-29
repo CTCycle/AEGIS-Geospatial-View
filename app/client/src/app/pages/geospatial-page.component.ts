@@ -464,6 +464,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.streamState = 'open';
       this.reconnectAttempts = 0;
       this.syncState();
+      this.changeDetectorRef.detectChanges();
     };
     const eventTypes = [
       'progress',
@@ -486,6 +487,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     source.onerror = () => {
       if (!this.activeRunId || !this.conversationId || !this.isLoading) {
         this.closeActiveEventSource();
+        this.changeDetectorRef.detectChanges();
         return;
       }
       this.streamState = 'reconnecting';
@@ -494,6 +496,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.streamState = 'failed';
         this.progressLabel = 'Stream disconnected; reconnect later to replay updates.';
         this.syncState();
+        this.changeDetectorRef.detectChanges();
         return;
       }
       this.reconnectAttempts += 1;
@@ -503,6 +506,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         }
       }, 750 * this.reconnectAttempts);
       this.syncState();
+      this.changeDetectorRef.detectChanges();
     };
   }
 
@@ -578,6 +582,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         break;
     }
     this.syncState();
+    this.changeDetectorRef.detectChanges();
     queueMicrotask(() => this.scrollTranscriptToBottom());
   }
 

@@ -31,9 +31,9 @@ Environment fallback variables include:
 - `SENTINEL_HUB_CLIENT_ID`
 - `SENTINEL_HUB_CLIENT_SECRET`
 - `TOMTOM_API_KEY`
-- `TRANSITLAND_API_KEY`
 - `WINDY_WEBCAMS_API_KEY`
 - `LOCAL_OPEN_DATA_SOURCES`
+- `AEGIS_MOBILITY_DATABASE_CATALOG_PATH` (optional local CSV snapshot override)
 
 ## Secret Safety Rules
 

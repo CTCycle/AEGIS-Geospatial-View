@@ -86,7 +86,7 @@ class OverlayInferenceService:
             ),
             (
                 ("poi", "amenities", "nearby", "places"),
-                ("overpass_poi_amenities", "overture_maps_places"),
+                ("overture_maps_places", "overpass_poi_amenities"),
                 "Matched POI or nearby-place intent from request text or action metadata.",
             ),
             (

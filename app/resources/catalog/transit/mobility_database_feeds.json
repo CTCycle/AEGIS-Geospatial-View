@@ -1,0 +1,70 @@
+{
+  "id": "mobility_database_feeds",
+  "name": "Mobility Database Feed Discovery",
+  "provider": "mobility_database",
+  "type": "search-index",
+  "description": "Local searchable catalog of worldwide GTFS and GTFS-Realtime feed metadata.",
+  "capabilities": ["metadata-search", "bbox-search"],
+  "coverage": "global",
+  "metadata": {
+    "label": "Mobility Database Feeds",
+    "attribution": "Mobility Database Catalog metadata is CC0; individual feeds retain their own licenses.",
+    "keywords": ["transit", "GTFS", "GTFS-Realtime", "agency feed", "feed discovery"],
+    "map_type_tags": ["metadata"],
+    "action_tags": ["transit", "feed_discovery"],
+    "task_tags": ["transit", "agency feed", "GTFS discovery"],
+    "coverage_scope": "worldwide catalog",
+    "temporal_behavior": "catalog refreshed one to three times per month upstream; local snapshot is refreshed on demand",
+    "constraints": "feed authentication and individual feed licenses remain provider-specific",
+    "official_docs_url": "https://github.com/MobilityData/mobility-database-catalogs",
+    "source_protocol": "csv-download",
+    "data_format": "CSV metadata catalog",
+    "geometry_type": "bounding-box metadata",
+    "queryable": true,
+    "endpoint_health": "local-snapshot",
+    "auth_mode": "none",
+    "rate_limit_notes": "interactive searches use the local snapshot; upstream download is explicit or first-use only"
+  },
+  "version": 2,
+  "last_modified": "2026-07-29T00:00:00+00:00",
+  "capabilityKind": "search-index",
+  "renderingMode": "metadata-only",
+  "sourceOfficialDocs": ["https://github.com/MobilityData/mobility-database-catalogs"],
+  "license": {
+    "name": "Mobility Database catalog metadata CC0; individual feed licenses apply",
+    "url": "https://github.com/MobilityData/mobility-database-catalogs#license",
+    "attributionRequired": false,
+    "commercialUse": "allowed",
+    "embeddingAllowed": "metadata-only"
+  },
+  "auth": {
+    "type": "none",
+    "required": false,
+    "providerKey": null,
+    "accessPageProviderId": null
+  },
+  "agenticUse": {
+    "defaultEnabled": true,
+    "manualToggle": false,
+    "plannerHints": ["transit feed", "agency feed", "GTFS discovery"],
+    "requiredUserAction": [],
+    "avoidWhen": ["live vehicle positions", "live service alerts"]
+  },
+  "reliability": {
+    "status": "partial",
+    "lastAudited": "2026-07-29",
+    "knownLimitations": ["Catalog freshness is lower than agency realtime feeds."]
+  },
+  "cachePolicy": {
+    "mode": "disk",
+    "ttlSeconds": 0,
+    "staleWhileRevalidateSeconds": 0
+  },
+  "normalization": {
+    "geometryPath": null,
+    "idPath": "feeds[].id",
+    "timestampPath": null,
+    "fieldMap": {},
+    "expectedGeometry": "bounding-box metadata"
+  }
+}

@@ -55,7 +55,7 @@ def test_key_required_providers_are_unavailable_without_saved_credentials(monkey
 
     assert not registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "missing_credentials"
-    assert not registry.credentials_present("geoapify_osm")
+    assert not registry.credentials_present("geoapify_amenities")
 
 ###############################################################################
 def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
@@ -69,4 +69,4 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
 
     assert registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
-    assert registry.credentials_present("geoapify_osm")
+    assert registry.credentials_present("geoapify_amenities")

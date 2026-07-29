@@ -39,11 +39,13 @@ class RenderDescriptorService:
             or metadata.get("url"),
             capability=capability,
         )
+        style_url = self._resolve_openfreemap_style_url(metadata.get("style_url"))
         return {
             "id": str(capability.get("id") or basemap_id),
             "label": str(metadata.get("label") or capability.get("name") or basemap_id),
             "provider": str(capability.get("provider") or "unknown"),
             "tile_url": tile_url,
+            "style_url": style_url,
             "attribution": str(metadata.get("attribution") or ""),
         }
 
@@ -451,6 +453,17 @@ class RenderDescriptorService:
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = capability.get("metadata")
         return dict(metadata) if isinstance(metadata, dict) else {}
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _resolve_openfreemap_style_url(value: object) -> str | None:
+        style_url = RenderDescriptorService._optional_string(value)
+        if style_url is None:
+            return None
+        base_url = os.getenv("OPENFREEMAP_STYLE_BASE_URL", "").strip().rstrip("/")
+        if base_url and style_url.startswith("https://tiles.openfreemap.org"):
+            return f"{base_url}{style_url[len('https://tiles.openfreemap.org'):] }"
+        return style_url
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import os
+import json
+import csv
+import io
+from pathlib import Path
 from urllib.parse import urlencode
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -34,14 +38,43 @@ class NRELProvider(GeospatialProvider):
         api_key: str | None = None,
         fetcher: JsonFetcher | None = None,
         cache: GeospatialCache | None = None,
+        snapshot_path: str | Path | None = None,
     ) -> None:
         self.api_key = api_key
         self.fetcher = fetcher or fetch_json_url
         self.cache = cache or GeospatialCache()
+        self.snapshot_path = Path(snapshot_path or os.getenv("AEGIS_AFDC_SNAPSHOT_PATH", "")).expanduser() if (snapshot_path or os.getenv("AEGIS_AFDC_SNAPSHOT_PATH", "").strip()) else None
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         api_key = (self.api_key or os.getenv("NREL_API_KEY") or "").strip()
+        snapshot = request.params.get("snapshot_path") or self.snapshot_path
+        if snapshot:
+            snapshot_path = Path(str(snapshot)).expanduser()
+            if not snapshot_path.is_file():
+                raise ProviderUnavailableError("Configured AFDC snapshot does not exist.")
+            try:
+                raw = snapshot_path.read_text(encoding="utf-8-sig")
+                payload = json.loads(raw) if snapshot_path.suffix.lower() == ".json" else {"fuel_stations": list(csv.DictReader(io.StringIO(raw)))}
+            except (OSError, UnicodeError, json.JSONDecodeError, csv.Error) as exc:
+                raise ProviderUnavailableError("AFDC snapshot is unavailable or malformed.") from exc
+            latitude, longitude = request_center(request)
+            radius_m = request_radius_m(request, 10000.0)
+            features = _filter_features(self._features(payload), request, latitude, longitude, radius_m)
+            return ProviderResponse(
+                capability_id=request.capability_id,
+                provider_id=self.provider_id,
+                payload={
+                    "renderingMode": "clustered-points",
+                    "sourceMode": "local-snapshot",
+                    "snapshotPath": str(snapshot_path),
+                    "features": features,
+                    "featureCount": len(features),
+                    "center": {"latitude": latitude, "longitude": longitude},
+                    "radiusM": radius_m,
+                },
+                attribution=["National Renewable Energy Laboratory"],
+            )
         if not api_key:
             raise ProviderAuthError("NREL_API_KEY is required for AFDC alternative fuel station access.")
         latitude, longitude = request_center(request)
@@ -110,7 +143,10 @@ class NRELProvider(GeospatialProvider):
                 continue
             latitude = station.get("latitude")
             longitude = station.get("longitude")
-            if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+            try:
+                latitude_value = float(latitude)
+                longitude_value = float(longitude)
+            except (TypeError, ValueError):
                 continue
             fuel_type = str(station.get("fuel_type_code") or "fuel")
             features.append(
@@ -119,8 +155,8 @@ class NRELProvider(GeospatialProvider):
                     "name": station.get("station_name"),
                     "category": normalize_poi_category("ev_charging" if fuel_type == "ELEC" else "fuel"),
                     "source": self.provider_id,
-                    "latitude": float(latitude),
-                    "longitude": float(longitude),
+                    "latitude": latitude_value,
+                    "longitude": longitude_value,
                     "address": station.get("street_address"),
                     "phone": station.get("station_phone"),
                     "metadata": {
@@ -131,3 +167,21 @@ class NRELProvider(GeospatialProvider):
                 }
             )
         return features
+
+###############################################################################
+def _filter_features(
+    features: list[dict[str, object]],
+    request: ProviderRequest,
+    latitude: float,
+    longitude: float,
+    radius_m: float,
+) -> list[dict[str, object]]:
+    del latitude, longitude, radius_m
+    if request.bbox is None:
+        return features[: int(request.params.get("limit") or 100)]
+    west, south, east, north = request.bbox
+    return [
+        item
+        for item in features
+        if west <= float(item["longitude"]) <= east and south <= float(item["latitude"]) <= north
+    ][: int(request.params.get("limit") or 100)]

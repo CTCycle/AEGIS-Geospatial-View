@@ -168,14 +168,14 @@
       "auth_required": false
     },
     {
-      "capability_id": "transitland_feeds",
+      "capability_id": "mobility_database_feeds",
       "enabled_by_default": true,
-      "credential_provider": "transitland",
+      "credential_provider": null,
       "supports_map": false,
       "supports_direct_text": true,
-      "coverage_policy": "global-partial",
-      "health_policy": "credential_gated",
-      "handler_name": "transitland_feed_discovery",
+      "coverage_policy": "global",
+      "health_policy": "local_snapshot",
+      "handler_name": "mobility_database_feed_discovery",
       "capability_kind": "search-index",
       "rendering_mode": "metadata-only",
       "health_status": "partial",
@@ -185,7 +185,7 @@
         "GTFS discovery"
       ],
       "manual_toggle": false,
-      "auth_required": true
+      "auth_required": false
     },
     {
       "capability_id": "usgs_earthquakes",
@@ -866,27 +866,48 @@
       "auth_required": true
     },
     {
-      "capability_id": "geoapify_osm",
+      "capability_id": "openfreemap_liberty",
       "enabled_by_default": true,
-      "credential_provider": "geoapify",
+      "credential_provider": null,
       "supports_map": true,
       "supports_direct_text": false,
       "coverage_policy": "global",
       "health_policy": "best_effort",
       "handler_name": null,
       "capability_kind": "basemap",
-      "rendering_mode": "xyz",
+      "rendering_mode": "vector-tile",
+      "health_status": "partial",
+      "planner_hints": [
+        "presentation",
+        "city_context",
+        "places",
+        "urban",
+        "street"
+      ],
+      "manual_toggle": true,
+      "auth_required": false
+    },
+    {
+      "capability_id": "openfreemap_positron",
+      "enabled_by_default": true,
+      "credential_provider": null,
+      "supports_map": true,
+      "supports_direct_text": false,
+      "coverage_policy": "global",
+      "health_policy": "best_effort",
+      "handler_name": null,
+      "capability_kind": "basemap",
+      "rendering_mode": "vector-tile",
       "health_status": "partial",
       "planner_hints": [
         "presentation",
         "clean_layout",
         "places",
-        "bright",
-        "light",
-        "clean"
+        "urban",
+        "light"
       ],
       "manual_toggle": true,
-      "auth_required": true
+      "auth_required": false
     },
     {
       "capability_id": "get_air_quality_forecast",
@@ -1279,28 +1300,6 @@
       ],
       "manual_toggle": true,
       "auth_required": false
-    },
-    {
-      "capability_id": "tomtom_basic",
-      "enabled_by_default": true,
-      "credential_provider": "tomtom",
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null,
-      "capability_kind": "basemap",
-      "rendering_mode": "xyz",
-      "health_status": "partial",
-      "planner_hints": [
-        "routing",
-        "traffic_monitoring",
-        "traffic",
-        "street",
-        "navigation"
-      ],
-      "manual_toggle": true,
-      "auth_required": true
     },
     {
       "capability_id": "tomtom_traffic_flow",

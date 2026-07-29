@@ -3,7 +3,7 @@
   "name": "Geoapify",
   "provider": "geoapify",
   "type": "provider",
-  "description": "Geoapify basemap and amenities overlays (API key required).",
+  "description": "Geoapify amenities overlays (API key required).",
   "capabilities": [
     "tile",
     "geojson",
@@ -15,19 +15,16 @@
     "commercial_notes": "Free tier supports limited commercial use with attribution.",
     "warning_level": "medium",
     "keywords": [
-      "tile",
       "geojson",
       "places",
       "geoapify",
       "geoapify"
     ],
     "action_tags": [
-      "tile",
       "geojson",
       "places"
     ],
     "task_tags": [
-      "tile",
       "geojson",
       "places"
     ],

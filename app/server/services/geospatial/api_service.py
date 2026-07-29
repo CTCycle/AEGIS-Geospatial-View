@@ -217,7 +217,7 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     async def fetch_tomtom_tile(self, kind: str, z: int, x: int, y: int) -> bytes:
-        if kind not in {"basic", "traffic-flow"}:
+        if kind != "traffic-flow":
             raise GeospatialUnsupportedTileError("Unsupported TomTom tile type.")
         api_key = os.getenv("TOMTOM_API_KEY", "").strip()
         if not api_key:

@@ -36,18 +36,6 @@ class LocationSearchOrchestrator:
         overlays: list[dict[str, object]] = []
         failed_overlays: list[dict[str, str]] = []
         warnings: list[str] = []
-        if (
-            isinstance(basemap, dict)
-            and basemap.get("tile_url") is None
-            and basemap.get("provider") in {"tomtom", "geoapify"}
-        ):
-            warnings.append(
-                f"{payload.basemap_id}: provider API key is required; "
-                "falling back to osm_default."
-            )
-            basemap = await self.render_descriptor_service.build_basemap_descriptor(
-                "osm_default"
-            )
         effective_basemap_id = (
             str(basemap.get("id"))
             if isinstance(basemap, dict) and basemap.get("id")

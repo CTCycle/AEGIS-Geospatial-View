@@ -616,6 +616,19 @@ class ParserService:
                     reason="basemap_only_follow_up",
                 )
 
+        if "openfreemap" in text:
+            updates.update(
+                requested_basemap=(
+                    "openfreemap_positron"
+                    if any(marker in text for marker in ("positron", "light", "clean"))
+                    else "openfreemap_liberty"
+                ),
+                relationship=(
+                    "follow_up" if memory_snapshot.get("active_visualization") else extracted.relationship
+                ),
+                expected_frontend_update="visualization_update",
+            )
+
         ground_temperature = (
             "temperature" in text
             and any(marker in text for marker in ("ground", "surface", "at the ground"))

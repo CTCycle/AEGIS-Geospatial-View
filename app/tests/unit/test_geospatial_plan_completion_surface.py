@@ -3,10 +3,8 @@ from __future__ import annotations
 import json
 from asyncio import run
 
-import pytest
-
 from server.services.geospatial.provider_registry import ProviderRegistry
-from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
+from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.tiler import build_vector_tile_manifest
 
 ###############################################################################
@@ -25,17 +23,27 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
     assert response.payload["downloadUrl"].startswith("https://")
 
 ###############################################################################
-def test_transitland_requires_configured_key() -> None:
-    registry = ProviderRegistry()
-    registry.build_from_manifests()
+def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
+    catalog = tmp_path / "feeds.csv"
+    catalog.write_text(
+        "mdb_source_id,provider,name,location.country_code,urls.latest,urls.license\n"
+        "mdb-1,Example Transit,Example City,IT,https://agency.example/gtfs.zip,https://agency.example/license\n",
+        encoding="utf-8",
+    )
+    from server.services.geospatial.providers.mobility_database import MobilityDatabaseProvider
 
-    with pytest.raises(ProviderAuthError):
-        run(
-            registry.fetch(
-                "transitland",
-                ProviderRequest(capability_id="transitland_feeds"),
-            )
+    registry = ProviderRegistry(providers=[MobilityDatabaseProvider(catalog_path=catalog)])
+
+    response = run(
+        registry.fetch(
+            "mobility_database",
+            ProviderRequest(capability_id="mobility_database_feeds", params={"query": "Example"}),
         )
+    )
+
+    assert response.payload["feedCount"] == 1
+    assert response.payload["feeds"][0]["staticFeedUrl"].endswith("gtfs.zip")
+    assert response.payload["feeds"][0]["license"].endswith("license")
 
 ###############################################################################
 def test_vector_tile_manifest_records_feature_count(tmp_path) -> None:

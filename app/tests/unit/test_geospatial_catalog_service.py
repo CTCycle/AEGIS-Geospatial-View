@@ -52,7 +52,7 @@ def test_catalog_marks_key_required_capabilities_unavailable_without_credentials
 
     assert lookup["tomtom_traffic_flow"]["requires_credentials"] is True
     assert lookup["tomtom_traffic_flow"]["is_available"] is False
-    assert lookup["geoapify_osm"]["is_available"] is False
+    assert lookup["geoapify_amenities"]["is_available"] is False
     assert providers["tomtom"]["is_available"] is False
 
 ###############################################################################
@@ -65,5 +65,5 @@ def test_catalog_marks_key_required_capabilities_available_with_saved_credential
     providers = {item["id"]: item for item in catalog["providers"]}
 
     assert lookup["tomtom_traffic_flow"]["is_available"] is True
-    assert lookup["geoapify_osm"]["is_available"] is True
+    assert lookup["geoapify_amenities"]["is_available"] is True
     assert providers["tomtom"]["is_available"] is True
