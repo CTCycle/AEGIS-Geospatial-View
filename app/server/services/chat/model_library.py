@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import monotonic
-from typing import Literal
-
+from typing import cast
 from server.common.constants import OLLAMA_DEFAULT_HOST
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.opencode_provider import (
+    OPENCODE_GO_PROVIDER,
+    OPENCODE_PROVIDER,
+)
 from server.services.llm.types import ModelDescriptor
 
 ###############################################################################
@@ -20,6 +23,9 @@ class _CachedOllamaFailure:
 ###############################################################################
 class ModelLibrarySourceError(RuntimeError):
     pass
+
+
+DYNAMIC_CLOUD_PROVIDERS = ("deepseek", OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER)
 
 ###############################################################################
 class ChatModelLibraryService:
@@ -56,7 +62,7 @@ class ChatModelLibraryService:
                 "catalog"
                 if item.provider in {"openai", "google"}
                 else "provider"
-                if item.provider == "deepseek"
+                if item.provider in DYNAMIC_CLOUD_PROVIDERS
                 else "unknown",
             )
         )
@@ -79,29 +85,30 @@ class ChatModelLibraryService:
         self,
         *,
         ollama_url: str,
-        cloud_provider: Literal["deepseek"] | None = None,
+        cloud_provider: str | None = None,
     ) -> dict[str, object]:
         normalized_ollama_url = self.normalize_ollama_url(ollama_url)
         cloud: list[dict[str, object]] = [
             self.model_payload(item) for item in get_cloud_model_catalog()
         ]
         sources: dict[str, dict[str, object]] = {}
-        if cloud_provider == "deepseek":
+        if cloud_provider in DYNAMIC_CLOUD_PROVIDERS:
             try:
-                provider = self.provider_factory.get_provider("deepseek")
-                deepseek_models = [
+                provider = self.provider_factory.get_provider(cloud_provider)
+                dynamic_models = [
                     self.model_payload(item) for item in provider.list_models()
                 ]
-                cloud.extend(deepseek_models)
-                sources["deepseek"] = {
+                cloud.extend(dynamic_models)
+                sources[cloud_provider] = {
                     "ok": True,
                     "message": None,
-                    "model_count": len(deepseek_models),
+                    "model_count": len(dynamic_models),
                 }
             except Exception as exc:
-                sources["deepseek"] = {
+                sources[cloud_provider] = {
                     "ok": False,
-                    "message": str(exc) or "Could not load DeepSeek models.",
+                    "message": str(exc)
+                    or f"Could not load {cloud_provider} models.",
                     "model_count": 0,
                 }
         deduped_cloud: dict[tuple[str, str], dict[str, object]] = {}
@@ -125,23 +132,24 @@ class ChatModelLibraryService:
         ollama_url: str,
         require_provider_availability: bool = False,
     ) -> dict[str, object] | None:
-        dynamic_cloud_provider: Literal["deepseek"] | None = (
-            "deepseek" if provider == "deepseek" else None
+        dynamic_cloud_provider = (
+            provider if provider in DYNAMIC_CLOUD_PROVIDERS else None
         )
         library = self.list_models(
             ollama_url=self.normalize_ollama_url(ollama_url),
             cloud_provider=dynamic_cloud_provider,
         )
-        if require_provider_availability and provider == "deepseek":
-            sources = library.get("sources", {})
-            source = (
-                sources.get("deepseek")
-                if isinstance(sources, dict)
-                else None
+        if require_provider_availability and provider in DYNAMIC_CLOUD_PROVIDERS:
+            sources_value = library.get("sources", {})
+            sources = (
+                cast(dict[str, object], sources_value)
+                if isinstance(sources_value, dict)
+                else {}
             )
+            source = sources.get(provider)
             if isinstance(source, dict) and not bool(source.get("ok")):
                 raise ModelLibrarySourceError(
-                    str(source.get("message") or "Could not load DeepSeek models.")
+                    str(source.get("message") or f"Could not load {provider} models.")
                 )
         for bucket in ("cloud", "local"):
             for item in library.get(bucket, []):

@@ -36,12 +36,12 @@
         </span>
       </section>
     }
-    @if (deepSeekLoadFailed) {
+    @if (dynamicProviderLoadFailed) {
       <section class="settings-page__warning" role="status" aria-live="polite">
-        <span class="settings-page__warning-badge">DeepSeek</span>
+        <span class="settings-page__warning-badge">{{ dynamicProviderLabel }}</span>
         <span class="settings-page__warning-copy">
-          <strong>DeepSeek models could not be loaded.</strong>
-          {{ deepSeekFailureMessage }}
+          <strong>{{ dynamicProviderLabel }} models could not be loaded.</strong>
+          {{ dynamicProviderFailureMessage }}
         </span>
       </section>
     }
@@ -55,6 +55,8 @@
               <button type="button" [class.active]="providerFilter === 'openai'" (click)="setProviderFilter('openai')">OpenAI</button>
               <button type="button" [class.active]="providerFilter === 'google'" (click)="setProviderFilter('google')">Google</button>
               <button type="button" [class.active]="providerFilter === 'deepseek'" (click)="setProviderFilter('deepseek')">DeepSeek</button>
+              <button type="button" [class.active]="providerFilter === 'opencode'" (click)="setProviderFilter('opencode')">OpenCode Zen</button>
+              <button type="button" [class.active]="providerFilter === 'opencode-go'" (click)="setProviderFilter('opencode-go')">OpenCode Go</button>
             </div>
 
           </div>
@@ -89,15 +91,15 @@
               <h2>Loading model catalog</h2>
               <p>Fetching model assignments and provider metadata.</p>
             </section>
-          } @else if (providerFilter === 'deepseek' && isLoadingDeepSeekModels) {
+          } @else if (isLoadingDynamicProviderModels) {
             <section class="settings-empty-state" aria-live="polite">
-              <h2>Loading DeepSeek models</h2>
-              <p>Fetching the live DeepSeek catalog from the configured provider account.</p>
+              <h2>Loading {{ dynamicProviderLabel }} models</h2>
+              <p>Fetching the live {{ dynamicProviderLabel }} catalog from the configured provider account.</p>
             </section>
           } @else if (!hasDisplayedModels) {
             <section class="settings-empty-state" aria-live="polite">
-              <h2>{{ deepSeekLoadFailed ? 'DeepSeek models unavailable' : 'No models match this filter' }}</h2>
-              <p>{{ deepSeekLoadFailed ? deepSeekFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
+              <h2>{{ dynamicProviderLoadFailed ? dynamicProviderLabel + ' models unavailable' : 'No models match this filter' }}</h2>
+              <p>{{ dynamicProviderLoadFailed ? dynamicProviderFailureMessage : 'Adjust the provider tabs or search query to show available models.' }}</p>
             </section>
           } @else {
             @for (provider of providerKeys; track trackProviderGroup(provider)) {
@@ -171,6 +173,30 @@
             [validationError]="keyValidationErrors.deepseek"
             [providerSection]="true"
             (valueChange)="deepseekKey = $event; keyValidationErrors.deepseek = undefined"
+          ></app-settings-api-key-field>
+          <app-settings-api-key-field
+            label="OpenCode Zen"
+            inputName="opencode_api_key"
+            placeholder="OpenCode API key"
+            hint="Used to discover and run OpenCode Zen’s OpenAI-compatible models."
+            [value]="opencodeKey"
+            [configured]="opencodeConfigured()"
+            [credentialHealth]="opencodeCredentialHealth()"
+            [validationError]="keyValidationErrors.opencode"
+            [providerSection]="true"
+            (valueChange)="opencodeKey = $event; keyValidationErrors.opencode = undefined"
+          ></app-settings-api-key-field>
+          <app-settings-api-key-field
+            label="OpenCode Go"
+            inputName="opencode_go_api_key"
+            placeholder="OpenCode API key"
+            hint="Used to discover and run OpenCode Go’s OpenAI-compatible models."
+            [value]="opencodeGoKey"
+            [configured]="opencodeGoConfigured()"
+            [credentialHealth]="opencodeGoCredentialHealth()"
+            [validationError]="keyValidationErrors['opencode-go']"
+            [providerSection]="true"
+            (valueChange)="opencodeGoKey = $event; keyValidationErrors['opencode-go'] = undefined"
           ></app-settings-api-key-field>
           @if (keysModalStatusText) {
             <p class="settings-modal__status" aria-live="polite">{{ keysModalStatusText }}</p>

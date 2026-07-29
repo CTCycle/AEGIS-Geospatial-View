@@ -51,6 +51,12 @@ export const providerDisplayLabel = (providerKey: string): string => {
   if (normalized === 'deepseek') {
     return 'DeepSeek';
   }
+  if (normalized === 'opencode') {
+    return 'OpenCode Zen';
+  }
+  if (normalized === 'opencode-go') {
+    return 'OpenCode Go';
+  }
   return providerKey;
 };
 

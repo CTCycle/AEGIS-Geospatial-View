@@ -9,6 +9,11 @@ from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
+from server.services.llm.opencode_provider import (
+    OPENCODE_GO_PROVIDER,
+    OPENCODE_PROVIDER,
+    OpenCodeProvider,
+)
 from server.services.llm.openai_provider import OpenAIProvider
 
 ###############################################################################
@@ -38,27 +43,29 @@ class LLMFactory:
     def _resolve_provider_api_key(self, provider: str) -> str:
         credential = self.credentials_repo.get_active(provider=provider, label="api_key")
         if credential is None:
-            if provider == "openai":
-                raise LLMConfigurationError(
-                    "OpenAI credentials are not configured. Add an OpenAI API key in Settings."
-                )
-            if provider == "deepseek":
-                raise LLMConfigurationError(
-                    "DeepSeek credentials are not configured. Add a DeepSeek API key in Settings."
-                )
+            provider_labels = {
+                "openai": ("OpenAI", "OpenAI"),
+                "google": ("Google", "Google/Gemini"),
+                "deepseek": ("DeepSeek", "DeepSeek"),
+                OPENCODE_PROVIDER: ("OpenCode Zen", "OpenCode Zen"),
+                OPENCODE_GO_PROVIDER: ("OpenCode Go", "OpenCode Go"),
+            }
+            label, credential_label = provider_labels.get(
+                provider, (provider, provider)
+            )
             raise LLMConfigurationError(
-                "Google credentials are not configured. Add a Google/Gemini API key in Settings."
+                f"{label} credentials are not configured. Add an {credential_label} API key in Settings."
             )
         try:
             api_key = self._get_crypto_service().decrypt(credential.encrypted_value)
         except ValueError as exc:
-            provider_label = (
-                "OpenAI"
-                if provider == "openai"
-                else "DeepSeek"
-                if provider == "deepseek"
-                else "Google"
-            )
+            provider_label = {
+                "openai": "OpenAI",
+                "google": "Google",
+                "deepseek": "DeepSeek",
+                OPENCODE_PROVIDER: "OpenCode Zen",
+                OPENCODE_GO_PROVIDER: "OpenCode Go",
+            }.get(provider, provider)
             raise LLMConfigurationError(
                 f"{provider_label} credentials are saved but cannot be decrypted. Re-enter the API key in Settings."
             ) from exc
@@ -85,5 +92,10 @@ class LLMFactory:
             return DeepSeekProvider(
                 api_key=api_key,
                 base_url=settings.deepseek_base_url,
+            )
+        if normalized in {OPENCODE_PROVIDER, OPENCODE_GO_PROVIDER}:
+            return OpenCodeProvider(
+                api_key=self._resolve_provider_api_key(normalized),
+                provider_name=normalized,
             )
         raise ValueError(f"Unsupported model provider '{provider}'.")

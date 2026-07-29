@@ -8,6 +8,7 @@ from server.services.llm.factory import LLMFactory
 from server.services.llm.errors import LLMConfigurationError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.ollama import OllamaProvider
+from server.services.llm.opencode_provider import OpenCodeProvider
 from server.services.llm.openai_provider import OpenAIProvider
 
 ###############################################################################
@@ -166,6 +167,45 @@ def test_get_provider_returns_google_provider_type() -> None:
 
     provider = factory.get_provider("google")
     assert isinstance(provider, GoogleProvider)
+
+
+def test_get_provider_returns_opencode_provider_types() -> None:
+    repo = _CredentialsRepo(
+        {
+            ("opencode", "api_key"): "enc-zen",
+            ("opencode-go", "api_key"): "enc-go",
+        }
+    )
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=repo,
+        crypto_service=_Crypto(),
+    )
+
+    zen = factory.get_provider("opencode")
+    go = factory.get_provider("opencode-go")
+
+    assert isinstance(zen, OpenCodeProvider)
+    assert isinstance(go, OpenCodeProvider)
+    assert zen.provider_name == "opencode"
+    assert go.provider_name == "opencode-go"
+    assert repo.mark_used_calls == [
+        ("opencode", "api_key"),
+        ("opencode-go", "api_key"),
+    ]
+
+
+def test_missing_opencode_credentials_are_provider_specific() -> None:
+    factory = LLMFactory(
+        settings_repo=_SettingsRepo(),
+        credentials_repo=_CredentialsRepo({}),
+        crypto_service=_Crypto(),
+    )
+
+    with pytest.raises(LLMConfigurationError, match="OpenCode Zen credentials"):
+        factory.get_provider("opencode")
+    with pytest.raises(LLMConfigurationError, match="OpenCode Go credentials"):
+        factory.get_provider("opencode-go")
 
 ###############################################################################
 def test_get_provider_keeps_structured_output_available_for_ollama() -> None:

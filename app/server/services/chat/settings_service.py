@@ -12,6 +12,7 @@ from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.chat.model_library import (
     ChatModelLibraryService,
+    DYNAMIC_CLOUD_PROVIDERS,
     ModelLibrarySourceError,
 )
 from server.services.cryptography import CredentialEncryptionService
@@ -60,7 +61,7 @@ class ChatSettingsService:
             else:
                 health_bucket[item.label] = (
                     "healthy"
-                    if item.provider in {"openai", "google", "deepseek"}
+                    if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
                     else "stored"
                 )
         return ModelSettingsResponse(
@@ -178,10 +179,16 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     def _available_models(self, *, ollama_url: str) -> dict[str, list[dict[str, object]]]:
         available: dict[str, list[dict[str, object]]] = {}
-        library = self.model_library_service.list_models(
-            ollama_url=ollama_url,
-            cloud_provider="deepseek",
-        )
+        libraries = [
+            self.model_library_service.list_models(ollama_url=ollama_url),
+            *[
+                self.model_library_service.list_models(
+                    ollama_url=ollama_url,
+                    cloud_provider=provider,
+                )
+                for provider in DYNAMIC_CLOUD_PROVIDERS
+            ],
+        ]
         active_credentials = self.credentials_repo.list_active()
         configured_cloud_providers: set[str] = set()
         for item in active_credentials:
@@ -192,20 +199,21 @@ class ChatSettingsService:
             except ValueError:
                 continue
             configured_cloud_providers.add(item.provider)
-        for entry in library.get("cloud", []):
-            if not isinstance(entry, dict):
-                continue
-            provider = str(entry.get("provider") or "").strip()
-            if provider not in configured_cloud_providers:
-                continue
-            available.setdefault(provider, []).append(entry)
-        local_models = [
-            item
-            for item in library.get("local", [])
-            if isinstance(item, dict)
-        ]
-        if local_models:
-            available["ollama"] = local_models
+        for library in libraries:
+            for entry in library.get("cloud", []):
+                if not isinstance(entry, dict):
+                    continue
+                provider = str(entry.get("provider") or "").strip()
+                if provider not in configured_cloud_providers:
+                    continue
+                available.setdefault(provider, []).append(entry)
+            local_models = [
+                item
+                for item in library.get("local", [])
+                if isinstance(item, dict)
+            ]
+            if local_models:
+                available["ollama"] = local_models
         return available
 
     # -------------------------------------------------------------------------
@@ -308,7 +316,7 @@ class ChatSettingsService:
             )
         except ModelLibrarySourceError as exc:
             raise ChatSettingsValidationError(
-                f"Could not validate DeepSeek model selection: {exc}"
+                f"Could not validate {agent_model_provider} model selection: {exc}"
             ) from exc
         if agent_model is not None and not bool(agent_model.get("supports_tools")):
             raise ChatSettingsValidationError(
@@ -320,9 +328,13 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Selected agent model does not support structured output."
             )
-        if agent_model is None and agent_model_provider == "deepseek" and agent_model_name:
+        if (
+            agent_model is None
+            and agent_model_provider in DYNAMIC_CLOUD_PROVIDERS
+            and agent_model_name
+        ):
             raise ChatSettingsValidationError(
-                "Selected DeepSeek agent model could not be found in the live DeepSeek catalog."
+                f"Selected {agent_model_provider} agent model could not be found in the live provider catalog."
             )
 
     # -------------------------------------------------------------------------
@@ -347,7 +359,9 @@ class ChatSettingsService:
             provider_preferences.append(current_provider)
         if active_provider_mode == "local":
             provider_preferences.append("ollama")
-        provider_preferences.extend(["deepseek", "openai", "google", "ollama"])
+        provider_preferences.extend(
+            ["opencode-go", "opencode", "deepseek", "openai", "google", "ollama"]
+        )
 
         seen: set[str] = set()
         deduped_providers = [
