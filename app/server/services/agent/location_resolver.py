@@ -152,9 +152,13 @@ class LocationResolver:
 
     # -------------------------------------------------------------------------
     def build_ambiguity_question(self, candidates: Sequence[LocationSignal]) -> ClarificationRequest:
-        options = ", ".join((candidate.raw_value for candidate in candidates if candidate.raw_value))
+        options: list[str] = []
+        for candidate in candidates:
+            label = str(candidate.normalized_value or candidate.raw_value or "").strip()
+            if label and label not in options:
+                options.append(label)
         return ClarificationRequest(
-            question=f"I found multiple possible locations: {options}. Which one should I use?",
+            question=f"Which location do you mean: {', '.join(options)}?",
             reason="Multiple location signals have similar confidence.",
             missing_fields=["location"],
         )

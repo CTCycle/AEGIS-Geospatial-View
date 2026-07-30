@@ -21,6 +21,21 @@ from server.services.geospatial.runtime_registry import RuntimeRegistry
 ###############################################################################
 class PolicyEngine:
 
+    LOCATION_AMBIGUITY_CODES = frozenset(
+        {
+            "ambiguous_place_name",
+            "alternate_location",
+            "multiple_possible_locations",
+            "potential_alternate_location",
+        }
+    )
+    LOCATION_MISSING_CODES = frozenset(
+        {
+            "deictic_without_memory",
+            "missing_location",
+        }
+    )
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -245,12 +260,9 @@ class PolicyEngine:
 
     # -------------------------------------------------------------------------
     def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
-        if "ambiguous_place_name" in turn.ambiguities:
-            return ClarificationRequest(
-                question="Which Naples do you mean: Naples, Italy or Naples, Florida?",
-                reason="The place name matches multiple well-known locations.",
-                missing_fields=["location"],
-            )
+        location_ambiguity = self._build_location_ambiguity_clarification(turn)
+        if location_ambiguity is not None:
+            return location_ambiguity
         if "deictic_without_memory" in turn.ambiguities:
             return ClarificationRequest(
                 question="Which location should I use?",
@@ -277,6 +289,100 @@ class PolicyEngine:
                 missing_fields=["location"],
             )
         return None
+
+    # -------------------------------------------------------------------------
+    def _build_location_ambiguity_clarification(
+        self,
+        turn: TurnParseResult,
+    ) -> ClarificationRequest | None:
+        clarification_plan = turn.clarification_plan
+        if isinstance(clarification_plan, dict):
+            blocking_fields = {
+                str(item).strip().casefold()
+                for item in clarification_plan.get("blocking_fields", [])
+            }
+            question = str(clarification_plan.get("question") or "").strip()
+            if "location" in blocking_fields and question:
+                return ClarificationRequest(
+                    question=question,
+                    reason=str(
+                        clarification_plan.get("reason")
+                        or "The request needs a more specific location."
+                    ).strip(),
+                    missing_fields=["location"],
+                )
+
+        if not self._contains_location_ambiguity(turn.ambiguities):
+            return None
+
+        if len(turn.location_signals) > 1:
+            return self.location_resolver.build_ambiguity_question(
+                turn.location_signals
+            )
+
+        location_reference = self._location_reference(turn)
+        if location_reference:
+            question = (
+                f"Which specific location do you mean by {location_reference!r}? "
+                "Please provide a city, region, country, or coordinates."
+            )
+        else:
+            question = (
+                "Which specific location do you mean? Please provide a city, "
+                "region, country, or coordinates."
+            )
+        return ClarificationRequest(
+            question=question,
+            reason="The request has multiple plausible location interpretations.",
+            missing_fields=["location"],
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _contains_location_ambiguity(cls, ambiguities: list[str]) -> bool:
+        for ambiguity in ambiguities:
+            normalized = " ".join(str(ambiguity or "").casefold().split())
+            if not normalized or normalized in cls.LOCATION_MISSING_CODES:
+                continue
+            if normalized in cls.LOCATION_AMBIGUITY_CODES:
+                return True
+            has_ambiguity_marker = any(
+                marker in normalized
+                for marker in (
+                    "ambig",
+                    "multiple",
+                    "more than one",
+                    "could refer",
+                    "alternate",
+                    "not unique",
+                    "defaulting to",
+                )
+            )
+            has_location_reference = any(
+                marker in normalized
+                for marker in (
+                    "location",
+                    "place",
+                    "city",
+                    "region",
+                    "country",
+                    "address",
+                    "area",
+                    "destination",
+                )
+            )
+            if has_ambiguity_marker and has_location_reference:
+                return True
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _location_reference(turn: TurnParseResult) -> str:
+        for signal in turn.location_signals:
+            value = str(signal.raw_value or signal.normalized_value or "").strip()
+            if value:
+                return value
+        return ""
 
     # -------------------------------------------------------------------------
     def _enforce_safety_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:

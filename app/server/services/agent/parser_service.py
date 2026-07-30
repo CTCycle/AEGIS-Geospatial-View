@@ -446,9 +446,6 @@ class ParserService:
                 ambiguities,
                 user_message,
             )
-        if self._is_known_ambiguous_bare_place(user_message, location_signals):
-            ambiguities = self._dedupe([*ambiguities, "ambiguous_place_name"])
-
         confidence = extracted.parser_confidence
         if ambiguities:
             confidence -= 0.15
@@ -836,20 +833,3 @@ class ParserService:
             return AgentAction(str(action_id).strip()).value
         except ValueError:
             return AgentAction.UNKNOWN.value
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _is_known_ambiguous_bare_place(
-        user_message: str,
-        location_signals: list[LocationSignal],
-    ) -> bool:
-        text = " ".join(str(user_message or "").casefold().split())
-        if not re.search(r"\bnaples\b", text):
-            return False
-        if any(marker in text for marker in ("italy", "italia", "florida", "usa", "united states")):
-            return False
-        return any(
-            str(signal.raw_value or "").strip().casefold() == "naples"
-            or str(signal.normalized_value or "").strip().casefold() == "naples"
-            for signal in location_signals
-        )
