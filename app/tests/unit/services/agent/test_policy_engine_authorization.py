@@ -83,9 +83,9 @@ def test_policy_constraints_include_catalog_tools_only() -> None:
     ]
 
 ###############################################################################
-def test_preflight_requires_clarification_for_known_ambiguous_place_name() -> None:
+def test_preflight_builds_generic_clarification_for_ambiguous_location() -> None:
     turn = TurnParseResult(
-        user_text="Show Naples.",
+        user_text="Show Springfield.",
         conversation_context=ConversationContextSnapshot(),
         task_class="map_search",
         normalized_action=NormalizedAction(
@@ -94,9 +94,13 @@ def test_preflight_requires_clarification_for_known_ambiguous_place_name() -> No
             requires_location=True,
         ),
         location_signals=[
-            LocationSignal(signal_type="city", raw_value="Naples", normalized_value="Naples")
+            LocationSignal(
+                signal_type="city",
+                raw_value="Springfield",
+                normalized_value="Springfield",
+            )
         ],
-        ambiguities=["ambiguous_place_name"],
+        ambiguities=["Springfield could refer to multiple possible locations."],
     )
 
     decision = _engine().evaluate_preflight(turn)
@@ -104,7 +108,59 @@ def test_preflight_requires_clarification_for_known_ambiguous_place_name() -> No
     assert decision is not None
     assert decision.clarification is not None
     assert decision.clarification.missing_fields == ["location"]
-    assert "Naples, Italy" in decision.clarification.question
+    assert "Springfield" in decision.clarification.question
+    assert "city, region, country, or coordinates" in decision.clarification.question
+
+###############################################################################
+def test_preflight_formats_arbitrary_location_candidates() -> None:
+    turn = TurnParseResult(
+        user_text="Show Cairo.",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="map_search",
+            action_label="Map Search",
+            requires_location=True,
+        ),
+        location_signals=[
+            LocationSignal(signal_type="city", raw_value="Cairo, Egypt"),
+            LocationSignal(signal_type="city", raw_value="Cairo, Illinois"),
+        ],
+        ambiguities=["multiple_possible_locations"],
+    )
+
+    decision = _engine().evaluate_preflight(turn)
+
+    assert decision is not None
+    assert decision.clarification is not None
+    assert decision.clarification.question == (
+        "Which location do you mean: Cairo, Egypt, Cairo, Illinois?"
+    )
+
+###############################################################################
+def test_preflight_uses_structured_location_clarification_plan() -> None:
+    turn = TurnParseResult(
+        user_text="Show the airport.",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="map_search",
+            action_label="Map Search",
+            requires_location=True,
+        ),
+        clarification_plan={
+            "question": "Which airport and city should I use?",
+            "reason": "The airport name is not unique.",
+            "blocking_fields": ["location"],
+        },
+    )
+
+    decision = _engine().evaluate_preflight(turn)
+
+    assert decision is not None
+    assert decision.clarification is not None
+    assert decision.clarification.question == "Which airport and city should I use?"
+    assert decision.clarification.reason == "The airport name is not unique."
 
 ###############################################################################
 def test_authorize_tool_call_rejects_disallowed_tool() -> None:
