@@ -10,6 +10,7 @@ from openai import OpenAI
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.context_budget import compute_context_usage
+from server.services.llm.errors import LLMProviderRequestError
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -115,12 +116,17 @@ class DeepSeekProvider(LLMProvider):
                     effective_request.messages, schema
                 ),
             )
-        response = self._client().chat.completions.create(
-            model=request.model,
-            messages=self.normalize_tool_messages(effective_request.messages),
-            temperature=request.temperature,
-            **kwargs,
-        )
+        try:
+            response = self._client().chat.completions.create(
+                model=request.model,
+                messages=self.normalize_tool_messages(effective_request.messages),
+                temperature=request.temperature,
+                **kwargs,
+            )
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc, provider=self.provider_name, model=request.model, stage="chat"
+            ) from exc
         content, tool_calls = self._parse_choice(response)
         return LLMResult(
             content=content,
@@ -159,14 +165,19 @@ class DeepSeekProvider(LLMProvider):
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
-        response = self._client().chat.completions.create(
-            model=request.model,
-            messages=self.normalize_tool_messages(
-                self._messages_with_json_schema(request.messages, json_schema)
-            ),
-            temperature=request.temperature,
-            response_format={"type": "json_object"},
-        )
+        try:
+            response = self._client().chat.completions.create(
+                model=request.model,
+                messages=self.normalize_tool_messages(
+                    self._messages_with_json_schema(request.messages, json_schema)
+                ),
+                temperature=request.temperature,
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc, provider=self.provider_name, model=request.model, stage="structured_output"
+            ) from exc
         content, _ = self._parse_choice(response)
         loaded = json.loads(content or "{}")
         if not isinstance(loaded, dict):

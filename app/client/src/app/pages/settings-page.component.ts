@@ -656,6 +656,9 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.isLoadingDynamicProviderModels = false;
+      // Eager change detection does not automatically publish this final state.
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
     }
   }
 

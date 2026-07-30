@@ -205,4 +205,35 @@ describe('map-preview-rendering', () => {
     expect(sources[0]['maxzoom']).toBe(9);
     expect((sources[0]['tiles'] as string[])[0]).toContain('request=GetMap');
   });
+
+  it('uses verified inline GeoJSON data without issuing a browser fetch', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+    const session = {
+      overlays: [{
+        id: 'overpass_poi',
+        label: 'Rail stations',
+        provider: 'overpass',
+        type: 'clustered-points',
+        rendering_mode: 'clustered-points',
+        data: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [139.767, 35.681] },
+            properties: { category: 'station' },
+          }],
+        },
+      }],
+    } as unknown as MapSession;
+
+    expect(addOverlayLayers(map as never, session)[0].status).toBe('loaded');
+    expect(sources[0].type).toBe('geojson');
+    expect((sources[0].data as { type: string }).type).toBe('FeatureCollection');
+    expect(layers[0].type).toBe('circle');
+  });
 });

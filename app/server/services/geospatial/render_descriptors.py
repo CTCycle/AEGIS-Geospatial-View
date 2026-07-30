@@ -10,6 +10,8 @@ from server.domain.geographics import LocationSearchRequest
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
+from server.services.geospatial.overpass import OverpassService
+from server.services.geospatial.normalizers import NormalizationError, normalize_poi_feature
 
 ###############################################################################
 class RenderDescriptorService:
@@ -95,8 +97,52 @@ class RenderDescriptorService:
             capability_kind in {"dataset-ingestion", "vector-overlay"}
             and rendering_mode in {"clustered-points", "geojson", "choropleth"}
             and raw_url is None
+            and not overlay_id.startswith("overpass_poi")
         ):
             return self._feature_overlay_descriptor(capability, metadata, overlay_id, request), warnings
+        if overlay_id.startswith("overpass_poi") and request.poi_categories:
+            try:
+                payload = await OverpassService().get_nearby_poi(
+                    latitude=request.viewport.center_latitude,
+                    longitude=request.viewport.center_longitude,
+                    radius_m=request.viewport.radius_m,
+                    categories=list(request.poi_categories),
+                )
+                features = []
+                for item in payload.get("items") or []:
+                    if not isinstance(item, dict):
+                        continue
+                    try:
+                        features.append(
+                            normalize_poi_feature(
+                                item,
+                                source="overpass",
+                                category=str(item.get("category") or item.get("amenity") or "poi"),
+                            ).model_dump(mode="json")
+                        )
+                    except NormalizationError:
+                        continue
+                descriptor = self._feature_overlay_descriptor(capability, metadata, overlay_id, request)
+                descriptor["data"] = {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": item["id"],
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [item["longitude"], item["latitude"]],
+                            },
+                            "properties": item,
+                        }
+                        for item in features
+                    ],
+                }
+                descriptor.pop("url", None)
+                return descriptor, warnings
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"{overlay_id}: public POI retrieval failed; no layer was added ({type(exc).__name__}).")
+                return self.metadata_only_descriptor(capability, metadata, overlay_id), warnings
         if capability_kind in {"dataset-ingestion", "vector-overlay"} and rendering_mode == "vector-tile" and raw_url is None:
             warnings.append(f"{overlay_id}: vector tile render metadata is incomplete; exposing metadata only.")
             return self.metadata_only_descriptor(capability, metadata, overlay_id), warnings

@@ -136,6 +136,16 @@ class CapabilityResolver:
             return self._enabled("tomtom_traffic_flow") or self._enabled(
                 "tomtom_traffic_incidents"
             )
+        # Open-Meteo forecast data is a supported context capability. It is
+        # intentionally metadata-only in the map, but it must still resolve
+        # so a forecast follow-up does not degrade into an unsupported-layer
+        # clarification or recreate the basemap.
+        if normalized in {"weather", "weather_forecast", "forecast"} or (
+            "weather" in normalized and "forecast" in normalized
+        ):
+            return self._enabled("openmeteo_weather_forecast") or self._enabled(
+                "get_weather_forecast"
+            )
         if "_" in layer:
             return None
         if self._is_precipitation_concept(normalized, text):

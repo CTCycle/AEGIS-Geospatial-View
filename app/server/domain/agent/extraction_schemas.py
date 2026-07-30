@@ -119,6 +119,7 @@ class LLMParserExtraction(BaseModel):
     map_target: str | None = None
     entity_target: str | None = None
     requested_layers: list[str] = Field(default_factory=list)
+    poi_categories: list[Literal["bicycle_parking", "transit_stops", "rail_stations"]] = Field(default_factory=list)
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=list)
     required_data_sources: list[str] = Field(default_factory=list)

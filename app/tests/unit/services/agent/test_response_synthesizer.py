@@ -208,3 +208,28 @@ def test_synthesizer_falls_back_on_invalid_structured_output() -> None:
         fallback_text="Verified fallback.",
         operation=operation,
     ) == "Verified fallback."
+
+###############################################################################
+def test_synthesizer_falls_back_when_successful_overlay_is_called_failed() -> None:
+    provider = _Provider("The overlay failed and is not available.")
+    synthesizer = GroundedResponseSynthesizer(
+        settings_repo=_SettingsRepo(),  # type: ignore[arg-type]
+        llm_factory=_Factory(provider),  # type: ignore[arg-type]
+        enabled=True,
+    )
+    map_session = MapSession(
+        session_id="map-1",
+        resolved_location=ResolvedLocation(label="Tokyo", latitude=35.6, longitude=139.7),
+        basemap_id="osm_default",
+        overlay_ids=["overpass_poi_amenities"],
+        viewport=ViewportPolicy(center_latitude=35.6, center_longitude=139.7, radius_m=4000.0),
+        overlays=[{"id": "overpass_poi_amenities", "rendering_mode": "clustered-points"}],
+    )
+    operation = ChatOperationResult(kind="map_session", status="success", message="Verified.", map_session=map_session)
+
+    assert synthesizer.synthesize(
+        user_text="Show rail stations in Tokyo.",
+        fallback_text="Map ready with the verified POI overlay.",
+        operation=operation,
+        map_session=map_session,
+    ) == "Map ready with the verified POI overlay."

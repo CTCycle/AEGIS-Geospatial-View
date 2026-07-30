@@ -8,7 +8,7 @@ import {
   CapabilityStatusTone,
 } from '../components/capability-status-list.component';
 import { ChatMessageComponent } from '../components/chat-message.component';
-import { MapPreviewComponent } from '../components/map-preview.component';
+import { MapPreviewComponent, MapRenderStateChange } from '../components/map-preview.component';
 import {
   AgentReadinessService,
   AgentReadinessState,
@@ -90,6 +90,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private steeringMutationCounter = 0;
   private reconnectAttempts = 0;
   private isDestroyed = false;
+  private pendingMapSession?: MapSession;
 
   constructor(
     private readonly router: Router,
@@ -660,11 +661,45 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (!mapSession) {
       return;
     }
-    this.mapSession = mapSession;
+    this.pendingMapSession = mapSession;
     this.payload = {
       map_session: mapSession,
       compliance_warnings: mapSession.compliance_warnings,
     };
+  }
+
+  onMapRenderStateChange(change: MapRenderStateChange): void {
+    if (this.pendingMapSession?.session_id !== change.sessionId) {
+      return;
+    }
+    if (change.state === 'ready') {
+      this.mapSession = this.pendingMapSession;
+      this.pendingMapSession = undefined;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+    if (change.state === 'failed') {
+      this.pendingMapSession = undefined;
+      if (this.mapSession) {
+        this.payload = {
+          map_session: this.mapSession,
+          compliance_warnings: this.mapSession.compliance_warnings,
+        };
+      } else {
+        this.payload = undefined;
+      }
+      const message = change.message || 'The map update could not be rendered; the previous map remains available.';
+      if (this.messages.at(-1)?.content !== message) {
+        this.messages = [...this.messages, { role: 'assistant', content: message }];
+      }
+      this.lastOperation = this.lastOperation
+        ? { ...this.lastOperation, status: 'partial', message }
+        : this.lastOperation;
+      this.status = 'Map update failed';
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+    }
   }
 
   private syncState(): void {

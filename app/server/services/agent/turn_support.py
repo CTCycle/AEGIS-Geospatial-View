@@ -70,6 +70,11 @@ class AgentTurnSupport:
                 "answer coordinate and weather queries through registered tools, remember the active location for follow-ups, "
                 "and reject requests that try to bypass policy or reveal secrets."
             )
+        if "basemap" in text and "layer" in text:
+            return (
+                "A basemap is the geographic background or reference, such as streets, satellite imagery, or terrain. "
+                "A map layer adds thematic or operational data above that background and can be shown or hidden independently."
+            )
         return "I can help with location-based maps, coordinates, weather, rainfall, traffic layers, and related geospatial questions."
 
     # -------------------------------------------------------------------------
@@ -109,7 +114,10 @@ class AgentTurnSupport:
     # -------------------------------------------------------------------------
     @staticmethod
     def has_parser_runtime_failure(turn_contract: Any) -> bool:
-        if "parser_unavailable" not in set(turn_contract.ambiguities or []):
+        ambiguities = set(turn_contract.ambiguities or [])
+        if "parser_unavailable" not in ambiguities and not any(
+            item.startswith("provider_") for item in ambiguities
+        ):
             return False
         if not hasattr(turn_contract, "task_class"):
             return True

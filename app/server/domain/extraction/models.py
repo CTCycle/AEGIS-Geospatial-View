@@ -5,7 +5,17 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 TaskClass = Literal["map_search", "direct_query", "general_question", "unclear"]
-LocationSignalType = Literal["address", "city", "country", "coordinates", "deictic"]
+PoiCategory = Literal["bicycle_parking", "transit_stops", "rail_stations"]
+LocationSignalType = Literal[
+    "address",
+    "city",
+    "country",
+    "coordinates",
+    "deictic",
+    "poi",
+    "region",
+    "street",
+]
 TemporalMode = Literal["current", "historical", "forecast", "none"]
 
 ###############################################################################
@@ -98,6 +108,7 @@ class TurnParseResult(BaseModel):
     map_target: str | None = None
     entity_target: str | None = None
     requested_layers: list[str] = Field(default_factory=list)
+    poi_categories: list[PoiCategory] = Field(default_factory=list)
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=list)
     required_data_sources: list[str] = Field(default_factory=list)
@@ -110,4 +121,5 @@ class TurnParseResult(BaseModel):
     atomic_tasks: list[dict[str, Any]] = Field(default_factory=list)
     clarification_plan: dict[str, Any] | None = None
     viewport_intent: ViewportIntent | None = None
+    provider_error: dict[str, Any] | None = None
     

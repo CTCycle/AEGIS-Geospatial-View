@@ -136,6 +136,7 @@
           [initialOverlayVisibility]="mapState.overlayVisibility"
           [initialOverlayOpacity]="mapState.overlayOpacity"
           (overlayStateChange)="onOverlayStateChange($event)"
+          (renderStateChange)="onMapRenderStateChange($event)"
         ></app-map-preview>
       </div>
     </section>

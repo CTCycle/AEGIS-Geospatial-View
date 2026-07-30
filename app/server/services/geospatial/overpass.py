@@ -27,6 +27,16 @@ class OverpassRateLimitError(OverpassServiceError):
 
 ###############################################################################
 class OverpassService:
+    CATEGORY_SELECTORS: dict[str, tuple[tuple[str, str], ...]] = {
+        "bicycle_parking": (("amenity", "bicycle_parking"),),
+        "transit_stops": (
+            ("public_transport", "platform"),
+            ("public_transport", "stop_position"),
+            ("highway", "bus_stop"),
+            ("amenity", "bus_station"),
+        ),
+        "rail_stations": (("railway", "station"), ("railway", "halt")),
+    }
     DEFAULT_AMENITIES = (
         "cafe",
         "restaurant",
@@ -93,6 +103,7 @@ class OverpassService:
         longitude: float,
         radius_m: float | None = None,
         amenity_tags: list[str] | None = None,
+        categories: list[str] | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
         resolved_radius_m = max(radius_m or self.default_radius_m, 100.0)
@@ -102,14 +113,25 @@ class OverpassService:
             for tag in (amenity_tags or list(self.DEFAULT_AMENITIES))
             if tag and tag.strip()
         ]
+        if categories and amenity_tags is None:
+            tags = []
         if not tags:
-            tags = list(self.DEFAULT_AMENITIES)
+            tags = [] if categories else list(self.DEFAULT_AMENITIES)
+        selectors = [
+            *[("amenity", tag) for tag in tags],
+            *[
+                selector
+                for category in (categories or [])
+                for selector in self.CATEGORY_SELECTORS.get(str(category), ())
+            ],
+        ]
+        selectors = list(dict.fromkeys(selectors))
         payload = await asyncio.to_thread(
             self._query_overpass,
             latitude=latitude,
             longitude=longitude,
             radius_m=resolved_radius_m,
-            tags=tags,
+            selectors=selectors,
             limit=resolved_limit,
         )
         elements = (
@@ -120,8 +142,15 @@ class OverpassService:
             if not isinstance(raw, dict):
                 continue
             tags_payload = raw.get("tags") if isinstance(raw.get("tags"), dict) else {}
-            amenity = tags_payload.get("amenity")
-            if not amenity:
+            category = next(
+                (
+                    tags_payload.get(key)
+                    for key in ("amenity", "public_transport", "railway", "highway")
+                    if tags_payload.get(key)
+                ),
+                None,
+            )
+            if not category:
                 continue
             lat = raw.get("lat")
             lon = raw.get("lon")
@@ -142,8 +171,9 @@ class OverpassService:
             points.append(
                 {
                     "id": str(raw.get("id")),
-                    "name": tags_payload.get("name") or f"{amenity.title()}",
-                    "amenity": str(amenity),
+                    "name": tags_payload.get("name") or f"{category.title()}",
+                    "amenity": str(tags_payload.get("amenity") or ""),
+                    "category": str(category),
                     "latitude": lat_value,
                     "longitude": lon_value,
                     "distance_m": round(distance_m, 1),
@@ -235,20 +265,20 @@ class OverpassService:
         latitude: float,
         longitude: float,
         radius_m: float,
-        tags: list[str],
+        selectors: list[tuple[str, str]],
         limit: int,
     ) -> dict[str, Any]:
-        cache_key = f"{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{','.join(sorted(tags))}:{limit}"
+        cache_key = f"{latitude:.5f}:{longitude:.5f}:{radius_m:.0f}:{','.join(f'{key}={value}' for key, value in sorted(selectors))}:{limit}"
         cached = self._cache_get(cache_key)
         if cached is not None:
             return cached
         self._wait_for_rate_limit_slot()
         filters = "\n".join(
             [
-                f'node["amenity"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
-                f'\nway["amenity"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
-                f'\nrelation["amenity"="{tag}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
-                for tag in tags
+                f'node["{key}"="{value}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+                f'\nway["{key}"="{value}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+                f'\nrelation["{key}"="{value}"](around:{int(radius_m)},{latitude:.6f},{longitude:.6f});'
+                for key, value in selectors
             ]
         )
         query = f"[out:json][timeout:25];\n(\n{filters}\n);\nout center {limit};"

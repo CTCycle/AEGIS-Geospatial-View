@@ -48,6 +48,7 @@ class TaskFailureDetail(BaseModel):
     partial_results_available: bool = False
     recovery_suggestion: str | None = None
     user_explanation: str
+    provider_error: dict[str, object] | None = None
 
 ###############################################################################
 class ToolRetryPolicy(BaseModel):

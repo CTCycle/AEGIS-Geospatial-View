@@ -283,11 +283,22 @@ export interface MapSession {
     default_time?: string | null;
     warnings?: string[];
     render?: GeospatialLayerRenderDescriptor | null;
+    data?: GeoJsonFeatureCollection;
   }>;
   requested_overlay_ids?: string[];
   rendered_overlay_ids?: string[];
   failed_overlays?: Array<{ id: string; reason: string }>;
   compliance_warnings?: string[];
+}
+
+export interface GeoJsonFeatureCollection {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    id?: string | number;
+    geometry: JsonObject | null;
+    properties?: JsonObject | null;
+  }>;
 }
 
 export type MapOverlayEntry = NonNullable<MapSession['overlays']>[number];
@@ -557,6 +568,14 @@ export interface ChatOperationResult {
   warnings?: string[];
   map_session?: MapSession | null;
   direct_result?: Record<string, JsonValue> | null;
+  provider_error?: {
+    code: string;
+    provider: string;
+    model: string;
+    stage: string;
+    http_status?: number | null;
+    retryable: boolean;
+  } | null;
 }
 
 export interface TaskFailureDetail {
@@ -569,6 +588,7 @@ export interface TaskFailureDetail {
   partial_results_available: boolean;
   recovery_suggestion?: string | null;
   user_explanation: string;
+  provider_error?: ChatOperationResult['provider_error'];
 }
 
 export interface ToolPlanStep {
