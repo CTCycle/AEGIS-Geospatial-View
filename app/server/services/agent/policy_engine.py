@@ -245,6 +245,12 @@ class PolicyEngine:
 
     # -------------------------------------------------------------------------
     def _enforce_location_policy(self, turn: TurnParseResult) -> ClarificationRequest | None:
+        if "ambiguous_place_name" in turn.ambiguities:
+            return ClarificationRequest(
+                question="Which Naples do you mean: Naples, Italy or Naples, Florida?",
+                reason="The place name matches multiple well-known locations.",
+                missing_fields=["location"],
+            )
         if "deictic_without_memory" in turn.ambiguities:
             return ClarificationRequest(
                 question="Which location should I use?",

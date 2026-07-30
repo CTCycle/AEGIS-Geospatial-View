@@ -331,10 +331,24 @@ class AgentTurnStateAssembler:
         )
         if not isinstance(resolved_location, ResolvedLocation):
             return None
+        active_visualization = (
+            latest_memory.get("active_visualization")
+            if isinstance(latest_memory, dict)
+            else None
+        )
+        existing_overlay_ids = (
+            [
+                item
+                for item in active_visualization.get("overlay_ids") or []
+                if isinstance(item, str)
+            ]
+            if isinstance(active_visualization, dict)
+            else []
+        )
         inferred_overlay_ids = self.infer_overlay_ids(
             turn_contract=turn_contract,
             resolved_location=resolved_location,
-            existing_overlay_ids=[],
+            existing_overlay_ids=existing_overlay_ids,
         )
         plan = ExecutionPlan(
             state="map_search",
@@ -348,9 +362,7 @@ class AgentTurnStateAssembler:
             resolved_location,
             turn_contract=turn_contract,
             active_visualization=(
-                latest_memory.get("active_visualization")
-                if isinstance(latest_memory, dict)
-                else None
+                active_visualization
             ),
         )
         return await self.search_orchestrator.execute(request)
@@ -489,12 +501,21 @@ class AgentTurnStateAssembler:
         resolved_location: Any,
         existing_overlay_ids: list[str],
     ) -> list[str]:
+        removed_overlay_ids = self.overlay_inference_service.removed_overlay_ids(
+            turn_contract=turn_contract,
+            existing_overlay_ids=existing_overlay_ids,
+        )
+        retained_overlay_ids = [
+            overlay_id
+            for overlay_id in existing_overlay_ids
+            if overlay_id not in removed_overlay_ids
+        ]
         inferred = self.overlay_inference_service.infer_overlays(
             turn_contract=turn_contract,
             location=resolved_location,
-            existing_overlay_ids=existing_overlay_ids,
+            existing_overlay_ids=retained_overlay_ids,
         )
-        merged = list(existing_overlay_ids)
+        merged = list(retained_overlay_ids)
         for overlay_id in inferred.overlay_ids:
             if overlay_id not in merged:
                 merged.append(overlay_id)

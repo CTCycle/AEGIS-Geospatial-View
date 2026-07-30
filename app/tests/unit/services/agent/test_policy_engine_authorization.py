@@ -83,6 +83,30 @@ def test_policy_constraints_include_catalog_tools_only() -> None:
     ]
 
 ###############################################################################
+def test_preflight_requires_clarification_for_known_ambiguous_place_name() -> None:
+    turn = TurnParseResult(
+        user_text="Show Naples.",
+        conversation_context=ConversationContextSnapshot(),
+        task_class="map_search",
+        normalized_action=NormalizedAction(
+            action_id="map_search",
+            action_label="Map Search",
+            requires_location=True,
+        ),
+        location_signals=[
+            LocationSignal(signal_type="city", raw_value="Naples", normalized_value="Naples")
+        ],
+        ambiguities=["ambiguous_place_name"],
+    )
+
+    decision = _engine().evaluate_preflight(turn)
+
+    assert decision is not None
+    assert decision.clarification is not None
+    assert decision.clarification.missing_fields == ["location"]
+    assert "Naples, Italy" in decision.clarification.question
+
+###############################################################################
 def test_authorize_tool_call_rejects_disallowed_tool() -> None:
     context = AgentExecutionContext(
         policy_constraints={"allowed_tool_names": ["list_geospatial_capabilities"]}

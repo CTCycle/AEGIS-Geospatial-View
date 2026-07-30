@@ -193,7 +193,7 @@ class RenderDescriptorService:
             if isinstance(metadata.get(key), int | float):
                 descriptor[key] = int(metadata[key]) if key != "default_opacity" else float(metadata[key])
         if descriptor["provider"] == "rainviewer":
-            descriptor["maxzoom"] = 10
+            descriptor["maxzoom"] = 7
         if self._is_bounds(metadata.get("bounds")):
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings
