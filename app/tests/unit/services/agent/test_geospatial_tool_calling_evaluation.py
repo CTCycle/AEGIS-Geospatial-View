@@ -12,6 +12,7 @@ from server.domain.extraction.models import (
 from server.services.agent.tool_planner import DeterministicToolPlanner
 
 
+###############################################################################
 def _turn(
     text: str,
     *,
@@ -57,6 +58,7 @@ def _turn(
     )
 
 
+###############################################################################
 @pytest.mark.parametrize(
     ("name", "turn", "specialist", "memory", "expected_tools", "expected_capabilities"),
     [
@@ -200,6 +202,7 @@ def test_deterministic_geospatial_tool_calling_scenarios(
     assert [step.capability_id for step in plan.steps if step.capability_id] == expected_capabilities
 
 
+###############################################################################
 def test_bbox_evaluation_preserves_canonical_coordinate_order() -> None:
     turn = _turn(
         "Show demographics in this extent",

@@ -16,26 +16,29 @@ from server.services.llm.types import LLMRequest
 class _StructuredPayload(BaseModel):
     answer: str
 
-
 ###############################################################################
 class _Response:
 
+    # -------------------------------------------------------------------------
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
 
+    # -------------------------------------------------------------------------
     def raise_for_status(self) -> None:
         return None
 
+    # -------------------------------------------------------------------------
     def json(self) -> dict[str, object]:
         return self.payload
-
 
 ###############################################################################
 class _Completions:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs):  # noqa: ANN003, ANN201
         self.calls.append(kwargs)
         message = SimpleNamespace(
@@ -46,15 +49,16 @@ class _Completions:
             choices=[SimpleNamespace(message=message, finish_reason="stop")]
         )
 
-
 ###############################################################################
 class _Client:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
 
 
+###############################################################################
 def test_zen_catalog_filters_models_to_openai_compatible_subset(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
@@ -82,6 +86,7 @@ def test_zen_catalog_filters_models_to_openai_compatible_subset(monkeypatch) -> 
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
 
 
+###############################################################################
 def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_GO_PROVIDER)
 
@@ -91,6 +96,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.supports_tools("claude-opus-5") is False
 
 
+###############################################################################
 def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:
     client = _Client()
     provider = OpenCodeProvider(api_key="test-key", provider_name=OPENCODE_PROVIDER)
