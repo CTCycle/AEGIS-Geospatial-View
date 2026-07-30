@@ -58,9 +58,11 @@ def test_overture_maps_can_augment_local_places_with_overpass_and_deduplicate(tm
         encoding="utf-8",
     )
 
+    ###############################################################################
     class _FakeOverpass:
         default_radius_m = 500.0
 
+        # -------------------------------------------------------------------------
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             assert kwargs["latitude"] == 41.9
             assert kwargs["longitude"] == 12.5

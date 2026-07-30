@@ -80,6 +80,7 @@ OVERLAP_GROUPS = {
 }
 
 
+###############################################################################
 def _read_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8")
@@ -87,6 +88,7 @@ def _read_text(path: Path) -> str:
         return ""
 
 
+###############################################################################
 def _safe_url(value: object) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -97,6 +99,7 @@ def _safe_url(value: object) -> str | None:
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(query), ""))
 
 
+###############################################################################
 def _manifest_urls(manifest: dict[str, Any]) -> list[str]:
     metadata = manifest.get("metadata") if isinstance(manifest.get("metadata"), dict) else {}
     urls: list[str] = []
@@ -113,6 +116,7 @@ def _manifest_urls(manifest: dict[str, Any]) -> list[str]:
     return urls
 
 
+###############################################################################
 def _native_tools() -> list[dict[str, Any]]:
     source = _read_text(NATIVE_TOOL_SOURCE)
     names = list(dict.fromkeys(re.findall(r'name="([a-z][a-z0-9_]+)"', source)))
@@ -135,6 +139,7 @@ def _native_tools() -> list[dict[str, Any]]:
     ]
 
 
+###############################################################################
 def _provider_overlaps(provider_id: str, capabilities: set[str]) -> list[str]:
     matches: list[str] = []
     for group, providers in OVERLAP_GROUPS.items():
@@ -145,6 +150,7 @@ def _provider_overlaps(provider_id: str, capabilities: set[str]) -> list[str]:
     return matches
 
 
+###############################################################################
 def _adapter_path(provider_id: str) -> str | None:
     filename = PROVIDER_SOURCE_ALIASES.get(provider_id, provider_id.replace("-", "_"))
     path = PROVIDER_SOURCE_DIR / f"{filename}.py"
@@ -153,6 +159,7 @@ def _adapter_path(provider_id: str) -> str | None:
     return None
 
 
+###############################################################################
 def _endpoint_validation(
     by_provider: dict[str, list[dict[str, Any]]],
     *,
@@ -208,6 +215,7 @@ def _endpoint_validation(
     return results
 
 
+###############################################################################
 def _status_for_provider(
     provider_id: str,
     manifests: list[dict[str, Any]],
@@ -233,6 +241,7 @@ def _status_for_provider(
     return "registered_not_enabled"
 
 
+###############################################################################
 def build_inventory(
     live_report: dict[str, Any] | None = None,
     *,
@@ -386,6 +395,7 @@ def build_inventory(
     }
 
 
+###############################################################################
 def _markdown(report: dict[str, Any]) -> str:
     lines = [
         "# Geospatial Provider and Tool Inventory",
@@ -420,6 +430,7 @@ def _markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+###############################################################################
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build a geospatial provider/tool inventory.")
     parser.add_argument("--output", type=Path, required=True, help="JSON report path.")

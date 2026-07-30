@@ -83,7 +83,6 @@ class FREDProvider(GeospatialProvider):
             attribution=["Federal Reserve Bank of St. Louis FRED"],
         )
 
-
 ###############################################################################
 def _normalize_series(payload: object) -> list[dict[str, object]]:
     if not isinstance(payload, dict):
