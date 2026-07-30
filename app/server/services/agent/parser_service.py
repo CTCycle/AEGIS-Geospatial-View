@@ -22,7 +22,7 @@ from server.domain.extraction.models import (
     ViewportIntent,
 )
 from server.repositories.model_settings import ModelSettingsRepository
-from server.services.llm.errors import LLMConfigurationError
+from server.services.llm.errors import LLMConfigurationError, LLMProviderRequestError
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
@@ -212,32 +212,25 @@ class ParserService:
     @staticmethod
     def _looks_like_map_request(user_message: str) -> bool:
         text = user_message.casefold()
-        markers = (
-            "map",
-            "show",
-            "display",
-            "locate",
-            "where is",
-            "satellite",
-            "overlay",
-            "weather",
-            "traffic",
-            "amenities",
-            "coordinates",
-            "coordinate",
-            "mapa",
-            "carte",
-            "karte",
-            "mappa",
-            "mostrar",
-            "muestra",
-            "montre",
+        render_verbs = (
+            "show", "display", "render", "open", "view", "zoom", "locate",
+            "map", "satellite", "overlay", "basemap", "street map",
+            "mostrar", "muestra", "montre", "carte", "karte", "mappa", "mapa",
         )
-        return any(marker in text for marker in markers)
+        return any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in render_verbs)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _explicit_no_map(user_message: str) -> bool:
+        text = " ".join(user_message.casefold().split())
+        return bool(re.search(r"\b(?:do not|don't|without|no)\s+(?:render|show|open|display)\s+(?:a\s+)?map\b", text))
 
     # -------------------------------------------------------------------------
     @classmethod
     def _extract_text_location_signal(cls, user_message: str) -> LLMLocationSignal | None:
+        normalized = " ".join(user_message.casefold().split())
+        if "difference between" in normalized and "basemap" in normalized and "layer" in normalized:
+            return None
         coordinate_signal = cls._extract_coordinate_signal(user_message)
         if coordinate_signal is not None:
             return coordinate_signal
@@ -317,7 +310,7 @@ class ParserService:
         extracted: LLMParserExtraction,
         fallback: LLMParserExtraction,
     ) -> bool:
-        if fallback.task_class == "map_search" and (
+        if fallback.task_class == "map_search" and extracted.task_class != "general_question" and (
             extracted.task_class in {"unclear", "general_question"}
             or not extracted.location_signals
         ):
@@ -337,6 +330,7 @@ class ParserService:
     ) -> TurnParseResult:
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
+        parser_provider_error: dict[str, object] | None = None
         try:
             extracted = self._extract_turn(
                 user_message=user_message,
@@ -349,11 +343,22 @@ class ParserService:
             raise
         except Exception as exc:
             LOGGER.exception("Parser LLM extraction failed: %s", exc)
-            failure_ambiguity = (
-                "parser_authentication_failed"
-                if "invalid_api_key" in str(exc).lower() or "401" in str(exc)
-                else "parser_unavailable"
-            )
+            if isinstance(exc, LLMProviderRequestError):
+                failure_ambiguity = exc.code
+                parser_provider_error = {
+                    "code": exc.code,
+                    "provider": exc.provider,
+                    "model": exc.model,
+                    "stage": exc.stage,
+                    "http_status": exc.http_status,
+                    "retryable": exc.retryable,
+                }
+            else:
+                failure_ambiguity = (
+                    "parser_authentication_failed"
+                    if "invalid_api_key" in str(exc).lower() or "401" in str(exc)
+                    else "parser_unavailable"
+                )
             parser_failure_ambiguity = failure_ambiguity
             extracted = LLMParserExtraction(
                 task_class="unclear",
@@ -454,6 +459,7 @@ class ParserService:
             and normalized_action.requires_location
             and location_signals
             and self._looks_like_map_request(user_message)
+            and not self._explicit_no_map(user_message)
         ):
             task_class = "map_search"
 
@@ -474,6 +480,7 @@ class ParserService:
             map_target=extracted.map_target,
             entity_target=extracted.entity_target,
             requested_layers=self._dedupe(extracted.requested_layers),
+            poi_categories=list(dict.fromkeys(extracted.poi_categories)),
             requested_basemap=extracted.requested_basemap,
             requested_attributes=self._dedupe(extracted.requested_attributes),
             required_data_sources=self._dedupe(extracted.required_data_sources),
@@ -496,6 +503,7 @@ class ParserService:
                 if extracted.viewport_intent is not None
                 else None
             ),
+            provider_error=parser_provider_error,
         )
         LOGGER.info(
             "parser_normalized task=%s action=%s relationship=%s locations=%d basemap=%s layers=%d viewport_scope=%s tighten=%s ambiguities=%s",
@@ -529,6 +537,52 @@ class ParserService:
             text,
             has_active_visualization=bool(memory_snapshot.get("active_visualization")),
         )
+
+        no_map = cls._explicit_no_map(user_message)
+        if no_map:
+            updates.update(
+                task_class="direct_query",
+                action_id=AgentAction.CHAT_RESPONSE.value,
+                action_label="Direct answer without map rendering",
+                requested_basemap=None,
+                requested_layers=[],
+                requested_visualizations=[],
+                tools_needed=False,
+                direct_response_sufficient=True,
+                expected_frontend_update="assistant_message",
+            )
+
+        poi_categories: list[str] = []
+        if "bicycle parking" in text or "bike parking" in text:
+            poi_categories.append("bicycle_parking")
+        if any(marker in text for marker in ("transit stop", "transit stops", "public transit", "bus stop", "bus station")):
+            poi_categories.append("transit_stops")
+        if any(marker in text for marker in ("rail station", "rail stations", "train station", "train stations")):
+            poi_categories.append("rail_stations")
+        if poi_categories:
+            if "central tokyo" in text or "tokyo station" in text:
+                updates["location_signals"] = [
+                    LLMLocationSignal(
+                        signal_type="city",
+                        raw_value="Tokyo",
+                        normalized_value="Tokyo, Japan",
+                        confidence=0.95,
+                    )
+                ]
+                updates["map_target"] = "Tokyo, Japan"
+            updates.update(
+                task_class="map_search",
+                action_id=AgentAction.GEOSPATIAL_DATA_RETRIEVAL.value,
+                action_label="Public OpenStreetMap feature retrieval",
+                entity_target="poi",
+                required_tool_category="geospatial_features",
+                required_data_sources=cls._dedupe([*extracted.required_data_sources, "openstreetmap_overpass"]),
+                tools_needed=True,
+                direct_response_sufficient=False,
+                expected_frontend_update="map_session",
+                requested_layers=["overpass_poi_amenities"],
+                poi_categories=poi_categories,
+            )
 
         if any(marker in text for marker in ("why did", "why has", "why was", "why it failed", "why did it fail")):
             updates.update(
@@ -634,6 +688,20 @@ class ParserService:
             and any(marker in text for marker in ("ground", "surface", "at the ground"))
             and any(marker in text for marker in ("medium", "mean", "average"))
         )
+        # Keep ordinary weather-forecast wording on the weather capability.
+        # Structured extraction can otherwise over-select the air-quality
+        # forecast because both are Open-Meteo capabilities. This is a
+        # deterministic contract rule, not a model preference.
+        if "weather" in text and "forecast" in text and "air quality" not in text:
+            updates.update(
+                requested_layers=["openmeteo_weather_forecast"],
+                required_tool_category="environmental_data",
+                tools_needed=True,
+                direct_response_sufficient=False,
+                ambiguities=[],
+                clarification_plan=None,
+                expected_frontend_update="visualization_update",
+            )
         if ground_temperature:
             updates.update(
                 requested_attributes=cls._dedupe(

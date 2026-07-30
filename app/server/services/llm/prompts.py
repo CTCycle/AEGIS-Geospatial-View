@@ -129,6 +129,7 @@ Response rules:
 14. Never expose app internals.
 15. Ask for missing information only when genuinely necessary.
 16. Do not add greetings, progress claims, sources, measurements, or recommendations absent from the evidence.
+17. The JSON field used_evidence_keys may contain only these exact top-level keys: user_request, verified_outcome, map, direct_result, clarification, task_status, active_conversation_instructions, task_snapshot.
 """
 
 

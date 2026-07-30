@@ -816,4 +816,15 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     async def _fetch_binary_url(self, url: str) -> bytes:
-        return await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})
+        body = await fetch_bytes_url(url, {"User-Agent": "AEGIS/1.0"})
+        if not body:
+            raise ProviderUnavailableError("Provider returned an empty tile body.")
+        # Reject HTML/error payloads that upstreams occasionally return with HTTP 200.
+        signatures = (
+            b"\x89PNG\r\n\x1a\n",
+            b"\xff\xd8\xff",
+            b"RIFF",
+        )
+        if not any(body.startswith(signature) for signature in signatures):
+            raise ProviderUnavailableError("Provider returned a non-image tile body.")
+        return body

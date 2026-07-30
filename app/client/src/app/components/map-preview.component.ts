@@ -32,7 +32,16 @@ import {
   normalizeBounds,
   recordBooleanEqual,
   recordNumberEqual,
+  removeOverlayLayers,
 } from './map-preview-rendering';
+
+export type MapRenderState = 'preparing' | 'ready' | 'failed';
+
+export interface MapRenderStateChange {
+  sessionId: string;
+  state: MapRenderState;
+  message?: string;
+}
 
 @Component({
   selector: 'app-map-preview',
@@ -49,6 +58,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() initialOverlayVisibility: Record<string, boolean> = {};
   @Input() initialOverlayOpacity: Record<string, number> = {};
   @Output() overlayStateChange = new EventEmitter<OverlayStateChange>();
+  @Output() renderStateChange = new EventEmitter<MapRenderStateChange>();
 
   @ViewChild('mapContainer', { static: false })
   private set mapContainer(value: ElementRef<HTMLDivElement> | undefined) {
@@ -65,8 +75,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   restoreNotice = '';
 
   private mapRef: Map | null = null;
+  private activeMapContainer: HTMLDivElement | null = null;
+  private activeBasemapId: string | null = null;
+  private activeCenterKey: string | null = null;
   private mapContainerRef?: ElementRef<HTMLDivElement>;
   private viewInitialized = false;
+  private mapPreparing = false;
 
   constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
@@ -259,28 +273,136 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (!this.mapContainerRef?.nativeElement) {
       return;
     }
+    if (this.mapPreparing) {
+      return;
+    }
 
-    this.destroyMap();
+    const nextBasemapId = this.mapSession?.basemap_id || this.mapSession?.basemap?.id || null;
+    const nextCenterKey = `${latitude.toFixed(5)}:${longitude.toFixed(5)}`;
+    if (this.mapRef && this.activeBasemapId === nextBasemapId && this.activeCenterKey === nextCenterKey) {
+      // Overlay and metadata updates are applied to the known-good map in place.
+      removeOverlayLayers(this.mapRef, this.mapSession);
+      this.overlayRenderStatuses = addOverlayLayers(this.mapRef, this.mapSession);
+      this.applyOverlayStateToMap();
+      this.emitRenderState('ready');
+      this.changeDetector.detectChanges();
+      return;
+    }
 
-    const map = new maplibregl.Map({
-      container: this.mapContainerRef.nativeElement,
+    const originalContainer = this.mapContainerRef.nativeElement;
+    const candidateContainer = this.mapRef
+      ? this.createCandidateContainer(originalContainer)
+      : originalContainer;
+    const previousMap = this.mapRef;
+    const previousContainer = this.activeMapContainer;
+    this.emitRenderState('preparing');
+    this.mapPreparing = true;
+    let candidateFailed = false;
+    let candidate: Map;
+    try {
+      candidate = new maplibregl.Map({
+      container: candidateContainer,
       style: this.mapSession?.basemap?.style_url || buildStyle(this.mapSession),
       center: [longitude, latitude],
       zoom: 12,
+      });
+    } catch (error) {
+      this.mapPreparing = false;
+      this.removeCandidateContainer(candidateContainer, originalContainer);
+      this.emitRenderState('failed', this.safeRenderError(error));
+      return;
+    }
+
+    candidate.on('error', (event: unknown) => {
+      if (candidateFailed) {
+        return;
+      }
+      const error = (event as { error?: unknown } | null)?.error;
+      if (error) {
+        candidateFailed = true;
+        this.mapPreparing = false;
+        candidate.remove();
+        this.removeCandidateContainer(candidateContainer, originalContainer);
+        this.emitRenderState('failed', this.safeRenderError(error));
+      }
     });
 
-    map.on('load', () => {
-      map.resize();
-      this.overlayRenderStatuses = addOverlayLayers(map, this.mapSession);
+    candidate.on('load', () => {
+      if (candidateFailed) {
+        return;
+      }
+      candidate.resize();
+      this.overlayRenderStatuses = addOverlayLayers(candidate, this.mapSession);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
-        map.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
+        candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
       }
+      if (!this.hasRenderableCanvas(candidate, candidateContainer)) {
+        this.mapPreparing = false;
+        candidate.remove();
+        this.removeCandidateContainer(candidateContainer, originalContainer);
+        this.emitRenderState('failed', 'The map source loaded but produced no renderable canvas.');
+        return;
+      }
+      this.mapPreparing = false;
+      this.mapRef = candidate;
+      this.activeMapContainer = candidateContainer;
+      this.activeBasemapId = nextBasemapId;
+      this.activeCenterKey = nextCenterKey;
       this.applyOverlayStateToMap();
+      if (previousMap && previousMap !== candidate) {
+        previousMap.remove();
+        if (previousContainer && previousContainer !== originalContainer) {
+          previousContainer.remove();
+        }
+      }
+      this.emitRenderState('ready');
       this.changeDetector.detectChanges();
     });
+  }
 
-    this.mapRef = map;
+  private createCandidateContainer(original: HTMLDivElement): HTMLDivElement {
+    const candidate = document.createElement('div');
+    candidate.className = 'maplibre-container maplibre-container--candidate';
+    // MapLibre adds its own `.maplibregl-map` class, which changes the
+    // container from absolute positioning to a flow element. Keep the
+    // candidate stacked over the known-good map with explicit inline sizing
+    // until promotion (and after MapLibre initializes it).
+    candidate.style.setProperty('position', 'absolute', 'important');
+    candidate.style.setProperty('inset', '0', 'important');
+    candidate.style.setProperty('width', '100%', 'important');
+    candidate.style.setProperty('height', '100%', 'important');
+    original.parentElement?.appendChild(candidate);
+    return candidate;
+  }
+
+  private removeCandidateContainer(candidate: HTMLDivElement, original: HTMLDivElement): void {
+    if (candidate !== original) {
+      candidate.remove();
+    }
+  }
+
+  private hasRenderableCanvas(map: Map, container: HTMLDivElement): boolean {
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) {
+      // Unit-test doubles and non-DOM renderers do not expose a canvas.
+      return typeof (map as unknown as { getCanvas?: () => unknown }).getCanvas !== 'function';
+    }
+    return canvas.width > 0 && canvas.height > 0;
+  }
+
+  private emitRenderState(state: MapRenderState, message?: string): void {
+    const sessionId = this.mapSession?.session_id;
+    if (sessionId) {
+      this.renderStateChange.emit({ sessionId, state, message });
+    }
+  }
+
+  private safeRenderError(error: unknown): string {
+    if (error instanceof Error && error.message.trim()) {
+      return `Map rendering failed: ${error.message}`;
+    }
+    return 'Map rendering failed. The previous map remains available.';
   }
 
   private applyOverlayStateToMap(): void {
@@ -318,9 +440,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private destroyMap(): void {
+    this.mapPreparing = false;
     if (this.mapRef) {
       this.mapRef.remove();
       this.mapRef = null;
     }
+    if (this.activeMapContainer && this.activeMapContainer !== this.mapContainerRef?.nativeElement) {
+      this.activeMapContainer.remove();
+    }
+    this.activeMapContainer = null;
+    this.activeBasemapId = null;
+    this.activeCenterKey = null;
   }
 }

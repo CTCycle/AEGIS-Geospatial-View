@@ -66,6 +66,7 @@ class RequestBuilder:
             ),
             presentation=self.build_presentation(overlays),
             viewport_intent=viewport_intent,
+            poi_categories=list(turn_contract.poi_categories) if turn_contract is not None else [],
         )
         LOGGER.info(
             "map_request_built action=%s basemap=%s overlays=%d viewport_scope=%s tighten=%s radius_m=%.1f bbox=%s location_type=%s",

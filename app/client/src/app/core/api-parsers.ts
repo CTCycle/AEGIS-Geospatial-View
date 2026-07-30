@@ -289,6 +289,9 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     time: stringOrNull(value.time ?? render?.time),
     default_time: stringOrNull(value.default_time ?? render?.default_time),
     warnings: isStringArray(value.warnings) ? value.warnings : render?.warnings,
+    data: isRecord(value.data) && value.data.type === 'FeatureCollection' && Array.isArray(value.data.features)
+      ? value.data as unknown as MapOverlayEntry['data']
+      : undefined,
     render,
   };
 };

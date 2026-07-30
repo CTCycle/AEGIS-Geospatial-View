@@ -75,6 +75,7 @@ class ChatOperationResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     map_session: MapSession | None = None
     direct_result: dict[str, Any] | None = None
+    provider_error: dict[str, Any] | None = None
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):

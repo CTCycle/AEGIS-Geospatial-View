@@ -52,6 +52,7 @@ class DirectTurnResponseService:
                 sanitized_error="The configured agent credential was rejected.",
                 recovery_suggestion="Replace the saved agent API key in Model Settings.",
                 user_explanation=assistant_message,
+                provider_error=getattr(turn_contract, "provider_error", None),
             )
             return self._persist_failure_response(
                 request_id=request_id,
@@ -68,16 +69,24 @@ class DirectTurnResponseService:
             )
 
         if AgentTurnSupport.has_parser_runtime_failure(turn_contract):
-            assistant_message = (
-                "I could not process this request because the configured agent model could not perform structured extraction. "
-                "Open Model Settings, choose an agent model that supports structured output and tool calling, or refresh/pull the configured Ollama model."
-            )
+            provider_error = getattr(turn_contract, "provider_error", None)
+            if isinstance(provider_error, dict) and provider_error.get("code") == "provider_model_incompatible":
+                assistant_message = (
+                    f"OpenCode Go rejected the selected model during structured intent extraction "
+                    f"(HTTP {provider_error.get('http_status') or 400}). Choose a compatible structured-output model and retry."
+                )
+            else:
+                assistant_message = (
+                    "I could not process this request because the configured agent model could not perform structured extraction. "
+                    "Open Model Settings, choose an agent model that supports structured output and tool calling, or retry when the provider is available."
+                )
             failure = TaskFailureDetail(
                 stage="structured_intent_extraction",
                 component="agent_model",
                 sanitized_error="The configured agent model could not perform structured extraction.",
                 recovery_suggestion="Open Model Settings, choose an agent model that supports structured output and tool calling, or refresh/pull the configured Ollama model.",
                 user_explanation=assistant_message,
+                provider_error=getattr(turn_contract, "provider_error", None),
             )
             return self._persist_failure_response(
                 request_id=request_id,

@@ -1,4 +1,5 @@
 import { LngLatBoundsLike, Map, StyleSpecification } from 'maplibre-gl';
+import type { GeoJSON } from 'geojson';
 
 import {
   DEFAULT_BASE_ATTRIBUTION,
@@ -201,6 +202,10 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
       overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
     ).toLowerCase();
     try {
+      if (typeof map.getLayer === 'function' && typeof map.getSource === 'function' && map.getLayer(layerId)) {
+        statuses.push({ overlayId: overlay.id, status: 'loaded' });
+        return;
+      }
       if (renderingMode === 'metadata-only' || overlay.type === 'metadata-only') {
         statuses.push({
           overlayId: overlay.id,
@@ -281,6 +286,23 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
   return statuses;
 };
 
+export const removeOverlayLayers = (map: Map, mapSession?: MapSession): void => {
+  const keep = new Set((mapSession?.overlays || []).map((overlay) => `overlay-layer-${overlay.id}`));
+  const styleLayers = typeof map.getStyle === 'function' ? map.getStyle()?.layers || [] : [];
+  for (const layer of styleLayers) {
+    if (!layer.id.startsWith('overlay-layer-') || keep.has(layer.id)) {
+      continue;
+    }
+    if (map.getLayer(layer.id)) {
+      map.removeLayer(layer.id);
+    }
+    const sourceId = `overlay-source-${layer.id.slice('overlay-layer-'.length)}`;
+    if (map.getSource(sourceId)) {
+      map.removeSource(sourceId);
+    }
+  }
+};
+
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
   const overlayType = overlay.type.toLowerCase();
   const renderingMode = String(overlay.rendering_mode || '').toLowerCase();
@@ -294,7 +316,7 @@ export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
     'camera-points',
   ]);
   return Boolean(
-    overlay.url
+    (overlay.url || overlay.data)
     && (overlayType === 'geojson'
       || overlayType === 'arcgis-geojson'
       || geoJsonRenderingModes.has(renderingMode)
@@ -310,12 +332,12 @@ const addGeoJsonOverlayLayer = (
   layerId: string,
   opacity: number,
 ): boolean => {
-  if (!isGeoJsonOverlay(overlay) || !overlay.url) {
+  if (!isGeoJsonOverlay(overlay) || (!overlay.url && !overlay.data)) {
     return false;
   }
   map.addSource(sourceId, {
     type: 'geojson',
-    data: overlay.url,
+    data: (overlay.data || overlay.url!) as unknown as GeoJSON,
   });
   const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
   const geometryType = overlay.geometry_type?.toLowerCase() || '';

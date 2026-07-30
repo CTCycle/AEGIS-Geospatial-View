@@ -1,11 +1,6 @@
 <div class="map-canvas">
   <div class="map-content">
-    @if (isLoading) {
-      <div class="spinner-container">
-        <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
-        <p class="loading-text">Rendering map...</p>
-      </div>
-    } @else if (!payload?.map_session) {
+    @if (!payload?.map_session) {
       <div class="empty-state empty-state--operations">
         <div class="empty-state__card">
           <p class="empty-state__eyebrow">Map Workspace</p>
@@ -24,6 +19,13 @@
     } @else {
       <div class="maplibre-wrap">
         <div #mapContainer class="maplibre-container"></div>
+
+        @if (isLoading) {
+          <div class="map-render-progress" role="status" aria-live="polite">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+            <p class="loading-text">Keeping the current map while the update renders…</p>
+          </div>
+        }
 
         <div class="map-zoom-controls" aria-label="Map zoom controls">
           <button type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">+</button>

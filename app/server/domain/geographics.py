@@ -460,6 +460,7 @@ class LocationSearchRequest(BaseModel):
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
     viewport_intent: ViewportIntent | None = None
+    poi_categories: list[str] = Field(default_factory=list)
 
 ###############################################################################
 class MapSession(BaseModel):

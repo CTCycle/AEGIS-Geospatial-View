@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import re
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,7 +21,16 @@ class GroundedSynthesisResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     content: str = Field(min_length=1, max_length=4000)
-    used_evidence_keys: list[str] = Field(min_length=1, max_length=20)
+    used_evidence_keys: list[Literal[
+        "user_request",
+        "verified_outcome",
+        "map",
+        "direct_result",
+        "clarification",
+        "task_status",
+        "active_conversation_instructions",
+        "task_snapshot",
+    ]] = Field(min_length=1, max_length=20)
     warnings: list[str] = Field(default_factory=list, max_length=20)
 
 ###############################################################################
@@ -117,10 +127,37 @@ class GroundedResponseSynthesizer:
             self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
             if any(key not in evidence for key in result.used_evidence_keys):
                 raise ValueError("Synthesis referenced evidence keys outside the verified payload.")
+            if not self._content_matches_verified_state(
+                result.content,
+                operation=operation,
+                map_session=map_session,
+            ):
+                raise ValueError("Synthesis contradicted the verified operation state.")
         except Exception:
             LOGGER.warning("Grounded response synthesis failed", exc_info=True)
             return fallback_text
         return result.content.strip() or fallback_text
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _content_matches_verified_state(
+        content: str,
+        *,
+        operation: ChatOperationResult,
+        map_session: MapSession | None,
+    ) -> bool:
+        """Reject obvious model claims that contradict a successful payload."""
+        if operation.status != "success" or not map_session or not map_session.overlays:
+            return True
+        if map_session.compliance_warnings:
+            return True
+        normalized = re.sub(r"\s+", " ", content.casefold())
+        return not bool(
+            re.search(
+                r"\b(?:failed|failure|error|not available|could not|unable to)\b",
+                normalized,
+            )
+        )
 
     # -------------------------------------------------------------------------
     @staticmethod

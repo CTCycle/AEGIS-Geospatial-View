@@ -64,6 +64,8 @@ class OverpassProvider(GeospatialProvider):
             )
         tags = request.params.get("amenity_tags")
         amenity_tags = [str(tag) for tag in tags] if isinstance(tags, list) else None
+        categories_value = request.params.get("poi_categories")
+        categories = [str(item) for item in categories_value] if isinstance(categories_value, list) else None
         if amenity_tags is None:
             category = str(request.params.get("category") or "").strip().lower()
             amenity_tags = AMENITY_GROUPS.get(category)
@@ -73,6 +75,7 @@ class OverpassProvider(GeospatialProvider):
                 longitude=longitude,
                 radius_m=radius_m,
                 amenity_tags=amenity_tags,
+                categories=categories,
                 limit=_optional_int(request.params.get("limit")),
             )
         except OverpassRateLimitError as exc:
