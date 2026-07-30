@@ -648,6 +648,30 @@ class ParserService:
 
         if any(marker in text for marker in ("satellite view", "satellite", "imagery")):
             updates["requested_basemap"] = "esri_world_imagery"
+            explicit_imagery_layer = any(
+                marker in text
+                for marker in (
+                    "satellite data layer",
+                    "satellite overlay",
+                    "satellite layer",
+                    "imagery data layer",
+                    "imagery overlay",
+                    "imagery layer",
+                    "additional satellite",
+                    "additional imagery",
+                )
+            )
+            if not explicit_imagery_layer:
+                requested_layers = updates.get(
+                    "requested_layers",
+                    extracted.requested_layers,
+                )
+                updates["requested_layers"] = [
+                    layer
+                    for layer in requested_layers
+                    if layer.casefold().strip()
+                    not in {"satellite", "satellite imagery", "imagery", "imagery layer"}
+                ]
         if any(
             marker in text
             for marker in (

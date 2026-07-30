@@ -36,6 +36,8 @@ class OverlayInferenceService:
         existing_overlay_ids: list[str],
     ) -> OverlayInferenceResult:
         _ = location
+        if self.is_removal_request(turn_contract):
+            return OverlayInferenceResult(overlay_ids=[], warnings=[], reasons={})
         snapshot = self.capability_registry.load_capabilities()
         candidates = [
             *snapshot.overlays,
@@ -132,6 +134,69 @@ class OverlayInferenceService:
             warnings=warnings,
             reasons=reasons,
         )
+
+    # -------------------------------------------------------------------------
+    def removed_overlay_ids(
+        self,
+        *,
+        turn_contract: TurnParseResult,
+        existing_overlay_ids: list[str],
+    ) -> list[str]:
+        if not self.is_removal_request(turn_contract):
+            return []
+        snapshot = self.capability_registry.load_capabilities()
+        candidates = [
+            *snapshot.overlays,
+            *snapshot.cameras,
+            *snapshot.transit,
+            *snapshot.tools,
+        ]
+        text = self._normalize_match_text(turn_contract.user_text)
+        removed: list[str] = []
+        for overlay_id in existing_overlay_ids:
+            manifest = next(
+                (item for item in candidates if str(item.get("id") or "") == overlay_id),
+                None,
+            )
+            match_text = " ".join(
+                [
+                    overlay_id.replace("_", " "),
+                    str(manifest.get("name") or "") if manifest else "",
+                ]
+            )
+            normalized_match = self._normalize_match_text(match_text)
+            if normalized_match and self._removal_matches(text, normalized_match):
+                removed.append(overlay_id)
+        return removed
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def is_removal_request(cls, turn_contract: TurnParseResult) -> bool:
+        text = cls._normalize_match_text(turn_contract.user_text)
+        return any(
+            marker in text
+            for marker in (
+                "remove",
+                "hide",
+                "disable",
+                "turnoff",
+                "deactivate",
+                "without",
+                "nolonger",
+                "stopshowing",
+                "clear",
+            )
+        )
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _removal_matches(cls, text: str, candidate: str) -> bool:
+        candidate_tokens = [
+            token
+            for token in ("traffic", "precipitation", "rain", "radar", "airquality", "pollution", "pm25", "pm10", "weather", "forecast", "terrain", "elevation", "webcam", "camera", "poi", "places", "solar")
+            if token in candidate
+        ]
+        return bool(candidate_tokens) and any(token in text for token in candidate_tokens)
 
     # -------------------------------------------------------------------------
     @staticmethod

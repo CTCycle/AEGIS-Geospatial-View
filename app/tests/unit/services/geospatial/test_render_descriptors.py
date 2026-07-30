@@ -103,6 +103,29 @@ def test_render_descriptor_service_builds_complete_wmts_template() -> None:
     assert "time=2026-06-18" in template
 
 ###############################################################################
+def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
+    service = RenderDescriptorService(
+        capability_registry=_CapabilityRegistry({
+            "id": "rainviewer_precipitation_radar",
+            "name": "RainViewer Precipitation Radar",
+            "provider": "rainviewer",
+            "type": "tile",
+            "capabilityKind": "raster-overlay",
+            "renderingMode": "raster-tile",
+            "metadata": {
+                "url": "https://tilecache.rainviewer.com/v2/radar/test/256/{z}/{x}/{y}/2/1_1.png",
+                "default_opacity": 0.7,
+            },
+        }),
+    )
+
+    result = asyncio.run(service.build_overlay_descriptor("rainviewer_precipitation_radar", request=_request()))
+
+    assert result is not None
+    descriptor, _warnings = result
+    assert descriptor["maxzoom"] == 7
+
+###############################################################################
 @pytest.mark.parametrize(
     ("rendering_mode", "capability_kind", "capability_type", "metadata"),
     [

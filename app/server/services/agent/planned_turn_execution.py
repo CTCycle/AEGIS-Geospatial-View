@@ -217,6 +217,20 @@ class PlannedTurnExecutionService:
             tool_result_refs=[result.step_id for result in planned_results],
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)
+        active_visualization = latest_memory.get("active_visualization")
+        active_overlay_ids = (
+            [
+                item
+                for item in active_visualization.get("overlay_ids") or []
+                if isinstance(item, str)
+            ]
+            if isinstance(active_visualization, dict)
+            else []
+        )
+        removed_layer_ids = self.turn_state_assembler.overlay_inference_service.removed_overlay_ids(
+            turn_contract=turn_contract,
+            existing_overlay_ids=active_overlay_ids,
+        )
         visualization_update = VisualizationUpdate(
             basemap_replacement=(
                 tool_plan.visualization_update.get("basemap_replacement")
@@ -224,6 +238,7 @@ class PlannedTurnExecutionService:
                 else turn_contract.requested_basemap
             ),
             add_layer_ids=list(turn_contract.requested_layers),
+            remove_layer_ids=removed_layer_ids,
         )
         if progress_callback is not None and map_session is not None:
             progress_callback(

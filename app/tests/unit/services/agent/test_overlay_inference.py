@@ -107,3 +107,21 @@ def test_overlay_inference_respects_existing_overlays() -> None:
 
     assert "tomtom_traffic_flow" not in result.overlay_ids
     assert "rainviewer_precipitation_radar" in result.overlay_ids
+
+###############################################################################
+def test_overlay_inference_removes_requested_existing_precipitation_overlay() -> None:
+    service = _overlay_service()
+    turn = _turn("Remove the precipitation radar from this map")
+
+    removed = service.removed_overlay_ids(
+        turn_contract=turn,
+        existing_overlay_ids=["rainviewer_precipitation_radar"],
+    )
+    result = service.infer_overlays(
+        turn_contract=turn,
+        location=_location(),
+        existing_overlay_ids=["rainviewer_precipitation_radar"],
+    )
+
+    assert removed == ["rainviewer_precipitation_radar"]
+    assert result.overlay_ids == []

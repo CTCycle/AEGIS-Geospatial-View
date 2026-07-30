@@ -233,6 +233,17 @@ def test_parser_domain_rules_infer_local_viewport_intent_for_around_street_reque
     assert extracted.requested_basemap == "esri_world_imagery"
 
 ###############################################################################
+def test_parser_domain_rules_keep_satellite_view_as_basemap_only() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Show current satellite context for Rome, Italy.",
+        LLMParserExtraction(requested_layers=["satellite"]),
+        {},
+    )
+
+    assert extracted.requested_basemap == "esri_world_imagery"
+    assert extracted.requested_layers == []
+
+###############################################################################
 def test_parser_domain_rules_tighten_viewport_for_closer_follow_up() -> None:
     extracted = ParserService._apply_domain_rules(
         "this is too high as point of view, i want to see much more closely",
