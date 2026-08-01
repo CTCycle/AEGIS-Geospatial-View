@@ -40,7 +40,7 @@ class BackgroundJobEvent(BaseModel):
     event_type: BackgroundJobEventType
     sequence: int
     created_at: datetime
-    payload_json: dict[str, Any] = Field(default_factory=dict)
+    payload_json: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class BackgroundJobStatusResponse(BaseModel):
@@ -69,7 +69,7 @@ class BackgroundJobEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     job_id: str
-    events: list[BackgroundJobEvent] = Field(default_factory=list)
+    events: list[BackgroundJobEvent] = Field(default_factory=lambda: list[BackgroundJobEvent]())
 
 ###############################################################################
 class JobCancelResponse(BaseModel):
@@ -104,4 +104,4 @@ class BackgroundJob:
     attempt_count: int = 0
     max_attempts: int = 1
     last_heartbeat_at: datetime | None = None
-    events: list["BackgroundJobEvent"] = field(default_factory=list)
+    events: list["BackgroundJobEvent"] = field(default_factory=lambda: list["BackgroundJobEvent"]())

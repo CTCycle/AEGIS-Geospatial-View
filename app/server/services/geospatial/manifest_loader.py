@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import json
 from pathlib import Path
 from typing import Any
@@ -60,7 +62,7 @@ class GeospatialManifestLoader:
     # -------------------------------------------------------------------------
     def load_index(self) -> JsonDict:
         payload = self._load_json(self.index_path)
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ManifestValidationError("Manifest index must be an object.")
         return payload
 
@@ -101,7 +103,7 @@ class GeospatialManifestLoader:
             if path.suffix.lower() != ".json":
                 continue
             payload = self._load_json(path)
-            if not isinstance(payload, dict):
+            if not is_json_object(payload):
                 raise ManifestValidationError(
                     f"Manifest document '{path}' must be an object."
                 )
@@ -114,14 +116,14 @@ class GeospatialManifestLoader:
     def _load_runtime_profiles(self, filename: str) -> list[JsonDict]:
         path = Path(self.root_path) / filename
         payload = self._load_json(path)
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ManifestValidationError("Runtime profiles must be an object.")
         profiles = payload.get("profiles")
-        if not isinstance(profiles, list):
+        if not is_json_array(profiles):
             raise ManifestValidationError("Runtime profiles must contain a profiles list.")
         normalized: list[JsonDict] = []
         for item in profiles:
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 raise ManifestValidationError("Runtime profile entries must be objects.")
             capability_id = str(item.get("capability_id") or "").strip()
             if not capability_id:

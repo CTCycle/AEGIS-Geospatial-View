@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import re
 
 from server.domain.agent.decision import ResolvedLocation
@@ -10,23 +14,21 @@ class LocationMemoryService:
     REFERENCE_PATTERN = re.compile(r"\b(there|that place|same place|same area|there now)\b", re.IGNORECASE)
 
     # -------------------------------------------------------------------------
-    def build_memory_snapshot(self, last_assistant_payload: dict | None) -> dict:
-        if not isinstance(last_assistant_payload, dict):
+    def build_memory_snapshot(self, last_assistant_payload: dict[str, Any] | None) -> dict[str, Any]:
+        if last_assistant_payload is None:
             return {"location_slots": [], "active_location": None}
-        snapshot = last_assistant_payload.get("memory_snapshot")
-        if isinstance(snapshot, dict):
-            return {
-                "location_slots": list(snapshot.get("location_slots") or []),
-                "active_location": snapshot.get("active_location"),
-            }
-        return {"location_slots": [], "active_location": None}
+        snapshot = json_object(last_assistant_payload.get("memory_snapshot"))
+        return {
+            "location_slots": json_array(snapshot.get("location_slots")),
+            "active_location": snapshot.get("active_location"),
+        }
 
     # -------------------------------------------------------------------------
-    def resolve_explicit_references(self, user_text: str, snapshot: dict) -> list[LocationSignal]:
+    def resolve_explicit_references(self, user_text: str, snapshot: dict[str, Any]) -> list[LocationSignal]:
         if not self.REFERENCE_PATTERN.search(user_text):
             return []
-        active = snapshot.get("active_location") if isinstance(snapshot, dict) else None
-        if not isinstance(active, dict):
+        active = json_object(snapshot.get("active_location"))
+        if not active:
             return []
         label = str(active.get("label") or "").strip()
         if not label:
@@ -36,8 +38,8 @@ class LocationMemoryService:
                 signal_type="deictic",
                 raw_value=label,
                 normalized_value=label,
-                latitude=float(active.get("latitude")),
-                longitude=float(active.get("longitude")),
+            latitude=float(active.get("latitude") or 0.0),
+            longitude=float(active.get("longitude") or 0.0),
                 confidence=0.85,
                 source="memory",
             )
@@ -46,11 +48,11 @@ class LocationMemoryService:
     # -------------------------------------------------------------------------
     def update_memory_snapshot(
         self,
-        snapshot: dict,
+        snapshot: dict[str, Any],
         resolved_location: ResolvedLocation,
         action: NormalizedAction,
-    ) -> dict:
-        slots = list(snapshot.get("location_slots") or []) if isinstance(snapshot, dict) else []
+    ) -> dict[str, Any]:
+        slots = json_array(snapshot.get("location_slots"))
         location_payload = {
             "label": resolved_location.label,
             "latitude": resolved_location.latitude,
@@ -60,13 +62,13 @@ class LocationMemoryService:
             "address": resolved_location.address,
             "location_type": resolved_location.location_type,
             "location_class": resolved_location.location_class,
-            "bbox": list(resolved_location.bbox) if isinstance(resolved_location.bbox, list) else None,
+            "bbox": list(resolved_location.bbox) if is_json_array(resolved_location.bbox) else None,
             "bbox_source": resolved_location.bbox_source,
             "source": resolved_location.source,
             "confidence": resolved_location.confidence,
             "action_id": action.action_id,
         }
-        slots = [entry for entry in slots if not isinstance(entry, dict) or entry.get("label") != resolved_location.label]
+        slots = [entry for entry in slots if not is_json_object(entry) or entry.get("label") != resolved_location.label]
         slots.insert(0, location_payload)
         return {
             "location_slots": slots[:8],

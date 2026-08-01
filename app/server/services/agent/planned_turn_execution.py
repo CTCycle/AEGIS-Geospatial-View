@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import json_array, json_object
+
 from collections.abc import Callable
 from typing import Any
 
@@ -63,7 +65,7 @@ class PlannedTurnExecutionService:
             task.task_id,
             status="in_progress",
             progress_summary="Executing validated tool plan.",
-            tool_plan=tool_plan,
+            tool_plan=tool_plan.model_dump(mode="json"),
         )
         planned_results = await self.tool_plan_executor.execute(
             tool_plan,
@@ -213,18 +215,19 @@ class PlannedTurnExecutionService:
             status="failed" if failure is not None else "completed",
             progress_summary=operation.message,
             failure=failure,
-            tool_plan=tool_plan,
+            tool_plan=tool_plan.model_dump(mode="json"),
             tool_result_refs=[result.step_id for result in planned_results],
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)
         active_visualization = latest_memory.get("active_visualization")
+        active_visualization_object = json_object(active_visualization)
         active_overlay_ids = (
             [
                 item
-                for item in active_visualization.get("overlay_ids") or []
+                for item in json_array(active_visualization_object.get("overlay_ids"))
                 if isinstance(item, str)
             ]
-            if isinstance(active_visualization, dict)
+            if active_visualization_object
             else []
         )
         removed_layer_ids = self.turn_state_assembler.overlay_inference_service.removed_overlay_ids(

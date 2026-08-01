@@ -69,7 +69,7 @@ class RunEvent(BaseModel):
     type: RunEventType
     timestamp: datetime
     visibility: RunEventVisibility
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class RunEventCreate(BaseModel):
@@ -80,7 +80,7 @@ class RunEventCreate(BaseModel):
     run_version: int
     type: RunEventType
     visibility: RunEventVisibility = RunEventVisibility.USER
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     timestamp: datetime = Field(default_factory=utc_now)
 
 ###############################################################################

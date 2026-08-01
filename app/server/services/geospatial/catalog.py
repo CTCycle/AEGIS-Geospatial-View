@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from server.common.typing import json_array, json_object
+
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 
@@ -21,10 +23,10 @@ class GeospatialCatalogService:
 
     # -------------------------------------------------------------------------
     def _descriptor(self, item: dict[str, Any], kind: str) -> dict[str, Any]:
-        metadata = dict(item.get("metadata") or {})
+        metadata = json_object(item.get("metadata"))
         capability_id = str(item.get("id") or "")
-        auth = dict(item.get("auth") or {})
-        reliability = dict(item.get("reliability") or {})
+        auth = json_object(item.get("auth"))
+        reliability = json_object(item.get("reliability"))
         requires_credentials = bool(auth.get("required", False))
         capability_kind = str(item.get("capabilityKind") or kind)
         is_available = (
@@ -54,7 +56,7 @@ class GeospatialCatalogService:
             "endpoint_health": str(reliability.get("status") or "unknown"),
             "auth_mode": str(auth.get("type") or "none"),
             "official_docs_url": "; ".join(
-                str(value) for value in item.get("sourceOfficialDocs") or []
+                str(value) for value in json_array(item.get("sourceOfficialDocs"))
             ),
             "capability_kind": capability_kind,
             "rendering_mode": str(item.get("renderingMode") or ""),
@@ -65,10 +67,10 @@ class GeospatialCatalogService:
 
     # -------------------------------------------------------------------------
     def _provider_descriptor(self, item: dict[str, Any]) -> dict[str, Any]:
-        metadata = dict(item.get("metadata") or {})
+        metadata = json_object(item.get("metadata"))
         provider_id = str(item.get("id") or item.get("provider") or "unknown")
-        auth = dict(item.get("auth") or {})
-        reliability = dict(item.get("reliability") or {})
+        auth = json_object(item.get("auth"))
+        reliability = json_object(item.get("reliability"))
         requires_credentials = bool(auth.get("required", False))
         is_available = True
         if requires_credentials:
@@ -91,13 +93,13 @@ class GeospatialCatalogService:
             "provider": provider_id,
             "requires_credentials": requires_credentials,
             "is_available": is_available,
-            "supports_map": "tile" in list(item.get("capabilities") or [])
-            or "wms" in list(item.get("capabilities") or [])
-            or "wmts" in list(item.get("capabilities") or [])
-            or "imagery" in list(item.get("capabilities") or []),
-            "supports_direct_text": "forecast" in list(item.get("capabilities") or [])
-            or "point-insight" in list(item.get("capabilities") or [])
-            or "poi" in list(item.get("capabilities") or []),
+            "supports_map": "tile" in json_array(item.get("capabilities"))
+            or "wms" in json_array(item.get("capabilities"))
+            or "wmts" in json_array(item.get("capabilities"))
+            or "imagery" in json_array(item.get("capabilities")),
+            "supports_direct_text": "forecast" in json_array(item.get("capabilities"))
+            or "point-insight" in json_array(item.get("capabilities"))
+            or "poi" in json_array(item.get("capabilities")),
             "coverage": str(item.get("coverage") or "global"),
             "action_tags": list(metadata.get("action_tags") or []),
             "task_tags": list(metadata.get("task_tags") or []),
@@ -108,7 +110,7 @@ class GeospatialCatalogService:
             "endpoint_health": str(reliability.get("status") or "unknown"),
             "auth_mode": str(auth.get("type") or "none"),
             "official_docs_url": "; ".join(
-                str(value) for value in item.get("sourceOfficialDocs") or []
+                str(value) for value in json_array(item.get("sourceOfficialDocs"))
             ),
             "capability_kind": str(item.get("capabilityKind") or "metadata-only"),
             "rendering_mode": str(item.get("renderingMode") or ""),

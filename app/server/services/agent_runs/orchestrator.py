@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.domain.agent_runs import AgentRunSnapshot
 from server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
 from server.repositories.agent_runs import AgentRunRepository
@@ -161,7 +162,9 @@ class AgentRunOrchestrator:
         )
 
     # -------------------------------------------------------------------------
-    async def _publish_response(self, snapshot, response: ChatTurnResponse) -> None:
+    async def _publish_response(
+        self, snapshot: AgentRunSnapshot, response: ChatTurnResponse
+    ) -> None:
         await self._publish_progress(snapshot, RunProgressStage.DRAFTING_ANSWER)
         await self.event_publisher.publish(
             conversation_id=snapshot.conversation_id,
@@ -177,7 +180,9 @@ class AgentRunOrchestrator:
         )
 
     # -------------------------------------------------------------------------
-    async def _publish_progress(self, snapshot, stage: RunProgressStage) -> None:
+    async def _publish_progress(
+        self, snapshot: AgentRunSnapshot, stage: RunProgressStage
+    ) -> None:
         await self.event_publisher.publish(
             conversation_id=snapshot.conversation_id,
             run_id=snapshot.run_id,
@@ -187,7 +192,7 @@ class AgentRunOrchestrator:
         )
 
     # -------------------------------------------------------------------------
-    async def _publish_cancelled(self, snapshot) -> None:
+    async def _publish_cancelled(self, snapshot: AgentRunSnapshot) -> None:
         cancelled = self.run_repository.request_cancel(snapshot.run_id)
         await self._publish_progress(cancelled, RunProgressStage.CANCELLED)
         await self.event_publisher.publish(

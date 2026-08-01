@@ -52,7 +52,7 @@ class ContextUsageResponse(BaseModel):
     response_schema_tokens: int = 0
     safety_margin_tokens: int = 512
     usage_source: str = "estimated"
-    phases: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    phases: dict[str, dict[str, Any]] = Field(default_factory=lambda: dict[str, dict[str, Any]]())
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
     total_output_tokens: int | None = None
@@ -72,7 +72,7 @@ class ChatOperationResult(BaseModel):
     ]
     status: Literal["success", "partial", "failed"]
     message: str
-    warnings: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
     map_session: MapSession | None = None
     direct_result: dict[str, Any] | None = None
     provider_error: dict[str, Any] | None = None
@@ -89,7 +89,7 @@ class ChatTurnResponse(BaseModel):
     operation: ChatOperationResult | None = None
     tool_payload: dict[str, Any] | None = None
     map_session: MapSession | None = None
-    memory_snapshot: dict[str, Any] = Field(default_factory=dict)
+    memory_snapshot: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     context_usage: ContextUsageResponse | None = None
     task_snapshot: ConversationTaskSnapshot | None = None
     tool_plan: ToolPlan | None = None
@@ -121,13 +121,13 @@ class ModelCardDescriptor(BaseModel):
     name: str
     description: str
     provider: str
-    capabilities: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=lambda: list[str]())
     supports_tools: bool = False
     supports_structured_output: bool = False
     supports_vision: bool = False
     supports_embeddings: bool = False
     tool_support_source: str = "unknown"
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class ModelLibrarySourceStatus(BaseModel):
@@ -150,7 +150,7 @@ class ModelSettingsResponse(BaseModel):
     google_base_url: str | None = None
     deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
-    credential_health: dict[str, dict[str, str]] = Field(default_factory=dict)
+    credential_health: dict[str, dict[str, str]] = Field(default_factory=lambda: dict[str, dict[str, str]]())
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):
@@ -163,7 +163,7 @@ class ModelSettingsUpdateRequest(BaseModel):
     openai_base_url: str | None = None
     google_base_url: str | None = None
     deepseek_base_url: str | None = None
-    credentials: dict[str, dict[str, str]] = Field(default_factory=dict)
+    credentials: dict[str, dict[str, str]] = Field(default_factory=lambda: dict[str, dict[str, str]]())
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -196,18 +196,18 @@ class ModelSettingsUpdateRequest(BaseModel):
 class ModelLibraryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    cloud: list[ModelCardDescriptor] = Field(default_factory=list)
-    local: list[ModelCardDescriptor] = Field(default_factory=list)
-    sources: dict[str, ModelLibrarySourceStatus] = Field(default_factory=dict)
+    cloud: list[ModelCardDescriptor] = Field(default_factory=lambda: list[ModelCardDescriptor]())
+    local: list[ModelCardDescriptor] = Field(default_factory=lambda: list[ModelCardDescriptor]())
+    sources: dict[str, ModelLibrarySourceStatus] = Field(default_factory=lambda: dict[str, ModelLibrarySourceStatus]())
 
 ###############################################################################
 class OllamaRefreshResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str
-    library_models: list[str] = Field(default_factory=list)
-    local_models: list[str] = Field(default_factory=list)
-    local_model_capabilities: list[ModelCardDescriptor] = Field(default_factory=list)
+    library_models: list[str] = Field(default_factory=lambda: list[str]())
+    local_models: list[str] = Field(default_factory=lambda: list[str]())
+    local_model_capabilities: list[ModelCardDescriptor] = Field(default_factory=lambda: list[ModelCardDescriptor]())
 
 ###############################################################################
 class OllamaPullRequest(BaseModel):

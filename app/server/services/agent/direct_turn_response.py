@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from typing import Any
 
 from server.domain.agent.decision import PolicyDecision
@@ -70,7 +72,7 @@ class DirectTurnResponseService:
 
         if AgentTurnSupport.has_parser_runtime_failure(turn_contract):
             provider_error = getattr(turn_contract, "provider_error", None)
-            if isinstance(provider_error, dict) and provider_error.get("code") == "provider_model_incompatible":
+            if is_json_object(provider_error) and provider_error.get("code") == "provider_model_incompatible":
                 assistant_message = (
                     f"OpenCode Go rejected the selected model during structured intent extraction "
                     f"(HTTP {provider_error.get('http_status') or 400}). Choose a compatible structured-output model and retry."

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
@@ -47,11 +49,11 @@ class DeepSeekProvider(LLMProvider):
         )
         response.raise_for_status()
         payload = response.json()
-        entries = payload.get("data", []) if isinstance(payload, dict) else []
+        entries = json_array(json_object(payload).get("data"))
         return [
             self._model_descriptor(item)
             for item in entries
-            if isinstance(item, dict) and str(item.get("id") or "").strip()
+            if is_json_object(item) and str(item.get("id") or "").strip()
         ]
 
     # -------------------------------------------------------------------------
@@ -154,14 +156,13 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def structured_output(
-        self, request: LLMRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
-        json_schema = (
-            schema.model_json_schema() if hasattr(schema, "model_json_schema") else {}
-        )
+        model_json_schema = getattr(schema, "model_json_schema", None)
+        json_schema = json_object(model_json_schema()) if callable(model_json_schema) else {}
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
@@ -180,14 +181,14 @@ class DeepSeekProvider(LLMProvider):
             ) from exc
         content, _ = self._parse_choice(response)
         loaded = json.loads(content or "{}")
-        if not isinstance(loaded, dict):
+        if not is_json_object(loaded):
             return {}
         validator = getattr(schema, "model_validate", None)
         if not callable(validator):
             return loaded
         validated = validator(loaded)
         dumper = getattr(validated, "model_dump", None)
-        return dumper(mode="json") if callable(dumper) else loaded
+        return json_object(dumper(mode="json")) if callable(dumper) else loaded
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -213,13 +214,12 @@ class DeepSeekProvider(LLMProvider):
         return {"ok": True, "detail": "configured"}
 
     # -------------------------------------------------------------------------
-    def normalize_tool_messages(
-        self, messages: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    @staticmethod
+    def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
         for message in messages:
             role = str(message.get("role") or "")
-            if role == "assistant" and isinstance(message.get("tool_calls"), list):
+            if role == "assistant" and is_json_array(message.get("tool_calls")):
                 normalized.append(
                     {
                         "role": "assistant",
@@ -236,7 +236,7 @@ class DeepSeekProvider(LLMProvider):
                                 },
                             }
                             for call in message["tool_calls"]
-                            if isinstance(call, dict)
+                            if is_json_object(call)
                         ],
                     }
                 )
@@ -284,7 +284,7 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def _parse_choice(self, response: Any) -> tuple[str, list[LLMToolCall]]:
-        choices = getattr(response, "choices", None) or []
+        choices: list[Any] = list(getattr(response, "choices", None) or [])
         if not choices:
             return "", []
         message = getattr(choices[0], "message", None)
@@ -292,7 +292,7 @@ class DeepSeekProvider(LLMProvider):
             return "", []
         content = getattr(message, "content", None)
         text = content if isinstance(content, str) else ""
-        raw_tool_calls = getattr(message, "tool_calls", None) or []
+        raw_tool_calls: list[Any] = list(getattr(message, "tool_calls", None) or [])
         tool_calls: list[LLMToolCall] = []
         for call in raw_tool_calls:
             function = getattr(call, "function", None)
@@ -301,7 +301,7 @@ class DeepSeekProvider(LLMProvider):
             if isinstance(arguments, str):
                 try:
                     loaded = json.loads(arguments)
-                    if isinstance(loaded, dict):
+                    if is_json_object(loaded):
                         parsed_arguments = loaded
                 except json.JSONDecodeError:
                     parsed_arguments = {}
@@ -317,7 +317,7 @@ class DeepSeekProvider(LLMProvider):
     # -------------------------------------------------------------------------
     @staticmethod
     def _finish_reason(response: Any) -> str | None:
-        choices = getattr(response, "choices", None) or []
+        choices: list[Any] = list(getattr(response, "choices", None) or [])
         if not choices:
             return None
         finish_reason = getattr(choices[0], "finish_reason", None)

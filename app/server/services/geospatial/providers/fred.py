@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import os
 from urllib.parse import urlencode
 
@@ -85,14 +87,14 @@ class FREDProvider(GeospatialProvider):
 
 ###############################################################################
 def _normalize_series(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         return []
     raw_series = payload.get("seriess")
-    if not isinstance(raw_series, list):
+    if not is_json_array(raw_series):
         return []
     normalized: list[dict[str, object]] = []
     for item in raw_series:
-        if not isinstance(item, dict) or not item.get("id"):
+        if not is_json_object(item) or not item.get("id"):
             continue
         normalized.append(
             {

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import cast
+
+from server.common.typing import is_json_object, json_array
+
 from server.common.constants import (
     DEFAULT_MODEL_PROVIDER_MODE,
 )
@@ -10,6 +14,7 @@ from server.domain.chat import (
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
+from server.repositories.schemas.models import ModelProviderSettingsRecord
 from server.services.chat.model_library import (
     ChatModelLibraryService,
     DYNAMIC_CLOUD_PROVIDERS,
@@ -43,7 +48,7 @@ class ChatSettingsService:
         record = self.settings_repo.get_or_create()
         record = self._repair_incomplete_agent_assignment(record)
         active_provider_mode: ModelProviderMode = (
-            record.active_provider_mode
+            cast(ModelProviderMode, record.active_provider_mode)
             if record.active_provider_mode in {"local", "cloud"}
             else DEFAULT_MODEL_PROVIDER_MODE
         )
@@ -163,7 +168,7 @@ class ChatSettingsService:
                     provider=provider,
                     label=label,
                     encrypted_value=encrypted.value,
-                    key_version=encrypted.key_version,
+                    key_version=cast(int, encrypted.key_version),
                 )
         self.settings_repo.update(
             active_provider_mode=next_active_provider_mode,
@@ -200,8 +205,8 @@ class ChatSettingsService:
                 continue
             configured_cloud_providers.add(item.provider)
         for library in libraries:
-            for entry in library.get("cloud", []):
-                if not isinstance(entry, dict):
+            for entry in json_array(library.get("cloud")):
+                if not is_json_object(entry):
                     continue
                 provider = str(entry.get("provider") or "").strip()
                 if provider not in configured_cloud_providers:
@@ -209,15 +214,17 @@ class ChatSettingsService:
                 available.setdefault(provider, []).append(entry)
             local_models = [
                 item
-                for item in library.get("local", [])
-                if isinstance(item, dict)
+                for item in json_array(library.get("local"))
+                if is_json_object(item)
             ]
             if local_models:
                 available["ollama"] = local_models
         return available
 
     # -------------------------------------------------------------------------
-    def _repair_incomplete_agent_assignment(self, record):
+    def _repair_incomplete_agent_assignment(
+        self, record: ModelProviderSettingsRecord
+    ) -> ModelProviderSettingsRecord:
         assignment = self._normalized_agent_assignment(record)
         if assignment["provider"] and assignment["model"]:
             return record
@@ -256,11 +263,11 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     def _persist_agent_assignment(
         self,
-        record: object,
+        record: ModelProviderSettingsRecord,
         *,
         provider: str,
         model: str,
-    ):
+    ) -> ModelProviderSettingsRecord:
         return self.settings_repo.update(
             active_provider_mode=(
                 getattr(record, "active_provider_mode", "")
@@ -289,10 +296,12 @@ class ChatSettingsService:
             return
         local_models = {
             str(item.get("id", ""))
-            for item in self.model_library_service.list_models(
-                ollama_url=ollama_url
-            ).get("local", [])
-            if isinstance(item, dict)
+            for item in json_array(
+                self.model_library_service.list_models(ollama_url=ollama_url).get(
+                    "local"
+                )
+            )
+            if is_json_object(item)
         }
         if agent_model_name not in local_models:
             raise ChatSettingsValidationError(
@@ -435,5 +444,3 @@ class ChatSettingsService:
             raise ChatSettingsValidationError(
                 "Agent model provider and model name must both be configured."
             )
-
-

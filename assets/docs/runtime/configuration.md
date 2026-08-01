@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-07-16
+Last updated: 2026-08-01
 
 ## Environment File
 
@@ -31,18 +31,21 @@ Common keys include:
 
 ## Structured Configuration
 
-`settings/configurations.json` defines:
+`settings/configurations.json` supplies the runtime JSON blocks for:
 
+- Nominatim settings
+- geospatial bounds
+- map defaults
 - job polling interval
-- job backend selection
-- durable-job requirement flag
-- geospatial bounds and service tuning
 - chat defaults
-- provider-specific request tuning
+- Open-Meteo, Overpass, RainViewer, and NASA GIBS request tuning
 
 Database mode and all database connection/security/performance settings come only
 from `settings/.env` (or process environment variables). The JSON settings file
 does not provide database configuration.
+
+The JSON loader only maps the blocks used by `ConfigurationManager`; legacy
+vector-sync and durable-job settings are not runtime controls.
 
 `AEGIS_RUNTIME_DATA_DIR` optionally overrides the local runtime storage root used
 for the embedded SQLite database. When unset, the embedded database defaults to

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import math
 from typing import Any
 
@@ -211,10 +213,10 @@ class RequestBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def _coerce_active_viewport(active_visualization: dict[str, Any] | None) -> ViewportPolicy | None:
-        if not isinstance(active_visualization, dict):
+        if not is_json_object(active_visualization):
             return None
         viewport = active_visualization.get("viewport")
-        if not isinstance(viewport, dict):
+        if not is_json_object(viewport):
             return None
         try:
             return ViewportPolicy.model_validate(viewport)
@@ -231,7 +233,8 @@ class RequestBuilder:
             return None
         if scope not in {"building", "street", "neighborhood", "district"}:
             return None
-        min_lon, min_lat, max_lon, max_lat = [float(item) for item in bbox]
+        assert bbox is not None
+        min_lon, min_lat, max_lon, max_lat = [float(str(item)) for item in bbox]
         lon_pad_factor = 0.2 if scope in {"building", "street"} else 0.35
         lat_pad_factor = lon_pad_factor
         lon_span = max(max_lon - min_lon, 0.0004 if scope in {"building", "street"} else 0.002)
@@ -261,7 +264,7 @@ class RequestBuilder:
     @staticmethod
     def _is_bbox(value: list[float] | None) -> bool:
         return (
-            isinstance(value, list)
+            is_json_array(value)
             and len(value) == 4
             and all(isinstance(item, int | float) for item in value)
         )

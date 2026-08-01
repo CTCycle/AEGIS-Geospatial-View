@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 import json
 from pathlib import Path
 from typing import Any
@@ -15,7 +17,7 @@ from server.configurations.settings import (
 
 ###############################################################################
 def _ensure_mapping(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict):
+    if is_json_object(value):
         return dict(value)
     return {}
 
@@ -80,7 +82,7 @@ class ConfigurationManager:
     def update(
         self, payload: dict[str, Any], *, persist: bool = True
     ) -> "ConfigurationManager":
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise RuntimeError("Configuration must be a JSON object.")
 
         configuration = self._validate_configuration(payload)
@@ -124,7 +126,7 @@ class ConfigurationManager:
                 f"Unable to load configuration from {self.config_path}"
             ) from exc
 
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise RuntimeError("Configuration must be a JSON object.")
         return payload
 

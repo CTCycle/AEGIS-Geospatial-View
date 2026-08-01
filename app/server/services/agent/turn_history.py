@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_object
+
 from typing import Any
 
 from server.domain.chat import ChatTurnResponse
@@ -33,10 +35,10 @@ class AgentTurnHistoryService:
         )
         if existing is None:
             return None
-        payload = existing.get("structured_payload")
-        if not isinstance(payload, dict):
+        payload = json_object(existing.get("structured_payload"))
+        if not payload:
             return None
-        response_payload = {
+        response_payload: dict[str, Any] = {
             "request_id": request_id,
             "conversation_id": conversation_id,
             "assistant_message": existing.get("content") or "",
@@ -71,11 +73,11 @@ class AgentTurnHistoryService:
         active_visualization: dict[str, Any] | None,
     ) -> dict[str, Any]:
         merged = dict(latest_memory or {})
-        if not isinstance(active_visualization, dict):
+        if not is_json_object(active_visualization):
             return merged
         merged["active_visualization"] = active_visualization
         location = active_visualization.get("resolved_location")
-        if isinstance(location, dict):
+        if is_json_object(location):
             merged["active_location"] = location
         return merged
 
@@ -86,7 +88,7 @@ class AgentTurnHistoryService:
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
     ) -> Any:
-        latest_memory = latest_memory if isinstance(latest_memory, dict) else {}
+        latest_memory = json_object(latest_memory)
         memory_signals = self.location_memory_service.resolve_explicit_references(
             turn_contract.user_text,
             latest_memory,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import asyncio
 from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Literal, cast
 
 from server.domain.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResponse
 from server.services.agent.orchestrator import AgentOrchestrator
@@ -23,7 +25,7 @@ class ChatStreamingService:
         event: str,
         data: dict[str, Any],
     ) -> None:
-        queue.put_nowait(ChatStreamEvent(event=event, data=data))
+        queue.put_nowait(ChatStreamEvent(event=cast(Literal["status", "parsed", "policy", "tool_call_started", "tool_call_completed", "map_session_created", "final", "error"], event), data=data))
 
     # -------------------------------------------------------------------------
     async def stream_turn(self, payload: ChatTurnRequest) -> AsyncIterator[ChatStreamEvent]:
@@ -112,16 +114,16 @@ class ChatStreamingService:
     @staticmethod
     def _build_tool_lifecycle_events(response: ChatTurnResponse) -> list[ChatStreamEvent]:
         tool_payload = response.tool_payload
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return []
         tool_calls = tool_payload.get("tool_calls")
         tool_results = tool_payload.get("tool_results")
-        if not isinstance(tool_calls, list) or not isinstance(tool_results, list):
+        if not is_json_array(tool_calls) or not is_json_array(tool_results):
             return []
 
         result_by_call_id: dict[str, dict[str, Any]] = {}
         for result in tool_results:
-            if not isinstance(result, dict):
+            if not is_json_object(result):
                 continue
             tool_call_id = result.get("tool_call_id")
             if isinstance(tool_call_id, str):
@@ -129,7 +131,7 @@ class ChatStreamingService:
 
         events: list[ChatStreamEvent] = []
         for tool_call in tool_calls:
-            if not isinstance(tool_call, dict):
+            if not is_json_object(tool_call):
                 continue
             tool_call_id = tool_call.get("id")
             if not isinstance(tool_call_id, str):

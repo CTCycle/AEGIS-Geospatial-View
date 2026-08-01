@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_object
+
 import asyncio
 import logging
 import time
@@ -102,7 +104,7 @@ class ToolPlanExecutor:
                     "error": {"code": "tool_timeout", "message": "Tool execution timed out."},
                 }
             elapsed_ms = int((time.perf_counter() - started) * 1000)
-            error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+            error = json_object(payload.get("error"))
             error_code = str(error.get("code") or "") or None
             ok = bool(payload.get("ok"))
             data = payload.get("data")
@@ -111,7 +113,7 @@ class ToolPlanExecutor:
                 result = PlannedToolResult(
                     step_id=step.step_id,
                     ok=True,
-                    data=data if isinstance(data, dict) else {"value": data},
+                    data=data if is_json_object(data) else {"value": data},
                     provenance=ToolResultProvenance(
                         tool_name=step.tool_name,
                         capability_id=step.capability_id,
@@ -167,12 +169,12 @@ class ToolPlanExecutor:
     # -------------------------------------------------------------------------
     @staticmethod
     def _validate_result(step: ToolPlanStep, data: Any) -> str | None:
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             return "Tool output must be an object."
         if step.tool_name == "execute_geospatial_capability":
             if data.get("ok") is False:
                 error = data.get("error")
-                if isinstance(error, dict):
+                if is_json_object(error):
                     return str(error.get("message") or "Capability execution failed.")
                 return "Capability execution failed."
             if data.get("capability_id") != step.capability_id:

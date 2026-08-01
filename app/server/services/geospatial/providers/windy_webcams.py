@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -40,7 +42,7 @@ class WindyWebcamsProvider(GeospatialProvider):
         if not self.api_key:
             raise ProviderAuthError("Windy Webcams API key is required.")
         raw_cameras = request.params.get("mock_cameras")
-        if isinstance(raw_cameras, list):
+        if is_json_array(raw_cameras):
             response = self._response_from_cameras(request, raw_cameras)
             self._last_response = response
             return response
@@ -73,9 +75,9 @@ class WindyWebcamsProvider(GeospatialProvider):
     def _response_from_cameras(
         self, request: ProviderRequest, cameras: list[Any]
     ) -> ProviderResponse:
-        features = []
+        features: list[dict[str, Any]] = []
         for item in cameras:
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 continue
             try:
                 features.append(
@@ -113,21 +115,21 @@ def _build_windy_webcams_url(request: ProviderRequest) -> str:
 
 ###############################################################################
 def _extract_windy_cameras(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         return []
     raw_items = payload.get("webcams")
-    if not isinstance(raw_items, list):
+    if not is_json_array(raw_items):
         raw_items = payload.get("items")
-    if not isinstance(raw_items, list):
+    if not is_json_array(raw_items):
         return []
-    return [_normalize_windy_camera(item) for item in raw_items if isinstance(item, dict)]
+    return [_normalize_windy_camera(item) for item in raw_items if is_json_object(item)]
 
 ###############################################################################
 def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
-    location = item.get("location") if isinstance(item.get("location"), dict) else {}
-    images = item.get("images") if isinstance(item.get("images"), dict) else {}
-    urls = item.get("urls") if isinstance(item.get("urls"), dict) else {}
-    player = item.get("player") if isinstance(item.get("player"), dict) else {}
+    location = json_object(item.get("location"))
+    images = json_object(item.get("images"))
+    urls = json_object(item.get("urls"))
+    player = json_object(item.get("player"))
     official_url = _first_nested_url(urls, ("detail", "web", "provider")) or str(
         item.get("url") or ""
     )
@@ -158,13 +160,13 @@ def _normalize_windy_camera(item: dict[str, object]) -> dict[str, object]:
 
 ###############################################################################
 def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         return None
     for key in keys:
         value = payload.get(key)
         if isinstance(value, str) and value:
             return value
-        if isinstance(value, dict):
+        if is_json_object(value):
             nested = value.get("url")
             if isinstance(nested, str) and nested:
                 return nested
@@ -172,13 +174,13 @@ def _first_nested_url(payload: object, keys: tuple[str, ...]) -> str | None:
 
 ###############################################################################
 def _preview_image_url(images: object) -> str | None:
-    if not isinstance(images, dict):
+    if not is_json_object(images):
         return None
     for key in ("current", "preview", "thumbnail", "daylight"):
         value = images.get(key)
         if isinstance(value, str) and value:
             return value
-        if isinstance(value, dict):
+        if is_json_object(value):
             if _is_expired_timestamp(value.get("expiresAt") or value.get("expires_at")):
                 continue
             nested = value.get("url")
@@ -190,7 +192,7 @@ def _preview_image_url(images: object) -> str | None:
 def _embedding_allowed(item: dict[str, object], player: object) -> bool:
     if item.get("embedding_allowed") is True or item.get("embeddingAllowed") is True:
         return True
-    if isinstance(player, dict):
+    if is_json_object(player):
         return player.get("embedding_allowed") is True or player.get(
             "embeddingAllowed"
         ) is True

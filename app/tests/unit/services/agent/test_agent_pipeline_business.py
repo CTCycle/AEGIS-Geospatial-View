@@ -30,6 +30,7 @@ from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.parser_service import ParserService
+from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_planner import DeterministicToolPlanner
@@ -101,7 +102,7 @@ class _SequenceParser:
         self.turns = turns
 
     # -------------------------------------------------------------------------
-    def parse_turn(self, user_message, memory_snapshot, conversation_messages):  # noqa: ANN001
+    def parse_turn(self, user_message, memory_snapshot, conversation_messages, **_kwargs):  # noqa: ANN001
         turn = self.turns.pop(0)
         return turn.model_copy(
             update={
@@ -309,6 +310,9 @@ def _orchestrator(turns: list[TurnParseResult]) -> AgentOrchestrator:
         task_state_service=state,
         conversation_repository=_ConversationRepository(),  # type: ignore[arg-type]
         native_tool_loop=_NativeLoop(),  # type: ignore[arg-type]
+        pipeline_router=DeterministicAgentRouter(),
+        tool_planner=DeterministicToolPlanner(),
+        tool_plan_executor=ToolPlanExecutor(tool_registry=registry),
         overlay_inference_service=OverlayInferenceService(
             capability_registry=search.capability_registry,
             runtime_registry=runtime,

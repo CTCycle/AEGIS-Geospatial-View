@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-07-28
+Last updated: 2026-08-01
 
 ## Purpose
 
@@ -17,7 +17,6 @@ AEGIS Geospatial View/
       proxy.conf.cjs
     resources/
       catalog/
-      database.db
     scripts/
     server/
       api/
@@ -28,6 +27,7 @@ AEGIS Geospatial View/
       services/
       app.py
     shared/
+      openapi.json
     tests/
       e2e/
       unit/
@@ -36,8 +36,6 @@ AEGIS Geospatial View/
     .env
     .env.example
     configurations.json
-  scripts/
-    launcher/
   start_on_windows.ps1
   README.md
 ```

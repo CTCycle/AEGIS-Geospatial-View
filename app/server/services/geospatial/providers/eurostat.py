@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 from typing import Any
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -81,12 +83,12 @@ class EurostatProvider(GeospatialProvider):
         dataset_url = str(payload.get("datasetUrl") or "").strip()
         cache_key = f"{self.provider_id}:{request.capability_id}:{dataset_url}"
         cached = self.cache.get(cache_key)
-        if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
+        if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
             return _response(request, metadata, {**payload, "jsonStatMetadata": cached.value})
         try:
             metadata_payload = await call_json_fetcher(self.fetcher, dataset_url, None)
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return _response(
                     request,
                     metadata,
@@ -99,7 +101,7 @@ class EurostatProvider(GeospatialProvider):
             raise ProviderUnavailableError("Eurostat JSON-stat metadata fetch failed.") from exc
         normalized = _normalize_jsonstat_metadata(metadata_payload)
         if normalized is None:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return _response(
                     request,
                     metadata,
@@ -119,7 +121,7 @@ class EurostatProvider(GeospatialProvider):
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
-    return dict(value) if isinstance(value, dict) else {}
+    return dict(value) if is_json_object(value) else {}
 
 ###############################################################################
 def _response(
@@ -141,16 +143,16 @@ def _response(
 
 ###############################################################################
 def _normalize_jsonstat_metadata(value: Any) -> dict[str, Any] | None:
-    if not isinstance(value, dict):
+    if not is_json_object(value):
         return None
     dimensions = value.get("dimension")
     ids = value.get("id")
     size = value.get("size")
-    if not isinstance(dimensions, dict) or not isinstance(ids, list):
+    if not is_json_object(dimensions) or not is_json_array(ids):
         return None
     return {
         "id": [str(item) for item in ids],
-        "size": size if isinstance(size, list) else [],
+        "size": json_array(size),
         "dimensions": sorted(str(key) for key in dimensions),
         "label": value.get("label"),
         "updated": value.get("updated"),
@@ -161,21 +163,21 @@ def _build_choropleth_payload(
     request: ProviderRequest, metadata: dict[str, Any]
 ) -> dict[str, Any]:
     joined = request.params.get("joined_features")
-    features = list(joined) if isinstance(joined, list) else []
+    features = list(joined) if is_json_array(joined) else []
     metric = str(request.params.get("metric") or metadata.get("label") or "value")
     values = [
         float(feature.get("properties", {}).get("value"))
         for feature in features
-        if isinstance(feature, dict)
-        and isinstance(feature.get("properties"), dict)
+        if is_json_object(feature)
+        and is_json_object(feature.get("properties"))
         and isinstance(feature["properties"].get("value"), int | float)
     ]
     bins = _legend_bins(values)
-    enriched_features = []
+    enriched_features: list[dict[str, Any]] = []
     for feature in features:
-        if not isinstance(feature, dict):
+        if not is_json_object(feature):
             continue
-        properties = dict(feature.get("properties") or {})
+        properties = json_object(feature.get("properties"))
         properties.setdefault("metric", metric)
         properties.setdefault("vintage", request.params.get("vintage") or metadata.get("vintage"))
         properties.setdefault("source", "Eurostat")

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 from dataclasses import dataclass
 from time import monotonic
 from typing import cast
@@ -143,18 +145,19 @@ class ChatModelLibraryService:
             sources_value = library.get("sources", {})
             sources = (
                 cast(dict[str, object], sources_value)
-                if isinstance(sources_value, dict)
+                if is_json_object(sources_value)
                 else {}
             )
             source = sources.get(provider)
-            if isinstance(source, dict) and not bool(source.get("ok")):
+            if is_json_object(source) and not bool(source.get("ok")):
                 raise ModelLibrarySourceError(
                     str(source.get("message") or f"Could not load {provider} models.")
                 )
         for bucket in ("cloud", "local"):
-            for item in library.get(bucket, []):
-                if item.get("provider") == provider and item.get("name") == model_name:
-                    return item
+            for item in json_array(library.get(bucket, [])):
+                item_object = json_object(item)
+                if item_object.get("provider") == provider and item_object.get("name") == model_name:
+                    return item_object
         return None
 
     # -------------------------------------------------------------------------

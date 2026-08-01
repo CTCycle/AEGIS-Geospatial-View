@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, json_object
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,26 +14,14 @@ def infer_datetime(action_payload: dict[str, Any]) -> str:
 
 ###############################################################################
 def requires_follow_up(action_payload: dict[str, Any]) -> bool:
-    planning = (
-        action_payload.get("planning")
-        if isinstance(action_payload.get("planning"), dict)
-        else action_payload
-    )
-    location = (
-        action_payload.get("location")
-        if isinstance(action_payload.get("location"), dict)
-        else {}
-    )
-    display_area = (
-        action_payload.get("display_area")
-        if isinstance(action_payload.get("display_area"), dict)
-        else {}
-    )
+    planning = json_object(action_payload.get("planning")) or action_payload
+    location = json_object(action_payload.get("location"))
+    display_area = json_object(action_payload.get("display_area"))
     follow_up = planning.get("follow_up_question")
     if isinstance(follow_up, str) and follow_up.strip():
         return True
     missing = planning.get("missing_information", [])
-    if isinstance(missing, list):
+    if is_json_array(missing):
         normalized = {str(item).lower() for item in missing}
         if normalized.intersection(
             {

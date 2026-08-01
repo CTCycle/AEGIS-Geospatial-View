@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import os
 import json
 import csv
@@ -117,7 +119,7 @@ class NRELProvider(GeospatialProvider):
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -132,20 +134,20 @@ class NRELProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ValueError("NREL AFDC payload must be an object.")
         stations = payload.get("fuel_stations")
-        if not isinstance(stations, list):
+        if not is_json_array(stations):
             return []
         features: list[dict[str, object]] = []
         for station in stations:
-            if not isinstance(station, dict):
+            if not is_json_object(station):
                 continue
             latitude = station.get("latitude")
             longitude = station.get("longitude")
             try:
-                latitude_value = float(latitude)
-                longitude_value = float(longitude)
+                latitude_value = float(str(latitude))
+                longitude_value = float(str(longitude))
             except (TypeError, ValueError):
                 continue
             fuel_type = str(station.get("fuel_type_code") or "fuel")
@@ -183,5 +185,5 @@ def _filter_features(
     return [
         item
         for item in features
-        if west <= float(item["longitude"]) <= east and south <= float(item["latitude"]) <= north
+        if west <= float(str(item["longitude"])) <= east and south <= float(str(item["latitude"])) <= north
     ][: int(request.params.get("limit") or 100)]

@@ -20,6 +20,9 @@ from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent.parser_service import ParserService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.tool_registry import ToolRegistry
+from server.services.agent.pipeline_router import DeterministicAgentRouter
+from server.services.agent.tool_plan_executor import ToolPlanExecutor
+from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.chat.maintenance_service import ChatMaintenanceService
 from server.services.chat.model_library import ChatModelLibraryService
 from server.services.chat.settings_service import ChatSettingsService
@@ -121,6 +124,9 @@ def build_chat_runtime(
         llm_factory=llm_factory,
     )
     task_state_service = ConversationTaskStateService()
+    pipeline_router = DeterministicAgentRouter()
+    tool_planner = DeterministicToolPlanner()
+    tool_plan_executor = ToolPlanExecutor(tool_registry=tool_registry)
     direct_turn_response_service = DirectTurnResponseService(
         task_state_service=task_state_service,
         history_service=history_service,
@@ -149,6 +155,9 @@ def build_chat_runtime(
             conversation_repository=conversation_repository,
             response_synthesizer=response_synthesizer,
             task_state_service=task_state_service,
+            pipeline_router=pipeline_router,
+            tool_planner=tool_planner,
+            tool_plan_executor=tool_plan_executor,
             direct_turn_response_service=direct_turn_response_service,
             overlay_inference_service=OverlayInferenceService(
                 capability_registry=search_orchestrator.capability_registry,

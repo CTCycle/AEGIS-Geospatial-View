@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_object
+
 import asyncio
 import json
 import threading
@@ -73,7 +75,7 @@ class OpenMeteoService:
             provider_key="openmeteo_weather",
         )
         hourly = (
-            payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
+            json_object(payload.get("hourly"))
         )
         timeline = list(hourly.get("time") or [])
         temperature = list(hourly.get("temperature_2m") or [])
@@ -107,7 +109,7 @@ class OpenMeteoService:
             "longitude": longitude,
             "timezone": payload.get("timezone"),
             "current": payload.get("current")
-            if isinstance(payload.get("current"), dict)
+            if is_json_object(payload.get("current"))
             else {},
             "hourly_preview": preview,
             "hourly_forecast": hourly_forecast,
@@ -133,7 +135,7 @@ class OpenMeteoService:
             provider_key="openmeteo_air_quality",
         )
         hourly = (
-            payload.get("hourly") if isinstance(payload.get("hourly"), dict) else {}
+            json_object(payload.get("hourly"))
         )
         timeline = list(hourly.get("time") or [])
         pollutants = {
@@ -183,7 +185,7 @@ class OpenMeteoService:
             raise OpenMeteoRequestError(
                 "Open-Meteo response was not valid JSON."
             ) from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise OpenMeteoRequestError("Open-Meteo response payload is malformed.")
         self._cache_set(cache_key, data)
         return data

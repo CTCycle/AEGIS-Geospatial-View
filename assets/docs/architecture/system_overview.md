@@ -1,6 +1,6 @@
 # System Overview
 
-Last updated: 2026-07-20
+Last updated: 2026-08-01
 
 ## Scope
 
@@ -35,7 +35,6 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 - composes search and chat runtimes
 - seeds chat settings through the settings service
 - runs startup validation
-- optionally syncs vectors
 
 `create_app()` mounts API routers under `/api`, serves the built SPA when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import argparse
 import asyncio
 import json
@@ -237,16 +239,16 @@ async def _run_check(
 
 ###############################################################################
 def _feature_count(payload: dict[str, Any]) -> int:
-    if isinstance(payload.get("features"), list):
+    if is_json_array(payload.get("features")):
         return len(payload["features"])
-    if isinstance(payload.get("results"), list):
+    if is_json_array(payload.get("results")):
         return len(payload["results"])
-    if isinstance(payload.get("feeds"), list):
+    if is_json_array(payload.get("feeds")):
         return len(payload["feeds"])
-    if isinstance(payload.get("series"), list):
+    if is_json_array(payload.get("series")):
         return len(payload["series"])
     summary = payload.get("summary")
-    if isinstance(summary, dict):
+    if is_json_object(summary):
         for key in ("vehicleCount", "alertCount", "stopCount", "routeCount"):
             value = summary.get(key)
             if isinstance(value, int):

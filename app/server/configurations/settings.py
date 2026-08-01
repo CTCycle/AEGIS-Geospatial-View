@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 import os
 import urllib.parse
 from dataclasses import dataclass
@@ -285,7 +287,7 @@ class JsonGIBSSettings(BaseModel):
     )
     @classmethod
     def normalize_string_mapping(cls, value: Any) -> dict[str, str]:
-        if not isinstance(value, dict):
+        if not is_json_object(value):
             return {}
         normalized: dict[str, str] = {}
         for key, raw in value.items():

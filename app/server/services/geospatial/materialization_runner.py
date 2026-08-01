@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from .ingestion import build_ingestion_plan, execute_ingestion_plan
 
@@ -11,7 +12,7 @@ def _iter_manifest_paths(manifest_root: Path) -> list[Path]:
     return sorted(path for path in manifest_root.rglob("*.json") if path.is_file())
 
 ###############################################################################
-def _load_manifest(path: Path) -> dict:
+def _load_manifest(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 ###############################################################################
@@ -20,8 +21,8 @@ def materialize_datasets(
     workspace_root: Path,
     manifest_root: Path,
     include_ids: set[str] | None = None,
-) -> list[dict[str, object]]:
-    results: list[dict[str, object]] = []
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
     for manifest_path in _iter_manifest_paths(manifest_root):
         manifest = _load_manifest(manifest_path)
         if manifest.get("capabilityKind") != "dataset-ingestion":

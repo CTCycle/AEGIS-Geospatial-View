@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import json_object
+
 from uuid import uuid4
 
 from sqlalchemy import func, select, update
@@ -115,5 +117,5 @@ class AgentRunEventRepository:
             type=RunEventType(record.type),
             timestamp=record.created_at,
             visibility=RunEventVisibility(record.visibility),
-            payload=payload if isinstance(payload, dict) else {},
+            payload=json_object(payload),
         )

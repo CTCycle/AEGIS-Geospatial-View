@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 import argparse
 import json
 import re
@@ -101,7 +103,7 @@ def _safe_url(value: object) -> str | None:
 
 ###############################################################################
 def _manifest_urls(manifest: dict[str, Any]) -> list[str]:
-    metadata = manifest.get("metadata") if isinstance(manifest.get("metadata"), dict) else {}
+    metadata = json_object(manifest.get("metadata"))
     urls: list[str] = []
     for key, value in metadata.items():
         if "url" not in str(key).casefold() and not str(key).casefold().endswith("endpoint"):
@@ -109,7 +111,7 @@ def _manifest_urls(manifest: dict[str, Any]) -> list[str]:
         safe = _safe_url(value)
         if safe and safe not in urls:
             urls.append(safe)
-    for value in manifest.get("sourceOfficialDocs") or []:
+    for value in json_array(manifest.get("sourceOfficialDocs")):
         safe = _safe_url(value)
         if safe and safe not in urls:
             urls.append(safe)
@@ -171,7 +173,7 @@ def _endpoint_validation(
     results: list[dict[str, Any]] = []
     for provider_id in sorted(by_provider):
         entries = by_provider[provider_id]
-        if any(bool((item.get("auth") or {}).get("required")) for item in entries):
+        if any(bool(json_object(item.get("auth")).get("required")) for item in entries):
             results.append(
                 {
                     "provider_id": provider_id,
@@ -185,7 +187,7 @@ def _endpoint_validation(
                 item
                 for item in entries
                 if service.build_validation_url(item) is not None
-                and str((item.get("metadata") or {}).get("endpoint_health") or "").casefold() != "local-snapshot"
+                and str(json_object(item.get("metadata")).get("endpoint_health") or "").casefold() != "local-snapshot"
             ),
             None,
         )
@@ -250,17 +252,20 @@ def build_inventory(
     catalog = GeospatialManifestLoader().load_all()
     manifests: list[dict[str, Any]] = []
     for collection in ("providers", "basemaps", "overlays", "cameras", "transit", "tools"):
-        for item in catalog.get(collection) or []:
+        for item in json_array(catalog.get(collection)):
+            if not is_json_object(item):
+                continue
             manifests.append({"collection": collection, **dict(item)})
 
     runtime_profiles = {
         str(item.get("capability_id")): dict(item)
-        for item in catalog.get("runtime_profiles") or []
+        for item in json_array(catalog.get("runtime_profiles"))
+        if is_json_object(item)
         if str(item.get("capability_id") or "").strip()
     }
     live_by_provider: dict[str, dict[str, Any]] = {}
-    for result in (live_report or {}).get("results") or []:
-        if isinstance(result, dict):
+    for result in json_array((live_report or {}).get("results")):
+        if is_json_object(result):
             live_by_provider[str(result.get("provider_id") or "")] = result
 
     by_provider: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -281,10 +286,14 @@ def build_inventory(
             {
                 str(capability)
                 for item in provider_manifests
-                for capability in item.get("capabilities") or []
+                for capability in json_array(item.get("capabilities"))
             }
         )
-        auth_entries = [item.get("auth") for item in provider_manifests if isinstance(item.get("auth"), dict)]
+        auth_entries = [
+            json_object(item.get("auth"))
+            for item in provider_manifests
+            if is_json_object(item.get("auth"))
+        ]
         required_auth = any(bool(item.get("required")) for item in auth_entries)
         provider_key = next(
             (str(item.get("providerKey")) for item in auth_entries if item.get("providerKey")),
@@ -308,7 +317,7 @@ def build_inventory(
                     "provider_key": provider_key,
                     "credential_environment_variable": env_name,
                     "runtime_profile_ids": profile_ids,
-                    "local_or_external": "local_snapshot" if any(str(item.get("metadata", {}).get("endpoint_health", "")).casefold() == "local-snapshot" for item in provider_manifests) else "external_service",
+                    "local_or_external": "local_snapshot" if any(str(json_object(item.get("metadata")).get("endpoint_health", "")).casefold() == "local-snapshot" for item in provider_manifests) else "external_service",
                 },
                 "upstream_endpoints": sorted({url for item in provider_manifests for url in _manifest_urls(item)}),
                 "internal_components": {
@@ -329,7 +338,10 @@ def build_inventory(
         )
 
     tools = []
-    for item in catalog.get("tools") or []:
+    tools: list[dict[str, Any]] = []
+    for item in json_array(catalog.get("tools")):
+        if not is_json_object(item):
+            continue
         tool_id = str(item.get("id") or "")
         tools.append(
             {
@@ -339,7 +351,7 @@ def build_inventory(
                 "provider": item.get("provider"),
                 "capabilities": item.get("capabilities") or [],
                 "exposure": "direct-tool-manifest",
-                "handler": (item.get("metadata") or {}).get("handler_name"),
+                "handler": json_object(item.get("metadata")).get("handler_name"),
                 "status": "active" if runtime_profiles.get(tool_id, {}).get("enabled_by_default") else "registered_not_enabled",
                 "source": str((CATALOG_SOURCE / "tools" / f"{tool_id}.json").relative_to(PROJECT_DIR.parent)),
             }
@@ -410,11 +422,15 @@ def _markdown(report: dict[str, Any]) -> str:
     for key, value in report["counts"].items():
         lines.append(f"| {key} | {value} |")
     lines.extend(["", "## Provider Health Matrix", "", "| Provider | Status | Auth | Adapter | Catalog manifests | Live check |", "| --- | --- | --- | --- | ---: | --- |"])
-    for provider in report["providers"]:
-        live = (provider.get("live_validation") or {}).get("status", "not_sampled")
+    for provider in json_array(report.get("providers")):
+        if not is_json_object(provider):
+            continue
+        live = json_object(provider.get("live_validation")).get("status", "not_sampled")
         lines.append(f"| `{provider['id']}` | {provider['operational_status']} | {'required' if provider['requires_authentication'] else 'none'} | {'yes' if provider['adapter_registered'] else 'rendering/catalog-only'} | {provider['catalog_manifest_count']} | {live} |")
     lines.extend(["", "## LLM Tools", "", "| Tool | Exposure | Provider/Handler | Status |", "| --- | --- | --- | --- |"])
-    for tool in report["tools"]:
+    for tool in json_array(report.get("tools")):
+        if not is_json_object(tool):
+            continue
         lines.append(f"| `{tool['id']}` | {tool['exposure']} | {tool.get('provider') or tool.get('handler') or 'capability-oriented'} | {tool['status']} |")
     lines.extend(["", "## Replacement Outcomes", ""])
     for replacement in report["replacements"]:
@@ -422,7 +438,9 @@ def _markdown(report: dict[str, Any]) -> str:
         for item in replacement["lost_or_degraded"]:
             lines.append(f"  - {item}")
     lines.extend(["", "## Endpoint Samples", "", "| Provider | Capability | Status | HTTP | Message |", "| --- | --- | --- | ---: | --- |"])
-    for endpoint in report.get("endpoint_validation") or []:
+    for endpoint in json_array(report.get("endpoint_validation")):
+        if not is_json_object(endpoint):
+            continue
         lines.append(f"| `{endpoint['provider_id']}` | `{endpoint.get('capability_id', '')}` | {endpoint['status']} | {endpoint.get('status_code') or ''} | {endpoint.get('message') or ''} |")
     lines.extend(["", "## Findings", ""])
     for finding in report["findings"]:

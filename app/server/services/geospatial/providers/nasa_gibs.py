@@ -39,13 +39,13 @@ class ParsedGIBSLayer:
     layer_id: str
     title: str
     abstract: str | None = None
-    protocols: set[str] = field(default_factory=set)
-    crs: set[str] = field(default_factory=set)
-    formats: set[str] = field(default_factory=set)
-    styles: set[str] = field(default_factory=set)
+    protocols: set[str] = field(default_factory=lambda: set[str]())
+    crs: set[str] = field(default_factory=lambda: set[str]())
+    formats: set[str] = field(default_factory=lambda: set[str]())
+    styles: set[str] = field(default_factory=lambda: set[str]())
     time_extent: str | None = None
     default_time: str | None = None
-    tile_matrix_sets: set[str] = field(default_factory=set)
+    tile_matrix_sets: set[str] = field(default_factory=lambda: set[str]())
 
 ###############################################################################
 class NASAGIBSProvider(GeospatialProvider):

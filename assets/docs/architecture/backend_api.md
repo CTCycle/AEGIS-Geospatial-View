@@ -1,10 +1,13 @@
 # Backend API
 
-Last updated: 2026-07-20
+Last updated: 2026-08-01
 
 ## Mounting
 
 All routers are mounted with `/api` prefix in `app/server/app.py`.
+
+`GET /api/health` returns `{"status": "ok"}` for launcher readiness checks.
+It is intentionally excluded from the generated OpenAPI schema.
 
 ## Job Routes
 
@@ -158,6 +161,11 @@ Defined in `app/server/api/conversations.py`:
   Marks the active run cancelled as a terminal user action.
 
 The v1 run stream emits concise user-visible events only: progress labels, assistant text completion, request updates, terminal errors, completion, and cancellation. Internal diagnostics can be persisted with internal visibility and are not replayed on the normal user stream.
+
+Conversation-run service failures are translated at the API boundary into
+`404` (missing conversation or run), `403` (access denied), or `409`
+(active-run conflict or terminal-run mutation) responses. The shared mapping is
+implemented in `app/server/api/run_errors.py`.
 
 Clarifications use the terminal `clarification_needed` event and may carry a
 partial map session plus a visualization delta.

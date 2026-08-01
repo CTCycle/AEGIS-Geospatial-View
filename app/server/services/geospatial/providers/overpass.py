@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, json_array, json_object
+
 from typing import Any
 
 from server.services.geospatial.normalizers import (
@@ -63,9 +65,9 @@ class OverpassProvider(GeospatialProvider):
                 attribution=["© OpenStreetMap contributors (ODbL)"],
             )
         tags = request.params.get("amenity_tags")
-        amenity_tags = [str(tag) for tag in tags] if isinstance(tags, list) else None
+        amenity_tags = [str(tag) for tag in tags] if is_json_array(tags) else None
         categories_value = request.params.get("poi_categories")
-        categories = [str(item) for item in categories_value] if isinstance(categories_value, list) else None
+        categories = [str(item) for item in categories_value] if is_json_array(categories_value) else None
         if amenity_tags is None:
             category = str(request.params.get("category") or "").strip().lower()
             amenity_tags = AMENITY_GROUPS.get(category)
@@ -82,9 +84,10 @@ class OverpassProvider(GeospatialProvider):
             raise ProviderRateLimitError(str(exc)) from exc
         except (OverpassServiceError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
-        features = []
-        for item in payload.get("items") or []:
-            if not isinstance(item, dict):
+        features: list[dict[str, Any]] = []
+        for item in json_array(payload.get("items")):
+            item = json_object(item)
+            if not item:
                 continue
             try:
                 feature = normalize_poi_feature(

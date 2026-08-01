@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from typing import Any
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -69,12 +71,12 @@ class ESAProvider(GeospatialProvider):
         service_url = str(payload.get("serviceUrl") or "").strip()
         cache_key = f"{self.provider_id}:{request.capability_id}:{service_url}"
         cached = self.cache.get(cache_key)
-        if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
+        if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
             return self._response(request, metadata, {**payload, "liveValidation": cached.value})
         try:
             validation = await call_json_fetcher(self.fetcher, service_url, None)
         except Exception as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return self._response(
                     request,
                     metadata,
@@ -85,8 +87,8 @@ class ESAProvider(GeospatialProvider):
             if isinstance(exc, ProviderUnavailableError):
                 raise
             raise ProviderUnavailableError("ESA WMTS validation failed.") from exc
-        if not isinstance(validation, dict):
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+        if not is_json_object(validation):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return self._response(
                     request,
                     metadata,
@@ -125,4 +127,4 @@ class ESAProvider(GeospatialProvider):
 ###############################################################################
 def _metadata(request: ProviderRequest) -> dict[str, Any]:
     value = request.params.get("metadata")
-    return dict(value) if isinstance(value, dict) else {}
+    return dict(value) if is_json_object(value) else {}

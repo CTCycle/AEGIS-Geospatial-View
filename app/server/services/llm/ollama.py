@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import json
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
@@ -135,13 +137,13 @@ class OllamaProvider(LLMProvider):
         self.last_list_models_error = None
         models: list[ModelDescriptor] = []
         for item in payload.get("models", []):
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 continue
             model_name = str(item.get("name") or "")
             if not model_name:
                 continue
             details = (
-                item.get("details") if isinstance(item.get("details"), dict) else {}
+                json_object(item.get("details"))
             )
             family = str(details.get("family") or "").strip()
             parameter_size = str(details.get("parameter_size") or "").strip()
@@ -163,7 +165,7 @@ class OllamaProvider(LLMProvider):
                     parameter_size=parameter_size,
                     quantization_level=quantization_level,
                     tag_capabilities=item.get("capabilities")
-                    if isinstance(item.get("capabilities"), list)
+                    if is_json_array(item.get("capabilities"))
                     else None,
                 )
             )
@@ -251,7 +253,7 @@ class OllamaProvider(LLMProvider):
         except Exception:
             return None
         raw = payload.get("capabilities")
-        if not isinstance(raw, list):
+        if not is_json_array(raw):
             return None
         return {str(item).strip().lower() for item in raw if str(item).strip()}
 
@@ -280,10 +282,10 @@ class OllamaProvider(LLMProvider):
         supported = False
         try:
             response = self._post_json("/api/chat", payload)
-            message = response.get("message") if isinstance(response, dict) else None
+            message = response.get("message") if is_json_object(response) else None
             supported = True
             source = "ollama_tool_request_accepted"
-            if isinstance(message, dict) and self._parse_tool_calls(message):
+            if is_json_object(message) and self._parse_tool_calls(message):
                 source = "ollama_probe"
         except HTTPError as exc:
             supported = False
@@ -367,15 +369,16 @@ class OllamaProvider(LLMProvider):
     @staticmethod
     def _parse_tool_calls(message: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
-        for item in message.get("tool_calls", []) if isinstance(message, dict) else []:
-            if not isinstance(item, dict):
+        for item in json_array(message.get("tool_calls")):
+            item = json_object(item)
+            if not item:
                 continue
-            function = item.get("function") if isinstance(item.get("function"), dict) else {}
+            function = json_object(item.get("function"))
             calls.append(
                 LLMToolCall(
                     id=item.get("id"),
                     name=str(function.get("name") or item.get("name") or ""),
-                    arguments=function.get("arguments") if isinstance(function.get("arguments"), dict) else {},
+                    arguments=json_object(function.get("arguments")),
                 )
             )
         return calls
@@ -410,7 +413,7 @@ class OllamaProvider(LLMProvider):
         if schema:
             payload["format"] = schema
         response = self._post_json("/api/chat", payload)
-        message = response.get("message") if isinstance(response.get("message"), dict) else {}
+        message = json_object(response.get("message"))
         return LLMResult(
             content=str(message.get("content") or ""),
             raw=response,
@@ -429,7 +432,7 @@ class OllamaProvider(LLMProvider):
             "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
         }
         for event in self._stream_post("/api/chat", payload):
-            message = event.get("message") if isinstance(event.get("message"), dict) else None
+            message = event.get("message") if is_json_object(event.get("message")) else None
             if message is not None:
                 content = message.get("content")
                 if isinstance(content, str) and content:
@@ -439,11 +442,12 @@ class OllamaProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def structured_output(
-        self, request: LLMRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
         usage = compute_ollama_context_usage(request)
         self.last_context_usage = usage.to_dict()
-        schema_json = schema.model_json_schema() if hasattr(schema, "model_json_schema") else {}
+        model_json_schema = getattr(schema, "model_json_schema", None)
+        schema_json = json_object(model_json_schema()) if callable(model_json_schema) else {}
         payload: dict[str, Any] = {
             "model": request.model,
             "messages": request.messages,
@@ -452,7 +456,7 @@ class OllamaProvider(LLMProvider):
             "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
         }
         response = self._post_json("/api/chat", payload)
-        message = response.get("message") if isinstance(response.get("message"), dict) else {}
+        message = json_object(response.get("message"))
         content = str(message.get("content") or "{}")
         try:
             return json.loads(content)
@@ -470,7 +474,7 @@ class OllamaProvider(LLMProvider):
         except Exception:
             return []
         embedding = response.get("embedding")
-        if not isinstance(embedding, list):
+        if not is_json_array(embedding):
             return []
         return [float(value) for value in embedding if isinstance(value, (int | float))]
 

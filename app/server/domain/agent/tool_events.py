@@ -15,7 +15,7 @@ class ToolLoopStarted:
 class ToolCallRequested:
     tool_name: str
     iteration: int
-    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)

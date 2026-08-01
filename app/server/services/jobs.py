@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from server.common.typing import json_object
+
 import asyncio
 import logging
 import threading
 import time
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from server.common.constants import (
@@ -17,7 +19,7 @@ from server.common.constants import (
 )
 from server.domain.chat import ChatTurnRequest
 from server.domain.jobs import (
-    BackgroundJob,
+    BackgroundJob, BackgroundJobEventType, BackgroundJobStatus, BackgroundJobType,
     BackgroundJobCreateResponse,
     BackgroundJobEvent,
     BackgroundJobEventsResponse,
@@ -211,11 +213,7 @@ class BackgroundJobService:
         if final_response is None:
             self._fail_job(job.job_id, {"message": "Chat job finished without final response"})
             return
-        operation = (
-            final_response.get("operation")
-            if isinstance(final_response.get("operation"), dict)
-            else {}
-        )
+        operation = json_object(final_response.get("operation"))
         if self._operation_failed(operation):
             self._fail_job(
                 job.job_id,
@@ -325,8 +323,8 @@ class BackgroundJobService:
     def _to_create_response(self, job: BackgroundJob, message: str) -> BackgroundJobCreateResponse:
         return BackgroundJobCreateResponse(
             job_id=job.job_id,
-            job_type=job.job_type,
-            status=job.status,
+            job_type=cast(BackgroundJobType, job.job_type),
+            status=cast(BackgroundJobStatus, job.status),
             request_id=job.request_id,
             message=message,
             poll_interval=self._polling_interval,
@@ -337,8 +335,8 @@ class BackgroundJobService:
     def _to_status_response(job: BackgroundJob) -> BackgroundJobStatusResponse:
         return BackgroundJobStatusResponse(
             job_id=job.job_id,
-            job_type=job.job_type,
-            status=job.status,
+            job_type=cast(BackgroundJobType, job.job_type),
+            status=cast(BackgroundJobStatus, job.status),
             request_id=job.request_id,
             parent_job_id=job.parent_job_id,
             priority=job.priority,
@@ -361,7 +359,7 @@ class BackgroundJobService:
         job.events.append(
             BackgroundJobEvent(
                 job_id=job.job_id,
-                event_type=event_type,
+                event_type=cast(BackgroundJobEventType, event_type),
                 sequence=len(job.events) + 1,
                 created_at=_utc_now(),
                 payload_json=payload_json,

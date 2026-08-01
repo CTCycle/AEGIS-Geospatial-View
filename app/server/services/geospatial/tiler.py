@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array
+
 import json
 from pathlib import Path
 from typing import Any
@@ -83,4 +85,4 @@ def _feature_count(source_path: Path | None) -> int:
         return 0
     payload: dict[str, Any] = json.loads(source_path.read_text(encoding="utf-8"))
     features = payload.get("features")
-    return len(features) if isinstance(features, list) else 0
+    return len(features) if is_json_array(features) else 0

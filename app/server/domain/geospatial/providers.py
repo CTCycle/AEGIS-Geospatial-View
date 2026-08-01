@@ -11,7 +11,7 @@ class ProviderRequest:
     bbox: tuple[float, float, float, float] | None = None
     zoom: int | None = None
     time: datetime | None = None
-    params: dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -19,8 +19,8 @@ class ProviderResponse:
     capability_id: str
     provider_id: str
     payload: dict[str, Any]
-    attribution: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    attribution: list[str] = field(default_factory=lambda: list[str]())
+    warnings: list[str] = field(default_factory=lambda: list[str]())
     stale: bool = False
     fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 

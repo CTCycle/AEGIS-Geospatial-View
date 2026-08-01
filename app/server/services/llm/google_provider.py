@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
@@ -35,9 +37,10 @@ class GoogleProvider(LLMProvider):
     # -------------------------------------------------------------------------
     def _client(self) -> Any:
         if self.base_url and self.base_url != DEFAULT_GOOGLE_BASE_URL:
+            http_options_constructor: Any = genai_types.HttpOptions
             return genai.Client(
                 api_key=self.api_key,
-                http_options=genai_types.HttpOptions(
+                http_options=http_options_constructor(
                     baseUrl=self.base_url,
                     apiVersion="v1beta",
                 ),
@@ -79,19 +82,21 @@ class GoogleProvider(LLMProvider):
     @staticmethod
     def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
-        candidates = raw.get("candidates") if isinstance(raw, dict) else None
-        for candidate in candidates if isinstance(candidates, list) else []:
-            content = candidate.get("content") if isinstance(candidate, dict) else {}
-            for part in content.get("parts", []) if isinstance(content, dict) else []:
-                function_call = part.get("functionCall") or part.get("function_call") if isinstance(part, dict) else None
-                if not isinstance(function_call, dict):
+        candidates = raw.get("candidates") if is_json_object(raw) else None
+        for candidate in json_array(candidates):
+            candidate_object = json_object(candidate)
+            content = json_object(candidate_object.get("content"))
+            for part in json_array(content.get("parts")):
+                part_object = json_object(part)
+                function_call = part_object.get("functionCall") or part_object.get("function_call")
+                if not is_json_object(function_call):
                     continue
-                args = function_call.get("args") or {}
+                args: dict[str, Any] = json_object(function_call.get("args"))
                 calls.append(
                     LLMToolCall(
                         id=function_call.get("id"),
                         name=str(function_call.get("name") or ""),
-                        arguments=args if isinstance(args, dict) else {},
+                        arguments=json_object(args),
                     )
                 )
         return calls
@@ -162,12 +167,13 @@ class GoogleProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def structured_output(
-        self, request: LLMRequest, schema: type[object]
+        self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
-        json_schema = schema.model_json_schema() if hasattr(schema, "model_json_schema") else {}
+        model_json_schema = getattr(schema, "model_json_schema", None)
+        json_schema = json_object(model_json_schema()) if callable(model_json_schema) else {}
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
@@ -181,7 +187,7 @@ class GoogleProvider(LLMProvider):
             },
         )
         loaded = json.loads(str(getattr(response, "text", "") or "{}"))
-        return loaded if isinstance(loaded, dict) else {}
+        return json_object(loaded)
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:
@@ -189,13 +195,13 @@ class GoogleProvider(LLMProvider):
         embeddings = getattr(response, "embeddings", None)
         if embeddings:
             values = getattr(embeddings[0], "values", None)
-            if isinstance(values, list):
+            if is_json_array(values):
                 return [
                     float(value) for value in values if isinstance(value, (int, float))
                 ]
         embedding = getattr(response, "embedding", None)
         values = getattr(embedding, "values", None)
-        if isinstance(values, list):
+        if is_json_array(values):
             return [float(value) for value in values if isinstance(value, (int, float))]
         return []
 
@@ -211,7 +217,7 @@ class GoogleProvider(LLMProvider):
             role = str(message.get("role") or "").strip().lower()
             if role == "system":
                 continue
-            if role == "assistant" and isinstance(message.get("tool_calls"), list):
+            if role == "assistant" and is_json_array(message.get("tool_calls")):
                 contents.append(
                     {
                         "role": "model",
@@ -223,7 +229,7 @@ class GoogleProvider(LLMProvider):
                                 }
                             }
                             for call in message["tool_calls"]
-                            if isinstance(call, dict)
+                            if is_json_object(call)
                         ],
                     }
                 )
@@ -255,11 +261,11 @@ class GoogleProvider(LLMProvider):
     # -------------------------------------------------------------------------
     @staticmethod
     def _extract_finish_reason(raw: dict[str, Any]) -> str | None:
-        candidates = raw.get("candidates") if isinstance(raw, dict) else None
-        if not isinstance(candidates, list) or not candidates:
+        candidates = raw.get("candidates") if is_json_object(raw) else None
+        if not is_json_array(candidates) or not candidates:
             return None
         candidate = candidates[0]
-        if not isinstance(candidate, dict):
+        if not is_json_object(candidate):
             return None
         reason = candidate.get("finishReason") or candidate.get("finish_reason")
         return str(reason) if reason else None
@@ -276,4 +282,3 @@ class GoogleProvider(LLMProvider):
         if system_instruction:
             config["system_instruction"] = system_instruction
         return config
-

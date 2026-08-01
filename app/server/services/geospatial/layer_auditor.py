@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import argparse
 import json
 import os
@@ -77,7 +79,7 @@ BASEMAP_TEST_MARKERS = ("basemap", "tile")
 def _read_json(path: Path) -> JsonDict:
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise ValueError("JSON document must be an object.")
     return payload
 
@@ -163,7 +165,7 @@ def _placeholder_statuses(source: str) -> list[str]:
 
 ###############################################################################
 def _basemap_fetch_implemented(manifest: CapabilityManifestV2) -> bool:
-    metadata = manifest.metadata if isinstance(manifest.metadata, dict) else {}
+    metadata = manifest.metadata if is_json_object(manifest.metadata) else {}
     if manifest.capability_kind != CapabilityKind.BASEMAP:
         return False
     # Raster XYZ basemaps expose a tile URL, while MapLibre vector basemaps
@@ -223,7 +225,7 @@ def _status_for_manifest(
 
 ###############################################################################
 def _contains_secret_value(value: Any) -> bool:
-    if isinstance(value, dict):
+    if is_json_object(value):
         for key, nested in value.items():
             key_text = str(key).lower()
             if (
@@ -234,7 +236,7 @@ def _contains_secret_value(value: Any) -> bool:
                     return True
             if _contains_secret_value(nested):
                 return True
-    if isinstance(value, list):
+    if is_json_array(value):
         return any(_contains_secret_value(item) for item in value)
     return False
 
@@ -419,11 +421,11 @@ def audit_all_manifests(
         manifest_items.append(
             (path, CapabilityManifestV2.model_validate(_read_json(path)))
         )
-    runtime_profiles = _read_json(root / "runtime_profiles.json").get("profiles") or []
+    runtime_profiles = json_array(_read_json(root / "runtime_profiles.json").get("profiles"))
     runtime_ids = {
-        str(item.get("capability_id"))
+        str(json_object(item).get("capability_id"))
         for item in runtime_profiles
-        if isinstance(item, dict) and item.get("capability_id")
+        if json_object(item).get("capability_id")
     }
     api_source = _read_text_if_exists(API_SOURCE_PATH)
     client_source = _combined_text(_client_files(CLIENT_SOURCE_DIR))

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array
+
 import json
 import os
 from pathlib import Path
@@ -71,22 +73,22 @@ class LocalOpenDataProvider:
 
     # -------------------------------------------------------------------------
     def _normalize_payload(self, payload: object, *, source: str) -> dict[str, Any]:
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ProviderMalformedPayloadError("Local open-data source must be a JSON object.")
         if payload.get("type") == "FeatureCollection":
             features = payload.get("features")
             return {
                 "renderingMode": "camera-points",
                 "type": "FeatureCollection",
-                "features": features if isinstance(features, list) else [],
+                "features": json_array(features),
                 "source": source,
             }
         cameras = payload.get("cameras")
-        if isinstance(cameras, list):
+        if is_json_array(cameras):
             return {
                 "renderingMode": "camera-points",
                 "type": "FeatureCollection",
-                "features": [self._camera_feature(item) for item in cameras if isinstance(item, dict)],
+                "features": [self._camera_feature(item) for item in cameras if is_json_object(item)],
                 "source": source,
             }
         return payload | {"source": source}
@@ -111,6 +113,6 @@ class LocalOpenDataProvider:
             payload = json.loads(raw)
         except json.JSONDecodeError:
             return {}
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             return {}
         return {str(key): str(value) for key, value in payload.items() if value}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -78,7 +80,7 @@ class ChatHistoryRepository:
             return structured_payload
         if structured_payload is None:
             return {"request_id": request_id}
-        if isinstance(structured_payload, dict):
+        if is_json_object(structured_payload):
             payload = dict(structured_payload)
             payload.setdefault("request_id", request_id)
             return payload
@@ -88,7 +90,7 @@ class ChatHistoryRepository:
     def _last_assistant_payload(self, conversation_id: str) -> dict[str, Any] | None:
         row = self.get_last_assistant_message(conversation_id)
         payload = row.get("structured_payload") if row else None
-        return payload if isinstance(payload, dict) else None
+        return payload if is_json_object(payload) else None
 
     # -------------------------------------------------------------------------
     def list_recent_messages(self, conversation_id: str, limit: int) -> list[dict[str, Any]]:

@@ -54,18 +54,8 @@ pythonpath = [".", ".."]
 asyncio_mode = "auto"
 
 [tool.pyright]
-include = [
-    "app.py",
-    "api/conversations.py",
-    "domain/agent_runs.py",
-    "repositories/database/backend.py",
-    "repositories/database/contracts.py",
-    "repositories/database/initializer.py",
-    "services/agent/direct_turn_response.py",
-    "services/agent_runs/lifecycle.py",
-    "services/chat/composition.py",
-    "services/geospatial/composition.py",
-]
+include = ["."]
+exclude = [".venv", "**/__pycache__"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"

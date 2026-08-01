@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-07-28
+Last updated: 2026-07-30
 
 ## Layering
 
@@ -27,6 +27,13 @@ AEGIS uses these main backend layers:
 - Runtime job state is owned by `app/server/services/jobs.py`.
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
+
+Run-service errors are translated once at the API boundary by
+`app/server/api/run_errors.py`. Run lifecycle and stream services translate
+repository failures into `RunServiceError` subclasses; conversation endpoints
+catch that service-level hierarchy and delegate status mapping to the shared
+translator. Run streams always receive an `AgentRunRepository` and verify the
+conversation-to-run relationship before opening the SSE response.
 
 ## Representative Request Flow
 
@@ -69,6 +76,11 @@ retaining the normal tool execution path.
 - `AgentTurnHistoryService` owns request-id idempotency, prior-message lookup, and conversation-state memory merging.
 - `AgentTurnStateAssembler` owns map-session reconstruction, memory snapshot updates, and partial clarification map-state application.
 - `AgentTurnSupport` owns static fallback helpers for direct rejection, general capability answers, parser-failure classification, and native-tool loop prompt assembly.
+
+The composition root constructs `DeterministicAgentRouter`,
+`DeterministicToolPlanner`, and `ToolPlanExecutor` and passes them explicitly
+to `AgentOrchestrator`; the orchestrator does not construct fallback
+dependencies internally.
 
 Conversation task state is keyed by conversation ID, hydrated from the durable
 conversation-context snapshot before each run, and persisted with optimistic

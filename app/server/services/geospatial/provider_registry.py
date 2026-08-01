@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from server.common.typing import json_array, json_object
+
 import asyncio
 import os
 from collections.abc import Callable
 from time import monotonic
-from typing import Any
+from typing import Any, cast
 
 from server.domain.geographics import GeospatialProviderLayerDescriptor
 from server.domain.geospatial.providers import ProviderExecutionPolicy
@@ -53,7 +55,7 @@ from server.services.geospatial.providers.mobility_database import MobilityDatab
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
-ProviderFactory = Callable[[], GeospatialProvider]
+ProviderFactory = Callable[[], Any]
 
 
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
@@ -160,7 +162,7 @@ class ProviderRegistry:
     # -------------------------------------------------------------------------
     def build_from_manifests(self) -> None:
         payload = self.manifest_loader.load_all()
-        items = []
+        items: list[tuple[str, dict[str, Any]]] = []
         for collection_name in (
             "providers",
             "basemaps",
@@ -169,9 +171,10 @@ class ProviderRegistry:
             "transit",
             "tools",
         ):
-            for item in payload.get(collection_name) or []:
-                if isinstance(item, dict):
-                    items.append((collection_name, item))
+            for item in json_array(payload.get(collection_name)):
+                item_object = json_object(item)
+                if item_object:
+                    items.append((collection_name, item_object))
         for collection_name, item in items:
             capability_kind = str(item.get("capabilityKind") or "").strip().lower()
             if (
@@ -179,9 +182,7 @@ class ProviderRegistry:
                 and capability_kind in {"basemap", "metadata", "metadata-only"}
             ):
                 continue
-            fallback_provider_id = (
-                item.get("id") if collection_name == "providers" else ""
-            )
+            fallback_provider_id = item.get("id") if collection_name == "providers" else ""
             provider_id = str(item.get("provider") or fallback_provider_id).strip()
             if not provider_id:
                 continue
@@ -245,7 +246,7 @@ class ProviderRegistry:
     ) -> list[GeospatialProviderLayerDescriptor]:
         normalized = self._normalize_provider_id(provider_id)
         provider = self.get(normalized)
-        list_layers = getattr(provider, "list_layers", None)
+        list_layers = cast(Callable[..., Any], getattr(provider, "list_layers", None))
         if not callable(list_layers):
             raise ProviderUnavailableError(
                 f"Provider '{normalized}' does not support live layer discovery."
@@ -271,7 +272,7 @@ class ProviderRegistry:
     ) -> GeospatialProviderLayerDescriptor:
         normalized = self._normalize_provider_id(provider_id)
         provider = self.get(normalized)
-        describe_layer = getattr(provider, "describe_layer", None)
+        describe_layer = cast(Callable[..., Any], getattr(provider, "describe_layer", None))
         if not callable(describe_layer):
             raise ProviderUnavailableError(
                 f"Provider '{normalized}' does not support live layer discovery."
@@ -291,7 +292,7 @@ class ProviderRegistry:
     async def _fetch_provider(
         self, provider: GeospatialProvider, request: ProviderRequest
     ) -> ProviderResponse:
-        fetch_features = getattr(provider, "fetch_features", None)
+        fetch_features = cast(Callable[..., Any], getattr(provider, "fetch_features", None))
         if callable(fetch_features):
             response = await fetch_features(request)
             if isinstance(response, ProviderResponse):

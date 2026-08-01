@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-07-28
+Last updated: 2026-08-01
 
 ## Relational Storage
 
@@ -81,7 +81,7 @@ cached database accessor, or compatibility import path.
 
 ## Model Capability Persistence
 
-- Cloud model capabilities are declared in `services/llm/cloud_catalog.py`.
+- Cloud model capabilities are declared in `app/server/services/llm/cloud_catalog.py`.
 - Ollama tool support is detected from provider capabilities or a cached probe.
 - Agent assignment requires tool support.
 - Parser assignment requires structured-output support.

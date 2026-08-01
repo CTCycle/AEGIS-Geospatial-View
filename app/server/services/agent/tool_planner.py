@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from server.domain.agent.pipeline import SpecialistGroup, ToolPlan, ToolPlanStep
 from server.domain.extraction.models import TurnParseResult
@@ -18,7 +19,7 @@ class DeterministicToolPlanner:
         self,
         turn: TurnParseResult,
         specialist: SpecialistGroup,
-        memory_snapshot: dict | None = None,
+        memory_snapshot: dict[str, Any] | None = None,
     ) -> ToolPlan:
         steps: list[ToolPlanStep] = []
         visualization_update = self._build_visualization_update(turn)

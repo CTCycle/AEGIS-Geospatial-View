@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import json_object
+
 from server.domain.geospatial.registry import AttributionEntry
 
 ###############################################################################
@@ -8,7 +10,7 @@ class AttributionService:
     # -------------------------------------------------------------------------
     def from_manifest(self, manifest: dict[str, object]) -> AttributionEntry:
         license_payload = manifest.get("license")
-        license_data = license_payload if isinstance(license_payload, dict) else {}
+        license_data = json_object(license_payload)
         return AttributionEntry(
             capability_id=str(manifest.get("id") or ""),
             provider_id=str(manifest.get("provider") or "unknown"),

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import csv
 import hashlib
 import json
@@ -171,7 +173,7 @@ def execute_ingestion_plan(
 ###############################################################################
 def _required_dict(manifest: dict[str, Any], field_name: str) -> dict[str, Any]:
     value = manifest.get(field_name)
-    if not isinstance(value, dict):
+    if not is_json_object(value):
         raise IngestionManifestError(f"{field_name} must be an object.")
     return value
 
@@ -296,12 +298,13 @@ def _normalize_geojson(
 ) -> tuple[Path, int, int]:
     output = normalized_dir / f"{plan.capability_id}.geojson"
     payload = json.loads(raw_file.read_text(encoding="utf-8"))
-    if payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
+    if payload.get("type") != "FeatureCollection" or not is_json_array(payload.get("features")):
         raise IngestionExecutionError("GeoJSON source must be a FeatureCollection.")
-    valid_features = []
+    valid_features: list[dict[str, Any]] = []
     invalid_count = 0
-    for feature in payload["features"]:
-        if not isinstance(feature, dict) or not _valid_geometry(feature.get("geometry")):
+    for feature in json_array(payload.get("features")):
+        feature = json_object(feature)
+        if not is_json_object(feature) or not _valid_geometry(feature.get("geometry")):
             invalid_count += 1
             continue
         valid_features.append(feature)
@@ -342,7 +345,7 @@ def _validate_bbox_intersection(plan: DatasetIngestionPlan, normalized_file: Pat
     if expected_bbox is None or normalized_file is None:
         return
     if (
-        not isinstance(expected_bbox, list)
+        not is_json_array(expected_bbox)
         or len(expected_bbox) != 4
         or not all(isinstance(item, int | float) for item in expected_bbox)
     ):
@@ -427,41 +430,41 @@ def _write_tile_manifest(
 
 ###############################################################################
 def _is_point(value: Any) -> bool:
-    return isinstance(value, list) and len(value) >= 2 and all(
+    return is_json_array(value) and len(value) >= 2 and all(
         isinstance(item, int | float) for item in value[:2]
     )
 
 ###############################################################################
 def _valid_geometry(value: Any) -> bool:
-    if not isinstance(value, dict):
+    if not is_json_object(value):
         return False
     geometry_type = str(value.get("type") or "")
     coordinates = value.get("coordinates")
     if geometry_type == "Point":
         return _is_coordinate_pair(coordinates)
     if geometry_type == "LineString":
-        return isinstance(coordinates, list) and any(
+        return is_json_array(coordinates) and any(
             _is_coordinate_pair(item) for item in coordinates
         )
     if geometry_type == "Polygon":
-        return isinstance(coordinates, list) and any(
-            isinstance(ring, list) and any(_is_coordinate_pair(item) for item in ring)
+        return is_json_array(coordinates) and any(
+            is_json_array(ring) and any(_is_coordinate_pair(item) for item in ring)
             for ring in coordinates
         )
     if geometry_type == "MultiPoint":
-        return isinstance(coordinates, list) and any(
+        return is_json_array(coordinates) and any(
             _is_coordinate_pair(item) for item in coordinates
         )
     if geometry_type == "MultiLineString":
-        return isinstance(coordinates, list) and any(
-            isinstance(line, list) and any(_is_coordinate_pair(item) for item in line)
+        return is_json_array(coordinates) and any(
+            is_json_array(line) and any(_is_coordinate_pair(item) for item in line)
             for line in coordinates
         )
     if geometry_type == "MultiPolygon":
-        return isinstance(coordinates, list) and any(
-            isinstance(polygon, list)
+        return is_json_array(coordinates) and any(
+            is_json_array(polygon)
             and any(
-                isinstance(ring, list) and any(_is_coordinate_pair(item) for item in ring)
+                is_json_array(ring) and any(_is_coordinate_pair(item) for item in ring)
                 for ring in polygon
             )
             for polygon in coordinates
@@ -473,7 +476,7 @@ def _iter_coordinate_pairs(value: Any) -> Generator[tuple[float, float] | Any, A
     if _is_coordinate_pair(value):
         yield float(value[0]), float(value[1])
         return
-    if not isinstance(value, list):
+    if not is_json_array(value):
         return
     for item in value:
         yield from _iter_coordinate_pairs(item)

@@ -25,7 +25,7 @@ class RunEventStreamService:
         self,
         event_publisher: RunEventPublisher,
         *,
-        run_repository: AgentRunRepository | None = None,
+        run_repository: AgentRunRepository,
         keep_alive_seconds: float = 15.0,
     ) -> None:
         self.event_publisher = event_publisher
@@ -34,8 +34,6 @@ class RunEventStreamService:
 
     # -------------------------------------------------------------------------
     def verify_run_access(self, conversation_id: str, run_id: str) -> None:
-        if self.run_repository is None:
-            return
         snapshot = self.run_repository.get_run(run_id)
         if snapshot is None or snapshot.conversation_id != conversation_id:
             raise RunNotFoundError("Run not found for conversation.")

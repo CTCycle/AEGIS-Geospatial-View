@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import json
 import os
 from pathlib import Path
@@ -72,7 +74,7 @@ class OvertureProvider(GeospatialProvider):
             payload = json.loads(source.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise ProviderUnavailableError("Overture Places index is unavailable or malformed.") from exc
-        if not isinstance(payload, dict) or not isinstance(payload.get("features"), list):
+        if not is_json_object(payload) or not is_json_array(payload.get("features")):
             raise ProviderUnavailableError("Overture Places index must be a GeoJSON FeatureCollection.")
 
         features = self._features(payload["features"], request)
@@ -113,9 +115,10 @@ class OvertureProvider(GeospatialProvider):
             amenity_tags=_amenity_tags(request),
             limit=_optional_int(request.params.get("limit")),
         )
-        features = []
-        for item in payload.get("items") or []:
-            if not isinstance(item, dict):
+        features: list[Any] = []
+        for item in json_array(payload.get("items")):
+            item = json_object(item)
+            if not item:
                 continue
             try:
                 features.append(
@@ -134,17 +137,18 @@ class OvertureProvider(GeospatialProvider):
         query = str(request.params.get("query") or "").strip().casefold()
         category = str(request.params.get("category") or "").strip().casefold()
         limit = max(1, min(500, _optional_int(request.params.get("limit")) or 100))
-        features = []
+        features: list[Any] = []
         for raw in raw_features:
-            if not isinstance(raw, dict):
+            raw = json_object(raw)
+            if not raw:
                 continue
-            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}
-            geometry = raw.get("geometry") if isinstance(raw.get("geometry"), dict) else {}
+            properties = json_object(raw.get("properties"))
+            geometry = json_object(raw.get("geometry"))
             coordinates = geometry.get("coordinates")
-            if not isinstance(coordinates, list) or len(coordinates) < 2:
+            if not is_json_array(coordinates) or len(coordinates) < 2:
                 continue
             try:
-                longitude, latitude = float(coordinates[0]), float(coordinates[1])
+                longitude, latitude = float(str(coordinates[0])), float(str(coordinates[1]))
             except (TypeError, ValueError):
                 continue
             if request.bbox and not _in_bbox(longitude, latitude, request.bbox):
@@ -187,12 +191,12 @@ def _in_bbox(longitude: float, latitude: float, bbox: tuple[float, float, float,
 ###############################################################################
 def _amenity_tags(request: ProviderRequest) -> list[str] | None:
     value = request.params.get("amenity_tags")
-    return [str(item) for item in value] if isinstance(value, list) else None
+    return [str(item) for item in value] if is_json_array(value) else None
 
 ###############################################################################
 def _optional_int(value: object) -> int | None:
     try:
-        return int(value) if value is not None else None
+        return int(str(value)) if value is not None else None
     except (TypeError, ValueError):
         return None
 

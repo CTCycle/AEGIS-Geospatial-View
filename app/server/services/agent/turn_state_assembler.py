@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 from typing import Any
 
 from server.common.logger import logger as LOGGER
-from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision, ResolvedLocation
+from server.domain.agent.decision import ClarificationRequest, DecisionTrace, ExecutionPlan, PolicyDecision, ResolvedLocation
 from server.domain.agent.pipeline import (
     ConversationTaskRecord,
     TaskFailureDetail,
@@ -59,7 +61,7 @@ class AgentTurnStateAssembler:
         context_usage: Any,
     ) -> ChatTurnResponse:
         clarification = turn_contract.clarification_plan
-        if not isinstance(clarification, dict):
+        if not is_json_object(clarification):
             raise ValueError("Partial clarification requires a validated clarification plan.")
         previous_raw = self.task_state_service.snapshot(
             conversation_key
@@ -70,7 +72,7 @@ class AgentTurnStateAssembler:
         requested_basemap = visualization_changes.get("basemap")
         if (
             bool(clarification.get("apply_visualization_changes"))
-            and isinstance(previous_raw, dict)
+            and is_json_object(previous_raw)
         ):
             try:
                 previous = MapSession.model_validate(previous_raw)
@@ -219,14 +221,14 @@ class AgentTurnStateAssembler:
         failed_result = next(
             (
                 item
-                for item in (tool_payload or {}).get("tool_results") or []
-                if isinstance(item, dict) and item.get("is_error")
+                for item in json_array(json_object(tool_payload).get("tool_results"))
+                if is_json_object(item) and item.get("is_error")
             ),
             None,
         )
         error_message = operation.message
         tool_name = None
-        if isinstance(failed_result, dict):
+        if is_json_object(failed_result):
             tool_name = str(failed_result.get("name") or "") or None
             error_message = str(failed_result.get("error") or error_message)
         return TaskFailureDetail(
@@ -244,19 +246,19 @@ class AgentTurnStateAssembler:
     def extract_direct_result_from_tool_results(
         tool_payload: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return None
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict):
+            if not is_json_object(content):
                 continue
             data = content.get("data")
-            if not isinstance(data, dict):
+            if not is_json_object(data):
                 continue
             direct_result = data.get("direct_result")
-            if isinstance(direct_result, dict):
+            if is_json_object(direct_result):
                 return direct_result
         return None
 
@@ -265,19 +267,19 @@ class AgentTurnStateAssembler:
     def extract_capability_selection_from_tool_results(
         tool_payload: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return None
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict):
+            if not is_json_object(content):
                 continue
             data = content.get("data")
-            if not isinstance(data, dict):
+            if not is_json_object(data):
                 continue
             selection = data.get("capability_selection")
-            if isinstance(selection, dict):
+            if is_json_object(selection):
                 return selection
         return None
 
@@ -313,7 +315,7 @@ class AgentTurnStateAssembler:
             turn_contract=turn_contract,
             active_visualization=(
                 latest_memory.get("active_visualization")
-                if isinstance(latest_memory, dict)
+                if is_json_object(latest_memory)
                 else None
             ),
         )
@@ -333,16 +335,16 @@ class AgentTurnStateAssembler:
             return None
         active_visualization = (
             latest_memory.get("active_visualization")
-            if isinstance(latest_memory, dict)
+            if is_json_object(latest_memory)
             else None
         )
         existing_overlay_ids = (
             [
                 item
-                for item in active_visualization.get("overlay_ids") or []
+                for item in json_array(active_visualization.get("overlay_ids"))
                 if isinstance(item, str)
             ]
-            if isinstance(active_visualization, dict)
+            if is_json_object(active_visualization)
             else []
         )
         inferred_overlay_ids = self.infer_overlay_ids(
@@ -377,7 +379,7 @@ class AgentTurnStateAssembler:
         direct_result: dict[str, Any] | None,
         tool_payload: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        base_snapshot = latest_memory if isinstance(latest_memory, dict) else {}
+        base_snapshot = json_object(latest_memory)
         resolved_location = await self.resolve_verified_location_for_memory(
             turn_contract=turn_contract,
             latest_memory=base_snapshot,
@@ -413,7 +415,7 @@ class AgentTurnStateAssembler:
             turn_contract.location_signals,
             latest_memory,
         )
-        if hasattr(resolved, "missing_fields"):
+        if isinstance(resolved, ClarificationRequest):
             return None
         return resolved
 
@@ -425,34 +427,34 @@ class AgentTurnStateAssembler:
         turn_contract: Any,
         latest_memory: dict[str, Any] | None,
     ) -> MapSession | None:
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return None
         overlay_ids: list[str] = []
         basemap_id: str | None = None
 
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict) or content.get("ok") is False:
+            if not is_json_object(content) or content.get("ok") is False:
                 continue
             data = content.get("data")
-            if not isinstance(data, dict):
+            if not is_json_object(data):
                 continue
             map_payload = data.get("map_session")
-            if isinstance(map_payload, dict):
+            if is_json_object(map_payload):
                 candidate_basemap = map_payload.get("basemap_id")
                 if isinstance(candidate_basemap, str) and candidate_basemap.strip() and basemap_id is None:
                     basemap_id = candidate_basemap
-                for overlay_id in map_payload.get("overlay_ids") or []:
+                for overlay_id in json_array(map_payload.get("overlay_ids")):
                     if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
                         overlay_ids.append(overlay_id)
             selection = data.get("capability_selection")
-            if isinstance(selection, dict):
+            if is_json_object(selection):
                 candidate_basemap = selection.get("basemap_id")
                 if isinstance(candidate_basemap, str) and candidate_basemap.strip() and basemap_id is None:
                     basemap_id = candidate_basemap
-                for overlay_id in selection.get("overlay_ids") or []:
+                for overlay_id in json_array(selection.get("overlay_ids")):
                     if isinstance(overlay_id, str) and overlay_id not in overlay_ids:
                         overlay_ids.append(overlay_id)
 
@@ -463,7 +465,7 @@ class AgentTurnStateAssembler:
             turn_contract.location_signals,
             latest_memory or {},
         )
-        if hasattr(resolved_location, "missing_fields"):
+        if isinstance(resolved_location, ClarificationRequest):
             return None
 
         plan = ExecutionPlan(
@@ -487,7 +489,7 @@ class AgentTurnStateAssembler:
             turn_contract=turn_contract,
             active_visualization=(
                 latest_memory.get("active_visualization")
-                if isinstance(latest_memory, dict)
+                if is_json_object(latest_memory)
                 else None
             ),
         )

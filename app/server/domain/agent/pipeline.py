@@ -43,7 +43,7 @@ class TaskFailureDetail(BaseModel):
     component: str | None = None
     tool_name: str | None = None
     sanitized_error: str
-    missing_input: list[str] = Field(default_factory=list)
+    missing_input: list[str] = Field(default_factory=lambda: list[str]())
     unsupported_capability: str | None = None
     partial_results_available: bool = False
     recovery_suggestion: str | None = None
@@ -72,8 +72,8 @@ class ToolPlanStep(BaseModel):
     tool_name: str
     capability_id: str | None = None
     reason: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
-    depends_on: list[str] = Field(default_factory=list)
+    arguments: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    depends_on: list[str] = Field(default_factory=lambda: list[str]())
     parallel_group: str | None = None
     timeout_seconds: int = Field(default=30, ge=1, le=120)
     retry_policy: ToolRetryPolicy = Field(default_factory=ToolRetryPolicy)
@@ -88,10 +88,10 @@ class ToolPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tool_group: SpecialistGroup
-    candidate_tools: list[str] = Field(default_factory=list)
-    selected_tools: list[str] = Field(default_factory=list)
-    steps: list[ToolPlanStep] = Field(default_factory=list)
-    visualization_update: dict[str, Any] = Field(default_factory=dict)
+    candidate_tools: list[str] = Field(default_factory=lambda: list[str]())
+    selected_tools: list[str] = Field(default_factory=lambda: list[str]())
+    steps: list[ToolPlanStep] = Field(default_factory=lambda: list[ToolPlanStep]())
+    visualization_update: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     frontend_derivation: str = "derive_from_validated_results"
     partial_failure_policy: str = "retain_successful_required_results"
 
@@ -106,13 +106,13 @@ class ConversationTaskRecord(BaseModel):
     task_type: str
     intent: str
     relationship: TaskRelationship
-    required_entities: list[str] = Field(default_factory=list)
+    required_entities: list[str] = Field(default_factory=lambda: list[str]())
     geographic_scope: dict[str, Any] | None = None
-    required_data_layers: list[str] = Field(default_factory=list)
-    visualization_changes: dict[str, Any] = Field(default_factory=dict)
+    required_data_layers: list[str] = Field(default_factory=lambda: list[str]())
+    visualization_changes: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     specialist: SpecialistGroup
     tool_plan: ToolPlan | None = None
-    tool_result_refs: list[str] = Field(default_factory=list)
+    tool_result_refs: list[str] = Field(default_factory=lambda: list[str]())
     status: TaskStatus = "pending"
     is_current: bool = True
     parent_task_id: str | None = None
@@ -149,9 +149,9 @@ class VisualizationUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     basemap_replacement: str | None = None
-    add_layer_ids: list[str] = Field(default_factory=list)
-    remove_layer_ids: list[str] = Field(default_factory=list)
-    replace_layer_ids: dict[str, str] = Field(default_factory=dict)
+    add_layer_ids: list[str] = Field(default_factory=lambda: list[str]())
+    remove_layer_ids: list[str] = Field(default_factory=lambda: list[str]())
+    replace_layer_ids: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
 
 ###############################################################################
 class ConversationTaskSnapshot(BaseModel):
@@ -159,5 +159,5 @@ class ConversationTaskSnapshot(BaseModel):
 
     conversation_key: str
     current_task_id: str | None = None
-    tasks: list[ConversationTaskRecord] = Field(default_factory=list)
+    tasks: list[ConversationTaskRecord] = Field(default_factory=lambda: list[ConversationTaskRecord]())
     active_visualization: dict[str, Any] | None = None

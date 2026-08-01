@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 import json
 from pathlib import Path
 from typing import Any
@@ -36,9 +38,9 @@ def build_geojson_search_index(path: str | Path) -> SearchIndex:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     indexed: list[IndexedFeature] = []
     for index, feature in enumerate(payload.get("features", [])):
-        if not isinstance(feature, dict):
+        if not is_json_object(feature):
             continue
-        properties = feature.get("properties") if isinstance(feature.get("properties"), dict) else {}
+        properties = json_object(feature.get("properties"))
         coordinates = _point_coordinates(feature.get("geometry"))
         indexed.append(
             IndexedFeature(
@@ -82,11 +84,11 @@ def _tokenize(value: str) -> list[str]:
 
 ###############################################################################
 def _point_coordinates(geometry: Any) -> tuple[float, float] | None:
-    if not isinstance(geometry, dict) or geometry.get("type") != "Point":
+    if not is_json_object(geometry) or geometry.get("type") != "Point":
         return None
     coordinates = geometry.get("coordinates")
     if (
-        isinstance(coordinates, list)
+        is_json_array(coordinates)
         and len(coordinates) >= 2
         and isinstance(coordinates[0], int | float)
         and isinstance(coordinates[1], int | float)

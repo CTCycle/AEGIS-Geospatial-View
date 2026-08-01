@@ -55,12 +55,16 @@ class CredentialEncryptionService:
                 "No active credential encryption material found. "
                 "Ensure the database is initialized."
             )
-        self._fernet = _load_fernet_from_material(self._material.key_material)
+        material = self._material
+        assert material is not None
+        self._fernet = _load_fernet_from_material(material.key_material)
 
     # -------------------------------------------------------------------------
     def encrypt(self, raw_value: str) -> EncryptedSecret:
         token = self._fernet.encrypt(raw_value.encode("utf-8")).decode("utf-8")
-        return EncryptedSecret(value=token, key_version=self._material.key_version)
+        material = self._material
+        assert material is not None
+        return EncryptedSecret(value=token, key_version=material.key_version)
 
     # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
@@ -76,7 +80,9 @@ class CredentialEncryptionService:
     def decrypt_with_key_version(
         self, encrypted_value: str, key_version: int | str
     ) -> str:
-        if key_version == self._material.key_version:
+        material = self._material
+        assert material is not None
+        if key_version == material.key_version:
             return self.decrypt(encrypted_value)
         if not isinstance(self._material_repo, CredentialEncryptionMaterialRepository):
             raise ValueError(

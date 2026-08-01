@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_object
+
 import math
 from datetime import UTC, datetime
 from typing import Any
@@ -38,7 +40,7 @@ class LocationSearchOrchestrator:
         warnings: list[str] = []
         effective_basemap_id = (
             str(basemap.get("id"))
-            if isinstance(basemap, dict) and basemap.get("id")
+            if is_json_object(basemap) and basemap.get("id")
             else payload.basemap_id
         )
         for overlay_id in payload.overlay_ids:
@@ -69,15 +71,18 @@ class LocationSearchOrchestrator:
                 failed_overlays.append({"id": selection_id, "reason": reason})
                 warnings.append(f"Provider layer '{selection_id}' failed: {reason}.")
                 continue
-            if selection.time and isinstance(descriptor.get("render"), dict):
+            render = json_object(descriptor.get("render"))
+            if selection.time and render:
                 descriptor["time"] = selection.time
-                descriptor["render"]["time"] = selection.time
-            if selection.style and isinstance(descriptor.get("render"), dict):
+                render["time"] = selection.time
+            if selection.style and render:
                 descriptor["style"] = selection.style
-                descriptor["render"]["style"] = selection.style
-            if selection.format and isinstance(descriptor.get("render"), dict):
+                render["style"] = selection.style
+            if selection.format and render:
                 descriptor["format"] = selection.format
-                descriptor["render"]["format"] = selection.format
+                render["format"] = selection.format
+            if render:
+                descriptor["render"] = render
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
         rendered_overlay_ids = [

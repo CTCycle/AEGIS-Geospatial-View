@@ -50,7 +50,7 @@ class LiveValidationReport(BaseModel):
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     error_count: int = 0
     skipped_count: int = 0
-    results: list[LiveValidationCheckResult] = Field(default_factory=list)
+    results: list[LiveValidationCheckResult] = Field(default_factory=lambda: list[LiveValidationCheckResult]())
 
     # -------------------------------------------------------------------------
     @property

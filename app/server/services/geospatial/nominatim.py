@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import asyncio
 import json
 import math
@@ -67,7 +69,7 @@ class NominatimService:
             return None
         ranked = self.rank_candidates(
             response,
-            address=address,
+            address=address or "",
             city=city,
             country_name=country_name,
             country_code=country_code,
@@ -96,7 +98,7 @@ class NominatimService:
         if not response:
             return None
         bounding_box = response.get("boundingbox")
-        if not isinstance(bounding_box, list) or len(bounding_box) != 4:
+        if not is_json_array(bounding_box) or len(bounding_box) != 4:
             return None
         try:
             south = float(bounding_box[0])
@@ -133,9 +135,9 @@ class NominatimService:
             cache=self._search_cache,
             request_kind="search",
         )
-        if not isinstance(data, list):
+        if not is_json_array(data):
             return []
-        return [item for item in data if isinstance(item, dict)]
+        return [item for item in data if is_json_object(item)]
 
     # -------------------------------------------------------------------------
     def perform_reverse_request(self, params: dict[str, str]) -> dict[str, Any] | None:
@@ -143,14 +145,14 @@ class NominatimService:
         cache_key = urlencode(sorted(params.items()))
         cached = self._cache_get(self._reverse_cache, cache_key)
         if cached is not None:
-            return dict(cached) if isinstance(cached, dict) else None
+            return dict(cached) if is_json_object(cached) else None
         data = self._perform_json_request(
             url=f"{reverse_url}?{urlencode(params)}",
             cache_key=cache_key,
             cache=self._reverse_cache,
             request_kind="reverse",
         )
-        if isinstance(data, dict):
+        if is_json_object(data):
             return data
         return None
 
@@ -233,7 +235,7 @@ class NominatimService:
             "display_name": data.get("display_name"),
         }
         bounding_box = data.get("boundingbox")
-        if isinstance(bounding_box, list) and len(bounding_box) == 4:
+        if is_json_array(bounding_box) and len(bounding_box) == 4:
             try:
                 south = float(bounding_box[0])
                 north = float(bounding_box[1])
@@ -310,7 +312,7 @@ class NominatimService:
                 country_code=country_code,
                 query=query,
             )
-            if not isinstance(formatted, dict):
+            if not is_json_object(formatted):
                 continue
             display_name = self.normalize_component(
                 str(candidate.get("display_name") or "")
@@ -364,7 +366,7 @@ class NominatimService:
             granularity_score=granularity_score,
             bbox_score=bbox_score,
             importance_score=importance_score,
-            address=address,
+            address=address or "",
             data=data,
         )
         if not math.isfinite(combined):
@@ -484,7 +486,7 @@ class NominatimService:
 
     # -------------------------------------------------------------------------
     def derive_bbox_score(self, bounding_box: Any) -> float:
-        if not isinstance(bounding_box, list) or len(bounding_box) != 4:
+        if not is_json_array(bounding_box) or len(bounding_box) != 4:
             return 0.5
         try:
             south = float(bounding_box[0])
@@ -522,7 +524,7 @@ class NominatimService:
     # -------------------------------------------------------------------------
     def collect_address_tokens(self, data: dict[str, Any]) -> list[str]:
         address_data = data.get("address")
-        if not isinstance(address_data, dict):
+        if not is_json_object(address_data):
             return []
         tokens: list[str] = []
         for key in (
@@ -613,7 +615,7 @@ class NominatimService:
         if not number_tokens:
             return 0.5
         address_data = data.get("address")
-        if not isinstance(address_data, dict):
+        if not is_json_object(address_data):
             return 0.2
         candidate = address_data.get("house_number")
         if not candidate:
@@ -666,7 +668,7 @@ class NominatimService:
             return 0.5
         normalized_city = " ".join(city_tokens)
         address_data = data.get("address")
-        if not isinstance(address_data, dict):
+        if not is_json_object(address_data):
             address_data = {}
         for key in (
             "city",
@@ -707,7 +709,7 @@ class NominatimService:
         normalized_display: str,
     ) -> float:
         address_data = data.get("address")
-        if not isinstance(address_data, dict):
+        if not is_json_object(address_data):
             address_data = {}
         expected_code = (country_code or "").lower()
         result_code = str(address_data.get("country_code", "")).lower()
@@ -774,4 +776,3 @@ class NominatimService:
             base = normalized[: -len(NOMINATIM_SEARCH_PATH)]
             return f"{base}{NOMINATIM_REVERSE_PATH}"
         return f"{normalized}{NOMINATIM_REVERSE_PATH}"
-

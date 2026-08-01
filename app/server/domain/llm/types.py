@@ -9,8 +9,8 @@ class ModelDescriptor:
     name: str
     description: str
     provider: str
-    capabilities: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=lambda: list[str]())
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class LLMRequest:
     tools: list["LLMToolDefinition"] | None = None
     tool_choice: Literal["auto", "none", "required"] | str | None = "auto"
     response_json_schema: dict[str, Any] | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
     # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
@@ -46,8 +46,8 @@ class LLMRequest:
 @dataclass(frozen=True)
 class LLMResult:
     content: str
-    raw: dict[str, Any] = field(default_factory=dict)
-    tool_calls: list["LLMToolCall"] = field(default_factory=list)
+    raw: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+    tool_calls: list["LLMToolCall"] = field(default_factory=lambda: list["LLMToolCall"]())
     finish_reason: str | None = None
 
 ###############################################################################
@@ -62,14 +62,16 @@ class LLMToolDefinition:
 class LLMToolCall:
     id: str | None = None
     name: str = ""
-    arguments: dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
 class LLMToolResult:
     tool_call_id: str | None = None
     name: str = ""
-    content: dict[str, Any] | list[Any] | str | int | float | bool | None = field(default_factory=dict)
+    content: dict[str, Any] | list[Any] | str | int | float | bool | None = field(
+        default_factory=lambda: dict[str, Any]()
+    )
     error: str | None = None
     is_error: bool = False
 
@@ -78,7 +80,7 @@ class LLMToolResult:
 class LLMAssistantToolCallMessage:
     role: Literal["assistant"] = "assistant"
     content: str | None = None
-    tool_calls: list[LLMToolCall] = field(default_factory=list)
+    tool_calls: list[LLMToolCall] = field(default_factory=lambda: list[LLMToolCall]())
 
 ###############################################################################
 @dataclass(frozen=True)

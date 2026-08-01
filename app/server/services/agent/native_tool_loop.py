@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 import asyncio
 import json
 import logging
@@ -106,7 +108,7 @@ class NativeToolLoop:
                 working_state = messages[1]
                 response = provider.chat(llm_request)
                 usage = getattr(provider, "last_context_usage", None)
-                if isinstance(usage, dict):
+                if is_json_object(usage):
                     self.last_context_usages.append(dict(usage))
             except Exception as exc:
                 LOGGER.exception("tool_loop_failed provider=%s model=%s", request.provider, request.model)
@@ -177,17 +179,17 @@ class NativeToolLoop:
         results: list[LLMToolResult],
     ) -> MapSession | None:
         for result in results:
-            content = result.content if isinstance(result.content, dict) else None
+            content = result.content if is_json_object(result.content) else None
             if content is None:
                 continue
             data = content.get("data")
-            if not isinstance(data, dict):
+            if not is_json_object(data):
                 continue
             operation = data.get("operation")
             if operation != "map_session_created":
                 continue
             ms_raw = data.get("map_session")
-            if isinstance(ms_raw, dict):
+            if is_json_object(ms_raw):
                 try:
                     return MapSession.model_validate(ms_raw)
                 except Exception:
@@ -249,16 +251,13 @@ class NativeToolLoop:
             elapsed_ms,
         )
         content = self._truncate_payload(envelope_payload)
+        error_payload = json_object(envelope_payload.get("error"))
         return LLMToolResult(
             tool_call_id=call.id,
             name=call.name,
             content=content,
             is_error=not ok,
-            error=(
-                envelope_payload.get("error", {}).get("message")
-                if isinstance(envelope_payload.get("error"), dict)
-                else None
-            ),
+            error=str(error_payload.get("message")) if error_payload.get("message") else None,
         )
 
     # -------------------------------------------------------------------------
@@ -282,7 +281,7 @@ class NativeToolLoop:
     @staticmethod
     def _extract_next_cursor(payload: dict[str, Any]) -> Any | None:
         data = payload.get("data")
-        if isinstance(data, dict):
+        if is_json_object(data):
             return data.get("next_cursor") or data.get("cursor")
         return None
 
@@ -304,13 +303,13 @@ class NativeToolLoop:
         if blocked_patterns:
             return "Request contains blocked policy patterns."
         allowed = constraints.get("allowed_tool_names")
-        if isinstance(allowed, list) and allowed and call.name not in set(map(str, allowed)):
+        if is_json_array(allowed) and allowed and call.name not in set(map(str, allowed)):
             return f"Tool '{call.name}' is not allowed by policy constraints."
         if call.name == "execute_geospatial_capability":
             capability_id = str(call.arguments.get("capability_id") or "")
             allowed_capabilities = constraints.get("allowed_capability_ids")
             if (
-                isinstance(allowed_capabilities, list)
+                is_json_array(allowed_capabilities)
                 and allowed_capabilities
                 and capability_id not in set(map(str, allowed_capabilities))
             ):
@@ -319,7 +318,7 @@ class NativeToolLoop:
             provider_id = str(call.arguments.get("provider_id") or "").lower()
             allowed_providers = constraints.get("allowed_provider_ids")
             if (
-                not isinstance(allowed_providers, list)
+                not is_json_array(allowed_providers)
                 or provider_id not in set(map(str, allowed_providers))
             ):
                 return f"Provider '{provider_id}' is not allowed by policy constraints."

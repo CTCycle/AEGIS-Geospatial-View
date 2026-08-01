@@ -24,7 +24,7 @@ class PVGISProvider(GeospatialProvider):
             payload = await self.service.get_point_estimate(latitude, longitude)
         except (PVGISError, ValueError) as exc:
             raise ProviderUnavailableError(str(exc)) from exc
-        warnings = []
+        warnings: list[str] = []
         if payload.get("error"):
             warnings.append(str(payload["error"]))
         return ProviderResponse(

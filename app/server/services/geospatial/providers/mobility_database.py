@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import json_object
+
 import csv
 import io
 import os
@@ -136,14 +138,14 @@ class MobilityDatabaseProvider(GeospatialProvider):
             if query not in haystack:
                 return False
         if bbox:
-            item_bbox = item.get("bbox") if isinstance(item.get("bbox"), dict) else {}
+            item_bbox = json_object(item.get("bbox"))
             west, south, east, north = bbox
             min_lon = item_bbox.get("minimumLongitude")
             max_lon = item_bbox.get("maximumLongitude")
             min_lat = item_bbox.get("minimumLatitude")
             max_lat = item_bbox.get("maximumLatitude")
             if all(value is not None for value in (min_lon, max_lon, min_lat, max_lat)) and (
-                float(max_lon) < west or float(min_lon) > east or float(max_lat) < south or float(min_lat) > north
+                float(str(max_lon)) < west or float(str(min_lon)) > east or float(str(max_lat)) < south or float(str(min_lat)) > north
             ):
                 return False
         return True
@@ -172,7 +174,7 @@ def _bool(value: str | None) -> bool | None:
 ###############################################################################
 def _bounded_limit(value: object) -> int:
     try:
-        return max(1, min(200, int(value or 50)))
+        return max(1, min(200, int(str(value or 50))))
     except (TypeError, ValueError):
         return 50
 

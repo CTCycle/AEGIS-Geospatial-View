@@ -1,12 +1,28 @@
 # Testing And Quality
 
-Last updated: 2026-06-02
+Last updated: 2026-07-30
 
 ## Python Quality Gates
 
 - Lint and format with Ruff or the project-standard equivalent.
-- Maintain Pylance-compatible typing discipline.
+- Run Pyright in strict mode across the complete `app/server` package using
+  `app/server/pyproject.toml`; do not narrow the include list to selected
+  modules to avoid diagnostics.
+- Maintain Pylance-compatible typing discipline without suppressing newly
+  exposed backend diagnostics.
 - Test backend behavior with pytest.
+
+The bounded backend validation sequence is:
+
+```text
+ruff check app/server app/tests
+pyright --project app/server/pyproject.toml
+python -m pytest -c app/server/pyproject.toml app/tests/unit -q
+```
+
+`app/tests/run_tests.bat` does not start the frontend for a bounded backend
+target. Full-suite and E2E targets retain frontend startup because those tests
+depend on the UI runtime.
 
 ## Frontend Quality Gates
 
