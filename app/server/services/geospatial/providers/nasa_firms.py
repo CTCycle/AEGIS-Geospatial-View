@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import csv
 import io
 import os
@@ -70,7 +71,7 @@ class NASAFIRMSProvider(GeospatialProvider):
 ###############################################################################
 async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
     value = fetcher(url)
-    if hasattr(value, "__await__"):
+    if inspect.isawaitable(value):
         return await value
     return value
 

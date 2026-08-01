@@ -22,8 +22,8 @@ TemporalMode = Literal["current", "historical", "forecast", "none"]
 class ConversationContextSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    recent_messages: list[dict[str, str]] = Field(default_factory=list)
-    memory_snapshot: dict[str, object] = Field(default_factory=dict)
+    recent_messages: list[dict[str, str]] = Field(default_factory=lambda: list[dict[str, str]]())
+    memory_snapshot: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
 
 ###############################################################################
 class LocationSignal(BaseModel):
@@ -51,9 +51,9 @@ class NormalizedAction(BaseModel):
 
     action_id: str
     action_label: str
-    task_tags: list[str] = Field(default_factory=list)
-    action_tags: list[str] = Field(default_factory=list)
-    requested_visualizations: list[str] = Field(default_factory=list)
+    task_tags: list[str] = Field(default_factory=lambda: list[str]())
+    action_tags: list[str] = Field(default_factory=lambda: list[str]())
+    requested_visualizations: list[str] = Field(default_factory=lambda: list[str]())
     requires_location: bool = True
 
 ###############################################################################
@@ -90,11 +90,11 @@ class TurnParseResult(BaseModel):
     user_text: str
     conversation_context: ConversationContextSnapshot
     task_class: TaskClass
-    location_signals: list[LocationSignal] = Field(default_factory=list)
+    location_signals: list[LocationSignal] = Field(default_factory=lambda: list[LocationSignal]())
     normalized_action: NormalizedAction
     temporal_signal: TemporalSignal = Field(default_factory=TemporalSignal)
-    ambiguities: list[str] = Field(default_factory=list)
-    disallowed_patterns: list[DisallowedPattern] = Field(default_factory=list)
+    ambiguities: list[str] = Field(default_factory=lambda: list[str]())
+    disallowed_patterns: list[DisallowedPattern] = Field(default_factory=lambda: list[DisallowedPattern]())
     parser_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     relationship: Literal[
         "new_task",
@@ -107,18 +107,18 @@ class TurnParseResult(BaseModel):
     ] = "new_task"
     map_target: str | None = None
     entity_target: str | None = None
-    requested_layers: list[str] = Field(default_factory=list)
-    poi_categories: list[PoiCategory] = Field(default_factory=list)
+    requested_layers: list[str] = Field(default_factory=lambda: list[str]())
+    poi_categories: list[PoiCategory] = Field(default_factory=lambda: list[PoiCategory]())
     requested_basemap: str | None = None
-    requested_attributes: list[str] = Field(default_factory=list)
-    required_data_sources: list[str] = Field(default_factory=list)
+    requested_attributes: list[str] = Field(default_factory=lambda: list[str]())
+    required_data_sources: list[str] = Field(default_factory=lambda: list[str]())
     required_tool_category: str | None = None
     tools_needed: bool = False
     direct_response_sufficient: bool = False
     requires_reparse: bool = False
-    capability_limitations: list[str] = Field(default_factory=list)
+    capability_limitations: list[str] = Field(default_factory=lambda: list[str]())
     expected_frontend_update: str = "assistant_message"
-    atomic_tasks: list[dict[str, Any]] = Field(default_factory=list)
+    atomic_tasks: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
     clarification_plan: dict[str, Any] | None = None
     viewport_intent: ViewportIntent | None = None
     provider_error: dict[str, Any] | None = None

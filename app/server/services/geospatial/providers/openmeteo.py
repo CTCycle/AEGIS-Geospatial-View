@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 from typing import Any
 
 from server.services.geospatial.openmeteo import OpenMeteoService, OpenMeteoServiceError
@@ -79,9 +81,9 @@ class OpenMeteoProvider(GeospatialProvider):
         ):
             return []
         kind = str(payload.get("kind") or "")
-        current = payload.get("current") if isinstance(payload.get("current"), dict) else {}
-        preview = payload.get("hourly_preview") if isinstance(payload.get("hourly_preview"), list) else []
-        first_hour = preview[0] if preview and isinstance(preview[0], dict) else {}
+        current = json_object(payload.get("current"))
+        preview = json_array(payload.get("hourly_preview"))
+        first_hour = preview[0] if preview and is_json_object(preview[0]) else {}
         if "air_quality" in kind:
             return [
                 {

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import os
 from urllib.parse import urlencode
 
@@ -86,7 +88,7 @@ class OpenTripMapProvider(GeospatialProvider):
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -101,21 +103,21 @@ class OpenTripMapProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
-        if not isinstance(payload, dict):
+        if not is_json_object(payload):
             raise ValueError("OpenTripMap payload must be an object.")
         raw_features = payload.get("features")
-        if not isinstance(raw_features, list):
+        if not is_json_array(raw_features):
             return []
         features: list[dict[str, object]] = []
         for item in raw_features:
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 continue
             geometry = item.get("geometry")
             properties = item.get("properties")
-            if not isinstance(geometry, dict) or not isinstance(properties, dict):
+            if not is_json_object(geometry) or not is_json_object(properties):
                 continue
             coordinates = geometry.get("coordinates")
-            if not isinstance(coordinates, list) or len(coordinates) < 2:
+            if not is_json_array(coordinates) or len(coordinates) < 2:
                 continue
             category = normalize_poi_category(str(properties.get("kinds") or "tourism").split(",")[0])
             features.append(

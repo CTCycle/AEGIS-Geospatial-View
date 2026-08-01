@@ -29,7 +29,10 @@ from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.native_tool_loop import AgentToolLoopResult
 from server.services.agent.overlay_inference import OverlayInferenceService
 from server.services.agent.orchestrator import AgentOrchestrator
+from server.services.agent.pipeline_router import DeterministicAgentRouter
 from server.services.agent.policy_engine import AgentPolicyConstraints
+from server.services.agent.tool_plan_executor import ToolPlanExecutor
+from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
@@ -115,6 +118,7 @@ class _Parser:
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -152,6 +156,7 @@ class _DeicticParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -181,6 +186,7 @@ class _ParisParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -218,6 +224,7 @@ class _ZurichParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -255,6 +262,7 @@ class _TimesSquareParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -292,6 +300,7 @@ class _CoordinateParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -329,6 +338,7 @@ class _MemoryMapParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -365,6 +375,7 @@ class _DirectToolParser(_Parser):
         user_message: str,
         memory_snapshot: dict,
         conversation_messages: list[dict],
+        **_kwargs: Any,
     ) -> TurnParseResult:
         return TurnParseResult(
             user_text=user_message,
@@ -660,6 +671,9 @@ def _build_test_orchestrator(**kwargs: Any) -> AgentOrchestrator:
             response_synthesizer=synthesizer,  # type: ignore[arg-type]
         ),
     )
+    kwargs.setdefault("pipeline_router", DeterministicAgentRouter())
+    kwargs.setdefault("tool_planner", DeterministicToolPlanner())
+    kwargs.setdefault("tool_plan_executor", ToolPlanExecutor(tool_registry=tool_registry))
     return _ProductionAgentOrchestrator(**kwargs)
 
 ###############################################################################

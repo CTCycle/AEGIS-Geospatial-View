@@ -59,9 +59,8 @@ class LLMProvider(ABC):
         return False
 
     # -------------------------------------------------------------------------
-    def normalize_tool_messages(
-        self, messages: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    @staticmethod
+    def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return messages
 
     # -------------------------------------------------------------------------

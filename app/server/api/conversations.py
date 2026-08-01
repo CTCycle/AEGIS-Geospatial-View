@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from server.common.paths import (
@@ -21,7 +21,8 @@ from server.domain.agent_runs import (
     ConversationCreateResponse,
 )
 from server.domain.steering import SteeringMessageRequest, SteeringMessageResponse
-from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
+from server.services.agent_runs.exceptions import RunServiceError
+from server.api.run_errors import raise_run_http_error
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.streaming import RunEventStreamService
@@ -76,10 +77,8 @@ async def create_agent_run(
             **result.model_dump(),
             stream_url=_run_stream_url(result.conversation_id, result.run_id),
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except RunConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except RunServiceError as exc:
+        raise_run_http_error(exc)
 
 ###############################################################################
 @router.get(
@@ -95,8 +94,8 @@ async def stream_agent_run_events(
 ) -> StreamingResponse:
     try:
         stream_service.verify_run_access(conversation_id, run_id)
-    except RunNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except RunServiceError as exc:
+        raise_run_http_error(exc)
     return StreamingResponse(
         stream_service.stream_sse(
             run_id,
@@ -120,10 +119,8 @@ async def steer_agent_run(
 ) -> SteeringMessageResponse:
     try:
         return await steering_service.steer(conversation_id, run_id, payload)
-    except RunNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except RunConflictError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except RunServiceError as exc:
+        raise_run_http_error(exc)
 
 ###############################################################################
 @router.post(
@@ -140,5 +137,5 @@ async def cancel_agent_run(
     del payload
     try:
         return await lifecycle_service.cancel_run(conversation_id, run_id)
-    except RunNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except RunServiceError as exc:
+        raise_run_http_error(exc)

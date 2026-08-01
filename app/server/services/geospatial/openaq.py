@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from server.common.constants import OPENAQ_API_BASE_URL
 from server.common.logger import logger
+from server.common.typing import json_array, json_object
 
 __all__ = [
     "OpenAQService",
@@ -157,10 +158,13 @@ class OpenAQService:
             logger.warning("OpenAQ response parse error: %s", exc)
             return []
 
-        results = data.get("results") or []
-        locations = []
+        results = json_array(json_object(data).get("results"))
+        locations: list[dict[str, Any]] = []
 
-        for location in results:
+        for raw_location in results:
+            location = json_object(raw_location)
+            if not location:
+                continue
             parsed = self._parse_location(location)
             if parsed:
                 locations.append(parsed)
@@ -173,7 +177,7 @@ class OpenAQService:
         location_id = location.get("id")
         name = location.get("name") or f"Station {location_id}"
 
-        coordinates = location.get("coordinates") or {}
+        coordinates = json_object(location.get("coordinates"))
         lat = coordinates.get("latitude")
         lon = coordinates.get("longitude")
 
@@ -181,15 +185,16 @@ class OpenAQService:
             return None
 
         # Extract latest measurements from sensors
-        sensors = location.get("sensors") or []
-        measurements = {}
+        sensors = json_array(location.get("sensors"))
+        measurements: dict[str, dict[str, Any]] = {}
 
         for sensor in sensors:
-            parameter = sensor.get("parameter") or {}
+            sensor_object = json_object(sensor)
+            parameter = json_object(sensor_object.get("parameter"))
             param_name = (parameter.get("name") or "").lower().replace(".", "")
 
             # Get latest value
-            latest = sensor.get("latest") or {}
+            latest = json_object(sensor_object.get("latest"))
             value = latest.get("value")
 
             if param_name and value is not None:
@@ -221,15 +226,15 @@ class OpenAQService:
         aggregates: dict[str, list[float]] = {}
 
         for location in locations:
-            measurements = location.get("measurements") or {}
+            measurements = json_object(location.get("measurements"))
             for param, data in measurements.items():
                 if param not in aggregates:
                     aggregates[param] = []
-                value = data.get("value")
+                value = json_object(data).get("value")
                 if value is not None:
                     aggregates[param].append(float(value))
 
-        summary = {}
+        summary: dict[str, dict[str, Any]] = {}
         for param, values in aggregates.items():
             if not values:
                 continue

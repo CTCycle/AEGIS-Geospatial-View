@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import hashlib
 import json
 from collections.abc import Mapping
@@ -83,7 +85,7 @@ def response_without_credentials(response: ProviderResponse) -> ProviderResponse
 
 ###############################################################################
 def _redact_secrets(value: Any) -> Any:
-    if isinstance(value, dict):
+    if is_json_object(value):
         redacted: dict[str, Any] = {}
         for key, nested in value.items():
             key_text = str(key)
@@ -92,7 +94,7 @@ def _redact_secrets(value: Any) -> Any:
             else:
                 redacted[key_text] = _redact_secrets(nested)
         return redacted
-    if isinstance(value, list):
+    if is_json_array(value):
         return [_redact_secrets(item) for item in value]
     return value
 
@@ -103,16 +105,20 @@ class GeospatialProvider(Protocol):
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         """Fetch and normalize a provider payload for a geospatial capability."""
+        raise NotImplementedError
 
     # -------------------------------------------------------------------------
     async def fetch_features(self, request: FeatureRequest) -> ProviderResult:
         """Fetch features using the canonical geospatial provider contract."""
+        response = await self.fetch(request)
+        return response
 
     # -------------------------------------------------------------------------
     async def validate_credentials(
         self, credentials: Mapping[str, str]
     ) -> ProviderCredentialValidationResult:
         """Validate provider credentials without persisting them."""
+        return await unsupported_credential_validation(self.provider_id)
 
 ###############################################################################
 async def unsupported_credential_validation(

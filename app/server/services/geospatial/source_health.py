@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from server.domain.geographics import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
@@ -44,7 +46,7 @@ class SourceHealthMonitor:
             if recorded is not None:
                 return recorded.status
         reliability = manifest.get("reliability")
-        if isinstance(reliability, dict):
+        if is_json_object(reliability):
             value = reliability.get("status")
             if isinstance(value, str) and value:
                 return LayerHealthStatus(value)

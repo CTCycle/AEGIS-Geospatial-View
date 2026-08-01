@@ -27,8 +27,8 @@ class AgentToolDefinition(BaseModel):
 
     name: str
     description: str
-    parameters_json_schema: dict[str, Any] = Field(default_factory=dict)
-    action_scope: list[AgentAction] = Field(default_factory=list)
+    parameters_json_schema: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    action_scope: list[AgentAction] = Field(default_factory=lambda: list[AgentAction]())
     requires_map_context: bool = False
     source_manifest_id: str | None = None
     source_capability_id: str | None = None
@@ -39,7 +39,7 @@ class AgentToolCall(BaseModel):
 
     id: str | None = None
     name: str
-    arguments: dict[str, Any] = Field(default_factory=dict)
+    arguments: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class AgentToolResult(BaseModel):
@@ -47,7 +47,7 @@ class AgentToolResult(BaseModel):
 
     tool_call_id: str | None = None
     name: str
-    result: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     error: str | None = None
 
 ###############################################################################
@@ -62,7 +62,7 @@ class ToolExecutionEnvelope:
     ok: bool
     data: Any | None = None
     error: ToolError | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
     # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:

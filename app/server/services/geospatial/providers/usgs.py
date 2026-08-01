@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 from urllib.parse import urlencode
 
 from server.services.geospatial.providers.base import (
@@ -103,19 +105,19 @@ class USGSProvider(GeospatialProvider):
 
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise ProviderUnavailableError("USGS earthquake payload must be a GeoJSON object.")
     raw_features = payload.get("features")
-    if not isinstance(raw_features, list):
+    if not is_json_array(raw_features):
         raise ProviderUnavailableError("USGS earthquake payload is missing features.")
     features: list[dict[str, object]] = []
     for item in raw_features:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             continue
-        properties = item.get("properties") if isinstance(item.get("properties"), dict) else {}
-        geometry = item.get("geometry") if isinstance(item.get("geometry"), dict) else {}
+        properties = json_object(item.get("properties"))
+        geometry = json_object(item.get("geometry"))
         coordinates = geometry.get("coordinates")
-        if not isinstance(coordinates, list) or len(coordinates) < 2:
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         longitude, latitude = coordinates[0], coordinates[1]
         if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
@@ -141,30 +143,28 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise ProviderUnavailableError("USGS water-services payload must be an object.")
-    value = payload.get("value") if isinstance(payload.get("value"), dict) else {}
-    raw_series = value.get("timeSeries") if isinstance(value.get("timeSeries"), list) else []
+    value = json_object(payload.get("value"))
+    raw_series = json_array(value.get("timeSeries"))
     features: list[dict[str, object]] = []
     for series in raw_series:
-        if not isinstance(series, dict):
+        if not is_json_object(series):
             continue
-        source_info = series.get("sourceInfo") if isinstance(series.get("sourceInfo"), dict) else {}
-        geo = source_info.get("geoLocation") if isinstance(source_info.get("geoLocation"), dict) else {}
-        geog = geo.get("geogLocation") if isinstance(geo.get("geogLocation"), dict) else {}
+        source_info = json_object(series.get("sourceInfo"))
+        geo = json_object(source_info.get("geoLocation"))
+        geog = json_object(geo.get("geogLocation"))
         latitude = geog.get("latitude")
         longitude = geog.get("longitude")
         if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
             continue
-        values = series.get("values") if isinstance(series.get("values"), list) else []
+        values = json_array(series.get("values"))
         latest_value = _latest_usgs_value(values)
+        site_codes = json_array(source_info.get("siteCode"))
+        first_site_code = json_object(site_codes[0]) if site_codes else {}
         features.append(
             {
-                "id": source_info.get("siteCode", [{}])[0].get("value")
-                if isinstance(source_info.get("siteCode"), list)
-                and source_info.get("siteCode")
-                and isinstance(source_info.get("siteCode")[0], dict)
-                else source_info.get("siteName"),
+                "id": first_site_code.get("value") or source_info.get("siteName"),
                 "name": source_info.get("siteName"),
                 "category": "water_gauge",
                 "latitude": float(latitude),
@@ -174,7 +174,7 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
                 "metadata": {
                     "variable": (
                         series.get("variable", {}).get("variableName")
-                        if isinstance(series.get("variable"), dict)
+                        if is_json_object(series.get("variable"))
                         else None
                     ),
                     "unit": _unit_code(series),
@@ -185,16 +185,16 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _latest_usgs_value(values: list[object]) -> dict[str, object]:
-    if not values or not isinstance(values[0], dict):
+    if not values or not is_json_object(values[0]):
         return {}
     entries = values[0].get("value")
-    if not isinstance(entries, list) or not entries:
+    if not is_json_array(entries) or not entries:
         return {}
     latest = entries[-1]
-    return latest if isinstance(latest, dict) else {}
+    return json_object(latest)
 
 ###############################################################################
 def _unit_code(series: dict[str, object]) -> object:
-    variable = series.get("variable") if isinstance(series.get("variable"), dict) else {}
-    unit = variable.get("unit") if isinstance(variable.get("unit"), dict) else {}
+    variable = json_object(series.get("variable"))
+    unit = json_object(variable.get("unit"))
     return unit.get("unitCode")

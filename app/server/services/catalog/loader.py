@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import json
 from pathlib import Path
 from typing import Any
@@ -55,7 +57,7 @@ def _load_json_file(path: Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Reference catalog file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise ValueError(f"Reference catalog file must contain an object: {path}")
     return payload
 
@@ -80,12 +82,12 @@ def _require_iso2(value: Any, *, field_name: str) -> str:
 ###############################################################################
 def _parse_countries(payload: dict[str, Any]) -> list[CountryReferenceEntry]:
     entries = payload.get("countries")
-    if not isinstance(entries, list):
+    if not is_json_array(entries):
         raise ValueError("countries.json must contain a countries list.")
     seen_iso2: set[str] = set()
     countries: list[CountryReferenceEntry] = []
     for item in entries:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             raise ValueError("Country entries must be objects.")
         iso2 = _require_iso2(item.get("iso2"), field_name="country.iso2")
         name = _require_string(item.get("name"), field_name="country.name")
@@ -101,13 +103,13 @@ def _parse_country_aliases(
     countries: list[CountryReferenceEntry],
 ) -> list[CountryAliasReferenceEntry]:
     entries = payload.get("aliases")
-    if not isinstance(entries, list):
+    if not is_json_array(entries):
         raise ValueError("countries.json must contain an aliases list.")
     valid_iso2 = {entry.iso2 for entry in countries}
     seen_aliases: set[str] = set()
     aliases: list[CountryAliasReferenceEntry] = []
     for item in entries:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             raise ValueError("Country alias entries must be objects.")
         alias = _require_string(item.get("alias"), field_name="alias.alias")
         alias_key = _normalize_alias_key(alias)
@@ -127,12 +129,12 @@ def _parse_geospatial_layers(
     payload: dict[str, Any],
 ) -> list[GeospatialLayerReferenceEntry]:
     entries = payload.get("layers")
-    if not isinstance(entries, list):
+    if not is_json_array(entries):
         raise ValueError("geospatial_layers.json must contain a layers list.")
     seen_layer_ids: set[str] = set()
     layers: list[GeospatialLayerReferenceEntry] = []
     for item in entries:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             raise ValueError("Geospatial layer entries must be objects.")
         layer_id = _require_string(item.get("layerId"), field_name="layer.layerId")
         if layer_id in seen_layer_ids:
@@ -164,14 +166,14 @@ def _parse_gibs_tile_matrix_sets(
     payload: dict[str, Any],
 ) -> list[GibsTileMatrixSetReferenceEntry]:
     entries = payload.get("tileMatrixSets")
-    if not isinstance(entries, list):
+    if not is_json_array(entries):
         raise ValueError(
             "gibs_tile_matrix_sets.json must contain a tileMatrixSets list."
         )
     seen_ids: set[str] = set()
     tile_matrix_sets: list[GibsTileMatrixSetReferenceEntry] = []
     for item in entries:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             raise ValueError("GIBS tile matrix set entries must be objects.")
         tile_matrix_set_id = _require_string(
             item.get("tileMatrixSetId"),
@@ -180,7 +182,7 @@ def _parse_gibs_tile_matrix_sets(
         if tile_matrix_set_id in seen_ids:
             raise ValueError(f"Duplicate tile matrix set ID: {tile_matrix_set_id}")
         try:
-            meters_per_pixel = float(item.get("metersPerPixel"))
+            meters_per_pixel = float(str(item.get("metersPerPixel")))
         except (TypeError, ValueError) as exc:
             raise ValueError(
                 f"Invalid metersPerPixel for tile matrix set '{tile_matrix_set_id}'."
@@ -203,12 +205,12 @@ def _parse_gibs_layer_defaults(
     payload: dict[str, Any],
 ) -> list[GibsLayerDefaultReferenceEntry]:
     entries = payload.get("layerDefaults")
-    if not isinstance(entries, list):
+    if not is_json_array(entries):
         raise ValueError("gibs_layer_defaults.json must contain a layerDefaults list.")
     seen_layer_ids: set[str] = set()
     defaults: list[GibsLayerDefaultReferenceEntry] = []
     for item in entries:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             raise ValueError("GIBS layer default entries must be objects.")
         layer_id = _require_string(
             item.get("layerId"), field_name="layerDefault.layerId"
@@ -243,7 +245,7 @@ def _parse_gibs_layer_defaults(
 def _parse_string_list(value: Any, *, field_name: str) -> tuple[str, ...]:
     if value is None:
         return tuple()
-    if not isinstance(value, list):
+    if not is_json_array(value):
         raise ValueError(f"{field_name} must be a list.")
     normalized: list[str] = []
     for item in value:

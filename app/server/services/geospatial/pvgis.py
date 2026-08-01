@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array
+
 import asyncio
 import json
 from typing import Any
@@ -67,7 +69,7 @@ class PVGISService:
         monthly = outputs.get("monthly", {})
         fixed = monthly.get("fixed", [])
         yearly_kwh = None
-        if isinstance(fixed, list) and fixed:
+        if is_json_array(fixed) and fixed:
             yearly_kwh = 0.0
             for entry in fixed:
                 try:

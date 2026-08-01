@@ -51,7 +51,7 @@ class OverlayInferenceService:
             *turn_contract.normalized_action.task_tags,
             *turn_contract.normalized_action.action_tags,
         ]
-        haystack = " ".join(part.strip().lower() for part in text_parts if isinstance(part, str))
+        haystack = " ".join(part.strip().lower() for part in text_parts)
         explicit_ids = list(existing_overlay_ids)
         explicit_haystack = self._normalize_match_text(
             " ".join(item.strip().lower() for item in explicit_ids)

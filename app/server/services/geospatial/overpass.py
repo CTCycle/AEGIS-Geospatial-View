@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 import asyncio
 import json
 import math
@@ -135,13 +137,13 @@ class OverpassService:
             limit=resolved_limit,
         )
         elements = (
-            payload.get("elements") if isinstance(payload.get("elements"), list) else []
+            json_array(payload.get("elements"))
         )
         points: list[dict[str, Any]] = []
         for raw in elements:
-            if not isinstance(raw, dict):
+            if not is_json_object(raw):
                 continue
-            tags_payload = raw.get("tags") if isinstance(raw.get("tags"), dict) else {}
+            tags_payload = json_object(raw.get("tags"))
             category = next(
                 (
                     tags_payload.get(key)
@@ -156,13 +158,13 @@ class OverpassService:
             lon = raw.get("lon")
             if lat is None or lon is None:
                 center = (
-                    raw.get("center") if isinstance(raw.get("center"), dict) else {}
+                    json_object(raw.get("center"))
                 )
                 lat = center.get("lat")
                 lon = center.get("lon")
             try:
-                lat_value = float(lat)
-                lon_value = float(lon)
+                lat_value = float(str(lat))
+                lon_value = float(str(lon))
             except (TypeError, ValueError):
                 continue
             distance_m = self._haversine_distance_m(
@@ -211,20 +213,20 @@ class OverpassService:
             radius_m=resolved_radius_m,
             limit=resolved_limit,
         )
-        elements = payload.get("elements") if isinstance(payload.get("elements"), list) else []
+        elements = json_array(payload.get("elements"))
         features: list[dict[str, Any]] = []
         for raw in elements:
-            if not isinstance(raw, dict) or raw.get("type") != "way":
+            if not is_json_object(raw) or raw.get("type") != "way":
                 continue
-            tags = raw.get("tags") if isinstance(raw.get("tags"), dict) else {}
+            tags = json_object(raw.get("tags"))
             building_type = str(tags.get("building") or "").strip()
             if building_type not in self.RESIDENTIAL_BUILDING_TAGS:
                 continue
-            geometry = raw.get("geometry") if isinstance(raw.get("geometry"), list) else []
+            geometry = json_array(raw.get("geometry"))
             coordinates = [
                 [float(point["lon"]), float(point["lat"])]
                 for point in geometry
-                if isinstance(point, dict)
+                if is_json_object(point)
                 and isinstance(point.get("lat"), int | float)
                 and isinstance(point.get("lon"), int | float)
             ]
@@ -304,7 +306,7 @@ class OverpassService:
             data = json.loads(body)
         except json.JSONDecodeError as exc:
             raise OverpassRequestError("Overpass response was not valid JSON.") from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise OverpassRequestError("Overpass response payload is malformed.")
         self._cache_set(cache_key, data)
         return data
@@ -352,7 +354,7 @@ class OverpassService:
             data = json.loads(body)
         except json.JSONDecodeError as exc:
             raise OverpassRequestError("Overpass response was not valid JSON.") from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise OverpassRequestError("Overpass response payload is malformed.")
         self._cache_set(cache_key, data)
         return data
@@ -399,4 +401,3 @@ class OverpassService:
         )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return radius * c
-

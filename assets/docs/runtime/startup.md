@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-07-20
+Last updated: 2026-08-01
 
 ## Local Development Via Launcher
 
@@ -36,14 +36,19 @@ Launching preserves the uv cache. Use menu option 2 to install or update depende
 
 ## Local Development Manual
 
+Run the backend and frontend commands in separate PowerShell terminals.
+
 ```powershell
+Set-Location app/server
 uv sync
-Set-Location app
-uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 7059
-Set-Location app/client
+uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002
+Set-Location ../client
 npm install
-npm run start -- --host 127.0.0.1 --port 4512
+npm run start -- --host 127.0.0.1 --port 5000
 ```
+
+These ports match the values in `settings/.env.example`; if `settings/.env`
+uses different `FASTAPI_PORT` or `UI_PORT` values, use those values instead.
 
 ## Codex And Sandbox Note
 

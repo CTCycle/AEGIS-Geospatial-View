@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
 from server.common.logger import logger as LOGGER
-from server.domain.chat import ChatTurnRequest, ChatTurnResponse
+from server.domain.chat import ChatTurnRequest, ChatTurnResponse, ContextUsageResponse
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -64,9 +66,9 @@ class AgentOrchestrator:
         history_service: ChatHistoryService,
         conversation_repository: ConversationRepository,
         task_state_service: ConversationTaskStateService,
-        pipeline_router: DeterministicAgentRouter | None = None,
-        tool_planner: DeterministicToolPlanner | None = None,
-        tool_plan_executor: ToolPlanExecutor | None = None,
+        pipeline_router: DeterministicAgentRouter,
+        tool_planner: DeterministicToolPlanner,
+        tool_plan_executor: ToolPlanExecutor,
         capability_resolver: CapabilityResolver,
         response_synthesizer: GroundedResponseSynthesizer,
         direct_turn_response_service: DirectTurnResponseService,
@@ -90,11 +92,9 @@ class AgentOrchestrator:
         self.context_assembler = AgentContextAssembler()
         self._context_packages: dict[str, Any] = {}
         self._persisted_context_state: dict[str, dict[str, Any]] = {}
-        self.pipeline_router = pipeline_router or DeterministicAgentRouter()
-        self.tool_planner = tool_planner or DeterministicToolPlanner()
-        self.tool_plan_executor = tool_plan_executor or ToolPlanExecutor(
-            tool_registry=self.tool_registry
-        )
+        self.pipeline_router = pipeline_router
+        self.tool_planner = tool_planner
+        self.tool_plan_executor = tool_plan_executor
         self.capability_resolver = capability_resolver
         self.response_synthesizer = response_synthesizer
         self.direct_turn_response_service = direct_turn_response_service
@@ -146,25 +146,24 @@ class AgentOrchestrator:
         self._active_directives[conversation_id] = directives
         response = await self._run_turn(payload, progress_callback)
         response = self._with_phase_usage(response)
-        if persisted is not None:
-            revision = repository.write_state(
-                conversation_id,
-                expected_revision=int(persisted["context_revision"]),
-                active_instructions=[item.model_dump(mode="json") for item in directives],
-                task_snapshot=self.task_state_service.serialize(conversation_id),
-                memory_snapshot=response.memory_snapshot,
-                conversation_summary=(
-                    self._context_packages[conversation_id].conversation_summary
-                    if conversation_id in self._context_packages
-                    else None
-                ),
-                summary_through_turn_index=(
-                    self._context_packages[conversation_id].summarized_through_turn_index
-                    if conversation_id in self._context_packages
-                    else None
-                ),
-            )
-            response = response.model_copy(update={"context_revision": revision})
+        revision = repository.write_state(
+            conversation_id,
+            expected_revision=int(persisted["context_revision"]),
+            active_instructions=[item.model_dump(mode="json") for item in directives],
+            task_snapshot=self.task_state_service.serialize(conversation_id),
+            memory_snapshot=response.memory_snapshot,
+            conversation_summary=(
+                self._context_packages[conversation_id].conversation_summary
+                if conversation_id in self._context_packages
+                else None
+            ),
+            summary_through_turn_index=(
+                self._context_packages[conversation_id].summarized_through_turn_index
+                if conversation_id in self._context_packages
+                else None
+            ),
+        )
+        response = response.model_copy(update={"context_revision": revision})
         return response
 
     # -------------------------------------------------------------------------
@@ -179,14 +178,14 @@ class AgentOrchestrator:
                 "estimated_input_tokens": sum(int(item.get("estimated_input_tokens") or 0) for item in loop_usages),
             }
         synthesis = getattr(self.response_synthesizer, "last_context_usage", None)
-        if isinstance(synthesis, dict):
+        if is_json_object(synthesis):
             phases["synthesis"] = synthesis
         if response.context_usage is None or not phases:
             return response
         inputs = [
             int(item.get("estimated_input_tokens") or 0)
             for item in phases.values()
-            if isinstance(item, dict)
+            if is_json_object(item)
         ]
         usage = response.context_usage.model_copy(
             update={
@@ -262,19 +261,18 @@ class AgentOrchestrator:
         self._context_packages[conversation_key] = context_package
         recent_messages = context_package.recent_messages
 
-        parser_kwargs = {
+        parser_kwargs: dict[str, Any] = {
             "user_message": payload.message,
             "memory_snapshot": latest_memory,
             "conversation_messages": recent_messages,
         }
-        if isinstance(self.parser_service, ParserService):
-            parser_kwargs["active_instructions"] = [
-                item.model_dump(mode="json")
-                for item in self.instruction_state_service.active(
-                    self._active_directives.get(conversation_key, [])
-                )
-            ]
-            parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
+        parser_kwargs["active_instructions"] = [
+            item.model_dump(mode="json")
+            for item in self.instruction_state_service.active(
+                self._active_directives.get(conversation_key, [])
+            )
+        ]
+        parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
         turn_contract = self.parser_service.parse_turn(**parser_kwargs)
         turn_contract = self.turn_history_service.merge_memory_location_signals(
             turn_contract=turn_contract,
@@ -317,9 +315,13 @@ class AgentOrchestrator:
             request_id,
             conversation_key,
             specialist,
-            bool(latest_memory.get("active_visualization")) if isinstance(latest_memory, dict) else False,
+            bool(latest_memory.get("active_visualization")) if is_json_object(latest_memory) else False,
         )
-        context_usage = self.parser_service.last_context_usage
+        context_usage = (
+            ContextUsageResponse.model_validate(self.parser_service.last_context_usage)
+            if is_json_object(self.parser_service.last_context_usage)
+            else None
+        )
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,
@@ -390,7 +392,7 @@ class AgentOrchestrator:
             task.task_id,
             status="routed",
             progress_summary=f"Routed to {specialist}.",
-            tool_plan=tool_plan,
+            tool_plan=tool_plan.model_dump(mode="json"),
         )
         constraints = self.policy_engine.build_agent_constraints(
             turn_contract,
@@ -400,7 +402,7 @@ class AgentOrchestrator:
             request_id=request_id,
             conversation_id=conversation_id,
             parsed_request=turn_contract.model_dump(mode="json"),
-            map_state=latest_memory if isinstance(latest_memory, dict) else {},
+            map_state=json_object(latest_memory),
             policy_constraints={
                 "requires_location": constraints.requires_location,
                 "blocked_patterns": constraints.blocked_patterns,
@@ -424,8 +426,12 @@ class AgentOrchestrator:
             },
         )
         deterministic_tools_available = (
-            isinstance(self.agent_tool_catalog_service, AgentToolCatalogService)
-            and (bool(tool_plan.steps) or bool(tool_plan.visualization_update))
+            isinstance(  # pyright: ignore[reportUnnecessaryIsInstance]
+                self.agent_tool_catalog_service,
+                AgentToolCatalogService,
+            )
+            and
+            (bool(tool_plan.steps) or bool(tool_plan.visualization_update))
             and all(
                 self.tool_registry.has_native_tool(step.tool_name)
                 for step in tool_plan.steps
@@ -445,14 +451,12 @@ class AgentOrchestrator:
                 tool_plan=tool_plan,
                 progress_callback=progress_callback,
             )
-        tool_builder = getattr(
-            self.agent_tool_catalog_service,
-            "build_native_tools",
-            None,
-        )
         native_tools = (
-            tool_builder(native_context)
-            if callable(tool_builder)
+            self.agent_tool_catalog_service.build_native_tools(native_context)
+            if isinstance(  # pyright: ignore[reportUnnecessaryIsInstance]
+                self.agent_tool_catalog_service,
+                AgentToolCatalogService,
+            )
             else self.tool_registry.list_native_tools()
         )
         if not native_tools:
@@ -581,11 +585,11 @@ class AgentOrchestrator:
             status="failed" if failure is not None else "completed",
             progress_summary=operation.message,
             failure=failure,
-            tool_plan=tool_plan,
+            tool_plan=tool_plan.model_dump(mode="json"),
             tool_result_refs=[
                 str(item.get("tool_call_id"))
-                for item in tool_payload.get("tool_results") or []
-                if isinstance(item, dict) and item.get("tool_call_id")
+                for item in json_array(tool_payload.get("tool_results"))
+                if is_json_object(item) and item.get("tool_call_id")
             ],
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)

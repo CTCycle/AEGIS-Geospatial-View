@@ -6,6 +6,7 @@ from uuid import uuid4
 from server.domain.agent_runs import AgentRunSnapshot, AgentRunState
 from server.repositories.database.contracts import DatabaseBackend
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from server.repositories.schemas.models import AgentRunRecord, ConversationRecord
 
@@ -145,7 +146,7 @@ class AgentRunRepository:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _require_run(session, run_id: str) -> AgentRunRecord:
+    def _require_run(session: Session, run_id: str) -> AgentRunRecord:
         record = session.get(AgentRunRecord, run_id)
         if record is None:
             raise ValueError("Run not found.")

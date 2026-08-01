@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 import argparse
 import json
 from dataclasses import dataclass
@@ -34,26 +36,26 @@ def load_poi_records(path: str | Path) -> list[dict[str, Any]]:
     """Load normalized POI records from a provider payload or GeoJSON file."""
     source = Path(path)
     payload = json.loads(source.read_text(encoding="utf-8"))
-    if isinstance(payload, dict) and isinstance(payload.get("payload"), dict):
+    if is_json_object(payload) and is_json_object(payload.get("payload")):
         payload = payload["payload"]
-    if isinstance(payload, dict) and isinstance(payload.get("features"), list):
+    if is_json_object(payload) and is_json_array(payload.get("features")):
         raw_features = payload["features"]
-    elif isinstance(payload, list):
+    elif is_json_array(payload):
         raw_features = payload
     else:
         raise ValueError(f"{source} must contain a POI list or FeatureCollection payload.")
 
     records: list[dict[str, Any]] = []
     for raw in raw_features:
-        if not isinstance(raw, dict):
+        if not is_json_object(raw):
             continue
         if _number(raw.get("latitude")) is not None and _number(raw.get("longitude")) is not None:
             records.append(dict(raw))
             continue
-        properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}
-        geometry = raw.get("geometry") if isinstance(raw.get("geometry"), dict) else {}
+        properties = json_object(raw.get("properties"))
+        geometry = json_object(raw.get("geometry"))
         coordinates = geometry.get("coordinates")
-        if not isinstance(coordinates, list) or len(coordinates) < 2:
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         records.append(
             {
@@ -134,7 +136,7 @@ def _dedupe_keys(items: list[dict[str, Any]]) -> set[tuple[str, float | None, fl
 ###############################################################################
 def _number(value: object) -> float | None:
     try:
-        return float(value) if value is not None else None
+        return float(str(value)) if value is not None else None
     except (TypeError, ValueError):
         return None
 

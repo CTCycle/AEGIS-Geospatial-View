@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 from datetime import datetime, timedelta
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
@@ -26,7 +28,7 @@ def _select_requested_forecast(
     if plan.temporal_mode != "forecast":
         return None
     hourly = result.get("hourly_forecast")
-    if not isinstance(hourly, list):
+    if not is_json_array(hourly):
         return None
     temporal_text = (plan.temporal_text or "").lower()
     target_date = None
@@ -35,7 +37,7 @@ def _select_requested_forecast(
 
     fallback: dict[str, object] | None = None
     for row in hourly:
-        if not isinstance(row, dict):
+        if not is_json_object(row):
             continue
         raw_time = row.get("time")
         if not isinstance(raw_time, str):

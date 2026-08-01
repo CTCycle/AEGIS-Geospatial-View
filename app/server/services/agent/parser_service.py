@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
+from server.common.typing import is_json_object
+
 import json
 import re
 from typing import Literal
@@ -54,11 +58,11 @@ class ParserService:
 
     # -------------------------------------------------------------------------
     def _normalize_recent_messages(
-        self, conversation_messages: list[dict]
+        self, conversation_messages: list[dict[str, Any]]
     ) -> list[dict[str, str]]:
         normalized: list[dict[str, str]] = []
         for item in conversation_messages[-8:]:
-            if not isinstance(item, dict):
+            if not is_json_object(item):
                 normalized.append({"role": "unknown", "content": str(item)})
                 continue
             normalized.append(
@@ -119,10 +123,10 @@ class ParserService:
         self,
         *,
         user_message: str,
-        memory_snapshot: dict,
+        memory_snapshot: dict[str, Any],
         recent_messages: list[dict[str, str]],
-        active_instructions: list[dict] | None = None,
-        task_snapshot: dict | None = None,
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
     ) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
@@ -165,7 +169,7 @@ class ParserService:
             request=request, schema=LLMParserExtraction
         )
         usage = getattr(parser_provider, "last_context_usage", None)
-        self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
+        self.last_context_usage = dict(usage) if is_json_object(usage) else None
         extracted = LLMParserExtraction.model_validate(payload)
         LOGGER.debug(
             "Parser LLM extraction: provider=%s model=%s task=%s action=%s",
@@ -323,10 +327,10 @@ class ParserService:
     def parse_turn(
         self,
         user_message: str,
-        memory_snapshot: dict,
-        conversation_messages: list[dict],
-        active_instructions: list[dict] | None = None,
-        task_snapshot: dict | None = None,
+        memory_snapshot: dict[str, Any],
+        conversation_messages: list[dict[str, Any]],
+        active_instructions: list[dict[str, Any]] | None = None,
+        task_snapshot: dict[str, Any] | None = None,
     ) -> TurnParseResult:
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
@@ -526,10 +530,10 @@ class ParserService:
         cls,
         user_message: str,
         extracted: LLMParserExtraction,
-        memory_snapshot: dict,
+        memory_snapshot: dict[str, Any],
     ) -> LLMParserExtraction:
         text = " ".join(user_message.casefold().split())
-        updates: dict[str, object] = {}
+        updates: dict[str, Any] = {}
         inferred_viewport = cls._infer_viewport_intent(
             text,
             has_active_visualization=bool(memory_snapshot.get("active_visualization")),

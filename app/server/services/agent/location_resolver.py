@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
+from server.common.typing import json_array, json_object
+
 from typing import Sequence
 
 from server.common.logger import logger as LOGGER
@@ -25,15 +29,15 @@ class LocationResolver:
     async def resolve_location_signals(
         self,
         location_signals: list[LocationSignal],
-        memory_snapshot: dict,
+        memory_snapshot: dict[str, Any],
     ) -> ResolvedLocation | ClarificationRequest:
         if not location_signals:
-            active = memory_snapshot.get("active_location") if isinstance(memory_snapshot, dict) else None
-            if isinstance(active, dict):
+            active = json_object(memory_snapshot.get("active_location"))
+            if active:
                 return ResolvedLocation(
                     label=str(active.get("label") or ""),
-                    latitude=float(active.get("latitude")),
-                    longitude=float(active.get("longitude")),
+                    latitude=float(active.get("latitude") or 0.0),
+                    longitude=float(active.get("longitude") or 0.0),
                     country=active.get("country") if isinstance(active.get("country"), str) else None,
                     city=active.get("city") if isinstance(active.get("city"), str) else None,
                     address=active.get("address") if isinstance(active.get("address"), str) else None,
@@ -41,7 +45,7 @@ class LocationResolver:
                     confidence=float(active.get("confidence") or 0.85),
                     location_type=active.get("location_type") if isinstance(active.get("location_type"), str) else None,
                     location_class=active.get("location_class") if isinstance(active.get("location_class"), str) else None,
-                    bbox=list(active.get("bbox")) if isinstance(active.get("bbox"), list) else None,
+                    bbox=json_array(active.get("bbox")) or None,
                     bbox_source=active.get("bbox_source") if isinstance(active.get("bbox_source"), str) else None,
                 )
             return ClarificationRequest(
@@ -105,11 +109,17 @@ class LocationResolver:
 
     # -------------------------------------------------------------------------
     def _same_resolved_point(self, left: LocationSignal, right: LocationSignal) -> bool:
-        if None in {left.latitude, left.longitude, right.latitude, right.longitude}:
+        if any(value is None for value in (left.latitude, left.longitude, right.latitude, right.longitude)):
             return False
+        left_latitude = left.latitude
+        left_longitude = left.longitude
+        right_latitude = right.latitude
+        right_longitude = right.longitude
+        assert left_latitude is not None and left_longitude is not None
+        assert right_latitude is not None and right_longitude is not None
         return (
-            abs(float(left.latitude) - float(right.latitude)) < 0.01
-            and abs(float(left.longitude) - float(right.longitude)) < 0.01
+            abs(float(left_latitude) - float(right_latitude)) < 0.01
+            and abs(float(left_longitude) - float(right_longitude)) < 0.01
         )
 
     # -------------------------------------------------------------------------
@@ -136,7 +146,8 @@ class LocationResolver:
             country_name=None,
             country_code=None,
         )
-        if not isinstance(geocoded, dict):
+        geocoded = json_object(geocoded)
+        if not geocoded:
             return None
         return ResolvedLocation(
             label=str(geocoded.get("display_name") or signal.raw_value),
@@ -146,7 +157,7 @@ class LocationResolver:
             confidence=float(geocoded.get("confidence") or signal.confidence),
             location_type=str(geocoded.get("selected_result_type") or "") or None,
             location_class=str(geocoded.get("selected_result_class") or "") or None,
-            bbox=list(geocoded.get("bbox")) if isinstance(geocoded.get("bbox"), list) else None,
+            bbox=json_array(geocoded.get("bbox")) or None,
             bbox_source=str(geocoded.get("bbox_source") or "") or None,
         )
 

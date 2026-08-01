@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from urllib.parse import urlencode
 
 from server.services.geospatial.providers.base import (
@@ -109,17 +111,17 @@ class NOAAProvider(GeospatialProvider):
 
 ###############################################################################
 def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise ProviderUnavailableError("NOAA alert payload must be a GeoJSON object.")
     raw_features = payload.get("features")
-    if not isinstance(raw_features, list):
+    if not is_json_array(raw_features):
         raise ProviderUnavailableError("NOAA alert payload is missing features.")
     features: list[dict[str, object]] = []
     for item in raw_features:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             continue
-        properties = item.get("properties") if isinstance(item.get("properties"), dict) else {}
-        geometry = item.get("geometry") if isinstance(item.get("geometry"), dict) else None
+        properties = json_object(item.get("properties"))
+        geometry = item.get("geometry") if is_json_object(item.get("geometry")) else None
         features.append(
             {
                 "id": str(item.get("id") or properties.get("id") or ""),

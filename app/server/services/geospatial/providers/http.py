@@ -60,7 +60,7 @@ async def call_json_fetcher(
     fetcher: JsonFetcher, url: str, headers: dict[str, str] | None = None
 ) -> Any:
     value = fetcher(url, headers)
-    if hasattr(value, "__await__"):
+    if inspect.isawaitable(value):
         return await value
     return value
 
@@ -78,6 +78,6 @@ async def call_bytes_fetcher(
     fetcher: BytesFetcher, url: str, headers: dict[str, str] | None = None
 ) -> bytes:
     value = fetcher(url, headers)
-    if hasattr(value, "__await__"):
+    if inspect.isawaitable(value):
         return await value
     return value

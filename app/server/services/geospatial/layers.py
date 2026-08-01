@@ -124,15 +124,21 @@ class LayerProviderService:
     ) -> dict[str, str]:
         lookup: dict[str, str] = {}
         for entry in entries.values():
-            lookup[entry.name.lower()] = entry.name
-            lookup[entry.label.lower()] = entry.name
+            name = entry.name
+            if name is None:
+                continue
+            lookup[name.lower()] = name
+            label = entry.label
+            if label is not None:
+                lookup[label.lower()] = name
             for alias in entry.aliases:
-                lookup[alias.lower()] = entry.name
+                if alias:
+                    lookup[alias.lower()] = name
         return lookup
 
     # -------------------------------------------------------------------------
     def list_options(self) -> dict[str, str]:
-        return {entry.name: entry.label for entry in self.layer_definitions.values()}
+        return {str(entry.name): str(entry.label) for entry in self.layer_definitions.values() if entry.name and entry.label}
 
     # -------------------------------------------------------------------------
     def resolve(self, value: str) -> LayerProviderEntry:

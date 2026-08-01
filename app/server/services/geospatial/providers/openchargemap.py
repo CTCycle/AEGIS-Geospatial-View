@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import os
 import json
 from pathlib import Path
@@ -117,7 +119,7 @@ class OpenChargeMapProvider(GeospatialProvider):
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -132,16 +134,17 @@ class OpenChargeMapProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _features(self, payload: object) -> list[dict[str, object]]:
-        if isinstance(payload, dict) and payload.get("type") == "FeatureCollection":
+        if is_json_object(payload) and payload.get("type") == "FeatureCollection":
             return _geojson_features(payload)
-        if not isinstance(payload, list):
+        if not is_json_array(payload):
             raise ValueError("Open Charge Map payload must be a list.")
         features: list[dict[str, object]] = []
-        for item in payload:
-            if not isinstance(item, dict):
+        for item in json_array(payload):
+            item = json_object(item)
+            if not item:
                 continue
-            address = item.get("AddressInfo")
-            if not isinstance(address, dict):
+            address = json_object(item.get("AddressInfo"))
+            if not address:
                 continue
             latitude = address.get("Latitude")
             longitude = address.get("Longitude")
@@ -153,13 +156,11 @@ class OpenChargeMapProvider(GeospatialProvider):
                     "name": address.get("Title"),
                     "category": normalize_poi_category("ev_charging"),
                     "source": self.provider_id,
-                    "latitude": float(latitude),
-                    "longitude": float(longitude),
+                    "latitude": float(str(latitude)),
+                    "longitude": float(str(longitude)),
                     "address": address.get("AddressLine1"),
                     "metadata": {
-                        "status": (item.get("StatusType") or {}).get("Title")
-                        if isinstance(item.get("StatusType"), dict)
-                        else None,
+                    "status": json_object(item.get("StatusType")).get("Title"),
                         "connections": item.get("Connections") or [],
                     },
                 }
@@ -181,27 +182,28 @@ def _filter_features(
     return [
         item
         for item in features
-        if west <= float(item["longitude"]) <= east and south <= float(item["latitude"]) <= north
+        if west <= float(str(item["longitude"])) <= east and south <= float(str(item["latitude"])) <= north
     ][: int(request.params.get("maxresults") or 100)]
 
 ###############################################################################
 def _geojson_features(payload: dict[str, object]) -> list[dict[str, object]]:
     features: list[dict[str, object]] = []
-    for feature in payload.get("features") or []:
-        if not isinstance(feature, dict):
+    for feature in json_array(payload.get("features")):
+        feature = json_object(feature)
+        if not feature:
             continue
-        geometry = feature.get("geometry") if isinstance(feature.get("geometry"), dict) else {}
-        properties = feature.get("properties") if isinstance(feature.get("properties"), dict) else {}
+        geometry = json_object(feature.get("geometry"))
+        properties = json_object(feature.get("properties"))
         coordinates = geometry.get("coordinates")
-        if not isinstance(coordinates, list) or len(coordinates) < 2:
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         features.append({
             "id": str(feature.get("id") or properties.get("id") or ""),
             "name": properties.get("name"),
             "category": normalize_poi_category("ev_charging"),
             "source": "openchargemap",
-            "latitude": float(coordinates[1]),
-            "longitude": float(coordinates[0]),
+            "latitude": float(str(coordinates[1])),
+            "longitude": float(str(coordinates[0])),
             "address": properties.get("address"),
             "metadata": properties,
         })

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from urllib.parse import urlencode
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -62,7 +64,7 @@ class NominatimProvider(GeospatialProvider):
             )
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return ProviderResponse(
                     capability_id=request.capability_id,
                     provider_id=self.provider_id,
@@ -89,11 +91,12 @@ class NominatimProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _normalize(self, payload: object, *, query: str) -> dict[str, object]:
-        if not isinstance(payload, list):
+        if not is_json_array(payload):
             raise ProviderMalformedPayloadError("Nominatim search payload must be a list.")
-        results = []
+        results: list[dict[str, object]] = []
         for item in payload:
-            if not isinstance(item, dict):
+            item = json_object(item)
+            if not item:
                 continue
             lat = self._float_or_none(item.get("lat"))
             lon = self._float_or_none(item.get("lon"))

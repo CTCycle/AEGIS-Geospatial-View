@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from server.common.typing import is_json_array, is_json_object
+
+from typing import Any
 
 import httpx
 
@@ -63,18 +65,17 @@ class OpenCodeProvider(DeepSeekProvider):
             timeout=20.0,
         )
         response.raise_for_status()
-        payload = cast(object, response.json())
-        if not isinstance(payload, dict):
+        payload = response.json()
+        if not is_json_object(payload):
             return []
-        typed_payload = cast(dict[str, Any], payload)
-        raw_entries = typed_payload.get("data", [])
-        entries = cast(list[object], raw_entries) if isinstance(raw_entries, list) else []
+        raw_entries = payload.get("data", [])
+        entries = raw_entries if is_json_array(raw_entries) else []
         compatible = OPENCODE_COMPATIBLE_MODELS[self.provider_name]
         models: list[ModelDescriptor] = []
         for raw_item in entries:
-            if not isinstance(raw_item, dict):
+            if not is_json_object(raw_item):
                 continue
-            item = cast(dict[str, Any], raw_item)
+            item = raw_item
             if str(item.get("id") or "").strip() in compatible:
                 models.append(self._model_descriptor(item))
         return models

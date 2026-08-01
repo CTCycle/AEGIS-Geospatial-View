@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object
+
 from typing import Any
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -35,12 +37,12 @@ class RainViewerProvider(GeospatialProvider):
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
         cache_key = f"{self.provider_id}:latest-radar"
         cached = self.cache.get(cache_key)
-        if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
+        if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
             return self._response(request, cached.value)
         try:
             metadata = await self.service.get_latest_radar_metadata()
         except RainViewerServiceError as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return self._response(
                     request,
                     cached.value,
@@ -54,7 +56,7 @@ class RainViewerProvider(GeospatialProvider):
                 warning=f"RainViewer metadata could not be fetched: {exc}",
             )
         if not self._is_usable_metadata(metadata):
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return self._response(
                     request,
                     cached.value,

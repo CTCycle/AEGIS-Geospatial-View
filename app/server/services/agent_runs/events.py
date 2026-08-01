@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any, AsyncGenerator
 
 from server.domain.run_events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
 from server.repositories.agent_run_events import AgentRunEventRepository
@@ -107,7 +107,7 @@ class RunEventPublisher:
         self,
         run_id: str,
         after_event_id: str | None = None,
-    ) -> AsyncIterator[RunEvent]:
+    ) -> AsyncGenerator[RunEvent, None]:
         subscription, replay = await self.subscribe(run_id, after_event_id=after_event_id)
         try:
             for event in replay:

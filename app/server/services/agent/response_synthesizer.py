@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 import json
 import logging
 import re
@@ -46,11 +48,7 @@ class GroundedResponseSynthesizer:
     ) -> None:
         self.settings_repo = settings_repo
         self.llm_factory = llm_factory
-        self.enabled = (
-            isinstance(self.settings_repo, ModelSettingsRepository)
-            if enabled is None
-            else enabled
-        )
+        self.enabled = True if enabled is None else enabled
         self.last_context_usage: dict[str, Any] | None = None
 
     # -------------------------------------------------------------------------
@@ -124,7 +122,7 @@ class GroundedResponseSynthesizer:
             )
             result = GroundedSynthesisResult.model_validate(payload)
             usage = getattr(provider, "last_context_usage", None)
-            self.last_context_usage = dict(usage) if isinstance(usage, dict) else None
+            self.last_context_usage = dict(usage) if is_json_object(usage) else None
             if any(key not in evidence for key in result.used_evidence_keys):
                 raise ValueError("Synthesis referenced evidence keys outside the verified payload.")
             if not self._content_matches_verified_state(
@@ -166,7 +164,7 @@ class GroundedResponseSynthesizer:
             return None
         resolved = map_session.resolved_location
         return {
-            "location": resolved.label if resolved is not None else None,
+            "location": resolved.label,
             "basemap": map_session.basemap_id,
             "overlays": [
                 {
@@ -181,7 +179,7 @@ class GroundedResponseSynthesizer:
                     ),
                 }
                 for overlay in map_session.overlays
-                if isinstance(overlay, dict)
+                if is_json_object(overlay)
             ],
             "warnings": list(map_session.compliance_warnings),
         }
@@ -195,9 +193,9 @@ class GroundedResponseSynthesizer:
             return value[:1000]
         if depth >= 3:
             return None
-        if isinstance(value, list):
+        if is_json_array(value):
             return [cls._bounded_value(item, depth=depth + 1) for item in value[:20]]
-        if isinstance(value, dict):
+        if is_json_object(value):
             return {
                 str(key)[:80]: cls._bounded_value(item, depth=depth + 1)
                 for key, item in list(value.items())[:30]

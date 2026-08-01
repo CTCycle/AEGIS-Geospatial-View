@@ -9,6 +9,7 @@ from server.common.time import utc_now
 from server.domain.agent.pipeline import (
     ConversationTaskRecord,
     ConversationTaskSnapshot,
+    ToolPlan,
     SpecialistGroup,
     TaskFailureDetail,
     TaskStatus,
@@ -20,7 +21,7 @@ from server.domain.geographics import MapSession
 @dataclass
 class _ConversationState:
     sequence: int = 0
-    tasks: list[ConversationTaskRecord] = field(default_factory=list)
+    tasks: list[ConversationTaskRecord] = field(default_factory=lambda: list[ConversationTaskRecord]())
     active_visualization: dict[str, Any] | None = None
     updated_at: datetime = field(default_factory=utc_now)
 
@@ -106,7 +107,7 @@ class ConversationTaskStateService:
             task.blocking_ambiguity = blocking_ambiguity
             task.failure = failure
             if tool_plan is not None:
-                task.tool_plan = tool_plan
+                task.tool_plan = ToolPlan.model_validate(tool_plan)
             if tool_result_refs is not None:
                 task.tool_result_refs = list(tool_result_refs)
             task.updated_at = utc_now()

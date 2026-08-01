@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object
+
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -85,7 +87,7 @@ class ToolRegistry:
         schema: dict[str, Any],
         arguments: dict[str, Any],
     ) -> str | None:
-        if not isinstance(arguments, dict):
+        if not is_json_object(arguments):
             return "Tool arguments must be an object."
         return cls._validate_schema_node(schema, arguments, path="")
 
@@ -103,14 +105,14 @@ class ToolRegistry:
             return f"{cls._label_for_path(path)} must be {cls._format_expected_type(expected_type)}."
 
         enum_values = schema.get("enum")
-        if isinstance(enum_values, list) and value not in enum_values:
+        if is_json_array(enum_values) and value not in enum_values:
             return f"{cls._label_for_path(path)} must be one of {enum_values!r}."
 
-        if isinstance(value, dict):
+        if is_json_object(value):
             object_error = cls._validate_object_schema(schema, value, path=path)
             if object_error is not None:
                 return object_error
-        if isinstance(value, list):
+        if is_json_array(value):
             array_error = cls._validate_array_schema(schema, value, path=path)
             if array_error is not None:
                 return array_error
@@ -130,14 +132,14 @@ class ToolRegistry:
         path: str,
     ) -> str | None:
         required = schema.get("required")
-        if isinstance(required, list):
+        if is_json_array(required):
             for field_name in required:
                 if isinstance(field_name, str) and field_name not in value:
                     missing_path = cls._child_path(path, field_name)
                     return f"Missing required argument '{missing_path}'."
 
         properties = schema.get("properties")
-        if not isinstance(properties, dict):
+        if not is_json_object(properties):
             return None
 
         if schema.get("additionalProperties") is False:
@@ -148,7 +150,7 @@ class ToolRegistry:
 
         for field_name, field_value in value.items():
             field_schema = properties.get(field_name)
-            if not isinstance(field_schema, dict):
+            if not is_json_object(field_schema):
                 continue
             field_path = cls._child_path(path, field_name)
             field_error = cls._validate_schema_node(field_schema, field_value, path=field_path)
@@ -173,7 +175,7 @@ class ToolRegistry:
             return f"{cls._label_for_path(path)} must contain at most {max_items} items."
 
         item_schema = schema.get("items")
-        if not isinstance(item_schema, dict):
+        if not is_json_object(item_schema):
             return None
         for index, item in enumerate(value):
             item_path = cls._child_path(path, str(index))
@@ -220,7 +222,7 @@ class ToolRegistry:
     def _format_expected_type(expected_type: Any) -> str:
         if isinstance(expected_type, str):
             return expected_type
-        if isinstance(expected_type, list):
+        if is_json_array(expected_type):
             return " or ".join(str(item) for item in expected_type)
         return str(expected_type)
 
@@ -233,8 +235,8 @@ class ToolRegistry:
             or ("integer" in expected and isinstance(value, int) and not isinstance(value, bool))
             or ("number" in expected and isinstance(value, (int, float)) and not isinstance(value, bool))
             or ("boolean" in expected and isinstance(value, bool))
-            or ("object" in expected and isinstance(value, dict))
-            or ("array" in expected and isinstance(value, list))
+            or ("object" in expected and is_json_object(value))
+            or ("array" in expected and is_json_array(value))
             or ("null" in expected and value is None)
         )
 
@@ -248,7 +250,7 @@ class ToolRegistry:
             "poi": poi.execute,
         }
         bindings: dict[str, ToolHandler] = {}
-        for capability_id, profile in self.runtime_registry._ensure().profiles.items():
+        for capability_id, profile in self.runtime_registry._ensure().profiles.items():  # pyright: ignore[reportPrivateUsage]
             handler_name = str(profile.get("handler_name") or "").strip()
             if not handler_name:
                 continue

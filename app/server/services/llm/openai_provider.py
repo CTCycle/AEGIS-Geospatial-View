@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
@@ -73,7 +75,7 @@ class OpenAIProvider(LLMProvider):
         normalized: list[dict[str, Any]] = []
         for message in messages:
             role = str(message.get("role") or "")
-            if role == "assistant" and isinstance(message.get("tool_calls"), list):
+            if role == "assistant" and is_json_array(message.get("tool_calls")):
                 normalized.append(
                     {
                         "role": "assistant",
@@ -87,8 +89,9 @@ class OpenAIProvider(LLMProvider):
                                     "arguments": json.dumps(call.get("arguments") or {}),
                                 },
                             }
-                            for call in message["tool_calls"]
-                            if isinstance(call, dict)
+                            for raw_call in json_array(message.get("tool_calls"))
+                            for call in [json_object(raw_call)]
+                            if call
                         ],
                     }
                 )
@@ -109,10 +112,11 @@ class OpenAIProvider(LLMProvider):
     @staticmethod
     def _parse_tool_calls(raw: dict[str, Any]) -> list[LLMToolCall]:
         calls: list[LLMToolCall] = []
-        for item in raw.get("output", []) if isinstance(raw.get("output"), list) else []:
-            if not isinstance(item, dict) or item.get("type") != "function_call":
+        for raw_item in json_array(raw.get("output")):
+            item = json_object(raw_item)
+            if not item or item.get("type") != "function_call":
                 continue
-            args = item.get("arguments") or {}
+            args: Any = item.get("arguments") or {}
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
@@ -122,7 +126,7 @@ class OpenAIProvider(LLMProvider):
                 LLMToolCall(
                     id=item.get("call_id") or item.get("id"),
                     name=str(item.get("name") or ""),
-                    arguments=args if isinstance(args, dict) else {},
+                    arguments=json_object(args),
                 )
             )
         return calls
@@ -171,7 +175,7 @@ class OpenAIProvider(LLMProvider):
             content=str(getattr(response, "output_text", "") or ""),
             raw=raw,
             tool_calls=self._parse_tool_calls(raw),
-            finish_reason=raw.get("finish_reason") if isinstance(raw, dict) else None,
+            finish_reason=raw.get("finish_reason") if is_json_object(raw) else None,
         )
 
     # -------------------------------------------------------------------------
@@ -200,7 +204,7 @@ class OpenAIProvider(LLMProvider):
             request, provider=self.provider_name
         ).to_dict()
         schema_dump = getattr(schema, "model_json_schema", None)
-        request_schema = schema_dump() if callable(schema_dump) else {}
+        request_schema = json_object(schema_dump()) if callable(schema_dump) else {}
         self._validate_request_capabilities(
             replace(request, response_json_schema=request_schema)
         )
@@ -211,16 +215,16 @@ class OpenAIProvider(LLMProvider):
             text_format=schema,
         )
         parsed = getattr(response, "output_parsed", None)
-        if isinstance(parsed, dict):
+        if is_json_object(parsed):
             return parsed
         model_dump = getattr(parsed, "model_dump", None)
         if callable(model_dump):
             dumped = model_dump(mode="json")
-            return dumped if isinstance(dumped, dict) else {}
+            return json_object(dumped)
         output_text = str(getattr(response, "output_text", "") or "")
         if output_text:
             loaded = json.loads(output_text)
-            return loaded if isinstance(loaded, dict) else {}
+            return json_object(loaded)
         return {}
 
     # -------------------------------------------------------------------------
@@ -230,11 +234,10 @@ class OpenAIProvider(LLMProvider):
         if not data:
             return []
         embedding = getattr(data[0], "embedding", None)
-        if not isinstance(embedding, list):
+        if not is_json_array(embedding):
             return []
         return [float(value) for value in embedding if isinstance(value, (int, float))]
 
     # -------------------------------------------------------------------------
     def health_check(self) -> dict[str, Any]:
         return {"ok": True, "detail": "configured"}
-

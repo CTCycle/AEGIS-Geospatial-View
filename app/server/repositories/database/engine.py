@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -7,8 +9,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from server.configurations import DatabaseSettings
 
 ###############################################################################
-def configure_sqlite_connection(dbapi_connection: object, settings: DatabaseSettings) -> None:
-    cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+def configure_sqlite_connection(dbapi_connection: Any, settings: DatabaseSettings) -> None:
+    cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     if settings.sqlite_wal_enabled:
         cursor.execute("PRAGMA journal_mode=WAL")
@@ -29,13 +31,10 @@ def build_engine(settings: DatabaseSettings) -> Engine:
             pool_pre_ping=True,
         )
 
-        event.listen(
-            engine,
-            "connect",
-            lambda dbapi_connection, _connection_record: configure_sqlite_connection(
-                dbapi_connection, settings
-            ),
-        )
+        def on_connect(dbapi_connection: Any, _connection_record: Any) -> None:
+            configure_sqlite_connection(dbapi_connection, settings)
+
+        event.listen(engine, "connect", on_connect)
 
         return engine
 

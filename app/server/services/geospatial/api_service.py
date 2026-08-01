@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import os
 from collections.abc import Iterator
 from datetime import datetime
@@ -61,18 +63,18 @@ class GeospatialUnsupportedTileError(GeospatialApiServiceError):
 
 ###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict) and value.get("type") == "FeatureCollection":
+    if is_json_object(value) and value.get("type") == "FeatureCollection":
         features = value.get("features")
         return {
             "type": "FeatureCollection",
-            "features": features if isinstance(features, list) else [],
+            "features": json_array(features),
         }
-    if isinstance(value, dict) and value.get("type") == "Feature":
+    if is_json_object(value) and value.get("type") == "Feature":
         return {
             "type": "FeatureCollection",
             "features": [value],
         }
-    if isinstance(value, dict) and isinstance(value.get("features"), list):
+    if is_json_object(value) and is_json_array(value.get("features")):
         return {
             "type": "FeatureCollection",
             "features": value["features"],
@@ -117,7 +119,7 @@ class GeospatialApiService:
         return {
             "id": layer_id,
             "provider": manifest.get("provider"),
-            "reliability": reliability if isinstance(reliability, dict) else {},
+            "reliability": json_object(reliability),
             "runtime": self.runtime_registry.provider_health(layer_id),
         }
 
@@ -241,7 +243,7 @@ class GeospatialApiService:
         y: int,
     ) -> bytes:
         manifest = self._manifest_by_id(capability_id)
-        metadata = manifest.get("metadata") if isinstance(manifest.get("metadata"), dict) else {}
+        metadata = json_object(manifest.get("metadata"))
         template = str(
             metadata.get("tile_url_template")
             or metadata.get("url_template")
@@ -325,10 +327,10 @@ class GeospatialApiService:
                     or "Camera detail lookup is not available.",
                 }
             payload = listing.get("payload")
-            features = payload.get("features") if isinstance(payload, dict) else None
-            if isinstance(features, list):
+            features = payload.get("features") if is_json_object(payload) else None
+            if is_json_array(features):
                 for feature in features:
-                    if not isinstance(feature, dict):
+                    if not is_json_object(feature):
                         continue
                     feature_id = str(feature.get("id") or "")
                     if feature_id in {camera_id, provider_camera_id}:
@@ -398,7 +400,9 @@ class GeospatialApiService:
             "providers",
         )
         for collection_name in collection_names:
-            for item in payload.get(collection_name) or []:
+            for item in json_array(payload.get(collection_name)):
+                if not is_json_object(item):
+                    continue
                 if str(item.get("id") or "") == capability_id:
                     return dict(item)
         raise GeospatialCapabilityNotFoundError(
@@ -491,7 +495,7 @@ class GeospatialApiService:
     # -------------------------------------------------------------------------
     def _provider_requires_credentials(self, provider_id: str) -> bool:
         for item in self._iter_manifest_payloads_for_account_setup():
-            auth = item.get("auth") if isinstance(item.get("auth"), dict) else {}
+            auth = json_object(item.get("auth"))
             manifest_provider = str(item.get("provider") or item.get("id") or "")
             access_id = str(auth.get("accessPageProviderId") or "")
             provider_key = str(auth.get("providerKey") or "")
@@ -503,15 +507,15 @@ class GeospatialApiService:
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
         payload = self.manifest_loader.load_all()
         for collection_name in ("providers", "overlays", "transit", "cameras"):
-            for item in payload.get(collection_name) or []:
-                if isinstance(item, dict):
+            for item in json_array(payload.get(collection_name)):
+                if is_json_object(item):
                     yield item
 
     # -------------------------------------------------------------------------
     def _extract_account_setup_record(
         self, payload: dict[str, Any]
     ) -> dict[str, Any] | None:
-        auth = payload.get("auth") if isinstance(payload.get("auth"), dict) else {}
+        auth = json_object(payload.get("auth"))
         requires_credentials = bool(auth.get("required"))
         provider_key = str(
             auth.get("providerKey")
@@ -522,12 +526,8 @@ class GeospatialApiService:
         access_provider_id = str(
             auth.get("accessPageProviderId") or provider_key
         ).strip()
-        account_setup = (
-            payload.get("account_setup")
-            if isinstance(payload.get("account_setup"), dict)
-            else {}
-        )
-        has_account_setup = isinstance(account_setup.get("automation"), dict)
+        account_setup = json_object(payload.get("account_setup"))
+        has_account_setup = is_json_object(account_setup.get("automation"))
         if (
             (not requires_credentials and not has_account_setup)
             or not provider_key
@@ -551,7 +551,7 @@ class GeospatialApiService:
             required=True,
         )
         metadata = (
-            payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+            json_object(payload.get("metadata"))
         )
         return {
             "provider_id": provider_key,
@@ -589,11 +589,7 @@ class GeospatialApiService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _account_setup_specificity(record: dict[str, Any]) -> int:
-        automation = (
-            record.get("automation")
-            if isinstance(record.get("automation"), dict)
-            else {}
-        )
+        automation = json_object(record.get("automation"))
         return (
             sum(
                 1
@@ -612,11 +608,7 @@ class GeospatialApiService:
         docs_url: str | None,
         account_setup: dict[str, Any],
     ) -> dict[str, Any]:
-        raw = (
-            account_setup.get("automation")
-            if isinstance(account_setup.get("automation"), dict)
-            else {}
-        )
+        raw = json_object(account_setup.get("automation"))
         support = str(
             raw.get("support") or self._default_automation_support(provider_key)
         )
@@ -638,8 +630,8 @@ class GeospatialApiService:
             else None,
             "required_fields": [
                 field
-                for field in raw.get("required_fields", [])
-                if isinstance(field, dict) and not field.get("sensitive")
+                for field in json_array(raw.get("required_fields"))
+                if is_json_object(field) and not field.get("sensitive")
             ],
             "user_action_notes": self._string_list(raw.get("user_action_notes"))
             or self._default_user_action_notes(provider_key, support),
@@ -710,18 +702,14 @@ class GeospatialApiService:
     def _string_list(value: Any) -> list[str]:
         return (
             [item for item in value if isinstance(item, str) and item.strip()]
-            if isinstance(value, list)
+            if is_json_array(value)
             else []
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _extract_docs_url(provider: dict[str, Any]) -> str | None:
-        metadata = (
-            provider.get("metadata")
-            if isinstance(provider.get("metadata"), dict)
-            else {}
-        )
+        metadata = json_object(provider.get("metadata"))
         for value in (
             metadata.get("official_docs_url"),
             provider.get("official_docs_url"),
@@ -729,9 +717,8 @@ class GeospatialApiService:
         ):
             if isinstance(value, str) and value.strip():
                 return value.strip()
-        docs = provider.get("sourceOfficialDocs")
-        if isinstance(docs, list):
-            for item in docs:
+        docs = json_array(provider.get("sourceOfficialDocs"))
+        for item in docs:
                 if isinstance(item, str) and item.strip():
                     return item.strip()
         return None
@@ -747,7 +734,7 @@ class GeospatialApiService:
     ) -> list[str]:
         if not required:
             return ["No account setup is required for public access."]
-        instructions = []
+        instructions: list[str] = []
         if docs_url:
             instructions.append(
                 f"Create or sign in to a provider account using {docs_url}."

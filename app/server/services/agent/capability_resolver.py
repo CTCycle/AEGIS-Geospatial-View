@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from server.common.typing import json_array, json_object
+
 from server.domain.extraction.models import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
@@ -185,11 +187,11 @@ class CapabilityResolver:
                 capability.get("id"),
                 capability.get("name"),
                 capability.get("description"),
-                *(capability.get("capabilities") or []),
-                *((capability.get("metadata") or {}).get("keywords") or []),
-                *((capability.get("metadata") or {}).get("action_tags") or []),
-                *((capability.get("metadata") or {}).get("task_tags") or []),
-                *((capability.get("agenticUse") or {}).get("plannerHints") or []),
+                *json_array(capability.get("capabilities")),
+                *json_array(json_object(capability.get("metadata")).get("keywords")),
+                *json_array(json_object(capability.get("metadata")).get("action_tags")),
+                *json_array(json_object(capability.get("metadata")).get("task_tags")),
+                *json_array(json_object(capability.get("agenticUse")).get("plannerHints")),
             ]
         ).casefold()
         score = sum(2 for term in terms if len(term) > 2 and term in searchable)

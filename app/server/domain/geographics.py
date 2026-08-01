@@ -104,10 +104,10 @@ class ProviderAuthPolicy(BaseModel):
 class GeospatialLayersResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    basemaps: list[dict[str, Any]] = Field(default_factory=list)
-    overlays: list[dict[str, Any]] = Field(default_factory=list)
-    cameras: list[dict[str, Any]] = Field(default_factory=list)
-    transit: list[dict[str, Any]] = Field(default_factory=list)
+    basemaps: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    overlays: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    cameras: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
+    transit: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
 
 ###############################################################################
 class GeospatialLayerHealthResponse(BaseModel):
@@ -115,7 +115,7 @@ class GeospatialLayerHealthResponse(BaseModel):
 
     id: str
     provider: str | None = None
-    reliability: dict[str, Any] = Field(default_factory=dict)
+    reliability: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     runtime: Any = None
 
 ###############################################################################
@@ -126,8 +126,8 @@ class GeospatialProviderPayloadResponse(BaseModel):
     provider: str
     message: str | None = None
     payload: Any = None
-    attribution: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    attribution: list[str] = Field(default_factory=lambda: list[str]())
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
     stale: bool = False
 
 ###############################################################################
@@ -149,8 +149,8 @@ class GeospatialLayerRenderDescriptor(BaseModel):
     tile_size: int | None = None
     min_zoom: int | None = None
     max_zoom: int | None = None
-    attribution: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    attribution: list[str] = Field(default_factory=lambda: list[str]())
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class GeospatialProviderLayerDescriptor(BaseModel):
@@ -165,15 +165,15 @@ class GeospatialProviderLayerDescriptor(BaseModel):
     data_format: str
     geometry_type: str
     queryable: bool = False
-    crs: list[str] = Field(default_factory=list)
-    formats: list[str] = Field(default_factory=list)
-    styles: list[str] = Field(default_factory=list)
+    crs: list[str] = Field(default_factory=lambda: list[str]())
+    formats: list[str] = Field(default_factory=lambda: list[str]())
+    styles: list[str] = Field(default_factory=lambda: list[str]())
     time_extent: str | None = None
     default_time: str | None = None
-    tile_matrix_sets: list[str] = Field(default_factory=list)
+    tile_matrix_sets: list[str] = Field(default_factory=lambda: list[str]())
     render: GeospatialLayerRenderDescriptor | None = None
-    attribution: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    attribution: list[str] = Field(default_factory=lambda: list[str]())
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class GeospatialProviderLayersResponse(BaseModel):
@@ -181,7 +181,7 @@ class GeospatialProviderLayersResponse(BaseModel):
 
     provider: str
     layers: list[GeospatialProviderLayerDescriptor]
-    warnings: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class GeospatialProviderLayerResponse(BaseModel):
@@ -189,7 +189,7 @@ class GeospatialProviderLayerResponse(BaseModel):
 
     provider: str
     layer: GeospatialProviderLayerDescriptor
-    warnings: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class GeospatialCameraDetailResponse(BaseModel):
@@ -200,8 +200,8 @@ class GeospatialCameraDetailResponse(BaseModel):
     provider: str
     message: str | None = None
     camera: dict[str, Any] | None = None
-    attribution: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    attribution: list[str] = Field(default_factory=lambda: list[str]())
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
     stale: bool = False
 
 ###############################################################################
@@ -232,9 +232,9 @@ class GeospatialProviderSignupAutomation(BaseModel):
     signup_url: str | None = None
     developer_portal_url: str | None = None
     docs_url: str | None = None
-    required_fields: list[GeospatialProviderSignupField] = Field(default_factory=list)
-    user_action_notes: list[str] = Field(default_factory=list)
-    safety_notes: list[str] = Field(default_factory=list)
+    required_fields: list[GeospatialProviderSignupField] = Field(default_factory=lambda: list[GeospatialProviderSignupField]())
+    user_action_notes: list[str] = Field(default_factory=lambda: list[str]())
+    safety_notes: list[str] = Field(default_factory=lambda: list[str]())
     experimental: bool = True
     experimental_label: str = "Experimental guided setup"
 
@@ -249,7 +249,7 @@ class GeospatialProviderAccountSetupResponse(BaseModel):
     docs_url: str | None = None
     environment_variable: str | None = None
     configured: bool = False
-    instructions: list[str] = Field(default_factory=list)
+    instructions: list[str] = Field(default_factory=lambda: list[str]())
     automation: GeospatialProviderSignupAutomation
     credential_storage_key: str
     credential_label: str
@@ -261,7 +261,7 @@ class GeospatialProviderAccountSetupListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     providers: list[GeospatialProviderAccountSetupResponse] = Field(
-        default_factory=list
+        default_factory=lambda: list[GeospatialProviderAccountSetupResponse]()
     )
 
 ###############################################################################
@@ -297,7 +297,7 @@ class CapabilityImplementationStatus(BaseModel):
     client_renderer_covered: bool
     unit_tested: bool
     visual_tested: bool
-    placeholder_statuses: list[str] = Field(default_factory=list)
+    placeholder_statuses: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class LayerAuditReport(BaseModel):
@@ -306,14 +306,14 @@ class LayerAuditReport(BaseModel):
     manifest_count: int = 0
     error_count: int = 0
     warning_count: int = 0
-    schema_coverage: dict[str, int] = Field(default_factory=dict)
-    provider_coverage: dict[str, int] = Field(default_factory=dict)
-    renderer_coverage: dict[str, int] = Field(default_factory=dict)
-    auth_coverage: dict[str, int] = Field(default_factory=dict)
-    source_doc_coverage: dict[str, int] = Field(default_factory=dict)
-    issues: list[LayerAuditIssue] = Field(default_factory=list)
+    schema_coverage: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
+    provider_coverage: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
+    renderer_coverage: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
+    auth_coverage: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
+    source_doc_coverage: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
+    issues: list[LayerAuditIssue] = Field(default_factory=lambda: list[LayerAuditIssue]())
     implementation_statuses: list[CapabilityImplementationStatus] = Field(
-        default_factory=list
+        default_factory=lambda: list[CapabilityImplementationStatus]()
     )
 
     # -------------------------------------------------------------------------
@@ -383,7 +383,7 @@ class CapabilityManifestV2(BaseModel):
     reliability: ReliabilityPolicy
     cache_policy: CachePolicy = Field(alias="cachePolicy")
     normalization: NormalizationPolicy
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class CameraFeature(BaseModel):
@@ -401,7 +401,7 @@ class CameraFeature(BaseModel):
     embed_url: str | None
     embedding_allowed: bool
     stale: bool
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class PoiFeature(BaseModel):
@@ -417,7 +417,7 @@ class PoiFeature(BaseModel):
     opening_hours: str | None = None
     website: str | None = None
     phone: str | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 class ViewportPolicy(BaseModel):
@@ -455,12 +455,12 @@ class LocationSearchRequest(BaseModel):
     action_id: str
     time_mode: TimeMode = "current"
     basemap_id: str
-    overlay_ids: list[str] = Field(default_factory=list)
-    provider_layer_selections: list[ProviderLayerSelection] = Field(default_factory=list)
+    overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
+    provider_layer_selections: list[ProviderLayerSelection] = Field(default_factory=lambda: list[ProviderLayerSelection]())
     viewport: ViewportPolicy
     presentation: PresentationPolicy = Field(default_factory=PresentationPolicy)
     viewport_intent: ViewportIntent | None = None
-    poi_categories: list[str] = Field(default_factory=list)
+    poi_categories: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class MapSession(BaseModel):
@@ -469,27 +469,27 @@ class MapSession(BaseModel):
     session_id: str
     resolved_location: ResolvedLocation
     basemap_id: str
-    overlay_ids: list[str] = Field(default_factory=list)
+    overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     viewport: ViewportPolicy
     generated_at: datetime = Field(default_factory=utc_now)
-    payload: dict[str, object] = Field(default_factory=dict)
+    payload: dict[str, object] = Field(default_factory=lambda: dict[str, object]())
     center: dict[str, float | None] | None = None
     bounds: list[float] | None = None
     basemap: dict[str, object] | None = None
-    overlays: list[dict[str, object]] = Field(default_factory=list)
-    requested_overlay_ids: list[str] = Field(default_factory=list)
-    rendered_overlay_ids: list[str] = Field(default_factory=list)
-    failed_overlays: list[dict[str, str]] = Field(default_factory=list)
-    compliance_warnings: list[str] = Field(default_factory=list)
+    overlays: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    requested_overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
+    rendered_overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
+    failed_overlays: list[dict[str, str]] = Field(default_factory=lambda: list[dict[str, str]]())
+    compliance_warnings: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    capabilities: list[dict[str, object]] = Field(default_factory=list)
-    providers: list[dict[str, object]] = Field(default_factory=list)
-    basemaps: list[dict[str, object]] = Field(default_factory=list)
-    overlays: list[dict[str, object]] = Field(default_factory=list)
-    cameras: list[dict[str, object]] = Field(default_factory=list)
-    transit: list[dict[str, object]] = Field(default_factory=list)
-    tools: list[dict[str, object]] = Field(default_factory=list)
+    capabilities: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    providers: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    basemaps: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    overlays: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    cameras: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    transit: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())
+    tools: list[dict[str, object]] = Field(default_factory=lambda: list[dict[str, object]]())

@@ -15,7 +15,11 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.aggregation import AggregatedRequestService
 from server.services.agent_runs.events import RunEventPublisher
-from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
+from server.services.agent_runs.exceptions import (
+    RunAccessError,
+    RunConflictError,
+    RunNotFoundError,
+)
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
 ###############################################################################
@@ -54,7 +58,12 @@ class RunLifecycleService:
         conversation_id: str,
         payload: AgentRunCreateRequest,
     ) -> AgentRunCreateResult:
-        self.conversation_repository.verify_conversation_access(conversation_id, None)
+        try:
+            self.conversation_repository.verify_conversation_access(conversation_id, None)
+        except ValueError as exc:
+            raise RunNotFoundError("Conversation not found.") from exc
+        except PermissionError as exc:
+            raise RunAccessError("Conversation access denied.") from exc
         active = self.run_repository.get_active_run_for_conversation(conversation_id)
         if active is not None and active.state not in TERMINAL_RUN_STATES:
             raise RunConflictError("Conversation already has an active run.")
@@ -62,9 +71,12 @@ class RunLifecycleService:
         try:
             run = self.run_repository.create_run(conversation_id, payload.message, aggregate)
         except ValueError as exc:
-            if "active run" in str(exc):
-                raise RunConflictError(str(exc)) from exc
-            raise
+            message = str(exc)
+            if "active run" in message:
+                raise RunConflictError(message) from exc
+            raise RunNotFoundError(message) from exc
+        except PermissionError as exc:
+            raise RunAccessError(str(exc)) from exc
         task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)

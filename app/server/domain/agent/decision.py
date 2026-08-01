@@ -15,7 +15,7 @@ class ClarificationRequest(BaseModel):
 
     question: str
     reason: str
-    missing_fields: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class CapabilityCandidate(BaseModel):
@@ -55,7 +55,7 @@ class ExecutionPlan(BaseModel):
     temporal_mode: str | None = None
     temporal_text: str | None = None
     basemap_id: str | None = None
-    overlay_ids: list[str] = Field(default_factory=list)
+    overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     tool_id: str | None = None
 
 ###############################################################################
@@ -72,8 +72,8 @@ class AgentDecision(BaseModel):
 
     action: AgentAction
     action_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    tool_names: list[str] = Field(default_factory=list)
-    tool_call_plan: list[AgentToolCallPlanItem] = Field(default_factory=list)
+    tool_names: list[str] = Field(default_factory=lambda: list[str]())
+    tool_call_plan: list[AgentToolCallPlanItem] = Field(default_factory=lambda: list[AgentToolCallPlanItem]())
     requires_clarification: bool = False
     clarification_question: str | None = None
 
@@ -81,7 +81,7 @@ class AgentDecision(BaseModel):
 class DecisionTrace(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    steps: list[str] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=lambda: list[str]())
 
 ###############################################################################
 class PolicyDecision(BaseModel):
@@ -90,7 +90,7 @@ class PolicyDecision(BaseModel):
     plan: ExecutionPlan
     clarification: ClarificationRequest | None = None
     resolved_location: ResolvedLocation | None = None
-    candidates: list[CapabilityCandidate] = Field(default_factory=list)
+    candidates: list[CapabilityCandidate] = Field(default_factory=lambda: list[CapabilityCandidate]())
     trace: DecisionTrace = Field(default_factory=DecisionTrace)
 
     # -------------------------------------------------------------------------

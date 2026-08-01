@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 from collections.abc import Mapping
 from urllib.parse import urlencode
 
@@ -130,25 +132,21 @@ def _build_incidents_url(request: ProviderRequest, api_key: str) -> str:
 
 ###############################################################################
 def _normalize_incidents(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         return []
     raw_incidents = payload.get("incidents")
-    if not isinstance(raw_incidents, list):
+    if not is_json_array(raw_incidents):
         return []
     features: list[dict[str, object]] = []
     for incident in raw_incidents:
-        if not isinstance(incident, dict):
+        if not is_json_object(incident):
             continue
-        properties = (
-            incident.get("properties")
-            if isinstance(incident.get("properties"), dict)
-            else {}
-        )
+        properties = json_object(incident.get("properties"))
         coordinate = _representative_coordinate(incident.get("geometry"))
         if coordinate is None:
             continue
         longitude, latitude = coordinate
-        events = properties.get("events") if isinstance(properties.get("events"), list) else []
+        events = json_array(properties.get("events"))
         description = _first_event_description(events)
         features.append(
             {
@@ -177,10 +175,10 @@ def _normalize_incidents(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
-    if not isinstance(geometry, dict):
+    if not is_json_object(geometry):
         return None
     coordinates = geometry.get("coordinates")
-    if not isinstance(coordinates, list):
+    if not is_json_array(coordinates):
         return None
     point = _first_coordinate_pair(coordinates)
     if point is None:
@@ -192,7 +190,7 @@ def _representative_coordinate(geometry: object) -> tuple[float, float] | None:
 
 ###############################################################################
 def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
-    if not isinstance(value, list) or not value:
+    if not is_json_array(value) or not value:
         return None
     if len(value) >= 2 and all(isinstance(item, (int, float)) for item in value[:2]):
         return value[0], value[1]
@@ -201,7 +199,7 @@ def _first_coordinate_pair(value: object) -> tuple[object, object] | None:
 ###############################################################################
 def _first_event_description(events: list[object]) -> str | None:
     for event in events:
-        if isinstance(event, dict) and event.get("description"):
+        if is_json_object(event) and event.get("description"):
             return str(event["description"])
     return None
 

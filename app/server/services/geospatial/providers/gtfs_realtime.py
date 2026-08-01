@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -37,7 +39,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
         decoded_feed = request.params.get("decoded_feed")
         feed_url = str(request.params.get("feed_url") or "").strip()
         feed_bytes = request.params.get("feed_bytes")
-        if isinstance(decoded_feed, dict):
+        if is_json_object(decoded_feed):
             payload = self._normalize_decoded_feed(decoded_feed, request=request)
         elif isinstance(feed_bytes, bytes):
             payload = self._parse_protobuf(feed_bytes, request=request)
@@ -78,14 +80,14 @@ class GTFSRealtimeProvider(GeospatialProvider):
             return payload
         except ProviderError:
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.STALE and isinstance(
-                cached.value, dict
-            ):
-                stale_payload = dict(cached.value)
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
+                stale_payload = json_object(cached.value)
                 stale_payload["stale"] = True
-                stale_payload.setdefault("warnings", []).append(
+                warnings = json_array(stale_payload.get("warnings"))
+                warnings.append(
                     "GTFS Realtime feed fetch failed; serving stale parsed feed."
                 )
+                stale_payload["warnings"] = warnings
                 return stale_payload
             raise
 
@@ -123,22 +125,22 @@ class GTFSRealtimeProvider(GeospatialProvider):
         self, feed: dict[str, Any], *, request: ProviderRequest | None = None
     ) -> dict[str, Any]:
         entities = [
-            entity for entity in feed.get("entities") or [] if isinstance(entity, dict)
+            entity for entity in json_array(feed.get("entities")) if is_json_object(entity)
         ]
         vehicles = [
             entity["vehicle"]
             for entity in entities
-            if isinstance(entity.get("vehicle"), dict)
+            if is_json_object(entity.get("vehicle"))
         ]
         alerts = [
             self._alert_feature(entity["alert"])
             for entity in entities
-            if isinstance(entity.get("alert"), dict)
+            if is_json_object(entity.get("alert"))
         ]
         trip_updates = [
             self._trip_update_feature(entity["tripUpdate"])
             for entity in entities
-            if isinstance(entity.get("tripUpdate"), dict)
+            if is_json_object(entity.get("tripUpdate"))
         ]
         feed_timestamp = self._feed_timestamp(feed.get("header"))
         vehicle_rendering_allowed = self._vehicle_rendering_allowed(
@@ -167,7 +169,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
     # -------------------------------------------------------------------------
     def _vehicle_feature(self, vehicle: dict[str, Any]) -> dict[str, Any]:
         position = (
-            vehicle.get("position") if isinstance(vehicle.get("position"), dict) else {}
+            json_object(vehicle.get("position"))
         )
         return {
             "id": vehicle.get("id") or vehicle.get("vehicleId") or vehicle.get("label"),
@@ -182,7 +184,7 @@ class GTFSRealtimeProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     def _feed_timestamp(self, header: Any) -> str | None:
-        if not isinstance(header, dict):
+        if not is_json_object(header):
             return None
         value = header.get("timestamp")
         if not isinstance(value, (int, float)) or value <= 0:

@@ -25,3 +25,6 @@ class GeospatialCapabilityExecutionResult(TypedDict, total=False):
     direct_result: dict[str, Any] | None
     capability_selection: dict[str, Any] | None
     observations: list[dict[str, Any]]
+    warnings: list[Any]
+    error: dict[str, Any] | None
+    metadata: dict[str, Any]

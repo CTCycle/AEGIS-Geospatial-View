@@ -1,10 +1,10 @@
 # Agent Catalog Contract
 
-Last updated: 2026-06-24
+Last updated: 2026-08-01
 
 ## Stable Native Tools
 
-The agent accesses manifests through three stable native tools:
+The agent accesses manifests through four stable native tools:
 
 - `list_geospatial_capabilities`
 - `describe_geospatial_capability`

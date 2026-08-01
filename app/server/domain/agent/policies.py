@@ -7,20 +7,20 @@ from typing import Any
 @dataclass(frozen=True)
 class AgentPolicyConstraints:
     requires_location: bool
-    blocked_patterns: list[str] = field(default_factory=list)
-    allowed_tool_names: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    blocked_patterns: list[str] = field(default_factory=lambda: list[str]())
+    allowed_tool_names: list[str] = field(default_factory=lambda: list[str]())
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
 class ToolAuthorizationResult:
     allowed: bool
     reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
 class ToolValidationResult:
     valid: bool
     reason: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())

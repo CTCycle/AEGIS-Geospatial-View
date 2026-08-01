@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 import math
 import os
 from datetime import UTC, datetime
@@ -71,7 +73,7 @@ class RenderDescriptorService:
         rendering_mode = str(capability.get("renderingMode") or "")
         capability_kind = str(capability.get("capabilityKind") or "")
         if capability_kind == "camera-network":
-            auth = capability.get("auth") if isinstance(capability.get("auth"), dict) else {}
+            auth = json_object(capability.get("auth"))
             credential_env = self._credential_env_for_provider(
                 str(auth.get("providerKey") or capability.get("provider") or "")
             )
@@ -108,9 +110,10 @@ class RenderDescriptorService:
                     radius_m=request.viewport.radius_m,
                     categories=list(request.poi_categories),
                 )
-                features = []
-                for item in payload.get("items") or []:
-                    if not isinstance(item, dict):
+                features: list[dict[str, Any]] = []
+                for item in json_array(payload.get("items")):
+                    item = json_object(item)
+                    if not item:
                         continue
                     try:
                         features.append(
@@ -224,7 +227,7 @@ class RenderDescriptorService:
             "rendering_mode": render.rendering_mode if render else "metadata-only",
             "render": render_payload,
             "url": render.url if render else None,
-            "tile_url_template": render_payload.get("tile_url_template") if isinstance(render_payload, dict) else None,
+            "tile_url_template": render_payload.get("tile_url_template") if is_json_object(render_payload) else None,
             "layer_id": layer.layer_id,
             "time": requested_time if requested_time else layer.default_time,
             "default_time": layer.default_time,
@@ -498,7 +501,7 @@ class RenderDescriptorService:
     @staticmethod
     def _metadata(capability: dict[str, Any]) -> dict[str, Any]:
         metadata = capability.get("metadata")
-        return dict(metadata) if isinstance(metadata, dict) else {}
+        return dict(metadata) if is_json_object(metadata) else {}
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -538,7 +541,7 @@ class RenderDescriptorService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _is_bounds(value: object) -> bool:
-        return isinstance(value, list) and len(value) == 4 and all(isinstance(item, int | float) for item in value)
+        return is_json_array(value) and len(value) == 4 and all(isinstance(item, int | float) for item in value)
 
     # -------------------------------------------------------------------------
     @staticmethod

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
 from typing import Any
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -49,7 +51,7 @@ class OpenAQProvider(GeospatialProvider):
             f"{','.join(pollutants)}"
         )
         cached = self.cache.get(cache_key)
-        if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
+        if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
             return self._response(request, cached.value, stale=False)
         try:
             payload = await self.service.get_nearby_measurements(
@@ -58,7 +60,7 @@ class OpenAQProvider(GeospatialProvider):
                 radius_m=radius_m,
             )
         except (OpenAQServiceError, ValueError) as exc:
-            if cached.status == CacheLookupStatus.STALE and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.STALE and is_json_object(cached.value):
                 return self._response(
                     request,
                     cached.value,
@@ -111,12 +113,13 @@ class OpenAQProvider(GeospatialProvider):
     def _features(
         self, payload: dict[str, Any], *, pollutants: list[str]
     ) -> list[dict[str, Any]]:
-        features = []
-        for location in payload.get("locations") or []:
-            if not isinstance(location, dict):
+        features: list[dict[str, Any]] = []
+        for location in json_array(payload.get("locations")):
+            location = json_object(location)
+            if not location:
                 continue
             measurements = self._filter_measurements(
-                location.get("measurements") or {}, pollutants
+                json_object(location.get("measurements")), pollutants
             )
             if not measurements:
                 continue
@@ -141,7 +144,7 @@ class OpenAQProvider(GeospatialProvider):
         raw = request.params.get("pollutants") or request.params.get("pollutant")
         if isinstance(raw, str):
             values = [item.strip().lower() for item in raw.split(",")]
-        elif isinstance(raw, list):
+        elif is_json_array(raw):
             values = [str(item).strip().lower() for item in raw]
         else:
             values = sorted(self.supported_pollutants)
@@ -152,7 +155,7 @@ class OpenAQProvider(GeospatialProvider):
     def _filter_measurements(
         self, measurements: Any, pollutants: list[str]
     ) -> dict[str, Any]:
-        if not isinstance(measurements, dict):
+        if not is_json_object(measurements):
             return {}
         allowed = set(pollutants)
         return {

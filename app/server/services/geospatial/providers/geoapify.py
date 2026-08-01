@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from collections.abc import Mapping
+from typing import Any
 from urllib.parse import urlencode
 
 from server.domain.geographics import ProviderCredentialValidationResult
@@ -50,7 +53,7 @@ class GeoapifyProvider(GeospatialProvider):
         if request.params.get("live"):
             cache_key = _cache_key(request)
             cached = self.cache.get(cache_key)
-            if cached.status == CacheLookupStatus.HIT and isinstance(cached.value, dict):
+            if cached.status == CacheLookupStatus.HIT and is_json_object(cached.value):
                 return _places_response(request, cached.value, stale=False)
             url = _build_places_url(request, self.api_key)
             payload = await call_json_fetcher(self.fetcher, url)
@@ -143,7 +146,7 @@ def _cache_key(request: ProviderRequest) -> str:
 
 ###############################################################################
 def _places_response(
-    request: ProviderRequest, payload: dict[str, object], *, stale: bool
+    request: ProviderRequest, payload: dict[str, Any], *, stale: bool
 ) -> ProviderResponse:
     return ProviderResponse(
         capability_id=request.capability_id,
@@ -155,19 +158,19 @@ def _places_response(
 
 ###############################################################################
 def _normalize_places_payload(payload: object) -> list[dict[str, object]]:
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         return []
     raw_features = payload.get("features")
-    if not isinstance(raw_features, list):
+    if not is_json_array(raw_features):
         return []
     features: list[dict[str, object]] = []
     for item in raw_features:
-        if not isinstance(item, dict):
+        if not is_json_object(item):
             continue
-        properties = item.get("properties") if isinstance(item.get("properties"), dict) else {}
-        geometry = item.get("geometry") if isinstance(item.get("geometry"), dict) else {}
+        properties = json_object(item.get("properties"))
+        geometry = json_object(item.get("geometry"))
         coordinates = geometry.get("coordinates")
-        if not isinstance(coordinates, list) or len(coordinates) < 2:
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
         raw_category = _first_category(properties.get("categories"))
         normalized = {
@@ -194,7 +197,7 @@ def _normalize_places_payload(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _first_category(value: object) -> str:
-    if isinstance(value, list) and value:
+    if is_json_array(value) and value:
         return str(value[0])
     if isinstance(value, str):
         return value

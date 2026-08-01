@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
+
+from collections.abc import Sequence
+from typing import Any, Literal
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.chat import ChatOperationResult
@@ -48,14 +51,14 @@ class AgentResponseBuilder:
         *,
         task_class: str,
         requires_location: bool,
-        location_signals: list[object],
+        location_signals: Sequence[Any],
         tool_payload: dict[str, Any] | None,
     ) -> bool:
         if task_class != "map_search":
             return False
         if not requires_location and not location_signals:
             return False
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return True
         if cls.tool_payload_has_error(tool_payload):
             return False
@@ -63,20 +66,20 @@ class AgentResponseBuilder:
             "list_geospatial_capabilities",
             "describe_geospatial_capability",
         }
-        for tool_call in tool_payload.get("tool_calls") or []:
-            if not isinstance(tool_call, dict):
+        for tool_call in json_array(tool_payload.get("tool_calls")):
+            if not is_json_object(tool_call):
                 continue
-            tool_name = tool_call.get("name")
-            if isinstance(tool_name, str) and tool_name not in catalog_only_tools:
+            tool_name = str(tool_call.get("name") or "")
+            if tool_name not in catalog_only_tools:
                 return False
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict):
+            if not is_json_object(content):
                 continue
             data = content.get("data")
-            if not isinstance(data, dict):
+            if not is_json_object(data):
                 continue
             if data.get("map_session") or data.get("direct_result") or data.get(
                 "capability_selection"
@@ -87,13 +90,13 @@ class AgentResponseBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def tool_payload_has_error(tool_payload: dict[str, Any] | None) -> bool:
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return False
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if isinstance(content, dict) and content.get("ok") is False:
+            if is_json_object(content) and content.get("ok") is False:
                 return True
         return False
 
@@ -194,7 +197,7 @@ class AgentResponseBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _map_session_status(map_session: MapSession) -> str:
+    def _map_session_status(map_session: MapSession) -> Literal["success", "partial", "failed"]:
         requested = list(map_session.requested_overlay_ids or map_session.overlay_ids)
         if map_session.failed_overlays and not map_session.overlay_ids:
             return "failed"
@@ -207,16 +210,16 @@ class AgentResponseBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def extract_tool_error_message(tool_payload: dict[str, Any] | None) -> str | None:
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return None
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict) or bool(content.get("ok", True)):
+            if not is_json_object(content) or bool(content.get("ok", True)):
                 continue
             error = content.get("error")
-            if isinstance(error, dict) and isinstance(error.get("message"), str):
+            if is_json_object(error) and isinstance(error.get("message"), str):
                 return error["message"]
         return None
 
@@ -232,20 +235,21 @@ class AgentResponseBuilder:
             warnings.extend(
                 warning
                 for warning in map_session.compliance_warnings
-                if isinstance(warning, str) and warning.strip()
+                if warning.strip()
             )
-        if not isinstance(tool_payload, dict):
+        if not is_json_object(tool_payload):
             return warnings
-        for result in tool_payload.get("tool_results") or []:
-            if not isinstance(result, dict):
+        for result in json_array(tool_payload.get("tool_results")):
+            if not is_json_object(result):
                 continue
             content = result.get("content")
-            if not isinstance(content, dict):
+            if not is_json_object(content):
                 continue
             data = content.get("data")
-            if not isinstance(data, dict):
+            if not is_json_object(data):
                 continue
-            for warning in data.get("warnings") or []:
+            warning_values: list[Any] = json_array(data.get("warnings"))
+            for warning in warning_values:
                 if (
                     isinstance(warning, str)
                     and warning.strip()
@@ -261,33 +265,34 @@ class AgentResponseBuilder:
         tool_id: object,
         tool_payload: dict[str, Any] | None,
     ) -> str:
-        if isinstance(tool_payload, dict) and tool_payload.get("error"):
-            return str(tool_payload["error"])
-        result = tool_payload.get("result") if isinstance(tool_payload, dict) else None
-        if not isinstance(result, dict):
+        payload = json_object(tool_payload)
+        if payload.get("error"):
+            return str(payload["error"])
+        result = payload.get("result")
+        if not is_json_object(result):
             return f"Completed {cls.humanize_identifier(tool_id)}."
 
         nested_result = result.get("result")
         if tool_id == "location_to_coordinates":
             coordinates = result.get("coordinates")
             location = result.get("location") or cls.extract_label(
-                tool_payload.get("location")
+                payload.get("location")
             )
-            if isinstance(coordinates, dict):
+            if is_json_object(coordinates):
                 latitude = coordinates.get("latitude")
                 longitude = coordinates.get("longitude")
                 if isinstance(latitude, (int, float)) and isinstance(
                     longitude, (int, float)
                 ):
                     return f"Coordinates for {location}: {latitude:.6f}, {longitude:.6f}."
-        if tool_id == "get_weather_forecast" and isinstance(nested_result, dict):
+        if tool_id == "get_weather_forecast" and is_json_object(nested_result):
             current = nested_result.get("selected_forecast") or nested_result.get(
                 "current"
             )
             location = result.get("location") or cls.extract_label(
-                tool_payload.get("location")
+                payload.get("location")
             )
-            if isinstance(current, dict):
+            if is_json_object(current):
                 temperature = current.get("temperature_2m")
                 precipitation = current.get("precipitation")
                 weather_time = current.get("time")
@@ -317,7 +322,7 @@ class AgentResponseBuilder:
         overlay_labels = cls.extract_overlay_labels(map_payload)
         warnings = [
             cls.humanize_warning(warning)
-            for warning in map_payload.get("compliance_warnings") or []
+            for warning in json_array(map_payload.get("compliance_warnings"))
             if isinstance(warning, str) and warning.strip()
         ]
 
@@ -334,14 +339,14 @@ class AgentResponseBuilder:
     @classmethod
     def extract_overlay_labels(cls, map_payload: dict[str, Any]) -> list[str]:
         overlays = map_payload.get("overlays")
-        if isinstance(overlays, list):
+        if is_json_array(overlays):
             labels = [cls.extract_label(overlay) for overlay in overlays]
             human_labels = [label for label in labels if label]
             if human_labels:
                 return human_labels
 
         overlay_ids = map_payload.get("overlay_ids")
-        if not isinstance(overlay_ids, list):
+        if not is_json_array(overlay_ids):
             return []
         return [
             cls.humanize_identifier(overlay_id)
@@ -352,7 +357,7 @@ class AgentResponseBuilder:
     # -------------------------------------------------------------------------
     @staticmethod
     def extract_label(value: object) -> str | None:
-        if isinstance(value, dict):
+        if is_json_object(value):
             label = value.get("label") or value.get("name") or value.get("id")
             if isinstance(label, str) and label.strip():
                 return label.strip()

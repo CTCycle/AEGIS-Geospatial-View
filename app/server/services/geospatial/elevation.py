@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 
 from server.common.constants import OPEN_ELEVATION_API_BASE_URL
 from server.common.logger import logger
+from server.common.typing import json_array, json_object
 
 __all__ = [
     "OpenElevationService",
@@ -109,11 +110,11 @@ class OpenElevationService:
             logger.warning("Open-Elevation response parse error: %s", exc)
             return self._empty_response(lat, lon)
 
-        results = data.get("results") or []
+        results = json_array(json_object(data).get("results"))
         if not results:
             return self._empty_response(lat, lon)
 
-        result = results[0]
+        result = json_object(results[0])
         elevation = result.get("elevation")
 
         return {
@@ -156,10 +157,11 @@ class OpenElevationService:
             logger.warning("Open-Elevation response parse error: %s", exc)
             return [self._empty_response(lat, lon) for lat, lon in points]
 
-        results = data.get("results") or []
-        parsed = []
+        results = json_array(json_object(data).get("results"))
+        parsed: list[dict[str, Any]] = []
 
         for i, result in enumerate(results):
+            result = json_object(result)
             lat, lon = points[i] if i < len(points) else (None, None)
             elevation = result.get("elevation")
             parsed.append(

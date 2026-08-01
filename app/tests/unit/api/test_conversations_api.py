@@ -188,3 +188,85 @@ def test_conversation_stream_rejects_run_from_different_conversation(
     )
 
     assert stream_response.status_code == 404
+
+###############################################################################
+def test_run_creation_translates_conversation_access_denial_to_forbidden(
+    conversations_api_client: tuple[TestClient, FastAPI],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, app = conversations_api_client
+    conversation_response = client.post(
+        "/api/conversations",
+        json={"title": "Restricted conversation"},
+    )
+    assert conversation_response.status_code == 201
+    conversation_id = conversation_response.json()["conversation_id"]
+
+    def deny_access(
+        _repository: ConversationRepository,
+        _conversation_id: str,
+        _owner_user_id: str | None = None,
+    ) -> object:
+        raise PermissionError("Conversation access denied.")
+
+    monkeypatch.setattr(ConversationRepository, "verify_conversation_access", deny_access)
+
+    response = client.post(
+        f"/api/conversations/{conversation_id}/runs",
+        json={"message": "Map Rome."},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Conversation access denied."
+
+###############################################################################
+def test_run_creation_translates_missing_conversation_to_not_found(
+    conversations_api_client: tuple[TestClient, FastAPI],
+) -> None:
+    client, _app = conversations_api_client
+
+    response = client.post(
+        "/api/conversations/conv_missing/runs",
+        json={"message": "Map Rome."},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Conversation not found."
+
+###############################################################################
+def test_run_endpoints_translate_missing_run_to_not_found(
+    conversations_api_client: tuple[TestClient, FastAPI],
+) -> None:
+    client, _app = conversations_api_client
+    conversation_response = client.post(
+        "/api/conversations",
+        json={"title": "Missing run"},
+    )
+    assert conversation_response.status_code == 201
+    conversation_id = conversation_response.json()["conversation_id"]
+    missing_run_id = "run_missing"
+
+    stream_response = client.get(
+        f"/api/conversations/{conversation_id}/runs/{missing_run_id}/events"
+    )
+    steer_response = client.post(
+        f"/api/conversations/{conversation_id}/runs/{missing_run_id}/steering",
+        json={"message": "Focus on transport."},
+    )
+    cancel_response = client.post(
+        f"/api/conversations/{conversation_id}/runs/{missing_run_id}/cancel"
+    )
+
+    assert stream_response.status_code == 404
+    assert steer_response.status_code == 404
+    assert cancel_response.status_code == 404
+
+###############################################################################
+def test_run_event_stream_requires_repository(
+    conversations_api_client: tuple[TestClient, FastAPI],
+) -> None:
+    _client, app = conversations_api_client
+    stream_service = app.state.run_event_stream_service
+
+    with pytest.raises(TypeError):
+        RunEventStreamService(stream_service.event_publisher)

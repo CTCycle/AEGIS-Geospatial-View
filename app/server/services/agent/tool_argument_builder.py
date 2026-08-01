@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from typing import Any
 
 from server.domain.extraction.models import TurnParseResult
@@ -23,7 +25,7 @@ class ToolArgumentBuilder:
             if signal.normalized_value or signal.raw_value:
                 return {"location": signal.normalized_value or signal.raw_value}
         active = (memory_snapshot or {}).get("active_location")
-        if isinstance(active, dict):
+        if is_json_object(active):
             latitude = active.get("latitude")
             longitude = active.get("longitude")
             if isinstance(latitude, int | float) and isinstance(longitude, int | float):
@@ -45,15 +47,11 @@ class ToolArgumentBuilder:
         memory = memory_snapshot or {}
         for candidate in (
             memory.get("bbox"),
-            (memory.get("viewport") or {}).get("bbox")
-            if isinstance(memory.get("viewport"), dict)
-            else None,
-            (memory.get("active_visualization") or {}).get("bounds")
-            if isinstance(memory.get("active_visualization"), dict)
-            else None,
+            json_object(memory.get("viewport")).get("bbox"),
+            json_object(memory.get("active_visualization")).get("bounds"),
         ):
             if (
-                isinstance(candidate, list)
+                is_json_array(candidate)
                 and len(candidate) == 4
                 and all(isinstance(value, int | float) for value in candidate)
             ):

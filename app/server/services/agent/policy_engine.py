@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_array, is_json_object, json_object
+
 from typing import Any
 
 from server.domain.agent.decision import (
@@ -137,7 +139,7 @@ class PolicyEngine:
                 reason="Request contains blocked policy patterns.",
             )
         allowed = constraints.get("allowed_tool_names")
-        if isinstance(allowed, list) and allowed and tool_name not in set(map(str, allowed)):
+        if is_json_array(allowed) and allowed and tool_name not in set(map(str, allowed)):
             return ToolAuthorizationResult(
                 allowed=False,
                 reason=f"Tool '{tool_name}' is not allowed by policy constraints.",
@@ -152,9 +154,9 @@ class PolicyEngine:
         context: Any,
     ) -> ToolValidationResult:
         _ = tool_name, context
-        if isinstance(result, dict) and result.get("ok") is False:
+        if is_json_object(result) and result.get("ok") is False:
             error = result.get("error")
-            reason = error.get("message") if isinstance(error, dict) else "Tool failed."
+            reason = error.get("message") if is_json_object(error) else "Tool failed."
             return ToolValidationResult(valid=False, reason=str(reason))
         return ToolValidationResult(valid=True)
 
@@ -189,7 +191,7 @@ class PolicyEngine:
 
         allowed_capability_ids = constraints.get("allowed_capability_ids")
         if (
-            isinstance(allowed_capability_ids, list)
+            is_json_array(allowed_capability_ids)
             and allowed_capability_ids
             and capability_id not in set(map(str, allowed_capability_ids))
         ):
@@ -296,7 +298,7 @@ class PolicyEngine:
         turn: TurnParseResult,
     ) -> ClarificationRequest | None:
         clarification_plan = turn.clarification_plan
-        if isinstance(clarification_plan, dict):
+        if is_json_object(clarification_plan):
             blocking_fields = {
                 str(item).strip().casefold()
                 for item in clarification_plan.get("blocking_fields", [])
@@ -409,7 +411,8 @@ class PolicyEngine:
     def _requires_location_for_capability(parsed_request: TurnParseResult, capability: dict[str, Any]) -> bool:
         if parsed_request.normalized_action.requires_location:
             return True
-        geometry_type = str((capability.get("metadata") or {}).get("geometry_type") or "").strip().lower()
+        metadata = json_object(capability.get("metadata"))
+        geometry_type = str(metadata.get("geometry_type") or "").strip().lower()
         return geometry_type not in {"", "not-applicable", "global"}
 
     # -------------------------------------------------------------------------
@@ -424,12 +427,12 @@ class PolicyEngine:
         if parsed_request.location_signals:
             return True
         active_location = parsed_request.conversation_context.memory_snapshot.get("active_location")
-        return isinstance(active_location, dict) and bool(active_location.get("label"))
+        return is_json_object(active_location) and bool(active_location.get("label"))
 
     # -------------------------------------------------------------------------
     @staticmethod
     def _is_sane_bbox(value: Any) -> bool:
-        if not isinstance(value, list) or len(value) != 4:
+        if not is_json_array(value) or len(value) != 4:
             return False
         if not all(isinstance(item, (int, float)) for item in value):
             return False

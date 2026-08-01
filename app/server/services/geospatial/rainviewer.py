@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from server.common.typing import is_json_object, json_array, json_object
+
 import asyncio
 import threading
 import time
@@ -69,10 +71,10 @@ class RainViewerService:
     # -------------------------------------------------------------------------
     async def get_latest_radar_metadata(self) -> dict[str, Any]:
         payload = await self._fetch_metadata_payload()
-        radar = payload.get("radar") if isinstance(payload.get("radar"), dict) else {}
-        past = radar.get("past") if isinstance(radar.get("past"), list) else []
-        nowcast = radar.get("nowcast") if isinstance(radar.get("nowcast"), list) else []
-        frames = [frame for frame in [*past, *nowcast] if isinstance(frame, dict)]
+        radar = json_object(payload.get("radar"))
+        past = json_array(radar.get("past"))
+        nowcast = json_array(radar.get("nowcast"))
+        frames = [frame for frame in [*past, *nowcast] if is_json_object(frame)]
         if not frames:
             raise RainViewerRequestError("RainViewer did not return radar frames.")
         latest = max(frames, key=lambda frame: int(frame.get("time") or 0))
@@ -109,7 +111,7 @@ class RainViewerService:
             )
         except ProviderUnavailableError as exc:
             raise RainViewerRequestError(f"RainViewer request failed: {exc}") from exc
-        if not isinstance(data, dict):
+        if not is_json_object(data):
             raise RainViewerRequestError("RainViewer response payload is malformed.")
         self._cache_set(data)
         return data

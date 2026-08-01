@@ -12,9 +12,9 @@ class AgentExecutionContext:
     request_id: str | None = None
     conversation_id: str | None = None
     parsed_request: Any | None = None
-    map_state: dict[str, Any] = field(default_factory=dict)
-    policy_constraints: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    map_state: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+    policy_constraints: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
+    metadata: dict[str, Any] = field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)
