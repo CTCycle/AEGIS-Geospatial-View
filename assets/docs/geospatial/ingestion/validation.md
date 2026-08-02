@@ -1,6 +1,6 @@
 # Validation
 
-Last updated: 2026-06-12
+Last updated: 2026-08-02
 
 ## Static Validation
 
@@ -54,6 +54,7 @@ CI should run:
 - focused geospatial unit contracts
 - client build and test suite
 - geospatial browser-smoke command
+- frontend E2E/browser renderer checks under `app/client/src/app/e2e`
 
 Live-provider validation should run outside deterministic CI when network access is available:
 
@@ -62,3 +63,8 @@ cd app
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict
 .\server\.venv\Scripts\python.exe -m server.services.geospatial.live_validator --strict --include-credentialed
 ```
+
+Live validation classifies upstream timeouts, rate limits, malformed responses,
+and missing credentials as provider availability failures. A failed provider
+probe is not a successful POI, layer, or map-render result; retain the last
+known-good map state and report the actionable warning.

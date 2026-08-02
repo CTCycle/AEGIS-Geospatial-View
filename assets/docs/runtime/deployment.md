@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Backend Persistence
 
@@ -27,3 +27,8 @@ Last updated: 2026-07-20
 ## Distribution Notes
 
 Current scripts optimize for local execution, not a standalone server distribution bundle. Use `start_on_windows.ps1` for the supported Windows workflow or the manual commands in `runtime/startup.md`.
+
+There is no first-class container, Linux/macOS launcher, hosted deployment
+manifest, or durable external job worker in this checkout. Background jobs and
+conversation-run event fanout remain process-local, while run events are
+persisted for replay during the process lifetime.

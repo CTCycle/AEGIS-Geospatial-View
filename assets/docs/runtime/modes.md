@@ -1,6 +1,6 @@
 # Runtime Modes
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Supported Modes
 
@@ -26,3 +26,5 @@ Last updated: 2026-08-01
 
 - No first-class Docker deployment files
 - No Linux or macOS launcher is included
+- No standalone production distribution artifact is maintained; deployment is
+  currently a local Windows launcher/manual-start workflow.

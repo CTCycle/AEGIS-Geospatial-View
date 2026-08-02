@@ -1,6 +1,6 @@
 # Python
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Baseline
 
@@ -24,6 +24,8 @@ Last updated: 2026-06-02
 - Use explicit HTTP status codes and consistent response models.
 - Never leak secrets or credentials in errors.
 - Preserve job and request traceability.
+- Normalize external provider responses into JSON-object contracts and classify
+  provider failures without leaking response bodies, credentials, or raw XML.
 
 ## Async And Background Work
 
@@ -31,6 +33,8 @@ Last updated: 2026-06-02
 - Keep CPU-heavy work out of async handlers.
 - Use the shared `BackgroundJobService` for long-running chat or map operations.
 - Long-running APIs must support start, poll, and cancel flows.
+- Conversation runs additionally support SSE replay, cooperative cancellation,
+  and steering against the same conversation/run identity.
 
 ## Code Structure
 

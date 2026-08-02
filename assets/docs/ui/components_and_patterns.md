@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-06-25
+Last updated: 2026-08-02
 
 ## Reusable Components
 
@@ -9,6 +9,11 @@ Last updated: 2026-06-25
 - `settings-modal-shell.component.*`
 - `settings-api-key-field.component.*`
 - `selected-model-summary.component.*`
+- `chat-message.component.*`
+- `capability-status-list.component.*`
+- `source-health-badge.component.*`
+- `camera-popup.component.*`
+- `overlay-controls.component.*`
 
 ## Interaction States
 
@@ -33,4 +38,6 @@ All interactive components must provide:
 - During active agent runs, keep the chat composer enabled. Additional messages are refinements for the active run and should use compact steering presentation.
 - Render assistant messages as sanitized Markdown and user messages as escaped plain text.
 - Keep agent availability shown as ready between requests; use run progress labels only while work is active.
+- Treat normalized backend render descriptors as the only source for raster and
+  provider-native map layers; component code must not reconstruct provider URLs.
 - Validate Operations Bar navigation, routed layouts, map controls, and text wrapping at desktop and mobile widths after significant UI edits.

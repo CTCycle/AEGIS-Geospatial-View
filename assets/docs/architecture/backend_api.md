@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Mounting
 
@@ -69,7 +69,11 @@ Defined in `app/server/api/chat.py`:
   Streams NDJSON chat events. `conversation_id` is required.
 - `GET /api/chat/models`
   Returns available cloud and local models.
-  Optional query: `provider=deepseek` to fetch the live DeepSeek model catalog using the saved DeepSeek API key.
+  Optional query: `provider=deepseek`, `provider=opencode`, or
+  `provider=opencode-go` fetches the selected live catalog using the saved
+  provider API key. The response includes per-source `ok`, reachability, error,
+  and model-count status; a provider catalog failure is not converted into a
+  usable empty catalog.
 - `GET /api/chat/settings`
   Reads persisted settings.
 - `PUT /api/chat/settings`
@@ -142,6 +146,13 @@ Supported event names:
 
 `final` carries the full serialized `ChatTurnResponse`, including `operation`.
 
+`POST /api/chat/turn` returns `503` when the selected provider credentials or
+local provider configuration cannot be used. Dynamic model catalog requests
+return `400` for an unsupported provider and `502` when the upstream catalog
+cannot be loaded. Provider request failures are normalized into safe provider,
+stage, code, HTTP-status, and retryability metadata without exposing response
+bodies or credentials.
+
 Planned tool execution, aggregation, synthesis, persistence, progress events,
 and final response construction are owned by `PlannedTurnExecutionService`.
 
@@ -160,7 +171,11 @@ Defined in `app/server/api/conversations.py`:
 - `POST /api/conversations/{conversation_id}/runs/{run_id}/cancel`
   Marks the active run cancelled as a terminal user action.
 
-The v1 run stream emits concise user-visible events only: progress labels, assistant text completion, request updates, terminal errors, completion, and cancellation. Internal diagnostics can be persisted with internal visibility and are not replayed on the normal user stream.
+The v1 run stream emits concise user-visible events only: progress labels,
+assistant text completion, request updates from steering, terminal errors,
+completion, cancellation, and clarification-needed. Internal diagnostics can be
+persisted with internal visibility and are not replayed on the normal user
+stream.
 
 Conversation-run service failures are translated at the API boundary into
 `404` (missing conversation or run), `403` (access denied), or `409`

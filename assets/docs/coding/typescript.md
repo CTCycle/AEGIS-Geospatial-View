@@ -1,6 +1,6 @@
 # TypeScript
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Baseline
 
@@ -22,6 +22,8 @@ Last updated: 2026-07-20
 - Keep reusable presentational blocks in `components/*`.
 - Keep API and shared state utilities in `core/*`.
 - Represent async UI state explicitly.
+- Parse `unknown` API payloads through the shared parser/type-guard boundary;
+  keep run event IDs and context revisions when applying replayed responses.
 
 ## UX And Accessibility Coding
 
@@ -29,3 +31,5 @@ Last updated: 2026-07-20
 - Preserve keyboard access and visible focus behavior.
 - Use semantic HTML.
 - Do not rely on color alone to convey meaning.
+- Render backend map and provider errors as explicit unavailable or warning
+  states; never create a visible layer from a failed provider response.

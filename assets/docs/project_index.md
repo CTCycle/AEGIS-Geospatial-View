@@ -1,10 +1,22 @@
 # Project Overview
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Purpose
 
 This file is the root index for `assets/docs`. Read it first, then open the smallest leaf document that answers the current question.
+
+## Current Implementation Snapshot
+
+The runtime catalog currently contains 92 JSON documents: 6 basemaps, 48
+overlays, 18 provider descriptors, 4 direct tools, 7 camera networks, 3
+transit capabilities, and 4 reference catalogs. `runtime_profiles.json` adds
+environment and credential availability on top of those manifests.
+
+The implemented chat model surface includes static cloud catalog entries,
+Ollama local models, and on-demand catalogs for DeepSeek, OpenCode Zen, and
+OpenCode Go. The geospatial agent exposes five native tools, including
+provider-native layer discovery and normalized provider-layer rendering.
 
 ## Navigation Rules
 

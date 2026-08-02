@@ -1,10 +1,13 @@
 # Capability Catalog
 
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Purpose
 
 This file is the reviewable inventory of geospatial capabilities implemented by AEGIS. The runtime source of truth remains `app/resources/catalog`.
+
+The current catalog snapshot contains 6 basemaps, 48 overlays, 18 provider
+descriptors, 4 direct tools, 7 camera networks, and 3 transit capabilities.
 
 ## Providers
 
@@ -25,6 +28,11 @@ This file is the reviewable inventory of geospatial capabilities implemented by 
 | `census` | U.S. geometry and demographic joins | public with optional key for some APIs |
 | `eurostat` | EU/EEA demographic and market indicators | public |
 | `fred` | U.S. economic and market indicators | credentialed |
+| `arcgis` | ArcGIS imagery and feature services | credentialed |
+| `data_europa` | European open-data discovery | public |
+| `geoss` | European geospatial discovery metadata | public |
+| `google_maps` | optional commercial mapping services | credentialed |
+| `inspire` | European INSPIRE discovery metadata | public |
 
 ## Basemaps
 
@@ -71,6 +79,16 @@ Representative implemented layers include:
 - `fred_regional_market_indicators`
 - `eurostat_regional_demographics`
 - `eurostat_housing_market`
+- `fema_nfhl_flood_zones`
+- `nasa_firms_active_fires`
+- `noaa_radar`
+- `noaa_weather_alerts`
+- `nrel_afdc_alt_fuel_stations`
+- `openchargemap_ev_charging`
+- `opentripmap_tourism_pois`
+- `usgs_earthquakes`
+- `gtfs_static`
+- `gtfs_realtime`
 
 ## Direct Tools
 

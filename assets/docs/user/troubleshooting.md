@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Basics
 
@@ -9,8 +9,16 @@ Last updated: 2026-06-02
 - Missing expected model: refresh the model list or pull the model in Ollama settings.
 - Unexpected state after auth failures: the app clears persisted state on 401 or 403 for safety.
 - Missing geospatial integration: add the required provider key or use an available open-data alternative.
+- A cloud provider catalog error: check the provider-specific source status in
+  Settings. DeepSeek, OpenCode Zen, and OpenCode Go catalogs are fetched on
+  request and can be unavailable even when the saved key is present.
+- A layer warning or unchanged map: the upstream provider may have timed out,
+  rate-limited, or returned invalid data. The app preserves the last valid map
+  state instead of displaying a failed request as a successful layer.
 
 ## Operational Notes
 
 - External data sources affect response quality and availability.
 - State persistence is session-based and tab-aware.
+- During an active run, additional messages are steering updates. Reconnects
+  replay durable SSE events and suppress duplicate event IDs.

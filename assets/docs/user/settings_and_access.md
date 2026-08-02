@@ -1,6 +1,6 @@
 # Settings And Access
 
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Access Configuration
 
@@ -18,6 +18,11 @@ The Access page is for optional geospatial provider keys such as Geoapify and To
 8. When `DeepSeek`, `OpenCode Zen`, or `OpenCode Go` is selected in model filters or as the agent model, AEGIS loads the compatible models from the configured provider account.
 9. OpenCode catalogs expose only models backed by the provider's OpenAI-compatible chat-completions endpoint, which is the protocol used for AEGIS tools, streaming, and structured output.
 10. If a dynamic cloud catalog cannot be loaded, Settings keeps its provider filter active and shows the provider-specific error instead of a generic empty-state message.
+
+An unavailable dynamic catalog does not erase a previously configured model.
+Re-enter a provider key only when Settings reports missing or undecryptable
+credentials; a valid key is not proof that the upstream catalog or inference
+endpoint is currently healthy.
 
 ## User-Facing Controls
 

@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Route-Level Pages
 
@@ -40,6 +40,12 @@ The agent is presented as continuously ready for the chat session. Per-run
 progress begins with request understanding and is separate from the persistent
 availability state.
 
+Run events are applied by type: progress labels update the activity indicator,
+assistant completion updates the transcript, clarification-needed preserves any
+partial map update, and completed payloads apply operation, task, memory,
+visualization, and context-revision state together. Replayed event IDs are
+ignored after reconnect.
+
 Assistant message strings are rendered as GitHub-style Markdown through the
 shared chat-message component and Angular HTML sanitization. User messages
 remain escaped plain text.
@@ -47,6 +53,11 @@ remain escaped plain text.
 ## Map Rendering
 
 `MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.
+
+Provider-native layer discovery is rendered through the same normalized overlay
+descriptor path as curated catalog capabilities. The frontend does not assemble
+provider-specific WMS/WMTS requests or treat provider errors as successful map
+layers.
 
 ## Component Patterns
 

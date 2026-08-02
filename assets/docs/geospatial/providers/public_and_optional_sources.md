@@ -1,12 +1,16 @@
 # Public And Optional Sources
 
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Canonical POI path
 
 Overture Places is the primary bulk POI source after local ingestion into the configured GeoJSON index (`AEGIS_OVERTURE_PLACES_INDEX`). Interactive requests are bounded by bounding box, category, query, and limit. Overpass can be requested as an augmentation source with `augment_overpass=true`; results are normalized and deduplicated through the shared POI model.
 
 Geoapify amenities and OpenTripMap tourism POIs remain available while representative-location parity benchmarks are incomplete. Removal requires the benchmark report to meet its recall, precision, completeness, and duplicate-rate thresholds.
+
+Provider health is evaluated independently of catalog declaration. A timeout,
+rate limit, malformed payload, or unavailable upstream is reported as a warning
+or unavailable source; it is never promoted to a successful empty POI layer.
 
 Run `python -m server.services.geospatial.poi_benchmark --baseline <provider-payload.json> --candidate <overture-or-overpass-payload.json> --output assets/QA/poi_parity_report.json` against captured representative-location payloads. The command returns success only when all configured parity thresholds pass.
 
