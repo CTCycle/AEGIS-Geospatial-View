@@ -1,6 +1,6 @@
 # Manifest Contract
 
-Last updated: 2026-06-19
+Last updated: 2026-08-02
 
 ## Loader Contract
 
@@ -40,6 +40,9 @@ Every metadata object must expose:
 - OpenLayers-compatible source protocols are the manifest standard even though the current UI renderer is MapLibre.
 - Provider manifests may declare `live_layers_supported` and capability protocols for provider-native discovery. Discovered live layers are not written back into static manifests automatically.
 - Curated overlays and live provider layers must use the same backend render descriptor contract before reaching `MapSession`.
+- The loader requires `agenticUse` in every schema-v2 manifest even when its
+  values disable agent exposure; optional behavior is expressed inside that
+  required object rather than by omitting the field.
 
 ## Maintenance Rules
 

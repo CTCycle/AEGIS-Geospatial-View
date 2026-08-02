@@ -1,6 +1,6 @@
 # System Overview
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Scope
 
@@ -13,7 +13,7 @@ AEGIS Geospatial View is a two-tier application:
 - Frontend: Angular 22 standalone SPA in `app/client/src`
 - Backend: FastAPI application in `app/server`
 
-The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace.
+The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace. The primary UI path uses durable conversation runs and SSE replay; direct chat-turn, NDJSON stream, and in-process job routes remain available for API clients and bounded test flows.
 
 ## Entry Points
 
@@ -36,6 +36,10 @@ The backend exposes `/api` routes for chat orchestration, geospatial capability 
 - seeds chat settings through the settings service
 - runs startup validation
 
+The composition root also wires the durable conversation/run lifecycle, steering,
+event replay, and the in-process background-job worker. A runtime dependency is
+not constructed ad hoc inside a request handler.
+
 `create_app()` mounts API routers under `/api`, serves the built SPA when `app/client/dist/browser/index.html` exists, and otherwise redirects `/` to `/docs`.
 
 ## External Integrations
@@ -44,13 +48,20 @@ Implemented service integrations include:
 
 - OpenStreetMap and Nominatim
 - Overpass
+- Overture Maps, OpenAddresses, OurAirports, Natural Earth, and local open-data snapshots
 - NASA GIBS
+- NASA FIRMS, NOAA, USGS, FEMA, Census, Eurostat, EEA, ESA, and FRED
 - OpenAQ
 - Open-Meteo
 - PVGIS
 - RainViewer
 - TomTom
 - Geoapify
+- OpenChargeMap and NREL AFDC
+- OpenFreeMap and other public basemap styles
+- GTFS, GTFS-Realtime, and Mobility Database feed catalogs
+- Windy Webcams and configured local camera networks
 - Ollama
 - OpenAI-compatible providers
 - Google-compatible providers
+- DeepSeek and OpenCode Zen/OpenCode Go

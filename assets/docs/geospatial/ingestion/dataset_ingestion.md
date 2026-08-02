@@ -1,6 +1,6 @@
 # Dataset Ingestion
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Scope
 
@@ -51,6 +51,12 @@ They should also define checksum and bbox constraints when the source publishes 
 - OpenAddresses points
 - local parcel template
 - OurAirports airport CSV
+- GTFS static feed snapshots
+
+Overture Places is the preferred bulk POI path when
+`AEGIS_OVERTURE_PLACES_INDEX` points to an ingested GeoJSON index. Interactive
+requests can optionally augment it with bounded Overpass results; normalization
+and deduplication happen before the map/session contract is built.
 
 ## Optional Heavy Dependencies
 

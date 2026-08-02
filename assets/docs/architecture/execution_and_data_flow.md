@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-07-30
+Last updated: 2026-08-02
 
 ## Layering
 
@@ -24,6 +24,8 @@ AEGIS uses these main backend layers:
   conversation repository is passed to both chat and run-lifecycle services.
 - `app/server/repositories/database/contracts.py` defines the shared database backend contract.
 - `domain/` holds request, response, and domain contracts.
+- Provider adapters normalize JSON objects and provider failures at the LLM
+  boundary; API and agent layers consume provider-neutral contracts.
 - Runtime job state is owned by `app/server/services/jobs.py`.
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
@@ -64,12 +66,19 @@ Geospatial API services are composed during application startup and accessed thr
 9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
 11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
-12. Task status, failure details, and active visualization are updated before persistence.
+12. Visualization changes are applied as a typed update: inferred overlays may
+    be added, explicit removal requests clear matching active overlays, and
+    clarification responses may carry a partial validated map update.
+13. Task status, failure details, and active visualization are updated before persistence.
 
 Direct responses (parser failures, capability questions, failure inquiries, and
 preflight rejection/clarification) are handled by
 `DirectTurnResponseService`. The orchestrator delegates these branches while
 retaining the normal tool execution path.
+
+Location resolution ranks coordinate, address, city, deictic, and country
+signals. Similar-confidence candidates with no clear specificity winner produce
+a structured ambiguity clarification instead of silently selecting a place.
 
 `AgentOrchestrator` remains the chat-turn entrypoint, while helper services keep non-routing responsibilities isolated:
 
@@ -104,7 +113,18 @@ and policy constraints. The current user message is supplied exactly once.
 - `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
 - `provider_registry.py` binds fetchable manifests to concrete provider adapters.
 
+The native agent catalog also exposes provider-native discovery and rendering:
+`fetch_geospatial_provider_layers` returns normalized descriptors and
+`render_geospatial_provider_layer` converts one descriptor into a map-session
+overlay. Raw provider XML and provider credentials do not cross the API boundary.
+
 Provider metadata manifests are registered only when a backend adapter exists. Basemap tile URLs stay manifest-backed and are served through proxy paths where applicable.
+
+LLM provider-native contracts are adapted for OpenAI-compatible providers,
+Google Gemini, Ollama, DeepSeek, and OpenCode Zen/OpenCode Go. Native tool calls
+and structured JSON responses are mutually exclusive within one LLM request;
+the response serializer and provider error model keep downstream handling
+provider-neutral.
 
 Live provider-native layer discovery flows through:
 

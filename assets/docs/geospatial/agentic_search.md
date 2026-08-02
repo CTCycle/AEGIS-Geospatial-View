@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Summary
 
@@ -15,6 +15,11 @@ The chat workflow separates structured parsing from provider-native tool calling
 7. Known capabilities execute through `ToolPlanExecutor`; catalog discovery uses the bounded native tool loop.
 8. Verified results update the map, task status, and structured diagnostics.
 9. The configured agent model converts only those verified results into concise Markdown, with deterministic text retained as fallback.
+
+Location ambiguity is explicit: similar-confidence city/address/country signals
+produce a clarification with candidate choices. Overlay intent is also
+state-aware: add requests preserve compatible active overlays, while explicit
+remove/hide/clear requests remove matching overlays from the next map session.
 
 Residential-building requests use `overpass_residential_buildings`; amenities
 remain separate. Satellite language selects the imagery basemap unless the user
@@ -85,6 +90,8 @@ Unknown or low-confidence classifications normalize to `unknown` before policy s
 - `describe_geospatial_capability`
 - `execute_geospatial_capability`
 - `fetch_geospatial_provider_layers` for explicitly routed and provider-allowlisted discovery only
+- `render_geospatial_provider_layer` for one explicitly selected normalized
+  provider-layer descriptor
 
 Catalog responses are deterministic, permission-aware, and capped at 50 items per page.
 
@@ -95,8 +102,12 @@ Provider-neutral LLM tool contracts are translated by adapters for:
 - OpenAI-compatible function tools
 - Google Gemini function declarations
 - Ollama chat tools
+- DeepSeek function tools
+- OpenCode Zen/OpenCode Go OpenAI-compatible tools
 
 Provider-specific schemas do not leak into parser, policy, or executor models.
+Native tools and structured response JSON are separate request modes; provider
+responses are normalized to JSON objects before agent synthesis.
 
 ## Response Contract
 
@@ -138,6 +149,10 @@ Current behavior:
 - preflight clarification returns `operation.kind = "clarification"`
 - policy denial returns `operation.kind = "rejection"`
 - parser, provider, validation, and timeout failures return `operation.kind = "error"`
+
+Provider catalog and upstream geospatial failures remain warnings or structured
+errors. They do not create successful empty layers or overwrite the last-known-
+good visible map state.
 
 `tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.
 

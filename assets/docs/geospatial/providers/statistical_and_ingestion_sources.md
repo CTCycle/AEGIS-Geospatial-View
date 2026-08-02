@@ -1,6 +1,6 @@
 # Statistical And Ingestion Sources
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Downloadable And Ingestion-Oriented Sources
 
@@ -60,8 +60,7 @@ The current source catalog also classifies or partially supports:
 These sources commonly participate in dataset-ingestion or metadata-only workflows rather than direct live map toggles.
 
 Mobility Database discovery uses the official public `feeds_v2.csv` catalog as a local snapshot. Feed-level authentication, licensing, and realtime URLs remain attached to each catalog record.
-# Snapshot prototypes
 
-Last updated: 2026-07-29
+## Snapshot prototypes
 
 Open Charge Map and AFDC support local JSON/CSV snapshot reads for prototype validation. Snapshot mode preserves the existing provider IDs and normalized response contract; it does not yet change their catalog access status or declare hosted replacement parity.

@@ -1,6 +1,6 @@
 # Background Jobs
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Scope
 
@@ -56,6 +56,8 @@ Important fields include:
 - Running handlers check cancellation between major execution phases.
 - There is no force-kill mechanism for active work.
 - Jobs are process-local and memory-backed.
+- The worker is started and stopped by the FastAPI lifespan. Shutdown is
+  cooperative; active lifecycle tasks are awaited before the application exits.
 
 ## Configuration
 

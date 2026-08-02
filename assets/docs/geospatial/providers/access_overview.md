@@ -1,6 +1,6 @@
 # Access Overview
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Purpose
 
@@ -12,8 +12,11 @@ Preferred flow:
 
 1. Open the Access settings page.
 2. Add the provider credential with label `api_key`.
-3. Restart the backend if the credential is used by long-running background services.
-4. Rebuild vectors when provider coverage changes and agent retrieval should reflect it.
+3. Return to the geodata or workspace page; provider availability is resolved
+   from the current credential and runtime profile.
+
+Model-provider credentials are managed separately in Model Settings. Geospatial
+agent visibility is catalog-based and does not require rebuilding embeddings.
 
 Environment fallback variables include:
 

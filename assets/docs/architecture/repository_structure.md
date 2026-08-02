@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Purpose
 
@@ -13,6 +13,7 @@ AEGIS Geospatial View/
   app/
     client/
       src/
+        app/e2e/
       package.json
       proxy.conf.cjs
     resources/
@@ -63,6 +64,12 @@ Key backend directories under `app/server`:
   `direct_turn_response.py`, `turn_history.py`, `turn_state_assembler.py`, and
   `turn_support.py` to keep `AgentOrchestrator` under the repository Python
   size constraint without changing the public chat-turn contract.
+- `services/agent_runs/`
+  Durable conversation-run lifecycle, steering, event publication, and SSE
+  replay services.
+- `services/llm/`
+  Provider adapters, model catalogs, structured-output handling, request
+  normalization, and safe provider error classification.
 - `app.py`
   Sole composition root. It constructs the database backend, initializes the
   schema, wires explicit repository/service dependencies, and owns lifecycle
@@ -95,6 +102,7 @@ Key frontend directories under `app/client/src/app`:
 
 ## Tests
 
-- E2E tests: `app/tests/e2e/*.py`
+- Backend/API E2E tests: `app/tests/e2e/*.py`
+- Browser smoke tests: `app/client/src/app/e2e/*.spec.ts`
 - Unit tests: `app/tests/unit/**/*.py`
 - Test runner: `app/tests/run_tests.bat`

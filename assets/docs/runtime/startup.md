@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Local Development Via Launcher
 
@@ -17,6 +17,12 @@ caches; and starts backend and frontend services. On first launch it copies
 The menu provides: launch application, install/update dependencies, initialize
 the database, run the test suite, remove logs, clear caches, uninstall local
 dependencies, and exit.
+
+Launch option 1 stops listeners on the configured backend/UI ports, starts the
+backend, waits for `/api/health`, starts the frontend preview, waits for the UI
+port, and only then opens the browser. It uses `app.server.app:app` from the
+repository root when importable and falls back to `server.app:app` from
+`app/server`.
 
 Set `ALWAYS_REBUILD=false` in `settings/.env` to skip the frontend build during
 application startup. The default is `true`.

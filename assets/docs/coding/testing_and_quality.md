@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-07-30
+Last updated: 2026-08-02
 
 ## Python Quality Gates
 
@@ -29,9 +29,14 @@ depend on the UI runtime.
 - Maintain `npm run build` success in `app/client`.
 - Keep relevant frontend tests passing.
 - Update E2E coverage for user-visible workflow changes.
+- Browser smoke coverage lives in `app/client/src/app/e2e`; backend/API E2E
+  coverage lives in `app/tests/e2e`.
 
 ## Scope Expectations
 
 - Cover `app/tests/unit` for contract and logic changes.
 - Cover relevant `app/tests/e2e` when user-facing behavior changes.
 - Prefer targeted regression coverage over broad speculative tests.
+- For provider, catalog, clarification, overlay-removal, or run-stream changes,
+  assert both the structured response contract and the user-visible failure or
+  clarification state.

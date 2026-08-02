@@ -1,6 +1,6 @@
 # Provider Framework
 
-Last updated: 2026-07-29
+Last updated: 2026-08-02
 
 ## Provider Adapter Location
 
@@ -10,27 +10,36 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 
 - `arcgis_rest.py`
 - `census.py`
+- `eea.py`
+- `esa.py`
+- `eurostat.py`
 - `geoapify.py`
 - `gtfs_realtime.py`
 - `gtfs_static.py`
 - `fema.py`
 - `fred.py`
+- `local_open_data.py`
+- `mapillary.py`
+- `mobility_database.py`
 - `nasa_gibs.py`
 - `nasa_firms.py`
+- `natural_earth.py`
 - `noaa.py`
+- `nominatim.py`
 - `nrel.py`
+- `openaddresses.py`
 - `openaq.py`
 - `openchargemap.py`
 - `openmeteo.py`
 - `opentripmap.py`
 - `overpass.py`
+- `overture.py`
 - `ourairports.py`
 - `pvgis.py`
 - `rainviewer.py`
 - `tomtom.py`
 - `usgs.py`
 - `windy_webcams.py`
-- `mobility_database.py`
 
 MapLibre style basemap providers such as OpenFreeMap are rendering-only
 providers. They do not require a backend adapter; their concrete fetch path is

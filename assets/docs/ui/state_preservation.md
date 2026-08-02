@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-07-20
+Last updated: 2026-08-02
 
 ## Overview
 
@@ -49,6 +49,9 @@ Otherwise the app falls back to `defaultAppState()`.
 
 Late completion payloads with older context revisions are discarded. Numeric
 backend chat-session identifiers are neither restored nor transmitted.
+
+The active run also persists the last SSE event ID, bounded seen-event IDs, and
+steering messages so reconnects can replay without duplicating transcript output.
 
 ## Tab Isolation And Clear Behavior
 

@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Relational Storage
 
@@ -82,6 +82,9 @@ cached database accessor, or compatibility import path.
 ## Model Capability Persistence
 
 - Cloud model capabilities are declared in `app/server/services/llm/cloud_catalog.py`.
+- DeepSeek, OpenCode Zen, and OpenCode Go catalogs are fetched on explicit
+  provider requests using encrypted credentials; source health is returned to
+  Settings and a failed refresh is not represented as a valid empty catalog.
 - Ollama tool support is detected from provider capabilities or a cached probe.
 - Agent assignment requires tool support.
 - Parser assignment requires structured-output support.

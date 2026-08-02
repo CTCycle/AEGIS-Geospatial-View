@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-06-02
+Last updated: 2026-08-02
 
 ## Workspace Layout
 
@@ -15,6 +15,11 @@ Toolbar width constraints:
 - minimum: `280px`
 - maximum: `760px`
 - map minimum width guard: `320px`
+
+On screens at or below `960px`, the workspace stacks chat above the map and
+removes the resize handle. At or below `700px`, the chat and map minimum heights
+are reduced for narrow-screen scrolling. The operations bar compresses at
+`900px` and `460px`.
 
 ## Other Page Layouts
 

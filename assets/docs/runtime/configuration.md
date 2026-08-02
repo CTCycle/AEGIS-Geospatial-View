@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Environment File
 
@@ -46,6 +46,11 @@ does not provide database configuration.
 
 The JSON loader only maps the blocks used by `ConfigurationManager`; legacy
 vector-sync and durable-job settings are not runtime controls.
+
+Model provider API keys are not environment settings in the default flow. They
+are entered through Settings and stored as encrypted credential records. The
+selected provider/model and provider base URLs are persisted model settings;
+DeepSeek, OpenCode Zen, and OpenCode Go use on-demand catalogs when requested.
 
 `AEGIS_RUNTIME_DATA_DIR` optionally overrides the local runtime storage root used
 for the embedded SQLite database. When unset, the embedded database defaults to
