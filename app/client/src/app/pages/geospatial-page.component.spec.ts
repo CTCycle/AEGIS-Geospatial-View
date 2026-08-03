@@ -175,6 +175,8 @@ describe('pages/geospatial-page.component', () => {
 
     await component.sendMessage();
 
+    expect(component['pendingMapSession']?.session_id).toBe('operation-map');
+    component.onMapRenderStateChange({ sessionId: 'operation-map', state: 'ready' });
     expect(component.mapSession?.session_id).toBe('operation-map');
     expect(component.mapSession?.overlay_ids).toEqual(['safe_overlay']);
     expect(JSON.stringify(component.payload)).not.toContain('forbidden-secret');
@@ -292,6 +294,7 @@ describe('pages/geospatial-page.component', () => {
         },
       },
     });
+    component.onMapRenderStateChange({ sessionId: 'street-map', state: 'ready' });
     expect(component.status).toBe('Agent ready');
     expect(component.isLoading).toBeFalse();
     expect(component.activeRunId).toBeUndefined();

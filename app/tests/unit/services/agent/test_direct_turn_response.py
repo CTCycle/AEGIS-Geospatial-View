@@ -102,6 +102,39 @@ def test_parser_authentication_failure_persists_stable_failure_response() -> Non
     asyncio.run(_run())
 
 ###############################################################################
+def test_provider_authentication_failure_persists_stable_failure_response() -> None:
+    async def _run() -> None:
+        service, state, history = _service()
+        turn = _turn(
+            user_text="Show Rome",
+            task_class="map_search",
+            ambiguities=["provider_authentication_failed"],
+        )
+        response = await service.handle(
+            request_id="request-provider-auth",
+            conversation_id="conversation",
+            conversation_key="conversation",
+            task=_task(state, turn),
+            turn_contract=turn,
+            latest_memory={},
+            latest_contract=None,
+            recent_messages=[],
+            context_usage=None,
+        )
+
+        assert response is not None
+        assert response.operation == ChatOperationResult(
+            kind="error",
+            status="failed",
+            message=response.assistant_message,
+        )
+        assert "saved API key was rejected" in response.assistant_message
+        assert response.failure_diagnostic is not None
+        assert history.messages[-1]["content"] == response.assistant_message
+
+    asyncio.run(_run())
+
+###############################################################################
 def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
     async def _run() -> None:
         service, state, _ = _service()

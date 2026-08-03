@@ -115,25 +115,17 @@ class AgentTurnSupport:
     @staticmethod
     def has_parser_runtime_failure(turn_contract: Any) -> bool:
         ambiguities = set(turn_contract.ambiguities or [])
-        if "parser_unavailable" not in ambiguities and not any(
-            item.startswith("provider_") for item in ambiguities
-        ):
-            return False
-        if not hasattr(turn_contract, "task_class"):
-            return True
         return (
-            turn_contract.task_class == "unclear"
-            or turn_contract.normalized_action.action_id == "unknown"
-            or (
-                turn_contract.normalized_action.requires_location
-                and not turn_contract.location_signals
-                and not turn_contract.conversation_context.memory_snapshot.get(
-                    "active_location"
-                )
-            )
+            "parser_unavailable" in ambiguities
+            or "parser_authentication_failed" in ambiguities
+            or any(item.startswith("provider_") for item in ambiguities)
         )
 
     # -------------------------------------------------------------------------
     @staticmethod
     def has_parser_authentication_failure(turn_contract: Any) -> bool:
-        return "parser_authentication_failed" in set(turn_contract.ambiguities or [])
+        ambiguities = set(turn_contract.ambiguities or [])
+        return (
+            "parser_authentication_failed" in ambiguities
+            or "provider_authentication_failed" in ambiguities
+        )
