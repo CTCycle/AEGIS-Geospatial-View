@@ -113,6 +113,16 @@ def test_parser_runtime_failure_message_is_actionable() -> None:
     assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
 
 ###############################################################################
+def test_provider_parser_failure_is_terminal_even_after_heuristic_extraction() -> None:
+
+    ###############################################################################
+    class _TurnContract:
+        ambiguities = ["provider_authentication_failed"]
+        task_class = "map_search"
+
+    assert AgentOrchestrator._has_parser_runtime_failure(_TurnContract())
+
+###############################################################################
 def test_general_question_can_answer_previous_user_request() -> None:
     message = AgentOrchestrator._compose_general_question_message(
         "What did I just ask?",
