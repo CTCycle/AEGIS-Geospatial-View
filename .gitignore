@@ -11,6 +11,7 @@ assets/QA/**
 .playwright-mcp/
 
 # Environment files (keep templates)
+settings/.env
 app/client/*.local
 
 # Python

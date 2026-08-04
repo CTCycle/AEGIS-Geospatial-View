@@ -23,12 +23,8 @@ from server.common.paths import (
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
 from server.configurations import get_server_settings
-from server.repositories.credential_material import seed_credential_encryption_material
 from server.repositories.database import build_database_backend
-from server.repositories.database.initializer import (
-    initialize_database,
-    seed_reference_catalog,
-)
+from server.repositories.database.initializer import initialize_database
 from server.services.chat.composition import build_chat_runtime
 from server.services.chat.streaming import ChatStreamingService
 from server.services.agent_runs.aggregation import AggregatedRequestService
@@ -88,9 +84,8 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_server_settings()
     database = build_database_backend(settings.database)
 
-    initialize_database(database)
-    seed_credential_encryption_material(database)
-    seed_reference_catalog(database)
+    if settings.database.embedded_database:
+        initialize_database(database)
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator, database)

@@ -143,20 +143,14 @@ function Write-Status {
     Write-Host "[$Level] $Message" -ForegroundColor $color
 }
 
-function Initialize-EnvironmentFile {
-    if (Test-Path -LiteralPath $DotEnvPath) {
-        return
-    }
-    if (-not (Test-Path -LiteralPath $DotEnvExamplePath)) {
-        throw "Missing environment template: $DotEnvExamplePath"
-    }
-
-    Copy-Item -LiteralPath $DotEnvExamplePath -Destination $DotEnvPath
-    Write-Status INFO "Created settings/.env from settings/.env.example."
-}
-
 function Import-EnvironmentFile {
-    Initialize-EnvironmentFile
+    $environmentSourcePath = $DotEnvPath
+    if (-not (Test-Path -LiteralPath $environmentSourcePath)) {
+        $environmentSourcePath = $DotEnvExamplePath
+    }
+    if (-not (Test-Path -LiteralPath $environmentSourcePath)) {
+        throw "Missing environment file and template: $DotEnvPath"
+    }
 
     $defaults = [ordered]@{
         FASTAPI_HOST = '127.0.0.1'
@@ -171,7 +165,7 @@ function Import-EnvironmentFile {
         [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
     }
 
-    foreach ($rawLine in Get-Content -LiteralPath $DotEnvPath) {
+    foreach ($rawLine in Get-Content -LiteralPath $environmentSourcePath) {
         $line = $rawLine.Trim()
         if (-not $line -or $line.StartsWith('#') -or $line.StartsWith(';') -or -not $line.Contains('=')) {
             continue
@@ -481,9 +475,9 @@ function Invoke-InitializeDatabase {
         throw "Missing database initialization script: $InitializeDatabaseScript"
     }
 
-    Push-Location $RootDir
+    Push-Location $AppDir
     try {
-        & $UvExe run --project app/server --python $PythonExe python app/scripts/initialize_database.py --drop-existing --seed-catalogs --force-reseed-catalogs
+        & $UvExe run --project server --python $PythonExe python -m scripts.initialize_database
         if ($LASTEXITCODE -ne 0) {
             throw "Database initialization failed with exit code $LASTEXITCODE."
         }
@@ -491,7 +485,7 @@ function Invoke-InitializeDatabase {
     finally {
         Pop-Location
     }
-    Write-Status SUCCESS 'Database initialized and catalogs reseeded.'
+    Write-Status SUCCESS 'Database initialization completed.'
 }
 
 function Invoke-TestSuite {
@@ -591,7 +585,9 @@ function Write-MenuOption {
 }
 
 function Show-LauncherMenu {
-    Clear-Host
+    if (-not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected) {
+        Clear-Host
+    }
     Write-Host ''
     Write-MenuRule
     Write-Host '  AEGIS' -ForegroundColor Cyan -NoNewline
@@ -602,7 +598,7 @@ function Show-LauncherMenu {
     Write-Host '  APPLICATION' -ForegroundColor DarkCyan
     Write-MenuOption -Number '1' -Label 'Launch application' -Description 'Start local services'
     Write-MenuOption -Number '2' -Label 'Install / update dependencies' -Description 'Sync and build'
-    Write-MenuOption -Number '3' -Label 'Initialize database' -Description 'Reseed catalogs'
+    Write-MenuOption -Number '3' -Label 'Initialize database' -Description 'Create schema and seed data'
     Write-Host ''
     Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
     Write-MenuOption -Number '4' -Label 'Run test suite' -Description 'Validate installation'
@@ -646,6 +642,9 @@ while ($true) {
     }
     catch {
         Write-Status FATAL $_.Exception.Message
+        if ([Console]::IsInputRedirected) {
+            exit 1
+        }
     }
 
     Wait-ForMenuReturn

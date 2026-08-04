@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Backend Persistence
 
@@ -10,6 +10,9 @@ Last updated: 2026-08-02
 - Embedded SQLite resolves to `%TEMP%/AEGIS Geospatial View/database.db` on
   Windows and `<repo>/.runtime/database.db` elsewhere.
 - Set `AEGIS_RUNTIME_DATA_DIR` to override the embedded database directory.
+- Missing SQLite files are created and seeded on first application startup.
+- PostgreSQL requires the explicit database initialization command from
+  `start_on_windows.ps1`; normal application startup never creates or resets it.
 
 ## Interoperability
 

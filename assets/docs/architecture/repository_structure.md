@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Purpose
 
@@ -57,7 +57,7 @@ Key backend directories under `app/server`:
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `repositories/database/`
   Canonical `DatabaseBackend` contract, SQLite/PostgreSQL implementations, and
-  the explicit startup initializer.
+  the explicit database initializer.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
   The agent orchestration area includes focused helpers such as

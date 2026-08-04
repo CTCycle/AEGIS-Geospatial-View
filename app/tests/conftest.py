@@ -9,8 +9,8 @@ from typing import Any
 
 import pytest
 from server.configurations import DatabaseSettings
-from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.schemas import Base
 
 ###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:
@@ -169,5 +169,5 @@ def sqlite_backend(tmp_path: Path) -> SQLiteRepository:
             insert_batch_size=100,
         )
     )
-    initialize_database(backend)
+    Base.metadata.create_all(backend.engine)
     return backend

@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Local Development Via Launcher
 
@@ -10,13 +10,19 @@ Last updated: 2026-08-02
 
 The interactive launcher installs or updates portable Python, uv, and Node.js
 runtimes; synchronizes backend and frontend dependencies; optionally builds the
-frontend; initializes or reseeds the database; runs tests; removes logs; clears
-caches; and starts backend and frontend services. On first launch it copies
-`settings/.env.example` to `settings/.env`.
+frontend; runs tests; removes logs; clears caches; and starts backend and
+frontend services. If `settings/.env` is missing, the launcher reads
+`settings/.env.example` for its first-run process settings and the application
+creates the local file without overwriting an existing file.
 
 The menu provides: launch application, install/update dependencies, initialize
-the database, run the test suite, remove logs, clear caches, uninstall local
-dependencies, and exit.
+the database explicitly, run the test suite, remove logs, clear caches,
+uninstall local dependencies, and exit.
+
+SQLite is created and seeded automatically only when its configured database
+file is missing. An existing SQLite file is left untouched. PostgreSQL is never
+created or initialized during application launch; select the database mode in
+`settings/.env`, then run menu option 3 once before launching the application.
 
 Launch option 1 stops listeners on the configured backend/UI ports, starts the
 backend, waits for `/api/health`, starts the frontend preview, waits for the UI
