@@ -1,10 +1,12 @@
 # Configuration
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Environment File
 
-Primary runtime environment file: `settings/.env`
+Primary runtime environment file: `settings/.env`. If it is missing, startup
+creates it from `settings/.env.example`; an existing file is never overwritten.
+The generated file is ignored by Git and must remain local.
 
 Common keys include:
 

@@ -169,7 +169,11 @@ The shortest path on Windows is:
 .\start_on_windows.ps1
 ```
 
-On first launch, the script creates `settings/.env` from `settings/.env.example`. The technical documentation under `assets/docs` covers manual setup and deeper runtime behavior.
+On first application launch, `settings/.env` is created from
+`settings/.env.example` only when it is missing. The launcher reads the
+example as a temporary first-run fallback until the application creates the
+local file. The technical documentation under `assets/docs` covers manual
+setup and deeper runtime behavior.
 
 ## Project Contents
 

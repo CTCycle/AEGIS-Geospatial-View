@@ -6,8 +6,6 @@ from server.configurations import DatabaseSettings
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
-from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
-from server.services.catalog.loader import load_reference_catalog
 
 ###############################################################################
 def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
@@ -28,7 +26,6 @@ def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
         )
     )
     initialize_database(repository)
-    ReferenceCatalogSeeder(repository).seed_if_needed(load_reference_catalog())
     return repository
 
 ###############################################################################

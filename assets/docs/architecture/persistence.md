@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Relational Storage
 
@@ -23,10 +23,14 @@ repository tree:
 Override this location with `AEGIS_RUNTIME_DATA_DIR` when an explicit runtime
 storage directory is required.
 
-Schema initialization is handled once by the application composition root in
-`app/server/app.py`, through `app/server/repositories/database/initializer.py`.
-Repositories receive the already-built `DatabaseBackend`; they never create
-tables, infer schema, or resolve a database singleton themselves.
+The full initialization workflow lives in
+`app/server/repositories/database/initializer.py` and is invoked by
+`app/scripts/initialize_database.py` for the explicit launcher command. During
+normal application startup, only a missing SQLite file invokes that workflow.
+Existing SQLite files and all PostgreSQL databases are not initialized or
+reseeded during startup. Repositories receive the already-built
+`DatabaseBackend`; they never create tables, infer schema, or resolve a database
+singleton themselves.
 
 The shared SQLAlchemy engine configuration is implemented in
 `app/server/repositories/database/engine.py`. SQLite connections enable foreign
@@ -58,7 +62,8 @@ Payload columns use portable SQLAlchemy JSON values on both backends.
 ## Encryption Material
 
 - Credential encryption uses Fernet symmetric keys stored in `credential_encryption_materials` table.
-- Keys are auto-generated via `Fernet.generate_key()` on first startup (idempotent).
+- Keys are auto-generated via `Fernet.generate_key()` during first-time database
+  initialization (idempotent).
 - Key material is managed by `app/server/repositories/credential_material.py` (`CredentialEncryptionMaterialRepository`).
 - Encryption/decryption is handled by `app/server/services/cryptography.py` (`CredentialEncryptionService`).
 - No encryption key lives in source code, `.env`, or settings files.
@@ -73,7 +78,8 @@ cached database accessor, or compatibility import path.
 - Reference catalog file loading and parsing belongs under `app/server/services/catalog/loader.py`.
 - Reference catalog seeding (DB write) belongs under `app/server/repositories/catalog/`.
 - New catalog/reference constants should not be hardcoded in `app/server/common/constants.py`.
-- Startup seeds empty reference tables from catalog files exactly once per table group.
+- First-time SQLite initialization and explicit PostgreSQL initialization seed
+  empty reference tables from catalog files exactly once per table group.
 
 ## Vector Persistence
 

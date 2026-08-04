@@ -12,7 +12,11 @@ from server.common.paths import FASTAPI_API_PREFIX
 ###############################################################################
 def _settings():  # noqa: ANN202
     return SimpleNamespace(
-        database=SimpleNamespace(database_path="test.db", insert_batch_size=1000),
+        database=SimpleNamespace(
+            database_path="test.db",
+            embedded_database=True,
+            insert_batch_size=1000,
+        ),
         jobs=SimpleNamespace(polling_interval=1.0),
         credential_master_key="dev-key",
         credential_key_version="v1",
@@ -114,8 +118,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
     monkeypatch.setattr(app_module, "initialize_database", lambda backend: call_order.append("initialize_database"))
-    monkeypatch.setattr(app_module, "seed_credential_encryption_material", lambda database: call_order.append("seed_credential_encryption_material"))
-    monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: call_order.append("build_search_runtime") or search_runtime)
     monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database: call_order.append("build_chat_runtime") or chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: call_order.append("build_geospatial_runtime") or geospatial_runtime)
@@ -138,7 +140,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
 
     assert call_order == [
         "initialize_database",
-        "seed_credential_encryption_material",
         "build_search_runtime",
         "build_chat_runtime",
         "build_geospatial_runtime",
@@ -147,6 +148,63 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
         "run_startup_validations",
         "job_service.stop",
     ]
+
+###############################################################################
+def test_postgres_startup_does_not_initialize_database(monkeypatch) -> None:
+    call_order: list[str] = []
+    search_runtime = SimpleNamespace(search_orchestrator=SimpleNamespace())
+    chat_runtime = _build_chat_runtime(call_order)
+    geospatial_runtime = _build_geospatial_runtime()
+    job_service = SimpleNamespace(
+        start=lambda: call_order.append("job_service.start"),
+        stop=lambda: call_order.append("job_service.stop"),
+    )
+    settings = lambda: SimpleNamespace(  # noqa: E731
+        database=SimpleNamespace(
+            database_path="unused.db",
+            embedded_database=False,
+            insert_batch_size=1000,
+        ),
+        jobs=SimpleNamespace(polling_interval=1.0),
+    )
+
+    monkeypatch.setattr(app_module, "get_server_settings", settings)
+    monkeypatch.setattr(app_module, "build_database_backend", lambda _settings: object())
+    monkeypatch.setattr(
+        app_module,
+        "initialize_database",
+        lambda _database: (_ for _ in ()).throw(
+            AssertionError("PostgreSQL startup initialized the database")
+        ),
+    )
+    monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
+    monkeypatch.setattr(
+        app_module,
+        "build_chat_runtime",
+        lambda _orchestrator, _database: chat_runtime,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "build_geospatial_runtime",
+        lambda _database: geospatial_runtime,
+    )
+    monkeypatch.setattr(app_module, "AgentRunEventRepository", lambda _database: object())
+    monkeypatch.setattr(app_module, "AgentRunRepository", lambda _database: object())
+    monkeypatch.setattr(app_module, "AgentSteeringRepository", lambda _database: object())
+    monkeypatch.setattr(app_module, "CredentialRepository", lambda _database: object())
+    monkeypatch.setattr(app_module, "BackgroundJobService", lambda **_kwargs: job_service)
+    monkeypatch.setattr(app_module, "ChatStreamingService", lambda _orchestrator: object())
+    monkeypatch.setattr(
+        app_module,
+        "run_startup_validations",
+        lambda _credentials_repo: call_order.append("run_startup_validations"),
+    )
+    monkeypatch.setattr(app_module, "_client_build_available", lambda: False)
+
+    with TestClient(app_module.create_app()):
+        pass
+
+    assert "initialize_database" not in call_order
 
 ###############################################################################
 def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:
@@ -163,8 +221,6 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
     monkeypatch.setattr(app_module, "initialize_database", lambda backend: None)
-    monkeypatch.setattr(app_module, "seed_credential_encryption_material", lambda database: None)
-    monkeypatch.setattr(app_module, "seed_reference_catalog", lambda backend: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
     monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database: chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: geospatial_runtime)

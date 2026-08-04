@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import time
 
+from server.common.logger import logger
 from server.configurations import get_server_settings
 from server.repositories.database import build_database_backend
 from server.repositories.database.initializer import initialize_database
-from server.common.logger import logger
 
 
 ###############################################################################

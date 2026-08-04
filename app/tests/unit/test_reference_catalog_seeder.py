@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from server.configurations import DatabaseSettings
-from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import (
     ReferenceCountryAliasRecord,
@@ -13,6 +12,7 @@ from server.repositories.schemas import (
     ReferenceGeospatialLayerRecord,
     ReferenceGibsLayerDefaultRecord,
     ReferenceGibsTileMatrixSetRecord,
+    Base,
 )
 from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
 from server.services.catalog.loader import load_reference_catalog
@@ -35,7 +35,7 @@ def _build_database(tmp_path: Path) -> SQLiteRepository:
             insert_batch_size=100,
         )
     )
-    initialize_database(repository)
+    Base.metadata.create_all(repository.engine)
     return repository
 
 ###############################################################################
