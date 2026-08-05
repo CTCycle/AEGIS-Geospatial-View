@@ -7,7 +7,6 @@ import pytest
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
 from server.services.geospatial.providers.fred import FREDProvider
 
-
 ###############################################################################
 def test_fred_requires_key_for_live_search() -> None:
     with pytest.raises(ProviderAuthError, match="FRED_API_KEY|FRED API key"):
@@ -19,7 +18,6 @@ def test_fred_requires_key_for_live_search() -> None:
                 )
             )
         )
-
 
 ###############################################################################
 def test_fred_normalizes_series_search_payload() -> None:

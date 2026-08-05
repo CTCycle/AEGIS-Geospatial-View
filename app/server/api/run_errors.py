@@ -12,6 +12,7 @@ from server.services.agent_runs.exceptions import (
 )
 
 
+###############################################################################
 def raise_run_http_error(exc: RunServiceError) -> NoReturn:
     if isinstance(exc, RunNotFoundError):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
