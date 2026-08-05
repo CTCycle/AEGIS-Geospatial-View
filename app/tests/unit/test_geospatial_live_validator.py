@@ -62,7 +62,6 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
         "pvgis",
     }
 
-
 ###############################################################################
 def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
     monkeypatch.setenv("GEOAPIFY_API_KEY", "   ")
@@ -71,7 +70,6 @@ def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
 
     assert result.status == "skipped"
     assert "GEOAPIFY_API_KEY" in (result.message or "")
-
 
 ###############################################################################
 def test_live_validator_rejects_error_payloads() -> None:

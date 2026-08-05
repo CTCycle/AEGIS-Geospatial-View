@@ -5,9 +5,11 @@ class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
 
 
+###############################################################################
 class LLMProviderRequestError(RuntimeError):
     """Safe, structured provider failure without response-body or credential leakage."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -29,6 +31,7 @@ class LLMProviderRequestError(RuntimeError):
             detail += f" (HTTP {http_status})"
         super().__init__(detail + ".")
 
+    # -------------------------------------------------------------------------
     @classmethod
     def from_exception(cls, exc: Exception, *, provider: str, model: str, stage: str) -> "LLMProviderRequestError":
         status = getattr(getattr(exc, "response", None), "status_code", None)

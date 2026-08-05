@@ -168,7 +168,6 @@ def test_get_provider_returns_google_provider_type() -> None:
     provider = factory.get_provider("google")
     assert isinstance(provider, GoogleProvider)
 
-
 ###############################################################################
 def test_get_provider_returns_opencode_provider_types() -> None:
     repo = _CredentialsRepo(
@@ -194,7 +193,6 @@ def test_get_provider_returns_opencode_provider_types() -> None:
         ("opencode", "api_key"),
         ("opencode-go", "api_key"),
     ]
-
 
 ###############################################################################
 def test_missing_opencode_credentials_are_provider_specific() -> None:
