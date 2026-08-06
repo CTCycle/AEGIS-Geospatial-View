@@ -65,8 +65,8 @@ Key backend directories under `app/server`:
   `turn_support.py` to keep `AgentOrchestrator` under the repository Python
   size constraint without changing the public chat-turn contract.
 - `services/agent_runs/`
-  Durable conversation-run lifecycle, steering, event publication, and SSE
-  replay services.
+  Durable conversation-run lifecycle, steering, event publication, WebSocket
+  lifecycle/replay services, and bounded realtime metrics.
 - `services/llm/`
   Provider adapters, model catalogs, structured-output handling, request
   normalization, and safe provider error classification.

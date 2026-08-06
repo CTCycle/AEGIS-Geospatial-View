@@ -33,8 +33,9 @@ Last updated: 2026-08-02
 - Keep CPU-heavy work out of async handlers.
 - Use the shared `BackgroundJobService` for long-running chat or map operations.
 - Long-running APIs must support start, poll, and cancel flows.
-- Conversation runs additionally support SSE replay, cooperative cancellation,
-  and steering against the same conversation/run identity.
+- Conversation runs additionally support versioned WebSocket replay,
+  cooperative cancellation, idempotent commands, and steering against the same
+  conversation/run identity. Legacy SSE remains available for batch clients.
 
 ## Code Structure
 

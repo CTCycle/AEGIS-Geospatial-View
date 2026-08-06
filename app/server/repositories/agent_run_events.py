@@ -75,7 +75,7 @@ class AgentRunEventRepository:
                 .scalars()
                 .all()
             )
-            return [self._to_domain(row) for row in rows]
+        return [self._to_domain(row) for row in rows]
 
     # -------------------------------------------------------------------------
     def get_last_sequence(self, run_id: str) -> int:

@@ -50,8 +50,10 @@ Otherwise the app falls back to `defaultAppState()`.
 Late completion payloads with older context revisions are discarded. Numeric
 backend chat-session identifiers are neither restored nor transmitted.
 
-The active run also persists the last SSE event ID, bounded seen-event IDs, and
-steering messages so reconnects can replay without duplicating transcript output.
+The active run also persists the last realtime event sequence, bounded seen-event
+IDs, and steering messages so WebSocket reconnects can replay without
+duplicating transcript output. The legacy SSE event ID is retained only for
+non-UI API clients.
 
 ## Tab Isolation And Clear Behavior
 

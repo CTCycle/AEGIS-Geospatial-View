@@ -28,9 +28,13 @@ Last updated: 2026-08-02
 
 ## Agent Run Interaction
 
-`GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, creates one active run, and opens an `EventSource` stream. Additional composer submissions while the run is active are sent as steering updates and rendered as compact refinements rather than independent tasks.
+`GeospatialPageComponent` uses the conversations API for agent chat. The first message creates a conversation if needed, opens the versioned realtime WebSocket, and sends an idempotent `run.start` command. Additional composer submissions while the run is active are sent as `run.steer` updates and rendered as compact refinements rather than independent tasks.
 
-The page tracks the last run event ID and ignores duplicate event IDs so reconnect replay can be applied without duplicating assistant or progress output.
+`RealtimeService` owns the socket lifecycle, subprotocol negotiation, heartbeat,
+stale-connection detection, full-jitter exponential backoff, command replay, and
+runtime envelope validation. The page persists the last durable event sequence
+and ignores duplicate event IDs so reconnect replay can be applied without
+duplicating assistant or progress output.
 
 Clarification runs terminate with `clarification_needed`. The event may include a
 partial validated map update, allowing a basemap or layer correction before the

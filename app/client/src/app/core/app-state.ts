@@ -25,7 +25,12 @@ export interface PersistedChatPanelState {
   taskSnapshot?: ConversationTaskSnapshot;
   activeRunId?: string;
   activeRunVersion?: number;
+  pendingRun?: {
+    clientRequestId: string;
+    message: string;
+  };
   lastRunEventId?: string;
+  lastRunSequence?: number;
   streamState?: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'failed';
   progressStage?: string;
   progressLabel?: string;
@@ -149,7 +154,9 @@ export const defaultAppState = (): PersistedAppState => ({
       taskSnapshot: undefined,
       activeRunId: undefined,
       activeRunVersion: undefined,
+      pendingRun: undefined,
       lastRunEventId: undefined,
+      lastRunSequence: 0,
       streamState: 'idle',
       progressStage: undefined,
       progressLabel: undefined,
@@ -307,9 +314,23 @@ export const loadPersistedAppState = (): PersistedAppState => {
           activeRunVersion: typeof parsed.chatPage.chatPanel.activeRunVersion === 'number'
             ? parsed.chatPage.chatPanel.activeRunVersion
             : undefined,
+          pendingRun: isRecord(parsed.chatPage.chatPanel.pendingRun)
+            && typeof parsed.chatPage.chatPanel.pendingRun.clientRequestId === 'string'
+            && typeof parsed.chatPage.chatPanel.pendingRun.message === 'string'
+            && parsed.chatPage.chatPanel.pendingRun.clientRequestId.trim().length > 0
+            && parsed.chatPage.chatPanel.pendingRun.message.trim().length > 0
+            ? {
+              clientRequestId: parsed.chatPage.chatPanel.pendingRun.clientRequestId.trim().slice(0, 160),
+              message: parsed.chatPage.chatPanel.pendingRun.message.trim().slice(0, 12000),
+            }
+            : undefined,
           lastRunEventId: typeof parsed.chatPage.chatPanel.lastRunEventId === 'string'
             ? parsed.chatPage.chatPanel.lastRunEventId
             : undefined,
+          lastRunSequence: typeof parsed.chatPage.chatPanel.lastRunSequence === 'number'
+            && Number.isFinite(parsed.chatPage.chatPanel.lastRunSequence)
+            ? Math.max(0, parsed.chatPage.chatPanel.lastRunSequence)
+            : 0,
           streamState: typeof parsed.chatPage.chatPanel.streamState === 'string'
             ? parsed.chatPage.chatPanel.streamState as PersistedChatPanelState['streamState']
             : 'idle',

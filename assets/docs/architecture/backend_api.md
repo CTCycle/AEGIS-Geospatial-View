@@ -163,13 +163,23 @@ Defined in `app/server/api/conversations.py`:
 - `POST /api/conversations`
   Creates a durable conversation shell.
 - `POST /api/conversations/{conversation_id}/runs`
-  Creates one active agent run for the conversation and returns its SSE stream URL.
+  Creates one active agent run for batch/API clients and returns its legacy SSE stream URL.
+- `GET /api/conversations/{conversation_id}/realtime` (WebSocket)
+  Opens the interactive `aegis.realtime.v1` protocol. The client sends
+  `session.resume`, `run.start`, `run.steer`, and `run.cancel` envelopes; the
+  server returns acknowledgements and ordered durable `run.event` envelopes.
+  `client_request_id` and `client_mutation_id` make retries idempotent.
 - `GET /api/conversations/{conversation_id}/runs/{run_id}/events`
-  Streams durable user-visible run events as Server-Sent Events. Supports `after_event_id` and `Last-Event-ID` replay.
+  Legacy durable Server-Sent Events for non-WebSocket API clients. Supports
+  `after_event_id` and `Last-Event-ID` replay.
 - `POST /api/conversations/{conversation_id}/runs/{run_id}/steering`
   Adds a steering message to the active run, rebuilds the deterministic aggregate request, and increments the run version.
 - `POST /api/conversations/{conversation_id}/runs/{run_id}/cancel`
   Marks the active run cancelled as a terminal user action.
+- `GET /api/realtime/metrics`
+  Loopback-only JSON counters for active sockets, protocol errors, delivered
+  events, and command latency. It is intentionally process-local in the
+  supported single-replica deployment.
 
 The v1 run stream emits concise user-visible events only: progress labels,
 assistant text completion, request updates from steering, terminal errors,

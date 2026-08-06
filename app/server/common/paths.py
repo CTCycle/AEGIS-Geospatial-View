@@ -65,6 +65,8 @@ CONVERSATIONS_ROUTER_PREFIX = "/conversations"
 CONVERSATIONS_ROOT_ROUTE = ""
 CONVERSATION_RUNS_ROUTE = "/{conversation_id}/runs"
 
+CONVERSATION_REALTIME_ROUTE = "/{conversation_id}/realtime"
+
 CONVERSATION_RUN_EVENTS_ROUTE = "/{conversation_id}/runs/{run_id}/events"
 CONVERSATION_RUN_STEERING_ROUTE = "/{conversation_id}/runs/{run_id}/steering"
 CONVERSATION_RUN_CANCEL_ROUTE = "/{conversation_id}/runs/{run_id}/cancel"

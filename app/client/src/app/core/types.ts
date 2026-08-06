@@ -591,6 +591,23 @@ export interface TaskFailureDetail {
   provider_error?: ChatOperationResult['provider_error'];
 }
 
+export type RealtimeConnectionState =
+  | 'idle'
+  | 'connecting'
+  | 'open'
+  | 'reconnecting'
+  | 'closed'
+  | 'failed';
+
+export interface RealtimeServerMessage {
+  protocol_version: number;
+  type: string;
+  message_id?: string | null;
+  correlation_id?: string | null;
+  conversation_id: string;
+  payload: JsonObject;
+}
+
 export interface ToolPlanStep {
   step_id: string;
   tool_name: string;

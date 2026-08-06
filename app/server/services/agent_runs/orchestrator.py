@@ -33,7 +33,16 @@ class AgentRunOrchestrator:
         if snapshot.cancel_requested_at is not None:
             await self._publish_cancelled(snapshot)
             return
-        snapshot = self.run_repository.mark_started(run_id)
+        expected_version = snapshot.active_run_version
+        snapshot, transitioned = self.run_repository.mark_started_if_current(
+            run_id, expected_version
+        )
+        if not transitioned:
+            if snapshot.cancel_requested_at is not None:
+                await self._publish_cancelled(snapshot)
+            elif snapshot.active_run_version != expected_version:
+                await self.execute_run(run_id)
+            return
         await self._publish_progress(snapshot, RunProgressStage.UNDERSTANDING_REQUEST)
         try:
             response = await self.agent_orchestrator.run_turn(
@@ -49,7 +58,18 @@ class AgentRunOrchestrator:
             if latest.cancel_requested_at is not None:
                 await self._publish_cancelled(latest)
                 return
-            self.run_repository.mark_failed(run_id, "agent_execution_failed", str(exc))
+            failed, transitioned = self.run_repository.mark_failed_if_current(
+                run_id,
+                snapshot.active_run_version,
+                "agent_execution_failed",
+                str(exc),
+            )
+            if not transitioned:
+                if failed.cancel_requested_at is not None:
+                    await self._publish_cancelled(failed)
+                elif failed.active_run_version != snapshot.active_run_version:
+                    await self.execute_run(run_id)
+                return
             await self.event_publisher.publish(
                 conversation_id=latest.conversation_id,
                 run_id=latest.run_id,
@@ -81,7 +101,15 @@ class AgentRunOrchestrator:
             return
         await self._publish_response(latest, response)
         if response.operation is not None and response.operation.kind == "clarification":
-            clarified = self.run_repository.mark_completed(run_id)
+            clarified, transitioned = self.run_repository.mark_completed_if_current(
+                run_id, snapshot.active_run_version
+            )
+            if not transitioned:
+                if clarified.cancel_requested_at is not None:
+                    await self._publish_cancelled(clarified)
+                elif clarified.active_run_version != snapshot.active_run_version:
+                    await self.execute_run(run_id)
+                return
             await self._publish_progress(
                 clarified,
                 RunProgressStage.WAITING_FOR_CLARIFICATION,
@@ -97,6 +125,7 @@ class AgentRunOrchestrator:
                     if response.map_session is not None
                     else None,
                     "operation": response.operation.model_dump(mode="json"),
+                    "decision": response.decision.model_dump(mode="json"),
                     "task_snapshot": response.task_snapshot.model_dump(mode="json")
                     if response.task_snapshot is not None
                     else None,
@@ -107,11 +136,18 @@ class AgentRunOrchestrator:
             )
             return
         if self._response_failed(response):
-            failed = self.run_repository.mark_failed(
+            failed, transitioned = self.run_repository.mark_failed_if_current(
                 run_id,
+                snapshot.active_run_version,
                 "agent_operation_failed",
                 response.operation.message if response.operation is not None else "Failed",
             )
+            if not transitioned:
+                if failed.cancel_requested_at is not None:
+                    await self._publish_cancelled(failed)
+                elif failed.active_run_version != snapshot.active_run_version:
+                    await self.execute_run(run_id)
+                return
             await self._publish_progress(failed, RunProgressStage.FAILED)
             await self.event_publisher.publish(
                 conversation_id=failed.conversation_id,
@@ -129,7 +165,15 @@ class AgentRunOrchestrator:
                 },
             )
             return
-        completed = self.run_repository.mark_completed(run_id)
+        completed, transitioned = self.run_repository.mark_completed_if_current(
+            run_id, snapshot.active_run_version
+        )
+        if not transitioned:
+            if completed.cancel_requested_at is not None:
+                await self._publish_cancelled(completed)
+            elif completed.active_run_version != snapshot.active_run_version:
+                await self.execute_run(run_id)
+            return
         await self._publish_progress(completed, RunProgressStage.COMPLETED)
         await self.event_publisher.publish(
             conversation_id=completed.conversation_id,
@@ -144,6 +188,7 @@ class AgentRunOrchestrator:
                 "operation": response.operation.model_dump(mode="json")
                 if response.operation is not None
                 else None,
+                "decision": response.decision.model_dump(mode="json"),
                 "memory_snapshot": response.memory_snapshot,
                 "context_usage": response.context_usage.model_dump(mode="json")
                 if response.context_usage is not None
@@ -193,7 +238,9 @@ class AgentRunOrchestrator:
 
     # -------------------------------------------------------------------------
     async def _publish_cancelled(self, snapshot: AgentRunSnapshot) -> None:
-        cancelled = self.run_repository.request_cancel(snapshot.run_id)
+        cancelled, transitioned = self.run_repository.request_cancel_once(snapshot.run_id)
+        if not transitioned:
+            return
         await self._publish_progress(cancelled, RunProgressStage.CANCELLED)
         await self.event_publisher.publish(
             conversation_id=cancelled.conversation_id,

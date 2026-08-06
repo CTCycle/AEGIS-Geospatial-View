@@ -8,6 +8,8 @@ import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { DEFAULT_BASE_TILE_PROXY_URL } from '../core/constants';
+import { FakeRealtimeService } from '../core/realtime.test-support';
+import { RealtimeService } from '../core/realtime.service';
 import { CameraFeature, ChatTurnResponse } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from '../pages/geospatial-page.component';
@@ -31,6 +33,7 @@ describe('e2e/geospatial browser smoke', () => {
   ];
   let fixture: ComponentFixture<GeospatialPageComponent>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
+  let realtime: FakeRealtimeService;
   let store: jasmine.SpyObj<AppStateStoreService>;
   let fakeMap: {
     addSource: jasmine.Spy;
@@ -275,6 +278,7 @@ describe('e2e/geospatial browser smoke', () => {
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-browser-smoke', title: 'show mocked map' });
     apiClient.sendChatTurn.and.resolveTo(mockedMapResponse);
     apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
+    realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
 
     store = jasmine.createSpyObj<AppStateStoreService>('AppStateStoreService', [
       'getChatPage',
@@ -288,6 +292,7 @@ describe('e2e/geospatial browser smoke', () => {
       providers: [
         provideRouter([]),
         { provide: ApiClientService, useValue: apiClient },
+        { provide: RealtimeService, useValue: realtime },
         { provide: AppStateStoreService, useValue: store },
         {
           provide: UserFacingErrorService,

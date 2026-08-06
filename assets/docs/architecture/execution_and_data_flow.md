@@ -35,7 +35,8 @@ Run-service errors are translated once at the API boundary by
 repository failures into `RunServiceError` subclasses; conversation endpoints
 catch that service-level hierarchy and delegate status mapping to the shared
 translator. Run streams always receive an `AgentRunRepository` and verify the
-conversation-to-run relationship before opening the SSE response.
+conversation-to-run relationship before opening the realtime WebSocket (or the
+legacy SSE response for batch clients).
 
 ## Representative Request Flow
 
@@ -143,8 +144,9 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - FastAPI route handlers are predominantly `async`.
 - `POST /api/chat/stream` uses streaming NDJSON.
 - Chat jobs run asynchronously through `/api/chat/jobs` and are observed through `/api/jobs/{job_id}`.
-- Conversation runs use `POST /api/conversations/{conversation_id}/runs` for creation and `GET /api/conversations/{conversation_id}/runs/{run_id}/events` for SSE delivery.
-- User steering during an active run is aggregated into the same run through `POST /api/conversations/{conversation_id}/runs/{run_id}/steering`; it does not create a child task or queue.
+- The interactive UI uses the WebSocket `/api/conversations/{conversation_id}/realtime` for `session.resume`, run commands, acknowledgements, heartbeats, and ordered durable events.
+- Conversation runs retain `POST /api/conversations/{conversation_id}/runs` and `GET /api/conversations/{conversation_id}/runs/{run_id}/events` as legacy/batch SSE APIs for non-UI clients.
+- User steering during an active run is aggregated into the same run through the realtime `run.steer` command (the legacy HTTP route remains for batch clients); it does not create a child task or queue.
 
 ### Threaded
 
@@ -157,11 +159,11 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - `app/server/services/jobs.py` defines the single in-memory `BackgroundJobService` used for chat jobs.
 - Distributed or high-concurrency workloads would require an external queue/worker model.
 - Async endpoints must avoid blocking CPU-heavy work on the event loop.
-- Run event fanout is in-process in v1, with persisted event replay as the reconnect source of truth.
+- Run event fanout is in-process in v1, with persisted event replay as the reconnect source of truth. The selected deployment is a single backend replica; multi-replica fanout requires a shared broker and external metrics/tracing.
 - Run cancellation is cooperative and terminal; stale agent results after a version change are persisted as internal diagnostics and discarded from user-visible completion.
 - Agent availability is application-level. Run progress begins with `understanding_request`; creating a run does not restart the agent or emit an `agent_started` event.
 - `RunLifecycleService.create_run()` returns a transport-neutral
-  `AgentRunCreateResult`; the HTTP route adds the SSE `stream_url` when it
-  constructs the API response.
+  `AgentRunCreateResult`; HTTP routes add the legacy SSE URL while the realtime
+  route sends protocol acknowledgements.
 - Application shutdown cancels tracked lifecycle tasks and awaits them before
   the FastAPI lifespan exits, including startup-failure paths.

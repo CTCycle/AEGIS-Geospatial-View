@@ -53,7 +53,7 @@ Run the backend and frontend commands in separate PowerShell terminals.
 ```powershell
 Set-Location app/server
 uv sync
-uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002
+uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002 --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10
 Set-Location ../client
 npm install
 npm run start -- --host 127.0.0.1 --port 5000

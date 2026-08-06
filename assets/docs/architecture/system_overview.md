@@ -13,7 +13,7 @@ AEGIS Geospatial View is a two-tier application:
 - Frontend: Angular 22 standalone SPA in `app/client/src`
 - Backend: FastAPI application in `app/server`
 
-The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace. The primary UI path uses durable conversation runs and SSE replay; direct chat-turn, NDJSON stream, and in-process job routes remain available for API clients and bounded test flows.
+The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace. The primary UI path uses a versioned WebSocket at `/api/conversations/{conversation_id}/realtime`; durable run events are replayed by sequence after reconnect. Direct chat-turn, NDJSON stream, legacy SSE, and in-process job routes remain available for API clients and bounded test flows, but are not used by the interactive UI.
 
 ## Entry Points
 

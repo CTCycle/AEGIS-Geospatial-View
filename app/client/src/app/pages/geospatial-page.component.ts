@@ -19,6 +19,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
 import { normalizeMapSession } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
+import { RealtimeService } from '../core/realtime.service';
 import {
   ChatOperationResult,
   MapSession,
@@ -29,6 +30,7 @@ import {
   ChatTurnResponse,
   ContextUsage,
   ConversationTaskSnapshot,
+  RealtimeServerMessage,
   RunEvent,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
@@ -81,20 +83,23 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly minWidth = 280;
   private readonly maxWidth = 760;
   private readonly canvasMinWidth = 320;
+  private readonly maxSeenEventIds = 512;
   private readonly chatPageState: PersistedChatPageState;
   private mouseMoveHandler?: (event: MouseEvent) => void;
   private mouseUpHandler?: () => void;
-  private activeEventSource?: EventSource;
   private seenEventIds = new Set<string>();
-  private currentAssistantMessageId?: string;
   private steeringMutationCounter = 0;
-  private reconnectAttempts = 0;
   private isDestroyed = false;
   private pendingMapSession?: MapSession;
+  private lastRunSequence = 0;
+  private pendingRun?: PersistedChatPageState['chatPanel']['pendingRun'];
+  private removeRealtimeMessageListener?: () => void;
+  private removeRealtimeStateListener?: () => void;
 
   constructor(
     private readonly router: Router,
     private readonly apiClient: ApiClientService,
+    private readonly realtimeService: RealtimeService,
     private readonly appStateStore: AppStateStoreService,
     private readonly localCommandService: LocalCommandService,
     private readonly agentReadinessService: AgentReadinessService,
@@ -113,7 +118,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.taskSnapshot = this.chatPageState.chatPanel.taskSnapshot;
     this.activeRunId = this.chatPageState.chatPanel.activeRunId;
     this.activeRunVersion = this.chatPageState.chatPanel.activeRunVersion;
+    this.pendingRun = this.chatPageState.chatPanel.pendingRun;
     this.lastRunEventId = this.chatPageState.chatPanel.lastRunEventId;
+    this.lastRunSequence = this.chatPageState.chatPanel.lastRunSequence ?? 0;
     this.streamState = this.chatPageState.chatPanel.streamState ?? 'idle';
     this.progressStage = this.chatPageState.chatPanel.progressStage;
     this.progressLabel = this.chatPageState.chatPanel.progressLabel;
@@ -132,6 +139,29 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   ngOnInit(): void {
+    this.removeRealtimeMessageListener = this.realtimeService.onMessage((message) => {
+      this.handleRealtimeMessage(message);
+    });
+    this.removeRealtimeStateListener = this.realtimeService.onStateChange((state) => {
+      this.streamState = state;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+    });
+    if (this.conversationId) {
+      this.realtimeService.connect(this.conversationId, {
+        runId: this.activeRunId,
+        afterSequence: this.lastRunSequence,
+      });
+      // If a page reload happened after conversation creation but before the
+      // start acknowledgement, replay the same idempotent command.  The
+      // server's client_request_id prevents an orphaned run or duplicate run.
+      if (!this.activeRunId && this.pendingRun) {
+        this.realtimeService.sendRunStart(
+          this.pendingRun.message,
+          this.pendingRun.clientRequestId,
+        );
+      }
+    }
     void this.loadAgentStatus();
   }
 
@@ -142,7 +172,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   ngOnDestroy(): void {
     this.isDestroyed = true;
-    this.closeActiveEventSource();
+    this.removeRealtimeMessageListener?.();
+    this.removeRealtimeStateListener?.();
+    this.realtimeService.disconnect({ discardPending: true });
     this.stopResize();
     this.syncState();
   }
@@ -240,17 +272,19 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   startNewChat(): void {
+    this.realtimeService.disconnect({ discardPending: true });
     this.conversationId = undefined;
     this.contextRevision = undefined;
     this.taskSnapshot = undefined;
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
+    this.pendingRun = undefined;
     this.lastRunEventId = undefined;
+    this.lastRunSequence = 0;
     this.streamState = 'idle';
     this.progressStage = undefined;
     this.progressLabel = undefined;
     this.seenEventIds.clear();
-    this.closeActiveEventSource();
     this.conversationNonce += 1;
     this.messages = [];
     this.lastDecision = undefined;
@@ -260,6 +294,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.mapSession = undefined;
     this.payload = undefined;
     this.status = 'Agent ready';
+    this.isLoading = false;
     this.assistantDraft = '';
     this.composerDraft = '';
     this.transcriptScrollTop = 0;
@@ -341,8 +376,13 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     this.composerDraft = '';
-    if (this.activeRunId && this.conversationId && this.isLoading) {
-      await this.sendSteeringMessage(message);
+    if (this.isLoading && this.conversationId) {
+      if (this.activeRunId) {
+        await this.sendSteeringMessage(message);
+      } else {
+        this.composerDraft = message;
+        this.syncState();
+      }
       return;
     }
     await this.startAgentRun(message, requestNonce);
@@ -359,19 +399,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.syncState();
 
     try {
-      if (!this.supportsRunTransport()) {
-        const conversation = this.conversationId
-          ? { conversation_id: this.conversationId }
-          : await this.apiClient.createConversation({ title: message.slice(0, 120) });
-        this.conversationId = conversation.conversation_id;
-        const result = await this.apiClient.sendChatTurn({
-          conversation_id: conversation.conversation_id,
-          message,
-        });
-        this.isLoading = false;
-        this.applyTurnResponse(result, requestNonce);
-        return;
-      }
       const conversation = this.conversationId
         ? { conversation_id: this.conversationId }
         : await this.apiClient.createConversation({ title: message.slice(0, 120) });
@@ -379,14 +406,22 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         return;
       }
       this.conversationId = conversation.conversation_id;
-      const run = await this.apiClient.createAgentRun(conversation.conversation_id, {
+      this.activeRunId = undefined;
+      this.activeRunVersion = undefined;
+      const pendingRun = {
+        clientRequestId: this.newClientRequestId(),
         message,
-        client_request_id: `client_req_${Date.now()}`,
-      });
-      this.activeRunId = run.run_id;
-      this.activeRunVersion = run.run_version;
-      this.streamState = 'connecting';
-      this.openRunEventStream(run.conversation_id, run.run_id);
+      };
+      this.pendingRun = pendingRun;
+      this.lastRunSequence = 0;
+      this.lastRunEventId = undefined;
+      this.syncState();
+      this.realtimeService.setResumeCursor(undefined, 0);
+      this.realtimeService.connect(conversation.conversation_id);
+      this.realtimeService.sendRunStart(
+        message,
+        pendingRun.clientRequestId,
+      );
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
@@ -417,11 +452,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.progressLabel = 'Request updated';
     this.syncState();
     try {
-      const response = await this.apiClient.sendRunSteering(this.conversationId, this.activeRunId, {
-        message,
-        client_mutation_id: clientMutationId,
-      });
-      this.activeRunVersion = response.run_version;
+      this.realtimeService.sendRunSteer(this.activeRunId, message, clientMutationId);
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
@@ -439,12 +470,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     try {
-      await this.apiClient.cancelAgentRun(this.conversationId, this.activeRunId);
-      this.status = 'Agent ready';
-      this.progressLabel = undefined;
-      this.isLoading = false;
-      this.activeRunId = undefined;
-      this.closeActiveEventSource();
+      this.realtimeService.sendRunCancel(this.activeRunId);
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
@@ -456,67 +482,87 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
-  private openRunEventStream(conversationId: string, runId: string, afterEventId = this.lastRunEventId): void {
-    this.closeActiveEventSource();
-    this.streamState = afterEventId ? 'reconnecting' : 'connecting';
-    const source = this.apiClient.openRunEventSource(conversationId, runId, afterEventId);
-    this.activeEventSource = source;
-    source.onopen = () => {
-      this.streamState = 'open';
-      this.reconnectAttempts = 0;
+  private handleRealtimeMessage(message: RealtimeServerMessage): void {
+    if (!this.conversationId || message.conversation_id !== this.conversationId) {
+      return;
+    }
+    if (message.type === 'run.ack') {
+      const runId = this.readString(message.payload['run_id']);
+      if (runId && message.payload['command'] === 'run.start') {
+        this.activeRunId = runId;
+        this.activeRunVersion = this.readNumber(message.payload['run_version']);
+        this.isLoading = true;
+        this.realtimeService.setResumeCursor(runId, this.lastRunSequence);
+      }
+      if (message.payload['command'] === 'run.cancel') {
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.pendingRun = undefined;
+      }
       this.syncState();
       this.changeDetectorRef.detectChanges();
-    };
-    const eventTypes = [
-      'progress',
-      'assistant_text_delta',
-      'assistant_text_completed',
-      'tool_started',
-      'tool_completed',
-      'request_updated',
-      'error',
-      'completed',
-      'cancelled',
-      'clarification_needed',
-    ];
-    eventTypes.forEach((type) => {
-      source.addEventListener(type, (event) => {
-        const parsed = JSON.parse((event as MessageEvent<string>).data) as RunEvent;
-        this.handleRunEvent(parsed);
-      });
-    });
-    source.onerror = () => {
-      if (!this.activeRunId || !this.conversationId || !this.isLoading) {
-        this.closeActiveEventSource();
-        this.changeDetectorRef.detectChanges();
-        return;
-      }
-      this.streamState = 'reconnecting';
-      this.closeActiveEventSource();
-      if (this.reconnectAttempts >= 3) {
-        this.streamState = 'failed';
-        this.progressLabel = 'Stream disconnected; reconnect later to replay updates.';
+      return;
+    }
+    if (message.type === 'session.resumed') {
+      const state = this.readString(message.payload['state']);
+      if (state === 'completed' || state === 'failed' || state === 'cancelled') {
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.status = 'Agent ready';
+        this.progressLabel = undefined;
+        this.pendingRun = undefined;
         this.syncState();
         this.changeDetectorRef.detectChanges();
-        return;
       }
-      this.reconnectAttempts += 1;
-      window.setTimeout(() => {
-        if (this.conversationId && this.activeRunId && this.isLoading) {
-          this.openRunEventStream(this.conversationId, this.activeRunId, this.lastRunEventId);
-        }
-      }, 750 * this.reconnectAttempts);
+      return;
+    }
+    if (message.type === 'run.event') {
+      const event = this.parseRunEvent(message.payload);
+      if (event) {
+        this.handleRunEvent(event);
+      }
+      return;
+    }
+    if (message.type === 'protocol.error') {
+      const code = this.readString(message.payload['code']) ?? 'connection_error';
+      const command = this.readString(message.payload['command']);
+      if (command === 'run.start' || code === 'run_not_found' || code === 'access_denied') {
+        this.isLoading = false;
+        this.activeRunId = undefined;
+        this.pendingRun = undefined;
+      }
+      this.status = 'Agent ready';
+      this.progressLabel = undefined;
+      const messageText = 'The real-time connection could not apply that request.';
+      if (this.messages.at(-1)?.content !== messageText) {
+        this.messages = [...this.messages, { role: 'assistant', content: messageText }];
+      }
       this.syncState();
       this.changeDetectorRef.detectChanges();
-    };
+    }
   }
 
   private handleRunEvent(event: RunEvent): void {
-    if (this.seenEventIds.has(event.event_id)) {
+    if (event.conversation_id !== this.conversationId
+      || (this.activeRunId && event.run_id !== this.activeRunId)) {
+      return;
+    }
+    if (this.seenEventIds.has(event.event_id) || event.sequence <= this.lastRunSequence) {
       return;
     }
     this.seenEventIds.add(event.event_id);
+    while (this.seenEventIds.size > this.maxSeenEventIds) {
+      const oldest = this.seenEventIds.values().next().value as string | undefined;
+      if (oldest === undefined) {
+        break;
+      }
+      this.seenEventIds.delete(oldest);
+    }
     this.lastRunEventId = event.event_id;
+    this.lastRunSequence = event.sequence;
+    this.realtimeService.setResumeCursor(event.run_id, event.sequence);
     this.activeRunVersion = event.run_version;
     switch (event.type) {
       case 'progress':
@@ -527,12 +573,10 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = this.progressLabel;
         break;
       case 'assistant_text_delta':
-        this.currentAssistantMessageId = event.event_id;
         this.assistantDraft += String(event.payload['delta'] ?? '');
         break;
       case 'assistant_text_completed':
         this.assistantDraft = '';
-        this.currentAssistantMessageId = undefined;
         this.messages = [...this.messages, { role: 'assistant', content: String(event.payload['content'] ?? '') }];
         break;
       case 'request_updated':
@@ -551,7 +595,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         }
         this.isLoading = false;
         this.activeRunId = undefined;
-        this.closeActiveEventSource();
+        this.pendingRun = undefined;
+        this.streamState = 'closed';
         break;
       case 'completed':
         this.isLoading = false;
@@ -559,17 +604,17 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressLabel = undefined;
         this.progressPercent = 100;
         this.activeRunId = undefined;
+        this.pendingRun = undefined;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
-        this.closeActiveEventSource();
         break;
       case 'cancelled':
         this.isLoading = false;
         this.status = 'Agent ready';
         this.progressLabel = undefined;
         this.activeRunId = undefined;
+        this.pendingRun = undefined;
         this.streamState = 'closed';
-        this.closeActiveEventSource();
         break;
       case 'clarification_needed':
         this.isLoading = false;
@@ -577,9 +622,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressStage = 'waiting_for_clarification';
         this.progressLabel = undefined;
         this.activeRunId = undefined;
+        this.pendingRun = undefined;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
-        this.closeActiveEventSource();
         break;
     }
     this.syncState();
@@ -597,6 +642,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.contextRevision = revision ?? this.contextRevision;
     this.taskSnapshot = (payload['task_snapshot'] as ConversationTaskSnapshot | undefined)
       ?? this.taskSnapshot;
+    this.lastDecision = payload['decision'] as ChatTurnResponse['decision'] | undefined
+      ?? this.lastDecision;
     const mapSession = normalizeMapSession(payload['map_session']);
     if (mapSession) {
       this.handleMapSession(mapSession);
@@ -606,11 +653,35 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.contextUsage = payload['context_usage'] as ContextUsage | undefined;
   }
 
-  private supportsRunTransport(): boolean {
-    const client = this.apiClient as unknown as Partial<ApiClientService>;
-    return typeof client.createConversation === 'function'
-      && typeof client.createAgentRun === 'function'
-      && typeof client.openRunEventSource === 'function';
+  private parseRunEvent(value: Record<string, unknown>): RunEvent | undefined {
+    const eventType = this.readString(value['type']);
+    const eventId = this.readString(value['event_id']);
+    const conversationId = this.readString(value['conversation_id']);
+    const runId = this.readString(value['run_id']);
+    const sequence = this.readNumber(value['sequence']);
+    const runVersion = this.readNumber(value['run_version']);
+    const timestamp = this.readString(value['timestamp']);
+    const payload = value['payload'];
+    if (!eventType || !eventId || !conversationId || !runId || sequence === undefined
+      || runVersion === undefined || !timestamp || !payload || typeof payload !== 'object') {
+      return undefined;
+    }
+    return value as unknown as RunEvent;
+  }
+
+  private readString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim() ? value : undefined;
+  }
+
+  private readNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
+  private newClientRequestId(): string {
+    const random = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    return `client_req_${random}`;
   }
 
   private applyTurnResponse(result: ChatTurnResponse, requestNonce: number): void {
@@ -713,7 +784,9 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         taskSnapshot: this.taskSnapshot,
         activeRunId: this.activeRunId,
         activeRunVersion: this.activeRunVersion,
+        pendingRun: this.pendingRun,
         lastRunEventId: this.lastRunEventId,
+        lastRunSequence: this.lastRunSequence,
         streamState: this.streamState,
         progressStage: this.progressStage,
         progressLabel: this.progressLabel,
@@ -753,11 +826,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       window.removeEventListener('mouseup', this.mouseUpHandler);
       this.mouseUpHandler = undefined;
     }
-  }
-
-  private closeActiveEventSource(): void {
-    this.activeEventSource?.close();
-    this.activeEventSource = undefined;
   }
 
   private async loadAgentStatus(): Promise<void> {

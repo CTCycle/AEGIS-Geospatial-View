@@ -21,4 +21,7 @@ Last updated: 2026-08-02
 - External data sources affect response quality and availability.
 - State persistence is session-based and tab-aware.
 - During an active run, additional messages are steering updates. Reconnects
-  replay durable SSE events and suppress duplicate event IDs.
+  resume the realtime WebSocket from the persisted sequence and suppress
+  duplicate event IDs. A browser must use the configured UI origin and
+  `aegis.realtime.v1` subprotocol; a rejected origin or missing subprotocol is
+  an intentional protocol failure.

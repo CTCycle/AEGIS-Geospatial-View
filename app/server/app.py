@@ -10,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 
 from server.api.chat import router as chat_router
 from server.api.conversations import router as conversations_router
+from server.api.realtime import metrics_router as realtime_metrics_router
+from server.api.realtime import router as realtime_router
 from server.api.geospatial import router as geospatial_router
 from server.api.jobs import router as jobs_router
 from server.common.paths import (
@@ -33,6 +35,8 @@ from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 from server.services.agent_runs.steering import RunSteeringService
 from server.services.agent_runs.streaming import RunEventStreamService
+from server.services.agent_runs.realtime import RealtimeConnectionRegistry
+from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.geospatial.composition import build_geospatial_runtime
 from server.services.jobs import BackgroundJobService
 from server.repositories.agent_run_events import AgentRunEventRepository
@@ -118,6 +122,8 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         run_event_publisher,
         run_repository=run_repository,
     )
+    realtime_connections = RealtimeConnectionRegistry()
+    realtime_metrics = RealtimeMetrics()
     job_service = BackgroundJobService(
         chat_streaming_service=chat_streaming_service,
         polling_interval=settings.jobs.polling_interval,
@@ -129,6 +135,11 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.run_lifecycle_service = run_lifecycle_service
     application.state.run_steering_service = run_steering_service
     application.state.run_event_stream_service = run_event_stream_service
+    application.state.conversation_repository = conversation_repository
+    application.state.run_repository = run_repository
+    application.state.run_event_publisher = run_event_publisher
+    application.state.realtime_connections = realtime_connections
+    application.state.realtime_metrics = realtime_metrics
     application.state.job_service = job_service
 
     try:
@@ -137,6 +148,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         run_startup_validations(CredentialRepository(database))
         yield
     finally:
+        await realtime_connections.close_all()
         job_service.stop()
         await run_lifecycle_service.shutdown()
 
@@ -146,6 +158,8 @@ def create_app() -> FastAPI:
 
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(realtime_router, prefix=FASTAPI_API_PREFIX)
+    application.include_router(realtime_metrics_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(jobs_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(geospatial_router, prefix=FASTAPI_API_PREFIX)
     application.add_api_route(

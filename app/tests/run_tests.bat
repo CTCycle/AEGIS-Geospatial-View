@@ -99,7 +99,7 @@ set "LIVE_SERVER_PHASE=PASS"
 curl -s --max-time 2 "%APP_TEST_BACKEND_URL%/docs" >nul 2>&1
 if errorlevel 1 (
   echo [INFO] Starting backend server...
-  start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning
+  start "" /B /D "%BACKEND_WORKDIR%" "%PYTHON_CMD%" -m uvicorn %UVICORN_APP% --host %FASTAPI_HOST% --port %FASTAPI_PORT% --log-level warning --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10
   set "STARTED_BACKEND=1"
 )
 
