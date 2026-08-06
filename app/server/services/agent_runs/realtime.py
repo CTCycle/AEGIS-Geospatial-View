@@ -57,21 +57,26 @@ OUTBOUND_ENQUEUE_TIMEOUT_SECONDS = 5.0
 MAX_COMMANDS_PER_MINUTE = 60
 
 
+###############################################################################
 class RealtimeConnectionRegistry:
     """Tracks live sockets so shutdown can close them deterministically."""
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self._connections: set[RealtimeConnection] = set()
         self._lock = asyncio.Lock()
 
+    # -------------------------------------------------------------------------
     async def add(self, connection: RealtimeConnection) -> None:
         async with self._lock:
             self._connections.add(connection)
 
+    # -------------------------------------------------------------------------
     async def remove(self, connection: RealtimeConnection) -> None:
         async with self._lock:
             self._connections.discard(connection)
 
+    # -------------------------------------------------------------------------
     async def close_all(self) -> None:
         async with self._lock:
             connections = list(self._connections)
@@ -80,12 +85,16 @@ class RealtimeConnectionRegistry:
             return_exceptions=True,
         )
 
+    # -------------------------------------------------------------------------
     async def count(self) -> int:
         async with self._lock:
             return len(self._connections)
 
 
+###############################################################################
 class RealtimeConnection:
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         websocket: WebSocket,
@@ -124,6 +133,7 @@ class RealtimeConnection:
         self._first_message_received = False
         self._metrics_opened = False
 
+    # -------------------------------------------------------------------------
     async def run(self) -> None:
         await self.registry.add(self)
         await self.websocket.accept(subprotocol=REALTIME_SUBPROTOCOL)
@@ -163,6 +173,7 @@ class RealtimeConnection:
         finally:
             await self.close(code=1000, reason="closed")
 
+    # -------------------------------------------------------------------------
     async def close(self, *, code: int = 1000, reason: str = "closed") -> None:
         async with self._close_lock:
             if self._closed.is_set():
@@ -185,6 +196,7 @@ class RealtimeConnection:
                 self._metrics_opened = False
             await self.registry.remove(self)
 
+    # -------------------------------------------------------------------------
     async def _receive_loop(self) -> None:
         first_deadline = time.monotonic() + HANDSHAKE_TIMEOUT_SECONDS
         while not self._closed.is_set():
@@ -212,6 +224,7 @@ class RealtimeConnection:
             self._first_message_received = True
             await self._handle_message(text)
 
+    # -------------------------------------------------------------------------
     async def _handle_message(self, text: str) -> None:
         started = time.monotonic()
         self.metrics.message_received()
@@ -280,6 +293,7 @@ class RealtimeConnection:
         finally:
             self.metrics.observe_command_latency((time.monotonic() - started) * 1000)
 
+    # -------------------------------------------------------------------------
     async def _resume(self, message: RealtimeClientMessage) -> None:
         payload = RealtimeResumePayload.model_validate(message.payload)
         if payload.run_id is None:
@@ -311,6 +325,7 @@ class RealtimeConnection:
         )
         await self._attach_run(payload.run_id, payload.after_sequence)
 
+    # -------------------------------------------------------------------------
     async def _start_run(self, message: RealtimeClientMessage) -> None:
         payload = RealtimeStartPayload.model_validate(message.payload)
         result, created = await self.lifecycle_service.create_run_with_status(
@@ -334,6 +349,7 @@ class RealtimeConnection:
         )
         await self._attach_run(result.run_id, 0 if created else self._last_sequence)
 
+    # -------------------------------------------------------------------------
     async def _steer_run(self, message: RealtimeClientMessage) -> None:
         payload = RealtimeSteerPayload.model_validate(message.payload)
         if self._active_run_id is not None and payload.run_id != self._active_run_id:
@@ -360,6 +376,7 @@ class RealtimeConnection:
             },
         )
 
+    # -------------------------------------------------------------------------
     async def _cancel_run(self, message: RealtimeClientMessage) -> None:
         payload = RealtimeCancelPayload.model_validate(message.payload)
         response, transitioned = await self.lifecycle_service.cancel_run_with_status(
@@ -378,6 +395,7 @@ class RealtimeConnection:
             },
         )
 
+    # -------------------------------------------------------------------------
     async def _attach_run(self, run_id: str, after_sequence: int) -> None:
         if self._event_task is not None:
             self._event_task.cancel()
@@ -390,6 +408,7 @@ class RealtimeConnection:
             name=f"realtime-events-{run_id}",
         )
 
+    # -------------------------------------------------------------------------
     async def _forward_events(self, run_id: str, after_sequence: int) -> None:
         terminal_seen = False
         async for event in self.event_publisher.events(
@@ -416,6 +435,7 @@ class RealtimeConnection:
         if not terminal_seen and not self._closed.is_set():
             await self.close(code=1013, reason="event_replay_required")
 
+    # -------------------------------------------------------------------------
     async def _writer(self) -> None:
         try:
             while not self._closed.is_set():
@@ -436,6 +456,7 @@ class RealtimeConnection:
             )
             await self.close(code=1011, reason="writer_failure")
 
+    # -------------------------------------------------------------------------
     async def _heartbeat(self) -> None:
         while not self._closed.is_set():
             await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
@@ -446,11 +467,13 @@ class RealtimeConnection:
             self._last_ping_nonce = nonce
             await self._send("heartbeat.ping", payload={"nonce": nonce})
 
+    # -------------------------------------------------------------------------
     def _handle_pong(self, payload: dict[str, Any]) -> None:
         nonce = payload.get("nonce")
         if self._last_ping_nonce is None or nonce == self._last_ping_nonce:
             self._last_pong = time.monotonic()
 
+    # -------------------------------------------------------------------------
     async def _send(
         self,
         message_type: str,
@@ -475,6 +498,7 @@ class RealtimeConnection:
         except TimeoutError:
             await self.close(code=1013, reason="outbound_backpressure")
 
+    # -------------------------------------------------------------------------
     async def _protocol_error(
         self,
         correlation_id: str | None,
@@ -495,6 +519,7 @@ class RealtimeConnection:
         if fatal:
             await self.close(code=1008, reason=code)
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _error_code(exc: RunServiceError) -> str:
         if isinstance(exc, RunNotFoundError):
@@ -506,6 +531,7 @@ class RealtimeConnection:
         return "run_service_failure"
 
 
+###############################################################################
 def is_realtime_origin_allowed(websocket: WebSocket) -> bool:
     """Restrict the unauthenticated local mode to the configured UI origin."""
     configured_host = os.getenv("FASTAPI_HOST", "127.0.0.1").strip().lower()

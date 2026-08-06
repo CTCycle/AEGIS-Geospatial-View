@@ -53,6 +53,7 @@ class AgentRunCreateRequest(BaseModel):
             raise ValueError("message is too long")
         return normalized
 
+    # -------------------------------------------------------------------------
     @field_validator("client_request_id")
     @classmethod
     def normalize_client_request_id(cls, value: str | None) -> str | None:

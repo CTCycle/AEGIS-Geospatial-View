@@ -11,7 +11,6 @@ from server.services.agent_runs.exceptions import (
     RunServiceError,
 )
 
-
 ###############################################################################
 def raise_run_http_error(exc: RunServiceError) -> NoReturn:
     if isinstance(exc, RunNotFoundError):

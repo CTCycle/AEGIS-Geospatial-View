@@ -19,6 +19,7 @@ RealtimeClientMessageType = Literal[
 ]
 
 
+###############################################################################
 class RealtimeClientMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -28,6 +29,7 @@ class RealtimeClientMessage(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+###############################################################################
 class RealtimeResumePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -35,12 +37,14 @@ class RealtimeResumePayload(BaseModel):
     after_sequence: int = Field(default=0, ge=0)
 
 
+###############################################################################
 class RealtimeStartPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str = Field(min_length=1, max_length=12000)
     client_request_id: str = Field(min_length=1, max_length=160)
 
+    # -------------------------------------------------------------------------
     @field_validator("message")
     @classmethod
     def normalize_message(cls, value: str) -> str:
@@ -49,6 +53,7 @@ class RealtimeStartPayload(BaseModel):
             raise ValueError("message must not be empty")
         return normalized
 
+    # -------------------------------------------------------------------------
     @field_validator("client_request_id")
     @classmethod
     def normalize_request_id(cls, value: str) -> str:
@@ -58,6 +63,7 @@ class RealtimeStartPayload(BaseModel):
         return normalized
 
 
+###############################################################################
 class RealtimeSteerPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -65,6 +71,7 @@ class RealtimeSteerPayload(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     client_mutation_id: str = Field(min_length=1, max_length=160)
 
+    # -------------------------------------------------------------------------
     @field_validator("run_id", "client_mutation_id")
     @classmethod
     def normalize_identifier(cls, value: str) -> str:
@@ -73,6 +80,7 @@ class RealtimeSteerPayload(BaseModel):
             raise ValueError("identifier must not be empty")
         return normalized
 
+    # -------------------------------------------------------------------------
     @field_validator("message")
     @classmethod
     def normalize_steering_message(cls, value: str) -> str:
@@ -82,6 +90,7 @@ class RealtimeSteerPayload(BaseModel):
         return normalized
 
 
+###############################################################################
 class RealtimeCancelPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,6 +98,7 @@ class RealtimeCancelPayload(BaseModel):
     reason: str | None = Field(default=None, max_length=400)
 
 
+###############################################################################
 class RealtimeServerMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
