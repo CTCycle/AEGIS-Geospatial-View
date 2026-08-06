@@ -30,9 +30,11 @@ from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.steering import RunSteeringService
 
 
+###############################################################################
 class _Backend:
     db_path = None
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.engine = sqlalchemy.create_engine(
             "sqlite://",
@@ -43,11 +45,15 @@ class _Backend:
         self.session = sessionmaker(bind=self.engine, future=True)
 
 
+###############################################################################
 class _Agent:
+
+    # -------------------------------------------------------------------------
     def __init__(self, runs: AgentRunRepository, publisher: RunEventPublisher) -> None:
         self.runs = runs
         self.publisher = publisher
 
+    # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
         run = self.runs.get_run(run_id)
         assert run is not None
@@ -75,6 +81,7 @@ class _Agent:
         self.runs.mark_completed(run_id)
 
 
+###############################################################################
 @pytest.fixture()
 def realtime_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, FastAPI]]:
     monkeypatch.setenv("FASTAPI_HOST", "127.0.0.1")
@@ -116,6 +123,7 @@ def realtime_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClien
         client.close()
 
 
+###############################################################################
 def _receive_until_terminal(socket) -> list[dict]:
     messages: list[dict] = []
     while True:
@@ -125,6 +133,7 @@ def _receive_until_terminal(socket) -> list[dict]:
             return messages
 
 
+###############################################################################
 def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:
@@ -179,6 +188,7 @@ def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
         assert duplicate_ack["payload"]["duplicate"] is True
 
 
+###############################################################################
 def test_websocket_route_rejects_wrong_origin(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:
@@ -194,6 +204,7 @@ def test_websocket_route_rejects_wrong_origin(
             pass
 
 
+###############################################################################
 def test_websocket_reconnect_replays_only_events_after_sequence(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:
@@ -240,6 +251,7 @@ def test_websocket_reconnect_replays_only_events_after_sequence(
         assert all(item["conversation_id"] == conversation_id for item in replayed)
 
 
+###############################################################################
 @pytest.mark.asyncio
 async def test_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
@@ -281,6 +293,7 @@ async def test_concurrent_conversations_keep_event_routing_isolated(
     assert second_events == [(second, 1), (second, 2), (second, 3)]
 
 
+###############################################################################
 def test_realtime_metrics_are_loopback_only(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:

@@ -21,6 +21,7 @@ router = APIRouter(prefix=CONVERSATIONS_ROUTER_PREFIX, tags=["realtime"])
 metrics_router = APIRouter(prefix="/realtime", tags=["realtime"])
 
 
+###############################################################################
 @router.websocket(CONVERSATION_REALTIME_ROUTE)
 async def realtime_socket(
     websocket: WebSocket,
@@ -64,6 +65,7 @@ async def realtime_socket(
     await connection.run()
 
 
+###############################################################################
 @metrics_router.get("/metrics", include_in_schema=False)
 def realtime_metrics(request: Request) -> dict[str, object]:
     """Expose local metrics only to loopback operators."""

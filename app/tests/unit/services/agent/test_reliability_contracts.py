@@ -3,7 +3,6 @@ from __future__ import annotations
 from server.services.agent.parser_service import ParserService
 from server.services.geospatial.overpass import OverpassService
 
-
 ###############################################################################
 def test_conceptual_basemap_question_is_not_a_map_fallback() -> None:
     extracted = ParserService._fallback_extraction(
@@ -12,7 +11,6 @@ def test_conceptual_basemap_question_is_not_a_map_fallback() -> None:
 
     assert extracted.task_class == "general_question"
     assert extracted.location_signals == []
-
 
 ###############################################################################
 def test_explicit_no_map_request_is_direct_and_poi_categories_are_typed() -> None:
@@ -34,7 +32,6 @@ def test_explicit_no_map_request_is_direct_and_poi_categories_are_typed() -> Non
         {},
     )
     assert poi.poi_categories == ["bicycle_parking", "rail_stations"]
-
 
 ###############################################################################
 def test_overpass_category_selectors_cover_public_transit_and_rail() -> None:
