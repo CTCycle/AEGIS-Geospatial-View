@@ -76,12 +76,21 @@ class RunEventPublisher:
         self,
         run_id: str,
         after_event_id: str | None = None,
+        after_sequence: int | None = None,
     ) -> tuple[RunEventSubscription, list[RunEvent]]:
         queue: asyncio.Queue[RunEvent | None] = asyncio.Queue(maxsize=self.subscriber_queue_size)
         subscription = RunEventSubscription(run_id=run_id, queue=queue)
-        replay = self.replay(run_id, after_event_id=after_event_id)
         async with self._lock:
             self._subscribers[run_id].add(queue)
+        # Register before reading replay so an event committed between the
+        # cursor lookup and subscription cannot be lost. The generator below
+        # rereads by sequence after every notification and deduplicates any
+        # overlap between replay and live fan-out.
+        replay = self.replay(
+            run_id,
+            after_event_id=after_event_id,
+            after_sequence=after_sequence,
+        )
         return subscription, replay
 
     # -------------------------------------------------------------------------
@@ -95,10 +104,16 @@ class RunEventPublisher:
                 self._subscribers.pop(subscription.run_id, None)
 
     # -------------------------------------------------------------------------
-    def replay(self, run_id: str, after_event_id: str | None = None) -> list[RunEvent]:
+    def replay(
+        self,
+        run_id: str,
+        after_event_id: str | None = None,
+        after_sequence: int | None = None,
+    ) -> list[RunEvent]:
         return self.event_repository.list_events(
             run_id,
             after_event_id=after_event_id,
+            after_sequence=after_sequence,
             visibility="user",
         )
 
@@ -107,15 +122,37 @@ class RunEventPublisher:
         self,
         run_id: str,
         after_event_id: str | None = None,
+        after_sequence: int | None = None,
     ) -> AsyncGenerator[RunEvent, None]:
-        subscription, replay = await self.subscribe(run_id, after_event_id=after_event_id)
+        subscription, replay = await self.subscribe(
+            run_id,
+            after_event_id=after_event_id,
+            after_sequence=after_sequence,
+        )
+        cursor = after_sequence or 0
+        if after_event_id:
+            previous = self.event_repository.find_event(run_id, after_event_id)
+            if previous is not None:
+                cursor = max(cursor, previous.sequence)
         try:
             for event in replay:
+                if event.sequence <= cursor:
+                    continue
+                cursor = event.sequence
                 yield event
             while True:
-                event = await subscription.queue.get()
-                if event is None:
+                notification = await subscription.queue.get()
+                if notification is None:
                     break
-                yield event
+                # A notification is only a wake-up signal. Reading the
+                # durable log gives every subscriber the same sequence order,
+                # even if concurrent publishers fan out in opposite order.
+                for event in self.event_repository.list_events(
+                    run_id,
+                    after_sequence=cursor,
+                    visibility="user",
+                ):
+                    cursor = event.sequence
+                    yield event
         finally:
             await self.unsubscribe(subscription)

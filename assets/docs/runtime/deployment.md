@@ -26,6 +26,11 @@ Last updated: 2026-08-03
 - Background jobs are in-process and do not survive backend restart.
 - Cancellation is cooperative.
 - External providers influence runtime reliability based on network and credential state.
+- The realtime WebSocket is production-hardened for the supported single-user,
+  single-replica deployment: durable ordered events, reconnect replay,
+  bounded queues, heartbeats, origin checks, and idempotent commands. A
+  load-balanced deployment needs sticky sessions or a shared event broker and
+  shared metrics/tracing before it is supported.
 
 ## Distribution Notes
 

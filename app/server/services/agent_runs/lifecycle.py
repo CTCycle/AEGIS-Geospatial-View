@@ -8,7 +8,6 @@ from server.domain.agent_runs import (
     AgentRunCreateResult,
     AgentRunState,
     ConversationCreateResponse,
-    TERMINAL_RUN_STATES,
 )
 from server.domain.run_events import RunEventType
 from server.repositories.agent_runs import AgentRunRepository
@@ -58,18 +57,29 @@ class RunLifecycleService:
         conversation_id: str,
         payload: AgentRunCreateRequest,
     ) -> AgentRunCreateResult:
+        result, _created = await self.create_run_with_status(conversation_id, payload)
+        return result
+
+    # -------------------------------------------------------------------------
+    async def create_run_with_status(
+        self,
+        conversation_id: str,
+        payload: AgentRunCreateRequest,
+    ) -> tuple[AgentRunCreateResult, bool]:
         try:
             self.conversation_repository.verify_conversation_access(conversation_id, None)
         except ValueError as exc:
             raise RunNotFoundError("Conversation not found.") from exc
         except PermissionError as exc:
             raise RunAccessError("Conversation access denied.") from exc
-        active = self.run_repository.get_active_run_for_conversation(conversation_id)
-        if active is not None and active.state not in TERMINAL_RUN_STATES:
-            raise RunConflictError("Conversation already has an active run.")
         aggregate = self.aggregation_service.build_aggregated_request(payload.message, [])
         try:
-            run = self.run_repository.create_run(conversation_id, payload.message, aggregate)
+            run, created = self.run_repository.create_or_get_run(
+                conversation_id,
+                payload.message,
+                aggregate,
+                client_request_id=payload.client_request_id,
+            )
         except ValueError as exc:
             message = str(exc)
             if "active run" in message:
@@ -77,15 +87,16 @@ class RunLifecycleService:
             raise RunNotFoundError(message) from exc
         except PermissionError as exc:
             raise RunAccessError(str(exc)) from exc
-        task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        if created:
+            task = asyncio.create_task(self.run_orchestrator.execute_run(run.run_id))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
         return AgentRunCreateResult(
             conversation_id=conversation_id,
             run_id=run.run_id,
             run_version=run.active_run_version,
             state=run.state,
-        )
+        ), created
 
     # -------------------------------------------------------------------------
     async def shutdown(self) -> None:
@@ -99,20 +110,28 @@ class RunLifecycleService:
 
     # -------------------------------------------------------------------------
     async def cancel_run(self, conversation_id: str, run_id: str) -> AgentRunCancelResponse:
+        response, _transitioned = await self.cancel_run_with_status(conversation_id, run_id)
+        return response
+
+    # -------------------------------------------------------------------------
+    async def cancel_run_with_status(
+        self, conversation_id: str, run_id: str
+    ) -> tuple[AgentRunCancelResponse, bool]:
         snapshot = self.run_repository.get_run(run_id)
         if snapshot is None or snapshot.conversation_id != conversation_id:
             raise RunNotFoundError("Run not found.")
-        cancelled = self.run_repository.request_cancel(run_id)
-        await self.event_publisher.publish(
-            conversation_id=conversation_id,
-            run_id=run_id,
-            run_version=cancelled.active_run_version,
-            type=RunEventType.CANCELLED,
-            payload={"state": AgentRunState.CANCELLED.value},
-        )
+        cancelled, transitioned = self.run_repository.request_cancel_once(run_id)
+        if transitioned:
+            await self.event_publisher.publish(
+                conversation_id=conversation_id,
+                run_id=run_id,
+                run_version=cancelled.active_run_version,
+                type=RunEventType.CANCELLED,
+                payload={"state": AgentRunState.CANCELLED.value},
+            )
         return AgentRunCancelResponse(
             conversation_id=conversation_id,
             run_id=run_id,
             state=cancelled.state,
             cancel_requested_at=cancelled.cancel_requested_at,
-        )
+        ), transitioned

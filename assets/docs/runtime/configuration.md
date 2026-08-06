@@ -17,6 +17,8 @@ Common keys include:
 - `UI_PORT`
 - `RELOAD`
 - `BACKEND_LOGS_VISIBLE`
+- `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for
+  non-browser clients)
 - `ALWAYS_REBUILD`
 - `EMBEDDED_DATABASE`
 - `DATABASE_URL`
@@ -65,3 +67,8 @@ Source template: `settings/.env.example`
 
 - `BACKEND_LOGS_VISIBLE=true` shows backend logs in a dedicated terminal; when absent, the launcher defaults to `true`
 - intended for the local web workflow
+
+The realtime WebSocket is deliberately restricted to loopback backend hosts and
+the configured UI origin. The launcher configures a 64 KiB frame limit and
+15-second native ping/10-second timeout values; the application protocol adds
+its own heartbeat and sequence replay.

@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from server.domain.steering import SteeringMessageRecord
 from server.repositories.database.contracts import DatabaseBackend
@@ -49,6 +50,7 @@ class AgentSteeringRepository:
         client_mutation_id: str | None,
         run_version: int,
         aggregated_request: str,
+        expected_run_version: int | None = None,
     ) -> tuple[SteeringMessageRecord, int, str]:
         """Persist the steering mutation and its run version in one transaction."""
         with self._session_factory() as session:
@@ -68,6 +70,8 @@ class AgentSteeringRepository:
                 )
                 if existing is not None:
                     return self._to_domain(existing), run.active_run_version, run.aggregated_request
+            if expected_run_version is not None and run.active_run_version != expected_run_version:
+                raise ValueError("Run version conflict.")
             record = AgentSteeringMessageRecord(
                 id=f"steer_{uuid4().hex}",
                 run_id=run_id,
@@ -79,7 +83,11 @@ class AgentSteeringRepository:
             run.active_run_version = run_version
             run.state = "updating"
             session.add(record)
-            session.commit()
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise ValueError("Run version conflict.") from exc
             session.refresh(record)
             return self._to_domain(record), run_version, aggregated_request
 

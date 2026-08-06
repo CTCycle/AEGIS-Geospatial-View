@@ -53,6 +53,18 @@ class AgentRunCreateRequest(BaseModel):
             raise ValueError("message is too long")
         return normalized
 
+    @field_validator("client_request_id")
+    @classmethod
+    def normalize_client_request_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if len(normalized) > 160:
+            raise ValueError("client_request_id is too long")
+        return normalized
+
 ###############################################################################
 class AgentRunCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")

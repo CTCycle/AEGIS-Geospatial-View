@@ -404,7 +404,7 @@ function Invoke-LaunchApplication {
         $env:PYTHONPATH = $AppDir
     }
 
-    $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info')
+    $backendArguments = @('-m', 'uvicorn', $backendModule, '--host', $env:FASTAPI_HOST, '--port', "$fastApiPort", '--log-level', 'info', '--ws-max-size', '65536', '--ws-ping-interval', '15', '--ws-ping-timeout', '10')
     if ($env:RELOAD -ieq 'true') {
         $backendArguments += '--reload'
     }

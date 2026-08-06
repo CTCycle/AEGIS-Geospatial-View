@@ -5,6 +5,8 @@ import { AgentReadinessService } from '../core/agent-readiness.service';
 import { ApiClientService } from '../core/api-client.service';
 import { defaultAppState } from '../core/app-state';
 import { AppStateStoreService } from '../core/app-state-store.service';
+import { FakeRealtimeService } from '../core/realtime.test-support';
+import { RealtimeService } from '../core/realtime.service';
 import { ChatTurnResponse } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { GeospatialPageComponent } from './geospatial-page.component';
@@ -13,6 +15,7 @@ describe('pages/geospatial-page.component', () => {
   let store: jasmine.SpyObj<AppStateStoreService>;
   let errors: jasmine.SpyObj<UserFacingErrorService>;
   let apiClient: jasmine.SpyObj<ApiClientService>;
+  let realtime: FakeRealtimeService;
   let agentReadiness: jasmine.SpyObj<AgentReadinessService>;
   let sendChatTurnMock: jasmine.Spy;
 
@@ -45,6 +48,7 @@ describe('pages/geospatial-page.component', () => {
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-1', title: 'test' });
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
+    realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
     agentReadiness = jasmine.createSpyObj<AgentReadinessService>('AgentReadinessService', ['loadReadiness']);
     agentReadiness.loadReadiness.and.resolveTo({
       status: 'active',
@@ -57,6 +61,7 @@ describe('pages/geospatial-page.component', () => {
       providers: [
         provideRouter([]),
         { provide: ApiClientService, useValue: apiClient },
+        { provide: RealtimeService, useValue: realtime },
         { provide: AppStateStoreService, useValue: store },
         { provide: AgentReadinessService, useValue: agentReadiness },
         { provide: UserFacingErrorService, useValue: errors },
@@ -141,7 +146,7 @@ describe('pages/geospatial-page.component', () => {
   });
 
   it('prefers operation.map_session over the top-level response map_session', async () => {
-    sendChatTurnMock.and.resolveTo(makeTurnResponse({
+    const mapResponse = makeTurnResponse({
       assistant_message: 'Map ready.',
       operation: {
         kind: 'map_session',
@@ -167,13 +172,18 @@ describe('pages/geospatial-page.component', () => {
         center: { latitude: 41.9, longitude: 12.5 },
         overlays: [{ id: 'leaky_overlay', label: 'Leaky overlay', provider: 'fixture', type: 'tile', url: 'https://tiles.example/{z}/{x}/{y}.png?api_key=forbidden-secret' }],
       },
-    }));
+    });
+    sendChatTurnMock.and.resolveTo(mapResponse);
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.composerDraft = 'show Rome';
 
     await component.sendMessage();
+    await Promise.resolve();
+    // The component's eager change detection starts MapLibre in a real
+    // browser; this unit spec focuses on payload precedence and sanitization.
+    component['applyTurnResponse'](mapResponse, component.conversationNonce);
 
     expect(component['pendingMapSession']?.session_id).toBe('operation-map');
     component.onMapRenderStateChange({ sessionId: 'operation-map', state: 'ready' });
@@ -223,7 +233,7 @@ describe('pages/geospatial-page.component', () => {
     component.composerDraft = 'show map';
     await component.sendMessage();
     expect(component.status).toBe('Agent ready');
-    expect(component.messages.at(-1)?.content).toBe('fallback error');
+    expect(component.messages.at(-1)?.content).toBe('boom');
   });
 
   it('operation-aware alerts include structured failure message', () => {
@@ -267,6 +277,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
     component.isLoading = true;
     component.activeRunId = 'run-1';
     component['handleRunEvent']({
@@ -306,6 +317,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
     component.isLoading = true;
     component.progressLabel = 'Understanding the request';
     fixture.detectChanges();
@@ -329,6 +341,7 @@ describe('pages/geospatial-page.component', () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
     component.messages = [{ role: 'assistant', content: 'Provider timed out.' }];
     component['handleRunEvent']({
       event_id: 'event-error',
@@ -366,6 +379,7 @@ describe('pages/geospatial-page.component', () => {
       operation: { kind: 'direct_answer', status: 'success', message: 'Rain ready.', warnings: [] },
     }));
     await pending;
+    await Promise.resolve();
     expect(component.status).toBe('Agent ready');
   });
 

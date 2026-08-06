@@ -154,6 +154,29 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
         )
     assert first.state == "pending"
 
+
+def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> None:
+    lifecycle, _, _, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Idempotency")
+
+    first, created = asyncio.run(
+        lifecycle.create_run_with_status(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Rome", client_request_id="request-1"),
+        )
+    )
+    duplicate, duplicate_created = asyncio.run(
+        lifecycle.create_run_with_status(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Map Milan", client_request_id="request-1"),
+        )
+    )
+
+    assert created is True
+    assert duplicate_created is False
+    assert duplicate.run_id == first.run_id
+    assert duplicate.state == first.state
+
 ###############################################################################
 def test_conversation_context_state_survives_repository_restart(
     run_repositories,
@@ -211,12 +234,14 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
 
     assert first.run_id == run.run_id
     assert first.run_version == 2
+    assert first.duplicate is False
     assert duplicate.steering_id == first.steering_id
     assert duplicate.run_version == 2
+    assert duplicate.duplicate is True
 
 ###############################################################################
 def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) -> None:
-    lifecycle, steering, _, _ = _services(run_repositories)
+    lifecycle, steering, publisher, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Rome")
     run = asyncio.run(
         lifecycle.create_run(
@@ -226,8 +251,18 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
     )
 
     cancel = asyncio.run(lifecycle.cancel_run(conversation.conversation_id, run.run_id))
+    duplicate_cancel = asyncio.run(
+        lifecycle.cancel_run(conversation.conversation_id, run.run_id)
+    )
 
     assert cancel.state == "cancelled"
+    assert duplicate_cancel.state == "cancelled"
+    assert len(publisher.replay(run.run_id)) == 1
+    cancelled_snapshot, transitioned = run_repositories["runs"].mark_completed_if_current(
+        run.run_id, run.run_version
+    )
+    assert transitioned is False
+    assert cancelled_snapshot.state == "cancelled"
     with pytest.raises(RunConflictError):
         asyncio.run(
             steering.steer(

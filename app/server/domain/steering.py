@@ -50,6 +50,7 @@ class SteeringMessageResponse(BaseModel):
     run_version: int
     aggregated_request: str
     state: AgentRunState
+    duplicate: bool = False
 
 ###############################################################################
 class SteeringMessageRecord(BaseModel):

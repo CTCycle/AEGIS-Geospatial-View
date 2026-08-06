@@ -41,11 +41,25 @@ class _FakeRunRepository:
         return self.snapshot
 
     # -------------------------------------------------------------------------
+    def mark_started_if_current(
+        self, run_id: str, expected_run_version: int
+    ) -> tuple[AgentRunSnapshot, bool]:
+        assert expected_run_version == self.snapshot.active_run_version
+        return self.mark_started(run_id), True
+
+    # -------------------------------------------------------------------------
     def mark_completed(self, run_id: str) -> AgentRunSnapshot:
         assert run_id == self.snapshot.run_id
         self.completed = True
         self.snapshot = self.snapshot.model_copy(update={"state": AgentRunState.COMPLETED})
         return self.snapshot
+
+    # -------------------------------------------------------------------------
+    def mark_completed_if_current(
+        self, run_id: str, expected_run_version: int
+    ) -> tuple[AgentRunSnapshot, bool]:
+        assert expected_run_version == self.snapshot.active_run_version
+        return self.mark_completed(run_id), True
 
     # -------------------------------------------------------------------------
     def mark_failed(self, run_id: str, code: str, message: str) -> AgentRunSnapshot:
@@ -61,10 +75,21 @@ class _FakeRunRepository:
         return self.snapshot
 
     # -------------------------------------------------------------------------
+    def mark_failed_if_current(
+        self, run_id: str, expected_run_version: int, code: str, message: str
+    ) -> tuple[AgentRunSnapshot, bool]:
+        assert expected_run_version == self.snapshot.active_run_version
+        return self.mark_failed(run_id, code, message), True
+
+    # -------------------------------------------------------------------------
     def request_cancel(self, run_id: str) -> AgentRunSnapshot:
         assert run_id == self.snapshot.run_id
         self.snapshot = self.snapshot.model_copy(update={"state": AgentRunState.CANCELLED})
         return self.snapshot
+
+    # -------------------------------------------------------------------------
+    def request_cancel_once(self, run_id: str) -> tuple[AgentRunSnapshot, bool]:
+        return self.request_cancel(run_id), True
 
 ###############################################################################
 class _FakeEventPublisher:
