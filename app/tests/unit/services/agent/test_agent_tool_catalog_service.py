@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from types import SimpleNamespace
 from typing import Any
 
@@ -320,7 +320,7 @@ def test_capability_description_includes_executable_schema() -> None:
 
 ###############################################################################
 def test_execute_rejects_invalid_nested_arguments() -> None:
-    result = asyncio.run(
+    result = run_async_in_thread(
         _service().execute_geospatial_capability(
             "weather_overlay",
             {"bbox": [12.0, "bad", 13.0, 42.0, 9.0]},
@@ -335,7 +335,7 @@ def test_execute_rejects_invalid_nested_arguments() -> None:
 
 ###############################################################################
 def test_execute_map_capability_returns_real_map_session() -> None:
-    result = asyncio.run(
+    result = run_async_in_thread(
         _service().execute_geospatial_capability(
             "weather_overlay",
             {},
@@ -350,7 +350,7 @@ def test_execute_map_capability_returns_real_map_session() -> None:
 
 ###############################################################################
 def test_execute_direct_capability_returns_direct_result() -> None:
-    result = asyncio.run(
+    result = run_async_in_thread(
         _service().execute_geospatial_capability(
             "coordinates_tool",
             {"location": "Rome"},
@@ -365,7 +365,7 @@ def test_execute_direct_capability_returns_direct_result() -> None:
 
 ###############################################################################
 def test_execute_returns_missing_credentials_without_fake_success() -> None:
-    result = asyncio.run(
+    result = run_async_in_thread(
         _service().execute_geospatial_capability(
             "tomtom_traffic_flow",
             {},
@@ -380,7 +380,7 @@ def test_execute_returns_missing_credentials_without_fake_success() -> None:
 
 ###############################################################################
 def test_execute_rejects_direct_only_capability_for_map_request() -> None:
-    result = asyncio.run(
+    result = run_async_in_thread(
         _service().execute_geospatial_capability(
             "coordinates_tool",
             {"location": "Rome"},

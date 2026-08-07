@@ -10,7 +10,7 @@ from playwright.sync_api import Page, Route, expect
 from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
 
 
-STORAGE_KEY = "aegis:webapp-state:v3"
+STORAGE_KEY = "aegis:webapp-state:v4"
 TAB_KEY = "aegis:webapp-tab-id:v1"
 HEARTBEAT_PREFIX = "aegis:webapp-tab-heartbeat:v1:"
 

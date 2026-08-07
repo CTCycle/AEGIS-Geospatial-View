@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 
 from server.domain.agent.decision import PolicyDecision
@@ -164,7 +164,7 @@ def test_execute_run_marks_failed_operation_as_failed_run() -> None:
         conversation_repository=object(),  # type: ignore[arg-type]
     )
 
-    asyncio.run(orchestrator.execute_run("run_1"))
+    run_async_in_thread(orchestrator.execute_run("run_1"))
 
     assert repository.completed is False
     assert repository.failed == (

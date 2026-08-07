@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 
@@ -10,7 +10,7 @@ from server.services.geospatial.providers.fred import FREDProvider
 ###############################################################################
 def test_fred_requires_key_for_live_search() -> None:
     with pytest.raises(ProviderAuthError, match="FRED_API_KEY|FRED API key"):
-        asyncio.run(
+        run_async_in_thread(
             FREDProvider().fetch(
                 ProviderRequest(
                     capability_id="fred_regional_market_indicators",
@@ -40,7 +40,7 @@ def test_fred_normalizes_series_search_payload() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         FREDProvider(api_key="fred-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="fred_regional_market_indicators",

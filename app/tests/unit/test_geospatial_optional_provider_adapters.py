@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 
@@ -18,7 +18,7 @@ from server.services.geospatial.providers.ourairports import OurAirportsProvider
 ###############################################################################
 def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             OpenTripMapProvider().fetch(
                 ProviderRequest(
                     capability_id="opentripmap_tourism_pois",
@@ -27,7 +27,7 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
             )
         )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenTripMapProvider(api_key="tourism-key").fetch(
             ProviderRequest(
                 capability_id="opentripmap_tourism_pois",
@@ -41,7 +41,7 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
 
 ###############################################################################
 def test_openchargemap_supports_optional_key() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenChargeMapProvider(api_key="charge-key").fetch(
             ProviderRequest(
                 capability_id="openchargemap_ev_charging",
@@ -49,7 +49,7 @@ def test_openchargemap_supports_optional_key() -> None:
             )
         )
     )
-    keyed = asyncio.run(
+    keyed = run_async_in_thread(
         OpenChargeMapProvider(api_key="charge-key").fetch(
             ProviderRequest(
                 capability_id="openchargemap_ev_charging",
@@ -64,7 +64,7 @@ def test_openchargemap_supports_optional_key() -> None:
 ###############################################################################
 def test_nrel_requires_key_for_afdc_descriptor() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             NRELProvider().fetch(
                 ProviderRequest(
                     capability_id="nrel_afdc_alt_fuel_stations",
@@ -73,7 +73,7 @@ def test_nrel_requires_key_for_afdc_descriptor() -> None:
             )
         )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         NRELProvider(api_key="nrel-key").fetch(
             ProviderRequest(
                 capability_id="nrel_afdc_alt_fuel_stations",
@@ -86,7 +86,7 @@ def test_nrel_requires_key_for_afdc_descriptor() -> None:
 
 ###############################################################################
 def test_ourairports_returns_source_ready_descriptor() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         OurAirportsProvider().fetch(ProviderRequest(capability_id="ourairports_airports"))
     )
 
@@ -109,7 +109,7 @@ def test_opentripmap_live_fetch_normalizes_geojson() -> None:
             ],
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenTripMapProvider(api_key="tourism-key", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="opentripmap_tourism_pois",
@@ -128,7 +128,7 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
         assert headers is None
         return []
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenChargeMapProvider(api_key="charge-key", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="openchargemap_ev_charging",
@@ -158,7 +158,7 @@ def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         NRELProvider(api_key="nrel-key", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="nrel_afdc_alt_fuel_stations",
@@ -176,7 +176,7 @@ def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
         return "not-json-shape"
 
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             NRELProvider(api_key="nrel-key", fetcher=fetcher).fetch(
                 ProviderRequest(
                     capability_id="nrel_afdc_alt_fuel_stations",
@@ -203,9 +203,9 @@ def test_optional_live_provider_uses_stale_cache_on_failure() -> None:
         capability_id="openchargemap_ev_charging",
         params={"latitude": 41.9, "longitude": 12.5, "live": True},
     )
-    first = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
     clock["now"] = 901.0
-    second = asyncio.run(provider.fetch(request))
+    second = run_async_in_thread(provider.fetch(request))
 
     assert first.stale is False
     assert second.stale is True

@@ -11,6 +11,7 @@ from starlette.websockets import WebSocketDisconnect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.conftest import run_async_in_thread
 from server.api.realtime import metrics_router as realtime_metrics_router
 from server.api.realtime import router as realtime_router
 from server.api.conversations import router as conversations_router
@@ -252,8 +253,7 @@ def test_websocket_reconnect_replays_only_events_after_sequence(
 
 
 ###############################################################################
-@pytest.mark.asyncio
-async def test_concurrent_conversations_keep_event_routing_isolated(
+async def _assert_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
 ) -> None:
     client, _app = realtime_client
@@ -292,6 +292,14 @@ async def test_concurrent_conversations_keep_event_routing_isolated(
     assert first_events == [(first, 1), (first, 2), (first, 3)]
     assert second_events == [(second, 1), (second, 2), (second, 3)]
 
+
+###############################################################################
+def test_concurrent_conversations_keep_event_routing_isolated(
+    realtime_client: tuple[TestClient, FastAPI],
+) -> None:
+    run_async_in_thread(
+        _assert_concurrent_conversations_keep_event_routing_isolated(realtime_client)
+    )
 
 ###############################################################################
 def test_realtime_metrics_are_loopback_only(

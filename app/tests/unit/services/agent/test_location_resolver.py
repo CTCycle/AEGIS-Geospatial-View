@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.agent.location_resolver import LocationResolver
 from server.domain.extraction.models import LocationSignal
@@ -25,7 +25,7 @@ def test_location_resolver_uses_coordinates_without_geocoder() -> None:
         assert result.latitude == 41.9
         assert result.longitude == 12.5
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
@@ -73,4 +73,4 @@ def test_location_resolver_prefers_specific_city_signal_over_country() -> None:
         assert result.latitude == 41.9028
         assert result.longitude == 12.4964
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())

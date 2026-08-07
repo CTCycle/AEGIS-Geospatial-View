@@ -18,6 +18,7 @@ from tests.e2e.helpers.chat_stub_payloads import (
     chat_turn_text_only_response,
     model_settings_payload,
 )
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 ###############################################################################
 def _json_ok(route: Route, payload: dict) -> None:
@@ -27,11 +28,9 @@ def _json_ok(route: Route, payload: dict) -> None:
 def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
     state: dict[str, object] = {"turn_count": 0, "last_session_id": session_id}
 
-    def handle_turn(route: Route) -> None:
-        body = route.request.post_data_json
+    def build_payload(message: str) -> dict[str, object]:
         state["turn_count"] = int(state["turn_count"]) + 1
-        message = str(body.get("message") or "")
-        current_session_id = int(body.get("session_id") or state["last_session_id"])
+        current_session_id = int(state["last_session_id"])
         if "air quality" in message.lower():
             payload = chat_turn_map_response(
                 current_session_id,
@@ -59,6 +58,12 @@ def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
                 current_session_id, "Search executed successfully."
             )
         state["last_session_id"] = payload["session_id"]
+        return payload
+
+    def handle_turn(route: Route) -> None:
+        body = route.request.post_data_json
+        message = str(body.get("message") or "")
+        payload = build_payload(message)
         _json_ok(route, payload)
 
     models_payload = {
@@ -99,6 +104,7 @@ def _setup_common_stubs(page: Page, session_id: int = 101) -> dict[str, object]:
             route, {"providers": [], "basemaps": [], "overlays": []}
         ),
     )
+    register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     return state
 
 ###############################################################################

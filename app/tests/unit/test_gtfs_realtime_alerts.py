@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 
 ###############################################################################
 def test_gtfs_realtime_alerts_render_popup_fields() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",

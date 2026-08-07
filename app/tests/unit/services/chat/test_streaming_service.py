@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ast
-import asyncio
+from tests.conftest import run_async_in_thread
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 from pathlib import Path
@@ -192,7 +192,7 @@ class UnexpectedErrorAgentOrchestrator:
 def stream_events(agent_orchestrator: object) -> list[ChatStreamEvent]:
     service = ChatStreamingService(agent_orchestrator)  # type: ignore[arg-type]
     payload = ChatTurnRequest(conversation_id="test-conversation", message="hi", request_id="chat-123")
-    return asyncio.run(collect_stream_events(service.stream_turn(payload)))
+    return run_async_in_thread(collect_stream_events(service.stream_turn(payload)))
 
 ###############################################################################
 def test_stream_turn_emits_lifecycle_and_map_events() -> None:

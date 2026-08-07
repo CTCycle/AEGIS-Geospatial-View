@@ -15,9 +15,10 @@ from tests.e2e.helpers.chat_stub_payloads import (
     model_catalog_payload,
     selected_agent_settings_payload,
 )
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jte8AAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
 ###############################################################################
@@ -119,7 +120,7 @@ def _setup_stub_harness(
     *,
     settings_payload: dict[str, Any] | None = None,
     models_payload: dict[str, Any] | None = None,
-    turn_payload_factory: Callable[[Route], dict[str, Any]] | None = None,
+    turn_payload_factory: Callable[[str], dict[str, Any]] | None = None,
     put_payloads: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     page.add_init_script(
@@ -160,7 +161,8 @@ def _setup_stub_harness(
                 route, chat_turn_map_response(9001, "Search executed successfully.")
             )
             return
-        _json_ok(route, turn_payload_factory(route))
+        message = str(_request_json(route).get("message", ""))
+        _json_ok(route, turn_payload_factory(message))
 
     def handle_create_conversation(route: Route) -> None:
         _json_ok(route, {"conversation_id": "conversation-e2e", "title": "E2E"})
@@ -169,11 +171,10 @@ def _setup_stub_harness(
         request_body = _request_json(route)
         message = str(request_body.get("message", ""))
         run_id = f"run-{len(run_turn_payloads) + 1}"
-        turn_route = route
         if turn_payload_factory is None:
             turn_payload = chat_turn_map_response(9001, "Search executed successfully.")
         else:
-            turn_payload = turn_payload_factory(turn_route)
+            turn_payload = turn_payload_factory(message)
         run_turn_payloads[run_id] = turn_payload
         route.fulfill(
             status=202,
@@ -276,9 +277,17 @@ def _setup_stub_harness(
         handle_run_events,
     )
     page.route(
-        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"),
+        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
+        ),
+    )
+    register_realtime_stub(
+        page,
+        lambda message, _run_number: (
+            turn_payload_factory(message)
+            if turn_payload_factory is not None
+            else chat_turn_map_response(9001, "Search executed successfully.")
         ),
     )
     return captured_put_payloads
@@ -293,7 +302,7 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(
     page.goto(f"{base_url.rstrip('/')}/settings?mode=cloud")
 
     expect(page.locator(".model-card").first).to_be_visible(timeout=15000)
-    expect(page.locator(".settings-page__stats-mobile-card").first).to_be_visible(
+    expect(page.get_by_role("complementary", name="Selected agent model")).to_be_visible(
         timeout=15000
     )
 
@@ -302,37 +311,22 @@ def test_settings_mobile_layout_has_no_overlap_at_320px(
         () => {
           const left = document.querySelector('.settings-page__left-column');
           const right = document.querySelector('.settings-page__right-column');
-          const cards = Array.from(document.querySelectorAll('.model-card'));
-          const statCards = Array.from(document.querySelectorAll('.settings-page__stats-mobile-card'));
           const asRect = (el) => {
             const r = el.getBoundingClientRect();
             return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
           };
-          const intersects = (a, b) => (
-            a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
-          );
-          const modelRects = cards.map(asRect).filter((rect) => rect.width > 0 && rect.height > 0);
-          const statsRects = statCards.map(asRect).filter((rect) => rect.width > 0 && rect.height > 0);
-          const overlaps = [];
-          modelRects.forEach((modelRect, modelIndex) => {
-            statsRects.forEach((statsRect, statsIndex) => {
-              if (intersects(modelRect, statsRect)) {
-                overlaps.push({ modelIndex, statsIndex });
-              }
-            });
-          });
           return {
-            overlaps,
             leftRect: left ? asRect(left) : null,
             rightRect: right ? asRect(right) : null,
+            bodyOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           };
         }
         """
     )
 
-    assert layout_metrics["overlaps"] == []
     assert layout_metrics["leftRect"] is not None
     assert layout_metrics["rightRect"] is not None
+    assert layout_metrics["bodyOverflow"] <= 1
     assert (
         layout_metrics["rightRect"]["top"] >= layout_metrics["leftRect"]["bottom"] - 1
     )
@@ -359,9 +353,6 @@ def test_model_card_selects_the_single_agent_model(page: Page, base_url: str) ->
     selection_button.focus()
     page.keyboard.press("Enter")
 
-    expect(page.get_by_text("Selected gpt-5-mini as agent model")).to_be_visible(
-        timeout=15000
-    )
     selected_button = model_card.get_by_role(
         "button", name="Selected agent model: gpt-5-mini"
     )
@@ -427,7 +418,7 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
 ) -> None:
     _setup_stub_harness(
         page,
-        turn_payload_factory=lambda route: chat_turn_text_only_response(
+        turn_payload_factory=lambda _message: chat_turn_text_only_response(
             12001,
             "This is the latest assistant response and it must remain visible above the composer.",
         ),
@@ -477,9 +468,8 @@ def test_settings_query_params_do_not_leak_back_to_chat(
 def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
     page: Page, base_url: str
 ) -> None:
-    def turn_payload(route: Route) -> dict[str, Any]:
-        request_body = route.request.post_data_json or {}
-        message = str(request_body.get("message", "")).lower()
+    def turn_payload(message: str) -> dict[str, Any]:
+        message = message.lower()
         if "coordinate" in message:
             return chat_turn_text_only_response(
                 11001, "Coordinates identified without map session."

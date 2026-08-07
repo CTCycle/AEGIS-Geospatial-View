@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 import pytest
 
 from server.services.geospatial.cache import GeospatialCache
@@ -11,7 +11,7 @@ from server.services.geospatial.providers.eurostat import EurostatProvider
 
 ###############################################################################
 def test_eea_provider_returns_wms_descriptor() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         EEAProvider().fetch(
             ProviderRequest(
                 capability_id="eea_noise_2019",
@@ -51,14 +51,14 @@ def test_eea_provider_live_validation_uses_stale_cache_after_failure() -> None:
         capability_id="eea_noise_2019",
         params={"live_validate": True, "metadata": {"url": "https://example.test/wms"}},
     )
-    first = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
 
     async def failing_fetcher(url: str, headers: dict[str, str] | None = None):
         raise ProviderUnavailableError("timeout")
 
     clock = 2.0
     provider.fetcher = failing_fetcher
-    stale = asyncio.run(provider.fetch(request))
+    stale = run_async_in_thread(provider.fetch(request))
 
     assert first.payload["liveValidation"]["service"] == "WMS"
     assert stale.stale is True
@@ -71,7 +71,7 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
         return ["not", "metadata"]
 
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             EEAProvider(fetcher=malformed_fetcher).fetch(
                 ProviderRequest(
                     capability_id="eea_noise_2019",
@@ -82,7 +82,7 @@ def test_eea_provider_rejects_malformed_live_validation_without_cache() -> None:
 
 ###############################################################################
 def test_esa_provider_returns_wmts_descriptor() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         ESAProvider().fetch(
             ProviderRequest(
                 capability_id="esa_worldcover",
@@ -122,21 +122,21 @@ def test_esa_provider_live_validation_handles_timeout_and_stale_cache() -> None:
         capability_id="esa_worldcover",
         params={"live_validate": True, "metadata": {"url": "https://example.test/wmts"}},
     )
-    asyncio.run(provider.fetch(request))
+    run_async_in_thread(provider.fetch(request))
 
     async def timeout_fetcher(url: str, headers: dict[str, str] | None = None):
         raise TimeoutError("timed out")
 
     clock = 2.0
     provider.fetcher = timeout_fetcher
-    stale = asyncio.run(provider.fetch(request))
+    stale = run_async_in_thread(provider.fetch(request))
 
     assert stale.stale is True
     assert stale.payload["liveValidation"]["service"] == "WMTS"
 
 ###############################################################################
 def test_eurostat_provider_keeps_statistics_metadata_only_until_joined() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         EurostatProvider().fetch(
             ProviderRequest(
                 capability_id="eurostat_regional_demographics",
@@ -175,14 +175,14 @@ def test_eurostat_provider_validates_jsonstat_metadata_and_stale_cache() -> None
         capability_id="eurostat_regional_demographics",
         params={"live_validate": True, "metadata": {"url": "https://example.test/jsonstat"}},
     )
-    first = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
 
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
         return {"value": []}
 
     clock = 2.0
     provider.fetcher = malformed_fetcher
-    stale = asyncio.run(provider.fetch(request))
+    stale = run_async_in_thread(provider.fetch(request))
 
     assert first.payload["jsonStatMetadata"]["dimensions"] == ["geo", "time"]
     assert stale.stale is True
@@ -194,7 +194,7 @@ def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
         return {"value": []}
 
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             EurostatProvider(fetcher=malformed_fetcher).fetch(
                 ProviderRequest(
                     capability_id="eurostat_regional_demographics",
@@ -205,7 +205,7 @@ def test_eurostat_provider_rejects_malformed_jsonstat_without_cache() -> None:
 
 ###############################################################################
 def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         EurostatProvider().fetch(
             ProviderRequest(
                 capability_id="eurostat_regional_demographics",
@@ -248,7 +248,7 @@ def test_eurostat_provider_builds_fixture_backed_choropleth_payload() -> None:
 
 ###############################################################################
 def test_eurostat_provider_describes_nuts_ingestion_payload() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         EurostatProvider().fetch(
             ProviderRequest(
                 capability_id="eurostat_nuts_regions",

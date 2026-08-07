@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 import io
 import zipfile
 
@@ -26,7 +26,7 @@ def test_gtfs_static_provider_fetches_configured_feed_url() -> None:
         calls.append(url)
         return _sample_gtfs_static_zip()
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSStaticProvider(fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="gtfs_static",

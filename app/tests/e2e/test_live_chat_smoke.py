@@ -14,6 +14,7 @@ from tests.e2e.helpers.artifacts import (
     write_report,
     write_snapshot,
 )
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 ###############################################################################
 def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
@@ -151,13 +152,10 @@ def test_live_new_chat_reset(page: Page, base_url: str, api_base_url: str) -> No
 def test_live_degraded_path_shows_user_failure_without_crash(
     page: Page, base_url: str
 ) -> None:
-    page.route(
-        "**/api/chat/turn",
-        lambda route: route.fulfill(
-            status=503,
-            content_type="application/json",
-            body=json.dumps({"detail": "Provider unavailable for this test"}),
-        ),
+    register_realtime_stub(
+        page,
+        lambda _message, _run_number: {},
+        error_message="Provider unavailable for this test",
     )
     page.goto(base_url)
     page.get_by_label("Chat message").fill("Show me Rome")

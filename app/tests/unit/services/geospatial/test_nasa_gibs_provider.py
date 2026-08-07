@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import pytest
-
+from tests.conftest import run_async_in_thread
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 
 WMTS_XML = """<?xml version="1.0"?>
@@ -42,8 +41,7 @@ WMS_XML = """<?xml version="1.0"?>
 """
 
 ###############################################################################
-@pytest.mark.asyncio
-async def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
+async def _assert_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
         del headers
         return WMTS_XML if "wmts" in url else WMS_XML
@@ -63,8 +61,7 @@ async def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     assert "GoogleMapsCompatible_Level9" in layer.render.tile_url_template
 
 ###############################################################################
-@pytest.mark.asyncio
-async def test_nasa_gibs_provider_describes_one_layer() -> None:
+async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
     async def fetcher(url: str, headers: dict[str, str] | None) -> str:
         del headers
         return WMTS_XML if "wmts" in url else WMS_XML
@@ -75,3 +72,13 @@ async def test_nasa_gibs_provider_describes_one_layer() -> None:
 
     assert layer.title == "MODIS Terra NDVI 8-Day"
     assert "EPSG:3857" in layer.crs
+
+
+###############################################################################
+def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
+    run_async_in_thread(_assert_nasa_gibs_provider_parses_xml_and_prefers_wmts())
+
+
+###############################################################################
+def test_nasa_gibs_provider_describes_one_layer() -> None:
+    run_async_in_thread(_assert_nasa_gibs_provider_describes_one_layer())

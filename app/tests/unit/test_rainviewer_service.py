@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
 
@@ -23,8 +23,8 @@ def test_rainviewer_service_returns_cached_metadata_without_refetch() -> None:
 
     service = RainViewerService(fetcher=_fetcher, cache_ttl_s=300.0)
 
-    first = asyncio.run(service.get_latest_radar_metadata())
-    second = asyncio.run(service.get_latest_radar_metadata())
+    first = run_async_in_thread(service.get_latest_radar_metadata())
+    second = run_async_in_thread(service.get_latest_radar_metadata())
 
     assert first["latest_time"] == 200
     assert first["tile_url_template"] == "https://tilecache.rainviewer.com/v2/radar/200/256/{z}/{x}/{y}/2/1_1.png"
@@ -40,7 +40,7 @@ def test_rainviewer_service_rejects_malformed_payload() -> None:
     service = RainViewerService(fetcher=_fetcher)
 
     try:
-        asyncio.run(service.get_latest_radar_metadata())
+        run_async_in_thread(service.get_latest_radar_metadata())
     except RainViewerRequestError as exc:
         assert "did not return radar frames" in str(exc)
     else:

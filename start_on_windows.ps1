@@ -447,10 +447,11 @@ function Invoke-LaunchApplication {
 }
 
 function Invoke-InstallOrUpdate {
-    $installationType = Read-InstallationType
     Import-EnvironmentFile
     Set-LauncherEnvironment
     Ensure-PortableRuntimes
+    Write-Status OK 'Portable runtimes ready.'
+    $installationType = Read-InstallationType
     Sync-Dependencies -InstallationType $installationType
     if (Test-Path -LiteralPath $UvCacheDir) {
         Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
@@ -459,11 +460,13 @@ function Invoke-InstallOrUpdate {
 }
 
 function Read-InstallationType {
-    $selection = (Read-Host 'Installation type [1=Development, 2=Standard]').Trim()
+    Write-Host '  [1] Development - include Ruff, Pyright, and pytest'
+    Write-Host '  [2] Standard    - install runtime dependencies only'
+    $selection = (Read-Host '  Select installation profile [1-2]').Trim()
     switch ($selection) {
         '1' { return 'Development' }
         '2' { return 'Standard' }
-        default { throw 'Invalid installation type. Enter 1 for Development or 2 for Standard.' }
+        default { throw 'Invalid installation profile. Enter 1 for Development or 2 for Standard.' }
     }
 }
 

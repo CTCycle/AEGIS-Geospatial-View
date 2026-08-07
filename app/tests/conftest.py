@@ -3,14 +3,30 @@ Pytest configuration for AEGIS E2E tests.
 Provides fixtures for Playwright page objects and API client.
 """
 
+import asyncio
 import os
+from collections.abc import Coroutine
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
 from server.configurations import DatabaseSettings
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base
+
+T = TypeVar("T")
+
+###############################################################################
+def run_async_in_thread(coroutine: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine safely when Playwright leaves an event loop active."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(asyncio.run, coroutine).result()
 
 ###############################################################################
 def _pick_first_non_empty(*values: str | None) -> str | None:

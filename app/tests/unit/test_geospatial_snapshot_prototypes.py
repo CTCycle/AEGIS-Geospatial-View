@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 import json
 
 from server.services.geospatial.providers.base import ProviderAuthError, ProviderRequest
@@ -10,7 +10,7 @@ from server.services.geospatial.providers.openchargemap import OpenChargeMapProv
 ###############################################################################
 def test_openchargemap_requires_key_for_hosted_access() -> None:
     try:
-        asyncio.run(
+        run_async_in_thread(
             OpenChargeMapProvider().fetch(
                 ProviderRequest(
                     capability_id="openchargemap_ev_charging",
@@ -30,7 +30,7 @@ def test_openchargemap_reads_local_snapshot(tmp_path) -> None:
         json.dumps([{"ID": 1, "AddressInfo": {"Title": "Charger", "Latitude": 41.9, "Longitude": 12.5}}]),
         encoding="utf-8",
     )
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenChargeMapProvider(snapshot_path=snapshot).fetch(
             ProviderRequest(capability_id="openchargemap_ev_charging", params={"live": True, "latitude": 41.9, "longitude": 12.5})
         )
@@ -45,7 +45,7 @@ def test_afdc_reads_local_csv_snapshot_without_hosted_key(tmp_path) -> None:
         "id,station_name,latitude,longitude,fuel_type_code\n1,Station,41.9,12.5,ELEC\n",
         encoding="utf-8",
     )
-    response = asyncio.run(
+    response = run_async_in_thread(
         NRELProvider(snapshot_path=snapshot).fetch(
             ProviderRequest(capability_id="nrel_afdc_alt_fuel_stations", params={"live": True, "latitude": 41.9, "longitude": 12.5})
         )

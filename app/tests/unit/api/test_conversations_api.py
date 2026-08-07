@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import asyncio
+from tests.conftest import run_async_in_thread
 from collections.abc import AsyncIterator
 
 import pytest
@@ -127,7 +127,7 @@ def test_conversation_http_run_stream_and_steering_reach_same_agent_run(
         f"/api/conversations/{conversation_id}/runs/{run_id}/events"
     )
 
-    first_event = asyncio.run(
+    first_event = run_async_in_thread(
         _read_first_sse_event(
             app.state.run_event_stream_service.stream_sse(run_id, after_event_id=None),
         )
@@ -150,7 +150,7 @@ def test_conversation_http_run_stream_and_steering_reach_same_agent_run(
     assert "Map Rome." in steering_payload["aggregated_request"]
     assert "Focus on public transport stops." in steering_payload["aggregated_request"]
 
-    update_event = asyncio.run(
+    update_event = run_async_in_thread(
         _read_first_sse_event(
             app.state.run_event_stream_service.stream_sse(
                 run_id,

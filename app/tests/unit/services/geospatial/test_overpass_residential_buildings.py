@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.overpass import OverpassService
 from server.services.geospatial.providers.base import ProviderRequest
@@ -42,7 +42,7 @@ def test_overpass_provider_routes_residential_capability_separately() -> None:
         assert response.payload["features"][0]["properties"]["building"] == "apartments"
         assert "OpenStreetMap" in response.attribution[0]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_residential_building_normalization_rejects_non_polygons() -> None:
@@ -62,7 +62,7 @@ def test_residential_building_normalization_rejects_non_polygons() -> None:
             },
         ]
     }
-    payload = asyncio.run(
+    payload = run_async_in_thread(
         service.get_residential_buildings(
             latitude=41.89,
             longitude=12.49,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.services.agent.tool_registry import ToolRegistry
@@ -35,7 +35,7 @@ def test_tool_registry_executes_coordinates() -> None:
         payload = await registry.execute("location_to_coordinates", plan, location)
         assert payload["tool_id"] == "location_to_coordinates"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_tool_registry_has_binding_for_all_direct_tool_capabilities() -> None:

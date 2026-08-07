@@ -11,9 +11,10 @@ from PIL import Image, ImageChops
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import model_settings_payload
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 PNG_1X1_TRANSPARENT = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jte8AAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
 DIFF_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "visual_diffs"
@@ -68,6 +69,20 @@ def _turn_payload() -> dict[str, Any]:
             }
         },
         "map_session": {
+            "session_id": "visual-fixture-map",
+            "resolved_location": {
+                "label": "Rome, Italy",
+                "latitude": 41.9028,
+                "longitude": 12.4964,
+            },
+            "basemap_id": "osm_default",
+            "overlay_ids": ["visual_fixture_points"],
+            "viewport": {
+                "center_latitude": 41.9028,
+                "center_longitude": 12.4964,
+                "radius_m": 2500.0,
+            },
+            "payload": {},
             "center": {"latitude": 41.9028, "longitude": 12.4964},
             "bounds": [12.492, 41.899, 12.500, 41.906],
             "basemap": {
@@ -105,6 +120,7 @@ def _turn_payload() -> dict[str, Any]:
 
 ###############################################################################
 def _setup_stubs(page: Page) -> None:
+    register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
     page.route(
         re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
     )
@@ -123,7 +139,7 @@ def _setup_stubs(page: Page) -> None:
         ),
     )
     page.route(
-        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png$"),
+        re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),
         lambda route: route.fulfill(
             status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),

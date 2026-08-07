@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
@@ -22,7 +22,7 @@ def test_openchargemap_infrastructure_source_normalizes_live_station() -> None:
             }
         ]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenChargeMapProvider(api_key="ocm-key", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="openchargemap_ev_charging",
@@ -41,7 +41,7 @@ def test_overture_maps_queries_ingested_places_index(tmp_path) -> None:
         '{"type":"FeatureCollection","features":[{"type":"Feature","id":"p1","properties":{"name":"Clinic","category":"healthcare"},"geometry":{"type":"Point","coordinates":[12.5,41.9]}}]}',
         encoding="utf-8",
     )
-    response = asyncio.run(
+    response = run_async_in_thread(
         OvertureProvider(places_path=index).fetch(
             ProviderRequest(capability_id="overture_maps_places", bbox=(12, 41, 13, 42))
         )
@@ -78,7 +78,7 @@ def test_overture_maps_can_augment_local_places_with_overpass_and_deduplicate(tm
                 ]
             }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OvertureProvider(places_path=index, overpass_service=_FakeOverpass()).fetch(
             ProviderRequest(
                 capability_id="overture_maps_places",

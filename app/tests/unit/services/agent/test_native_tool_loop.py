@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from typing import Any
 
 from server.services.agent.native_tool_loop import (
@@ -99,7 +99,7 @@ def test_native_tool_loop_executes_single_tool_call() -> None:
         assert result.tool_results[0].content["ok"] is True
         assert provider.requests[1].messages[-1]["role"] == "tool"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
@@ -132,7 +132,7 @@ def test_native_tool_loop_returns_tool_errors_as_tool_results() -> None:
         assert result.tool_results[0].is_error is True
         assert result.tool_results[0].content["error"]["code"] == "invalid_arguments"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_native_tool_loop_stops_at_max_iterations() -> None:
@@ -169,7 +169,7 @@ def test_native_tool_loop_stops_at_max_iterations() -> None:
         assert result.stopped_reason == "max_iterations"
         assert result.iterations == 2
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> None:
@@ -205,4 +205,4 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
         assert result.tool_results[0].is_error is True
         assert result.tool_results[0].content["error"]["code"] == "tool_rejected"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
