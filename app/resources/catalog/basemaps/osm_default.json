@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static tiles",
     "constraints": "best default for general context",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "4d0687c289599cd801a61e9ed75ffce6bde974aee7046b14c9b85ead54db1ec4",
     "human_summary": "Balanced default basemap for roads, places, and everyday location-oriented questions.",
     "primary_use_cases": [
@@ -65,7 +62,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "best default for general context",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

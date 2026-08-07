@@ -4,7 +4,6 @@ import base64
 import json
 import re
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 from playwright.sync_api import Page, Route, expect
@@ -44,77 +43,6 @@ def _request_json(route: Route) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 ###############################################################################
-def _sse_event(
-    *,
-    conversation_id: str,
-    run_id: str,
-    sequence: int,
-    event_type: str,
-    payload: dict[str, Any],
-) -> dict[str, Any]:
-    return {
-        "event_id": f"evt-{sequence}",
-        "sequence": sequence,
-        "conversation_id": conversation_id,
-        "run_id": run_id,
-        "run_version": 1,
-        "type": event_type,
-        "timestamp": datetime.now(UTC).isoformat(),
-        "visibility": "user",
-        "payload": payload,
-    }
-
-###############################################################################
-def _sse_frame(event: dict[str, Any]) -> str:
-    return (
-        f"id: {event['event_id']}\n"
-        f"event: {event['type']}\n"
-        f"data: {json.dumps(event)}\n\n"
-    )
-
-###############################################################################
-def _run_event_stream(
-    *,
-    conversation_id: str,
-    run_id: str,
-    turn_payload: dict[str, Any],
-) -> str:
-    assistant_message = str(turn_payload.get("assistant_message", ""))
-    completed_payload = {
-        "operation": turn_payload.get("operation"),
-        "map_session": turn_payload.get("map_session"),
-        "memory_snapshot": turn_payload.get("memory_snapshot", {}),
-        "context_usage": turn_payload.get("context_usage"),
-    }
-    events = [
-        _sse_event(
-            conversation_id=conversation_id,
-            run_id=run_id,
-            sequence=1,
-            event_type="progress",
-            payload={
-                "stage": "understanding_request",
-                "label": "Understanding the request",
-            },
-        ),
-        _sse_event(
-            conversation_id=conversation_id,
-            run_id=run_id,
-            sequence=2,
-            event_type="assistant_text_completed",
-            payload={"content": assistant_message},
-        ),
-        _sse_event(
-            conversation_id=conversation_id,
-            run_id=run_id,
-            sequence=3,
-            event_type="completed",
-            payload=completed_payload,
-        ),
-    ]
-    return "".join(_sse_frame(event) for event in events)
-
-###############################################################################
 def _setup_stub_harness(
     page: Page,
     *,
@@ -135,7 +63,6 @@ def _setup_stub_harness(
     active_settings = dict(settings_payload or selected_agent_settings_payload())
     active_models = models_payload or model_catalog_payload()
     captured_put_payloads = put_payloads if put_payloads is not None else []
-    run_turn_payloads: dict[str, dict[str, Any]] = {}
 
     def handle_settings(route: Route) -> None:
         method = route.request.method.upper()
@@ -166,46 +93,6 @@ def _setup_stub_harness(
 
     def handle_create_conversation(route: Route) -> None:
         _json_ok(route, {"conversation_id": "conversation-e2e", "title": "E2E"})
-
-    def handle_create_run(route: Route) -> None:
-        request_body = _request_json(route)
-        message = str(request_body.get("message", ""))
-        run_id = f"run-{len(run_turn_payloads) + 1}"
-        if turn_payload_factory is None:
-            turn_payload = chat_turn_map_response(9001, "Search executed successfully.")
-        else:
-            turn_payload = turn_payload_factory(message)
-        run_turn_payloads[run_id] = turn_payload
-        route.fulfill(
-            status=202,
-            content_type="application/json",
-            body=json.dumps(
-                {
-                    "conversation_id": "conversation-e2e",
-                    "run_id": run_id,
-                    "run_version": 1,
-                    "state": "running",
-                    "stream_url": f"/api/conversations/conversation-e2e/runs/{run_id}/events",
-                    "message": message,
-                }
-            ),
-        )
-
-    def handle_run_events(route: Route) -> None:
-        match = re.search(r"/runs/([^/]+)/events", route.request.url)
-        run_id = match.group(1) if match else "run-1"
-        turn_payload = run_turn_payloads.get(
-            run_id, chat_turn_map_response(9001, "Search executed successfully.")
-        )
-        route.fulfill(
-            status=200,
-            content_type="text/event-stream",
-            body=_run_event_stream(
-                conversation_id="conversation-e2e",
-                run_id=run_id,
-                turn_payload=turn_payload,
-            ),
-        )
 
     page.route(re.compile(r".*/api/chat/settings.*"), handle_settings)
     page.route(
@@ -269,13 +156,6 @@ def _setup_stub_harness(
     )
     page.route(re.compile(r".*/api/chat/turn.*"), handle_turn)
     page.route(re.compile(r".*/api/conversations$"), handle_create_conversation)
-    page.route(
-        re.compile(r".*/api/conversations/[^/]+/runs$"), handle_create_run
-    )
-    page.route(
-        re.compile(r".*/api/conversations/[^/]+/runs/[^/]+/events.*"),
-        handle_run_events,
-    )
     page.route(
         re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),
         lambda route: route.fulfill(

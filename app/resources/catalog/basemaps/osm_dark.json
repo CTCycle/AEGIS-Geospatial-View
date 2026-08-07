@@ -32,9 +32,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static tiles",
     "constraints": "optimized for high-contrast thematic overlays",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "782aa1d485b7e990b3df88c848b84169ca6751108e23a07c1efc81feed99c3cc",
     "human_summary": "Dark visual style that improves readability of bright overlays such as traffic, heat, or event layers.",
     "primary_use_cases": [
@@ -63,7 +60,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "best-effort public tiles; avoid excessive burst traffic",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

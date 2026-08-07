@@ -35,7 +35,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Use bounded radii and limits.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-06-24"
   },
   "version": 1,

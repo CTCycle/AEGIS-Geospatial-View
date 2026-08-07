@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "c6ba595320625fae98dd386ccb573fa9fab709092eff87113f7c8705082ed9b1",
     "human_summary": "Aerosol concentration visualization for haze, smoke, and atmospheric particle context.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

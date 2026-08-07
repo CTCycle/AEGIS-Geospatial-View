@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "13785d1dfc732def6ef18e35c877dd36a520c1508219330eecca86c449b95aad",
     "human_summary": "Binary thematic layer useful for separating land and water domains in analysis.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

@@ -52,8 +52,8 @@ backend chat-session identifiers are neither restored nor transmitted.
 
 The active run also persists the last realtime event sequence, bounded seen-event
 IDs, and steering messages so WebSocket reconnects can replay without
-duplicating transcript output. The legacy SSE event ID is retained only for
-non-UI API clients.
+duplicating transcript output. Event IDs protect against duplicate delivery;
+sequence remains the durable replay cursor.
 
 ## Tab Isolation And Clear Behavior
 

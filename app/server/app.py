@@ -34,7 +34,6 @@ from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 from server.services.agent_runs.steering import RunSteeringService
-from server.services.agent_runs.streaming import RunEventStreamService
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.geospatial.composition import build_geospatial_runtime
@@ -118,10 +117,6 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         aggregation_service=aggregation_service,
         event_publisher=run_event_publisher,
     )
-    run_event_stream_service = RunEventStreamService(
-        run_event_publisher,
-        run_repository=run_repository,
-    )
     realtime_connections = RealtimeConnectionRegistry()
     realtime_metrics = RealtimeMetrics()
     job_service = BackgroundJobService(
@@ -134,7 +129,6 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     application.state.chat_streaming_service = chat_streaming_service
     application.state.run_lifecycle_service = run_lifecycle_service
     application.state.run_steering_service = run_steering_service
-    application.state.run_event_stream_service = run_event_stream_service
     application.state.conversation_repository = conversation_repository
     application.state.run_repository = run_repository
     application.state.run_event_publisher = run_event_publisher

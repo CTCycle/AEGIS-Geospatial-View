@@ -34,9 +34,6 @@
     "coverage_scope": "global-except-poles",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "1f0550e82e4f9df286d41833bb5daa35d39854b46dcc3190bd84596f833904d6",
     "human_summary": "Point-insight solar potential layer to estimate photovoltaic opportunity by location.",
     "primary_use_cases": [
@@ -65,7 +62,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

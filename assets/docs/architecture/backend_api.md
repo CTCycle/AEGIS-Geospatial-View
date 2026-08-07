@@ -162,20 +162,11 @@ Defined in `app/server/api/conversations.py`:
 
 - `POST /api/conversations`
   Creates a durable conversation shell.
-- `POST /api/conversations/{conversation_id}/runs`
-  Creates one active agent run for batch/API clients and returns its legacy SSE stream URL.
 - `GET /api/conversations/{conversation_id}/realtime` (WebSocket)
   Opens the interactive `aegis.realtime.v1` protocol. The client sends
   `session.resume`, `run.start`, `run.steer`, and `run.cancel` envelopes; the
   server returns acknowledgements and ordered durable `run.event` envelopes.
   `client_request_id` and `client_mutation_id` make retries idempotent.
-- `GET /api/conversations/{conversation_id}/runs/{run_id}/events`
-  Legacy durable Server-Sent Events for non-WebSocket API clients. Supports
-  `after_event_id` and `Last-Event-ID` replay.
-- `POST /api/conversations/{conversation_id}/runs/{run_id}/steering`
-  Adds a steering message to the active run, rebuilds the deterministic aggregate request, and increments the run version.
-- `POST /api/conversations/{conversation_id}/runs/{run_id}/cancel`
-  Marks the active run cancelled as a terminal user action.
 - `GET /api/realtime/metrics`
   Loopback-only JSON counters for active sockets, protocol errors, delivered
   events, and command latency. It is intentionally process-local in the
@@ -186,11 +177,6 @@ assistant text completion, request updates from steering, terminal errors,
 completion, cancellation, and clarification-needed. Internal diagnostics can be
 persisted with internal visibility and are not replayed on the normal user
 stream.
-
-Conversation-run service failures are translated at the API boundary into
-`404` (missing conversation or run), `403` (access denied), or `409`
-(active-run conflict or terminal-run mutation) responses. The shared mapping is
-implemented in `app/server/api/run_errors.py`.
 
 Clarifications use the terminal `clarification_needed` event and may carry a
 partial map session plus a visualization delta.

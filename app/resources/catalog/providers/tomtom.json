@@ -30,9 +30,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "99f464e159fa27582e2db3cef3c6bc303d81e7bb5b0d935f16726ba4a5902986",
     "requires_key": true,
     "official_docs_url": "https://docs.tomtom.com/platform/documentation/my-tomtom/how-to-get-a-tomtom-api-key/",
@@ -45,7 +42,6 @@
     "auth_mode": "api_key",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show TomTom",

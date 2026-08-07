@@ -50,7 +50,6 @@ Core relational storage covers:
 - conversations, agent runs, steering messages, and ordered run events
 - model provider settings
 - encrypted model credentials (backed by auto-seeded Fernet key material)
-- manifest embedding records
 - seeded geospatial reference data
 
 Message and run-event sequencing is allocated atomically from the owning row,
@@ -69,8 +68,8 @@ Payload columns use portable SQLAlchemy JSON values on both backends.
 - No encryption key lives in source code, `.env`, or settings files.
 
 The application creates one database backend per process and injects it into
-repositories and startup services. There is no legacy database facade,
-cached database accessor, or compatibility import path.
+repositories and startup services. There is no database facade, cached
+database accessor, or compatibility import path.
 
 ## Reference Catalog Policy
 

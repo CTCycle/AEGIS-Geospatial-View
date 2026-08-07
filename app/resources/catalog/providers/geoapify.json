@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "3676396c62d7b5dc84274ef205ec1363f058e28d21b1202676a18ff819d81e1a",
     "requires_key": true,
     "official_docs_url": "https://apidocs.geoapify.com/docs/places/",
@@ -49,7 +46,6 @@
     "auth_mode": "api_key",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show Geoapify",

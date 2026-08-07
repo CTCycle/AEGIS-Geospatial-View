@@ -33,9 +33,6 @@
     "coverage_scope": "global-except-poles",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "fa9c4cd59ae3a465944163e41e84856c6d070086d9e01f67fd2912bbe02af95d",
     "requires_key": false,
     "official_docs_url": "https://re.jrc.ec.europa.eu/pvg_tools/en/",
@@ -48,7 +45,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show PVGIS",

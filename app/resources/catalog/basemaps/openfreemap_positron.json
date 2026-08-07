@@ -27,7 +27,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "public service; configure a self-hosted style endpoint for dependable production operation",
     "retrieval_mode": "direct",
-    "openlayers_compatible": false,
     "last_validated": "2026-07-29"
   },
   "version": 2,

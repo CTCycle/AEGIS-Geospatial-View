@@ -44,9 +44,6 @@
     "coverage_scope": "eu-eea",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "7118230a6eb24577193ea1130f6a6cb1a0efd8c8ba257a65afa9d42f8cabc271",
     "human_summary": "Thematic environmental noise map focused on European coverage.",
     "primary_use_cases": [
@@ -75,7 +72,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

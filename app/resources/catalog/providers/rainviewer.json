@@ -34,9 +34,6 @@
     "coverage_scope": "global-partial",
     "temporal_behavior": "dynamic",
     "constraints": "Respect update cadence and provider terms for high-frequency requests.",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "rainviewer-provider-v1",
     "requires_key": false,
     "official_docs_url": "https://www.rainviewer.com/api.html",
@@ -49,7 +46,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Respect update cadence and provider terms for high-frequency requests.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show RainViewer",

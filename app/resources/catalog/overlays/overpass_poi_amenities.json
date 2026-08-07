@@ -37,9 +37,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "Query volume must respect Overpass instance limits and ODbL attribution obligations.",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "overpass_poi_amenities_overlay_v1",
     "human_summary": "POI-oriented layer for nearby amenities such as cafes, transit points, and public services.",
     "primary_use_cases": [
@@ -68,7 +65,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Query volume must respect Overpass instance limits and ODbL attribution obligations.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

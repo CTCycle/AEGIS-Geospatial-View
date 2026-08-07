@@ -263,16 +263,8 @@ export interface MapSession {
     tile_size?: number;
     min_zoom?: number;
     max_zoom?: number;
-    // Legacy aliases accepted only while reading older persisted map sessions.
-    minzoom?: number;
-    wmts_format?: string;
-    wmts_style?: string;
-    wms_version?: string;
-    wms_exceptions?: string;
-    render_params?: Record<string, JsonValue>;
     bounds?: [number, number, number, number];
     attribution?: string;
-    maxzoom?: number;
     source_protocol?: string;
     data_format?: string;
     geometry_type?: string;
@@ -381,40 +373,6 @@ export interface ConversationCreateRequest {
 export interface ConversationCreateResponse {
   conversation_id: string;
   title?: string | null;
-}
-
-export interface AgentRunCreateRequest {
-  message: string;
-  client_request_id?: string;
-}
-
-export interface AgentRunCreateResponse {
-  conversation_id: string;
-  run_id: string;
-  run_version: number;
-  state: AgentRunState;
-  stream_url: string;
-}
-
-export interface SteeringMessageRequest {
-  message: string;
-  client_mutation_id?: string;
-}
-
-export interface SteeringMessageResponse {
-  conversation_id: string;
-  run_id: string;
-  steering_id: string;
-  run_version: number;
-  aggregated_request: string;
-  state: AgentRunState;
-}
-
-export interface AgentRunCancelResponse {
-  conversation_id: string;
-  run_id: string;
-  state: AgentRunState;
-  cancel_requested_at?: string | null;
 }
 
 export interface ChatTurnRequest {
