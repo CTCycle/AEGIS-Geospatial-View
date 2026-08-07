@@ -17,6 +17,14 @@ def _get(api_context: APIRequestContext, path: str):
 def _put(api_context: APIRequestContext, path: str, payload: dict):
     return api_context.put(path, data=payload)
 
+
+def _create_conversation(api_context: APIRequestContext, title: str) -> str:
+    response = _post(api_context, "/api/conversations", {"title": title})
+    assert response.status == 201, response.text()
+    conversation_id = response.json().get("conversation_id")
+    assert isinstance(conversation_id, str) and conversation_id
+    return conversation_id
+
 ###############################################################################
 def _require_provider_or_skip(response) -> None:  # noqa: ANN001
     if response.status in {400, 502, 503}:
@@ -91,20 +99,23 @@ def test_chat_models_with_prefix_parity(
 def test_chat_turn_stream_event_order_and_contract_parity(
     api_context: APIRequestContext,
 ) -> None:
+    conversation_id = _create_conversation(api_context, "chat API contract")
+    turn_payload = {
+        "conversation_id": conversation_id,
+        "message": "show map at 41.9028, 12.4964",
+    }
     turn_response = _post(
-        api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
+        api_context, "/api/chat/turn", turn_payload
     )
     _require_provider_or_skip(turn_response)
     assert turn_response.ok
     turn_body = turn_response.json()
     assert "assistant_message" in turn_body
-    assert "session_id" in turn_body
+    assert turn_body["conversation_id"] == conversation_id
     assert "turn_contract" in turn_body
     assert "decision" in turn_body
 
-    prefixed_turn = _post(
-        api_context, "/api/chat/turn", {"message": "show map at 41.9028, 12.4964"}
-    )
+    prefixed_turn = _post(api_context, "/api/chat/turn", turn_payload)
     _require_provider_or_skip(prefixed_turn)
     assert prefixed_turn.ok
     assert set(turn_body.keys()) == set(prefixed_turn.json().keys())
@@ -113,7 +124,7 @@ def test_chat_turn_stream_event_order_and_contract_parity(
         api_context,
         "/api/chat/stream",
         {
-            "session_id": turn_body["session_id"],
+            "conversation_id": conversation_id,
             "message": "show map at 41.9028, 12.4964",
         },
     )
@@ -127,7 +138,10 @@ def test_chat_turn_stream_event_order_and_contract_parity(
     assert event_names[-1] in {"final", "error"}
     if event_names[-1] == "final":
         assert "parsed" in event_names
-        assert "policy" in event_names
+        # Direct-answer/map-coordinate requests may complete before the
+        # planner stage; planned requests include the policy event.
+        if "policy" in event_names:
+            assert event_names.index("parsed") < event_names.index("policy")
         if "tool_call_started" in event_names:
             assert "tool_call_completed" in event_names
             assert event_names.index("tool_call_started") < event_names.index("tool_call_completed")
@@ -138,7 +152,7 @@ def test_chat_turn_stream_event_order_and_contract_parity(
         api_context,
         "/api/chat/stream",
         {
-            "session_id": turn_body["session_id"],
+            "conversation_id": conversation_id,
             "message": "show map at 41.9028, 12.4964",
         },
     )
@@ -149,10 +163,14 @@ def test_chat_turn_stream_event_order_and_contract_parity(
 def test_chat_turn_coordinate_lookup_and_follow_up(
     api_context: APIRequestContext,
 ) -> None:
+    conversation_id = _create_conversation(api_context, "coordinate lookup")
     geocode_response = _post(
         api_context,
         "/api/chat/turn",
-        {"message": "Give me the coordinates of Rome, Italy"},
+        {
+            "conversation_id": conversation_id,
+            "message": "Give me the coordinates of Rome, Italy",
+        },
     )
     _require_provider_or_skip(geocode_response)
     assert geocode_response.ok
@@ -170,7 +188,10 @@ def test_chat_turn_coordinate_lookup_and_follow_up(
     unsupported = _post(
         api_context,
         "/api/chat/turn",
-        {"message": "Find the absolute best weather area in Europe"},
+        {
+            "conversation_id": conversation_id,
+            "message": "Find the absolute best weather area in Europe",
+        },
     )
     _require_provider_or_skip(unsupported)
     assert unsupported.ok

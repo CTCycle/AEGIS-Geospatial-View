@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
@@ -36,7 +36,7 @@ class _OpenMeteoService:
 
 ###############################################################################
 def test_openmeteo_wind_sampling_emits_arrow_metadata() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenMeteoProvider(service=_OpenMeteoService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="openmeteo_pressure_humidity_wind",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
 import re
-import time
 from typing import Any
 
 from playwright.sync_api import Page, Route, expect
@@ -11,6 +11,11 @@ from tests.e2e.helpers.chat_stub_payloads import (
     chat_turn_clarification_response,
     chat_turn_map_response,
     model_settings_payload,
+)
+from tests.e2e.helpers.realtime_stub import register_realtime_stub
+
+PNG_1X1_TRANSPARENT = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
 ###############################################################################
@@ -21,10 +26,8 @@ def _json_ok(route: Route, payload: dict[str, Any]) -> None:
 def _stub_ui_api(page: Page) -> None:
     state = {"session_id": 777}
 
-    def handle_turn(route: Route) -> None:
-        body = route.request.post_data_json
-        message = str(body.get("message") or "")
-        session_id = int(body.get("session_id") or state["session_id"])
+    def build_payload(message: str) -> dict[str, Any]:
+        session_id = int(state["session_id"])
         if "ambiguous" in message.lower() or "weather only" in message.lower():
             payload = chat_turn_clarification_response(
                 session_id, "Please clarify location and time."
@@ -34,8 +37,15 @@ def _stub_ui_api(page: Page) -> None:
                 session_id, "Search executed successfully."
             )
         state["session_id"] = payload["session_id"]
+        return payload
+
+    def handle_turn(route: Route) -> None:
+        body = route.request.post_data_json
+        message = str(body.get("message") or "")
+        payload = build_payload(message)
         _json_ok(route, payload)
 
+    register_realtime_stub(page, lambda message, _run_number: build_payload(message))
     page.route(re.compile(r".*/api/chat/turn$"), handle_turn)
     page.route(
         re.compile(r".*/api/chat/settings$"),
@@ -58,6 +68,18 @@ def _stub_ui_api(page: Page) -> None:
                 ],
                 "local": [],
             },
+        ),
+    )
+    page.route(
+        "**/api/geospatial/tiles/osm_default/**",
+        lambda route: route.fulfill(
+            status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
+        ),
+    )
+    page.route(
+        "https://example.test/openaq/**",
+        lambda route: route.fulfill(
+            status=200, content_type="image/png", body=PNG_1X1_TRANSPARENT
         ),
     )
 
@@ -83,18 +105,11 @@ def test_rapid_double_submit_does_not_duplicate_assistant_state(
     page: Page, base_url: str
 ) -> None:
     _stub_ui_api(page)
-
-    def delayed_turn(route: Route) -> None:
-        time.sleep(0.15)
-        _json_ok(route, chat_turn_map_response(999, "Search executed successfully."))
-
-    page.route(re.compile(r".*/api/chat/turn$"), delayed_turn)
     page.goto(base_url)
     page.get_by_label("Chat message").fill("show map quickly")
     send = page.get_by_role("button", name="Send")
     send.click()
-    if send.is_enabled():
-        send.click()
+    send.dispatch_event("click")
     expect(page.locator(".chat-message--assistant")).to_have_count(1, timeout=10000)
 
 ###############################################################################

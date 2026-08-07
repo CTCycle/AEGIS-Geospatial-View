@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from asyncio import run
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import ProviderRequest
@@ -12,7 +12,7 @@ def test_ingestion_only_providers_return_graceful_state() -> None:
     registry = ProviderRegistry()
     registry.build_from_manifests()
 
-    response = run(
+    response = run_async_in_thread(
         registry.fetch(
             "natural_earth",
             ProviderRequest(capability_id="natural_earth_admin_boundaries"),
@@ -34,7 +34,7 @@ def test_mobility_database_search_uses_local_snapshot(tmp_path) -> None:
 
     registry = ProviderRegistry(providers=[MobilityDatabaseProvider(catalog_path=catalog)])
 
-    response = run(
+    response = run_async_in_thread(
         registry.fetch(
             "mobility_database",
             ProviderRequest(capability_id="mobility_database_feeds", params={"query": "Example"}),

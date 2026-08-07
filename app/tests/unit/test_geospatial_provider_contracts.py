@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.providers.base import (
@@ -35,7 +35,7 @@ class _FeatureOnlyProvider:
 def test_provider_registry_prefers_canonical_fetch_features_contract() -> None:
     registry = ProviderRegistry(providers=[_FeatureOnlyProvider()])
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         registry.fetch("feature_only", FeatureRequest(capability_id="sample"))
     )
 
@@ -85,7 +85,7 @@ def test_nominatim_provider_geocodes_live_contract_payload() -> None:
             }
         ]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         NominatimProvider(fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="location_to_coordinates",
@@ -105,7 +105,7 @@ def test_mobility_database_provider_searches_local_snapshot(tmp_path) -> None:
         "f-test,Example Transit,Example Transit,https://agency.example/gtfs.zip,https://agency.example/license,1\n",
         encoding="utf-8",
     )
-    response = asyncio.run(
+    response = run_async_in_thread(
         MobilityDatabaseProvider(catalog_path=catalog).fetch(
             ProviderRequest(capability_id="mobility_database_feeds", params={"query": "Example"})
         )

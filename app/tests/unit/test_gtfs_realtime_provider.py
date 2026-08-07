@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 
 from google.transit import gtfs_realtime_pb2
@@ -11,7 +11,7 @@ from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvi
 def test_gtfs_realtime_provider_normalizes_trip_updates_alerts_and_vehicles() -> None:
     now = int(datetime.now(UTC).timestamp())
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",
@@ -55,7 +55,7 @@ def test_gtfs_realtime_provider_fetches_configured_protobuf_feed_url() -> None:
         calls.append(url)
         return feed_bytes
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider(fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",

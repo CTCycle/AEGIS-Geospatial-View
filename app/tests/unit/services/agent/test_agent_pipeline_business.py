@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
@@ -397,7 +397,7 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
         assert second.map_session.viewport.radius_m == first.map_session.viewport.radius_m
         assert "Which temperature metric should I use?" in second.assistant_message
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
@@ -436,7 +436,7 @@ def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
         assert second.map_session.resolved_location.label == first.map_session.resolved_location.label
         assert second.map_session.viewport.radius_m < first.map_session.viewport.radius_m
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
@@ -473,7 +473,7 @@ def test_failure_inquiry_uses_structured_failure_without_tools() -> None:
         assert response.tool_payload is None
         assert "building provider timed out" in response.assistant_message.lower()
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_tool_planner_deduplicates_semantically_identical_calls() -> None:
@@ -538,7 +538,7 @@ def test_tool_plan_executor_orders_dependencies_and_retains_partial_success() ->
         assert results[0].ok is True
         assert results[1].ok is False
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_tool_output_validation_rejects_wrong_capability() -> None:
@@ -586,4 +586,4 @@ def test_tool_output_validation_rejects_wrong_capability() -> None:
         assert result.ok is False
         assert result.error_code == "invalid_tool_output"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())

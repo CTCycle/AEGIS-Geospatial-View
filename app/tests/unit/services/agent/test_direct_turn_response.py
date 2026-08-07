@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from typing import Any
 
 from server.domain.agent.decision import ClarificationRequest, DecisionTrace, ExecutionPlan, PolicyDecision
@@ -99,7 +99,7 @@ def test_parser_authentication_failure_persists_stable_failure_response() -> Non
         assert response.task_snapshot is not None
         assert response.task_snapshot.tasks[-1].status == "failed"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_provider_authentication_failure_persists_stable_failure_response() -> None:
@@ -132,7 +132,7 @@ def test_provider_authentication_failure_persists_stable_failure_response() -> N
         assert response.failure_diagnostic is not None
         assert history.messages[-1]["content"] == response.assistant_message
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
@@ -173,7 +173,7 @@ def test_failure_inquiry_explains_the_latest_structured_failure() -> None:
         assert response.operation.status == "success"
         assert "Try again later." in response.assistant_message
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_preflight_clarification_is_persisted_as_partial_response() -> None:
@@ -213,4 +213,4 @@ def test_preflight_clarification_is_persisted_as_partial_response() -> None:
         assert response.assistant_message == "synthesized: Which location should I use?"
         assert history.messages[-1]["structured_payload"]["decision"] == decision.model_dump(mode="json")
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())

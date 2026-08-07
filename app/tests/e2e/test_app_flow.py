@@ -2,6 +2,8 @@
 E2E tests for AEGIS chat-first UI flow.
 """
 
+import re
+
 from playwright.sync_api import Page, expect
 
 ###############################################################################
@@ -35,7 +37,11 @@ class TestChatFlow:
         page.goto(base_url)
         page.get_by_role("link", name="Model Settings").click()
         expect(page).to_have_url(f"{base_url.rstrip('/')}/settings")
-        expect(page.get_by_text("Select AEGIS models")).to_be_visible()
+        expect(
+            page.get_by_text(
+                re.compile(r"Select one AEGIS agent model across cloud providers")
+            )
+        ).to_be_visible()
         expect(page.get_by_placeholder("Search models")).to_be_visible()
         expect(page.get_by_role("button", name="All")).to_be_visible()
         expect(page.get_by_role("button", name="Open Ollama settings")).to_be_visible()
@@ -51,7 +57,11 @@ class TestChatFlow:
         page.go_back()
         expect(page.get_by_label("Chat message")).to_be_visible()
         page.go_forward()
-        expect(page.get_by_text("Select AEGIS models")).to_be_visible()
+        expect(
+            page.get_by_text(
+                re.compile(r"Select one AEGIS agent model across cloud providers")
+            )
+        ).to_be_visible()
         expect(search).to_have_value("gpt")
 
     # -------------------------------------------------------------------------

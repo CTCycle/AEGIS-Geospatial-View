@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.rainviewer import RainViewerProvider
@@ -8,7 +8,7 @@ from server.services.geospatial.providers.tomtom import TomTomProvider
 
 ###############################################################################
 def test_rainviewer_provider_emits_renderable_raster_payload() -> None:
-    rainviewer = asyncio.run(
+    rainviewer = run_async_in_thread(
         RainViewerProvider().fetch(
             ProviderRequest(capability_id="rainviewer_precipitation_radar")
         )
@@ -19,7 +19,7 @@ def test_rainviewer_provider_emits_renderable_raster_payload() -> None:
 
 ###############################################################################
 def test_tomtom_traffic_flow_keeps_key_server_side() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         TomTomProvider(api_key="tomtom-secret").fetch(
             ProviderRequest(capability_id="tomtom_traffic_flow")
         )

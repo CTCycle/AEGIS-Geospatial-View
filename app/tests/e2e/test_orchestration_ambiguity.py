@@ -4,10 +4,13 @@ import pytest
 from playwright.sync_api import APIRequestContext
 
 ###############################################################################
-def _turn(api_context: APIRequestContext, message: str, session_id: int | None = None):
-    payload = {"message": message}
-    if session_id is not None:
-        payload["session_id"] = session_id
+def _turn(api_context: APIRequestContext, message: str):
+    conversation_response = api_context.post(
+        "/api/conversations", data={"title": "orchestration ambiguity"}
+    )
+    assert conversation_response.status == 201, conversation_response.text()
+    conversation_id = conversation_response.json()["conversation_id"]
+    payload = {"conversation_id": conversation_id, "message": message}
     response = api_context.post("/api/chat/turn", data=payload)
     if response.status in {400, 502, 503}:
         pytest.skip(

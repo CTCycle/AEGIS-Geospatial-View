@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 
@@ -189,7 +189,7 @@ async def _gibs_capabilities_fetcher(url: str, headers: dict[str, str] | None = 
 def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
 
-    weather = asyncio.run(
+    weather = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openmeteo_weather_forecast",
@@ -197,7 +197,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
             )
         )
     )
-    air = asyncio.run(
+    air = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openmeteo_air_quality_forecast",
@@ -216,7 +216,7 @@ def test_openmeteo_provider_selects_weather_or_air_quality() -> None:
 def test_openmeteo_provider_returns_wind_arrow_features() -> None:
     provider = OpenMeteoProvider(service=_OpenMeteoService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openmeteo_pressure_humidity_wind",
@@ -236,7 +236,7 @@ def test_overpass_provider_normalizes_poi_features_from_bbox() -> None:
     service = _OverpassService()
     provider = OverpassProvider(service=service)  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="overpass_poi_amenities",
@@ -254,7 +254,7 @@ def test_overpass_provider_maps_supported_amenity_groups() -> None:
     service = _OverpassService()
     provider = OverpassProvider(service=service)  # type: ignore[arg-type]
 
-    asyncio.run(
+    run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="overpass_poi_amenities",
@@ -289,7 +289,7 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
             raise OverpassRequestError("timed out")
 
     with pytest.raises(ProviderRateLimitError):
-        asyncio.run(
+        run_async_in_thread(
             OverpassProvider(service=_RateLimitedService()).fetch(  # type: ignore[arg-type]
                 ProviderRequest(
                     capability_id="overpass_poi_amenities",
@@ -298,7 +298,7 @@ def test_overpass_provider_propagates_rate_limits_and_timeouts() -> None:
             )
         )
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             OverpassProvider(service=_TimeoutService()).fetch(  # type: ignore[arg-type]
                 ProviderRequest(
                     capability_id="overpass_poi_amenities",
@@ -317,7 +317,7 @@ def test_overpass_provider_returns_empty_result() -> None:
         async def get_nearby_poi(self, **kwargs):  # noqa: ANN003
             return {"items": [], "attribution": "OSM"}
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OverpassProvider(service=_EmptyService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="overpass_poi_amenities",
@@ -333,7 +333,7 @@ def test_overpass_provider_returns_empty_result() -> None:
 def test_openaq_provider_returns_station_features() -> None:
     provider = OpenAQProvider(api_key="openaq-test", service=_OpenAQService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="openaq_air_quality",
@@ -348,7 +348,7 @@ def test_openaq_provider_returns_station_features() -> None:
 ###############################################################################
 def test_openaq_provider_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             OpenAQProvider(service=_OpenAQService()).fetch(  # type: ignore[arg-type]
                 ProviderRequest(capability_id="openaq_air_quality")
             )
@@ -356,7 +356,7 @@ def test_openaq_provider_requires_key() -> None:
 
 ###############################################################################
 def test_openaq_provider_filters_pollutants() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenAQProvider(api_key="openaq-test", service=_OpenAQService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="openaq_air_quality",
@@ -382,7 +382,7 @@ def test_openaq_provider_returns_empty_bbox_result() -> None:
             self.calls.append({"lat": lat, "lon": lon, "radius_m": radius_m})
             return {"locations": [], "summary": {}, "attribution": "OpenAQ"}
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         OpenAQProvider(api_key="openaq-test", service=_EmptyOpenAQService()).fetch(  # type: ignore[arg-type]
             ProviderRequest(
                 capability_id="openaq_air_quality",
@@ -425,11 +425,11 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
         params={"latitude": 41.9, "longitude": 12.5},
     )
 
-    first = asyncio.run(provider.fetch(request))
-    second = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
+    second = run_async_in_thread(provider.fetch(request))
     clock = 2.0
     provider.service = _FailingOpenAQService()  # type: ignore[assignment]
-    stale = asyncio.run(provider.fetch(request))
+    stale = run_async_in_thread(provider.fetch(request))
 
     assert first.payload == second.payload
     assert len(service.calls) == 1
@@ -441,7 +441,7 @@ def test_openaq_provider_uses_cache_and_stale_fallback() -> None:
 def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     provider = PVGISProvider(service=_PVGISService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(
             ProviderRequest(
                 capability_id="pvgis_solar",
@@ -456,13 +456,13 @@ def test_pvgis_provider_returns_metadata_only_analysis() -> None:
 ###############################################################################
 def test_tomtom_and_geoapify_require_keys_before_emitting_urls() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             TomTomProvider().fetch(
                 ProviderRequest(capability_id="tomtom_traffic_flow")
             )
         )
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             GeoapifyProvider().fetch(ProviderRequest(capability_id="geoapify_amenities"))
         )
 
@@ -492,7 +492,7 @@ def test_tomtom_provider_normalizes_live_incidents() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         TomTomProvider(api_key="tomtom-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="tomtom_traffic_incidents",
@@ -509,7 +509,7 @@ def test_tomtom_provider_normalizes_live_incidents() -> None:
 
 ###############################################################################
 def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         TomTomProvider(api_key="tomtom-test").fetch(
             ProviderRequest(capability_id="tomtom_traffic_flow")
         )
@@ -528,10 +528,10 @@ def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch
     registry = ProviderRegistry()
     registry.build_from_manifests()
 
-    tomtom = asyncio.run(
+    tomtom = run_async_in_thread(
         registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
     )
-    geoapify = asyncio.run(
+    geoapify = run_async_in_thread(
         registry.fetch("geoapify", ProviderRequest(capability_id="geoapify_amenities"))
     )
 
@@ -562,7 +562,7 @@ def test_geoapify_provider_normalizes_live_places() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="geoapify_amenities",
@@ -603,8 +603,8 @@ def test_geoapify_provider_caches_live_places_by_bbox_and_category() -> None:
         params={"live": True, "categories": "healthcare"},
     )
 
-    first = asyncio.run(provider.fetch(request))
-    second = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
+    second = run_async_in_thread(provider.fetch(request))
 
     assert first.payload == second.payload
     assert len(calls) == 1
@@ -617,7 +617,7 @@ def test_geoapify_provider_returns_empty_result_for_empty_or_malformed_payloads(
     async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
         return {"features": [{"properties": {"name": "Missing geometry"}}]}
 
-    empty = asyncio.run(
+    empty = run_async_in_thread(
         GeoapifyProvider(api_key="geoapify-test", fetcher=empty_fetcher).fetch(
             ProviderRequest(
                 capability_id="geoapify_amenities",
@@ -626,7 +626,7 @@ def test_geoapify_provider_returns_empty_result_for_empty_or_malformed_payloads(
             )
         )
     )
-    malformed = asyncio.run(
+    malformed = run_async_in_thread(
         GeoapifyProvider(api_key="geoapify-test", fetcher=malformed_fetcher).fetch(
             ProviderRequest(
                 capability_id="geoapify_amenities",
@@ -643,7 +643,7 @@ def test_geoapify_provider_returns_empty_result_for_empty_or_malformed_payloads(
 
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         NASAGIBSProvider(fetcher=_gibs_capabilities_fetcher).fetch(
             ProviderRequest(
                 capability_id="VIIRS_SNPP_CorrectedReflectance_TrueColor",
@@ -659,7 +659,7 @@ def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
 
 ###############################################################################
 def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         ArcGISRestProvider().fetch(
             ProviderRequest(
                 capability_id="arcgis_layer",
@@ -675,7 +675,7 @@ def test_arcgis_rest_provider_builds_geojson_query_url() -> None:
 
 ###############################################################################
 def test_census_provider_selects_demographic_choropleth() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         CensusProvider().fetch(
             ProviderRequest(
                 capability_id="census_tigerweb_demographics",
@@ -707,7 +707,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="windy_webcams",
@@ -726,7 +726,7 @@ def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:
 ###############################################################################
 def test_windy_webcams_requires_key() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             WindyWebcamsProvider().fetch(
                 ProviderRequest(capability_id="windy_webcams", params={"live": True})
             )
@@ -753,7 +753,7 @@ def test_windy_webcams_omits_expired_preview_and_detects_stale_camera() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )
@@ -789,7 +789,7 @@ def test_windy_webcams_embeds_only_when_explicitly_allowed() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         WindyWebcamsProvider(api_key="windy-test", fetcher=fetcher).fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )
@@ -817,7 +817,7 @@ def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
         }
 
     provider = WindyWebcamsProvider(api_key="windy-test", fetcher=first_fetcher)
-    asyncio.run(
+    run_async_in_thread(
         provider.fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )
@@ -827,7 +827,7 @@ def test_windy_webcams_returns_stale_cache_after_live_failure() -> None:
         raise RuntimeError("network down")
 
     provider.fetcher = failing_fetcher
-    stale = asyncio.run(
+    stale = run_async_in_thread(
         provider.fetch(
             ProviderRequest(capability_id="windy_webcams", params={"live": True})
         )

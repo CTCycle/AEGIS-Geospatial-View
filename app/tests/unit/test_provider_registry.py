@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.provider_registry import (
     ProviderExecutionPolicy,
@@ -77,7 +78,7 @@ class _AuthProvider:
 def test_provider_registry_registers_and_fetches_provider() -> None:
     registry = ProviderRegistry(providers=[_Provider()])
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         registry.fetch("example", ProviderRequest(capability_id="capability"))
     )
 
@@ -156,7 +157,7 @@ def test_provider_registry_times_out_slow_provider() -> None:
     )
 
     try:
-        asyncio.run(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
+        run_async_in_thread(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
     except ProviderTimeoutError as exc:
         assert "slow" in str(exc)
     else:
@@ -170,7 +171,7 @@ def test_provider_registry_retries_transient_provider_failure() -> None:
         execution_policy=ProviderExecutionPolicy(max_attempts=2),
     )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
     )
 
@@ -185,7 +186,7 @@ def test_provider_registry_does_not_retry_auth_errors() -> None:
     )
 
     try:
-        asyncio.run(registry.fetch("auth", ProviderRequest(capability_id="secure")))
+        run_async_in_thread(registry.fetch("auth", ProviderRequest(capability_id="secure")))
     except ProviderAuthError:
         pass
     else:
@@ -203,14 +204,14 @@ def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
     )
 
     try:
-        asyncio.run(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
+        run_async_in_thread(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
     except ProviderTimeoutError:
         pass
     else:
         raise AssertionError("Slow provider unexpectedly succeeded.")
 
     try:
-        asyncio.run(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
+        run_async_in_thread(registry.fetch("slow", ProviderRequest(capability_id="slow_layer")))
     except ProviderCircuitOpenError:
         pass
     else:

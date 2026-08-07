@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 
@@ -52,7 +52,7 @@ def test_render_descriptor_service_exposes_configurable_openfreemap_style(monkey
         }),
     )
 
-    result = asyncio.run(service.build_basemap_descriptor("openfreemap_liberty"))
+    result = run_async_in_thread(service.build_basemap_descriptor("openfreemap_liberty"))
 
     assert result is not None
     assert result["style_url"] == "https://maps.internal.example/styles/liberty"
@@ -119,7 +119,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
         }),
     )
 
-    result = asyncio.run(service.build_overlay_descriptor("rainviewer_precipitation_radar", request=_request()))
+    result = run_async_in_thread(service.build_overlay_descriptor("rainviewer_precipitation_radar", request=_request()))
 
     assert result is not None
     descriptor, _warnings = result
@@ -192,7 +192,7 @@ def test_overlay_descriptor_covers_every_declared_rendering_mode(
         capability_registry=_CapabilityRegistry(capability),  # type: ignore[arg-type]
     )
 
-    result = asyncio.run(
+    result = run_async_in_thread(
         service.build_overlay_descriptor("test-layer", request=_request())
     )
 

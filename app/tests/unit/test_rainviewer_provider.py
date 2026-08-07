@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.cache import GeospatialCache
 from server.services.geospatial.providers.base import ProviderRequest
@@ -47,7 +47,7 @@ def test_rainviewer_provider_returns_resolved_raster_tile_payload() -> None:
     service = _RainViewerService()
     provider = RainViewerProvider(service=service)  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(ProviderRequest(capability_id="rainviewer_precipitation_radar"))
     )
 
@@ -77,7 +77,7 @@ def test_rainviewer_provider_uses_stale_cache_when_refresh_fails() -> None:
         cache=cache,
     )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(ProviderRequest(capability_id="rainviewer_precipitation_radar"))
     )
 
@@ -89,7 +89,7 @@ def test_rainviewer_provider_uses_stale_cache_when_refresh_fails() -> None:
 def test_rainviewer_provider_returns_empty_state_when_no_cache_exists() -> None:
     provider = RainViewerProvider(service=_RainViewerService(fail=True))  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(ProviderRequest(capability_id="rainviewer_precipitation_radar"))
     )
 
@@ -103,7 +103,7 @@ def test_rainviewer_provider_returns_empty_state_for_malformed_payload() -> None
         service=_RainViewerService(payload={"latest_time": 123}),  # type: ignore[arg-type]
     )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(ProviderRequest(capability_id="rainviewer_precipitation_radar"))
     )
 
@@ -132,7 +132,7 @@ def test_rainviewer_provider_uses_stale_cache_when_payload_is_malformed() -> Non
         cache=cache,
     )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(ProviderRequest(capability_id="rainviewer_precipitation_radar"))
     )
 
@@ -145,8 +145,8 @@ def test_rainviewer_provider_caches_successful_metadata_for_five_minutes() -> No
     provider = RainViewerProvider(service=service)  # type: ignore[arg-type]
     request = ProviderRequest(capability_id="rainviewer_precipitation_radar")
 
-    first = asyncio.run(provider.fetch(request))
-    second = asyncio.run(provider.fetch(request))
+    first = run_async_in_thread(provider.fetch(request))
+    second = run_async_in_thread(provider.fetch(request))
 
     assert first.payload == second.payload
     assert service.calls == 1
@@ -163,7 +163,7 @@ def test_rainviewer_provider_handles_timeout_like_service_failure() -> None:
 
     provider = RainViewerProvider(service=_TimeoutService())  # type: ignore[arg-type]
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         provider.fetch(ProviderRequest(capability_id="rainviewer_precipitation_radar"))
     )
 

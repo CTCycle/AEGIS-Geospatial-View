@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 import io
 import zipfile
 from datetime import UTC, datetime
@@ -43,7 +43,7 @@ def _gtfs_zip() -> bytes:
 
 ###############################################################################
 def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSStaticProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_static",
@@ -63,7 +63,7 @@ def test_gtfs_static_provider_normalizes_stops_routes_and_shapes() -> None:
 ###############################################################################
 def test_gtfs_static_provider_rejects_bad_zip() -> None:
     with pytest.raises(ProviderUnavailableError):
-        asyncio.run(
+        run_async_in_thread(
             GTFSStaticProvider().fetch(
                 ProviderRequest(
                     capability_id="gtfs_static",
@@ -75,7 +75,7 @@ def test_gtfs_static_provider_rejects_bad_zip() -> None:
 ###############################################################################
 def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
     now = int(datetime.now(UTC).timestamp())
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",
@@ -116,7 +116,7 @@ def test_gtfs_realtime_provider_normalizes_decoded_feed() -> None:
 
 ###############################################################################
 def test_gtfs_realtime_provider_suppresses_stale_vehicle_rendering() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         GTFSRealtimeProvider().fetch(
             ProviderRequest(
                 capability_id="gtfs_realtime",

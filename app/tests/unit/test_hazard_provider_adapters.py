@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 
@@ -12,10 +12,10 @@ from server.services.geospatial.providers.usgs import USGSProvider
 
 ###############################################################################
 def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
-    earthquake = asyncio.run(
+    earthquake = run_async_in_thread(
         USGSProvider().fetch(ProviderRequest(capability_id="usgs_earthquakes"))
     )
-    water = asyncio.run(
+    water = run_async_in_thread(
         USGSProvider().fetch(
             ProviderRequest(
                 capability_id="usgs_water_gauges",
@@ -50,7 +50,7 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
             ],
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         USGSProvider(fetcher=fetcher).fetch(
             ProviderRequest(capability_id="usgs_earthquakes", params={"live": True})
         )
@@ -94,7 +94,7 @@ def test_usgs_provider_normalizes_live_water_gauges() -> None:
             }
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         USGSProvider(fetcher=fetcher).fetch(
             ProviderRequest(capability_id="usgs_water_gauges", params={"live": True})
         )
@@ -106,13 +106,13 @@ def test_usgs_provider_normalizes_live_water_gauges() -> None:
 
 ###############################################################################
 def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
-    alerts = asyncio.run(
+    alerts = run_async_in_thread(
         NOAAProvider().fetch(ProviderRequest(capability_id="noaa_weather_alerts"))
     )
-    radar = asyncio.run(
+    radar = run_async_in_thread(
         NOAAProvider().fetch(ProviderRequest(capability_id="noaa_radar"))
     )
-    coops = asyncio.run(
+    coops = run_async_in_thread(
         NOAAProvider().fetch(ProviderRequest(capability_id="noaa_coops_water_levels"))
     )
 
@@ -151,7 +151,7 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
             ],
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         NOAAProvider(fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="noaa_weather_alerts",
@@ -167,7 +167,7 @@ def test_noaa_provider_normalizes_live_alert_geojson() -> None:
 
 ###############################################################################
 def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
-    response = asyncio.run(
+    response = run_async_in_thread(
         FEMAProvider().fetch(ProviderRequest(capability_id="fema_nfhl_flood_zones"))
     )
 
@@ -178,7 +178,7 @@ def test_fema_provider_builds_nfhl_tile_descriptor() -> None:
 ###############################################################################
 def test_nasa_firms_requires_key_before_descriptor() -> None:
     with pytest.raises(ProviderAuthError):
-        asyncio.run(
+        run_async_in_thread(
             NASAFIRMSProvider().fetch(
                 ProviderRequest(
                     capability_id="nasa_firms_active_fires",
@@ -187,7 +187,7 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
             )
         )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         NASAFIRMSProvider(api_key="test-key").fetch(
             ProviderRequest(
                 capability_id="nasa_firms_active_fires",
@@ -207,7 +207,7 @@ def test_nasa_firms_normalizes_live_csv() -> None:
             "38.2,-122.1,345.6,h,2026-05-11,0930,N,VIIRS,12.4,D\n"
         )
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         NASAFIRMSProvider(api_key="test-key", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="nasa_firms_active_fires",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from tests.conftest import run_async_in_thread
 
 import pytest
 import sqlalchemy
@@ -138,7 +139,7 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Rome")
 
-    first = asyncio.run(
+    first = run_async_in_thread(
         lifecycle.create_run(
             conversation.conversation_id,
             AgentRunCreateRequest(message="Map Rome"),
@@ -146,7 +147,7 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
     )
 
     with pytest.raises(RunConflictError):
-        asyncio.run(
+        run_async_in_thread(
             lifecycle.create_run(
                 conversation.conversation_id,
                 AgentRunCreateRequest(message="Map Milan"),
@@ -160,13 +161,13 @@ def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> Non
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Idempotency")
 
-    first, created = asyncio.run(
+    first, created = run_async_in_thread(
         lifecycle.create_run_with_status(
             conversation.conversation_id,
             AgentRunCreateRequest(message="Map Rome", client_request_id="request-1"),
         )
     )
-    duplicate, duplicate_created = asyncio.run(
+    duplicate, duplicate_created = run_async_in_thread(
         lifecycle.create_run_with_status(
             conversation.conversation_id,
             AgentRunCreateRequest(message="Map Milan", client_request_id="request-1"),
@@ -207,14 +208,14 @@ def test_conversation_context_state_survives_repository_restart(
 def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
     lifecycle, steering, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Rome")
-    run = asyncio.run(
+    run = run_async_in_thread(
         lifecycle.create_run(
             conversation.conversation_id,
             AgentRunCreateRequest(message="Map Rome"),
         )
     )
 
-    first = asyncio.run(
+    first = run_async_in_thread(
         steering.steer(
             conversation.conversation_id,
             run.run_id,
@@ -223,7 +224,7 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
             ),
         )
     )
-    duplicate = asyncio.run(
+    duplicate = run_async_in_thread(
         steering.steer(
             conversation.conversation_id,
             run.run_id,
@@ -244,15 +245,15 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
 def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) -> None:
     lifecycle, steering, publisher, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Rome")
-    run = asyncio.run(
+    run = run_async_in_thread(
         lifecycle.create_run(
             conversation.conversation_id,
             AgentRunCreateRequest(message="Map Rome"),
         )
     )
 
-    cancel = asyncio.run(lifecycle.cancel_run(conversation.conversation_id, run.run_id))
-    duplicate_cancel = asyncio.run(
+    cancel = run_async_in_thread(lifecycle.cancel_run(conversation.conversation_id, run.run_id))
+    duplicate_cancel = run_async_in_thread(
         lifecycle.cancel_run(conversation.conversation_id, run.run_id)
     )
 
@@ -265,7 +266,7 @@ def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) ->
     assert transitioned is False
     assert cancelled_snapshot.state == "cancelled"
     with pytest.raises(RunConflictError):
-        asyncio.run(
+        run_async_in_thread(
             steering.steer(
                 conversation.conversation_id,
                 run.run_id,
@@ -297,4 +298,4 @@ def test_shutdown_cancels_in_flight_tasks_and_clears_task_registry(
         assert long_task.cancelled()
         assert not lifecycle._tasks  # noqa: SLF001
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())

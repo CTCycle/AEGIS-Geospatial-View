@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
@@ -885,7 +885,7 @@ def test_orchestrator_uses_verified_tool_map_session() -> None:
         assert response.tool_payload["tool_calls"][0]["name"] == "execute_geospatial_capability"
         assert policy.preflight_calls == 1
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
@@ -939,7 +939,7 @@ def test_orchestrator_builds_fallback_map_when_tool_loop_only_chats() -> None:
         assert search_orchestrator.requests
         assert response.assistant_message.startswith("Map ready for Rome")
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> None:
@@ -987,7 +987,7 @@ def test_orchestrator_fallback_map_infers_requested_overlay_from_user_text() -> 
         assert "tomtom_traffic_flow" in response.map_session.overlay_ids
         assert search_orchestrator.requests[0].overlay_ids == ["tomtom_traffic_flow"]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap() -> None:
@@ -1027,7 +1027,7 @@ def test_orchestrator_stage10_show_rome_returns_map_with_center_and_osm_basemap(
         assert response.map_session.resolved_location.label == "Rome"
         assert response.map_session.overlay_ids == []
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session() -> None:
@@ -1067,7 +1067,7 @@ def test_orchestrator_stage10_show_rome_with_traffic_returns_single_map_session(
         assert "Missing credential" in response.map_session.compliance_warnings[0]
         assert len(search_orchestrator.requests) == 1
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainviewer() -> None:
@@ -1105,7 +1105,7 @@ def test_orchestrator_stage10_show_zurich_with_precipitation_radar_infers_rainvi
         assert response.map_session.resolved_location.label == "Zurich"
         assert response.map_session.overlay_ids == ["rainviewer_precipitation_radar"]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -> None:
@@ -1141,7 +1141,7 @@ def test_orchestrator_stage10_show_paris_with_air_quality_infers_air_overlay() -
         assert response.map_session.resolved_location.label == "Paris"
         assert response.map_session.overlay_ids == ["openaq_air_quality"]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning() -> None:
@@ -1181,7 +1181,7 @@ def test_orchestrator_stage10_show_webcams_around_times_square_surfaces_warning(
         assert response.map_session.compliance_warnings
         assert "Missing credential" in response.map_session.compliance_warnings[0]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
@@ -1310,7 +1310,7 @@ def test_orchestrator_merges_multiple_successful_overlay_results() -> None:
         assert response.map_session is not None
         assert response.map_session.overlay_ids == ["traffic_overlay", "rain_overlay"]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_order() -> None:
@@ -1444,7 +1444,7 @@ def test_orchestrator_merges_capability_selections_and_deduplicates_overlay_orde
             "rain_overlay",
         ]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() -> None:
@@ -1509,7 +1509,7 @@ def test_orchestrator_resolves_memory_follow_up_and_preserves_active_location() 
         assert response.memory_snapshot["active_location"]["label"] == "Rome"
         assert history.messages[-1]["structured_payload"]["memory_snapshot"]["active_location"]["label"] == "Rome"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() -> None:
@@ -1565,7 +1565,7 @@ def test_orchestrator_stage10_show_previous_location_with_traffic_uses_memory() 
         assert response.map_session.resolved_location.label == "Rome"
         assert response.map_session.overlay_ids == ["tomtom_traffic_flow"]
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_updates_active_location_when_user_switches_places() -> None:
@@ -1629,7 +1629,7 @@ def test_orchestrator_updates_active_location_when_user_switches_places() -> Non
         assert response.memory_snapshot["active_location"]["label"] == "Paris"
         assert response.memory_snapshot["location_slots"][0]["label"] == "Paris"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_without_clarification() -> None:
@@ -1675,7 +1675,7 @@ def test_orchestrator_stage10_coordinates_request_uses_direct_coordinates_withou
         ]
         assert response.decision.plan.state != "clarify"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
@@ -1749,7 +1749,7 @@ def test_orchestrator_does_not_update_memory_after_provider_failure() -> None:
         assert response.memory_snapshot == starting_memory
         assert history.messages[-1]["structured_payload"]["memory_snapshot"] == starting_memory
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_returns_clarification_operation_for_preflight_question() -> None:
@@ -1784,7 +1784,7 @@ def test_orchestrator_returns_clarification_operation_for_preflight_question() -
         assert response.operation.status == "partial"
         assert response.operation.message == "Which location should I use?"
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
@@ -1819,7 +1819,7 @@ def test_orchestrator_returns_rejection_operation_for_blocked_request() -> None:
         assert response.operation.status == "failed"
         assert "policy constraints" in response.operation.message.lower()
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool() -> None:
@@ -1876,7 +1876,7 @@ def test_orchestrator_returns_direct_answer_operation_for_verified_direct_tool()
         assert response.operation.direct_result["tool_id"] == "location_to_coordinates"
         assert "Coordinates for Rome" in response.assistant_message
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session() -> None:
@@ -1936,7 +1936,7 @@ def test_orchestrator_returns_error_when_planned_map_request_has_no_map_session(
         assert history.messages[-1]["structured_payload"]["operation"]["status"] == "failed"
         assert history.messages[-1]["map_session"] is None
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())
 
 ###############################################################################
 def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
@@ -1998,4 +1998,4 @@ def test_orchestrator_returns_error_operation_for_tool_timeout() -> None:
         assert response.map_session is None
         assert response.memory_snapshot == {}
 
-    asyncio.run(_run())
+    run_async_in_thread(_run())

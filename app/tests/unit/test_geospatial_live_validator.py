@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.live_validator import (
     CREDENTIAL_LIVE_CHECKS,
@@ -40,7 +40,7 @@ class _LiveValidationRegistry:
 
 ###############################################################################
 def test_live_validator_runs_public_provider_checks_with_injected_registry() -> None:
-    report = asyncio.run(
+    report = run_async_in_thread(
         validate_live_geospatial_sources(registry_factory=_LiveValidationRegistry)
     )
 
@@ -66,7 +66,7 @@ def test_live_validator_runs_public_provider_checks_with_injected_registry() -> 
 def test_live_validator_skips_whitespace_only_credentials(monkeypatch) -> None:
     monkeypatch.setenv("GEOAPIFY_API_KEY", "   ")
 
-    result = asyncio.run(_run_check(_LiveValidationRegistry(), CREDENTIAL_LIVE_CHECKS[0]))
+    result = run_async_in_thread(_run_check(_LiveValidationRegistry(), CREDENTIAL_LIVE_CHECKS[0]))
 
     assert result.status == "skipped"
     assert "GEOAPIFY_API_KEY" in (result.message or "")
@@ -85,7 +85,7 @@ def test_live_validator_rejects_error_payloads() -> None:
                 payload={"error": "upstream unavailable"},
             )
 
-    result = asyncio.run(
+    result = run_async_in_thread(
         _run_check(
             _ErrorRegistry(),
             CREDENTIAL_LIVE_CHECKS[0].__class__(

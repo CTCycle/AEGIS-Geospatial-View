@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.providers.base import ProviderRequest
 from server.services.geospatial.providers.geoapify import GeoapifyProvider
@@ -22,7 +22,7 @@ def test_geoapify_poi_normalization_keeps_popup_metadata() -> None:
             ]
         }
 
-    response = asyncio.run(
+    response = run_async_in_thread(
         GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher).fetch(
             ProviderRequest(
                 capability_id="geoapify_amenities",
