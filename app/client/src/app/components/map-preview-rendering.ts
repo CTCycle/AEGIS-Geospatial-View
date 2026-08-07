@@ -85,8 +85,8 @@ const buildWmsTileUrl = (
     return null;
   }
   const layers = 'layers' in descriptor && descriptor.layers ? descriptor.layers : descriptor.layer_id || DEFAULT_WMS_LAYER_ID;
-  const version = 'wms_version' in descriptor && descriptor.wms_version ? descriptor.wms_version : DEFAULT_WMS_VERSION;
-  const exceptions = 'wms_exceptions' in descriptor && descriptor.wms_exceptions ? descriptor.wms_exceptions : DEFAULT_WMS_EXCEPTIONS;
+  const version = DEFAULT_WMS_VERSION;
+  const exceptions = DEFAULT_WMS_EXCEPTIONS;
   const crs = descriptor.crs || 'EPSG:3857';
   const format = descriptor.format || 'image/png';
   const style = descriptor.style || '';
@@ -120,8 +120,8 @@ const buildWmtsTileUrl = (
   }
   const layerId = descriptor.layer_id || ('layers' in descriptor ? descriptor.layers : undefined) || DEFAULT_WMS_LAYER_ID;
   const matrixSet = descriptor.tile_matrix_set || DEFAULT_WMTS_MATRIX_SET;
-  const format = descriptor.format || ('wmts_format' in descriptor ? descriptor.wmts_format : undefined) || DEFAULT_WMTS_FORMAT;
-  const style = descriptor.style || ('wmts_style' in descriptor ? descriptor.wmts_style : undefined) || 'default';
+  const format = descriptor.format || DEFAULT_WMTS_FORMAT;
+  const style = descriptor.style || 'default';
   const query = [
     'service=WMTS',
     'request=GetTile',
@@ -484,8 +484,8 @@ const addRasterOverlayLayer = (
     tiles,
     tileSize: overlay.render?.tile_size || overlay.tile_size || 256,
   };
-  const minZoom = overlay.render?.min_zoom ?? overlay.min_zoom ?? overlay.minzoom;
-  const maxZoom = overlay.render?.max_zoom ?? overlay.max_zoom ?? overlay.maxzoom;
+  const minZoom = overlay.render?.min_zoom ?? overlay.min_zoom;
+  const maxZoom = overlay.render?.max_zoom ?? overlay.max_zoom;
   if (typeof minZoom === 'number') {
     (rasterSource as { minzoom?: number }).minzoom = minZoom;
   }

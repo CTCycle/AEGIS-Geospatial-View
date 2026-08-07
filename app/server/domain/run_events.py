@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -82,10 +82,3 @@ class RunEventCreate(BaseModel):
     visibility: RunEventVisibility = RunEventVisibility.USER
     payload: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
     timestamp: datetime = Field(default_factory=utc_now)
-
-###############################################################################
-class RunEventStreamResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    events: list[RunEvent]
-    visibility: Literal["user", "internal"] = "user"

@@ -30,13 +30,9 @@ AEGIS uses these main backend layers:
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
 
-Run-service errors are translated once at the API boundary by
-`app/server/api/run_errors.py`. Run lifecycle and stream services translate
-repository failures into `RunServiceError` subclasses; conversation endpoints
-catch that service-level hierarchy and delegate status mapping to the shared
-translator. Run streams always receive an `AgentRunRepository` and verify the
-conversation-to-run relationship before opening the realtime WebSocket (or the
-legacy SSE response for batch clients).
+Run-service errors are classified by the realtime protocol boundary. The
+realtime service verifies the conversation-to-run relationship before starting,
+steering, or cancelling a run, and returns structured protocol errors.
 
 ## Representative Request Flow
 
@@ -145,8 +141,7 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - `POST /api/chat/stream` uses streaming NDJSON.
 - Chat jobs run asynchronously through `/api/chat/jobs` and are observed through `/api/jobs/{job_id}`.
 - The interactive UI uses the WebSocket `/api/conversations/{conversation_id}/realtime` for `session.resume`, run commands, acknowledgements, heartbeats, and ordered durable events.
-- Conversation runs retain `POST /api/conversations/{conversation_id}/runs` and `GET /api/conversations/{conversation_id}/runs/{run_id}/events` as legacy/batch SSE APIs for non-UI clients.
-- User steering during an active run is aggregated into the same run through the realtime `run.steer` command (the legacy HTTP route remains for batch clients); it does not create a child task or queue.
+- User steering during an active run is aggregated into the same run through the realtime `run.steer` command; it does not create a child task or queue.
 
 ### Threaded
 
@@ -163,7 +158,6 @@ Renderable map overlays are produced by `RenderDescriptorService` and then place
 - Run cancellation is cooperative and terminal; stale agent results after a version change are persisted as internal diagnostics and discarded from user-visible completion.
 - Agent availability is application-level. Run progress begins with `understanding_request`; creating a run does not restart the agent or emit an `agent_started` event.
 - `RunLifecycleService.create_run()` returns a transport-neutral
-  `AgentRunCreateResult`; HTTP routes add the legacy SSE URL while the realtime
-  route sends protocol acknowledgements.
+  `AgentRunCreateResult`; the realtime route sends protocol acknowledgements.
 - Application shutdown cancels tracked lifecycle tasks and awaits them before
   the FastAPI lifespan exits, including startup-failure paths.

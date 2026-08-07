@@ -37,9 +37,6 @@
     "coverage_scope": "global-partial",
     "temporal_behavior": "dynamic",
     "constraints": "Time-indexed radar tiles; coverage and licensing vary by region and usage scenario.",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "rainviewer_precipitation_radar_overlay_v1",
     "human_summary": "Radar precipitation overlay for rapid rain and storm intensity context in a selected area.",
     "primary_use_cases": [
@@ -68,7 +65,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Time-indexed radar tiles; coverage and licensing vary by region and usage scenario.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

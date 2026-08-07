@@ -33,9 +33,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "886881adeb0dceb3d63339a3e82a98c47d0c9f98a594128ccb0a27f1c393066e",
     "requires_key": false,
     "official_docs_url": "https://esa-worldcover.org/en/data-access",
@@ -48,7 +45,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show ESA",

@@ -39,9 +39,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "d155f809aaf624f14b66d5f9900844890a719d514b7e46ea507e3b4b0cfe835e",
     "human_summary": "Global land-cover classification layer for consistent thematic surface analysis.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

@@ -82,12 +82,6 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
         schema, f"{FASTAPI_API_PREFIX}/conversations", "post", "201"
     ) == "#/components/schemas/ConversationCreateResponse"
     assert _response_schema_ref(
-        schema,
-        f"{FASTAPI_API_PREFIX}/conversations/{{conversation_id}}/runs",
-        "post",
-        "202",
-    ) == "#/components/schemas/AgentRunCreateResponse"
-    assert _response_schema_ref(
         schema, f"{FASTAPI_API_PREFIX}/chat/settings", "get", "200"
     ) == "#/components/schemas/ModelSettingsResponse"
     assert _response_schema_ref(

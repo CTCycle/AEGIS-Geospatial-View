@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "686f050f517c0c48beaa7dd99946d50abd56bd59662077fd14db85c371613398",
     "human_summary": "Hotspot layer for probable active fires and high-temperature anomalies.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

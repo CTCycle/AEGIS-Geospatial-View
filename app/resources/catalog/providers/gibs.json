@@ -37,9 +37,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "ddcc5f9fb5eb78592deca4a078bf0cf4d6a7a8c99ec15edcd92f4b96f49946e0",
     "requires_key": false,
     "official_docs_url": "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
@@ -59,7 +56,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show NASA GIBS",

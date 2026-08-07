@@ -33,9 +33,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static tiles",
     "constraints": "optimized for terrain and landform interpretation",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "78436aa4ec76d2188f3525ec7ac3559e45e9e9300e9c5ec21c97844cd5be120b",
     "human_summary": "Terrain basemap that helps interpret relief, slopes, and natural landform structure.",
     "primary_use_cases": [
@@ -64,7 +61,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "best-effort public tiles; avoid excessive burst traffic",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

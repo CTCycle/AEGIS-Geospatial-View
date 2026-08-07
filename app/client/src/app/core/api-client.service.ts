@@ -2,14 +2,11 @@ import { Injectable } from '@angular/core';
 
 import {
   checkOllamaHealth,
-  cancelAgentRun,
-  createAgentRun,
   createConversation,
   fetchCatalog,
   fetchChatModels,
   fetchChatSettings,
   fetchGeospatialCameras,
-  fetchGeospatialCapabilities,
   fetchGeospatialCredentialStatus,
   fetchGeospatialProviderAccountSetups,
   fetchGeospatialLayerFeatures,
@@ -17,15 +14,10 @@ import {
   pullOllamaModel,
   refreshOllamaModels,
   sendChatTurn,
-  sendRunSteering,
-  openRunEventSource,
   updateChatSettings,
 } from './api';
 import {
   CatalogResponse,
-  AgentRunCancelResponse,
-  AgentRunCreateRequest,
-  AgentRunCreateResponse,
   ChatTurnRequest,
   ChatTurnResponse,
   ConversationCreateRequest,
@@ -38,18 +30,12 @@ import {
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
   OllamaHealthResponse,
-  SteeringMessageRequest,
-  SteeringMessageResponse,
 } from './types';
 
 @Injectable({ providedIn: 'root' })
 export class ApiClientService {
   fetchCatalog(): Promise<CatalogResponse> {
     return fetchCatalog();
-  }
-
-  fetchGeospatialCapabilities(): Promise<CatalogResponse> {
-    return fetchGeospatialCapabilities();
   }
 
   fetchGeospatialLayers(): Promise<Pick<CatalogResponse, 'basemaps' | 'overlays' | 'cameras' | 'transit'>> {
@@ -83,26 +69,6 @@ export class ApiClientService {
 
   createConversation(payload: ConversationCreateRequest): Promise<ConversationCreateResponse> {
     return createConversation(payload);
-  }
-
-  createAgentRun(conversationId: string, payload: AgentRunCreateRequest): Promise<AgentRunCreateResponse> {
-    return createAgentRun(conversationId, payload);
-  }
-
-  sendRunSteering(
-    conversationId: string,
-    runId: string,
-    payload: SteeringMessageRequest,
-  ): Promise<SteeringMessageResponse> {
-    return sendRunSteering(conversationId, runId, payload);
-  }
-
-  cancelAgentRun(conversationId: string, runId: string): Promise<AgentRunCancelResponse> {
-    return cancelAgentRun(conversationId, runId);
-  }
-
-  openRunEventSource(conversationId: string, runId: string, afterEventId?: string): EventSource {
-    return openRunEventSource(conversationId, runId, afterEventId);
   }
 
   fetchChatModels(provider?: 'deepseek' | 'opencode' | 'opencode-go'): Promise<ModelLibraryResponse> {

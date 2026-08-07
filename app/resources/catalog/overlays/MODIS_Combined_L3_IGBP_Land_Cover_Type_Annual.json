@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "f873d5b3140abc82b9b3c7f51f1d2ec1d50a86d63599e5f690982026bf15a231",
     "human_summary": "Thematic land-cover map distinguishing vegetation, urban, water, and other cover classes.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

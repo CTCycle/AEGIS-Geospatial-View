@@ -25,7 +25,7 @@ Residential-building requests use `overpass_residential_buildings`; amenities
 remain separate. Satellite language selects the imagery basemap unless the user
 explicitly requests an imagery data layer.
 
-No legacy routing compatibility is preserved.
+The agentic path uses the current normalized routing and capability contracts.
 
 ## Conversation Context
 

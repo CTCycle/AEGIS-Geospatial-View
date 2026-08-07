@@ -129,7 +129,7 @@ def test_event_repository_replay_orders_and_filters_visibility(
     )
     second = repo.append_event(visible.model_copy(update={"payload": {"label": "two"}}))
 
-    replay = repo.list_events("run_1", after_event_id=first.event_id)
+    replay = repo.list_events("run_1", after_sequence=first.sequence)
 
     assert [event.event_id for event in replay] == [second.event_id]
     assert all(event.visibility == RunEventVisibility.USER for event in replay)

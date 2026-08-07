@@ -192,11 +192,11 @@ class RenderDescriptorService:
             normalized = self._optional_string(value)
             if normalized is not None:
                 descriptor[key] = normalized
-        for key in ("default_opacity", "tile_size", "minzoom", "maxzoom"):
+        for key in ("default_opacity", "tile_size", "min_zoom", "max_zoom"):
             if isinstance(metadata.get(key), int | float):
                 descriptor[key] = int(metadata[key]) if key != "default_opacity" else float(metadata[key])
         if descriptor["provider"] == "rainviewer":
-            descriptor["maxzoom"] = 7
+            descriptor["max_zoom"] = 7
         if self._is_bounds(metadata.get("bounds")):
             descriptor["bounds"] = list(metadata["bounds"])
         return descriptor, warnings

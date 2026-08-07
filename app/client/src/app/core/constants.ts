@@ -52,16 +52,8 @@ export const API_OLLAMA_REFRESH_PATH = '/chat/models/ollama/refresh';
 export const API_OLLAMA_PULL_PATH = '/chat/models/ollama/pull';
 export const API_OLLAMA_HEALTH_PATH = '/chat/models/ollama/health';
 export const API_CONVERSATIONS_PATH = '/conversations';
-export const API_CONVERSATION_RUNS_PATH = (conversationId: string): string =>
-  `/conversations/${encodeURIComponent(conversationId)}/runs`;
 export const API_CONVERSATION_REALTIME_PATH = (conversationId: string): string =>
   `/conversations/${encodeURIComponent(conversationId)}/realtime`;
-export const API_CONVERSATION_RUN_EVENTS_PATH = (conversationId: string, runId: string): string =>
-  `/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/events`;
-export const API_CONVERSATION_RUN_STEERING_PATH = (conversationId: string, runId: string): string =>
-  `/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/steering`;
-export const API_CONVERSATION_RUN_CANCEL_PATH = (conversationId: string, runId: string): string =>
-  `/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/cancel`;
 
 export const REALTIME_PROTOCOL_VERSION = 1;
 export const REALTIME_SUBPROTOCOL = 'aegis.realtime.v1';

@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "17908e443612b7972d450ca2068facbb60f93afc60ac4a610435603b76ed5b58",
     "human_summary": "Point-based amenity layer highlighting services such as food, health, and public facilities.",
     "primary_use_cases": [
@@ -65,7 +62,6 @@
     "auth_mode": "api_key",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

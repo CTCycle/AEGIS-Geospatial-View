@@ -67,16 +67,6 @@ class AgentRunCreateRequest(BaseModel):
         return normalized
 
 ###############################################################################
-class AgentRunCreateResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    conversation_id: str
-    run_id: str
-    run_version: int
-    state: AgentRunState
-    stream_url: str
-
-###############################################################################
 class AgentRunCreateResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -101,12 +91,6 @@ class AgentRunSnapshot(BaseModel):
     cancel_requested_at: datetime | None = None
     error_code: str | None = None
     error_message: str | None = None
-
-###############################################################################
-class AgentRunCancelRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    reason: str | None = None
 
 ###############################################################################
 class AgentRunCancelResponse(BaseModel):

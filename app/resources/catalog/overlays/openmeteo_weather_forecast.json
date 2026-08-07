@@ -38,9 +38,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "Useful for forecast context. Validate non-commercial limits and attribution requirements.",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "openmeteo_weather_forecast_overlay_v1",
     "human_summary": "Forecast-oriented weather overlay for location-specific temperature and precipitation context.",
     "primary_use_cases": [
@@ -69,7 +66,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Useful for forecast context. Validate non-commercial limits and attribution requirements.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

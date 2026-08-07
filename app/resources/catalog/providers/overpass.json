@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "Respect instance rate and volume guidance and include attribution.",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "overpass-provider-v1",
     "requires_key": false,
     "official_docs_url": "https://wiki.openstreetmap.org/wiki/Overpass_API",
@@ -49,7 +46,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Respect instance rate and volume guidance and include attribution.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "search_examples": [
       "show Overpass API",

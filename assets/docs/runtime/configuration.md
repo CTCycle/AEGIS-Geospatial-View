@@ -48,8 +48,8 @@ Database mode and all database connection/security/performance settings come onl
 from `settings/.env` (or process environment variables). The JSON settings file
 does not provide database configuration.
 
-The JSON loader only maps the blocks used by `ConfigurationManager`; legacy
-vector-sync and durable-job settings are not runtime controls.
+The JSON loader maps the blocks used by `ConfigurationManager`; only typed
+settings fields have runtime effect.
 
 Model provider API keys are not environment settings in the default flow. They
 are entered through Settings and stored as encrypted credential records. The

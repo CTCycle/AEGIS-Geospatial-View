@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "13e6f165dc3d6a6b1fdcd08d818e0e88c6be9435f3ee74c2ff2bb4a79263fe68",
     "human_summary": "Vegetation vigor layer indicating relative greenness and plant activity.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

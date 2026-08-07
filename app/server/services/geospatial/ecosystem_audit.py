@@ -351,12 +351,6 @@ def build_inventory(
 
     findings = [
         {
-            "id": "schema-v1-dominant",
-            "severity": "medium",
-            "status": "open_risk",
-            "detail": "The loader accepts all manifests, but the auditor reports 83 schema-v1 and 3 schema-v2 manifests; migration is not part of this scoped audit fix.",
-        },
-        {
             "id": "credentialed-live-coverage",
             "severity": "medium",
             "status": "external_gate",

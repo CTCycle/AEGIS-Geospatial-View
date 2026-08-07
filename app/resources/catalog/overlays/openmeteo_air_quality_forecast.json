@@ -37,9 +37,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "Forecast-based environmental layer; verify usage limits and non-commercial terms before production.",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "openmeteo_air_quality_forecast_overlay_v1",
     "human_summary": "Forecast air-quality layer that helps anticipate pollutant conditions in a selected area.",
     "primary_use_cases": [
@@ -68,7 +65,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Forecast-based environmental layer; verify usage limits and non-commercial terms before production.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

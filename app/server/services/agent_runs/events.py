@@ -75,7 +75,6 @@ class RunEventPublisher:
     async def subscribe(
         self,
         run_id: str,
-        after_event_id: str | None = None,
         after_sequence: int | None = None,
     ) -> tuple[RunEventSubscription, list[RunEvent]]:
         queue: asyncio.Queue[RunEvent | None] = asyncio.Queue(maxsize=self.subscriber_queue_size)
@@ -88,7 +87,6 @@ class RunEventPublisher:
         # overlap between replay and live fan-out.
         replay = self.replay(
             run_id,
-            after_event_id=after_event_id,
             after_sequence=after_sequence,
         )
         return subscription, replay
@@ -107,12 +105,10 @@ class RunEventPublisher:
     def replay(
         self,
         run_id: str,
-        after_event_id: str | None = None,
         after_sequence: int | None = None,
     ) -> list[RunEvent]:
         return self.event_repository.list_events(
             run_id,
-            after_event_id=after_event_id,
             after_sequence=after_sequence,
             visibility="user",
         )
@@ -121,19 +117,13 @@ class RunEventPublisher:
     async def events(
         self,
         run_id: str,
-        after_event_id: str | None = None,
         after_sequence: int | None = None,
     ) -> AsyncGenerator[RunEvent, None]:
         subscription, replay = await self.subscribe(
             run_id,
-            after_event_id=after_event_id,
             after_sequence=after_sequence,
         )
         cursor = after_sequence or 0
-        if after_event_id:
-            previous = self.event_repository.find_event(run_id, after_event_id)
-            if previous is not None:
-                cursor = max(cursor, previous.sequence)
         try:
             for event in replay:
                 if event.sequence <= cursor:

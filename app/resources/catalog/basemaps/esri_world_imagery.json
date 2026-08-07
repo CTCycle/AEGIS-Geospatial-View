@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "daily imagery snapshots",
     "constraints": "imagery tile availability and attribution are governed by the upstream basemap provider",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "293c6d23aa1556a75b91919dd4293596a15feb2322dbc760d2cd3a47e422f7d4",
     "human_summary": "Satellite imagery basemap for natural-color visual inspection of land, coasts, and clouds.",
     "primary_use_cases": [
@@ -65,7 +62,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "imagery tile availability and attribution are governed by Esri basemap terms",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

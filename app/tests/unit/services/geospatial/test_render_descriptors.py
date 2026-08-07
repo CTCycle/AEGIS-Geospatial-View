@@ -123,7 +123,7 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
 
     assert result is not None
     descriptor, _warnings = result
-    assert descriptor["maxzoom"] == 7
+    assert descriptor["max_zoom"] == 7
 
 ###############################################################################
 @pytest.mark.parametrize(

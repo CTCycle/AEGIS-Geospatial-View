@@ -54,14 +54,10 @@ class AgentRunEventRepository:
         self,
         run_id: str,
         *,
-        after_event_id: str | None = None,
         after_sequence: int | None = None,
         visibility: str = "user",
     ) -> list[RunEvent]:
         threshold = after_sequence
-        if threshold is None and after_event_id:
-            found = self.find_event(run_id, after_event_id)
-            threshold = found.sequence if found is not None else None
         with self._session_factory() as session:
             statement = select(AgentRunEventRecord).where(
                 AgentRunEventRecord.run_id == run_id
@@ -88,21 +84,6 @@ class AgentRunEventRepository:
                 )
                 or 0
             )
-
-    # -------------------------------------------------------------------------
-    def find_event(self, run_id: str, event_id: str) -> RunEvent | None:
-        with self._session_factory() as session:
-            row = (
-                session.execute(
-                    select(AgentRunEventRecord).where(
-                        AgentRunEventRecord.run_id == run_id,
-                        AgentRunEventRecord.id == event_id,
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            return self._to_domain(row) if row is not None else None
 
     # -------------------------------------------------------------------------
     @staticmethod

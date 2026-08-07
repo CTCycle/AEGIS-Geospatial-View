@@ -37,7 +37,7 @@ Every metadata object must expose:
 - Queryable claims are reserved for structured machine-readable sources.
 - `metadata-only` capabilities must not claim renderable geometry.
 - Disabled or broken layers must remain unavailable until manifest, runtime, credentials, and health allow rendering.
-- OpenLayers-compatible source protocols are the manifest standard even though the current UI renderer is MapLibre.
+- Manifest source protocols are normalized into the backend render descriptor contract used by the MapLibre UI.
 - Provider manifests may declare `live_layers_supported` and capability protocols for provider-native discovery. Discovered live layers are not written back into static manifests automatically.
 - Curated overlays and live provider layers must use the same backend render descriptor contract before reaching `MapSession`.
 - The loader requires `agenticUse` in every schema-v2 manifest even when its

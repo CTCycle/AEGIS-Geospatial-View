@@ -55,7 +55,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27",
     "location_dependency": "Depends on selected map extent or requested location.",
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."

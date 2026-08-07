@@ -34,9 +34,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "static",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "0c4be2a4d1cd9b687a74960cf773fcc26125a336384b21f5ce79a5b59f2c23f5",
     "human_summary": "Terrain color index layer for understanding elevation gradients and relief structure.",
     "primary_use_cases": [
@@ -70,7 +67,6 @@
     "auth_mode": "none",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,

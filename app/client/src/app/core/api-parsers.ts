@@ -273,9 +273,8 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     source_layer: stringOrNull(value.source_layer) ?? undefined,
     tile_matrix_set: stringOrNull(value.tile_matrix_set ?? render?.tile_matrix_set) ?? undefined,
     tile_size: numberOrNull(value.tile_size ?? render?.tile_size) ?? undefined,
-    minzoom: numberOrNull(value.minzoom ?? render?.min_zoom) ?? undefined,
-    maxzoom: numberOrNull(value.maxzoom ?? render?.max_zoom) ?? undefined,
-    render_params: isRecord(value.render_params) ? value.render_params as Record<string, JsonValue> : undefined,
+    min_zoom: numberOrNull(value.min_zoom ?? render?.min_zoom) ?? undefined,
+    max_zoom: numberOrNull(value.max_zoom ?? render?.max_zoom) ?? undefined,
     bounds: Array.isArray(value.bounds) && value.bounds.length === 4
       ? value.bounds as [number, number, number, number]
       : undefined,

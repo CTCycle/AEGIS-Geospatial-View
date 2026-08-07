@@ -35,7 +35,7 @@ Last updated: 2026-08-02
 - Long-running APIs must support start, poll, and cancel flows.
 - Conversation runs additionally support versioned WebSocket replay,
   cooperative cancellation, idempotent commands, and steering against the same
-  conversation/run identity. Legacy SSE remains available for batch clients.
+  conversation/run identity.
 
 ## Code Structure
 

@@ -35,9 +35,6 @@
     "coverage_scope": "global",
     "temporal_behavior": "dynamic",
     "constraints": "verify provider availability and attribution requirements",
-    "last_embedded": null,
-    "embedding_provider": "ollama",
-    "embedding_model": "nomic-embed-text",
     "content_hash": "e345f92cef1f6cfc55c74a6b178799313690670855782b6e513edfc0c097bc01",
     "human_summary": "Dynamic traffic layer for near-real-time road congestion and flow conditions.",
     "primary_use_cases": [
@@ -66,7 +63,6 @@
     "auth_mode": "api_key",
     "rate_limit_notes": "verify provider availability and attribution requirements",
     "retrieval_mode": "direct",
-    "openlayers_compatible": true,
     "last_validated": "2026-04-27"
   },
   "version": 1,
