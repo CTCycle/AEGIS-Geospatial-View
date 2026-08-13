@@ -39,7 +39,7 @@ export class AgentReadinessService {
       }
       return {
         status: 'active',
-        label: 'Active',
+        label: 'Configured',
         message: this.describeActiveAgent(settings),
       };
     } catch {
@@ -102,6 +102,6 @@ export class AgentReadinessService {
     if (!provider || !model) {
       return 'No agent model selected.';
     }
-    return `${model} is ready through ${providerDisplayLabel(provider)}.`;
+    return `${model} is configured through ${providerDisplayLabel(provider)}. Live inference is verified on the first request.`;
   }
 }

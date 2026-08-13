@@ -333,6 +333,18 @@
     line-height: 1.42;
 }
 
+.chat-composer textarea::placeholder {
+    color: #9bb0ba;
+    opacity: 1;
+}
+
+.chat-composer-error {
+    margin: 0.45rem 0.78rem 0;
+    color: #ffb5b5;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
 .chat-composer .primary-button {
     width: 100%;
     height: 100%;

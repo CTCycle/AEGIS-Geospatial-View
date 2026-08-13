@@ -34,6 +34,7 @@
             <textarea
               aria-label="Chat message"
               [value]="composerDraft"
+              [attr.maxlength]="maxChatMessageLength"
               (input)="onComposerInput($event)"
               (keydown)="onComposerKeydown($event)"
               placeholder="Ask for a location, map data, or coordinates for a place."
@@ -64,6 +65,9 @@
               </button>
             }
           </div>
+          @if (composerError) {
+            <p class="chat-composer-error" role="alert">{{ composerError }}</p>
+          }
         </section>
 
         <section class="rail-context-strip" aria-label="Context window utilization">

@@ -1,6 +1,6 @@
 # Experience And Accessibility
 
-Last updated: 2026-08-02
+Last updated: 2026-08-12
 
 ## Core User Journeys
 
@@ -33,6 +33,8 @@ Last updated: 2026-08-02
 - Maintain keyboard navigability for all controls.
 - Preserve `:focus-visible` outlines.
 - Maintain semantic containers and labels for form elements.
+- Keep exactly one `main` landmark in the routed application shell.
+- Modal dialogs must receive focus on open, trap Tab and Shift+Tab, close with Escape, and restore focus to the invoking control.
 - Do not encode status solely by color.
 - Respect reduced-motion preferences.
 

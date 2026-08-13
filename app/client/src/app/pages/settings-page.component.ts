@@ -371,10 +371,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ollamaModalStatusText = summary;
       this.statusText = `Ollama: ${summary}`;
       this.syncState();
+      this.changeDetectorRef.detectChanges();
     } catch (error: unknown) {
       const detail = this.getOllamaFailureMessage(error);
       this.statusText = detail;
       this.ollamaModalStatusText = detail;
+      this.changeDetectorRef.detectChanges();
     }
   }
 
@@ -583,7 +585,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.statusText = modelLibrary.sources[dynamicProvider]?.message || `Could not load ${providerDisplayLabel(dynamicProvider)} models right now.`;
       }
       if (this.statusText === 'Loading model settings' && !dynamicProviderFailed) {
-        this.statusText = 'Ready';
+        this.statusText = 'Model settings loaded';
       }
       this.syncQueryState();
       this.syncState();

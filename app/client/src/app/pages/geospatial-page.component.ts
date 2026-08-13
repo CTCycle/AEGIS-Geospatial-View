@@ -19,6 +19,7 @@ import { AppStateStoreService } from '../core/app-state-store.service';
 import { LocalCommandService } from '../core/local-command.service';
 import { normalizeMapSession } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
+import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
 import { RealtimeService } from '../core/realtime.service';
 import {
   ChatOperationResult,
@@ -48,6 +49,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   @ViewChild('transcript', { static: false }) transcriptRef?: ElementRef<HTMLDivElement>;
   @ViewChild(MapPreviewComponent) mapPreview?: MapPreviewComponent;
 
+  readonly maxChatMessageLength = MAX_CHAT_MESSAGE_LENGTH;
+
   payload?: SearchResponsePayload;
   toolbarWidthState = 480;
   isToolbarCollapsed = false;
@@ -70,6 +73,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   contextUsage?: ContextUsage;
   mapSession?: MapSession;
   status = 'Agent ready';
+  composerError = '';
   assistantDraft = '';
   composerDraft = '';
   transcriptScrollTop = 0;
@@ -233,7 +237,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   get capabilityStatusItems(): CapabilityStatusItem[] {
     return [
       {
-        label: 'Agent online',
+        label: 'Agent model',
         statusLabel: this.agentReadiness.label,
         tone: this.agentStatusTone,
       },
@@ -344,6 +348,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   onComposerChange(value: string): void {
     this.composerDraft = value;
+    this.composerError = '';
     this.syncState();
   }
 
@@ -369,7 +374,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (!trimmed) {
       return;
     }
+    if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+      this.composerError = `Message must be ${MAX_CHAT_MESSAGE_LENGTH.toLocaleString()} characters or fewer.`;
+      this.status = this.composerError;
+      this.syncState();
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
 
+    this.composerError = '';
     const message = trimmed;
     const requestNonce = this.conversationNonce;
     if (await this.tryHandleLocalCommand(message)) {
@@ -585,10 +598,15 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = 'Request updated';
         break;
       case 'error':
-        this.status = 'Agent ready';
+        this.status = 'Agent needs attention';
         this.progressLabel = undefined;
         {
           const message = String(event.payload['message'] ?? 'Failed');
+          this.agentReadiness = {
+            status: 'needs_attention',
+            label: 'Needs attention',
+            message,
+          };
           if (this.messages.at(-1)?.content !== message) {
             this.messages = [...this.messages, { role: 'assistant', content: message }];
           }
@@ -607,6 +625,11 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.pendingRun = undefined;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
+        this.agentReadiness = {
+          status: 'active',
+          label: 'Verified',
+          message: 'The selected agent model completed the latest request.',
+        };
         break;
       case 'cancelled':
         this.isLoading = false;

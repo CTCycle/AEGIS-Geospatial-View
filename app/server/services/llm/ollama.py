@@ -71,6 +71,11 @@ class _OllamaLibraryParser(HTMLParser):
 class OllamaProvider(LLMProvider):
     provider_name = "ollama"
 
+    # Local structured extraction can include the full orchestration schema and
+    # needs more time than lightweight health, capability, and chat probes.
+    _DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
+    _STRUCTURED_REQUEST_TIMEOUT_SECONDS = 90
+
     # -------------------------------------------------------------------------
     def __init__(
         self,
@@ -91,7 +96,12 @@ class OllamaProvider(LLMProvider):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urlopen(request, timeout=30) as response:
+        timeout = (
+            self._STRUCTURED_REQUEST_TIMEOUT_SECONDS
+            if path == "/api/chat" and payload.get("format")
+            else self._DEFAULT_REQUEST_TIMEOUT_SECONDS
+        )
+        with urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
     # -------------------------------------------------------------------------
@@ -444,15 +454,16 @@ class OllamaProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
-        usage = compute_ollama_context_usage(request)
-        self.last_context_usage = usage.to_dict()
         model_json_schema = getattr(schema, "model_json_schema", None)
         schema_json = json_object(model_json_schema()) if callable(model_json_schema) else {}
+        usage = compute_ollama_context_usage(request, response_schema=schema_json)
+        self.last_context_usage = usage.to_dict()
         payload: dict[str, Any] = {
             "model": request.model,
             "messages": request.messages,
             "stream": False,
             "format": schema_json,
+            "think": False,
             "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
         }
         response = self._post_json("/api/chat", payload)

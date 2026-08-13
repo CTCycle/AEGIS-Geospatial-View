@@ -42,15 +42,15 @@ describe('AgentReadinessService', () => {
     service = TestBed.inject(AgentReadinessService);
   });
 
-  it('reports active readiness for a configured cloud agent', async () => {
+  it('reports configured readiness without claiming live inference', async () => {
     apiClient.fetchChatSettings.and.resolveTo(settings());
 
     const readiness = await service.loadReadiness();
 
     expect(readiness).toEqual({
       status: 'active',
-      label: 'Active',
-      message: 'gpt-4.1-mini is ready through OpenAI.',
+      label: 'Configured',
+      message: 'gpt-4.1-mini is configured through OpenAI. Live inference is verified on the first request.',
     });
   });
 

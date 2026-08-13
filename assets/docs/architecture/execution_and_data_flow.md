@@ -123,6 +123,12 @@ and structured JSON responses are mutually exclusive within one LLM request;
 the response serializer and provider error model keep downstream handling
 provider-neutral.
 
+Ollama structured-output requests disable optional model thinking so extraction
+does not spend its bounded inference window on hidden reasoning. Their selected
+context window includes the response schema, a structured-output reserve, and
+the standard safety margin. Structured local inference has a 90-second request
+window; lightweight health and capability requests retain the 30-second limit.
+
 Live provider-native layer discovery flows through:
 
 - `geospatial.py`
