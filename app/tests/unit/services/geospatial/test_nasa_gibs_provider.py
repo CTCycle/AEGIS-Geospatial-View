@@ -73,11 +73,9 @@ async def _assert_nasa_gibs_provider_describes_one_layer() -> None:
     assert layer.title == "MODIS Terra NDVI 8-Day"
     assert "EPSG:3857" in layer.crs
 
-
 ###############################################################################
 def test_nasa_gibs_provider_parses_xml_and_prefers_wmts() -> None:
     run_async_in_thread(_assert_nasa_gibs_provider_parses_xml_and_prefers_wmts())
-
 
 ###############################################################################
 def test_nasa_gibs_provider_describes_one_layer() -> None:

@@ -155,7 +155,6 @@ def test_create_run_rejects_second_active_run(run_repositories) -> None:
         )
     assert first.state == "pending"
 
-
 ###############################################################################
 def test_duplicate_run_start_is_idempotent_while_active(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)

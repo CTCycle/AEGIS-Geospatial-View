@@ -30,7 +30,6 @@ from server.services.agent_runs.metrics import RealtimeMetrics
 from server.services.agent_runs.realtime import RealtimeConnectionRegistry
 from server.services.agent_runs.steering import RunSteeringService
 
-
 ###############################################################################
 class _Backend:
     db_path = None
@@ -44,7 +43,6 @@ class _Backend:
             future=True,
         )
         self.session = sessionmaker(bind=self.engine, future=True)
-
 
 ###############################################################################
 class _Agent:
@@ -80,7 +78,6 @@ class _Agent:
             payload={"state": "completed"},
         )
         self.runs.mark_completed(run_id)
-
 
 ###############################################################################
 @pytest.fixture()
@@ -123,7 +120,6 @@ def realtime_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClien
     finally:
         client.close()
 
-
 ###############################################################################
 def _receive_until_terminal(socket) -> list[dict]:
     messages: list[dict] = []
@@ -132,7 +128,6 @@ def _receive_until_terminal(socket) -> list[dict]:
         messages.append(message)
         if message.get("type") == "run.event" and message.get("payload", {}).get("type") == "completed":
             return messages
-
 
 ###############################################################################
 def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
@@ -188,7 +183,6 @@ def test_websocket_start_replays_ordered_events_and_deduplicates_retry(
         assert duplicate_ack["type"] == "run.ack"
         assert duplicate_ack["payload"]["duplicate"] is True
 
-
 ###############################################################################
 def test_websocket_route_rejects_wrong_origin(
     realtime_client: tuple[TestClient, FastAPI],
@@ -203,7 +197,6 @@ def test_websocket_route_rejects_wrong_origin(
             headers={"origin": "http://evil.example"},
         ):
             pass
-
 
 ###############################################################################
 def test_websocket_reconnect_replays_only_events_after_sequence(
@@ -251,7 +244,6 @@ def test_websocket_reconnect_replays_only_events_after_sequence(
         assert [item["sequence"] for item in replayed] == [2, 3]
         assert all(item["conversation_id"] == conversation_id for item in replayed)
 
-
 ###############################################################################
 async def _assert_concurrent_conversations_keep_event_routing_isolated(
     realtime_client: tuple[TestClient, FastAPI],
@@ -291,7 +283,6 @@ async def _assert_concurrent_conversations_keep_event_routing_isolated(
     first_events, second_events = results[:2]
     assert first_events == [(first, 1), (first, 2), (first, 3)]
     assert second_events == [(second, 1), (second, 2), (second, 3)]
-
 
 ###############################################################################
 def test_concurrent_conversations_keep_event_routing_isolated(
