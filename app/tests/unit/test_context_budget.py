@@ -27,7 +27,6 @@ def test_ollama_context_uses_minimum_for_small_prompt() -> None:
     assert usage.model_context_limit == resolve_model_context_limit("llama3.2")
     assert usage.provider == "ollama"
 
-
 ###############################################################################
 def test_ollama_context_reserves_schema_and_structured_output_capacity() -> None:
     usage = compute_ollama_context_usage(

@@ -12,6 +12,7 @@ from playwright.sync_api import Page, WebSocketRoute
 TurnPayloadFactory = Callable[[str, int], dict[str, Any]]
 
 
+###############################################################################
 def _envelope(
     *,
     conversation_id: str,
@@ -32,6 +33,7 @@ def _envelope(
     return json.dumps(envelope)
 
 
+###############################################################################
 def register_realtime_stub(
     page: Page,
     turn_payload_factory: TurnPayloadFactory,

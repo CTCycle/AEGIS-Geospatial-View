@@ -57,7 +57,6 @@ def test_ollama_tag_capabilities_include_structured_output() -> None:
     assert "structured_output" in model.capabilities
     assert "tools" in model.capabilities
 
-
 ###############################################################################
 def test_ollama_structured_requests_allow_the_longer_local_inference_window() -> None:
     provider = OllamaProvider(base_url="http://ollama.test")
