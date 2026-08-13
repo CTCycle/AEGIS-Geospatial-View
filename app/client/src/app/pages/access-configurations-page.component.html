@@ -5,7 +5,7 @@
     </div>
   </header>
 
-  <main class="access-page__content">
+  <div class="access-page__content">
     <p class="access-page__status" role="status" aria-live="polite">{{ statusText }}</p>
     <section class="access-grid" aria-label="Optional providers">
       @for (provider of providers; track provider.id) {
@@ -90,7 +90,7 @@
         </article>
       }
     </section>
-  </main>
+  </div>
 
   @if (isSignupModalOpen && selectedProviderAccountSetup; as setup) {
     <app-settings-modal-shell

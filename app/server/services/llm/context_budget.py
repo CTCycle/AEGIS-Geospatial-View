@@ -12,6 +12,7 @@ DEFAULT_MODEL_CONTEXT_LIMIT = 8192
 MIN_OLLAMA_CONTEXT_WINDOW = 2048
 CONTEXT_HEADROOM_TOKENS = 512
 CONTEXT_WINDOW_STEP = 512
+OLLAMA_STRUCTURED_OUTPUT_RESERVE_TOKENS = 1024
 
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, str]]) -> int:
@@ -54,13 +55,19 @@ def resolve_model_context_limit(model: str) -> int:
     return DEFAULT_MODEL_CONTEXT_LIMIT
 
 ###############################################################################
-def compute_ollama_context_usage(request: LLMRequest) -> ContextUsage:
+def compute_ollama_context_usage(
+    request: LLMRequest,
+    *,
+    response_schema: object | None = None,
+) -> ContextUsage:
     estimated = estimate_message_tokens(request.messages)
+    schema_tokens = estimate_json_tokens(response_schema)
+    output_reserve = OLLAMA_STRUCTURED_OUTPUT_RESERVE_TOKENS if response_schema else 0
     model_limit = resolve_model_context_limit(request.model)
-    needed = estimated + CONTEXT_HEADROOM_TOKENS
+    needed = estimated + schema_tokens + output_reserve + CONTEXT_HEADROOM_TOKENS
     stepped = math.ceil(needed / CONTEXT_WINDOW_STEP) * CONTEXT_WINDOW_STEP
     selected = max(MIN_OLLAMA_CONTEXT_WINDOW, min(model_limit, stepped))
-    percent = round((estimated / max(selected, 1)) * 100, 1)
+    percent = round(((estimated + schema_tokens) / max(selected, 1)) * 100, 1)
     return ContextUsage(
         estimated_input_tokens=estimated,
         selected_context_window=selected,
@@ -68,6 +75,8 @@ def compute_ollama_context_usage(request: LLMRequest) -> ContextUsage:
         usage_percent=percent,
         provider="ollama",
         model=request.model,
+        reserved_output_tokens=output_reserve,
+        response_schema_tokens=schema_tokens,
     )
 
 ###############################################################################

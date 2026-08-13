@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-08-02
+Last updated: 2026-08-12
 
 ## Reusable Components
 
@@ -38,6 +38,9 @@ All interactive components must provide:
 - During active agent runs, keep the chat composer enabled. Additional messages are refinements for the active run and should use compact steering presentation.
 - Render assistant messages as sanitized Markdown and user messages as escaped plain text.
 - Keep agent availability shown as ready between requests; use run progress labels only while work is active.
+- Describe a cloud agent as configured until a live request succeeds. Mark it verified after a successful run and needs attention after a terminal run error; never infer live provider readiness from stored credential health or model-catalog access alone.
+- Settings dialogs move focus inside on open, trap keyboard focus, close with Escape, and restore focus to their opener.
+- Keep chat input within the realtime contract's 12,000-character message limit before sending.
 - Treat normalized backend render descriptors as the only source for raster and
   provider-native map layers; component code must not reconstruct provider URLs.
 - Validate Operations Bar navigation, routed layouts, map controls, and text wrapping at desktop and mobile widths after significant UI edits.

@@ -52,8 +52,8 @@ describe('pages/geospatial-page.component', () => {
     agentReadiness = jasmine.createSpyObj<AgentReadinessService>('AgentReadinessService', ['loadReadiness']);
     agentReadiness.loadReadiness.and.resolveTo({
       status: 'active',
-      label: 'Active',
-      message: 'gpt-4.1-mini is ready through OpenAI.',
+      label: 'Configured',
+      message: 'gpt-4.1-mini is configured through OpenAI. Live inference is verified on the first request.',
     });
 
     await TestBed.configureTestingModule({
@@ -193,7 +193,7 @@ describe('pages/geospatial-page.component', () => {
     expect(JSON.stringify(component.payload)).not.toContain('api_key=');
   });
 
-  it('operation-driven failures preserve the response and return the agent to ready', async () => {
+  it('operation-driven failures preserve the response and flag the agent model', async () => {
     sendChatTurnMock.and.resolveTo(makeTurnResponse({
       assistant_message: 'Tool timed out.',
       operation: { kind: 'error', status: 'failed', message: 'Tool timed out.', warnings: [] },
@@ -206,7 +206,7 @@ describe('pages/geospatial-page.component', () => {
     const component = fixture.componentInstance;
     component.composerDraft = 'show weather';
     await component.sendMessage();
-    expect(component.status).toBe('Agent ready');
+    expect(component.status).toBe('Agent needs attention');
     expect(component.messages.at(-1)?.content).toContain('Tool timed out.');
   });
 
@@ -225,14 +225,14 @@ describe('pages/geospatial-page.component', () => {
     expect(component.messages.find((entry) => entry.content === 'late response')).toBeUndefined();
   });
 
-  it('error path adds fallback assistant message and returns the agent to ready', async () => {
+  it('error path adds fallback assistant message and flags the agent model', async () => {
     sendChatTurnMock.and.rejectWith(new Error('boom'));
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.composerDraft = 'show map';
     await component.sendMessage();
-    expect(component.status).toBe('Agent ready');
+    expect(component.status).toBe('Agent needs attention');
     expect(component.messages.at(-1)?.content).toBe('boom');
   });
 
@@ -266,7 +266,7 @@ describe('pages/geospatial-page.component', () => {
 
     expect(component.agentReadiness.status).toBe('needs_attention');
     expect(component.capabilityStatusItems[0]).toEqual({
-      label: 'Agent online',
+      label: 'Agent model',
       statusLabel: 'Needs attention',
       tone: 'warn',
     });
@@ -355,7 +355,27 @@ describe('pages/geospatial-page.component', () => {
       payload: { message: 'Provider timed out.' },
     });
     expect(component.messages.length).toBe(1);
-    expect(component.status).toBe('Agent ready');
+    expect(component.status).toBe('Agent needs attention');
+    expect(component.agentReadiness).toEqual({
+      status: 'needs_attention',
+      label: 'Needs attention',
+      message: 'Provider timed out.',
+    });
+  });
+
+  it('rejects messages beyond the realtime contract before creating a conversation', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.composerDraft = 'a'.repeat(component.maxChatMessageLength + 1);
+
+    await component.sendMessage();
+    fixture.detectChanges();
+
+    expect(apiClient.createConversation).not.toHaveBeenCalled();
+    expect(component.status).toBe(`Message must be ${component.maxChatMessageLength.toLocaleString()} characters or fewer.`);
+    expect(component.composerDraft.length).toBe(component.maxChatMessageLength + 1);
+    expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain(component.composerError);
   });
 
   it('starts each request at understanding and returns the persistent agent to ready', async () => {

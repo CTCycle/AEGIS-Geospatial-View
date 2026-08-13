@@ -324,5 +324,7 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
     assert post_calls[0][0] == "/api/chat"
     assert stream_calls[0][0] == "/api/chat"
     assert post_calls[0][1]["options"]["num_ctx"] >= 2048
+    structured_payload = next(payload for _, payload in post_calls if payload.get("format"))
+    assert structured_payload["think"] is False
     assert provider.last_context_usage is not None
     assert provider.last_context_usage["provider"] == "ollama"

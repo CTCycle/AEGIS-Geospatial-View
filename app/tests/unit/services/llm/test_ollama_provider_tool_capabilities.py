@@ -57,6 +57,14 @@ def test_ollama_tag_capabilities_include_structured_output() -> None:
     assert "structured_output" in model.capabilities
     assert "tools" in model.capabilities
 
+
+###############################################################################
+def test_ollama_structured_requests_allow_the_longer_local_inference_window() -> None:
+    provider = OllamaProvider(base_url="http://ollama.test")
+
+    assert provider._STRUCTURED_REQUEST_TIMEOUT_SECONDS == 90
+    assert provider._DEFAULT_REQUEST_TIMEOUT_SECONDS == 30
+
 ###############################################################################
 def test_ollama_falls_back_to_probe_when_show_capabilities_absent() -> None:
 

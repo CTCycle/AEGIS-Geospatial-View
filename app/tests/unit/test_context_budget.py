@@ -27,6 +27,18 @@ def test_ollama_context_uses_minimum_for_small_prompt() -> None:
     assert usage.model_context_limit == resolve_model_context_limit("llama3.2")
     assert usage.provider == "ollama"
 
+
+###############################################################################
+def test_ollama_context_reserves_schema_and_structured_output_capacity() -> None:
+    usage = compute_ollama_context_usage(
+        _request("x" * 5000, model="qwen3.5:2b"),
+        response_schema={"type": "object", "properties": {"answer": {"type": "string"}}},
+    )
+
+    assert usage.selected_context_window > MIN_OLLAMA_CONTEXT_WINDOW
+    assert usage.response_schema_tokens > 0
+    assert usage.reserved_output_tokens > 0
+
 ###############################################################################
 def test_ollama_context_clamps_to_model_limit_for_large_prompt() -> None:
     usage = compute_ollama_context_usage(_request("x" * 50000, model="custom-4k"))

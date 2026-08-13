@@ -57,6 +57,7 @@ export const API_CONVERSATION_REALTIME_PATH = (conversationId: string): string =
 
 export const REALTIME_PROTOCOL_VERSION = 1;
 export const REALTIME_SUBPROTOCOL = 'aegis.realtime.v1';
+export const MAX_CHAT_MESSAGE_LENGTH = 12_000;
 
 export const DEFAULT_OVERLAY_OPACITY = 0.65;
 export const DEFAULT_WMS_LAYER_ID = '0';

@@ -551,10 +551,12 @@ describe('pages/settings-page.component', () => {
     const component = fixture.componentInstance;
     await component.checkOllamaConnection();
     expect(component.statusText).toContain('Ollama:');
+    expect(fixture.nativeElement.textContent).toContain('Connection is healthy.');
 
     checkOllamaHealthMock.and.rejectWith(new Error('connection refused'));
     await component.checkOllamaConnection();
     expect(component.statusText).toContain('Unable to reach Ollama');
+    expect(fixture.nativeElement.textContent).toContain('Unable to reach Ollama');
   });
 
   it('refresh library and pull model flows update status', async () => {
