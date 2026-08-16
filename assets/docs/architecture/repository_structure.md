@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-08-03
+Last updated: 2026-08-16
 
 ## Purpose
 
@@ -27,8 +27,6 @@ AEGIS Geospatial View/
       repositories/
       services/
       app.py
-    shared/
-      openapi.json
     tests/
       e2e/
       unit/

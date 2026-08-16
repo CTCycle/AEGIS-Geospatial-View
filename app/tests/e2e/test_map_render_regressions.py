@@ -9,7 +9,7 @@ from typing import Any
 from playwright.sync_api import ConsoleMessage, Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
-    chat_turn_map_response,
+    chat_completion_map_payload,
     model_settings_payload,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
@@ -40,7 +40,7 @@ def _models_payload() -> dict[str, Any]:
 
 ###############################################################################
 def _turn_payload() -> dict[str, Any]:
-    payload = chat_turn_map_response(7001, "Search executed successfully.")
+    payload = chat_completion_map_payload(7001, "Search executed successfully.")
     payload["map_session"]["bounds"] = [12.4963044, 41.902725, 12.4964044, 41.902825]
     payload["map_session"]["overlays"] = []
     payload["map_session"]["overlay_ids"] = []
@@ -50,9 +50,6 @@ def _turn_payload() -> dict[str, Any]:
 ###############################################################################
 def _setup_stubs(page: Page, record_tile_zoom: Callable[[int], None]) -> None:
     register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
-    page.route(
-        re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
-    )
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),

@@ -9,8 +9,8 @@ from typing import Any
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
-    chat_turn_map_response,
-    chat_turn_text_only_response,
+    chat_completion_map_payload,
+    chat_completion_text_payload,
     model_catalog_payload,
     selected_agent_settings_payload,
 )
@@ -82,15 +82,6 @@ def _setup_stub_harness(
             body=json.dumps({"detail": "Method not allowed"}),
         )
 
-    def handle_turn(route: Route) -> None:
-        if turn_payload_factory is None:
-            _json_ok(
-                route, chat_turn_map_response(9001, "Search executed successfully.")
-            )
-            return
-        message = str(_request_json(route).get("message", ""))
-        _json_ok(route, turn_payload_factory(message))
-
     def handle_create_conversation(route: Route) -> None:
         _json_ok(route, {"conversation_id": "conversation-e2e", "title": "E2E"})
 
@@ -154,7 +145,6 @@ def _setup_stub_harness(
             },
         ),
     )
-    page.route(re.compile(r".*/api/chat/turn.*"), handle_turn)
     page.route(re.compile(r".*/api/conversations$"), handle_create_conversation)
     page.route(
         re.compile(r".*/api/geospatial/tiles/osm_default/\d+/\d+/\d+\.png(?:\?.*)?$"),
@@ -167,7 +157,7 @@ def _setup_stub_harness(
         lambda message, _run_number: (
             turn_payload_factory(message)
             if turn_payload_factory is not None
-            else chat_turn_map_response(9001, "Search executed successfully.")
+            else chat_completion_map_payload(9001, "Search executed successfully.")
         ),
     )
     return captured_put_payloads
@@ -298,7 +288,7 @@ def test_chat_composer_does_not_cover_latest_assistant_message(
 ) -> None:
     _setup_stub_harness(
         page,
-        turn_payload_factory=lambda _message: chat_turn_text_only_response(
+        turn_payload_factory=lambda _message: chat_completion_text_payload(
             12001,
             "This is the latest assistant response and it must remain visible above the composer.",
         ),
@@ -351,10 +341,10 @@ def test_coordinate_lookup_and_place_search_follow_distinct_ui_paths(
     def turn_payload(message: str) -> dict[str, Any]:
         message = message.lower()
         if "coordinate" in message:
-            return chat_turn_text_only_response(
+            return chat_completion_text_payload(
                 11001, "Coordinates identified without map session."
             )
-        return chat_turn_map_response(
+        return chat_completion_map_payload(
             11001, "Place search rendered with an interactive map."
         )
 

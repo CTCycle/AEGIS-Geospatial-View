@@ -8,8 +8,8 @@ from typing import Any
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e.helpers.chat_stub_payloads import (
-    chat_turn_clarification_response,
-    chat_turn_map_response,
+    chat_completion_clarification_payload,
+    chat_completion_map_payload,
     model_settings_payload,
 )
 from tests.e2e.helpers.realtime_stub import register_realtime_stub
@@ -24,29 +24,20 @@ def _json_ok(route: Route, payload: dict[str, Any]) -> None:
 
 ###############################################################################
 def _stub_ui_api(page: Page) -> None:
-    state = {"session_id": 777}
+    state = {"turn_number": 777}
 
     def build_payload(message: str) -> dict[str, Any]:
-        session_id = int(state["session_id"])
+        turn_number = int(state["turn_number"])
+        state["turn_number"] = turn_number + 1
         if "ambiguous" in message.lower() or "weather only" in message.lower():
-            payload = chat_turn_clarification_response(
-                session_id, "Please clarify location and time."
+            return chat_completion_clarification_payload(
+                turn_number, "Please clarify location and time."
             )
-        else:
-            payload = chat_turn_map_response(
-                session_id, "Search executed successfully."
-            )
-        state["session_id"] = payload["session_id"]
-        return payload
-
-    def handle_turn(route: Route) -> None:
-        body = route.request.post_data_json
-        message = str(body.get("message") or "")
-        payload = build_payload(message)
-        _json_ok(route, payload)
+        return chat_completion_map_payload(
+            turn_number, "Search executed successfully."
+        )
 
     register_realtime_stub(page, lambda message, _run_number: build_payload(message))
-    page.route(re.compile(r".*/api/chat/turn$"), handle_turn)
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),

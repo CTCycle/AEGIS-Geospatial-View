@@ -42,11 +42,6 @@ from server.services.llm.types import LLMToolCall, LLMToolDefinition, LLMToolRes
 
 ###############################################################################
 @dataclass
-class _Session:
-    id: int = 7
-
-###############################################################################
-@dataclass
 class _Settings:
     agent_model_provider: str = "openai"
     agent_model_name: str = "gpt-4.1"
@@ -74,10 +69,6 @@ class _HistoryRepo:
         return self.context_revision
 
     # -------------------------------------------------------------------------
-    def upsert_session(self, session_id, title=None):  # noqa: ANN001
-        return _Session(id=session_id or 7)
-
-    # -------------------------------------------------------------------------
     def append_message(self, **kwargs: Any) -> None:
         self.messages.append(kwargs)
 
@@ -97,15 +88,18 @@ class _HistoryRepo:
         )
 
     # -------------------------------------------------------------------------
-    def list_recent_messages(self, session_id: int, limit: int) -> list[dict[str, Any]]:
+    def list_recent_messages(self, conversation_id: str, limit: int) -> list[dict[str, Any]]:
+        _ = conversation_id
         return []
 
     # -------------------------------------------------------------------------
-    def get_latest_turn_contract(self, session_id: int):
+    def get_latest_turn_contract(self, conversation_id: str):
+        _ = conversation_id
         return None
 
     # -------------------------------------------------------------------------
-    def get_latest_memory_snapshot(self, session_id: int) -> dict[str, Any]:
+    def get_latest_memory_snapshot(self, conversation_id: str) -> dict[str, Any]:
+        _ = conversation_id
         return self.latest_memory
 
 ###############################################################################

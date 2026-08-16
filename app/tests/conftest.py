@@ -131,7 +131,7 @@ def api_context(playwright):
 ###############################################################################
 @pytest.fixture(scope="session")
 def artifact_root() -> Path:
-    root = Path(__file__).parent / "artifacts"
+    root = Path(__file__).resolve().parents[2] / "assets" / "QA" / "e2e"
     root.mkdir(parents=True, exist_ok=True)
     for child in ("screenshots", "http", "logs", "reports"):
         (root / child).mkdir(parents=True, exist_ok=True)
