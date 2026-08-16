@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 
+E2E_CONVERSATION_ID = "conversation-e2e"
+
 ROME_MAP_SESSION = {
     "session_id": "rome-map-session",
     "resolved_location": {"label": "Rome, Italy", "latitude": 41.9028, "longitude": 12.4964},
@@ -65,14 +67,14 @@ def _chat_decision(state: str = "direct_tool") -> dict[str, Any]:
     }
 
 ###############################################################################
-def chat_turn_map_response(
-    session_id: int, assistant_message: str, basemap_id: str = "osm_default"
+def chat_completion_map_payload(
+    turn_number: int, assistant_message: str, basemap_id: str = "osm_default"
 ) -> dict[str, Any]:
     payload = dict(ROME_MAP_SESSION)
     payload["basemap"] = {**ROME_MAP_SESSION["basemap"], "id": basemap_id}
     return {
-        "request_id": f"chat-stub-{session_id}",
-        "session_id": session_id,
+        "request_id": f"chat-stub-{turn_number}",
+        "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": assistant_message,
         "turn_contract": _chat_turn_contract(),
         "decision": _chat_decision("map_search"),
@@ -84,10 +86,10 @@ def chat_turn_map_response(
     }
 
 ###############################################################################
-def chat_turn_clarification_response(session_id: int, message: str) -> dict[str, Any]:
+def chat_completion_clarification_payload(turn_number: int, message: str) -> dict[str, Any]:
     return {
-        "request_id": f"chat-stub-{session_id}",
-        "session_id": session_id,
+        "request_id": f"chat-stub-{turn_number}",
+        "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": message,
         "turn_contract": _chat_turn_contract(),
         "decision": _chat_decision("clarify"),
@@ -98,10 +100,10 @@ def chat_turn_clarification_response(session_id: int, message: str) -> dict[str,
     }
 
 ###############################################################################
-def chat_turn_text_only_response(session_id: int, message: str) -> dict[str, Any]:
+def chat_completion_text_payload(turn_number: int, message: str) -> dict[str, Any]:
     return {
-        "request_id": f"chat-stub-{session_id}",
-        "session_id": session_id,
+        "request_id": f"chat-stub-{turn_number}",
+        "conversation_id": E2E_CONVERSATION_ID,
         "assistant_message": message,
         "turn_contract": _chat_turn_contract(),
         "decision": _chat_decision("direct_tool"),
@@ -185,90 +187,3 @@ def selected_agent_settings_payload() -> dict[str, Any]:
     }
 
 ###############################################################################
-def chat_stream_events(
-    session_id: int, assistant_message: str, include_tool_status: bool = True
-) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = [
-        {"event": "status", "data": {"message": "received"}}
-    ]
-    events.append(
-        {
-            "event": "parsed",
-            "data": {
-                "request_id": f"chat-stub-{session_id}",
-                "session_id": session_id,
-                "task_class": "map_search",
-                "action_id": "stub",
-                "requires_location": False,
-                "location_signal_count": 0,
-                "ambiguities": [],
-            },
-        }
-    )
-    events.append(
-        {
-            "event": "policy",
-            "data": {
-                "request_id": f"chat-stub-{session_id}",
-                "session_id": session_id,
-                "state": "map_search",
-                "mode": "map",
-                "action_id": "stub",
-                "trace_steps": ["stub"],
-                "has_clarification": False,
-            },
-        }
-    )
-    if include_tool_status:
-        events.append(
-            {
-                "event": "tool_call_started",
-                "data": {
-                    "request_id": f"chat-stub-{session_id}",
-                    "session_id": session_id,
-                    "tool_call_id": "tool-1",
-                    "name": "execute_geospatial_capability",
-                    "arguments": {"capability_id": "openaq_air_quality"},
-                },
-            }
-        )
-        events.append(
-            {
-                "event": "tool_call_completed",
-                "data": {
-                    "request_id": f"chat-stub-{session_id}",
-                    "session_id": session_id,
-                    "tool_call_id": "tool-1",
-                    "name": "execute_geospatial_capability",
-                    "ok": True,
-                    "error": None,
-                    "content": {
-                        "ok": True,
-                        "data": {"map_session": ROME_MAP_SESSION},
-                        "error": None,
-                    },
-                },
-            }
-        )
-    events.append(
-        {
-            "event": "map_session_created",
-            "data": {
-                "request_id": f"chat-stub-{session_id}",
-                "session_id": session_id,
-                "map_session": ROME_MAP_SESSION,
-            },
-        }
-    )
-    events.append(
-        {
-            "event": "final",
-            "data": {
-                "session_id": session_id,
-                "request_id": f"chat-stub-{session_id}",
-                "assistant_message": assistant_message,
-                "map_session": ROME_MAP_SESSION,
-            },
-        }
-    )
-    return events

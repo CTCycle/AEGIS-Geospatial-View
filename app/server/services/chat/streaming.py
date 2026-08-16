@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object
-
 import asyncio
 from collections.abc import AsyncIterator
 from http import HTTPStatus
@@ -84,86 +82,6 @@ class ChatStreamingService:
                     "request_id": request_id,
                 },
             )
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_parsed_payload(response: ChatTurnResponse) -> dict[str, Any]:
-        return {
-            "request_id": response.request_id,
-            "conversation_id": response.conversation_id,
-            "task_class": response.turn_contract.task_class,
-            "action_id": response.turn_contract.normalized_action.action_id,
-            "requires_location": response.turn_contract.normalized_action.requires_location,
-            "location_signal_count": len(response.turn_contract.location_signals),
-            "ambiguities": list(response.turn_contract.ambiguities),
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_policy_payload(response: ChatTurnResponse) -> dict[str, Any]:
-        return {
-            "request_id": response.request_id,
-            "conversation_id": response.conversation_id,
-            "state": response.decision.plan.state,
-            "mode": response.decision.plan.mode,
-            "action_id": response.decision.plan.action_id,
-            "has_clarification": response.decision.clarification is not None,
-        }
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _build_tool_lifecycle_events(response: ChatTurnResponse) -> list[ChatStreamEvent]:
-        tool_payload = response.tool_payload
-        if not is_json_object(tool_payload):
-            return []
-        tool_calls = tool_payload.get("tool_calls")
-        tool_results = tool_payload.get("tool_results")
-        if not is_json_array(tool_calls) or not is_json_array(tool_results):
-            return []
-
-        result_by_call_id: dict[str, dict[str, Any]] = {}
-        for result in tool_results:
-            if not is_json_object(result):
-                continue
-            tool_call_id = result.get("tool_call_id")
-            if isinstance(tool_call_id, str):
-                result_by_call_id[tool_call_id] = result
-
-        events: list[ChatStreamEvent] = []
-        for tool_call in tool_calls:
-            if not is_json_object(tool_call):
-                continue
-            tool_call_id = tool_call.get("id")
-            if not isinstance(tool_call_id, str):
-                continue
-            events.append(
-                ChatStreamEvent(
-                    event="tool_call_started",
-                    data={
-                        "request_id": response.request_id,
-                        "conversation_id": response.conversation_id,
-                        "tool_call_id": tool_call_id,
-                        "name": tool_call.get("name"),
-                    },
-                )
-            )
-            tool_result = result_by_call_id.get(tool_call_id)
-            if tool_result is None:
-                continue
-            events.append(
-                ChatStreamEvent(
-                    event="tool_call_completed",
-                    data={
-                        "request_id": response.request_id,
-                        "conversation_id": response.conversation_id,
-                        "tool_call_id": tool_call_id,
-                        "name": tool_result.get("name") or tool_call.get("name"),
-                        "ok": bool(not tool_result.get("is_error")),
-                        "error": tool_result.get("error"),
-                    },
-                )
-            )
-        return events
 
     # -------------------------------------------------------------------------
     @staticmethod

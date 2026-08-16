@@ -18,9 +18,25 @@ from tests.e2e.helpers.realtime_stub import register_realtime_stub
 
 ###############################################################################
 def _check_live_provider(page: Page, api_base_url: str) -> tuple[bool, str]:
+    conversation_response = page.request.post(
+        f"{api_base_url.rstrip('/')}/api/conversations",
+        data={"title": "live provider preflight"},
+    )
+    if conversation_response.status != 201:
+        return False, (
+            "Could not create a conversation for live provider preflight "
+            f"({conversation_response.status})"
+        )
+    conversation_id = conversation_response.json().get("conversation_id")
+    if not isinstance(conversation_id, str) or not conversation_id:
+        return False, "Conversation preflight returned no conversation_id"
+
     response = page.request.post(
         f"{api_base_url.rstrip('/')}/api/chat/turn",
-        data={"message": "Give me the coordinates of Rome, Italy"},
+        data={
+            "conversation_id": conversation_id,
+            "message": "Give me the coordinates of Rome, Italy",
+        },
     )
     if response.status == 200:
         body = response.json()
@@ -39,12 +55,15 @@ def _assert_clean_backend_tail(tail: str) -> None:
     assert "unhandled exception" not in normalized
 
 ###############################################################################
-def _read_session_id(page: Page) -> int | None:
-    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-state:v3')")
+def _read_conversation_id(page: Page) -> str | None:
+    raw = page.evaluate("() => window.sessionStorage.getItem('aegis:webapp-state:v4')")
     if not raw:
         return None
     data = json.loads(raw)
-    return data.get("chatPage", {}).get("chatPanel", {}).get("sessionId")
+    chat_page = data.get("chatPage", {})
+    chat_panel = chat_page.get("chatPanel", {}) if isinstance(chat_page, dict) else {}
+    conversation_id = chat_panel.get("conversationId")
+    return conversation_id if isinstance(conversation_id, str) and conversation_id else None
 
 ###############################################################################
 def test_live_chat_happy_path(
@@ -68,15 +87,14 @@ def test_live_chat_happy_path(
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     write_snapshot(page, dirs["screenshots"], "02-live-response")
 
-    session_id = _read_session_id(page)
-    if session_id is not None:
-        assert isinstance(session_id, int) and session_id > 0
+    conversation_id = _read_conversation_id(page)
+    assert conversation_id
 
     tail = read_backend_log_tail(200)
     write_log_tail(dirs["logs"], test_id, tail)
     _assert_clean_backend_tail(tail)
     write_http_capture(
-        dirs["http"], "turn-01", {"message": "Show me Rome"}, {"session_id": session_id}
+        dirs["http"], "turn-01", {"message": "Show me Rome"}, {"conversation_id": conversation_id}
     )
     write_report(
         dirs["reports"],
@@ -84,14 +102,14 @@ def test_live_chat_happy_path(
         prompts=["Show me Rome"],
         assertions=[
             "assistant response rendered",
-            "session id persisted",
+            "conversation id persisted",
             "backend log tail clean",
         ],
         backend_log_status="clean" if tail.strip() else "empty",
     )
 
 ###############################################################################
-def test_live_follow_up_same_session(
+def test_live_follow_up_same_conversation(
     page: Page,
     base_url: str,
     api_base_url: str,
@@ -108,7 +126,8 @@ def test_live_follow_up_same_session(
     page.get_by_label("Chat message").fill("Show me Rome")
     page.get_by_role("button", name="Send").click()
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
-    first_session_id = _read_session_id(page)
+    first_conversation_id = _read_conversation_id(page)
+    assert first_conversation_id
     write_snapshot(page, dirs["screenshots"], "00-before-followup")
 
     page.get_by_label("Chat message").fill("Now zoom to nearby neighborhoods")
@@ -116,8 +135,8 @@ def test_live_follow_up_same_session(
     write_snapshot(page, dirs["screenshots"], "01-live-followup")
     expect(page.locator(".chat-message--assistant").last).to_be_visible(timeout=60000)
     write_snapshot(page, dirs["screenshots"], "02-live-followup-response")
-    second_session_id = _read_session_id(page)
-    assert first_session_id == second_session_id
+    second_conversation_id = _read_conversation_id(page)
+    assert second_conversation_id == first_conversation_id
 
     tail = read_backend_log_tail(200)
     write_log_tail(dirs["logs"], test_id, tail)
@@ -128,7 +147,7 @@ def test_live_follow_up_same_session(
         prompts=["Show me Rome", "Now zoom to nearby neighborhoods"],
         assertions=[
             "follow-up completed",
-            "session continuity preserved",
+            "conversation continuity preserved",
             "no full reset occurred",
             "backend log tail clean",
         ],

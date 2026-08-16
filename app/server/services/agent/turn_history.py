@@ -28,7 +28,7 @@ class AgentTurnHistoryService:
         conversation_id: str,
         request_id: str,
     ) -> ChatTurnResponse | None:
-        existing = self.find_history_message_by_request_id(
+        existing = self.history_service.find_message_by_request_id(
             conversation_id=conversation_id,
             role="assistant",
             request_id=request_id,
@@ -51,20 +51,6 @@ class AgentTurnHistoryService:
             "context_usage": payload.get("context_usage"),
         }
         return ChatTurnResponse.model_validate(response_payload)
-
-    # -------------------------------------------------------------------------
-    def find_history_message_by_request_id(
-        self,
-        *,
-        conversation_id: str,
-        role: str,
-        request_id: str,
-    ) -> dict[str, Any] | None:
-        return self.history_service.find_message_by_request_id(
-            conversation_id=conversation_id,
-            role=role,
-            request_id=request_id,
-        )
 
     # -------------------------------------------------------------------------
     @staticmethod

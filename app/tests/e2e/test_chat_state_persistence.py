@@ -96,7 +96,7 @@ def _base_state(saved_at: int | None = None) -> dict[str, Any]:
                 }
             },
             "chatPanel": {
-                "sessionId": 11,
+                "conversationId": "conversation-e2e",
                 "conversationNonce": 5,
                 "messages": [
                     {"role": "user", "content": "show map at 41.9028, 12.4964"},

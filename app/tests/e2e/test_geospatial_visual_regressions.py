@@ -17,7 +17,7 @@ PNG_1X1_TRANSPARENT = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 BASELINE_ROOT = Path(__file__).with_name("visual_baselines")
-DIFF_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "visual_diffs"
+DIFF_ROOT = Path(__file__).resolve().parents[3] / "assets" / "QA" / "e2e" / "visual_diffs"
 
 ###############################################################################
 def _json_ok(route: Route, payload: dict[str, Any]) -> None:
@@ -43,7 +43,7 @@ def _models_payload() -> dict[str, Any]:
 def _turn_payload() -> dict[str, Any]:
     return {
         "request_id": "visual-regression-7901",
-        "session_id": 7901,
+        "conversation_id": "conversation-e2e",
         "assistant_message": "Loaded visual regression fixture.",
         "turn_contract": {
             "user_text": "show fixture map",
@@ -121,9 +121,6 @@ def _turn_payload() -> dict[str, Any]:
 ###############################################################################
 def _setup_stubs(page: Page) -> None:
     register_realtime_stub(page, lambda _message, _run_number: _turn_payload())
-    page.route(
-        re.compile(r".*/api/chat/turn$"), lambda route: _json_ok(route, _turn_payload())
-    )
     page.route(
         re.compile(r".*/api/chat/settings$"),
         lambda route: _json_ok(route, model_settings_payload()),

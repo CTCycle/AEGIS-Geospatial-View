@@ -163,20 +163,11 @@ class _Search:
         )
 
 ###############################################################################
-@dataclass
-class _Session:
-    id: int = 1
-
-###############################################################################
 class _History:
 
     # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.messages: list[dict[str, Any]] = []
-
-    # -------------------------------------------------------------------------
-    def upsert_session(self, session_id, title=None):  # noqa: ANN001
-        return _Session(session_id or 1)
 
     # -------------------------------------------------------------------------
     def append_message(self, **kwargs):  # noqa: ANN003
@@ -198,15 +189,18 @@ class _History:
         )
 
     # -------------------------------------------------------------------------
-    def list_recent_messages(self, session_id, limit):  # noqa: ANN001
+    def list_recent_messages(self, conversation_id, limit):  # noqa: ANN001
+        _ = conversation_id
         return []
 
     # -------------------------------------------------------------------------
-    def get_latest_turn_contract(self, session_id):  # noqa: ANN001
+    def get_latest_turn_contract(self, conversation_id):  # noqa: ANN001
+        _ = conversation_id
         return None
 
     # -------------------------------------------------------------------------
-    def get_latest_memory_snapshot(self, session_id):  # noqa: ANN001
+    def get_latest_memory_snapshot(self, conversation_id):  # noqa: ANN001
+        _ = conversation_id
         return {}
 
 ###############################################################################

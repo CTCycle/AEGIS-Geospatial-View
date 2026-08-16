@@ -214,7 +214,7 @@ class AgentOrchestrator:
         existing_response = self.turn_history_service.load_existing_response(conversation_id, request_id)
         if existing_response is not None:
             return existing_response
-        if self.turn_history_service.find_history_message_by_request_id(
+        if self.history_service.find_message_by_request_id(
             conversation_id=conversation_id,
             role="user",
             request_id=request_id,
