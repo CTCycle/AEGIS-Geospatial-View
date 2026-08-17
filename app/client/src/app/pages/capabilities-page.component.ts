@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from '@angular/core';
 
 import { ApiClientService } from '../core/api-client.service';
 import { CapabilityDescriptor, CatalogResponse } from '../core/types';
@@ -52,6 +52,7 @@ export class CapabilitiesPageComponent implements OnInit {
       this.statusText = 'Capability catalog unavailable.';
     } finally {
       this.isLoading = false;
+      // Eager change detection does not automatically publish the async catalog result.
       this.changeDetector.detectChanges();
     }
   }

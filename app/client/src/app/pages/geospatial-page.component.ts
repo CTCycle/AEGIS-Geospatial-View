@@ -20,6 +20,7 @@ import { LocalCommandService } from '../core/local-command.service';
 import { normalizeMapSession } from '../core/api-parsers';
 import { PersistedChatPageState } from '../core/app-state';
 import { MAX_CHAT_MESSAGE_LENGTH } from '../core/constants';
+import { parseRunCompletionPayload, parseRunEvent } from '../core/realtime-parsers';
 import { RealtimeService } from '../core/realtime.service';
 import {
   ChatOperationResult,
@@ -61,7 +62,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   taskSnapshot?: ConversationTaskSnapshot;
   activeRunId?: string;
   activeRunVersion?: number;
-  lastRunEventId?: string;
   streamState: PersistedChatPageState['chatPanel']['streamState'] = 'idle';
   progressStage?: string;
   progressLabel?: string;
@@ -123,7 +123,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.activeRunId = this.chatPageState.chatPanel.activeRunId;
     this.activeRunVersion = this.chatPageState.chatPanel.activeRunVersion;
     this.pendingRun = this.chatPageState.chatPanel.pendingRun;
-    this.lastRunEventId = this.chatPageState.chatPanel.lastRunEventId;
     this.lastRunSequence = this.chatPageState.chatPanel.lastRunSequence ?? 0;
     this.streamState = this.chatPageState.chatPanel.streamState ?? 'idle';
     this.progressStage = this.chatPageState.chatPanel.progressStage;
@@ -192,10 +191,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return this.messages;
     }
     return [...this.messages, { role: 'assistant' as ChatRole, content: this.assistantDraft }];
-  }
-
-  get hasMessages(): boolean {
-    return this.renderedMessages.length > 0;
   }
 
   get activeAlertItems(): string[] {
@@ -283,7 +278,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.activeRunId = undefined;
     this.activeRunVersion = undefined;
     this.pendingRun = undefined;
-    this.lastRunEventId = undefined;
     this.lastRunSequence = 0;
     this.streamState = 'idle';
     this.progressStage = undefined;
@@ -307,7 +301,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.isAlertsOpen = false;
     this.appStateStore.resetChatPage();
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
   }
 
   toggleAlerts(): void {
@@ -378,7 +372,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.composerError = `Message must be ${MAX_CHAT_MESSAGE_LENGTH.toLocaleString()} characters or fewer.`;
       this.status = this.composerError;
       this.syncState();
-      this.changeDetectorRef.detectChanges();
       return;
     }
 
@@ -427,7 +420,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       };
       this.pendingRun = pendingRun;
       this.lastRunSequence = 0;
-      this.lastRunEventId = undefined;
       this.syncState();
       this.realtimeService.setResumeCursor(undefined, 0);
       this.realtimeService.connect(conversation.conversation_id);
@@ -448,7 +440,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.isLoading = false;
     } finally {
       this.syncState();
-      queueMicrotask(() => this.scrollTranscriptToBottom());
+      this.queueTranscriptScroll();
     }
   }
 
@@ -474,7 +466,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.messages = [...this.messages, { role: 'assistant', content: fallback }];
     } finally {
       this.syncState();
-      queueMicrotask(() => this.scrollTranscriptToBottom());
+      this.queueTranscriptScroll();
     }
   }
 
@@ -532,7 +524,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     if (message.type === 'run.event') {
-      const event = this.parseRunEvent(message.payload);
+      const event = parseRunEvent(message.payload, this.conversationId);
       if (event) {
         this.handleRunEvent(event);
       }
@@ -573,7 +565,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       }
       this.seenEventIds.delete(oldest);
     }
-    this.lastRunEventId = event.event_id;
     this.lastRunSequence = event.sequence;
     this.realtimeService.setResumeCursor(event.run_id, event.sequence);
     this.activeRunVersion = event.run_version;
@@ -652,44 +643,39 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.syncState();
     this.changeDetectorRef.detectChanges();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
   }
 
   private applyRunCompletionPayload(payload: Record<string, unknown>): void {
-    const revision = typeof payload['context_revision'] === 'number'
-      ? payload['context_revision']
-      : undefined;
-    if (revision !== undefined && this.contextRevision !== undefined && revision < this.contextRevision) {
+    const parsed = parseRunCompletionPayload(payload);
+    if (
+      parsed.contextRevision !== undefined &&
+      this.contextRevision !== undefined &&
+      parsed.contextRevision < this.contextRevision
+    ) {
       return;
     }
-    this.contextRevision = revision ?? this.contextRevision;
-    this.taskSnapshot = (payload['task_snapshot'] as ConversationTaskSnapshot | undefined)
-      ?? this.taskSnapshot;
-    this.lastDecision = payload['decision'] as ChatTurnResponse['decision'] | undefined
-      ?? this.lastDecision;
-    const mapSession = normalizeMapSession(payload['map_session']);
-    if (mapSession) {
-      this.handleMapSession(mapSession);
+    if (parsed.contextRevision !== undefined) {
+      this.contextRevision = parsed.contextRevision;
     }
-    this.lastOperation = payload['operation'] as ChatOperationResult | null | undefined;
-    this.memorySnapshot = (payload['memory_snapshot'] as Record<string, unknown> | undefined) ?? this.memorySnapshot;
-    this.contextUsage = payload['context_usage'] as ContextUsage | undefined;
-  }
-
-  private parseRunEvent(value: Record<string, unknown>): RunEvent | undefined {
-    const eventType = this.readString(value['type']);
-    const eventId = this.readString(value['event_id']);
-    const conversationId = this.readString(value['conversation_id']);
-    const runId = this.readString(value['run_id']);
-    const sequence = this.readNumber(value['sequence']);
-    const runVersion = this.readNumber(value['run_version']);
-    const timestamp = this.readString(value['timestamp']);
-    const payload = value['payload'];
-    if (!eventType || !eventId || !conversationId || !runId || sequence === undefined
-      || runVersion === undefined || !timestamp || !payload || typeof payload !== 'object') {
-      return undefined;
+    if (parsed.taskSnapshot !== undefined) {
+      this.taskSnapshot = parsed.taskSnapshot;
     }
-    return value as unknown as RunEvent;
+    if (parsed.decision !== undefined) {
+      this.lastDecision = parsed.decision;
+    }
+    if (parsed.mapSession) {
+      this.handleMapSession(parsed.mapSession);
+    }
+    if (parsed.operation !== undefined) {
+      this.lastOperation = parsed.operation;
+    }
+    if (parsed.memorySnapshot !== undefined) {
+      this.memorySnapshot = parsed.memorySnapshot;
+    }
+    if (parsed.contextUsage !== undefined) {
+      this.contextUsage = parsed.contextUsage ?? undefined;
+    }
   }
 
   private readString(value: unknown): string | undefined {
@@ -728,7 +714,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.status = 'Agent ready';
     this.progressPercent = 100;
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
   }
 
   private async tryHandleLocalCommand(message: string): Promise<boolean> {
@@ -747,7 +733,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.composerDraft = '';
     this.status = 'Agent ready';
     this.syncState();
-    queueMicrotask(() => this.scrollTranscriptToBottom());
+    this.queueTranscriptScroll();
     return true;
   }
 
@@ -808,7 +794,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         activeRunId: this.activeRunId,
         activeRunVersion: this.activeRunVersion,
         pendingRun: this.pendingRun,
-        lastRunEventId: this.lastRunEventId,
         lastRunSequence: this.lastRunSequence,
         streamState: this.streamState,
         progressStage: this.progressStage,
@@ -874,6 +859,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.transcriptScrollTop = container.scrollTop;
   }
 
+  private queueTranscriptScroll(): void {
+    queueMicrotask(() => {
+      if (!this.isDestroyed) {
+        this.scrollTranscriptToBottom();
+      }
+    });
+  }
+
   private looksLikeRuntimeFailure(message: string): boolean {
     const normalized = message.toLowerCase();
     return normalized.includes('cannot reach')
@@ -883,25 +876,4 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       || normalized.includes('error');
   }
 
-  private deriveStatusLabel(result: ChatTurnResponse): string {
-    const operation = result.operation;
-    if (operation) {
-      if (operation.kind === 'clarification' || operation.status === 'partial') {
-        return 'Need more detail';
-      }
-      if (operation.kind === 'error' || operation.kind === 'rejection' || operation.status === 'failed') {
-        return 'Failed';
-      }
-      return 'Complete';
-    }
-
-    const planState = result.decision?.plan?.state;
-    if (planState === 'clarify') {
-      return 'Need more detail';
-    }
-    if (planState === 'reject') {
-      return 'Failed';
-    }
-    return 'Complete';
-  }
 }

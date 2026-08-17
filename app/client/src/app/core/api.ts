@@ -231,5 +231,12 @@ export const pullOllamaModel = async (model: string): Promise<GenericObjectRespo
 
 export const checkOllamaHealth = async (): Promise<OllamaHealthResponse> => {
   const data = await executeApiRequest(`${API_BASE_URL}${API_OLLAMA_HEALTH_PATH}`, { method: 'GET' });
-  return isRecord(data) ? data : {};
+  if (!isRecord(data)) {
+    return { ok: null, detail: null };
+  }
+  return {
+    ...data,
+    ok: data.ok === true || data.ok === false ? data.ok : null,
+    detail: typeof data.detail === 'string' ? data.detail : null,
+  };
 };

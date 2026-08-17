@@ -707,8 +707,8 @@ export interface ModelSettingsUpdateRequest {
 }
 
 export interface OllamaHealthResponse {
-  ok?: boolean;
-  detail?: string;
+  ok: boolean | null;
+  detail: string | null;
   [key: string]: unknown;
 }
 

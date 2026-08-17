@@ -1,6 +1,6 @@
 # State Preservation
 
-Last updated: 2026-08-02
+Last updated: 2026-08-17
 
 ## Overview
 
@@ -22,7 +22,7 @@ Older schema payloads are invalidated and discarded.
 
 Persisted chat state includes:
 
-- `conversationId`, `contextRevision`, `taskSnapshot`, `activeRunId`, `activeRunVersion`, and `lastRunEventId`
+- `conversationId`, `contextRevision`, `taskSnapshot`, `activeRunId`, and `activeRunVersion`
 - `conversationNonce`
 - `messages`
 - `lastDecision`
@@ -50,10 +50,11 @@ Otherwise the app falls back to `defaultAppState()`.
 Late completion payloads with older context revisions are discarded. Numeric
 backend chat-session identifiers are neither restored nor transmitted.
 
-The active run also persists the last realtime event sequence, bounded seen-event
-IDs, and steering messages so WebSocket reconnects can replay without
-duplicating transcript output. Event IDs protect against duplicate delivery;
-sequence remains the durable replay cursor.
+The active run also persists the last realtime event sequence and bounded seen-
+event IDs so WebSocket reconnects can replay without duplicating transcript
+output. Event IDs protect against duplicate delivery; sequence remains the
+durable replay cursor. Steering refinements are already represented in the
+persisted message list and do not need a separate persisted field.
 
 ## Tab Isolation And Clear Behavior
 
