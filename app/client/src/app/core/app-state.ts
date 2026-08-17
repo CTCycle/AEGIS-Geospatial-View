@@ -29,16 +29,10 @@ export interface PersistedChatPanelState {
     clientRequestId: string;
     message: string;
   };
-  lastRunEventId?: string;
   lastRunSequence?: number;
   streamState?: 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed' | 'failed';
   progressStage?: string;
   progressLabel?: string;
-  steeringMessages?: Array<{
-    content: string;
-    createdAt: string;
-    runVersion?: number;
-  }>;
   seenRunEventIds?: string[];
   conversationNonce: number;
   messages: ChatMessage[];
@@ -155,12 +149,10 @@ export const defaultAppState = (): PersistedAppState => ({
       activeRunId: undefined,
       activeRunVersion: undefined,
       pendingRun: undefined,
-      lastRunEventId: undefined,
       lastRunSequence: 0,
       streamState: 'idle',
       progressStage: undefined,
       progressLabel: undefined,
-      steeringMessages: [],
       seenRunEventIds: [],
       conversationNonce: 1,
       messages: [],
@@ -324,9 +316,6 @@ export const loadPersistedAppState = (): PersistedAppState => {
               message: parsed.chatPage.chatPanel.pendingRun.message.trim().slice(0, 12000),
             }
             : undefined,
-          lastRunEventId: typeof parsed.chatPage.chatPanel.lastRunEventId === 'string'
-            ? parsed.chatPage.chatPanel.lastRunEventId
-            : undefined,
           lastRunSequence: typeof parsed.chatPage.chatPanel.lastRunSequence === 'number'
             && Number.isFinite(parsed.chatPage.chatPanel.lastRunSequence)
             ? Math.max(0, parsed.chatPage.chatPanel.lastRunSequence)
@@ -340,11 +329,6 @@ export const loadPersistedAppState = (): PersistedAppState => {
           progressLabel: typeof parsed.chatPage.chatPanel.progressLabel === 'string'
             ? parsed.chatPage.chatPanel.progressLabel
             : undefined,
-          steeringMessages: Array.isArray(parsed.chatPage.chatPanel.steeringMessages)
-            ? parsed.chatPage.chatPanel.steeringMessages
-                .filter((entry) => isRecord(entry) && typeof entry.content === 'string' && typeof entry.createdAt === 'string')
-                .slice(-20) as PersistedChatPanelState['steeringMessages']
-            : [],
           seenRunEventIds: Array.isArray(parsed.chatPage.chatPanel.seenRunEventIds)
             ? parsed.chatPage.chatPanel.seenRunEventIds.filter((entry) => typeof entry === 'string').slice(-100)
             : [],

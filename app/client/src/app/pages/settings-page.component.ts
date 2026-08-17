@@ -8,6 +8,7 @@ import { SelectedModelSummaryComponent } from '../components/selected-model-summ
 import { SettingsApiKeyFieldComponent } from '../components/settings-api-key-field.component';
 import { SettingsIconActionComponent } from '../components/settings-icon-action.component';
 import { SettingsModalShellComponent } from '../components/settings-modal-shell.component';
+import { SettingsWarningBannerComponent } from '../components/settings-warning-banner.component';
 import { ApiClientService } from '../core/api-client.service';
 import { AppStateStoreService } from '../core/app-state-store.service';
 import { PersistedSettingsPageState } from '../core/app-state';
@@ -30,23 +31,21 @@ import {
   SelectedAgentModelSummary,
 } from '../core/model-selection';
 import {
+  isDynamicCloudProvider,
+  mergeModelLibraries,
+  type DynamicCloudProvider,
+} from '../core/model-library';
+import {
   ModelCardDescriptor,
   ModelLibraryResponse,
   ModelLibrarySourceStatus,
   ModelProviderMode,
   ModelSettingsResponse,
   ModelSettingsUpdateRequest,
+  OllamaHealthResponse,
 } from '../core/types';
 import { UserFacingErrorService } from '../core/user-facing-error.service';
 import { ViewStateSyncService } from '../core/view-state-sync.service';
-
-type DynamicCloudProvider = 'deepseek' | 'opencode' | 'opencode-go';
-
-const DYNAMIC_CLOUD_PROVIDERS: readonly DynamicCloudProvider[] = [
-  'deepseek',
-  'opencode',
-  'opencode-go',
-];
 
 @Component({
   selector: 'app-settings-page',
@@ -58,6 +57,7 @@ const DYNAMIC_CLOUD_PROVIDERS: readonly DynamicCloudProvider[] = [
     SettingsApiKeyFieldComponent,
     SettingsIconActionComponent,
     SettingsModalShellComponent,
+    SettingsWarningBannerComponent,
     SelectedModelSummaryComponent,
   ],
   templateUrl: './settings-page.component.html',
@@ -233,6 +233,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.providerFilter === 'deepseek' && this.deepseekStatus !== null && !this.deepseekStatus.ok;
   }
 
+  get unavailableAssignedOllamaModelsMessage(): string {
+    const models = this.unavailableAssignedOllamaModels;
+    return `${models.join(', ')} ${models.length === 1 ? 'is' : 'are'} selected but not installed in Ollama. Pull the model or select an installed local model before using the workspace.`;
+  }
+
   get deepSeekFailureMessage(): string {
     if (!this.deepSeekLoadFailed) {
       return '';
@@ -241,10 +246,10 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get dynamicProvider(): DynamicCloudProvider | null {
-    if (this.isDynamicCloudProvider(this.providerFilter)) {
+    if (isDynamicCloudProvider(this.providerFilter)) {
       return this.providerFilter;
     }
-    if (this.isDynamicCloudProvider(this.settings.agent_model_provider)) {
+    if (isDynamicCloudProvider(this.settings.agent_model_provider)) {
       return this.settings.agent_model_provider;
     }
     return null;
@@ -305,6 +310,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.statusText = `Selecting ${model.name} as agent model...`;
       this.syncQueryState();
       this.syncState();
+      // Keep the optimistic selected-card state visible while the save is pending.
       this.changeDetectorRef.detectChanges();
       const updated = await this.saveModelSettings(payload);
       if (this.isDestroyed) {
@@ -545,15 +551,11 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return errors;
   }
 
-  private isDynamicCloudProvider(value: string): value is DynamicCloudProvider {
-    return DYNAMIC_CLOUD_PROVIDERS.includes(value as DynamicCloudProvider);
-  }
-
   private dynamicProviderForSettings(settings: ModelSettingsResponse): DynamicCloudProvider | null {
-    if (this.isDynamicCloudProvider(this.providerFilter)) {
+    if (isDynamicCloudProvider(this.providerFilter)) {
       return this.providerFilter;
     }
-    return this.isDynamicCloudProvider(settings.agent_model_provider)
+    return isDynamicCloudProvider(settings.agent_model_provider)
       ? settings.agent_model_provider
       : null;
   }
@@ -571,7 +573,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       let modelLibrary = baseLibrary;
       if (dynamicProvider) {
         const dynamicLibrary = await this.apiClient.fetchChatModels(dynamicProvider);
-        modelLibrary = this.mergeModelLibraries(baseLibrary, dynamicLibrary, dynamicProvider);
+        modelLibrary = mergeModelLibraries(baseLibrary, dynamicLibrary, dynamicProvider);
       }
       if (this.isDestroyed) {
         return;
@@ -600,6 +602,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.isLoadingModels = false;
+      // Publish the async catalog completion in the Eager change-detection view.
       this.changeDetectorRef.detectChanges();
     }
   }
@@ -608,7 +611,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     provider: ModelProviderFilter,
     forceRefresh = false,
   ): Promise<void> {
-    if (!this.isDynamicCloudProvider(provider)) {
+    if (!isDynamicCloudProvider(provider)) {
       return;
     }
     const configured = Boolean(this.settings.credentials[provider]?.['api_key']);
@@ -630,7 +633,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.isDestroyed) {
         return;
       }
-      this.applyModelLibrary(this.mergeModelLibraries({
+      this.applyModelLibrary(mergeModelLibraries({
         cloud: this.cloudModels,
         local: this.localModels,
         sources: {
@@ -658,7 +661,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       this.isLoadingDynamicProviderModels = false;
-      // Eager change detection does not automatically publish this final state.
       this.syncState();
       this.changeDetectorRef.detectChanges();
     }
@@ -677,24 +679,6 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.opencodeGoStatus = modelLibrary.sources['opencode-go'] ?? null;
   }
 
-  private mergeModelLibraries(
-    baseLibrary: ModelLibraryResponse,
-    dynamicLibrary: ModelLibraryResponse,
-    provider: DynamicCloudProvider,
-  ): ModelLibraryResponse {
-    return {
-      cloud: mergeModelCards(
-        baseLibrary.cloud.filter((model) => model.provider !== provider),
-        dynamicLibrary.cloud,
-      ),
-      local: dynamicLibrary.local.length ? dynamicLibrary.local : baseLibrary.local,
-      sources: {
-        ...baseLibrary.sources,
-        ...dynamicLibrary.sources,
-      },
-    };
-  }
-
   private setDynamicProviderStatus(
     provider: DynamicCloudProvider,
     status: ModelLibrarySourceStatus,
@@ -706,7 +690,7 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private syncQueryState(): void {
     const currentPath = window.location.pathname;
-    if (currentPath !== '/settings' && window.location.pathname !== '/settings') {
+    if (currentPath !== '/settings') {
       return;
     }
 
@@ -766,12 +750,12 @@ export class SettingsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
-  private formatOllamaHealthSummary(health: { ok?: unknown; detail?: unknown }): string {
-    if (Boolean(health.ok)) {
+  private formatOllamaHealthSummary(health: OllamaHealthResponse): string {
+    if (health.ok === true) {
       return 'Connection is healthy.';
     }
 
-    const detail = typeof health.detail === 'string' ? health.detail : 'an unknown status';
+    const detail = health.detail ?? 'an unknown status';
     if (this.userFacingErrorService.isLowLevelConnectionError(detail)) {
       return `Unable to reach Ollama at ${this.settings.ollama_url || this.ollamaUrlDraft}. Check that the service is running and the URL is correct.`;
     }

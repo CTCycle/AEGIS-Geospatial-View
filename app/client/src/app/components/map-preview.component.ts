@@ -63,8 +63,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   @ViewChild('mapContainer', { static: false })
   private set mapContainer(value: ElementRef<HTMLDivElement> | undefined) {
     this.mapContainerRef = value;
-    if (value && this.viewInitialized) {
-      queueMicrotask(() => this.recreateMapIfPossible());
+    if (value && this.viewInitialized && !this.destroyed) {
+      queueMicrotask(() => {
+        if (!this.destroyed) {
+          this.recreateMapIfPossible();
+        }
+      });
     }
   }
 
@@ -81,6 +85,14 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   private mapContainerRef?: ElementRef<HTMLDivElement>;
   private viewInitialized = false;
   private mapPreparing = false;
+  private destroyed = false;
+  private candidateGeneration = 0;
+  private pendingCandidate?: {
+    map: Map;
+    container: HTMLDivElement;
+    originalContainer: HTMLDivElement;
+    generation: number;
+  };
 
   constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
@@ -126,10 +138,15 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   ngAfterViewInit(): void {
+    if (this.destroyed) {
+      return;
+    }
     this.viewInitialized = true;
     if (!this.mapSession && this.payload) {
       this.syncSessionFromPayload();
       this.rebuildOverlayStateFromSession();
+      // The session-derived loading state changes during view initialization;
+      // publish it before MapLibre starts its external render lifecycle.
       this.changeDetector.detectChanges();
     }
     this.recreateMapIfPossible();
@@ -137,6 +154,9 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (this.destroyed) {
+      return;
+    }
     if (changes['payload'] || changes['initialOverlayVisibility'] || changes['initialOverlayOpacity']) {
       this.syncSessionFromPayload();
       this.rebuildOverlayStateFromSession();
@@ -146,6 +166,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.destroyMap();
   }
 
@@ -261,7 +282,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private recreateMapIfPossible(): void {
     const center = this.mapSession?.center;
-    if (!this.viewInitialized) {
+    if (this.destroyed || !this.viewInitialized) {
       return;
     }
     if (!Number.isFinite(center?.longitude) || !Number.isFinite(center?.latitude)) {
@@ -297,7 +318,6 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const previousContainer = this.activeMapContainer;
     this.emitRenderState('preparing');
     this.mapPreparing = true;
-    let candidateFailed = false;
     let candidate: Map;
     try {
       candidate = new maplibregl.Map({
@@ -309,26 +329,49 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     } catch (error) {
       this.mapPreparing = false;
       this.removeCandidateContainer(candidateContainer, originalContainer);
-      this.emitRenderState('failed', this.safeRenderError(error));
+      if (!this.destroyed) {
+        this.emitRenderState('failed', this.safeRenderError(error));
+      }
       return;
     }
 
+    const generation = ++this.candidateGeneration;
+    this.pendingCandidate = {
+      map: candidate,
+      container: candidateContainer,
+      originalContainer,
+      generation,
+    };
+    let candidateSettled = false;
+    const isCurrentCandidate = (): boolean => !this.destroyed
+      && !candidateSettled
+      && this.pendingCandidate?.map === candidate
+      && this.pendingCandidate.generation === generation;
+    const clearCandidate = (): void => {
+      if (this.pendingCandidate?.map === candidate) {
+        this.pendingCandidate = undefined;
+      }
+    };
+
     candidate.on('error', (event: unknown) => {
-      if (candidateFailed) {
+      if (!isCurrentCandidate()) {
         return;
       }
       const error = (event as { error?: unknown } | null)?.error;
       if (error) {
-        candidateFailed = true;
+        candidateSettled = true;
         this.mapPreparing = false;
+        clearCandidate();
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
-        this.emitRenderState('failed', this.safeRenderError(error));
+        if (!this.destroyed) {
+          this.emitRenderState('failed', this.safeRenderError(error));
+        }
       }
     });
 
     candidate.on('load', () => {
-      if (candidateFailed) {
+      if (!isCurrentCandidate()) {
         return;
       }
       candidate.resize();
@@ -338,12 +381,18 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
       }
       if (!this.hasRenderableCanvas(candidate, candidateContainer)) {
+        candidateSettled = true;
         this.mapPreparing = false;
+        clearCandidate();
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
-        this.emitRenderState('failed', 'The map source loaded but produced no renderable canvas.');
+        if (!this.destroyed) {
+          this.emitRenderState('failed', 'The map source loaded but produced no renderable canvas.');
+        }
         return;
       }
+      candidateSettled = true;
+      clearCandidate();
       this.mapPreparing = false;
       this.mapRef = candidate;
       this.activeMapContainer = candidateContainer;
@@ -441,6 +490,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   private destroyMap(): void {
     this.mapPreparing = false;
+    this.candidateGeneration += 1;
+    const pendingCandidate = this.pendingCandidate;
+    this.pendingCandidate = undefined;
+    if (pendingCandidate) {
+      pendingCandidate.map.remove();
+      this.removeCandidateContainer(pendingCandidate.container, pendingCandidate.originalContainer);
+    }
     if (this.mapRef) {
       this.mapRef.remove();
       this.mapRef = null;

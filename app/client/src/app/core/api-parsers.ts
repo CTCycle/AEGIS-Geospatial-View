@@ -12,7 +12,7 @@ import {
   ModelLibraryResponse,
   ModelSettingsResponse,
 } from './types';
-import { isRecord, isStringArray } from './type-guards';
+import { isFiniteNumber, isRecord, isStringArray } from './type-guards';
 
 export const parseBooleanCredentialMap = (value: unknown): Record<string, Record<string, boolean>> => {
   if (!isRecord(value)) {
@@ -361,13 +361,18 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
   if (!isRecord(input)) {
     return undefined;
   }
+  const estimatedInputTokens = input.estimated_input_tokens;
+  const usagePercent = input.usage_percent;
+  if (!isFiniteNumber(estimatedInputTokens) || !isFiniteNumber(usagePercent)) {
+    return undefined;
+  }
   return {
-    estimated_input_tokens: Number(input.estimated_input_tokens ?? 0),
-    selected_context_window: typeof input.selected_context_window === 'number' ? input.selected_context_window : null,
-    model_context_limit: typeof input.model_context_limit === 'number' ? input.model_context_limit : null,
-    usage_percent: Number(input.usage_percent ?? 0),
-    provider: String(input.provider ?? ''),
-    model: String(input.model ?? ''),
+    estimated_input_tokens: estimatedInputTokens,
+    selected_context_window: isFiniteNumber(input.selected_context_window) ? input.selected_context_window : null,
+    model_context_limit: isFiniteNumber(input.model_context_limit) ? input.model_context_limit : null,
+    usage_percent: usagePercent,
+    provider: typeof input.provider === 'string' ? input.provider : '',
+    model: typeof input.model === 'string' ? input.model : '',
   };
 };
 

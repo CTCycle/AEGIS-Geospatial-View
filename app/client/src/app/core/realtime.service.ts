@@ -6,12 +6,8 @@ import {
   REALTIME_PROTOCOL_VERSION,
   REALTIME_SUBPROTOCOL,
 } from './constants';
-import { isRecord } from './type-guards';
-import {
-  JsonObject,
-  RealtimeConnectionState,
-  RealtimeServerMessage,
-} from './types';
+import { parseRealtimeServerMessage } from './realtime-parsers';
+import { JsonObject, RealtimeConnectionState, RealtimeServerMessage } from './types';
 
 type RealtimeMessageHandler = (message: RealtimeServerMessage) => void;
 type RealtimeStateHandler = (state: RealtimeConnectionState) => void;
@@ -254,27 +250,7 @@ export class RealtimeService {
   }
 
   private parseServerMessage(data: unknown): RealtimeServerMessage | null {
-    let value: unknown = data;
-    if (typeof data === 'string') {
-      try {
-        value = JSON.parse(data);
-      } catch {
-        return null;
-      }
-    }
-    if (!isRecord(value)
-      || value.protocol_version !== REALTIME_PROTOCOL_VERSION
-      || typeof value.type !== 'string'
-      || typeof value.conversation_id !== 'string'
-      || !isRecord(value.payload)
-      || (value.message_id !== undefined && value.message_id !== null && typeof value.message_id !== 'string')
-      || (value.correlation_id !== undefined && value.correlation_id !== null && typeof value.correlation_id !== 'string')) {
-      return null;
-    }
-    if (this.conversationId && value.conversation_id !== this.conversationId) {
-      return null;
-    }
-    return value as unknown as RealtimeServerMessage;
+    return parseRealtimeServerMessage(data, this.conversationId);
   }
 
   private buildSocketUrl(conversationId: string): string {

@@ -27,23 +27,26 @@
 
   <div class="settings-page__content">
     @if (unavailableAssignedOllamaModels.length > 0) {
-      <section class="settings-page__warning" role="status" aria-live="polite">
-        <span class="settings-page__warning-badge">Needs attention</span>
-        <span class="settings-page__warning-copy">
-          <strong>Selected local model unavailable.</strong>
-          {{ unavailableAssignedOllamaModels.join(', ') }} {{ unavailableAssignedOllamaModels.length === 1 ? 'is' : 'are' }}
-          selected but not installed in Ollama. Pull the model or select an installed local model before using the workspace.
-        </span>
-      </section>
+      <section
+        appSettingsWarning
+        class="settings-page__warning"
+        role="status"
+        aria-live="polite"
+        badge="Needs attention"
+        title="Selected local model unavailable."
+        [message]="unavailableAssignedOllamaModelsMessage"
+      ></section>
     }
     @if (dynamicProviderLoadFailed) {
-      <section class="settings-page__warning" role="status" aria-live="polite">
-        <span class="settings-page__warning-badge">{{ dynamicProviderLabel }}</span>
-        <span class="settings-page__warning-copy">
-          <strong>{{ dynamicProviderLabel }} models could not be loaded.</strong>
-          {{ dynamicProviderFailureMessage }}
-        </span>
-      </section>
+      <section
+        appSettingsWarning
+        class="settings-page__warning"
+        role="status"
+        aria-live="polite"
+        [badge]="dynamicProviderLabel"
+        [title]="dynamicProviderLabel + ' models could not be loaded.'"
+        [message]="dynamicProviderFailureMessage"
+      ></section>
     }
     <div class="settings-page__layout">
       <section class="settings-page__left-column">

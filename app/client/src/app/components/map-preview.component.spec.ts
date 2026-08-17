@@ -67,6 +67,67 @@ describe('components/map-preview.component', () => {
     expect(style.layers.find((layer: { id: string }) => layer.id === 'basemap')?.maxzoom).toBe(DEFAULT_BASE_TILE_MAX_ZOOM);
   });
 
+  it('disposes a pending candidate and ignores its late load callback after teardown', () => {
+    let loadCallback: (() => void) | undefined;
+    fakeMap.on.and.callFake((event: string, callback: () => void) => {
+      if (event === 'load') {
+        loadCallback = callback;
+      }
+    });
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+
+    fixture.detectChanges();
+    expect(states).toContain('preparing');
+
+    fixture.destroy();
+    expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+
+    loadCallback?.();
+    expect(states.filter((state) => state === 'ready')).toEqual([]);
+    expect(fakeMap.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the active map when a replacement candidate fails', () => {
+    let candidateError: ((event: unknown) => void) | undefined;
+    const candidateMap = {
+      ...fakeMap,
+      on: jasmine.createSpy('candidateOn'),
+      remove: jasmine.createSpy('candidateRemove'),
+    };
+    candidateMap.on.and.callFake((event: string, callback: (value?: unknown) => void) => {
+      if (event === 'error') {
+        candidateError = callback as (event: unknown) => void;
+      }
+    });
+    (maplibregl.Map as unknown as jasmine.Spy).and.returnValues(fakeMap as never, candidateMap as never);
+
+    const states: string[] = [];
+    component.renderStateChange.subscribe((change) => states.push(change.state));
+    component.payload = { map_session: makeMapSession() as never };
+    fixture.detectChanges();
+    expect(states).toContain('ready');
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        basemap_id: 'esri_world_imagery',
+        basemap: {
+          id: 'esri_world_imagery',
+          label: 'Satellite Imagery',
+          provider: 'arcgis',
+          tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        },
+      }) as never,
+    });
+    fixture.detectChanges();
+    candidateError?.({ error: new Error('candidate failed') });
+
+    expect(candidateMap.remove).toHaveBeenCalledTimes(1);
+    expect(fakeMap.remove).not.toHaveBeenCalled();
+    expect(states.at(-1)).toBe('failed');
+  });
+
   it('preserves external satellite imagery tile URLs', () => {
     component.payload = {
       map_session: makeMapSession({
