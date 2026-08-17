@@ -57,7 +57,7 @@ def _build_base_url(
     return f"http://{host}:{port}"
 
 
-FRONTEND_URL_FALLBACK = _build_base_url("UI_HOST", "UI_PORT", "127.0.0.1", "7861")
+FRONTEND_URL_FALLBACK = _build_base_url("UI_HOST", "UI_PORT", "127.0.0.1", "8001")
 BACKEND_URL_FALLBACK = _build_base_url(
     "FASTAPI_HOST", "FASTAPI_PORT", "127.0.0.1", "8000"
 )

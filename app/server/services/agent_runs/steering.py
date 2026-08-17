@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from server.domain.agent_runs import TERMINAL_RUN_STATES
 from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
 from server.domain.steering import (
@@ -9,7 +11,9 @@ from server.domain.steering import (
 )
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
+from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.aggregation import AggregatedRequestService
+from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError, RunNotFoundError
 
@@ -24,11 +28,15 @@ class RunSteeringService:
         steering_repository: AgentSteeringRepository,
         aggregation_service: AggregatedRequestService,
         event_publisher: RunEventPublisher,
+        conversation_repository: ConversationRepository | None = None,
+        task_state_service: ConversationTaskStateService | None = None,
     ) -> None:
         self.run_repository = run_repository
         self.steering_repository = steering_repository
         self.aggregation_service = aggregation_service
         self.event_publisher = event_publisher
+        self.conversation_repository = conversation_repository
+        self.task_state_service = task_state_service
 
     # -------------------------------------------------------------------------
     async def steer(
@@ -65,6 +73,7 @@ class RunSteeringService:
                     state=snapshot.state,
                     duplicate=True,
                     delta=delta,
+                    state_delta_applied=existing.state_delta_applied,
                 )
             next_version = snapshot.active_run_version + 1
             messages = [
@@ -97,6 +106,9 @@ class RunSteeringService:
             break
         if steering is None or updated is None:
             raise RunConflictError("Concurrent run update could not be applied.")
+        state_delta_applied = self._apply_state_delta(conversation_id, delta)
+        if state_delta_applied:
+            steering = self.steering_repository.mark_state_delta_applied(steering.steering_id)
         await self.event_publisher.publish(
             conversation_id=conversation_id,
             run_id=run_id,
@@ -108,6 +120,7 @@ class RunSteeringService:
                 "steering_id": steering.steering_id,
                 "aggregated_request": aggregate,
                 "delta": delta.model_dump(mode="json"),
+                "state_delta_applied": state_delta_applied,
             },
         )
         return SteeringMessageResponse(
@@ -119,4 +132,36 @@ class RunSteeringService:
             state=updated.state,
             duplicate=False,
             delta=delta,
+            state_delta_applied=state_delta_applied,
         )
+
+    # -------------------------------------------------------------------------
+    def _apply_state_delta(self, conversation_id: str, delta: object) -> bool:
+        """Persist only mutations that can be applied without model interpretation."""
+
+        if (
+            self.conversation_repository is None
+            or self.task_state_service is None
+            or getattr(delta, "kind", "instruction")
+            not in {"scope_change", "exclusion", "add_dataset", "comparison"}
+        ):
+            return False
+        try:
+            persisted: dict[str, Any] = self.conversation_repository.read_state(conversation_id)
+            task_snapshot_value: Any = persisted.get("task_snapshot")
+            if not isinstance(task_snapshot_value, dict):
+                return False
+            task_snapshot = cast(dict[str, Any], task_snapshot_value)
+            if not task_snapshot.get("tasks"):
+                return False
+            if not self.task_state_service.has_state(conversation_id):
+                self.task_state_service.hydrate(conversation_id, task_snapshot)
+            self.task_state_service.apply_steering_delta(conversation_id, delta)
+            self.conversation_repository.write_state(
+                conversation_id,
+                expected_revision=int(persisted["context_revision"]),
+                task_snapshot=self.task_state_service.serialize(conversation_id),
+            )
+            return True
+        except (KeyError, TypeError, ValueError):
+            return False

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Small, provider-neutral contracts for the AEGIS agent runtime.
 
 The runtime deliberately keeps orchestration in ordinary application code.  These
@@ -9,10 +7,13 @@ independent from any LLM SDK so they can also be used by scripted benchmark
 models and deterministic failure tests.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
+import re
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -52,14 +53,14 @@ class GeographicScope(BaseModel):
     bbox: list[float] | None = None
     radius_m: float | None = Field(default=None, gt=0)
     geometry_ref: str | None = None
-    exclusions: list[dict[str, Any]] = Field(default_factory=list)
+    exclusions: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
     crs: str = "EPSG:4326"
 
 
 class GeospatialWorkingState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    resolved_locations: list[dict[str, Any]] = Field(default_factory=list)
+    resolved_locations: list[dict[str, Any]] = Field(default_factory=lambda: list[dict[str, Any]]())
     geographic_scope: GeographicScope = Field(default_factory=GeographicScope)
     candidate_place_refs: list[str] = Field(default_factory=list)
     selected_place_ids: list[str] = Field(default_factory=list)
@@ -94,7 +95,7 @@ class AgentThreadState(BaseModel):
     revision: int = Field(default=0, ge=0)
     active_task_id: str | None = None
     goal: AgentGoal | None = None
-    tasks: list[AgentTask] = Field(default_factory=list)
+    tasks: list[AgentTask] = Field(default_factory=lambda: list[AgentTask]())
     geospatial_state: GeospatialWorkingState = Field(default_factory=GeospatialWorkingState)
     evidence_refs: list[str] = Field(default_factory=list)
     active_map_session: dict[str, Any] | None = None
@@ -256,14 +257,15 @@ def state_fingerprint(state: AgentThreadState) -> str:
 def compact_task_context(task_state: dict[str, Any], *, completed_limit: int = 6) -> dict[str, Any]:
     """Keep active dependencies and a small completed window in model context."""
 
-    raw_tasks = task_state.get("tasks")
+    raw_tasks: Any = task_state.get("tasks")
     if not isinstance(raw_tasks, list):
         return task_state
     active: list[dict[str, Any]] = []
     completed: list[dict[str, Any]] = []
-    for raw in raw_tasks:
-        if not isinstance(raw, dict):
+    for raw_value in cast(list[Any], raw_tasks):
+        if not isinstance(raw_value, dict):
             continue
+        raw = cast(dict[str, Any], raw_value)
         status = raw.get("status")
         item = {
             key: raw.get(key)
@@ -326,6 +328,13 @@ def invalidate_scope_evidence(
     retained = tuple(ref for ref in state.evidence_refs if ref not in invalidated_refs)
     invalidated = tuple(ref for ref in state.evidence_refs if ref in invalidated_refs)
     state.evidence_refs = list(retained)
+    for collection_name in ("feature_refs", "layer_refs", "renderable_refs"):
+        collection = getattr(state.geospatial_state, collection_name)
+        setattr(
+            state.geospatial_state,
+            collection_name,
+            [ref for ref in collection if ref not in invalidated_refs],
+        )
     if new_scope is not None:
         state.geospatial_state.geographic_scope = new_scope
     state.revision += 1
@@ -337,6 +346,7 @@ def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadStat
 
     kind = str(getattr(delta, "kind", "instruction"))
     text = str(getattr(delta, "text", "")).strip()
+    parameters = cast(dict[str, Any], getattr(delta, "parameters", {}))
     state.revision += 1
     if kind in {"scope_change", "exclusion"}:
         invalidated_refs: set[str] = set()
@@ -347,6 +357,13 @@ def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadStat
                 invalidated_refs.update(task.output_refs)
         if invalidated_refs:
             invalidate_scope_evidence(state, invalidated_refs=invalidated_refs)
+        radius_text: Any = parameters.get("radius_text")
+        if isinstance(radius_text, str):
+            match = re.search(r"(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>km|mi|miles?)", radius_text.lower())
+            if match is not None:
+                value = float(match.group("value"))
+                multiplier = 1_609.344 if match.group("unit").startswith("mi") else 1_000.0
+                state.geospatial_state.geographic_scope.radius_m = value * multiplier
         state.geospatial_state.geographic_scope.exclusions.extend(
             [{"text": text}] if kind == "exclusion" else []
         )

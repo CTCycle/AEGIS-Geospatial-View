@@ -5,6 +5,7 @@ from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
 from server.repositories.agent_runs import AgentRunRepository
+from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
@@ -23,11 +24,13 @@ class AgentRunOrchestrator:
         run_repository: AgentRunRepository,
         event_publisher: RunEventPublisher,
         conversation_repository: ConversationRepository,
+        steering_repository: AgentSteeringRepository | None = None,
     ) -> None:
         self.agent_orchestrator = agent_orchestrator
         self.run_repository = run_repository
         self.event_publisher = event_publisher
         self.conversation_repository = conversation_repository
+        self.steering_repository = steering_repository
 
     # -------------------------------------------------------------------------
     async def execute_run(self, run_id: str) -> None:
@@ -64,7 +67,7 @@ class AgentRunOrchestrator:
         try:
             response = await self.agent_orchestrator.run_turn(
                 ChatTurnRequest(
-                    message=snapshot.aggregated_request,
+                    message=self._request_message(snapshot),
                     request_id=run_id,
                     title=snapshot.original_request[:120],
                     conversation_id=snapshot.conversation_id,
@@ -383,3 +386,15 @@ class AgentRunOrchestrator:
         if operation is None:
             return False
         return operation.status == "failed" or operation.kind == "error"
+
+    # -------------------------------------------------------------------------
+    def _request_message(self, snapshot: AgentRunSnapshot) -> str:
+        """Use a structured delta on rerun only after it was durably applied."""
+
+        if self.steering_repository is None:
+            return snapshot.aggregated_request
+        messages = self.steering_repository.list_steering_messages(snapshot.run_id)
+        latest = messages[-1] if messages else None
+        if latest is not None and latest.state_delta_applied:
+            return latest.content
+        return snapshot.aggregated_request

@@ -325,6 +325,7 @@ class AgentSteeringMessageRecord(Base):
     run_version: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     client_mutation_id: Mapped[str | None] = mapped_column(String(160))
+    state_delta_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

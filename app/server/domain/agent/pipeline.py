@@ -167,7 +167,7 @@ class ConversationTaskSnapshot(BaseModel):
     conversation_key: str
     current_task_id: str | None = None
     goal: AgentGoal | None = None
-    tasks: list[AgentTask] = Field(default_factory=list)
+    tasks: list[AgentTask] = Field(default_factory=lambda: list[AgentTask]())
     geospatial_state: GeospatialWorkingState = Field(default_factory=GeospatialWorkingState)
     evidence_refs: list[str] = Field(default_factory=list)
     active_map_session: dict[str, Any] | None = None
