@@ -208,6 +208,8 @@ def test_openai_provider_uses_responses_api(monkeypatch) -> None:
     assert first_client.kwargs == {
         "api_key": "k",
         "base_url": "https://api.openai.test/v1",
+        "timeout": 30.0,
+        "max_retries": 0,
     }
     assert first_client.responses.create_calls[0]["model"] == "test-model"
     assert first_client.responses.create_calls[0]["input"] == _request().messages

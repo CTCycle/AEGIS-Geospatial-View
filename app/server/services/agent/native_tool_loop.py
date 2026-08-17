@@ -16,6 +16,7 @@ from server.domain.agent.execution import (
     AgentToolLoopResult,
 )
 from server.services.agent.tool_registry import ToolRegistry
+from server.domain.agent.runtime import canonical_call_fingerprint
 from server.services.llm.factory import LLMFactory
 from server.services.llm.context_budget import prepare_request
 from server.services.llm.types import (
@@ -39,6 +40,11 @@ class NativeToolLoop:
         max_parallel_tool_calls: int = 8,
         max_tool_result_chars: int = 12000,
         tool_timeout_seconds: int = 30,
+        max_model_calls: int = 6,
+        max_tool_calls: int = 12,
+        max_state_transitions: int = 16,
+        max_run_seconds: float = 180.0,
+        max_no_progress_steps: int = 2,
     ) -> None:
         self.provider_factory = provider_factory
         self.tool_registry = tool_registry
@@ -46,6 +52,11 @@ class NativeToolLoop:
         self.max_parallel_tool_calls = max_parallel_tool_calls
         self.max_tool_result_chars = max_tool_result_chars
         self.tool_timeout_seconds = tool_timeout_seconds
+        self.max_model_calls = max_model_calls
+        self.max_tool_calls = max_tool_calls
+        self.max_state_transitions = max_state_transitions
+        self.max_run_seconds = max_run_seconds
+        self.max_no_progress_steps = max_no_progress_steps
         self.last_context_usages: list[dict[str, Any]] = []
 
     # -------------------------------------------------------------------------
@@ -68,9 +79,34 @@ class NativeToolLoop:
         messages.insert(1, working_state)
         all_calls: list[LLMToolCall] = []
         all_results: list[LLMToolResult] = []
+        fingerprints: set[str] = set()
+        duplicate_tool_calls = 0
+        no_progress_steps = 0
+        started_run = time.perf_counter()
+        simple_run = str(request.context.metadata.get("complexity") or "").lower() == "simple"
+        model_budget = 2 if simple_run else self.max_model_calls
+        tool_budget = 2 if simple_run else self.max_tool_calls
+        transition_budget = 6 if simple_run else self.max_state_transitions
         self.last_context_usages = []
 
         for iteration in range(1, self.max_iterations + 1):
+            if (
+                iteration > model_budget
+                or len(all_calls) >= tool_budget
+                or iteration + len(all_results) > transition_budget
+                or time.perf_counter() - started_run > (45.0 if simple_run else self.max_run_seconds)
+            ):
+                return AgentToolLoopResult(
+                    final_text="The agent reached its execution budget before completing the request.",
+                    tool_calls=all_calls,
+                    tool_results=all_results,
+                    iterations=iteration - 1,
+                    stopped_reason="budget_exhausted",
+                    map_session=self._extract_map_session(all_results),
+                    model_calls=iteration - 1,
+                    duplicate_tool_calls=duplicate_tool_calls,
+                    no_progress_steps=no_progress_steps,
+                )
             working_state["content"] = "WORKING_STATE (replaceable): " + json.dumps(
                 {
                     "parsed_request": request.context.parsed_request,
@@ -119,6 +155,9 @@ class NativeToolLoop:
                     iterations=iteration,
                     stopped_reason="provider_error",
                     map_session=self._extract_map_session(all_results),
+                    model_calls=iteration,
+                    duplicate_tool_calls=duplicate_tool_calls,
+                    no_progress_steps=no_progress_steps,
                 )
 
             if not response.tool_calls:
@@ -129,31 +168,80 @@ class NativeToolLoop:
                     iterations=iteration,
                     stopped_reason="final",
                     map_session=self._extract_map_session(all_results),
+                    model_calls=iteration,
+                    duplicate_tool_calls=duplicate_tool_calls,
+                    no_progress_steps=no_progress_steps,
                 )
 
-            tool_calls = response.tool_calls[: self.max_parallel_tool_calls]
+            tool_calls = response.tool_calls[: min(self.max_parallel_tool_calls, tool_budget - len(all_calls))]
             all_calls.extend(tool_calls)
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": response.content or None,
-                    "tool_calls": [
-                        {
-                            "id": call.id,
-                            "name": call.name,
-                            "arguments": call.arguments,
-                        }
-                        for call in tool_calls
-                    ],
-                }
-            )
-            results = await asyncio.gather(
-                *[
-                    self._execute_tool_call(call, request.context, iteration)
-                    for call in tool_calls
-                ]
-            )
+            raw_output = response.raw.get("output") if is_json_object(response.raw) else None
+            if is_json_array(raw_output):
+                # Responses providers require every output item (including
+                # reasoning/function-call items) to be retained on the next
+                # request.  Other providers continue using the portable
+                # assistant/tool-message representation below.
+                messages.extend(
+                    item for item in raw_output if is_json_object(item)
+                )
+            else:
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": response.content or None,
+                        "tool_calls": [
+                            {
+                                "id": call.id,
+                                "name": call.name,
+                                "arguments": call.arguments,
+                            }
+                            for call in tool_calls
+                        ],
+                    }
+                )
+            results_list: list[LLMToolResult] = []
+            for call in tool_calls:
+                fingerprint = canonical_call_fingerprint(call.name, call.arguments)
+                if fingerprint in fingerprints:
+                    duplicate_tool_calls += 1
+                    results_list.append(
+                        LLMToolResult(
+                            tool_call_id=call.id,
+                            name=call.name,
+                            content={
+                                "ok": False,
+                                "data": None,
+                                "error": {
+                                    "code": "duplicate_tool_call",
+                                    "message": "This canonical tool call already completed in the run.",
+                                },
+                                "metadata": {},
+                            },
+                            is_error=True,
+                            error="Duplicate canonical tool call.",
+                        )
+                    )
+                    continue
+                fingerprints.add(fingerprint)
+                results_list.append(await self._execute_tool_call(call, request.context, iteration))
+            results = results_list
             all_results.extend(results)
+            if results and all(result.is_error for result in results):
+                no_progress_steps += 1
+            else:
+                no_progress_steps = 0
+            if no_progress_steps >= self.max_no_progress_steps:
+                return AgentToolLoopResult(
+                    final_text="The agent stopped after repeated steps produced no progress.",
+                    tool_calls=all_calls,
+                    tool_results=all_results,
+                    iterations=iteration,
+                    stopped_reason="no_progress",
+                    map_session=self._extract_map_session(all_results),
+                    model_calls=iteration,
+                    duplicate_tool_calls=duplicate_tool_calls,
+                    no_progress_steps=no_progress_steps,
+                )
             for result in results:
                 messages.append(
                     {
@@ -171,6 +259,9 @@ class NativeToolLoop:
             iterations=self.max_iterations,
             stopped_reason="max_iterations",
             map_session=self._extract_map_session(all_results),
+            model_calls=self.max_iterations,
+            duplicate_tool_calls=duplicate_tool_calls,
+            no_progress_steps=no_progress_steps,
         )
 
     # -------------------------------------------------------------------------

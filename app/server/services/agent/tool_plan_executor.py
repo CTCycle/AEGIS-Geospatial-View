@@ -15,6 +15,7 @@ from server.domain.agent.pipeline import (
     ToolPlanStep,
     ToolResultProvenance,
 )
+from server.domain.agent.runtime import canonical_call_fingerprint
 from server.services.agent.tool_registry import ToolRegistry
 
 LOGGER = logging.getLogger(__name__)
@@ -37,13 +38,33 @@ class ToolPlanExecutor:
     ) -> list[PlannedToolResult]:
         remaining = {step.step_id: step for step in plan.steps}
         completed: dict[str, PlannedToolResult] = {}
+        fingerprints: set[str] = set()
         while remaining:
             ready = [
                 step
                 for step in remaining.values()
-                if all(dependency in completed for dependency in step.depends_on)
+                if all(
+                    dependency in completed and completed[dependency].ok
+                    for dependency in step.depends_on
+                )
             ]
+            blocked = [
+                step
+                for step in remaining.values()
+                if any(
+                    dependency in completed and not completed[dependency].ok
+                    for dependency in step.depends_on
+                )
+            ]
+            for step in blocked:
+                result = self._dependency_error(step, code="dependency_failed")
+                completed[step.step_id] = result
+                remaining.pop(step.step_id, None)
+                if on_tool_completed is not None:
+                    on_tool_completed(result)
             if not ready:
+                if not remaining:
+                    break
                 for step in remaining.values():
                     completed[step.step_id] = self._dependency_error(step)
                 break
@@ -62,6 +83,7 @@ class ToolPlanExecutor:
                         self._execute_step(
                             step,
                             context,
+                            fingerprints=fingerprints,
                             on_tool_started=on_tool_started,
                             on_tool_completed=on_tool_completed,
                         )
@@ -79,12 +101,30 @@ class ToolPlanExecutor:
         step: ToolPlanStep,
         context: AgentExecutionContext,
         *,
+        fingerprints: set[str],
         on_tool_started: Callable[[ToolPlanStep], None] | None = None,
         on_tool_completed: Callable[[PlannedToolResult], None] | None = None,
     ) -> PlannedToolResult:
         if on_tool_started is not None:
             on_tool_started(step)
         retryable = set(step.retry_policy.retryable_error_codes)
+        fingerprint = canonical_call_fingerprint(step.tool_name, step.arguments)
+        if fingerprint in fingerprints:
+            result = PlannedToolResult(
+                step_id=step.step_id,
+                ok=False,
+                error_code="duplicate_tool_call",
+                error_message="The same validated tool call was already completed in this run.",
+                provenance=ToolResultProvenance(
+                    tool_name=step.tool_name,
+                    capability_id=step.capability_id,
+                    call_fingerprint=fingerprint,
+                ),
+            )
+            if on_tool_completed is not None:
+                on_tool_completed(result)
+            return result
+        fingerprints.add(fingerprint)
         for attempt in range(1, step.retry_policy.max_attempts + 1):
             started = time.perf_counter()
             try:
@@ -119,6 +159,7 @@ class ToolPlanExecutor:
                         capability_id=step.capability_id,
                         attempt=attempt,
                         elapsed_ms=elapsed_ms,
+                        call_fingerprint=fingerprint,
                     ),
                 )
                 if on_tool_completed is not None:
@@ -136,6 +177,7 @@ class ToolPlanExecutor:
                         capability_id=step.capability_id,
                         attempt=attempt,
                         elapsed_ms=elapsed_ms,
+                        call_fingerprint=fingerprint,
                     ),
                 )
                 if on_tool_completed is not None:
@@ -152,6 +194,7 @@ class ToolPlanExecutor:
                         capability_id=step.capability_id,
                         attempt=attempt,
                         elapsed_ms=elapsed_ms,
+                        call_fingerprint=fingerprint,
                     ),
                 )
                 if on_tool_completed is not None:
@@ -164,6 +207,7 @@ class ToolPlanExecutor:
                 attempt,
                 error_code,
             )
+            await asyncio.sleep(0.25)
         raise AssertionError("unreachable")
 
     # -------------------------------------------------------------------------
@@ -183,12 +227,20 @@ class ToolPlanExecutor:
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def _dependency_error(step: ToolPlanStep) -> PlannedToolResult:
+    def _dependency_error(
+        step: ToolPlanStep,
+        *,
+        code: str = "dependency_cycle",
+    ) -> PlannedToolResult:
         return PlannedToolResult(
             step_id=step.step_id,
             ok=False,
-            error_code="dependency_cycle",
-            error_message="Tool plan dependencies could not be resolved.",
+            error_code=code,
+            error_message=(
+                "A required predecessor failed."
+                if code == "dependency_failed"
+                else "Tool plan dependencies could not be resolved."
+            ),
             provenance=ToolResultProvenance(
                 tool_name=step.tool_name,
                 capability_id=step.capability_id,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_array, is_json_object
 
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from typing import Any
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
@@ -66,6 +67,8 @@ class ToolRegistry:
             registered.definition.parameters_json_schema,
             arguments,
         )
+        if validation_error is None:
+            validation_error = self._validate_domain_arguments(arguments)
         if validation_error is not None:
             return ToolExecutionEnvelope(
                 ok=False,
@@ -90,6 +93,51 @@ class ToolRegistry:
         if not is_json_object(arguments):
             return "Tool arguments must be an object."
         return cls._validate_schema_node(schema, arguments, path="")
+
+    @classmethod
+    def _validate_domain_arguments(cls, arguments: dict[str, Any]) -> str | None:
+        """Validate cross-field geospatial invariants before a handler runs."""
+
+        def walk(value: Any, path: str = "") -> str | None:
+            if is_json_object(value):
+                for key, child in value.items():
+                    child_path = cls._child_path(path, key)
+                    key_lower = key.lower()
+                    if key_lower in {"latitude", "lat"} and isinstance(child, (int, float)):
+                        if not -90 <= child <= 90:
+                            return f"Argument '{child_path}' must be between -90 and 90."
+                    if key_lower in {"longitude", "lon", "lng"} and isinstance(child, (int, float)):
+                        if not -180 <= child <= 180:
+                            return f"Argument '{child_path}' must be between -180 and 180."
+                    if key_lower in {"radius", "radius_m", "radius_km"} and isinstance(child, (int, float)):
+                        if child <= 0:
+                            return f"Argument '{child_path}' must be greater than zero."
+                    nested_error = walk(child, child_path)
+                    if nested_error:
+                        return nested_error
+                bbox = value.get("bbox")
+                if is_json_array(bbox) and len(bbox) == 4 and all(isinstance(item, (int, float)) for item in bbox):
+                    west, south, east, north = bbox
+                    if west < -180 or east > 180 or south < -90 or north > 90:
+                        return "Argument 'bbox' contains coordinates outside supported ranges."
+                    if west > east or south > north:
+                        return "Argument 'bbox' must be ordered west,south,east,north."
+                for start_key, end_key in (("start", "end"), ("start_time", "end_time"), ("from", "to")):
+                    start, end = value.get(start_key), value.get(end_key)
+                    if isinstance(start, str) and isinstance(end, str):
+                        try:
+                            if datetime.fromisoformat(start.replace("Z", "+00:00")) > datetime.fromisoformat(end.replace("Z", "+00:00")):
+                                return f"Arguments '{start_key}' and '{end_key}' are in reverse order."
+                        except ValueError:
+                            return f"Argument '{start_key}' or '{end_key}' is not a valid ISO-8601 timestamp."
+            if is_json_array(value):
+                for index, child in enumerate(value):
+                    nested_error = walk(child, cls._child_path(path, str(index)))
+                    if nested_error:
+                        return nested_error
+            return None
+
+        return walk(arguments)
 
     # -------------------------------------------------------------------------
     @classmethod

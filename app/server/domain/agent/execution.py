@@ -34,5 +34,15 @@ class AgentToolLoopResult:
     tool_calls: list[LLMToolCall]
     tool_results: list[LLMToolResult]
     iterations: int
-    stopped_reason: Literal["final", "max_iterations", "provider_error", "tool_error"]
+    stopped_reason: Literal[
+        "final",
+        "max_iterations",
+        "provider_error",
+        "tool_error",
+        "budget_exhausted",
+        "no_progress",
+    ]
     map_session: MapSession | None = None
+    model_calls: int = 0
+    duplicate_tool_calls: int = 0
+    no_progress_steps: int = 0

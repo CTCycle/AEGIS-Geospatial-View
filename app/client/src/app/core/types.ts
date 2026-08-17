@@ -350,7 +350,9 @@ export type RunEventType =
   | 'error'
   | 'completed'
   | 'cancelled'
-  | 'clarification_needed';
+  | 'clarification_needed'
+  | 'trace'
+  | 'checkpoint';
 
 export type RunEventVisibility = 'user' | 'internal';
 
@@ -587,31 +589,32 @@ export interface ToolPlan {
   partial_failure_policy: string;
 }
 
-export interface ConversationTaskRecord {
-  task_id: string;
-  raw_user_text: string;
-  prompt_summary: string;
-  normalized_description: string;
-  task_type: string;
-  intent: string;
-  relationship: string;
-  required_entities: string[];
-  required_data_layers: string[];
-  visualization_changes: Record<string, JsonValue>;
-  specialist: string;
-  status: 'pending' | 'needs_clarification' | 'routed' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-  is_current: boolean;
-  parent_task_id?: string | null;
-  blocking_ambiguity?: string | null;
-  failure?: TaskFailureDetail | null;
-  progress_summary?: string | null;
+export interface AgentTask {
+  id: string;
+  description: string;
+  kind: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'skipped' | 'superseded';
+  depends_on: string[];
+  required: boolean;
+  input_refs: string[];
+  output_refs: string[];
+  attempt_count: number;
+  last_failure?: Record<string, JsonValue> | null;
+  scope_revision: number;
 }
 
 export interface ConversationTaskSnapshot {
+  schema_version: 2;
   conversation_key: string;
   current_task_id?: string | null;
-  tasks: ConversationTaskRecord[];
-  active_visualization?: Record<string, JsonValue> | null;
+  goal?: { id: string; text: string; status: string; revision: number } | null;
+  tasks: AgentTask[];
+  geospatial_state: Record<string, JsonValue>;
+  evidence_refs: string[];
+  active_map_session?: Record<string, JsonValue> | null;
+  assumptions: string[];
+  unresolved_questions: string[];
+  conversation_summary?: Record<string, JsonValue> | null;
 }
 
 export interface VisualizationUpdate {

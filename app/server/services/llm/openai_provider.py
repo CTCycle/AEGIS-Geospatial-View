@@ -33,7 +33,12 @@ class OpenAIProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def _client(self) -> Any:
-        return OpenAI(api_key=self.api_key, base_url=self.base_url)
+        return OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=30.0,
+            max_retries=0,
+        )
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:
@@ -62,45 +67,86 @@ class OpenAIProvider(LLMProvider):
     def tool_to_openai_schema(tool: LLMToolDefinition) -> dict[str, Any]:
         return {
             "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.parameters_json_schema,
-            },
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": OpenAIProvider._strict_parameters(tool.parameters_json_schema),
+            "strict": True,
         }
+
+    @staticmethod
+    def _strict_parameters(schema: dict[str, Any]) -> dict[str, Any]:
+        """Normalize JSON Schema for Responses strict function tools."""
+
+        normalized = dict(schema)
+        if normalized.get("type") == "object" or "properties" in normalized:
+            properties = normalized.get("properties")
+            if is_json_object(properties):
+                normalized["properties"] = {
+                    key: OpenAIProvider._strict_parameters(value)
+                    if is_json_object(value)
+                    else value
+                    for key, value in properties.items()
+                }
+                normalized["required"] = list(properties.keys())
+                normalized["additionalProperties"] = False
+        if is_json_object(normalized.get("items")):
+            normalized["items"] = OpenAIProvider._strict_parameters(normalized["items"])
+        return normalized
 
     # -------------------------------------------------------------------------
     @staticmethod
     def normalize_tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
         for message in messages:
+            if message.get("type") in {"function_call", "function_call_output", "reasoning"}:
+                normalized.append(message)
+                continue
+            if message.get("type") == "message":
+                content = message.get("content")
+                if is_json_array(content):
+                    text_parts = [
+                        str(item.get("text") or "")
+                        for raw_item in content
+                        for item in [json_object(raw_item)]
+                        if item and item.get("text") is not None
+                    ]
+                    normalized.append(
+                        {
+                            "role": str(message.get("role") or "assistant"),
+                            "content": "".join(text_parts),
+                        }
+                    )
+                    continue
             role = str(message.get("role") or "")
             if role == "assistant" and is_json_array(message.get("tool_calls")):
-                normalized.append(
-                    {
-                        "role": "assistant",
-                        "content": message.get("content"),
-                        "tool_calls": [
-                            {
-                                "id": call.get("id"),
-                                "type": "function",
-                                "function": {
-                                    "name": call.get("name"),
-                                    "arguments": json.dumps(call.get("arguments") or {}),
-                                },
-                            }
-                            for raw_call in json_array(message.get("tool_calls"))
-                            for call in [json_object(raw_call)]
-                            if call
-                        ],
-                    }
-                )
+                for raw_call in json_array(message.get("tool_calls")):
+                    call = json_object(raw_call)
+                    if not call:
+                        continue
+                    call_id = str(call.get("id") or "")
+                    normalized.append(
+                        {
+                            "type": "function_call",
+                            "id": call_id or None,
+                            "call_id": call_id,
+                            "name": str(call.get("name") or ""),
+                            "arguments": json.dumps(call.get("arguments") or {}, separators=(",", ":")),
+                        }
+                    )
                 continue
             if role == "tool":
                 normalized.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": message.get("tool_call_id"),
+                        "type": "function_call_output",
+                        "call_id": message.get("tool_call_id"),
+                        "output": str(message.get("content") or ""),
+                    }
+                )
+                continue
+            if role in {"system", "developer", "user", "assistant"}:
+                normalized.append(
+                    {
+                        "role": role,
                         "content": str(message.get("content") or ""),
                     }
                 )

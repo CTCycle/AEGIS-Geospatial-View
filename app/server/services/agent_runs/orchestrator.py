@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from server.domain.agent_runs import AgentRunSnapshot
+from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
 from server.domain.chat import ChatTurnRequest, ChatTurnResponse
 from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.agent_runs.events import RunEventPublisher
+
+import hashlib
+import json
 
 ###############################################################################
 class AgentRunOrchestrator:
@@ -44,6 +48,19 @@ class AgentRunOrchestrator:
                 await self.execute_run(run_id)
             return
         await self._publish_progress(snapshot, RunProgressStage.UNDERSTANDING_REQUEST)
+        await self._publish_trace(
+            snapshot,
+            AgentTraceEvent(
+                kind="run_started",
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                sequence=0,
+                payload={
+                    "objective": snapshot.original_request,
+                    "request_length": len(snapshot.aggregated_request),
+                },
+            ),
+        )
         try:
             response = await self.agent_orchestrator.run_turn(
                 ChatTurnRequest(
@@ -75,7 +92,23 @@ class AgentRunOrchestrator:
                 run_id=latest.run_id,
                 run_version=latest.active_run_version,
                 type=RunEventType.ERROR,
-                payload={"code": "agent_execution_failed", "message": "Failed"},
+                payload={
+                    "code": "agent_execution_failed",
+                    "message": self._safe_failure_message(exc),
+                },
+            )
+            await self._publish_trace(
+                latest,
+                AgentTraceEvent(
+                    kind="completion",
+                    run_id=latest.run_id,
+                    run_version=latest.active_run_version,
+                    sequence=1,
+                    payload={
+                        "completion_reason": "required_task_failed",
+                        "error_type": type(exc).__name__,
+                    },
+                ),
             )
             return
 
@@ -99,6 +132,41 @@ class AgentRunOrchestrator:
             )
             await self.execute_run(run_id)
             return
+        await self._publish_trace(
+            latest,
+            AgentTraceEvent(
+                kind="checkpoint",
+                run_id=latest.run_id,
+                run_version=latest.active_run_version,
+                sequence=1,
+                payload=AgentCheckpoint(
+                    run_id=latest.run_id,
+                    conversation_id=latest.conversation_id,
+                    run_version=latest.active_run_version,
+                    task_snapshot=(
+                        response.task_snapshot.model_dump(mode="json")
+                        if response.task_snapshot is not None
+                        else {"schema_version": 2, "tasks": []}
+                    ),
+                    state_hash=hashlib.sha256(
+                        json.dumps(
+                            response.task_snapshot.model_dump(mode="json")
+                            if response.task_snapshot is not None
+                            else {},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            default=str,
+                        ).encode("utf-8")
+                    ).hexdigest(),
+                    completion_reason=(
+                        "clarification_required"
+                        if response.operation is not None
+                        and response.operation.kind == "clarification"
+                        else None
+                    ),
+                ).model_dump(mode="json"),
+            ),
+        )
         await self._publish_response(latest, response)
         if response.operation is not None and response.operation.kind == "clarification":
             clarified, transitioned = self.run_repository.mark_completed_if_current(
@@ -206,6 +274,24 @@ class AgentRunOrchestrator:
             },
         )
 
+        await self._publish_trace(
+            completed,
+            AgentTraceEvent(
+                kind="completion",
+                run_id=completed.run_id,
+                run_version=completed.active_run_version,
+                sequence=2,
+                payload={
+                    "completion_reason": "completed",
+                    "operation_status": response.operation.status
+                    if response.operation is not None
+                    else None,
+                    "model_calls": self._model_call_count(response),
+                    "tool_calls": len((response.tool_payload or {}).get("tool_calls", [])),
+                },
+            ),
+        )
+
     # -------------------------------------------------------------------------
     async def _publish_response(
         self, snapshot: AgentRunSnapshot, response: ChatTurnResponse
@@ -249,6 +335,46 @@ class AgentRunOrchestrator:
             type=RunEventType.CANCELLED,
             payload={"state": cancelled.state.value},
         )
+
+    async def _publish_trace(
+        self,
+        snapshot: AgentRunSnapshot,
+        trace: AgentTraceEvent,
+    ) -> None:
+        """Persist operational metadata without affecting user-visible events."""
+
+        try:
+            await self.event_publisher.publish(
+                conversation_id=snapshot.conversation_id,
+                run_id=snapshot.run_id,
+                run_version=snapshot.active_run_version,
+                type=(
+                    RunEventType.CHECKPOINT
+                    if trace.kind == "checkpoint"
+                    else RunEventType.TRACE
+                ),
+                visibility=RunEventVisibility.INTERNAL,
+                payload=trace.model_dump(mode="json"),
+            )
+        except Exception:
+            # Observability is best effort.  A storage hiccup must not turn a
+            # successful geospatial response into an agent failure.
+            return
+
+    @staticmethod
+    def _model_call_count(response: ChatTurnResponse) -> int:
+        payload = response.tool_payload or {}
+        iterations = payload.get("iterations")
+        return int(iterations) if isinstance(iterations, int) else 1
+
+    @staticmethod
+    def _safe_failure_message(exc: Exception) -> str:
+        text = str(exc).strip().lower()
+        if "credential" in text or "api key" in text or "authentication" in text:
+            return "The configured agent provider is not ready. Open Model Settings and configure its credential."
+        if "timeout" in text:
+            return "The configured agent provider timed out before the request could be completed."
+        return "The agent could not complete this request."
 
     # -------------------------------------------------------------------------
     @staticmethod

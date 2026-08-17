@@ -35,7 +35,12 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def _client(self) -> Any:
-        return OpenAI(api_key=self.api_key, base_url=self.base_url)
+        return OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=30.0,
+            max_retries=0,
+        )
 
     # -------------------------------------------------------------------------
     def list_models(self) -> list[ModelDescriptor]:

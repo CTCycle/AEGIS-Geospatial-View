@@ -117,6 +117,7 @@ class AgentTurnSupport:
         ambiguities = set(turn_contract.ambiguities or [])
         return (
             "parser_unavailable" in ambiguities
+            or "parser_timeout" in ambiguities
             or "parser_authentication_failed" in ambiguities
             or any(item.startswith("provider_") for item in ambiguities)
         )
