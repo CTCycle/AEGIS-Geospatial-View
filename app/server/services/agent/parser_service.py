@@ -57,8 +57,9 @@ class ParserService:
         return str(value)
 
     # -------------------------------------------------------------------------
+    @staticmethod
     def _normalize_recent_messages(
-        self, conversation_messages: list[dict[str, Any]]
+        conversation_messages: list[dict[str, Any]]
     ) -> list[dict[str, str]]:
         normalized: list[dict[str, str]] = []
         for item in conversation_messages[-8:]:
@@ -67,12 +68,12 @@ class ParserService:
                 continue
             normalized.append(
                 {
-                    "id": self._to_text(item.get("id")),
-                    "conversation_id": self._to_text(item.get("conversation_id")),
-                    "turn_index": self._to_text(item.get("turn_index")),
-                    "role": self._to_text(item.get("role")),
-                    "content": self._to_text(item.get("content")),
-                    "created_at": self._to_text(item.get("created_at")),
+                    "id": ParserService._to_text(item.get("id")),
+                    "conversation_id": ParserService._to_text(item.get("conversation_id")),
+                    "turn_index": ParserService._to_text(item.get("turn_index")),
+                    "role": ParserService._to_text(item.get("role")),
+                    "content": ParserService._to_text(item.get("content")),
+                    "created_at": ParserService._to_text(item.get("created_at")),
                 }
             )
         return normalized

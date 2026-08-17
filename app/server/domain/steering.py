@@ -100,6 +100,7 @@ class SteeringMessageResponse(BaseModel):
     state: AgentRunState
     duplicate: bool = False
     delta: SteeringDelta | None = None
+    state_delta_applied: bool = False
 
 ###############################################################################
 class SteeringMessageRecord(BaseModel):
@@ -110,4 +111,5 @@ class SteeringMessageRecord(BaseModel):
     run_version: int
     content: str
     client_mutation_id: str | None = None
+    state_delta_applied: bool = False
     created_at: datetime

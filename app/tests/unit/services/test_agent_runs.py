@@ -21,6 +21,7 @@ from server.services.agent_runs.events import RunEventPublisher
 from server.services.agent_runs.exceptions import RunConflictError
 from server.services.agent_runs.lifecycle import RunLifecycleService
 from server.services.agent_runs.steering import RunSteeringService
+from server.services.agent.conversation_state import ConversationTaskStateService
 
 ###############################################################################
 class _InMemoryBackend:
@@ -239,6 +240,78 @@ def test_steering_updates_same_run_and_is_idempotent(run_repositories) -> None:
     assert duplicate.steering_id == first.steering_id
     assert duplicate.run_version == 2
     assert duplicate.duplicate is True
+
+###############################################################################
+def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
+    lifecycle, _, publisher, _ = _services(run_repositories)
+    conversation = lifecycle.create_conversation(title="Zurich")
+    run = run_async_in_thread(
+        lifecycle.create_run(
+            conversation.conversation_id,
+            AgentRunCreateRequest(message="Find Zurich and show weather."),
+        )
+    )
+    conversations = run_repositories["conversations"]
+    initial = conversations.read_state(conversation.conversation_id)
+    conversations.write_state(
+        conversation.conversation_id,
+        expected_revision=initial["context_revision"],
+        task_snapshot={
+            "schema_version": 2,
+            "conversation_key": conversation.conversation_id,
+            "current_task_id": "task-1",
+            "goal": {"id": "task-1", "text": "Find Zurich"},
+            "tasks": [
+                {
+                    "id": "task-1",
+                    "description": "Find Zurich and show weather",
+                    "kind": "weather",
+                    "status": "completed",
+                    "depends_on": [],
+                    "required": True,
+                    "input_refs": [],
+                    "output_refs": ["weather-layer"],
+                    "attempt_count": 1,
+                    "last_failure": None,
+                    "scope_revision": 0,
+                }
+            ],
+            "geospatial_state": {
+                "layer_refs": ["weather-layer"],
+                "renderable_refs": ["weather-layer"],
+            },
+            "evidence_refs": ["weather-layer"],
+            "active_map_session": None,
+            "assumptions": [],
+            "unresolved_questions": [],
+            "conversation_summary": None,
+        },
+    )
+    steering = RunSteeringService(
+        run_repository=run_repositories["runs"],
+        steering_repository=run_repositories["steering"],
+        aggregation_service=AggregatedRequestService(),
+        event_publisher=publisher,
+        conversation_repository=conversations,
+        task_state_service=ConversationTaskStateService(),
+    )
+
+    response = run_async_in_thread(
+        steering.steer(
+            conversation.conversation_id,
+            run.run_id,
+            SteeringMessageRequest(message="Expand the area to 50 km."),
+        )
+    )
+
+    persisted = conversations.read_state(conversation.conversation_id)
+    snapshot = persisted["task_snapshot"]
+    assert response.state_delta_applied is True
+    assert snapshot["geospatial_state"]["geographic_scope"]["radius_m"] == 50_000
+    assert snapshot["tasks"][0]["status"] == "superseded"
+    assert snapshot["evidence_refs"] == []
+    assert snapshot["geospatial_state"]["renderable_refs"] == []
+    assert run_repositories["steering"].list_steering_messages(run.run_id)[0].state_delta_applied is True
 
 ###############################################################################
 def test_cancellation_is_terminal_and_blocks_later_steering(run_repositories) -> None:

@@ -92,6 +92,17 @@ class AgentSteeringRepository:
             return self._to_domain(record), run_version, aggregated_request
 
     # -------------------------------------------------------------------------
+    def mark_state_delta_applied(self, steering_id: str) -> SteeringMessageRecord:
+        with self._session_factory() as session:
+            record = session.get(AgentSteeringMessageRecord, steering_id)
+            if record is None:
+                raise ValueError("Steering message not found.")
+            record.state_delta_applied = True
+            session.commit()
+            session.refresh(record)
+            return self._to_domain(record)
+
+    # -------------------------------------------------------------------------
     def list_steering_messages(self, run_id: str) -> list[SteeringMessageRecord]:
         with self._session_factory() as session:
             rows = session.execute(
@@ -125,5 +136,6 @@ class AgentSteeringRepository:
             run_version=record.run_version,
             content=record.content,
             client_mutation_id=record.client_mutation_id,
+            state_delta_applied=record.state_delta_applied,
             created_at=record.created_at,
         )

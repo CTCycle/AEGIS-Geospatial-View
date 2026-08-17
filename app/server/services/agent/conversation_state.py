@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from server.common.time import utc_now
 from server.domain.agent.pipeline import (
@@ -17,8 +17,10 @@ from server.domain.agent.pipeline import (
 from server.domain.agent.runtime import (
     AgentGoal,
     AgentTask,
+    AgentTaskStatus,
     AgentThreadState,
     GeospatialWorkingState,
+    apply_steering_delta as apply_runtime_steering_delta,
     validate_task_graph,
 )
 from server.domain.extraction.models import TurnParseResult
@@ -57,6 +59,23 @@ class ConversationTaskStateService:
                 unresolved_questions=list(runtime.unresolved_questions),
                 conversation_summary=runtime.conversation_summary,
             )
+
+    # -------------------------------------------------------------------------
+    def has_state(self, conversation_key: str) -> bool:
+        with self._lock:
+            state = self._states.get(conversation_key)
+            return state is not None and state.runtime_state is not None
+
+    # -------------------------------------------------------------------------
+    def apply_steering_delta(self, conversation_key: str, delta: Any) -> ConversationTaskSnapshot:
+        """Apply a safe steering mutation to the live v2 state in place."""
+
+        with self._lock:
+            state = self._get_state(conversation_key)
+            runtime = self._runtime_state(state, conversation_key)
+            apply_runtime_steering_delta(runtime, delta)
+            state.updated_at = utc_now()
+            return self.snapshot(conversation_key)
 
     # -------------------------------------------------------------------------
     def start_task(
@@ -114,7 +133,7 @@ class ConversationTaskStateService:
                 text=task.normalized_description or task.raw_user_text,
                 revision=runtime.revision,
             )
-            atomic_items = [item for item in turn.atomic_tasks if isinstance(item, dict)]
+            atomic_items = list(turn.atomic_tasks)
             planned_tasks: list[AgentTask] = []
             if atomic_items:
                 generated_ids: list[str] = []
@@ -200,10 +219,14 @@ class ConversationTaskStateService:
             runtime = self._runtime_state(state, conversation_key)
             runtime_task = next((item for item in runtime.tasks if item.id == task_id), None)
             if runtime_task is not None:
-                runtime_task.status = {
+                runtime_status = cast(
+                    AgentTaskStatus,
+                    {
                     "routed": "pending",
                     "needs_clarification": "blocked",
-                }.get(status, status)
+                    }.get(status, status),
+                )
+                runtime_task.status = runtime_status
                 runtime_task.attempt_count = max(runtime_task.attempt_count, 1 if status == "in_progress" else 0)
                 if failure is not None:
                     runtime_task.last_failure = failure.model_dump(mode="json")
