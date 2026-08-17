@@ -65,7 +65,7 @@ class AgentTurnStateAssembler:
             raise ValueError("Partial clarification requires a validated clarification plan.")
         previous_raw = self.task_state_service.snapshot(
             conversation_key
-        ).active_visualization
+        ).active_map_session
         map_session: MapSession | None = None
         removed_layers: list[str] = []
         visualization_changes = task.visualization_changes

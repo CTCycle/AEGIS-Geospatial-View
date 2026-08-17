@@ -26,6 +26,8 @@ const RUN_EVENT_TYPES: readonly RunEventType[] = [
   'completed',
   'cancelled',
   'clarification_needed',
+  'trace',
+  'checkpoint',
 ];
 
 const RUN_EVENT_VISIBILITIES: readonly RunEventVisibility[] = ['user', 'internal'];
@@ -50,13 +52,7 @@ const POLICY_PLAN_STATES: readonly PolicyDecision['plan']['state'][] = [
   'reject',
 ];
 const TASK_STATUSES: readonly ConversationTaskSnapshot['tasks'][number]['status'][] = [
-  'pending',
-  'needs_clarification',
-  'routed',
-  'in_progress',
-  'completed',
-  'failed',
-  'skipped',
+  'pending', 'in_progress', 'completed', 'failed', 'blocked', 'skipped', 'superseded',
 ];
 
 export interface ParsedRunCompletionPayload {
@@ -257,61 +253,17 @@ const parsePolicyDecision = (value: unknown): PolicyDecision | undefined => {
   return decision;
 };
 
-const parseTaskFailure = (value: unknown): NonNullable<ConversationTaskSnapshot['tasks'][number]['failure']> | undefined => {
-  if (!isJsonObject(value)) {
-    return undefined;
-  }
-
-  const stage = value['stage'];
-  const sanitizedError = value['sanitized_error'];
-  const missingInput = value['missing_input'];
-  const partialResultsAvailable = value['partial_results_available'];
-  const userExplanation = value['user_explanation'];
-  if (
-    !isNonEmptyString(stage) ||
-    !isNonEmptyString(sanitizedError) ||
-    !isStringArray(missingInput) ||
-    typeof partialResultsAvailable !== 'boolean' ||
-    !isNonEmptyString(userExplanation)
-  ) {
-    return undefined;
-  }
-
-  const failure: NonNullable<ConversationTaskSnapshot['tasks'][number]['failure']> = {
-    stage,
-    sanitized_error: sanitizedError,
-    missing_input: missingInput,
-    partial_results_available: partialResultsAvailable,
-    user_explanation: userExplanation,
-  };
-
-  if (value['component'] === null || isNonEmptyString(value['component'])) {
-    failure.component = value['component'];
-  }
-  if (value['tool_name'] === null || isNonEmptyString(value['tool_name'])) {
-    failure.tool_name = value['tool_name'];
-  }
-  if (value['unsupported_capability'] === null || isNonEmptyString(value['unsupported_capability'])) {
-    failure.unsupported_capability = value['unsupported_capability'];
-  }
-  if (value['recovery_suggestion'] === null || isNonEmptyString(value['recovery_suggestion'])) {
-    failure.recovery_suggestion = value['recovery_suggestion'];
-  }
-  if (value['provider_error'] === null) {
-    failure.provider_error = null;
-  } else if (hasOwn(value, 'provider_error')) {
-    const providerError = parseProviderError(value['provider_error']);
-    if (!providerError) {
-      return undefined;
-    }
-    failure.provider_error = providerError;
-  }
-
-  return failure;
-};
-
 const parseTaskSnapshot = (value: unknown): ConversationTaskSnapshot | undefined => {
-  if (!isJsonObject(value) || !isNonEmptyString(value['conversation_key']) || !Array.isArray(value['tasks'])) {
+  if (
+    !isJsonObject(value) ||
+    value['schema_version'] !== 2 ||
+    !isNonEmptyString(value['conversation_key']) ||
+    !Array.isArray(value['tasks']) ||
+    !isJsonObject(value['geospatial_state']) ||
+    !isStringArray(value['evidence_refs']) ||
+    !isStringArray(value['assumptions']) ||
+    !isStringArray(value['unresolved_questions'])
+  ) {
     return undefined;
   }
 
@@ -321,76 +273,68 @@ const parseTaskSnapshot = (value: unknown): ConversationTaskSnapshot | undefined
       return undefined;
     }
 
-    const requiredEntities = item['required_entities'];
-    const requiredDataLayers = item['required_data_layers'];
-    const visualizationChanges = item['visualization_changes'];
     if (
-      !isNonEmptyString(item['task_id']) ||
-      !isNonEmptyString(item['raw_user_text']) ||
-      !isNonEmptyString(item['prompt_summary']) ||
-      !isNonEmptyString(item['normalized_description']) ||
-      !isNonEmptyString(item['task_type']) ||
-      !isNonEmptyString(item['intent']) ||
-      !isNonEmptyString(item['relationship']) ||
-      !isStringArray(requiredEntities) ||
-      !isStringArray(requiredDataLayers) ||
-      !isJsonObject(visualizationChanges) ||
-      !isNonEmptyString(item['specialist']) ||
+      !isNonEmptyString(item['id']) ||
+      !isNonEmptyString(item['description']) ||
+      !isNonEmptyString(item['kind']) ||
       !isTaskStatus(item['status']) ||
-      typeof item['is_current'] !== 'boolean'
+      !isStringArray(item['depends_on']) ||
+      typeof item['required'] !== 'boolean' ||
+      !isStringArray(item['input_refs']) ||
+      !isStringArray(item['output_refs']) ||
+      !isFiniteInteger(item['attempt_count']) ||
+      !isFiniteInteger(item['scope_revision'])
     ) {
       return undefined;
     }
 
     const task: ConversationTaskSnapshot['tasks'][number] = {
-      task_id: item['task_id'],
-      raw_user_text: item['raw_user_text'],
-      prompt_summary: item['prompt_summary'],
-      normalized_description: item['normalized_description'],
-      task_type: item['task_type'],
-      intent: item['intent'],
-      relationship: item['relationship'],
-      required_entities: requiredEntities,
-      required_data_layers: requiredDataLayers,
-      visualization_changes: visualizationChanges,
-      specialist: item['specialist'],
+      id: item['id'],
+      description: item['description'],
+      kind: item['kind'],
       status: item['status'],
-      is_current: item['is_current'],
+      depends_on: item['depends_on'],
+      required: item['required'],
+      input_refs: item['input_refs'],
+      output_refs: item['output_refs'],
+      attempt_count: item['attempt_count'],
+      scope_revision: item['scope_revision'],
     };
-
-    if (item['parent_task_id'] === null || isNonEmptyString(item['parent_task_id'])) {
-      task.parent_task_id = item['parent_task_id'];
-    }
-    if (item['blocking_ambiguity'] === null || isNonEmptyString(item['blocking_ambiguity'])) {
-      task.blocking_ambiguity = item['blocking_ambiguity'];
-    }
-    if (item['progress_summary'] === null || isNonEmptyString(item['progress_summary'])) {
-      task.progress_summary = item['progress_summary'];
-    }
-    if (item['failure'] === null) {
-      task.failure = null;
-    } else if (hasOwn(item, 'failure')) {
-      const failure = parseTaskFailure(item['failure']);
-      if (!failure) {
+    if (item['last_failure'] === null) {
+      task.last_failure = null;
+    } else if (hasOwn(item, 'last_failure')) {
+      if (!isJsonObject(item['last_failure'])) {
         return undefined;
       }
-      task.failure = failure;
+      task.last_failure = item['last_failure'];
     }
 
     tasks.push(task);
   }
 
   const snapshot: ConversationTaskSnapshot = {
+    schema_version: 2,
     conversation_key: value['conversation_key'],
     tasks,
+    geospatial_state: value['geospatial_state'],
+    evidence_refs: value['evidence_refs'],
+    assumptions: value['assumptions'],
+    unresolved_questions: value['unresolved_questions'],
   };
 
   if (value['current_task_id'] === null || isNonEmptyString(value['current_task_id'])) {
     snapshot.current_task_id = value['current_task_id'];
   }
 
-  if (value['active_visualization'] === null || isJsonObject(value['active_visualization'])) {
-    snapshot.active_visualization = value['active_visualization'];
+  if (value['active_map_session'] === null || isJsonObject(value['active_map_session'])) {
+    snapshot.active_map_session = value['active_map_session'];
+  }
+
+  if (value['goal'] === null || isJsonObject(value['goal'])) {
+    snapshot.goal = value['goal'] as ConversationTaskSnapshot['goal'];
+  }
+  if (value['conversation_summary'] === null || isJsonObject(value['conversation_summary'])) {
+    snapshot.conversation_summary = value['conversation_summary'];
   }
 
   return snapshot;

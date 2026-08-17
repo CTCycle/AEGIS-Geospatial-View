@@ -20,6 +20,8 @@ class RunEventType(StrEnum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     CLARIFICATION_NEEDED = "clarification_needed"
+    TRACE = "trace"
+    CHECKPOINT = "checkpoint"
 
 ###############################################################################
 class RunEventVisibility(StrEnum):

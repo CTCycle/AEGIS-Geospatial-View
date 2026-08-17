@@ -324,6 +324,89 @@ class ParserService:
         return False
 
     # -------------------------------------------------------------------------
+    @classmethod
+    def build_fallback_turn_result(
+        cls,
+        *,
+        user_message: str,
+        memory_snapshot: dict[str, Any],
+        conversation_messages: list[dict[str, Any]],
+        provider_error: dict[str, Any],
+    ) -> TurnParseResult:
+        """Build a bounded deterministic parse when the model exceeds its budget."""
+
+        extracted = cls._apply_domain_rules(
+            user_message,
+            cls._fallback_extraction(user_message),
+            memory_snapshot,
+        )
+        normalized_recent = cls._normalize_recent_messages(conversation_messages)
+        locations = [
+            LocationSignal(
+                signal_type=item.signal_type,
+                raw_value=item.raw_value,
+                normalized_value=item.normalized_value or item.raw_value,
+                latitude=item.latitude,
+                longitude=item.longitude,
+                confidence=item.confidence,
+                source="text",
+            )
+            for item in extracted.location_signals
+            if item.raw_value.strip()
+        ]
+        ambiguities = cls._dedupe([*extracted.ambiguities, "parser_timeout"])
+        return TurnParseResult(
+            user_text=user_message,
+            conversation_context=ConversationContextSnapshot(
+                recent_messages=normalized_recent,
+                memory_snapshot=memory_snapshot,
+            ),
+            task_class=extracted.task_class,
+            location_signals=locations,
+            normalized_action=NormalizedAction(
+                action_id=cls._normalize_action_id(extracted.action_id, extracted.parser_confidence),
+                action_label=extracted.action_label.strip() or "General map request",
+                task_tags=list(extracted.task_tags),
+                action_tags=list(extracted.action_tags),
+                requested_visualizations=list(extracted.requested_visualizations),
+                requires_location=extracted.requires_location,
+            ),
+            temporal_signal=TemporalSignal(
+                mode=extracted.temporal_signal.mode,
+                raw_text=extracted.temporal_signal.raw_text,
+                reference_time_iso=extracted.temporal_signal.reference_time_iso,
+            ),
+            ambiguities=ambiguities,
+            parser_confidence=min(0.35, extracted.parser_confidence),
+            relationship=extracted.relationship,
+            map_target=extracted.map_target,
+            entity_target=extracted.entity_target,
+            requested_layers=cls._dedupe(extracted.requested_layers),
+            poi_categories=list(dict.fromkeys(extracted.poi_categories)),
+            requested_basemap=extracted.requested_basemap,
+            requested_attributes=cls._dedupe(extracted.requested_attributes),
+            required_data_sources=cls._dedupe(extracted.required_data_sources),
+            required_tool_category=extracted.required_tool_category,
+            tools_needed=extracted.tools_needed,
+            direct_response_sufficient=extracted.direct_response_sufficient,
+            requires_reparse=False,
+            capability_limitations=cls._dedupe(extracted.capability_limitations),
+            expected_frontend_update=extracted.expected_frontend_update,
+            atomic_tasks=[item.model_dump(mode="json") for item in extracted.atomic_tasks],
+            clarification_plan=(
+                extracted.clarification_plan.model_dump(mode="json")
+                if extracted.clarification_plan is not None
+                else None
+            ),
+            viewport_intent=(
+                ViewportIntent.model_validate(extracted.viewport_intent.model_dump(mode="json"))
+                if extracted.viewport_intent is not None
+                else None
+            ),
+            provider_error=provider_error,
+        )
+
+    # -------------------------------------------------------------------------
     def parse_turn(
         self,
         user_message: str,

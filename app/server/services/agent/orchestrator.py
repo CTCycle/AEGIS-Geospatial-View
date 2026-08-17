@@ -3,6 +3,7 @@ from __future__ import annotations
 from server.common.typing import is_json_object, json_array, json_object
 
 from collections.abc import Callable
+import asyncio
 from typing import Any
 from uuid import uuid4
 
@@ -238,7 +239,7 @@ class AgentOrchestrator:
         state_before = self.task_state_service.snapshot(conversation_key)
         latest_memory = self.turn_history_service.merge_conversation_state_memory(
             latest_memory,
-            state_before.active_visualization,
+            state_before.active_map_session,
         )
 
         settings = self.settings_repo.get_or_create()
@@ -273,7 +274,30 @@ class AgentOrchestrator:
             )
         ]
         parser_kwargs["task_snapshot"] = state_before.model_dump(mode="json")
-        turn_contract = self.parser_service.parse_turn(**parser_kwargs)
+        try:
+            turn_contract = await asyncio.wait_for(
+                asyncio.to_thread(self.parser_service.parse_turn, **parser_kwargs),
+                timeout=35.0,
+            )
+        except asyncio.TimeoutError:
+            LOGGER.warning(
+                "parser_budget_exhausted request_id=%s provider=%s model=%s",
+                request_id,
+                settings.agent_model_provider,
+                settings.agent_model_name,
+            )
+            turn_contract = self.parser_service.build_fallback_turn_result(
+                user_message=payload.message,
+                memory_snapshot=latest_memory,
+                conversation_messages=recent_messages,
+                provider_error={
+                    "code": "parser_timeout",
+                    "provider": settings.agent_model_provider,
+                    "model": settings.agent_model_name,
+                    "stage": "structured_intent_extraction",
+                    "retryable": True,
+                },
+            )
         turn_contract = self.turn_history_service.merge_memory_location_signals(
             turn_contract=turn_contract,
             latest_memory=latest_memory,
@@ -423,6 +447,13 @@ class AgentOrchestrator:
                     if step.capability_id is not None
                 ],
                 "specialist": specialist,
+                "complexity": (
+                    "simple"
+                    if not turn_contract.atomic_tasks
+                    and len(tool_plan.steps) <= 1
+                    and not turn_contract.required_data_sources
+                    else "complex"
+                ),
             },
         )
         deterministic_tools_available = (
@@ -459,8 +490,6 @@ class AgentOrchestrator:
             )
             else self.tool_registry.list_native_tools()
         )
-        if not native_tools:
-            native_tools = self.tool_registry.list_native_tools()
         tool_loop_result = await self.native_tool_loop.run(
             AgentToolLoopRequest(
                 provider=settings.agent_model_provider,

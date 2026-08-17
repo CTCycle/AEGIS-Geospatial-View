@@ -5,6 +5,7 @@ from typing import Any
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
 from server.services.llm.cloud_catalog import get_model_context_profile
 from server.services.llm.context_budget import estimate_json_tokens
+from server.domain.agent.runtime import compact_task_context
 
 ###############################################################################
 class AgentContextAssembler:
@@ -29,7 +30,7 @@ class AgentContextAssembler:
         mandatory = {
             "current_user_message": current_user_message,
             "active_instructions": [item.model_dump(mode="json") for item in directives],
-            "task_state": task_state,
+            "task_state": compact_task_context(task_state),
             "map_memory": map_memory,
         }
         mandatory_tokens = estimate_json_tokens(mandatory)
@@ -76,7 +77,7 @@ class AgentContextAssembler:
         return AgentContextPackage(
             current_user_message=current_user_message,
             active_instructions=directives,
-            task_state=task_state,
+            task_state=compact_task_context(task_state),
             map_memory=map_memory,
             conversation_summary=summary,
             recent_messages=included,

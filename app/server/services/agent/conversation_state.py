@@ -14,6 +14,13 @@ from server.domain.agent.pipeline import (
     TaskFailureDetail,
     TaskStatus,
 )
+from server.domain.agent.runtime import (
+    AgentGoal,
+    AgentTask,
+    AgentThreadState,
+    GeospatialWorkingState,
+    validate_task_graph,
+)
 from server.domain.extraction.models import TurnParseResult
 from server.domain.geographics import MapSession
 
@@ -22,7 +29,7 @@ from server.domain.geographics import MapSession
 class _ConversationState:
     sequence: int = 0
     tasks: list[ConversationTaskRecord] = field(default_factory=lambda: list[ConversationTaskRecord]())
-    active_visualization: dict[str, Any] | None = None
+    runtime_state: AgentThreadState | None = None
     updated_at: datetime = field(default_factory=utc_now)
 
 ###############################################################################
@@ -38,12 +45,17 @@ class ConversationTaskStateService:
     def snapshot(self, conversation_key: str) -> ConversationTaskSnapshot:
         with self._lock:
             state = self._get_state(conversation_key)
-            current = next((task for task in reversed(state.tasks) if task.is_current), None)
             return ConversationTaskSnapshot(
                 conversation_key=conversation_key,
-                current_task_id=current.task_id if current else None,
-                tasks=list(state.tasks),
-                active_visualization=state.active_visualization,
+                current_task_id=runtime.active_task_id if (runtime := self._runtime_state(state, conversation_key)) else None,
+                goal=runtime.goal,
+                tasks=[task.model_copy(deep=True) for task in runtime.tasks],
+                geospatial_state=runtime.geospatial_state.model_copy(deep=True),
+                evidence_refs=list(runtime.evidence_refs),
+                active_map_session=runtime.active_map_session,
+                assumptions=list(runtime.assumptions),
+                unresolved_questions=list(runtime.unresolved_questions),
+                conversation_summary=runtime.conversation_summary,
             )
 
     # -------------------------------------------------------------------------
@@ -55,6 +67,18 @@ class ConversationTaskStateService:
     ) -> ConversationTaskRecord:
         with self._lock:
             state = self._get_state(conversation_key)
+            runtime = self._runtime_state(state, conversation_key)
+            state.sequence = max(
+                state.sequence,
+                max(
+                    (
+                        int(item.id.removeprefix("task-"))
+                        for item in runtime.tasks
+                        if item.id.removeprefix("task-").isdigit()
+                    ),
+                    default=0,
+                ),
+            )
             parent = next((task for task in reversed(state.tasks) if task.is_current), None)
             for task in state.tasks:
                 task.is_current = False
@@ -83,6 +107,68 @@ class ConversationTaskStateService:
                 ),
             )
             state.tasks.append(task)
+            runtime.revision += 1
+            runtime.active_task_id = task.task_id
+            runtime.goal = AgentGoal(
+                id=task.task_id,
+                text=task.normalized_description or task.raw_user_text,
+                revision=runtime.revision,
+            )
+            atomic_items = [item for item in turn.atomic_tasks if isinstance(item, dict)]
+            planned_tasks: list[AgentTask] = []
+            if atomic_items:
+                generated_ids: list[str] = []
+                for index, item in enumerate(atomic_items, start=1):
+                    raw_id = str(item.get("id") or "").strip()
+                    generated_id = task.task_id if index == 1 else f"{task.task_id}-a{index}"
+                    generated_ids.append(raw_id or generated_id)
+                for index, item in enumerate(atomic_items, start=1):
+                    raw_id = str(item.get("id") or "").strip()
+                    item_id = task.task_id if index == 1 else f"{task.task_id}-a{index}"
+                    dependencies: list[str] = []
+                    for dependency in item.get("depends_on", []):
+                        dependency_text = str(dependency)
+                        if dependency_text.isdigit():
+                            dependency_index = int(dependency_text) - 1
+                            if 0 <= dependency_index < len(generated_ids):
+                                dependencies.append(
+                                    task.task_id
+                                    if dependency_index == 0
+                                    else f"{task.task_id}-a{dependency_index + 1}"
+                                )
+                        elif dependency_text in generated_ids:
+                            dependencies.append(
+                                task.task_id
+                                if generated_ids.index(dependency_text) == 0
+                                else f"{task.task_id}-a{generated_ids.index(dependency_text) + 1}"
+                            )
+                    planned_tasks.append(
+                        AgentTask(
+                            id=item_id,
+                            description=str(
+                                item.get("description")
+                                or item.get("task")
+                                or task.normalized_description
+                                or task.raw_user_text
+                            ),
+                            kind=str(item.get("kind") or task.task_type),
+                            depends_on=dependencies,
+                            required=bool(item.get("required", True)),
+                            scope_revision=runtime.revision,
+                        )
+                    )
+            else:
+                planned_tasks.append(
+                    AgentTask(
+                        id=task.task_id,
+                        description=task.normalized_description or task.raw_user_text,
+                        kind=task.task_type,
+                        required=True,
+                        scope_revision=runtime.revision,
+                    )
+                )
+            runtime.tasks.extend(planned_tasks)
+            validate_task_graph(runtime.tasks)
             state.updated_at = utc_now()
             return task
 
@@ -111,6 +197,17 @@ class ConversationTaskStateService:
             if tool_result_refs is not None:
                 task.tool_result_refs = list(tool_result_refs)
             task.updated_at = utc_now()
+            runtime = self._runtime_state(state, conversation_key)
+            runtime_task = next((item for item in runtime.tasks if item.id == task_id), None)
+            if runtime_task is not None:
+                runtime_task.status = {
+                    "routed": "pending",
+                    "needs_clarification": "blocked",
+                }.get(status, status)
+                runtime_task.attempt_count = max(runtime_task.attempt_count, 1 if status == "in_progress" else 0)
+                if failure is not None:
+                    runtime_task.last_failure = failure.model_dump(mode="json")
+            runtime.revision += 1
             state.updated_at = utc_now()
             return task
 
@@ -124,7 +221,12 @@ class ConversationTaskStateService:
             return
         with self._lock:
             state = self._get_state(conversation_key)
-            state.active_visualization = map_session.model_dump(mode="json")
+            runtime = self._runtime_state(state, conversation_key)
+            runtime.active_map_session = map_session.model_dump(mode="json")
+            runtime.geospatial_state.renderable_refs = [
+                str(map_session.session_id)
+            ] if getattr(map_session, "session_id", None) else runtime.geospatial_state.renderable_refs
+            runtime.revision += 1
             state.updated_at = utc_now()
 
     # -------------------------------------------------------------------------
@@ -146,25 +248,40 @@ class ConversationTaskStateService:
     def hydrate(self, conversation_key: str, payload: dict[str, Any] | None) -> None:
         if not payload:
             return
+        if payload.get("schema_version") != 2:
+            raise ValueError("Only task snapshot schema_version=2 is supported.")
         snapshot = ConversationTaskSnapshot.model_validate(payload)
+        validate_task_graph(snapshot.tasks)
         with self._lock:
-            sequence = max(
-                (
-                    int(task.task_id.removeprefix("task-"))
-                    for task in snapshot.tasks
-                    if task.task_id.removeprefix("task-").isdigit()
-                ),
-                default=0,
-            )
             self._states[conversation_key] = _ConversationState(
-                sequence=sequence,
-                tasks=[task.model_copy(deep=True) for task in snapshot.tasks],
-                active_visualization=snapshot.active_visualization,
+                runtime_state=AgentThreadState(
+                    conversation_id=conversation_key,
+                    revision=0,
+                    active_task_id=snapshot.current_task_id,
+                    goal=snapshot.goal,
+                    tasks=[task.model_copy(deep=True) for task in snapshot.tasks],
+                    geospatial_state=snapshot.geospatial_state.model_copy(deep=True),
+                    evidence_refs=list(snapshot.evidence_refs),
+                    active_map_session=snapshot.active_map_session,
+                    assumptions=list(snapshot.assumptions),
+                    unresolved_questions=list(snapshot.unresolved_questions),
+                    conversation_summary=snapshot.conversation_summary,
+                ),
             )
 
     # -------------------------------------------------------------------------
     def serialize(self, conversation_key: str) -> dict[str, Any]:
         return self.snapshot(conversation_key).model_dump(mode="json")
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _runtime_state(state: _ConversationState, conversation_key: str) -> AgentThreadState:
+        if state.runtime_state is None:
+            state.runtime_state = AgentThreadState(
+                conversation_id=conversation_key,
+                geospatial_state=GeospatialWorkingState(),
+            )
+        return state.runtime_state
 
     # -------------------------------------------------------------------------
     def _get_state(self, conversation_key: str) -> _ConversationState:

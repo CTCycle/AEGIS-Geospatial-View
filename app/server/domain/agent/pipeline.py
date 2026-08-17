@@ -6,6 +6,11 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.common.time import utc_now
+from server.domain.agent.runtime import (
+    AgentGoal,
+    AgentTask,
+    GeospatialWorkingState,
+)
 
 TaskRelationship = Literal[
     "new_task",
@@ -131,6 +136,7 @@ class ToolResultProvenance(BaseModel):
     provider: str | None = None
     attempt: int = 1
     elapsed_ms: int = 0
+    call_fingerprint: str | None = None
 
 ###############################################################################
 class PlannedToolResult(BaseModel):
@@ -157,7 +163,14 @@ class VisualizationUpdate(BaseModel):
 class ConversationTaskSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    schema_version: Literal[2] = 2
     conversation_key: str
     current_task_id: str | None = None
-    tasks: list[ConversationTaskRecord] = Field(default_factory=lambda: list[ConversationTaskRecord]())
-    active_visualization: dict[str, Any] | None = None
+    goal: AgentGoal | None = None
+    tasks: list[AgentTask] = Field(default_factory=list)
+    geospatial_state: GeospatialWorkingState = Field(default_factory=GeospatialWorkingState)
+    evidence_refs: list[str] = Field(default_factory=list)
+    active_map_session: dict[str, Any] | None = None
+    assumptions: list[str] = Field(default_factory=list)
+    unresolved_questions: list[str] = Field(default_factory=list)
+    conversation_summary: dict[str, Any] | None = None

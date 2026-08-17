@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from server.domain.agent_runs import TERMINAL_RUN_STATES
 from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
-from server.domain.steering import SteeringMessageRequest, SteeringMessageResponse
+from server.domain.steering import (
+    SteeringMessageRequest,
+    SteeringMessageResponse,
+    classify_steering_delta,
+)
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.services.agent_runs.aggregation import AggregatedRequestService
@@ -37,6 +41,7 @@ class RunSteeringService:
         run_version = 0
         aggregate = ""
         updated = None
+        delta = classify_steering_delta(payload.message)
         for _attempt in range(3):
             snapshot = self.run_repository.get_run(run_id)
             if snapshot is None or snapshot.conversation_id != conversation_id:
@@ -59,6 +64,7 @@ class RunSteeringService:
                     aggregated_request=snapshot.aggregated_request,
                     state=snapshot.state,
                     duplicate=True,
+                    delta=delta,
                 )
             next_version = snapshot.active_run_version + 1
             messages = [
@@ -101,6 +107,7 @@ class RunSteeringService:
                 "label": RUN_PROGRESS_LABELS[RunProgressStage.REQUEST_UPDATED],
                 "steering_id": steering.steering_id,
                 "aggregated_request": aggregate,
+                "delta": delta.model_dump(mode="json"),
             },
         )
         return SteeringMessageResponse(
@@ -111,4 +118,5 @@ class RunSteeringService:
             aggregated_request=aggregate,
             state=updated.state,
             duplicate=False,
+            delta=delta,
         )
