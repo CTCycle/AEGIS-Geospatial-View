@@ -1,6 +1,6 @@
 # Cross-Language Rules
 
-Last updated: 2026-08-02
+Last updated: 2026-08-18
 
 ## Shared Rules
 
@@ -15,3 +15,12 @@ Last updated: 2026-08-02
 - Treat provider and visualization warnings as first-class response data. Do
   not infer success from a non-empty trace, an HTTP 200 wrapper, or a failed
   upstream request.
+
+## OpenAPI Contract
+
+- `app/shared/openapi.json` is generated from `server.app:app` and is the
+  shared backend/frontend API contract.
+- Regenerate it with `python app/scripts/generate_openapi.py` after changing
+  an API route or Pydantic contract.
+- Keep the generated file synchronized with the runtime schema; do not edit it
+  manually.

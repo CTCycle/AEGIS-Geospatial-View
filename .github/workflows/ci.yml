@@ -31,7 +31,12 @@ jobs:
 
       - name: Run backend unit suites
         run: |
-          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
+          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_openapi_schema.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
+
+      - name: Verify shared OpenAPI schema
+        run: |
+          python app/scripts/generate_openapi.py --app server.app:app --output app/shared/openapi.json
+          git diff --exit-code -- app/shared/openapi.json
 
   persistence-conformance:
     runs-on: ubuntu-latest
