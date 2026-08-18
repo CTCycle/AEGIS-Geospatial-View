@@ -21,6 +21,7 @@ SteeringDeltaKind = Literal[
 ]
 
 
+###############################################################################
 class SteeringDelta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -31,6 +32,7 @@ class SteeringDelta(BaseModel):
     invalidates_scope_dependent_evidence: bool = False
 
 
+###############################################################################
 def classify_steering_delta(message: str) -> SteeringDelta:
     normalized = message.strip()
     lowered = normalized.lower()

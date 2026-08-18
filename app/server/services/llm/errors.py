@@ -57,6 +57,7 @@ class LLMProviderRequestError(RuntimeError):
             retryable=retryable,
         )
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _is_transient_connection_error(exc: Exception) -> bool:
         current: BaseException | None = exc

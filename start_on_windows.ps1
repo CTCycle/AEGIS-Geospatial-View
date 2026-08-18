@@ -159,7 +159,6 @@ function Import-EnvironmentFile {
         UI_PORT = '8001'
         RELOAD = 'false'
         BACKEND_LOGS_VISIBLE = 'true'
-        ALWAYS_REBUILD = 'true'
     }
     foreach ($entry in $defaults.GetEnumerator()) {
         [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
@@ -247,7 +246,7 @@ function Ensure-PortableRuntimes {
 
 function Sync-Dependencies {
     param(
-        [bool]$BuildFrontend = $true,
+        [bool]$BuildFrontend = $false,
         [ValidateSet('Standard', 'Development')]
         [string]$InstallationType = 'Standard'
     )
@@ -373,7 +372,7 @@ function Invoke-LaunchApplication {
     if (-not (Test-DependenciesReady)) {
         Write-Status STEP 'Required application environments are missing or unusable; installing dependencies.'
         Ensure-PortableRuntimes
-        Sync-Dependencies -BuildFrontend ($env:ALWAYS_REBUILD -ieq 'true') -InstallationType 'Standard'
+        Sync-Dependencies -BuildFrontend $false -InstallationType 'Standard'
     }
     else {
         Write-Status OK 'Application environments are ready; skipped dependency installation.'
@@ -452,7 +451,7 @@ function Invoke-InstallOrUpdate {
     Ensure-PortableRuntimes
     Write-Status OK 'Portable runtimes ready.'
     $installationType = Read-InstallationType
-    Sync-Dependencies -InstallationType $installationType
+    Sync-Dependencies -BuildFrontend $true -InstallationType $installationType
     if (Test-Path -LiteralPath $UvCacheDir) {
         Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
     }

@@ -14,6 +14,7 @@ if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
 
+###############################################################################
 def load_asgi_app(spec: str) -> FastAPI:
     module_name, separator, app_name = spec.partition(":")
     if not module_name or not separator or not app_name:
@@ -29,6 +30,7 @@ def load_asgi_app(spec: str) -> FastAPI:
     return application
 
 
+###############################################################################
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate OpenAPI JSON for a FastAPI app."

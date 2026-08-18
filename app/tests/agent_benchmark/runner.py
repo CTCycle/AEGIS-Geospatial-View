@@ -35,6 +35,7 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMToolDefinition
 
 
+###############################################################################
 def _json_response(response: httpx.Response) -> dict[str, Any]:
     try:
         payload = response.json()
@@ -43,27 +44,32 @@ def _json_response(response: httpx.Response) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {"value": payload}
 
 
+###############################################################################
 def _fingerprint(tool: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(tool, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
 
 
+###############################################################################
 def _response(trace: dict[str, Any]) -> dict[str, Any]:
     value = trace.get("response")
     return value if isinstance(value, dict) else {}
 
 
+###############################################################################
 def _contract(trace: dict[str, Any]) -> dict[str, Any]:
     value = _response(trace).get("turn_contract")
     return value if isinstance(value, dict) else {}
 
 
+###############################################################################
 def _map_session(trace: dict[str, Any]) -> dict[str, Any] | None:
     value = trace.get("map_session")
     return value if isinstance(value, dict) else None
 
 
+###############################################################################
 def _tool_calls(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         item
@@ -73,6 +79,7 @@ def _tool_calls(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+###############################################################################
 def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         item
@@ -82,6 +89,7 @@ def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+###############################################################################
 def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
     capability_ids: set[str] = set()
     for call in tool_calls:
@@ -94,6 +102,7 @@ def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
     return capability_ids
 
 
+###############################################################################
 def _map_has_location(map_session: dict[str, Any] | None) -> bool:
     if not isinstance(map_session, dict):
         return False
@@ -109,6 +118,7 @@ def _map_has_location(map_session: dict[str, Any] | None) -> bool:
     )
 
 
+###############################################################################
 def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
     overlays: set[str] = set()
     for trace in traces:
@@ -125,6 +135,7 @@ def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
     return overlays
 
 
+###############################################################################
 def _has_error(trace: dict[str, Any]) -> bool:
     if int(trace.get("status_code") or 0) >= 400:
         return True
@@ -137,11 +148,13 @@ def _has_error(trace: dict[str, Any]) -> bool:
     return False
 
 
+###############################################################################
 def _answer(trace: dict[str, Any]) -> str:
     value = _response(trace).get("assistant_message")
     return value if isinstance(value, str) else ""
 
 
+###############################################################################
 def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
     if not tool_calls:
         return False
@@ -172,10 +185,12 @@ def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
     )
 
 
+###############################################################################
 def _assertion_result(name: str, passed: bool, reason: str) -> dict[str, Any]:
     return {"name": name, "passed": passed, "reason": reason}
 
 
+###############################################################################
 def _evaluate_model_assertion(
     name: str,
     traces: list[dict[str, Any]],
@@ -363,6 +378,7 @@ def _evaluate_model_assertion(
     return _assertion_result(name, False, "No evaluator exists for this assertion.")
 
 
+###############################################################################
 def evaluate_model_scenario(
     scenario: dict[str, Any], traces: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -397,6 +413,7 @@ def evaluate_model_scenario(
     }
 
 
+###############################################################################
 def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     evaluations = [result.get("evaluation", {}) for result in results]
     assertion_results = [
@@ -449,11 +466,15 @@ def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 class _ScriptedToolRegistry:
+
+    # -------------------------------------------------------------------------
     def __init__(self, failure: str) -> None:
         self.failure = failure
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
+    # -------------------------------------------------------------------------
     async def execute_native_tool(
         self, name: str, arguments: dict[str, Any], context: AgentExecutionContext
     ) -> ToolExecutionEnvelope:
@@ -480,6 +501,7 @@ class _ScriptedToolRegistry:
         return ToolExecutionEnvelope(ok=True, data={"value": "scripted"})
 
 
+###############################################################################
 def _scripted_plan(failure: str) -> ToolPlan:
     if failure == "malformed_schema":
         steps = [
@@ -511,6 +533,7 @@ def _scripted_plan(failure: str) -> ToolPlan:
     return ToolPlan(tool_group="direct_chat", selected_tools=[step.tool_name for step in steps], steps=steps)
 
 
+###############################################################################
 def _run_scripted_plan(failure: str) -> tuple[list[Any], int]:
     if failure == "invalid_coordinates_bounds_temporal":
         registry = ToolRegistry(runtime_registry=object())
@@ -562,6 +585,7 @@ def _run_scripted_plan(failure: str) -> tuple[list[Any], int]:
     return results, len(registry.calls)
 
 
+###############################################################################
 def _run_scripted_fault_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
     scenario_id = str(scenario["id"])
     failure = str(scenario.get("failure") or "")
@@ -630,6 +654,7 @@ def _run_scripted_fault_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+###############################################################################
 def run_scripted_fault_lane(*, manifest_path: Path, output_dir: Path) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     scenarios = [item for item in manifest["scenarios"] if item.get("lane") == "scripted_fault"]
@@ -666,6 +691,7 @@ def run_scripted_fault_lane(*, manifest_path: Path, output_dir: Path) -> dict[st
     return bundle
 
 
+###############################################################################
 def run_manifest(
     *,
     manifest_path: Path,
@@ -760,6 +786,7 @@ def run_manifest(
     return bundle
 
 
+###############################################################################
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)

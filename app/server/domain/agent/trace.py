@@ -24,6 +24,7 @@ TraceKind = Literal[
 ]
 
 
+###############################################################################
 class AgentTraceEvent(BaseModel):
     """Operational trace metadata; never a chain-of-thought transcript."""
 
@@ -39,6 +40,7 @@ class AgentTraceEvent(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+###############################################################################
 class AgentCheckpoint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

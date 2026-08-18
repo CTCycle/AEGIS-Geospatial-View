@@ -19,7 +19,6 @@ Common keys include:
 - `BACKEND_LOGS_VISIBLE`
 - `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for
   non-browser clients)
-- `ALWAYS_REBUILD`
 - `EMBEDDED_DATABASE`
 - `DATABASE_URL`
 - `DATABASE_ENGINE`

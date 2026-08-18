@@ -234,6 +234,7 @@ class RequestBuilder:
         except Exception:
             return None
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _active_location_differs(
         location: ResolvedLocation,
