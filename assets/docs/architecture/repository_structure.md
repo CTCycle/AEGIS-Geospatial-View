@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-08-16
+Last updated: 2026-08-18
 
 ## Purpose
 
@@ -16,9 +16,13 @@ AEGIS Geospatial View/
         app/e2e/
       package.json
       proxy.conf.cjs
+    shared/
+      openapi.json
     resources/
       catalog/
     scripts/
+      generate_openapi.py
+      initialize_database.py
     server/
       api/
       common/
@@ -72,6 +76,18 @@ Key backend directories under `app/server`:
   Sole composition root. It constructs the database backend, initializes the
   schema, wires explicit repository/service dependencies, and owns lifecycle
   shutdown.
+
+## Shared Contracts
+
+`app/shared/openapi.json` is the checked-in OpenAPI contract exported from the
+runtime FastAPI application. Regenerate it from the repository root with:
+
+```powershell
+python app/scripts/generate_openapi.py
+```
+
+The unit contract test and CI diff check keep the shared file synchronized with
+the current backend routes and Pydantic response models.
 
 ## Frontend Areas
 
