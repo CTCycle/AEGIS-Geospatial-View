@@ -7,7 +7,7 @@ import pytest
 from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.services.agent.parser_service import ParserService
 from server.services.llm.prompts import PARSER_SYSTEM_PROMPT
-from server.services.llm.errors import LLMConfigurationError
+from server.services.llm.errors import LLMConfigurationError, LLMProviderRequestError
 
 ###############################################################################
 class _ProviderStub:
@@ -108,6 +108,33 @@ class _ConfigErrorFactoryStub:
         raise LLMConfigurationError("OpenAI credentials are saved but cannot be decrypted.")
 
 ###############################################################################
+class _RetryProviderStub(_ProviderStub):
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def structured_output(self, request, schema):  # noqa: ANN001
+        self.calls += 1
+        if self.calls == 1:
+            raise LLMProviderRequestError(
+                provider="opencode-go",
+                model="mimo-v2.5",
+                stage="structured_output",
+                code="provider_request_failed",
+                retryable=True,
+            )
+        return super().structured_output(request, schema)
+
+###############################################################################
+class _RetryFactoryStub:
+
+    def __init__(self) -> None:
+        self.provider = _RetryProviderStub()
+
+    def get_provider(self, provider: str):  # noqa: ARG002
+        return self.provider
+
+###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
     result = parser.parse_turn(
@@ -117,6 +144,25 @@ def test_parser_service_classifies_direct_query() -> None:
     )
     assert result.task_class == "direct_query"
     assert result.normalized_action.action_id == "geospatial_data_retrieval"
+
+###############################################################################
+def test_parser_service_retries_transient_provider_failure() -> None:
+    factory = _RetryFactoryStub()
+    parser = ParserService(
+        llm_factory=factory,
+        settings_repo=object(),
+        provider="opencode-go",
+        model="mimo-v2.5",
+    )
+
+    result = parser.parse_turn(
+        user_message="What is the difference between a layer and a basemap?",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert result.task_class == "general_question"
+    assert factory.provider.calls == 2
 
 ###############################################################################
 def test_parser_schema_accepts_poi_region_and_street_location_signals() -> None:
@@ -268,6 +314,33 @@ def test_parser_domain_rules_preserve_view_for_street_map_basemap_only_follow_up
     assert extracted.viewport_intent.scope == "preserve_current"
 
 ###############################################################################
+def test_parser_domain_rules_preserve_active_location_for_satellite_follow_up() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Switch to satellite imagery",
+        LLMParserExtraction(
+            location_signals=[
+                {
+                    "signal_type": "city",
+                    "raw_value": "Switch",
+                    "normalized_value": "Switch, Pennsylvania",
+                }
+            ]
+        ),
+        {
+            "active_visualization": {
+                "resolved_location": {"label": "Lugano"},
+            }
+        },
+    )
+
+    assert extracted.location_signals == []
+    assert extracted.map_target is None
+    assert extracted.relationship == "follow_up"
+    assert extracted.requested_basemap == "esri_world_imagery"
+    assert extracted.viewport_intent is not None
+    assert extracted.viewport_intent.scope == "preserve_current"
+
+###############################################################################
 def test_parser_domain_rules_select_openfreemap_styles() -> None:
     liberty = ParserService._apply_domain_rules(
         "Show a street map using OpenFreeMap Liberty",
@@ -282,6 +355,27 @@ def test_parser_domain_rules_select_openfreemap_styles() -> None:
 
     assert liberty.requested_basemap == "openfreemap_liberty"
     assert positron.requested_basemap == "openfreemap_positron"
+
+###############################################################################
+def test_parser_domain_rules_route_weather_addition_to_map_layer() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Add weather to the same map.",
+        LLMParserExtraction(
+            task_class="general_question",
+            requires_location=True,
+            requested_visualizations=["weather"],
+            ambiguities=["missing_location"],
+        ),
+        {"active_visualization": {"basemap_id": "osm_default"}},
+    )
+
+    assert extracted.task_class == "map_search"
+    assert extracted.requested_layers == ["openmeteo_weather_forecast"]
+    assert extracted.tools_needed is True
+    assert extracted.relationship == "follow_up"
+    assert "missing_location" not in extracted.ambiguities
+    assert extracted.viewport_intent is not None
+    assert extracted.viewport_intent.scope == "preserve_current"
 
 ###############################################################################
 def test_parser_domain_rules_infer_city_scale_viewport_intent() -> None:

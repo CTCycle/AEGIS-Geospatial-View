@@ -346,6 +346,7 @@ class AgentOrchestrator:
             if is_json_object(self.parser_service.last_context_usage)
             else None
         )
+        preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,
@@ -356,11 +357,15 @@ class AgentOrchestrator:
             latest_contract=latest_contract,
             recent_messages=recent_messages,
             context_usage=context_usage,
+            preflight_decision=preflight_decision,
         )
         if direct_response is not None:
             return direct_response
 
-        if turn_contract.clarification_plan is not None:
+        if (
+            turn_contract.clarification_plan is not None
+            and not turn_contract.requested_layers
+        ):
             return await self.turn_state_assembler.build_partial_clarification_response(
                 request_id=request_id,
                 conversation_id=conversation_id,
@@ -371,7 +376,6 @@ class AgentOrchestrator:
                 context_usage=context_usage,
             )
 
-        preflight_decision = self.policy_engine.evaluate_preflight(turn_contract)
         direct_response = await self.direct_turn_response_service.handle(
             request_id=request_id,
             conversation_id=conversation_id,

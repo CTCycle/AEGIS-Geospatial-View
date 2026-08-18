@@ -235,6 +235,23 @@ def test_get_settings_preserves_blank_agent_when_no_models_are_available() -> No
     assert settings_repo.last_update is None
 
 ###############################################################################
+def test_updating_only_credentials_is_allowed_before_first_agent_selection() -> None:
+    settings_repo = FakeSettingsRepository(
+        FakeSettingsRecord(agent_model_provider="", agent_model_name="")
+    )
+    credentials_repo = FakeCredentialsRepository()
+    service = build_service(settings_repo=settings_repo, credentials_repo=credentials_repo)
+
+    service.update_settings(
+        ModelSettingsUpdateRequest(credentials={"opencode-go": {"api_key": " secret "}})
+    )
+
+    assert credentials_repo.upserts == [("opencode-go", "api_key", "enc:secret", "v1")]
+    assert settings_repo.last_update is not None
+    assert settings_repo.last_update["agent_model_provider"] == ""
+    assert settings_repo.last_update["agent_model_name"] == ""
+
+###############################################################################
 def test_updating_only_credentials_preserves_selected_agent_and_base_urls() -> None:
     settings_repo = FakeSettingsRepository()
     credentials_repo = FakeCredentialsRepository()

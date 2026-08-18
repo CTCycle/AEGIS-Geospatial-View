@@ -5,7 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from server.common.paths import DATABASE_FILE_PATH, RUNTIME_DATA_PATH, resolve_database_file_path
+from server.common.paths import (
+    DATABASE_FILE_PATH,
+    RESOURCES_PATH,
+    RUNTIME_DATA_PATH,
+    resolve_database_file_path,
+    resolve_runtime_data_root,
+)
 from server.configurations import build_database_settings
 from server.configurations.environment import (
     ensure_environment_loaded,
@@ -136,6 +142,14 @@ def test_database_settings_ignores_json_database_keys(
 def test_database_path_defaults_to_runtime_data_root() -> None:
     assert DATABASE_FILE_PATH == RUNTIME_DATA_PATH / "database.db"
     assert resolve_database_file_path() == RUNTIME_DATA_PATH / "database.db"
+
+###############################################################################
+def test_default_runtime_data_root_is_resources_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AEGIS_RUNTIME_DATA_DIR", raising=False)
+
+    assert resolve_runtime_data_root() == RESOURCES_PATH / "runtime"
 
 ###############################################################################
 def test_configuration_manager_reads_database_settings_from_env_only(

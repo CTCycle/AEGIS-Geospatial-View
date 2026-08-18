@@ -126,6 +126,17 @@ class AgentTurnStateAssembler:
                     progress_summary="Partial follow-up map update failed.",
                 )
         question = str(clarification.get("question") or "Can you clarify the request?")
+        updated_memory = json_object(latest_memory)
+        resolved_for_memory = await self.policy_engine.location_resolver.resolve_location_signals(
+            turn_contract.location_signals,
+            updated_memory,
+        )
+        if isinstance(resolved_for_memory, ResolvedLocation):
+            updated_memory = self.location_memory_service.update_memory_snapshot(
+                updated_memory,
+                resolved_for_memory,
+                turn_contract.normalized_action,
+            )
         applied_change = (
             f"I applied the valid map change to {requested_basemap}. "
             if map_session is not None and requested_basemap
@@ -173,7 +184,8 @@ class AgentTurnStateAssembler:
             or str(clarification.get("reason") or "clarification_required"),
             progress_summary=assistant_message,
         )
-        self.task_state_service.set_active_visualization(conversation_key, map_session)
+        if map_session is not None:
+            self.task_state_service.set_active_visualization(conversation_key, map_session)
         visualization_update = VisualizationUpdate(
             basemap_replacement=(
                 str(requested_basemap)
@@ -191,7 +203,7 @@ class AgentTurnStateAssembler:
                 "turn_contract": turn_contract.model_dump(mode="json"),
                 "decision": decision.model_dump(mode="json"),
                 "operation": operation.model_dump(mode="json"),
-                "memory_snapshot": latest_memory,
+                "memory_snapshot": updated_memory,
                 "request_id": request_id,
             },
             map_session=map_session.model_dump(mode="json") if map_session else None,
@@ -204,7 +216,7 @@ class AgentTurnStateAssembler:
             decision=decision,
             operation=operation,
             map_session=map_session,
-            memory_snapshot=latest_memory,
+            memory_snapshot=updated_memory,
             context_usage=context_usage,
             task_snapshot=self.task_state_service.snapshot(conversation_key),
             visualization_update=visualization_update,
@@ -297,27 +309,45 @@ class AgentTurnStateAssembler:
         )
         if not isinstance(resolved_location, ResolvedLocation):
             return None
+        active_visualization = (
+            latest_memory.get("active_visualization")
+            if is_json_object(latest_memory)
+            else None
+        )
+        active_visualization_object = json_object(active_visualization)
+        active_overlay_ids = [
+            item
+            for item in json_array(active_visualization_object.get("overlay_ids"))
+            if isinstance(item, str)
+        ]
         inferred_overlay_ids = self.infer_overlay_ids(
             turn_contract=turn_contract,
             resolved_location=resolved_location,
-            existing_overlay_ids=list(capability_selection.get("overlay_ids") or []),
+            existing_overlay_ids=list(dict.fromkeys([
+                *active_overlay_ids,
+                *[
+                    item
+                    for item in capability_selection.get("overlay_ids") or []
+                    if isinstance(item, str)
+                ],
+            ])),
         )
         plan = ExecutionPlan(
             state="map_search",
             mode="map",
             action_id=turn_contract.normalized_action.action_id,
-            basemap_id=capability_selection.get("basemap_id"),
+            basemap_id=(
+                turn_contract.requested_basemap
+                or active_visualization_object.get("basemap_id")
+                or capability_selection.get("basemap_id")
+            ),
             overlay_ids=inferred_overlay_ids,
         )
         request = self.request_builder.build_location_search_request(
             plan,
             resolved_location,
             turn_contract=turn_contract,
-            active_visualization=(
-                latest_memory.get("active_visualization")
-                if is_json_object(latest_memory)
-                else None
-            ),
+            active_visualization=active_visualization,
         )
         return await self.search_orchestrator.execute(request)
 
@@ -429,8 +459,22 @@ class AgentTurnStateAssembler:
     ) -> MapSession | None:
         if not is_json_object(tool_payload):
             return None
-        overlay_ids: list[str] = []
-        basemap_id: str | None = None
+        active_visualization = (
+            latest_memory.get("active_visualization")
+            if is_json_object(latest_memory)
+            else None
+        )
+        active_visualization_object = json_object(active_visualization)
+        overlay_ids = [
+            item
+            for item in json_array(active_visualization_object.get("overlay_ids"))
+            if isinstance(item, str)
+        ]
+        basemap_id = (
+            str(active_visualization_object.get("basemap_id"))
+            if isinstance(active_visualization_object.get("basemap_id"), str)
+            else None
+        )
 
         for result in json_array(tool_payload.get("tool_results")):
             if not is_json_object(result):
@@ -488,9 +532,7 @@ class AgentTurnStateAssembler:
             resolved_location,
             turn_contract=turn_contract,
             active_visualization=(
-                latest_memory.get("active_visualization")
-                if is_json_object(latest_memory)
-                else None
+                active_visualization
             ),
         )
         return await self.search_orchestrator.execute(request)

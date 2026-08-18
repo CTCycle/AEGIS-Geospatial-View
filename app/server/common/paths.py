@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -24,12 +23,7 @@ def resolve_runtime_data_root() -> Path:
     if override:
         return Path(override).expanduser()
 
-    if os.name == "nt":
-        temp_dir = tempfile.gettempdir().strip()
-        if temp_dir:
-            return Path(temp_dir) / "AEGIS Geospatial View"
-
-    return ROOT_DIR / ".runtime"
+    return RESOURCES_PATH / "runtime"
 
 ###############################################################################
 def resolve_database_file_path() -> Path:

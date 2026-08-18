@@ -420,7 +420,7 @@ class ParserService:
         parser_failure_ambiguity: str | None = None
         parser_provider_error: dict[str, object] | None = None
         try:
-            extracted = self._extract_turn(
+            extracted = self._extract_turn_with_retry(
                 user_message=user_message,
                 memory_snapshot=memory_snapshot,
                 recent_messages=normalized_recent,
@@ -609,6 +609,21 @@ class ParserService:
         return result
 
     # -------------------------------------------------------------------------
+    def _extract_turn_with_retry(self, **kwargs: Any) -> LLMParserExtraction:
+        try:
+            return self._extract_turn(**kwargs)
+        except LLMProviderRequestError as exc:
+            if not exc.retryable:
+                raise
+            LOGGER.warning(
+                "Retrying transient parser provider failure provider=%s model=%s code=%s",
+                exc.provider,
+                exc.model,
+                exc.code,
+            )
+            return self._extract_turn(**kwargs)
+
+    # -------------------------------------------------------------------------
     @classmethod
     def _apply_domain_rules(
         cls,
@@ -757,6 +772,22 @@ class ParserService:
                     if layer.casefold().strip()
                     not in {"satellite", "satellite imagery", "imagery", "imagery layer"}
                 ]
+            if memory_snapshot.get("active_visualization") and not cls._has_explicit_location_context(text):
+                # A follow-up such as "Switch to satellite imagery" can be
+                # misread by the model or fallback parser as a place named
+                # "Switch". Keep the active map unless the user explicitly
+                # supplies a location in the same turn.
+                updates.update(
+                    location_signals=[],
+                    map_target=None,
+                    relationship="follow_up",
+                    expected_frontend_update="visualization_update",
+                )
+                if inferred_viewport is None:
+                    inferred_viewport = LLMViewportIntent(
+                        scope="preserve_current",
+                        reason="basemap_only_follow_up",
+                    )
         if any(
             marker in text
             for marker in (
@@ -811,6 +842,43 @@ class ParserService:
                 clarification_plan=None,
                 expected_frontend_update="visualization_update",
             )
+        if (
+            memory_snapshot.get("active_visualization")
+            and "weather" in text
+            and any(
+                marker in text
+                for marker in (
+                    "add weather",
+                    "weather layer",
+                    "weather overlay",
+                    "same map",
+                    "to the map",
+                )
+            )
+        ):
+            updates.update(
+                task_class="map_search",
+                action_id=AgentAction.OVERLAY_CONTROL.value,
+                action_label="Add weather forecast layer to the active map",
+                entity_target="weather",
+                requested_layers=["openmeteo_weather_forecast"],
+                required_tool_category="environmental_data",
+                tools_needed=True,
+                direct_response_sufficient=False,
+                clarification_plan=None,
+                ambiguities=[
+                    item
+                    for item in extracted.ambiguities
+                    if item not in {"missing_location", "deictic_without_memory"}
+                ],
+                relationship="follow_up",
+                expected_frontend_update="map_session",
+            )
+            if inferred_viewport is None:
+                inferred_viewport = LLMViewportIntent(
+                    scope="preserve_current",
+                    reason="active_map_layer_addition",
+                )
         if ground_temperature:
             updates.update(
                 requested_attributes=cls._dedupe(
@@ -911,6 +979,19 @@ class ParserService:
         ):
             return LLMViewportIntent(scope="preserve_current", reason="basemap_only_follow_up")
         return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _has_explicit_location_context(text: str) -> bool:
+        if re.search(r"[-+]?\d{1,3}[.,]\d+\s*[,/]\s*[-+]?\d{1,3}[.,]\d+", text):
+            return True
+        return re.search(
+            r"\b(?:in|around|near|over|at|within|of|for)\s+"
+            r"(?!the\b|same\b|current\b|this\b|there\b|map\b|area\b|view\b|imagery\b)"
+            r"[\wÀ-ÖØ-öø-ÿ]",
+            text,
+            re.IGNORECASE,
+        ) is not None
 
     # -------------------------------------------------------------------------
     @staticmethod

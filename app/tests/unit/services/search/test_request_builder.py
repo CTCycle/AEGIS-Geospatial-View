@@ -134,4 +134,39 @@ def test_request_builder_preserves_current_viewport_for_basemap_only_follow_up()
     assert viewport.radius_m == 640.0
     assert viewport.bbox == [8.94, 44.4, 8.95, 44.41]
 
+###############################################################################
+def test_request_builder_recenters_when_follow_up_changes_location() -> None:
+    builder = RequestBuilder()
+    viewport = builder.build_viewport(
+        ResolvedLocation(
+            label="Zurich",
+            latitude=47.3769,
+            longitude=8.5417,
+            location_type="city",
+        ),
+        NormalizedAction(
+            action_id="map_search",
+            action_label="Change map location",
+            task_tags=["map"],
+            action_tags=["correction"],
+        ),
+        viewport_intent=ViewportIntent(scope="preserve_current", reason="location_correction"),
+        active_visualization={
+            "resolved_location": {
+                "label": "Lugano",
+                "latitude": 46.0037,
+                "longitude": 8.9511,
+            },
+            "viewport": {
+                "center_latitude": 46.0037,
+                "center_longitude": 8.9511,
+                "radius_m": 350.0,
+            },
+        },
+    )
+
+    assert viewport.center_latitude == 47.3769
+    assert viewport.center_longitude == 8.5417
+    assert viewport.radius_m == 18000.0
+
 

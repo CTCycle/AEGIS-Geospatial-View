@@ -44,6 +44,8 @@ class ToolArgumentBuilder:
         turn: TurnParseResult,
         memory_snapshot: dict[str, Any] | None,
     ) -> dict[str, Any]:
+        if self._has_explicit_location_signal(turn):
+            return self.build_location_arguments(turn, memory_snapshot)
         memory = memory_snapshot or {}
         for candidate in (
             memory.get("bbox"),
@@ -60,12 +62,41 @@ class ToolArgumentBuilder:
 
     # -------------------------------------------------------------------------
     @staticmethod
+    def _has_explicit_location_signal(turn: TurnParseResult) -> bool:
+        user_text = turn.user_text.casefold()
+        follow_up_tokens = {
+            "again",
+            "current",
+            "here",
+            "keep",
+            "map",
+            "same",
+            "switch",
+            "there",
+            "use",
+        }
+        for signal in turn.location_signals:
+            if signal.signal_type == "deictic":
+                continue
+            raw_value = str(signal.raw_value or "").strip().casefold()
+            if raw_value and raw_value not in follow_up_tokens and raw_value in user_text:
+                return True
+        return False
+
+    # -------------------------------------------------------------------------
+    @staticmethod
     def build_temporal_arguments(turn: TurnParseResult) -> dict[str, Any]:
         temporal = turn.temporal_signal
         if temporal.mode == "none":
             return {}
         arguments: dict[str, Any] = {"temporal_mode": temporal.mode}
-        if temporal.raw_text:
+        # Current-mode requests do not need a free-form time argument.  The
+        # parser can occasionally place the remainder of a compound request
+        # in raw_text (for example, "show the weather there"); forwarding
+        # that text to a provider makes the tool call look temporal even
+        # though no temporal constraint was requested.  Forecast and
+        # historical handlers use the phrase to select the requested slice.
+        if temporal.mode in {"forecast", "historical"} and temporal.raw_text:
             arguments["time"] = temporal.raw_text
         if temporal.reference_time_iso:
             arguments["reference_time_iso"] = temporal.reference_time_iso

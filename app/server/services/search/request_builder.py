@@ -105,7 +105,13 @@ class RequestBuilder:
         active_visualization: dict[str, Any] | None = None,
     ) -> ViewportPolicy:
         current_viewport = self._coerce_active_viewport(active_visualization)
-        if viewport_intent is not None and viewport_intent.scope == "preserve_current" and current_viewport is not None:
+        location_changed = self._active_location_differs(location, active_visualization)
+        if (
+            viewport_intent is not None
+            and viewport_intent.scope == "preserve_current"
+            and current_viewport is not None
+            and not location_changed
+        ):
             return current_viewport
 
         explicit_scope = (
@@ -113,7 +119,12 @@ class RequestBuilder:
             if viewport_intent is not None and viewport_intent.scope != "preserve_current"
             else None
         )
-        if viewport_intent is not None and viewport_intent.tighten_relative_to_active and current_viewport is not None:
+        if (
+            viewport_intent is not None
+            and viewport_intent.tighten_relative_to_active
+            and current_viewport is not None
+            and not location_changed
+        ):
             tightened = self._tighten_viewport(
                 current_viewport,
                 viewport_intent.radius_hint_m,
@@ -222,6 +233,26 @@ class RequestBuilder:
             return ViewportPolicy.model_validate(viewport)
         except Exception:
             return None
+
+    @staticmethod
+    def _active_location_differs(
+        location: ResolvedLocation,
+        active_visualization: dict[str, Any] | None,
+    ) -> bool:
+        if not is_json_object(active_visualization):
+            return False
+        active_location = active_visualization.get("resolved_location")
+        if not is_json_object(active_location):
+            return False
+        try:
+            active_latitude = float(active_location["latitude"])
+            active_longitude = float(active_location["longitude"])
+            return (
+                abs(active_latitude - float(location.latitude)) > 1e-6
+                or abs(active_longitude - float(location.longitude)) > 1e-6
+            )
+        except (KeyError, TypeError, ValueError):
+            return False
 
     # -------------------------------------------------------------------------
     def _padded_bbox_for_scope(

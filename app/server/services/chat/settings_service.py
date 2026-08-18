@@ -143,11 +143,15 @@ class ChatSettingsService:
             if payload.deepseek_base_url is not None
             else current.deepseek_base_url
         )
-        self._validate_agent_assignment(
-            agent_model_provider=next_agent_model_provider,
-            agent_model_name=next_agent_model_name,
+        has_agent_assignment = bool(
+            next_agent_model_provider.strip() and next_agent_model_name.strip()
         )
-        if should_validate_model_selection:
+        if has_agent_assignment or should_validate_model_selection:
+            self._validate_agent_assignment(
+                agent_model_provider=next_agent_model_provider,
+                agent_model_name=next_agent_model_name,
+            )
+        if should_validate_model_selection and has_agent_assignment:
             self._validate_local_model_selection(
                 agent_model_provider=next_agent_model_provider,
                 agent_model_name=next_agent_model_name,

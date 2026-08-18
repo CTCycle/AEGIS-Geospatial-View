@@ -134,3 +134,89 @@ def test_general_question_can_answer_previous_user_request() -> None:
     )
 
     assert message == "You just asked: Show me Rome"
+
+###############################################################################
+def test_general_question_can_answer_active_map_location() -> None:
+    message = AgentOrchestrator._compose_general_question_message(
+        "What city is the map centered on?",
+        [],
+        {"active_location": {"label": "Lugano"}},
+    )
+
+    assert message == "The map is currently centered on Lugano."
+
+###############################################################################
+def test_general_question_accepts_which_city_variant() -> None:
+    message = AgentOrchestrator._compose_general_question_message(
+        "Which city is the map centered on?",
+        [],
+        {"active_location": {"label": "Zurich"}},
+    )
+
+    assert message == "The map is currently centered on Zurich."
+
+###############################################################################
+def test_general_question_can_answer_active_map_overlays() -> None:
+    message = AgentOrchestrator._compose_general_question_message(
+        "What overlays are currently requested?",
+        [],
+        {
+            "active_visualization": {
+                "overlay_ids": ["openmeteo_air_quality_forecast"],
+                "overlays": [
+                    {
+                        "id": "openmeteo_air_quality_forecast",
+                        "label": "Open-Meteo Air Quality Forecast",
+                    }
+                ],
+            }
+        },
+    )
+
+    assert message == (
+        "The current map includes these overlays: Open-Meteo Air Quality Forecast."
+    )
+
+###############################################################################
+def test_general_question_can_summarize_active_map() -> None:
+    message = AgentOrchestrator._compose_general_question_message(
+        "Summarize the current map.",
+        [],
+        {
+            "active_visualization": {
+                "resolved_location": {"label": "Zurich"},
+                "basemap": {"label": "Satellite Imagery"},
+                "overlay_ids": [],
+            }
+        },
+    )
+
+    assert message == (
+        "The map is centered on Zurich using Satellite Imagery. "
+        "The current map has no overlays requested."
+    )
+
+###############################################################################
+def test_general_question_can_summarize_interesting_areas_from_active_map() -> None:
+    message = AgentOrchestrator._compose_general_question_message(
+        "Now summarize the three most interesting areas.",
+        [],
+        {
+            "active_visualization": {
+                "resolved_location": {"label": "Athens, Greece"},
+                "basemap": {"label": "OpenStreetMap"},
+                "overlay_ids": ["openmeteo_air_quality_forecast"],
+                "overlays": [
+                    {
+                        "id": "openmeteo_air_quality_forecast",
+                        "label": "Open-Meteo Air Quality Forecast",
+                    }
+                ],
+            }
+        },
+    )
+
+    assert message == (
+        "The map is centered on Athens, Greece using OpenStreetMap. "
+        "The current map includes these overlays: Open-Meteo Air Quality Forecast."
+    )

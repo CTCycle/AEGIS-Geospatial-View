@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 ## Environment File
 
@@ -56,10 +56,9 @@ are entered through Settings and stored as encrypted credential records. The
 selected provider/model and provider base URLs are persisted model settings;
 DeepSeek, OpenCode Zen, and OpenCode Go use on-demand catalogs when requested.
 
-`AEGIS_RUNTIME_DATA_DIR` optionally overrides the local runtime storage root used
-for the embedded SQLite database. When unset, the embedded database defaults to
-`%TEMP%/AEGIS Geospatial View/database.db` on Windows and
-`<repo>/.runtime/database.db` elsewhere.
+`AEGIS_RUNTIME_DATA_DIR` optionally overrides the runtime storage root used for
+the embedded SQLite database. When unset, the embedded database defaults to
+`<repo>/app/resources/runtime/database.db` in every environment.
 
 ## Local Profile
 

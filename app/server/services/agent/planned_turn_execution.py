@@ -172,12 +172,15 @@ class PlannedTurnExecutionService:
             )
             if any(not result.ok for result in planned_results) and operation.status == "success":
                 operation = operation.model_copy(update={"status": "partial"})
+            if turn_contract.clarification_plan is not None:
+                operation = operation.model_copy(update={"status": "partial"})
             assistant_message = self.response_synthesizer.synthesize(
                 user_text=turn_contract.user_text,
                 fallback_text=assistant_message,
                 operation=operation,
                 map_session=map_session,
                 direct_result=direct_result,
+                clarification_plan=turn_contract.clarification_plan,
                 task_status="completed" if operation.status == "success" else "partial",
                 active_instructions=[
                     item.model_dump(mode="json")

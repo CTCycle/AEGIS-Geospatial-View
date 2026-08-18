@@ -24,6 +24,18 @@ class CapabilityResolver:
     # -------------------------------------------------------------------------
     def resolve(self, turn: TurnParseResult) -> TurnParseResult:
         requested = [item.strip() for item in turn.requested_layers if item.strip()]
+        for task in turn.atomic_tasks:
+            if not isinstance(task, dict):
+                continue
+            required_layers = task.get("required_layers")
+            if not isinstance(required_layers, list):
+                continue
+            requested.extend(
+                str(item).strip()
+                for item in required_layers
+                if str(item).strip()
+            )
+        requested = self._dedupe(requested)
         if not requested:
             return turn
 
@@ -124,6 +136,53 @@ class CapabilityResolver:
             return layer if self.runtime_registry.is_enabled(layer) else None
         normalized = layer.casefold()
         text = f"{turn.user_text} {layer}".casefold()
+        if normalized in {
+            "poi",
+            "points_of_interest",
+            "amenities",
+            "restaurant",
+            "restaurants",
+        }:
+            return self._enabled("overpass_poi_amenities") or self._enabled(
+                "get_nearby_poi"
+            )
+        if normalized in {
+            "transit",
+            "transit_stops",
+            "public_transit",
+            "rail_stations",
+            "stations",
+        }:
+            return (
+                self._enabled("overpass_poi_amenities")
+                or self._enabled("get_nearby_poi")
+                or self._enabled("gtfs_static")
+            )
+        if normalized in {"precipitation_radar", "radar"}:
+            return self._enabled("rainviewer_precipitation_radar") or self._enabled(
+                "noaa_radar"
+            )
+        if (
+            normalized in {"weather", "weather_forecast", "forecast", "weather_overlay"}
+            or "weather" in normalized
+            or normalized.endswith("_forecast")
+        ):
+            return self._enabled("openmeteo_weather_forecast") or self._enabled(
+                "get_weather_forecast"
+            )
+        if any(
+            marker in normalized.replace("_", " ")
+            for marker in ("precipitation", "rain", "rainfall")
+        ):
+            if turn.temporal_signal.mode == "forecast" or "forecast" in text:
+                return self._enabled("openmeteo_weather_forecast")
+            if "radar" in text or "storm" in text:
+                return self._enabled("rainviewer_precipitation_radar")
+            if any(marker in text for marker in ("rate", "level", "intensity")):
+                return self._enabled("IMERG_Precipitation_Rate")
+            return self._enabled("rainviewer_precipitation_radar") or self._enabled(
+                "IMERG_Precipitation_Rate"
+            )
         if self._is_air_quality_concept(normalized, text):
             if turn.temporal_signal.mode == "forecast" or "forecast" in text:
                 return self._enabled("openmeteo_air_quality_forecast") or self._enabled(
@@ -138,28 +197,8 @@ class CapabilityResolver:
             return self._enabled("tomtom_traffic_flow") or self._enabled(
                 "tomtom_traffic_incidents"
             )
-        # Open-Meteo forecast data is a supported context capability. It is
-        # intentionally metadata-only in the map, but it must still resolve
-        # so a forecast follow-up does not degrade into an unsupported-layer
-        # clarification or recreate the basemap.
-        if normalized in {"weather", "weather_forecast", "forecast"} or (
-            "weather" in normalized and "forecast" in normalized
-        ):
-            return self._enabled("openmeteo_weather_forecast") or self._enabled(
-                "get_weather_forecast"
-            )
         if "_" in layer:
             return None
-        if self._is_precipitation_concept(normalized, text):
-            if turn.temporal_signal.mode == "forecast" or "forecast" in text:
-                return self._enabled("openmeteo_weather_forecast")
-            if "radar" in text or "storm" in text:
-                return self._enabled("rainviewer_precipitation_radar")
-            if any(marker in text for marker in ("rate", "level", "intensity")):
-                return self._enabled("IMERG_Precipitation_Rate")
-            return self._enabled("rainviewer_precipitation_radar") or self._enabled(
-                "IMERG_Precipitation_Rate"
-            )
 
         ranked = sorted(
             (
