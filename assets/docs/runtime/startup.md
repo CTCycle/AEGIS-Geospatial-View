@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-18
+Last updated: 2026-08-19
 
 ## Local Development Via Launcher
 
@@ -30,8 +30,10 @@ port, and only then opens the browser. It uses `app.server.app:app` from the
 repository root when importable and falls back to `server.app:app` from
 `app/server`.
 
-Application startup does not rebuild the frontend. Use menu option 2 to install
-or update dependencies and build the frontend.
+When option 1 detects missing or unusable application environments, it restores
+dependencies and rebuilds the frontend. A ready environment is reused without a
+rebuild. Use menu option 2 to install or update dependencies and build the
+frontend on demand.
 
 `BACKEND_LOGS_VISIBLE=true` (the default when absent) starts backend logs in a
 separate visible terminal. Set it to `false` to start the backend detached and
