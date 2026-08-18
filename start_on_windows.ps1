@@ -370,9 +370,9 @@ function Invoke-LaunchApplication {
     Import-EnvironmentFile
     Set-LauncherEnvironment
     if (-not (Test-DependenciesReady)) {
-        Write-Status STEP 'Required application environments are missing or unusable; installing dependencies.'
+        Write-Status STEP 'Required application environments are missing or unusable; installing dependencies and rebuilding the frontend.'
         Ensure-PortableRuntimes
-        Sync-Dependencies -BuildFrontend $false -InstallationType 'Standard'
+        Sync-Dependencies -BuildFrontend $true -InstallationType 'Standard'
     }
     else {
         Write-Status OK 'Application environments are ready; skipped dependency installation.'
