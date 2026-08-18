@@ -110,9 +110,11 @@ class _ConfigErrorFactoryStub:
 ###############################################################################
 class _RetryProviderStub(_ProviderStub):
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls = 0
 
+    # -------------------------------------------------------------------------
     def structured_output(self, request, schema):  # noqa: ANN001
         self.calls += 1
         if self.calls == 1:
@@ -128,9 +130,11 @@ class _RetryProviderStub(_ProviderStub):
 ###############################################################################
 class _RetryFactoryStub:
 
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.provider = _RetryProviderStub()
 
+    # -------------------------------------------------------------------------
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
 

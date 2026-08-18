@@ -23,6 +23,7 @@ from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.conversation_state import ConversationTaskStateService
 
 
+###############################################################################
 def test_task_graph_requires_successful_predecessors() -> None:
     tasks = [
         AgentTask(id="resolve", description="Resolve place", status="failed"),
@@ -37,6 +38,7 @@ def test_task_graph_requires_successful_predecessors() -> None:
     ) == "required_task_failed"
 
 
+###############################################################################
 def test_task_graph_rejects_cycles() -> None:
     tasks = [
         AgentTask(id="a", description="A", depends_on=["b"]),
@@ -46,6 +48,7 @@ def test_task_graph_rejects_cycles() -> None:
         validate_task_graph(tasks)
 
 
+###############################################################################
 def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> None:
     assert canonical_call_fingerprint("search", {"b": 2, "a": 1}) == canonical_call_fingerprint(
         "search", {"a": 1, "b": 2}
@@ -64,6 +67,7 @@ def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> Non
     assert state_fingerprint(state)
 
 
+###############################################################################
 def test_tool_selection_is_deterministic() -> None:
     profiles = [
         ToolCapabilityProfile(
@@ -82,6 +86,7 @@ def test_tool_selection_is_deterministic() -> None:
     assert [item.name for item in select_tools(profiles, require_rendering=True)] == ["render"]
 
 
+###############################################################################
 def test_domain_validation_rejects_invalid_bounds_and_temporal_ranges() -> None:
     assert "between -90" in (ToolRegistry._validate_domain_arguments({"latitude": 91}) or "")
     assert "ordered" in (
@@ -89,6 +94,7 @@ def test_domain_validation_rejects_invalid_bounds_and_temporal_ranges() -> None:
     )
 
 
+###############################################################################
 def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
     state = AgentThreadState(
         conversation_id="c",
@@ -105,6 +111,8 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
             ),
         ],
     )
+
+    ###############################################################################
     class Delta:
         kind = "exclusion"
         text = "Exclude the western side"
@@ -112,6 +120,8 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
     assert state.tasks[0].status == "completed"
     assert state.tasks[1].status == "superseded"
     assert state.evidence_refs == []
+
+    ###############################################################################
     class Add:
         kind = "add_dataset"
         text = "Add recent air quality"
@@ -125,6 +135,7 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
     )
 
 
+###############################################################################
 def test_hydration_accepts_v2_only_and_restores_active_task() -> None:
     service = ConversationTaskStateService()
     service.hydrate(

@@ -11,6 +11,7 @@ from server.services.llm.opencode_provider import OPENCODE_GO_PROVIDER, OpenCode
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
 
+###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
         name="resolve_location",
@@ -23,6 +24,7 @@ def _tool() -> LLMToolDefinition:
     )
 
 
+###############################################################################
 def _request(provider: str, model: str) -> LLMRequest:
     return LLMRequest(
         provider=provider,
@@ -32,10 +34,14 @@ def _request(provider: str, model: str) -> LLMRequest:
     )
 
 
+###############################################################################
 class _Completions:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
 
+    # -------------------------------------------------------------------------
     def create(self, **kwargs):  # noqa: ANN003, ANN201
         self.calls.append(kwargs)
         message = SimpleNamespace(
@@ -56,12 +62,16 @@ class _Completions:
         )
 
 
+###############################################################################
 class _OpenAICompatibleClient:
+
+    # -------------------------------------------------------------------------
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
 
 
+###############################################################################
 def test_google_native_tool_contract_uses_function_declarations() -> None:
     contents = GoogleProvider._contents_from_messages(
         [
@@ -75,6 +85,7 @@ def test_google_native_tool_contract_uses_function_declarations() -> None:
     assert contents[1]["parts"][0]["function_response"]["name"] == "resolve_location"
 
 
+###############################################################################
 def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(monkeypatch) -> None:
     for provider, model in (
         (DeepSeekProvider(api_key="test", base_url="https://deepseek.test"), "deepseek-chat"),
@@ -89,14 +100,19 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(monkey
         assert result.tool_calls[0].arguments == {"query": "Zurich"}
 
 
+###############################################################################
 def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     captured: dict[str, object] = {}
 
+    ###############################################################################
     class _Provider(OllamaProvider):
+
+        # -------------------------------------------------------------------------
         def supports_tools(self, model: str) -> bool:
             _ = model
             return True
 
+        # -------------------------------------------------------------------------
         def _post_json(self, path: str, payload: dict[str, object]):
             captured["path"] = path
             captured["payload"] = payload
@@ -122,6 +138,7 @@ def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     assert result.tool_calls[0].arguments == {"query": "Zurich"}
 
 
+###############################################################################
 def test_provider_contract_envelope_error_remains_structured() -> None:
     envelope = ToolExecutionEnvelope(
         ok=False,

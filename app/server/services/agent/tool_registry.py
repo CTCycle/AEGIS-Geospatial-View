@@ -94,6 +94,7 @@ class ToolRegistry:
             return "Tool arguments must be an object."
         return cls._validate_schema_node(schema, arguments, path="")
 
+    # -------------------------------------------------------------------------
     @classmethod
     def _validate_domain_arguments(cls, arguments: dict[str, Any]) -> str | None:
         """Validate cross-field geospatial invariants before a handler runs."""

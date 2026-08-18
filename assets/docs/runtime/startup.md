@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 ## Local Development Via Launcher
 
@@ -30,8 +30,8 @@ port, and only then opens the browser. It uses `app.server.app:app` from the
 repository root when importable and falls back to `server.app:app` from
 `app/server`.
 
-Set `ALWAYS_REBUILD=false` in `settings/.env` to skip the frontend build during
-application startup. The default is `true`.
+Application startup does not rebuild the frontend. Use menu option 2 to install
+or update dependencies and build the frontend.
 
 `BACKEND_LOGS_VISIBLE=true` (the default when absent) starts backend logs in a
 separate visible terminal. Set it to `false` to start the backend detached and

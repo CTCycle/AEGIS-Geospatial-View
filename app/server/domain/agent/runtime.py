@@ -38,6 +38,7 @@ CompletionReason = Literal[
 ]
 
 
+###############################################################################
 class AgentGoal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -47,6 +48,7 @@ class AgentGoal(BaseModel):
     revision: int = Field(default=0, ge=0)
 
 
+###############################################################################
 class GeographicScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +59,7 @@ class GeographicScope(BaseModel):
     crs: str = "EPSG:4326"
 
 
+###############################################################################
 class GeospatialWorkingState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -71,6 +74,7 @@ class GeospatialWorkingState(BaseModel):
     renderable_refs: list[str] = Field(default_factory=list)
 
 
+###############################################################################
 class AgentTask(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -87,6 +91,7 @@ class AgentTask(BaseModel):
     scope_revision: int = Field(default=0, ge=0)
 
 
+###############################################################################
 class AgentThreadState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,6 +109,7 @@ class AgentThreadState(BaseModel):
     conversation_summary: dict[str, Any] | None = None
 
 
+###############################################################################
 class AgentBudgets(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -114,6 +120,7 @@ class AgentBudgets(BaseModel):
     wall_clock_seconds: float
 
 
+###############################################################################
 class AgentRunState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -131,6 +138,7 @@ class AgentRunState(BaseModel):
     completion_reason: CompletionReason | None = None
 
 
+###############################################################################
 class ToolCapabilityProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -147,10 +155,12 @@ class ToolCapabilityProfile(BaseModel):
     healthy: bool = True
 
 
+###############################################################################
 class RuntimeValidationError(ValueError):
     """Raised when an application-owned runtime invariant is violated."""
 
 
+###############################################################################
 def validate_task_graph(tasks: list[AgentTask]) -> None:
     """Validate unique task IDs, existing dependencies, and acyclicity."""
 
@@ -183,6 +193,7 @@ def validate_task_graph(tasks: list[AgentTask]) -> None:
         visit(task.id)
 
 
+###############################################################################
 def runnable_tasks(tasks: list[AgentTask]) -> list[AgentTask]:
     """Return pending tasks whose required dependencies completed successfully."""
 
@@ -195,6 +206,7 @@ def runnable_tasks(tasks: list[AgentTask]) -> list[AgentTask]:
     ]
 
 
+###############################################################################
 def block_tasks_with_failed_dependencies(tasks: list[AgentTask]) -> int:
     """Mark dependent tasks blocked; failed work is never treated as success."""
 
@@ -216,6 +228,7 @@ def block_tasks_with_failed_dependencies(tasks: list[AgentTask]) -> int:
     return changed
 
 
+###############################################################################
 def canonical_call_fingerprint(tool_name: str, arguments: dict[str, Any]) -> str:
     payload = json.dumps(
         {"tool": tool_name, "arguments": arguments},
@@ -227,6 +240,7 @@ def canonical_call_fingerprint(tool_name: str, arguments: dict[str, Any]) -> str
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+###############################################################################
 def select_tools(
     profiles: list[ToolCapabilityProfile],
     *,
@@ -247,6 +261,7 @@ def select_tools(
     ]
 
 
+###############################################################################
 def state_fingerprint(state: AgentThreadState) -> str:
     payload = state.model_dump(mode="json", exclude={"conversation_summary"})
     return hashlib.sha256(
@@ -254,6 +269,7 @@ def state_fingerprint(state: AgentThreadState) -> str:
     ).hexdigest()
 
 
+###############################################################################
 def compact_task_context(task_state: dict[str, Any], *, completed_limit: int = 6) -> dict[str, Any]:
     """Keep active dependencies and a small completed window in model context."""
 
@@ -294,6 +310,7 @@ def compact_task_context(task_state: dict[str, Any], *, completed_limit: int = 6
     return compact
 
 
+###############################################################################
 def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
     """Return a completion reason only when required tasks are terminal."""
 
@@ -311,12 +328,14 @@ def evaluate_completion(state: AgentThreadState) -> CompletionReason | None:
     return "completed"
 
 
+###############################################################################
 @dataclass(frozen=True)
 class ScopeInvalidation:
     invalidated_evidence_refs: tuple[str, ...]
     retained_evidence_refs: tuple[str, ...]
 
 
+###############################################################################
 def invalidate_scope_evidence(
     state: AgentThreadState,
     *,
@@ -341,6 +360,7 @@ def invalidate_scope_evidence(
     return ScopeInvalidation(invalidated, retained)
 
 
+###############################################################################
 def apply_steering_delta(state: AgentThreadState, delta: Any) -> AgentThreadState:
     """Apply a classified follow-up without rebuilding unrelated evidence."""
 

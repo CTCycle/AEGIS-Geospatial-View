@@ -339,6 +339,7 @@ class AgentRunOrchestrator:
             payload={"state": cancelled.state.value},
         )
 
+    # -------------------------------------------------------------------------
     async def _publish_trace(
         self,
         snapshot: AgentRunSnapshot,
@@ -364,12 +365,14 @@ class AgentRunOrchestrator:
             # successful geospatial response into an agent failure.
             return
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _model_call_count(response: ChatTurnResponse) -> int:
         payload = response.tool_payload or {}
         iterations = payload.get("iterations")
         return int(iterations) if isinstance(iterations, int) else 1
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _safe_failure_message(exc: Exception) -> str:
         text = str(exc).strip().lower()

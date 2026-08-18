@@ -73,6 +73,7 @@ class OpenAIProvider(LLMProvider):
             "strict": True,
         }
 
+    # -------------------------------------------------------------------------
     @staticmethod
     def _strict_parameters(schema: dict[str, Any]) -> dict[str, Any]:
         """Normalize JSON Schema for Responses strict function tools."""
