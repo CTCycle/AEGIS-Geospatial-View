@@ -358,6 +358,9 @@ class PolicyEngine:
                     "alternate",
                     "not unique",
                     "defaulting to",
+                    "cities",
+                    "towns",
+                    "municipalities",
                 )
             )
             has_location_reference = any(

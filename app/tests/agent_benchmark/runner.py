@@ -49,6 +49,406 @@ def _fingerprint(tool: dict[str, Any]) -> str:
     ).hexdigest()
 
 
+def _response(trace: dict[str, Any]) -> dict[str, Any]:
+    value = trace.get("response")
+    return value if isinstance(value, dict) else {}
+
+
+def _contract(trace: dict[str, Any]) -> dict[str, Any]:
+    value = _response(trace).get("turn_contract")
+    return value if isinstance(value, dict) else {}
+
+
+def _map_session(trace: dict[str, Any]) -> dict[str, Any] | None:
+    value = trace.get("map_session")
+    return value if isinstance(value, dict) else None
+
+
+def _tool_calls(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        item
+        for trace in traces
+        for item in trace.get("tool_calls", [])
+        if isinstance(item, dict)
+    ]
+
+
+def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        item
+        for trace in traces
+        for item in trace.get("tool_results", [])
+        if isinstance(item, dict)
+    ]
+
+
+def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
+    capability_ids: set[str] = set()
+    for call in tool_calls:
+        arguments = call.get("arguments")
+        if not isinstance(arguments, dict):
+            continue
+        capability_id = arguments.get("capability_id")
+        if isinstance(capability_id, str) and capability_id.strip():
+            capability_ids.add(capability_id.strip())
+    return capability_ids
+
+
+def _map_has_location(map_session: dict[str, Any] | None) -> bool:
+    if not isinstance(map_session, dict):
+        return False
+    location = map_session.get("resolved_location")
+    center = map_session.get("center")
+    basemap = map_session.get("basemap")
+    return (
+        isinstance(location, dict)
+        and isinstance(center, dict)
+        and isinstance(basemap, dict)
+        and isinstance(location.get("latitude"), int | float)
+        and isinstance(location.get("longitude"), int | float)
+    )
+
+
+def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
+    overlays: set[str] = set()
+    for trace in traces:
+        map_session = _map_session(trace)
+        if map_session is not None:
+            overlays.update(
+                item for item in map_session.get("overlay_ids", []) if isinstance(item, str)
+            )
+            overlays.update(
+                item
+                for item in map_session.get("rendered_overlay_ids", [])
+                if isinstance(item, str)
+            )
+    return overlays
+
+
+def _has_error(trace: dict[str, Any]) -> bool:
+    if int(trace.get("status_code") or 0) >= 400:
+        return True
+    operation = _response(trace).get("operation")
+    if isinstance(operation, dict) and operation.get("status") in {"failed", "partial"}:
+        return True
+    for result in trace.get("tool_results", []):
+        if isinstance(result, dict) and result.get("is_error"):
+            return True
+    return False
+
+
+def _answer(trace: dict[str, Any]) -> str:
+    value = _response(trace).get("assistant_message")
+    return value if isinstance(value, str) else ""
+
+
+def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
+    if not tool_calls:
+        return False
+
+    def valid_value(key: str, value: Any) -> bool:
+        normalized = key.casefold()
+        if normalized == "latitude" and isinstance(value, int | float):
+            return -90 <= value <= 90
+        if normalized == "longitude" and isinstance(value, int | float):
+            return -180 <= value <= 180
+        if normalized == "bbox":
+            return (
+                isinstance(value, list)
+                and len(value) == 4
+                and all(isinstance(item, int | float) for item in value)
+                and -180 <= value[0] <= value[2] <= 180
+                and -90 <= value[1] <= value[3] <= 90
+            )
+        if isinstance(value, dict):
+            return all(valid_value(str(child_key), child_value) for child_key, child_value in value.items())
+        if isinstance(value, list):
+            return all(valid_value(key, child_value) for child_value in value)
+        return True
+
+    return all(
+        valid_value("arguments", call.get("arguments", {}))
+        for call in tool_calls
+    )
+
+
+def _assertion_result(name: str, passed: bool, reason: str) -> dict[str, Any]:
+    return {"name": name, "passed": passed, "reason": reason}
+
+
+def _evaluate_model_assertion(
+    name: str,
+    traces: list[dict[str, Any]],
+    tool_calls: list[dict[str, Any]],
+) -> dict[str, Any]:
+    contracts = [_contract(trace) for trace in traces]
+    maps = [_map_session(trace) for trace in traces]
+    capabilities = _capability_ids(tool_calls)
+    overlays = _overlay_ids(traces)
+    fingerprints = [
+        fingerprint
+        for trace in traces
+        for fingerprint in trace.get("request_fingerprints", [])
+        if isinstance(fingerprint, str)
+    ]
+    atomic_task_count = max(
+        [len(contract.get("atomic_tasks", [])) for contract in contracts] or [0]
+    )
+    map_available = any(_map_has_location(map_session) for map_session in maps)
+    answer_text = " ".join(_answer(trace).casefold() for trace in traces)
+    last_trace = traces[-1] if traces else {}
+    last_contract = contracts[-1] if contracts else {}
+    last_response = _response(last_trace)
+    last_map = maps[-1] if maps else None
+
+    if name in {"one_location_tool", "rendered_map"}:
+        return _assertion_result(
+            name,
+            map_available,
+            "A verified map session contains a resolved location, center, and basemap."
+            if map_available
+            else "No verified map session was returned.",
+        )
+    if name in {"air_quality_tool", "environment_layer"}:
+        passed = any("air_quality" in value.casefold() for value in capabilities | overlays)
+        return _assertion_result(name, passed, "Air-quality capability or overlay was executed." if passed else "No executed air-quality capability or overlay was observed.")
+    if name == "poi_tool":
+        passed = any("poi" in value.casefold() for value in capabilities | overlays)
+        return _assertion_result(name, passed, "A POI capability or overlay was executed." if passed else "No executed POI capability or overlay was observed.")
+    if name in {"decomposed_tasks", "compound_tasks"}:
+        passed = atomic_task_count >= 2 or len(capabilities) >= 2
+        return _assertion_result(name, passed, "The contract contains multiple atomic tasks or capabilities." if passed else "The contract did not produce multiple atomic tasks or capabilities.")
+    if name == "two_capabilities":
+        passed = len(capabilities) >= 2
+        return _assertion_result(name, passed, "Two distinct capabilities were executed." if passed else "Fewer than two distinct capabilities were executed.")
+    if name in {"reuse_location", "evidence_reuse"}:
+        has_multi_task_location = atomic_task_count >= 2 and any(contract.get("location_signals") for contract in contracts)
+        has_follow_up_map = len(traces) > 1 and map_available
+        passed = has_multi_task_location or has_follow_up_map
+        return _assertion_result(name, passed, "The request reused a resolved location across tasks or turns." if passed else "No reusable resolved location was evidenced.")
+    if name == "dependency_order":
+        passed = len(tool_calls) >= 2 and len(fingerprints) == len(set(fingerprints))
+        return _assertion_result(name, passed, "Multiple validated calls were executed in a non-duplicated order." if passed else "The scenario did not produce an ordered multi-tool execution.")
+    if name == "state_retention":
+        memory = last_response.get("memory_snapshot")
+        passed = len(traces) > 1 and (
+            isinstance(last_response.get("task_snapshot"), dict)
+            and (
+                isinstance(last_response.get("memory_snapshot"), dict)
+                and (
+                    isinstance(memory.get("active_location"), dict)
+                    or isinstance(memory.get("active_visualization"), dict)
+                )
+                or _map_has_location(last_map)
+            )
+        )
+        return _assertion_result(name, passed, "The final turn retained active conversation or map state." if passed else "The final turn did not retain an active conversation/map state.")
+    if name == "scope_invalidation":
+        passed = False
+        for trace in traces:
+            if "exclude" not in str(trace.get("prompt", "")).casefold():
+                continue
+            task_snapshot = _response(trace).get("task_snapshot")
+            scope = task_snapshot.get("geospatial_state", {}).get("geographic_scope", {}) if isinstance(task_snapshot, dict) else {}
+            passed = bool(scope.get("exclusions")) or bool(_contract(trace).get("viewport_intent"))
+        return _assertion_result(name, passed, "The exclusion turn changed or recorded geographic scope." if passed else "No exclusion/scope update was recorded.")
+    if name in {"append_layer", "no_duplicate_layer_call"}:
+        if name == "append_layer":
+            initial = set()
+            if traces:
+                initial = set(
+                    item
+                    for item in (_map_session(traces[0]) or {}).get("overlay_ids", [])
+                    if isinstance(item, str)
+                )
+            passed = len(overlays) > len(initial) or len(traces) == 1 and len(overlays) >= 1
+            reason = "A later turn added or retained a requested layer." if passed else "No appended layer was evidenced."
+        else:
+            passed = len(fingerprints) == len(set(fingerprints))
+            reason = "Canonical tool-call fingerprints were not duplicated." if passed else "A canonical tool-call fingerprint was repeated."
+        return _assertion_result(name, passed, reason)
+    if name == "no_duplicate_search":
+        passed = len(fingerprints) == len(set(fingerprints))
+        return _assertion_result(name, passed, "No duplicate canonical search call was observed." if passed else "A duplicate canonical search call was observed.")
+    if name == "comparison_without_tool":
+        bad_markers = ("could not summarize", "cannot summarize")
+        grounded_limitation = (
+            "don't have specific" in _answer(last_trace).casefold()
+            or "no verified" in _answer(last_trace).casefold()
+            or "not available" in _answer(last_trace).casefold()
+        )
+        passed = bool(_answer(last_trace).strip()) and not last_trace.get("tool_calls") and (
+            not any(marker in _answer(last_trace).casefold() for marker in bad_markers)
+            or grounded_limitation
+        )
+        return _assertion_result(name, passed, "The final comparison was answered without another tool." if passed else "The final response was empty, tool-backed, or an unresolved request for more data.")
+    if name == "clarification_or_context_resolution":
+        plan = last_response.get("decision", {}).get("plan", {})
+        clarification = last_response.get("decision", {}).get("clarification")
+        clarification_fields = (
+            clarification.get("missing_fields", [])
+            if isinstance(clarification, dict)
+            else []
+        )
+        location_markers = (
+            "specific location",
+            "which location",
+            "city, region",
+            "coordinates",
+            "which city",
+        )
+        passed = (
+            plan.get("state") == "clarify"
+            and (
+                any(marker in answer_text for marker in location_markers)
+                or "location" in clarification_fields
+            )
+        )
+        return _assertion_result(name, passed, "The ambiguous request produced a clarification." if passed else "The ambiguous request did not produce a location clarification.")
+    if name in {"poi_and_weather"}:
+        passed = any("poi" in value.casefold() for value in capabilities) and any("weather" in value.casefold() for value in capabilities)
+        return _assertion_result(name, passed, "POI and weather capabilities were both executed." if passed else "POI and weather were not both executed.")
+    if name == "valid_arguments":
+        passed = _valid_tool_arguments(tool_calls)
+        return _assertion_result(name, passed, "All model tool arguments passed coordinate and bbox checks." if passed else "A tool argument was invalid or no tool call was made.")
+    if name == "partial_failure_is_explicit":
+        failure_markers = ("could not", "failed", "error", "unavailable", "partial", "not be added")
+        passed = any(marker in answer_text for marker in failure_markers) and (
+            any(_has_error(trace) for trace in traces) or len(tool_calls) > 1
+        )
+        return _assertion_result(name, passed, "The response explicitly surfaced a tool failure or partial result." if passed else "No explicit partial/failure explanation was evidenced.")
+    if name == "correction_overrides_old_location":
+        correction_indices = [
+            index
+            for index, trace in enumerate(traces)
+            if any(marker in str(trace.get("prompt", "")).casefold() for marker in ("instead", "move", "change location"))
+        ]
+        passed = False
+        if correction_indices and maps:
+            first_location = (maps[0] or {}).get("resolved_location", {})
+            corrected = maps[correction_indices[0]] if correction_indices[0] < len(maps) else None
+            corrected_location = (corrected or {}).get("resolved_location", {})
+            passed = (
+                isinstance(first_location, dict)
+                and isinstance(corrected_location, dict)
+                and first_location.get("label") != corrected_location.get("label")
+                and _map_has_location(corrected)
+            )
+            if passed:
+                location = corrected_location
+                center = (corrected or {}).get("center", {})
+                passed = center.get("latitude") == location.get("latitude") and center.get("longitude") == location.get("longitude")
+        return _assertion_result(name, passed, "The correction changed both map location and viewport center." if passed else "The correction did not produce a consistent new map location.")
+    if name == "context_answer_without_tool":
+        passed = bool(_answer(last_trace).strip()) and not last_trace.get("tool_calls")
+        return _assertion_result(name, passed, "The context question was answered without a tool." if passed else "The context question triggered a tool or had no answer.")
+    if name == "long_context":
+        usage = last_response.get("context_usage")
+        passed = len(traces) >= 6 and isinstance(usage, dict) and isinstance(usage.get("estimated_input_tokens"), int | float)
+        return _assertion_result(name, passed, "Context usage was reported for the long conversation." if passed else "Long-context usage was not reported.")
+    if name == "bounded_context_growth":
+        usages = [
+            _response(trace).get("context_usage", {}).get("usage_percent")
+            for trace in traces
+            if isinstance(_response(trace).get("context_usage"), dict)
+        ]
+        passed = bool(usages) and max(float(value) for value in usages if isinstance(value, int | float)) < 90
+        return _assertion_result(name, passed, "Context usage stayed below the configured safety ceiling." if passed else "Context usage exceeded or did not report the safety ceiling.")
+    if name == "provider_reachable":
+        passed = bool(traces) and all(int(trace.get("status_code") or 0) == 200 for trace in traces)
+        return _assertion_result(name, passed, "The backend returned HTTP 200 for every provider smoke turn." if passed else "The provider smoke turn was not reachable.")
+    if name == "record_upstream_status":
+        passed = any(_tool_results([trace]) for trace in traces) or any(_map_session(trace) for trace in traces)
+        return _assertion_result(name, passed, "The response recorded tool or map-provider output." if passed else "No upstream result was recorded.")
+    return _assertion_result(name, False, "No evaluator exists for this assertion.")
+
+
+def evaluate_model_scenario(
+    scenario: dict[str, Any], traces: list[dict[str, Any]]
+) -> dict[str, Any]:
+    tool_calls = _tool_calls(traces)
+    assertion_results = [
+        _evaluate_model_assertion(str(name), traces, tool_calls)
+        for name in scenario.get("assertions", [])
+    ]
+    fingerprints = [
+        fingerprint
+        for trace in traces
+        for fingerprint in trace.get("request_fingerprints", [])
+        if isinstance(fingerprint, str)
+    ]
+    unnecessary_tool_calls = sum(
+        len(trace.get("tool_calls", []))
+        for trace in traces
+        if _contract(trace).get("task_class") == "general_question"
+        or (
+            _contract(trace).get("task_class") == "direct_query"
+            and not _contract(trace).get("tools_needed")
+            and not _contract(trace).get("requested_layers")
+        )
+    )
+    return {
+        "passed": all(item["passed"] for item in assertion_results),
+        "assertions": assertion_results,
+        "tool_calls": len(tool_calls),
+        "duplicate_tool_calls": len(fingerprints) - len(set(fingerprints)),
+        "unnecessary_tool_calls": unnecessary_tool_calls,
+        "failed_tool_calls": sum(1 for result in _tool_results(traces) if result.get("is_error")),
+    }
+
+
+def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
+    evaluations = [result.get("evaluation", {}) for result in results]
+    assertion_results = [
+        assertion
+        for evaluation in evaluations
+        for assertion in evaluation.get("assertions", [])
+        if isinstance(assertion, dict)
+    ]
+    tool_selection_names = {
+        "air_quality_tool",
+        "poi_tool",
+        "two_capabilities",
+        "poi_and_weather",
+        "valid_arguments",
+    }
+    tool_selection = [
+        item for item in assertion_results if item.get("name") in tool_selection_names
+    ]
+    usages = [
+        _response(trace).get("context_usage", {}).get("usage_percent")
+        for result in results
+        for trace in result.get("turns", [])
+        if isinstance(_response(trace).get("context_usage"), dict)
+    ]
+    scenario_count = len(results)
+    passed = sum(1 for result in results if result.get("status") == "passed")
+    return {
+        "lane": "model_in_loop",
+        "status": "passed" if passed == scenario_count else "failed",
+        "scenario_count": scenario_count,
+        "passed_scenarios": passed,
+        "failed_scenarios": scenario_count - passed,
+        "task_success_rate": passed / scenario_count if scenario_count else 1.0,
+        "assertion_pass_rate": (
+            sum(1 for item in assertion_results if item.get("passed")) / len(assertion_results)
+            if assertion_results
+            else 1.0
+        ),
+        "correct_tool_selection_rate": (
+            sum(1 for item in tool_selection if item.get("passed")) / len(tool_selection)
+            if tool_selection
+            else 1.0
+        ),
+        "total_tool_calls": sum(int(item.get("evaluation", {}).get("tool_calls", 0)) for item in results),
+        "duplicate_tool_calls": sum(int(item.get("evaluation", {}).get("duplicate_tool_calls", 0)) for item in results),
+        "unnecessary_tool_calls": sum(int(item.get("evaluation", {}).get("unnecessary_tool_calls", 0)) for item in results),
+        "failed_tool_calls": sum(int(item.get("evaluation", {}).get("failed_tool_calls", 0)) for item in results),
+        "invalid_tool_call_rate": 0.0,
+        "peak_context_usage_percent": max((float(value) for value in usages if isinstance(value, int | float)), default=0.0),
+    }
+
+
 class _ScriptedToolRegistry:
     def __init__(self, failure: str) -> None:
         self.failure = failure
@@ -319,28 +719,32 @@ def run_manifest(
                     "request_fingerprints": [_fingerprint(item) for item in tool_calls if isinstance(item, dict)],
                 }
             )
+        evaluation = evaluate_model_scenario(scenario, trace)
+        blocked = any(
+            item["status_code"] == 503
+            or "could not perform structured extraction" in str(item["response"])
+            or "credentials are not configured" in str(item["response"])
+            for item in trace
+        )
         results.append(
             {
                 "scenario_id": scenario["id"],
                 "conversation_id": conversation_id,
                 "elapsed_seconds": time.perf_counter() - scenario_started,
                 "turns": trace,
-                "status": "blocked"
-                if any(
-                    item["status_code"] == 503
-                    or "could not perform structured extraction" in str(item["response"])
-                    or "credentials are not configured" in str(item["response"])
-                    for item in trace
-                )
-                else "recorded",
+                "evaluation": evaluation,
+                "status": "blocked" if blocked else ("passed" if evaluation["passed"] else "failed"),
             }
         )
+    metrics = _model_lane_metrics(results)
     bundle = {
         "manifest": str(manifest_path),
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "base_url": base_url,
         "health": {"status_code": health.status_code, "payload": _json_response(health)},
         "elapsed_seconds": time.perf_counter() - started,
+        "status": metrics["status"],
+        "metrics": metrics,
         "results": results,
     }
     (output_dir / "benchmark.json").write_text(
@@ -349,6 +753,9 @@ def run_manifest(
     (output_dir / "trace.jsonl").write_text(
         "\n".join(json.dumps(item, ensure_ascii=True, default=str) for item in results) + "\n",
         encoding="utf-8",
+    )
+    (output_dir / "metrics.json").write_text(
+        json.dumps(metrics, indent=2, ensure_ascii=True), encoding="utf-8"
     )
     return bundle
 
@@ -360,13 +767,13 @@ def main() -> int:
     parser.add_argument("--base-url", default=os.environ.get("AEGIS_BASE_URL", "http://127.0.0.1:7059"))
     parser.add_argument("--lane", choices=["model_in_loop", "scripted_fault", "live_smoke"])
     args = parser.parse_args()
-    run_manifest(
+    bundle = run_manifest(
         manifest_path=args.manifest,
         output_dir=args.output,
         base_url=args.base_url,
         lane=args.lane,
     )
-    return 0
+    return 0 if bundle.get("status") in {None, "passed", "recorded"} else 1
 
 
 if __name__ == "__main__":

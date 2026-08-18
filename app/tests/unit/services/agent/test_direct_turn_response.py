@@ -214,3 +214,96 @@ def test_preflight_clarification_is_persisted_as_partial_response() -> None:
         assert history.messages[-1]["structured_payload"]["decision"] == decision.model_dump(mode="json")
 
     run_async_in_thread(_run())
+
+###############################################################################
+def test_general_question_uses_active_map_location_without_tool_call() -> None:
+    async def _run() -> None:
+        service, state, _ = _service()
+        turn = _turn(user_text="What city is the map centered on?")
+        response = await service.handle(
+            request_id="request-context-location",
+            conversation_id="conversation",
+            conversation_key="conversation",
+            task=_task(state, turn),
+            turn_contract=turn,
+            latest_memory={"active_location": {"label": "Lugano"}},
+            latest_contract=None,
+            recent_messages=[],
+            context_usage=None,
+        )
+
+        assert response is not None
+        assert response.tool_payload is None
+        assert "Lugano" in response.assistant_message
+
+    run_async_in_thread(_run())
+
+###############################################################################
+def test_context_question_bypasses_map_planning_and_parser_failure() -> None:
+    async def _run() -> None:
+        service, state, _ = _service()
+        turn = _turn(
+            user_text="Which city is the map centered on?",
+            task_class="map_search",
+            ambiguities=["parser_unavailable"],
+        )
+        response = await service.handle(
+            request_id="request-context-map-search",
+            conversation_id="conversation",
+            conversation_key="conversation",
+            task=_task(state, turn),
+            turn_contract=turn,
+            latest_memory={
+                "active_location": {"label": "Lugano"},
+                "active_visualization": {
+                    "resolved_location": {"label": "Lugano"},
+                    "overlay_ids": [],
+                },
+            },
+            latest_contract=None,
+            recent_messages=[],
+            context_usage=None,
+        )
+
+        assert response is not None
+        assert response.tool_payload is None
+        assert "Lugano" in response.assistant_message
+        assert response.operation is not None
+        assert response.operation.kind == "direct_answer"
+
+    run_async_in_thread(_run())
+
+###############################################################################
+def test_map_summary_bypasses_parser_failure_without_inventing_areas() -> None:
+    async def _run() -> None:
+        service, state, _ = _service()
+        turn = _turn(
+            user_text="Now summarize the three most interesting areas.",
+            task_class="map_search",
+            ambiguities=["parser_unavailable"],
+        )
+        response = await service.handle(
+            request_id="request-context-summary",
+            conversation_id="conversation",
+            conversation_key="conversation",
+            task=_task(state, turn),
+            turn_contract=turn,
+            latest_memory={
+                "active_visualization": {
+                    "resolved_location": {"label": "Athens, Greece"},
+                    "basemap": {"label": "OpenStreetMap"},
+                    "overlay_ids": [],
+                }
+            },
+            latest_contract=None,
+            recent_messages=[],
+            context_usage=None,
+        )
+
+        assert response is not None
+        assert response.tool_payload is None
+        assert "Athens, Greece" in response.assistant_message
+        assert response.operation is not None
+        assert response.operation.kind == "direct_answer"
+
+    run_async_in_thread(_run())

@@ -44,6 +44,8 @@ class LLMProviderRequestError(RuntimeError):
             code, retryable = "provider_rate_limited", True
         elif isinstance(status, int) and status >= 500:
             code, retryable = "provider_unavailable", True
+        elif cls._is_transient_connection_error(exc):
+            code, retryable = "provider_request_failed", True
         else:
             code, retryable = "provider_request_failed", False
         return cls(
@@ -54,4 +56,27 @@ class LLMProviderRequestError(RuntimeError):
             http_status=status if isinstance(status, int) else None,
             retryable=retryable,
         )
+
+    @staticmethod
+    def _is_transient_connection_error(exc: Exception) -> bool:
+        current: BaseException | None = exc
+        for _ in range(4):
+            if current is None:
+                break
+            class_name = type(current).__name__.casefold()
+            detail = str(current).casefold()
+            if (
+                isinstance(current, (TimeoutError, ConnectionError))
+                or any(
+                    marker in class_name
+                    for marker in ("connection", "connecterror", "timeout")
+                )
+                or any(
+                    marker in detail
+                    for marker in ("connection error", "winerror 100", "timed out")
+                )
+            ):
+                return True
+            current = current.__cause__ or current.__context__
+        return False
 

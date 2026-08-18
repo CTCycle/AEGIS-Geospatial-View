@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 ## Relational Storage
 
@@ -14,11 +14,10 @@ Database mode and connection settings come from `settings/.env` or runtime
 environment variables. SQLite resolves through
 `server.common.paths.DATABASE_FILE_PATH`.
 
-Embedded SQLite storage defaults to a local runtime directory instead of the
-repository tree:
+Embedded SQLite storage defaults to the application resources runtime
+directory:
 
-- Windows: `%TEMP%/AEGIS Geospatial View/database.db`
-- other environments: `<repo>/.runtime/database.db`
+- all environments: `<repo>/app/resources/runtime/database.db`
 
 Override this location with `AEGIS_RUNTIME_DATA_DIR` when an explicit runtime
 storage directory is required.

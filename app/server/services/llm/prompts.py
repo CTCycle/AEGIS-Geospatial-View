@@ -178,6 +178,7 @@ Rules:
 14. Infer viewport intent from the user's wording when they imply scale or zoom, such as "around", "near", "street level", "much more closely", "zoom in", "entire city", or "whole region".
 15. Use viewport_intent.scope only from: preserve_current, building, street, neighborhood, district, city, region, country, auto.
 16. For basemap-only follow-ups, default viewport_intent.scope to preserve_current unless the user also asks to zoom or widen/narrow the area.
+17. For compound requests, include every independently requested operation in atomic_tasks and list each requested data concept; never drop a second data request merely because another layer is also requested.
 """
 
 ###############################################################################

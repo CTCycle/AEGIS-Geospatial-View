@@ -394,6 +394,108 @@ def test_colosseum_houses_and_street_temperature_follow_up_preserve_context() ->
     run_async_in_thread(_run())
 
 ###############################################################################
+def test_location_ambiguity_precedes_unsupported_layer_clarification() -> None:
+    async def _run() -> None:
+        orchestrator = _orchestrator(
+            [
+                _turn(
+                    "Find Springfield and show protected areas.",
+                    requested_layers=["protected_areas"],
+                    ambiguities=["Multiple potential Springfield locations; disambiguation required."],
+                    clarification_plan={
+                        "question": "I could not match protected areas to an enabled map layer.",
+                        "reason": "No compatible executable catalog capability was found.",
+                        "blocking_fields": ["geospatial_layer"],
+                        "options": [],
+                        "preserve_valid_results": True,
+                        "apply_visualization_changes": False,
+                    },
+                )
+            ]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="Find Springfield and show protected areas.",
+                conversation_id="conv-ambiguous-layer",
+            )
+        )
+
+        assert response.operation is not None
+        assert response.operation.kind == "clarification"
+        assert "specific location" in response.assistant_message.lower()
+        assert response.tool_payload is None
+
+    run_async_in_thread(_run())
+
+###############################################################################
+def test_partial_clarification_retains_verified_location_memory() -> None:
+    async def _run() -> None:
+        orchestrator = _orchestrator(
+            [
+                _turn(
+                    "Show unsupported data around Rome.",
+                    requested_layers=["unsupported_layer"],
+                    clarification_plan={
+                        "question": "That layer is not available.",
+                        "reason": "No compatible executable catalog capability was found.",
+                        "blocking_fields": ["geospatial_layer"],
+                        "options": [],
+                        "preserve_valid_results": True,
+                        "apply_visualization_changes": False,
+                    },
+                )
+            ]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="Show unsupported data around Rome.",
+                conversation_id="conv-partial-location",
+            )
+        )
+
+        assert response.memory_snapshot["active_location"]["label"] == "Colosseum, Rome"
+        assert orchestrator.task_state_service.snapshot("conv-partial-location").active_map_session is None
+
+    run_async_in_thread(_run())
+
+###############################################################################
+def test_partial_capability_plan_executes_resolved_layers_before_clarifying() -> None:
+    async def _run() -> None:
+        orchestrator = _orchestrator(
+            [
+                _turn(
+                    "Show supported and unsupported data around Rome.",
+                    requested_layers=["overpass_residential_buildings", "unsupported_layer"],
+                    clarification_plan={
+                        "question": "The unsupported layer is unavailable.",
+                        "reason": "No compatible executable catalog capability was found.",
+                        "blocking_fields": ["geospatial_layer"],
+                        "options": [],
+                        "preserve_valid_results": True,
+                        "apply_visualization_changes": False,
+                    },
+                )
+            ]
+        )
+
+        response = await orchestrator.run_turn(
+            ChatTurnRequest(
+                message="Show supported and unsupported data around Rome.",
+                conversation_id="conv-partial-capability",
+            )
+        )
+
+        assert response.tool_payload is not None
+        assert response.tool_payload["tool_calls"]
+        assert response.map_session is not None
+        assert response.operation is not None
+        assert response.operation.status == "partial"
+
+    run_async_in_thread(_run())
+
+###############################################################################
 def test_follow_up_zoom_refinement_tightens_existing_viewport() -> None:
     async def _run() -> None:
         orchestrator = _orchestrator(

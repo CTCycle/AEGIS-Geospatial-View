@@ -17,6 +17,7 @@ def _turn(
     layer: str,
     *,
     temporal_mode: str = "none",
+    atomic_layers: list[str] | None = None,
 ) -> TurnParseResult:
     return TurnParseResult(
         user_text=text,
@@ -31,6 +32,11 @@ def _turn(
         temporal_signal=TemporalSignal(mode=temporal_mode),
         parser_confidence=0.9,
         requested_layers=[layer],
+        atomic_tasks=(
+            [{"required_layers": atomic_layers}]
+            if atomic_layers is not None
+            else []
+        ),
         tools_needed=True,
     )
 
@@ -95,6 +101,38 @@ def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> No
         _turn("Show air quality overlay for Paris", "air_quality")
     )
     assert resolved.requested_layers == ["openmeteo_air_quality_forecast"]
+    assert resolved.clarification_plan is None
+
+###############################################################################
+def test_resolves_all_supported_atomic_task_layers() -> None:
+    resolved = _resolver().resolve(
+        _turn(
+            "Show air quality and weather around Zurich",
+            "openmeteo_air_quality_forecast",
+            atomic_layers=["air_quality", "weather"],
+        )
+    )
+
+    assert resolved.requested_layers == [
+        "openmeteo_air_quality_forecast",
+        "openmeteo_weather_forecast",
+    ]
+    assert resolved.clarification_plan is None
+
+###############################################################################
+def test_resolves_generic_poi_transit_and_radar_atomic_layers() -> None:
+    resolved = _resolver().resolve(
+        _turn(
+            "Show restaurants, transit stops, and precipitation radar around Rome",
+            "overpass_poi_amenities",
+            atomic_layers=["poi", "transit_stops", "precipitation_radar"],
+        )
+    )
+
+    assert resolved.requested_layers == [
+        "overpass_poi_amenities",
+        "rainviewer_precipitation_radar",
+    ]
     assert resolved.clarification_plan is None
 
 ###############################################################################

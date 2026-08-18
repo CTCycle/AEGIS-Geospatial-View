@@ -43,7 +43,13 @@ class DirectTurnResponseService:
         context_usage: Any,
         preflight_decision: PolicyDecision | None = None,
     ) -> ChatTurnResponse | None:
-        if AgentTurnSupport.has_parser_authentication_failure(turn_contract):
+        deterministic_context_question = AgentTurnSupport.is_deterministic_context_question(
+            turn_contract.user_text
+        )
+        if (
+            AgentTurnSupport.has_parser_authentication_failure(turn_contract)
+            and not deterministic_context_question
+        ):
             assistant_message = (
                 "I could not use the configured agent model because the saved API key was rejected. "
                 "Open Model Settings and replace the key before using that cloud model."
@@ -70,7 +76,10 @@ class DirectTurnResponseService:
                 progress_summary="Intent extraction failed.",
             )
 
-        if AgentTurnSupport.has_parser_runtime_failure(turn_contract):
+        if (
+            AgentTurnSupport.has_parser_runtime_failure(turn_contract)
+            and not deterministic_context_question
+        ):
             provider_error = getattr(turn_contract, "provider_error", None)
             if is_json_object(provider_error) and provider_error.get("code") == "provider_model_incompatible":
                 assistant_message = (
@@ -160,10 +169,12 @@ class DirectTurnResponseService:
         if (
             turn_contract.task_class == "general_question"
             or AgentTurnSupport.is_capability_question(turn_contract.user_text)
+            or deterministic_context_question
         ):
             fallback_message = AgentTurnSupport.compose_general_question_message(
                 turn_contract.user_text,
                 recent_messages,
+                latest_memory,
             )
             operation = ChatOperationResult(
                 kind=(

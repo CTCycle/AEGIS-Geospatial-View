@@ -1,14 +1,14 @@
 # Deployment
 
-Last updated: 2026-08-03
+Last updated: 2026-08-18
 
 ## Backend Persistence
 
 - SQLite and PostgreSQL are both supported.
 - Database mode is controlled by `settings/.env` or runtime environment variables.
 - `EMBEDDED_DATABASE` switches between SQLite and PostgreSQL.
-- Embedded SQLite resolves to `%TEMP%/AEGIS Geospatial View/database.db` on
-  Windows and `<repo>/.runtime/database.db` elsewhere.
+- Embedded SQLite resolves to `<repo>/app/resources/runtime/database.db` by
+  default in every environment.
 - Set `AEGIS_RUNTIME_DATA_DIR` to override the embedded database directory.
 - Missing SQLite files are created and seeded on first application startup.
 - PostgreSQL requires the explicit database initialization command from
