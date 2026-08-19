@@ -22,7 +22,6 @@ from server.domain.agent.runtime import (
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.agent.conversation_state import ConversationTaskStateService
 
-
 ###############################################################################
 def test_task_graph_requires_successful_predecessors() -> None:
     tasks = [
@@ -37,7 +36,6 @@ def test_task_graph_requires_successful_predecessors() -> None:
         AgentThreadState(conversation_id="c", goal=AgentGoal(id="g", text="x"), tasks=tasks)
     ) == "required_task_failed"
 
-
 ###############################################################################
 def test_task_graph_rejects_cycles() -> None:
     tasks = [
@@ -46,7 +44,6 @@ def test_task_graph_rejects_cycles() -> None:
     ]
     with pytest.raises(RuntimeValidationError, match="cycle"):
         validate_task_graph(tasks)
-
 
 ###############################################################################
 def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> None:
@@ -66,7 +63,6 @@ def test_fingerprints_are_canonical_and_scope_invalidation_is_selective() -> Non
     assert state.evidence_refs == ["location", "air"]
     assert state_fingerprint(state)
 
-
 ###############################################################################
 def test_tool_selection_is_deterministic() -> None:
     profiles = [
@@ -85,14 +81,12 @@ def test_tool_selection_is_deterministic() -> None:
     ]
     assert [item.name for item in select_tools(profiles, require_rendering=True)] == ["render"]
 
-
 ###############################################################################
 def test_domain_validation_rejects_invalid_bounds_and_temporal_ranges() -> None:
     assert "between -90" in (ToolRegistry._validate_domain_arguments({"latitude": 91}) or "")
     assert "ordered" in (
         ToolRegistry._validate_domain_arguments({"bbox": [10, 1, -10, 2]}) or ""
     )
-
 
 ###############################################################################
 def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
@@ -133,7 +127,6 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
         )
         or ""
     )
-
 
 ###############################################################################
 def test_hydration_accepts_v2_only_and_restores_active_task() -> None:

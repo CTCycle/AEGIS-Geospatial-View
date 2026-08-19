@@ -460,6 +460,7 @@ def test_tomtom_requires_keys_before_emitting_urls() -> None:
                 ProviderRequest(capability_id="tomtom_traffic_flow")
             )
         )
+
 ###############################################################################
 def test_tomtom_provider_normalizes_live_incidents() -> None:
     calls: list[str] = []
@@ -528,6 +529,7 @@ def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch
         "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
     )
     assert "tomtom-test" not in str(tomtom.payload)
+
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
     response = run_async_in_thread(

@@ -116,6 +116,7 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     assert response.payload["features"] == []
     assert response.payload["featureCount"] == 0
 
+###############################################################################
 def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
     async def fetcher(url, headers):
         return "not-json-shape"

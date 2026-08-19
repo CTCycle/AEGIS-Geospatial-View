@@ -20,7 +20,6 @@ SteeringDeltaKind = Literal[
     "instruction",
 ]
 
-
 ###############################################################################
 class SteeringDelta(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -30,7 +29,6 @@ class SteeringDelta(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     preserve_evidence: bool = True
     invalidates_scope_dependent_evidence: bool = False
-
 
 ###############################################################################
 def classify_steering_delta(message: str) -> SteeringDelta:

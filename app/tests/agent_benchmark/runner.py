@@ -34,7 +34,6 @@ from server.services.agent.tool_plan_executor import ToolPlanExecutor
 from server.services.agent.tool_registry import ToolRegistry
 from server.services.llm.types import LLMToolDefinition
 
-
 ###############################################################################
 def _json_response(response: httpx.Response) -> dict[str, Any]:
     try:
@@ -43,31 +42,26 @@ def _json_response(response: httpx.Response) -> dict[str, Any]:
         return {"status_code": response.status_code, "text": response.text[:1000]}
     return payload if isinstance(payload, dict) else {"value": payload}
 
-
 ###############################################################################
 def _fingerprint(tool: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(tool, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
 
-
 ###############################################################################
 def _response(trace: dict[str, Any]) -> dict[str, Any]:
     value = trace.get("response")
     return value if isinstance(value, dict) else {}
-
 
 ###############################################################################
 def _contract(trace: dict[str, Any]) -> dict[str, Any]:
     value = _response(trace).get("turn_contract")
     return value if isinstance(value, dict) else {}
 
-
 ###############################################################################
 def _map_session(trace: dict[str, Any]) -> dict[str, Any] | None:
     value = trace.get("map_session")
     return value if isinstance(value, dict) else None
-
 
 ###############################################################################
 def _tool_calls(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -78,7 +72,6 @@ def _tool_calls(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if isinstance(item, dict)
     ]
 
-
 ###############################################################################
 def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
@@ -87,7 +80,6 @@ def _tool_results(traces: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for item in trace.get("tool_results", [])
         if isinstance(item, dict)
     ]
-
 
 ###############################################################################
 def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
@@ -100,7 +92,6 @@ def _capability_ids(tool_calls: list[dict[str, Any]]) -> set[str]:
         if isinstance(capability_id, str) and capability_id.strip():
             capability_ids.add(capability_id.strip())
     return capability_ids
-
 
 ###############################################################################
 def _map_has_location(map_session: dict[str, Any] | None) -> bool:
@@ -116,7 +107,6 @@ def _map_has_location(map_session: dict[str, Any] | None) -> bool:
         and isinstance(location.get("latitude"), int | float)
         and isinstance(location.get("longitude"), int | float)
     )
-
 
 ###############################################################################
 def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
@@ -134,7 +124,6 @@ def _overlay_ids(traces: list[dict[str, Any]]) -> set[str]:
             )
     return overlays
 
-
 ###############################################################################
 def _has_error(trace: dict[str, Any]) -> bool:
     if int(trace.get("status_code") or 0) >= 400:
@@ -147,12 +136,10 @@ def _has_error(trace: dict[str, Any]) -> bool:
             return True
     return False
 
-
 ###############################################################################
 def _answer(trace: dict[str, Any]) -> str:
     value = _response(trace).get("assistant_message")
     return value if isinstance(value, str) else ""
-
 
 ###############################################################################
 def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
@@ -184,11 +171,9 @@ def _valid_tool_arguments(tool_calls: list[dict[str, Any]]) -> bool:
         for call in tool_calls
     )
 
-
 ###############################################################################
 def _assertion_result(name: str, passed: bool, reason: str) -> dict[str, Any]:
     return {"name": name, "passed": passed, "reason": reason}
-
 
 ###############################################################################
 def _evaluate_model_assertion(
@@ -377,7 +362,6 @@ def _evaluate_model_assertion(
         return _assertion_result(name, passed, "The response recorded tool or map-provider output." if passed else "No upstream result was recorded.")
     return _assertion_result(name, False, "No evaluator exists for this assertion.")
 
-
 ###############################################################################
 def evaluate_model_scenario(
     scenario: dict[str, Any], traces: list[dict[str, Any]]
@@ -411,7 +395,6 @@ def evaluate_model_scenario(
         "unnecessary_tool_calls": unnecessary_tool_calls,
         "failed_tool_calls": sum(1 for result in _tool_results(traces) if result.get("is_error")),
     }
-
 
 ###############################################################################
 def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -465,7 +448,6 @@ def _model_lane_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         "peak_context_usage_percent": max((float(value) for value in usages if isinstance(value, int | float)), default=0.0),
     }
 
-
 ###############################################################################
 class _ScriptedToolRegistry:
 
@@ -500,7 +482,6 @@ class _ScriptedToolRegistry:
             )
         return ToolExecutionEnvelope(ok=True, data={"value": "scripted"})
 
-
 ###############################################################################
 def _scripted_plan(failure: str) -> ToolPlan:
     if failure == "malformed_schema":
@@ -531,7 +512,6 @@ def _scripted_plan(failure: str) -> ToolPlan:
             update={"retry_policy": ToolRetryPolicy(max_attempts=2)}
         )
     return ToolPlan(tool_group="direct_chat", selected_tools=[step.tool_name for step in steps], steps=steps)
-
 
 ###############################################################################
 def _run_scripted_plan(failure: str) -> tuple[list[Any], int]:
@@ -583,7 +563,6 @@ def _run_scripted_plan(failure: str) -> tuple[list[Any], int]:
         )
     )
     return results, len(registry.calls)
-
 
 ###############################################################################
 def _run_scripted_fault_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
@@ -653,7 +632,6 @@ def _run_scripted_fault_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
         **details,
     }
 
-
 ###############################################################################
 def run_scripted_fault_lane(*, manifest_path: Path, output_dir: Path) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -689,7 +667,6 @@ def run_scripted_fault_lane(*, manifest_path: Path, output_dir: Path) -> dict[st
         json.dumps(metrics, indent=2, ensure_ascii=True), encoding="utf-8"
     )
     return bundle
-
 
 ###############################################################################
 def run_manifest(
@@ -784,7 +761,6 @@ def run_manifest(
         json.dumps(metrics, indent=2, ensure_ascii=True), encoding="utf-8"
     )
     return bundle
-
 
 ###############################################################################
 def main() -> int:

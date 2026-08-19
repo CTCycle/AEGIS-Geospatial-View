@@ -13,7 +13,6 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-
 ###############################################################################
 def load_asgi_app(spec: str) -> FastAPI:
     module_name, separator, app_name = spec.partition(":")
@@ -28,7 +27,6 @@ def load_asgi_app(spec: str) -> FastAPI:
             f"in module '{module_name}'"
         )
     return application
-
 
 ###############################################################################
 def main() -> int:

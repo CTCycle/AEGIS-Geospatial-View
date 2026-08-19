@@ -1,6 +1,5 @@
 from server.services.llm.errors import LLMProviderRequestError
 
-
 ###############################################################################
 def test_provider_connection_errors_are_retryable() -> None:
     error = LLMProviderRequestError.from_exception(
@@ -12,7 +11,6 @@ def test_provider_connection_errors_are_retryable() -> None:
 
     assert error.code == "provider_request_failed"
     assert error.retryable is True
-
 
 ###############################################################################
 def test_non_transient_provider_errors_are_not_retryable() -> None:
