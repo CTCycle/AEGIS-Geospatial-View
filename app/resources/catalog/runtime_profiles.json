@@ -375,27 +375,6 @@
       "auth_required": false
     },
     {
-      "capability_id": "nrel_afdc_alt_fuel_stations",
-      "enabled_by_default": true,
-      "credential_provider": "nrel",
-      "supports_map": true,
-      "supports_direct_text": true,
-      "coverage_policy": "united-states",
-      "health_policy": "credential_gated",
-      "handler_name": "nrel_afdc_alt_fuel_stations",
-      "capability_kind": "vector-overlay",
-      "rendering_mode": "clustered-points",
-      "health_status": "partial",
-      "planner_hints": [
-        "alternative fuel",
-        "ev charging",
-        "hydrogen",
-        "fuel station"
-      ],
-      "manual_toggle": true,
-      "auth_required": true
-    },
-    {
       "capability_id": "ourairports_airports",
       "enabled_by_default": true,
       "credential_provider": null,
@@ -815,55 +794,6 @@
       ],
       "manual_toggle": false,
       "auth_required": false
-    },
-    {
-      "capability_id": "fred_regional_market_indicators",
-      "enabled_by_default": true,
-      "credential_provider": "fred",
-      "supports_map": false,
-      "supports_direct_text": true,
-      "coverage_policy": "us",
-      "health_policy": "best_effort",
-      "handler_name": null,
-      "capability_kind": "metadata-only",
-      "rendering_mode": "metadata-only",
-      "health_status": "partial",
-      "planner_hints": [
-        "market data",
-        "housing prices",
-        "rent trends",
-        "market analysis",
-        "economic context",
-        "housing trends",
-        "fred",
-        "housing",
-        "rent",
-        "economic indicators",
-        "market"
-      ],
-      "manual_toggle": false,
-      "auth_required": true
-    },
-    {
-      "capability_id": "geoapify_amenities",
-      "enabled_by_default": true,
-      "credential_provider": "geoapify",
-      "supports_map": true,
-      "supports_direct_text": false,
-      "coverage_policy": "global",
-      "health_policy": "best_effort",
-      "handler_name": null,
-      "capability_kind": "search-index",
-      "rendering_mode": "clustered-points",
-      "health_status": "partial",
-      "planner_hints": [
-        "places",
-        "geojson",
-        "geoapify",
-        "geoapify places (amenities)"
-      ],
-      "manual_toggle": true,
-      "auth_required": true
     },
     {
       "capability_id": "openfreemap_liberty",

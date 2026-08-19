@@ -14,13 +14,10 @@ class RuntimeRegistry:
     CREDENTIAL_ENV_BY_PROVIDER = {
         "arcgis": "ARCGIS_API_KEY",
         "census": "CENSUS_API_KEY",
-        "fred": "FRED_API_KEY",
-        "geoapify": "GEOAPIFY_API_KEY",
         "google": "GOOGLE_API_KEY",
         "google_maps": "GOOGLE_MAPS_API_KEY",
         "nasa": "NASA_API_KEY",
         "nasa_firms": "NASA_API_KEY",
-        "nrel": "NREL_API_KEY",
         "openaq": "OPENAQ_API_KEY",
         "openchargemap": "OPENCHARGEMAP_API_KEY",
         "openaip": "OPENAIP_API_KEY",

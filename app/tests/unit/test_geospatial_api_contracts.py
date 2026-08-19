@@ -399,7 +399,6 @@ def test_geospatial_provider_account_setup_detail_reports_env(monkeypatch) -> No
     [
         ("opentripmap", "OPENTRIPMAP_API_KEY"),
         ("openchargemap", "OPENCHARGEMAP_API_KEY"),
-        ("nrel", "NREL_API_KEY"),
     ],
 )
 def test_optional_provider_credential_status_uses_provider_environment(
@@ -428,11 +427,8 @@ def test_account_setup_lists_all_credential_gated_manifest_providers() -> None:
     provider_ids = {item["provider_id"] for item in response.json()["providers"]}
     assert provider_ids == {
         "arcgis",
-        "fred",
-        "geoapify",
         "google_maps",
         "nasa_firms",
-        "nrel",
         "openaq",
         "openchargemap",
         "opentripmap",

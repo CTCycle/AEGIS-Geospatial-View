@@ -382,7 +382,6 @@ class AgentResponseBuilder:
 
         replacements = {
             "TOMTOM_API_KEY": "TomTom API key",
-            "GEOAPIFY_API_KEY": "Geoapify API key",
             "WINDY_WEBCAMS_API_KEY": "Windy Webcams API key",
             "osm_default": "OpenStreetMap",
             "tomtom_traffic_flow": "TomTom Traffic Flow",

@@ -10,7 +10,6 @@ from server.services.geospatial.providers.base import (
     ProviderRequest,
     ProviderUnavailableError,
 )
-from server.services.geospatial.providers.nrel import NRELProvider
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
 from server.services.geospatial.providers.opentripmap import OpenTripMapProvider
 from server.services.geospatial.providers.ourairports import OurAirportsProvider
@@ -60,29 +59,6 @@ def test_openchargemap_supports_optional_key() -> None:
 
     assert "openchargemap" in response.payload["featuresUrl"]
     assert "charge-key" in keyed.payload["featuresUrl"]
-
-###############################################################################
-def test_nrel_requires_key_for_afdc_descriptor() -> None:
-    with pytest.raises(ProviderAuthError):
-        run_async_in_thread(
-            NRELProvider().fetch(
-                ProviderRequest(
-                    capability_id="nrel_afdc_alt_fuel_stations",
-                    params={"latitude": 41.9, "longitude": 12.5},
-                )
-            )
-        )
-
-    response = run_async_in_thread(
-        NRELProvider(api_key="nrel-key").fetch(
-            ProviderRequest(
-                capability_id="nrel_afdc_alt_fuel_stations",
-                params={"latitude": 41.9, "longitude": 12.5},
-            )
-        )
-    )
-    assert "nrel-key" in response.payload["featuresUrl"]
-    assert "alt-fuel-stations" in response.payload["featuresUrl"]
 
 ###############################################################################
 def test_ourairports_returns_source_ready_descriptor() -> None:
@@ -140,46 +116,15 @@ def test_openchargemap_live_fetch_handles_empty_payload() -> None:
     assert response.payload["features"] == []
     assert response.payload["featureCount"] == 0
 
-###############################################################################
-def test_nrel_live_fetch_normalizes_alt_fuel_stations() -> None:
-    async def fetcher(url, headers):
-        assert "developer.nrel.gov" in url
-        assert headers is None
-        return {
-            "fuel_stations": [
-                {
-                    "id": 1,
-                    "station_name": "Fast Charge",
-                    "latitude": 41.9,
-                    "longitude": 12.5,
-                    "fuel_type_code": "ELEC",
-                    "street_address": "1 Main St",
-                }
-            ]
-        }
-
-    response = run_async_in_thread(
-        NRELProvider(api_key="nrel-key", fetcher=fetcher).fetch(
-            ProviderRequest(
-                capability_id="nrel_afdc_alt_fuel_stations",
-                params={"latitude": 41.9, "longitude": 12.5, "live": True},
-            )
-        )
-    )
-
-    assert response.payload["featureCount"] == 1
-    assert response.payload["features"][0]["category"] == "ev_charging"
-
-###############################################################################
 def test_optional_live_provider_malformed_payload_fails_cleanly() -> None:
     async def fetcher(url, headers):
         return "not-json-shape"
 
     with pytest.raises(ProviderUnavailableError):
         run_async_in_thread(
-            NRELProvider(api_key="nrel-key", fetcher=fetcher).fetch(
+            OpenChargeMapProvider(api_key="charge-key", fetcher=fetcher).fetch(
                 ProviderRequest(
-                    capability_id="nrel_afdc_alt_fuel_stations",
+                    capability_id="openchargemap_ev_charging",
                     params={"latitude": 41.9, "longitude": 12.5, "live": True},
                 )
             )

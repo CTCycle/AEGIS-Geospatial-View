@@ -28,8 +28,6 @@ from server.services.geospatial.providers.eea import EEAProvider
 from server.services.geospatial.providers.esa import ESAProvider
 from server.services.geospatial.providers.eurostat import EurostatProvider
 from server.services.geospatial.providers.fema import FEMAProvider
-from server.services.geospatial.providers.fred import FREDProvider
-from server.services.geospatial.providers.geoapify import GeoapifyProvider
 from server.services.geospatial.providers.gtfs_realtime import GTFSRealtimeProvider
 from server.services.geospatial.providers.gtfs_static import GTFSStaticProvider
 from server.services.geospatial.providers.local_open_data import LocalOpenDataProvider
@@ -39,7 +37,6 @@ from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 from server.services.geospatial.providers.natural_earth import NaturalEarthProvider
 from server.services.geospatial.providers.noaa import NOAAProvider
 from server.services.geospatial.providers.nominatim import NominatimProvider
-from server.services.geospatial.providers.nrel import NRELProvider
 from server.services.geospatial.providers.openaddresses import OpenAddressesProvider
 from server.services.geospatial.providers.openaq import OpenAQProvider
 from server.services.geospatial.providers.openchargemap import OpenChargeMapProvider
@@ -71,14 +68,12 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "openaq": lambda: OpenAQProvider(api_key=os.getenv("OPENAQ_API_KEY")),
     "pvgis": PVGISProvider,
     "tomtom": lambda: TomTomProvider(api_key=os.getenv("TOMTOM_API_KEY")),
-    "geoapify": lambda: GeoapifyProvider(api_key=os.getenv("GEOAPIFY_API_KEY")),
     "windy_webcams": lambda: WindyWebcamsProvider(
         api_key=os.getenv("WINDY_WEBCAMS_API_KEY")
     ),
     "usgs": USGSProvider,
     "noaa": NOAAProvider,
     "fema": FEMAProvider,
-    "fred": lambda: FREDProvider(api_key=os.getenv("FRED_API_KEY")),
     "nasa_firms": lambda: NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY")),
     "opentripmap": lambda: OpenTripMapProvider(
         api_key=os.getenv("OPENTRIPMAP_API_KEY")
@@ -86,7 +81,6 @@ PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
     "openchargemap": lambda: OpenChargeMapProvider(
         api_key=os.getenv("OPENCHARGEMAP_API_KEY")
     ),
-    "nrel": lambda: NRELProvider(api_key=os.getenv("NREL_API_KEY")),
     "ourairports": OurAirportsProvider,
     "gtfs_static": GTFSStaticProvider,
     "gtfs_realtime": GTFSRealtimeProvider,

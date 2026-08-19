@@ -13,11 +13,9 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `eea.py`
 - `esa.py`
 - `eurostat.py`
-- `geoapify.py`
 - `gtfs_realtime.py`
 - `gtfs_static.py`
 - `fema.py`
-- `fred.py`
 - `local_open_data.py`
 - `mapillary.py`
 - `mobility_database.py`
@@ -26,7 +24,6 @@ Provider adapters live under `app/server/services/geospatial/providers`.
 - `natural_earth.py`
 - `noaa.py`
 - `nominatim.py`
-- `nrel.py`
 - `openaddresses.py`
 - `openaq.py`
 - `openchargemap.py`
