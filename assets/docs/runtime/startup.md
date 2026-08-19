@@ -15,14 +15,14 @@ frontend services. If `settings/.env` is missing, the launcher reads
 `settings/.env.example` for its first-run process settings and the application
 creates the local file without overwriting an existing file.
 
-The menu provides: launch application, install/update dependencies, initialize
-the database explicitly, run the test suite, remove logs, clear caches,
-uninstall local dependencies, and exit.
+The menu provides: launch application, install/update dependencies, rebuild the
+frontend independently, initialize the database explicitly, run the test suite,
+remove logs, clear caches, uninstall local dependencies, and exit.
 
 SQLite is created and seeded automatically only when its configured database
 file is missing. An existing SQLite file is left untouched. PostgreSQL is never
 created or initialized during application launch; select the database mode in
-`settings/.env`, then run menu option 3 once before launching the application.
+`settings/.env`, then run menu option 4 once before launching the application.
 
 Launch option 1 stops listeners on the configured backend/UI ports, starts the
 backend, waits for `/api/health`, starts the frontend preview, waits for the UI
@@ -33,7 +33,8 @@ repository root when importable and falls back to `server.app:app` from
 When option 1 detects missing or unusable application environments, it restores
 dependencies and rebuilds the frontend. A ready environment is reused without a
 rebuild. Use menu option 2 to install or update dependencies and build the
-frontend on demand.
+frontend, or menu option 3 to rebuild the frontend without synchronizing
+backend dependencies.
 
 `BACKEND_LOGS_VISIBLE=true` (the default when absent) starts backend logs in a
 separate visible terminal. Set it to `false` to start the backend detached and
@@ -46,7 +47,7 @@ An existing `app\server\.venv` is reused. The launcher recreates it only when
 repository or runtime folder is moved. An unrelated dependency-sync failure
 does not delete the environment.
 
-Launching preserves the uv cache. Use menu option 2 to install or update dependencies and prune it, or menu option 6 to clear caches without reinstalling.
+Launching preserves the uv cache. Use menu option 2 to install or update dependencies and prune it, or menu option 7 to clear caches without reinstalling.
 
 ## Local Development Manual
 
