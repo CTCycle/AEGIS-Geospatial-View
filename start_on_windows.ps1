@@ -194,8 +194,31 @@ function Set-LauncherEnvironment {
     $env:PATH = "$NodeDir;$($env:PATH)"
 }
 
+function Ensure-NodeRuntime {
+    New-Item -ItemType Directory -Path $RuntimesDir, $NodeDir -Force | Out-Null
+
+    Write-Status STEP 'Installing Node.js (portable)'
+    if (-not (Test-Path -LiteralPath $NodeExe)) {
+        Write-Status INFO "Downloading $NodeArchiveUri"
+        Invoke-DownloadAndExtract -Uri $NodeArchiveUri -ArchivePath (Join-Path $NodeDir $NodeArchiveName) -DestinationPath $NodeDir
+    }
+    $nestedNodeDir = Join-Path $NodeDir "node-v$NodeVersion-win-x64"
+    if (Test-Path -LiteralPath (Join-Path $nestedNodeDir 'node.exe')) {
+        Get-ChildItem -LiteralPath $nestedNodeDir -Force | Move-Item -Destination $NodeDir -Force
+        Remove-Item -LiteralPath $nestedNodeDir -Recurse -Force
+    }
+    if (-not (Test-Path -LiteralPath $NodeExe) -or -not (Test-Path -LiteralPath $NpmCmd)) {
+        throw "The portable Node.js runtime is incomplete at $NodeDir."
+    }
+    $nodeVersionOutput = & $NodeExe --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to execute Node.js at $NodeExe."
+    }
+    Write-Status OK "Node.js ready: $nodeVersionOutput"
+}
+
 function Ensure-PortableRuntimes {
-    New-Item -ItemType Directory -Path $RuntimesDir, $PythonDir, $UvDir, $NodeDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $RuntimesDir, $PythonDir, $UvDir -Force | Out-Null
 
     Write-Status STEP 'Setting up Python (embeddable) locally'
     if (-not (Test-Path -LiteralPath $PythonExe)) {
@@ -224,24 +247,25 @@ function Ensure-PortableRuntimes {
     }
     Write-Status OK ($uvVersion -join ' ')
 
-    Write-Status STEP 'Installing Node.js (portable)'
-    if (-not (Test-Path -LiteralPath $NodeExe)) {
-        Write-Status INFO "Downloading $NodeArchiveUri"
-        Invoke-DownloadAndExtract -Uri $NodeArchiveUri -ArchivePath (Join-Path $NodeDir $NodeArchiveName) -DestinationPath $NodeDir
+    Ensure-NodeRuntime
+}
+
+function Build-Frontend {
+    if (-not (Test-Path -LiteralPath (Join-Path $ClientDir 'package.json'))) {
+        throw "Frontend package manifest was not found at $ClientDir."
     }
-    $nestedNodeDir = Join-Path $NodeDir "node-v$NodeVersion-win-x64"
-    if (Test-Path -LiteralPath (Join-Path $nestedNodeDir 'node.exe')) {
-        Get-ChildItem -LiteralPath $nestedNodeDir -Force | Move-Item -Destination $NodeDir -Force
-        Remove-Item -LiteralPath $nestedNodeDir -Recurse -Force
+
+    Write-Status STEP 'Building frontend'
+    Push-Location $ClientDir
+    try {
+        & $NpmCmd run build
+        if ($LASTEXITCODE -ne 0) {
+            throw "Frontend build failed with exit code $LASTEXITCODE."
+        }
     }
-    if (-not (Test-Path -LiteralPath $NodeExe) -or -not (Test-Path -LiteralPath $NpmCmd)) {
-        throw "The portable Node.js runtime is incomplete at $NodeDir."
+    finally {
+        Pop-Location
     }
-    $nodeVersionOutput = & $NodeExe --version
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to execute Node.js at $NodeExe."
-    }
-    Write-Status OK "Node.js ready: $nodeVersionOutput"
 }
 
 function Sync-Dependencies {
@@ -282,18 +306,22 @@ function Sync-Dependencies {
         if ($LASTEXITCODE -ne 0) {
             throw "npm dependency installation failed with exit code $LASTEXITCODE."
         }
-
-        if ($BuildFrontend) {
-            Write-Status STEP 'Building frontend'
-            & $NpmCmd run build
-            if ($LASTEXITCODE -ne 0) {
-                throw "Frontend build failed with exit code $LASTEXITCODE."
-            }
-        }
     }
     finally {
         Pop-Location
     }
+
+    if ($BuildFrontend) {
+        Build-Frontend
+    }
+}
+
+function Invoke-RebuildFrontend {
+    Import-EnvironmentFile
+    Set-LauncherEnvironment
+    Ensure-NodeRuntime
+    Build-Frontend
+    Write-Status SUCCESS 'Frontend rebuilt successfully.'
 }
 
 function Test-DependenciesReady {
@@ -600,31 +628,32 @@ function Show-LauncherMenu {
     Write-Host '  APPLICATION' -ForegroundColor DarkCyan
     Write-MenuOption -Number '1' -Label 'Launch application' -Description 'Start local services'
     Write-MenuOption -Number '2' -Label 'Install / update dependencies' -Description 'Sync and build'
-    Write-MenuOption -Number '3' -Label 'Initialize database' -Description 'Create schema and seed data'
+    Write-MenuOption -Number '3' -Label 'Rebuild frontend' -Description 'Run frontend production build'
+    Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create schema and seed data'
     Write-Host ''
     Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
-    Write-MenuOption -Number '4' -Label 'Run test suite' -Description 'Validate installation'
-    Write-MenuOption -Number '5' -Label 'Remove logs' -Description 'Clear application logs'
-    Write-MenuOption -Number '6' -Label 'Clear cache' -Description 'Remove Python and uv caches'
-    Write-MenuOption -Number '7' -Label 'Uninstall application' -Description 'Remove local dependencies' -Destructive
+    Write-MenuOption -Number '5' -Label 'Run test suite' -Description 'Validate installation'
+    Write-MenuOption -Number '6' -Label 'Remove logs' -Description 'Clear application logs'
+    Write-MenuOption -Number '7' -Label 'Clear cache' -Description 'Remove Python and uv caches'
+    Write-MenuOption -Number '8' -Label 'Uninstall application' -Description 'Remove local dependencies' -Destructive
     Write-Host ''
     Write-MenuRule
-    Write-MenuOption -Number '8' -Label 'Exit' -Description 'Close launcher' -Exit
+    Write-MenuOption -Number '9' -Label 'Exit' -Description 'Close launcher' -Exit
     Write-MenuRule
     Write-Host ''
 }
 
 while ($true) {
     Show-LauncherMenu
-    $selection = (Read-Host '  Select an option (1-8)').Trim()
+    $selection = (Read-Host '  Select an option (1-9)').Trim()
 
-    if ($selection -notmatch '^[1-8]$') {
-        Write-Status WARN 'Invalid option. Enter a number from 1 to 8.'
+    if ($selection -notmatch '^[1-9]$') {
+        Write-Status WARN 'Invalid option. Enter a number from 1 to 9.'
         Wait-ForMenuReturn
         continue
     }
 
-    if ($selection -eq '8') {
+    if ($selection -eq '9') {
         break
     }
 
@@ -635,11 +664,12 @@ while ($true) {
                 exit 0
             }
             '2' { Invoke-InstallOrUpdate }
-            '3' { Invoke-InitializeDatabase }
-            '4' { Invoke-TestSuite }
-            '5' { Remove-ApplicationLogs }
-            '6' { Clear-ApplicationCache }
-            '7' { Uninstall-Application }
+            '3' { Invoke-RebuildFrontend }
+            '4' { Invoke-InitializeDatabase }
+            '5' { Invoke-TestSuite }
+            '6' { Remove-ApplicationLogs }
+            '7' { Clear-ApplicationCache }
+            '8' { Uninstall-Application }
         }
     }
     catch {
