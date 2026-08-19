@@ -95,6 +95,7 @@ def test_openapi_declares_stable_response_models(monkeypatch) -> None:
     ) == "#/components/schemas/GeospatialCatalogResponse"
     stream_schema = schema["paths"][f"{FASTAPI_API_PREFIX}/chat/stream"]["post"]["responses"]["200"]
     assert "$ref" not in str(stream_schema)
+    assert schema["info"]["version"] == "1.0.0"
 
 ###############################################################################
 def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:

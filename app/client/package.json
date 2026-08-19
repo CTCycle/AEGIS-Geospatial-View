@@ -1,7 +1,7 @@
 {
   "name": "aegis-client",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.0.0",
   "scripts": {
     "start": "ng serve --proxy-config proxy.conf.cjs",
     "build": "ng build",
