@@ -14,6 +14,7 @@ from server.api.realtime import metrics_router as realtime_metrics_router
 from server.api.realtime import router as realtime_router
 from server.api.geospatial import router as geospatial_router
 from server.api.jobs import router as jobs_router
+from server.common.constants import AEGIS_VERSION
 from server.common.paths import (
     CLIENT_ASSETS_PATH,
     CLIENT_DIST_PATH,
@@ -155,7 +156,11 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 
 ###############################################################################
 def create_app() -> FastAPI:
-    application = FastAPI(title="AEGIS API", lifespan=app_lifespan)
+    application = FastAPI(
+        title="AEGIS API",
+        version=AEGIS_VERSION,
+        lifespan=app_lifespan,
+    )
 
     application.include_router(chat_router, prefix=FASTAPI_API_PREFIX)
     application.include_router(conversations_router, prefix=FASTAPI_API_PREFIX)
