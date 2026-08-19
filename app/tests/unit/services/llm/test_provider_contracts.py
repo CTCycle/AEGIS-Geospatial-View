@@ -10,7 +10,6 @@ from server.services.llm.ollama import OllamaProvider
 from server.services.llm.opencode_provider import OPENCODE_GO_PROVIDER, OpenCodeProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
-
 ###############################################################################
 def _tool() -> LLMToolDefinition:
     return LLMToolDefinition(
@@ -23,7 +22,6 @@ def _tool() -> LLMToolDefinition:
         },
     )
 
-
 ###############################################################################
 def _request(provider: str, model: str) -> LLMRequest:
     return LLMRequest(
@@ -32,7 +30,6 @@ def _request(provider: str, model: str) -> LLMRequest:
         messages=[{"role": "user", "content": "Find Zurich."}],
         tools=[_tool()],
     )
-
 
 ###############################################################################
 class _Completions:
@@ -61,7 +58,6 @@ class _Completions:
             model_dump=lambda mode="json": {"choices": []},
         )
 
-
 ###############################################################################
 class _OpenAICompatibleClient:
 
@@ -69,7 +65,6 @@ class _OpenAICompatibleClient:
     def __init__(self) -> None:
         self.completions = _Completions()
         self.chat = SimpleNamespace(completions=self.completions)
-
 
 ###############################################################################
 def test_google_native_tool_contract_uses_function_declarations() -> None:
@@ -84,7 +79,6 @@ def test_google_native_tool_contract_uses_function_declarations() -> None:
     assert contents[0]["role"] == "model"
     assert contents[1]["parts"][0]["function_response"]["name"] == "resolve_location"
 
-
 ###############################################################################
 def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(monkeypatch) -> None:
     for provider, model in (
@@ -98,7 +92,6 @@ def test_deepseek_and_opencode_chat_contracts_are_chat_completions_native(monkey
         assert call["tools"][0]["type"] == "function"
         assert call["tool_choice"] == "auto"
         assert result.tool_calls[0].arguments == {"query": "Zurich"}
-
 
 ###############################################################################
 def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
@@ -136,7 +129,6 @@ def test_ollama_chat_contract_emits_native_tools_and_parses_results() -> None:
     assert captured["path"] == "/api/chat"
     assert captured["payload"]["tools"][0]["function"]["name"] == "resolve_location"
     assert result.tool_calls[0].arguments == {"query": "Zurich"}
-
 
 ###############################################################################
 def test_provider_contract_envelope_error_remains_structured() -> None:

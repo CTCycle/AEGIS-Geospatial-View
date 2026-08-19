@@ -5,7 +5,6 @@ from pathlib import Path
 
 from tests.agent_benchmark.runner import evaluate_model_scenario, run_manifest
 
-
 ###############################################################################
 def test_model_lane_evaluates_structured_tool_and_map_evidence() -> None:
     scenario = {
@@ -43,7 +42,6 @@ def test_model_lane_evaluates_structured_tool_and_map_evidence() -> None:
     assert evaluation["passed"] is True
     assert evaluation["duplicate_tool_calls"] == 0
 
-
 ###############################################################################
 def test_model_lane_scores_ambiguous_location_clarification() -> None:
     evaluation = evaluate_model_scenario(
@@ -64,7 +62,6 @@ def test_model_lane_scores_ambiguous_location_clarification() -> None:
     )
 
     assert evaluation["passed"] is True
-
 
 ###############################################################################
 def test_scripted_fault_lane_is_provider_independent(tmp_path: Path) -> None:
