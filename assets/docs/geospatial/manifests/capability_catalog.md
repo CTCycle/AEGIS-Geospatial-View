@@ -6,7 +6,7 @@ Last updated: 2026-08-02
 
 This file is the reviewable inventory of geospatial capabilities implemented by AEGIS. The runtime source of truth remains `app/resources/catalog`.
 
-The current catalog snapshot contains 6 basemaps, 48 overlays, 18 provider
+The current catalog snapshot contains 6 basemaps, 45 overlays, 16 provider
 descriptors, 4 direct tools, 7 camera networks, and 3 transit capabilities.
 
 ## Providers
@@ -15,7 +15,6 @@ descriptors, 4 direct tools, 7 camera networks, and 3 transit capabilities.
 | --- | --- | --- |
 | `eea` | EU/EEA environmental overlays | public |
 | `esa` | WorldCover land-use context | public |
-| `geoapify` | optional OSM-derived amenities | credentialed |
 | `gibs` | satellite and earth-observation layers | public |
 | `openaq` | air-quality station observations | credentialed |
 | `openmeteo` | weather and air-quality forecasts | public |
@@ -27,7 +26,6 @@ descriptors, 4 direct tools, 7 camera networks, and 3 transit capabilities.
 | `mobility_database` | local GTFS and GTFS-Realtime feed metadata catalog | public |
 | `census` | U.S. geometry and demographic joins | public with optional key for some APIs |
 | `eurostat` | EU/EEA demographic and market indicators | public |
-| `fred` | U.S. economic and market indicators | credentialed |
 | `arcgis` | ArcGIS imagery and feature services | credentialed |
 | `data_europa` | European open-data discovery | public |
 | `geoss` | European geospatial discovery metadata | public |
@@ -51,7 +49,6 @@ Representative implemented layers include:
 
 - `eea_noise_2019`
 - `esa_worldcover`
-- `geoapify_amenities`
 - `IMERG_Precipitation_Rate`
 - `MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual`
 - `MODIS_Combined_Thermal_Anomalies_Fire`
@@ -76,14 +73,12 @@ Representative implemented layers include:
 - `census_tigerweb_demographics`
 - `openmeteo_pressure_humidity_wind`
 - `mobility_database_feeds`
-- `fred_regional_market_indicators`
 - `eurostat_regional_demographics`
 - `eurostat_housing_market`
 - `fema_nfhl_flood_zones`
 - `nasa_firms_active_fires`
 - `noaa_radar`
 - `noaa_weather_alerts`
-- `nrel_afdc_alt_fuel_stations`
 - `openchargemap_ev_charging`
 - `opentripmap_tourism_pois`
 - `usgs_earthquakes`

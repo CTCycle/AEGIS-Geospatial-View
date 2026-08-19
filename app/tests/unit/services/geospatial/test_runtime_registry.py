@@ -13,7 +13,7 @@ class _CredentialRepo:
 
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
-        if self.present and provider in {"tomtom", "geoapify"} and label == "api_key":
+        if self.present and provider == "tomtom" and label == "api_key":
             return object()
         return None
 
@@ -46,7 +46,6 @@ def test_runtime_profiles_cover_all_capabilities() -> None:
 ###############################################################################
 def test_key_required_providers_are_unavailable_without_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
     registry = RuntimeRegistry(
         manifest_loader=GeospatialManifestLoader(),
         credentials_repo=_CredentialRepo(False),
@@ -55,12 +54,10 @@ def test_key_required_providers_are_unavailable_without_saved_credentials(monkey
 
     assert not registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "missing_credentials"
-    assert not registry.credentials_present("geoapify_amenities")
 
 ###############################################################################
 def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
     registry = RuntimeRegistry(
         manifest_loader=GeospatialManifestLoader(),
         credentials_repo=_CredentialRepo(True),
@@ -69,4 +66,3 @@ def test_key_required_providers_use_saved_credentials(monkeypatch) -> None:
 
     assert registry.credentials_present("tomtom_traffic_flow")
     assert registry.provider_health("tomtom_traffic_flow") == "healthy"
-    assert registry.credentials_present("geoapify_amenities")

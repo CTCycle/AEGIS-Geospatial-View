@@ -19,7 +19,7 @@ const settings = {
 
 const setup = (providerId: string, support: GeospatialProviderAccountSetup['automation']['support'] = 'agent_assisted'): GeospatialProviderAccountSetup => ({
   providerId,
-  name: providerId === 'opentripmap' ? 'OpenTripMap Tourism POIs' : 'Geoapify',
+  name: providerId === 'opentripmap' ? 'OpenTripMap Tourism POIs' : 'TomTom Traffic',
   requiresCredentials: true,
   authMode: 'api-key',
   docsUrl: 'https://example.test/docs',
@@ -57,15 +57,15 @@ describe('pages/access-configurations-page.component', () => {
     ]);
     fetchChatSettingsMock = jasmine.createSpy('fetchChatSettings').and.resolveTo(settings);
     fetchGeospatialProviderAccountSetupsMock = jasmine.createSpy('fetchGeospatialProviderAccountSetups').and.resolveTo({
-      providers: [setup('geoapify'), setup('opentripmap', 'unsupported')],
+      providers: [setup('tomtom'), setup('opentripmap', 'unsupported')],
     });
     updateChatSettingsMock = jasmine.createSpy('updateChatSettings').and.callFake(async (payload): Promise<ModelSettingsResponse> => ({
       ...settings,
-      credentials: payload.credentials.geoapify?.api_key
-        ? ({ geoapify: { api_key: true } } as Record<string, Record<string, boolean>>)
+      credentials: payload.credentials.tomtom?.api_key
+        ? ({ tomtom: { api_key: true } } as Record<string, Record<string, boolean>>)
         : ({} as Record<string, Record<string, boolean>>),
-      credential_health: payload.credentials.geoapify?.api_key
-        ? { geoapify: { api_key: 'healthy' } }
+      credential_health: payload.credentials.tomtom?.api_key
+        ? { tomtom: { api_key: 'healthy' } }
         : {},
     }));
 
@@ -98,7 +98,7 @@ describe('pages/access-configurations-page.component', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    fixture.componentInstance.openProviderSignup(fixture.componentInstance.getAccountSetupForProvider('geoapify'));
+    fixture.componentInstance.openProviderSignup(fixture.componentInstance.getAccountSetupForProvider('tomtom'));
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
@@ -116,14 +116,14 @@ describe('pages/access-configurations-page.component', () => {
     fixture.detectChanges();
 
     const component = fixture.componentInstance;
-    component.drafts.geoapify = 'geo-key';
-    await component.saveProvider('geoapify');
+    component.drafts.tomtom = 'tomtom-key';
+    await component.saveProvider('tomtom');
     fixture.detectChanges();
     expect(updateChatSettingsMock).toHaveBeenCalled();
-    expect(component.configured('geoapify')).toBeTrue();
+    expect(component.configured('tomtom')).toBeTrue();
     expect(fixture.nativeElement.textContent).toContain('Provider access has not been validated.');
 
-    await component.clearProvider('geoapify');
+    await component.clearProvider('tomtom');
     fixture.detectChanges();
     expect(component.statusText).toContain('cleared');
     expect(fixture.nativeElement.textContent).toContain('Optional capabilities are disabled.');
@@ -135,13 +135,13 @@ describe('pages/access-configurations-page.component', () => {
     await fixture.whenStable();
 
     const component = fixture.componentInstance;
-    const geoapify = component.getAccountSetupForProvider('geoapify');
-    expect(geoapify).toBeDefined();
+    const tomtom = component.getAccountSetupForProvider('tomtom');
+    expect(tomtom).toBeDefined();
     component.signupKeyInput = 'generated-key';
-    await component.saveGeneratedCredential(geoapify!);
+    await component.saveGeneratedCredential(tomtom!);
 
     expect(updateChatSettingsMock).toHaveBeenCalledWith(jasmine.objectContaining({
-      credentials: { geoapify: { api_key: 'generated-key' } },
+      credentials: { tomtom: { api_key: 'generated-key' } },
     }));
   });
 

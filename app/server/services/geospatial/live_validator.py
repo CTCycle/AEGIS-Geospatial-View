@@ -80,15 +80,6 @@ PUBLIC_LIVE_CHECKS = (
 
 CREDENTIAL_LIVE_CHECKS = (
     LiveCheck(
-        provider_id="geoapify",
-        request=ProviderRequest(
-            capability_id="geoapify_amenities",
-            bbox=(12.45, 41.88, 12.55, 41.93),
-            params={"live": True, "categories": "catering.restaurant", "limit": 10},
-        ),
-        credential_env="GEOAPIFY_API_KEY",
-    ),
-    LiveCheck(
         provider_id="tomtom",
         request=ProviderRequest(
             capability_id="tomtom_incidents",
@@ -134,14 +125,6 @@ CREDENTIAL_LIVE_CHECKS = (
             },
         ),
         credential_env="OPENAQ_API_KEY",
-    ),
-    LiveCheck(
-        provider_id="fred",
-        request=ProviderRequest(
-            capability_id="fred_regional_market_indicators",
-            params={"live": True, "search_text": "housing rent income", "limit": 10},
-        ),
-        credential_env="FRED_API_KEY",
     ),
     LiveCheck(
         provider_id="nasa_firms",

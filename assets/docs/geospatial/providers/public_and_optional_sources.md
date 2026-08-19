@@ -6,7 +6,7 @@ Last updated: 2026-08-02
 
 Overture Places is the primary bulk POI source after local ingestion into the configured GeoJSON index (`AEGIS_OVERTURE_PLACES_INDEX`). Interactive requests are bounded by bounding box, category, query, and limit. Overpass can be requested as an augmentation source with `augment_overpass=true`; results are normalized and deduplicated through the shared POI model.
 
-Geoapify amenities and OpenTripMap tourism POIs remain available while representative-location parity benchmarks are incomplete. Removal requires the benchmark report to meet its recall, precision, completeness, and duplicate-rate thresholds.
+Overture Places is the bulk POI path and Overpass provides public bounded augmentation. Overture requires a locally ingested index; when it is not configured, bounded Overpass lookup remains available. Tourism-specific metadata remains a separate optional capability.
 
 Provider health is evaluated independently of catalog declaration. A timeout,
 rate limit, malformed payload, or unavailable upstream is reported as a warning
@@ -66,14 +66,6 @@ Use for EU or EEA environmental noise layers.
 
 ## Optional Credentialed Sources
 
-### Geoapify
-
-Use for optional amenities overlays; OpenFreeMap and native OpenStreetMap styles provide the public basemap path.
-
-- Configure `GEOAPIFY_API_KEY` or Access credentials.
-- Review Places API quotas and pricing.
-- Confirm commercial-use rights before production deployment.
-
 ### TomTom
 
 Use for optional traffic flow and incident layers; it is no longer a basic basemap source.
@@ -106,15 +98,6 @@ Use for EV charging station discovery.
 - Prototype local snapshots with `AEGIS_OCM_SNAPSHOT_PATH` for bounded, keyless reads.
 - Bound requests by viewport, radius, and result count.
 - Cache station metadata and degrade gracefully on stale or empty results.
-
-### NREL AFDC
-
-Use for U.S. alternative fuel station discovery.
-
-- Configure `NREL_API_KEY` or Access credentials.
-- Prototype official current-data snapshots with `AEGIS_AFDC_SNAPSHOT_PATH`; keep the hosted API credential-gated until freshness and schema parity are validated.
-- Use bounded searches only.
-- Keep fuel type, access, and station status visible in normalized metadata.
 
 ### NASA Open APIs
 

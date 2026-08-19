@@ -481,9 +481,7 @@ class RenderDescriptorService:
         env_by_provider = {
             "arcgis": "ARCGIS_API_KEY",
             "census": "CENSUS_API_KEY",
-            "fred": "FRED_API_KEY",
             "tomtom": "TOMTOM_API_KEY",
-            "geoapify": "GEOAPIFY_API_KEY",
             "google_maps": "GOOGLE_MAPS_API_KEY",
             "openaq": "OPENAQ_API_KEY",
         }

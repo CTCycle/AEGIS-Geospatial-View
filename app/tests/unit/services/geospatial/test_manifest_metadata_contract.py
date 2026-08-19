@@ -37,7 +37,6 @@ def test_all_manifest_entries_expose_source_traits() -> None:
 ###############################################################################
 def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypatch) -> None:
     monkeypatch.delenv("OPENAQ_API_KEY", raising=False)
-    monkeypatch.delenv("FRED_API_KEY", raising=False)
     runtime = RuntimeRegistry(
         manifest_loader=GeospatialManifestLoader(),
         credentials_repo=_NoCredentials(),  # type: ignore[arg-type]
@@ -45,7 +44,6 @@ def test_credentialed_capabilities_are_not_healthy_without_credentials(monkeypat
     runtime.build_snapshot()
 
     assert runtime.provider_health("openaq_air_quality") == "missing_credentials"
-    assert runtime.provider_health("fred_regional_market_indicators") == "missing_credentials"
 
 ###############################################################################
 def test_endpoint_validation_builds_sampled_urls_without_network_calls() -> None:

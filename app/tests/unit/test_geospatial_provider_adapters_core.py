@@ -15,7 +15,6 @@ from server.services.geospatial.providers.base import (
 )
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.census import CensusProvider
-from server.services.geospatial.providers.geoapify import GeoapifyProvider
 from server.services.geospatial.providers.nasa_gibs import NASAGIBSProvider
 from server.services.geospatial.providers.openaq import OpenAQProvider
 from server.services.geospatial.providers.openmeteo import OpenMeteoProvider
@@ -454,18 +453,13 @@ def test_pvgis_provider_returns_metadata_only_analysis() -> None:
     assert response.payload["yearlyKwhPerKwpEstimate"] == 1234.5
 
 ###############################################################################
-def test_tomtom_and_geoapify_require_keys_before_emitting_urls() -> None:
+def test_tomtom_requires_keys_before_emitting_urls() -> None:
     with pytest.raises(ProviderAuthError):
         run_async_in_thread(
             TomTomProvider().fetch(
                 ProviderRequest(capability_id="tomtom_traffic_flow")
             )
         )
-    with pytest.raises(ProviderAuthError):
-        run_async_in_thread(
-            GeoapifyProvider().fetch(ProviderRequest(capability_id="geoapify_amenities"))
-        )
-
 ###############################################################################
 def test_tomtom_provider_normalizes_live_incidents() -> None:
     calls: list[str] = []
@@ -524,123 +518,16 @@ def test_tomtom_provider_emits_proxy_tile_payload_without_secret() -> None:
 ###############################################################################
 def test_provider_registry_passes_environment_keys_to_gated_adapters(monkeypatch) -> None:
     monkeypatch.setenv("TOMTOM_API_KEY", "tomtom-test")
-    monkeypatch.setenv("GEOAPIFY_API_KEY", "geoapify-test")
     registry = ProviderRegistry()
     registry.build_from_manifests()
 
     tomtom = run_async_in_thread(
         registry.fetch("tomtom", ProviderRequest(capability_id="tomtom_traffic_flow"))
     )
-    geoapify = run_async_in_thread(
-        registry.fetch("geoapify", ProviderRequest(capability_id="geoapify_amenities"))
-    )
-
     assert tomtom.payload["tileUrl"] == (
         "/api/geospatial/proxy/tomtom/traffic-flow/{z}/{x}/{y}.png"
     )
     assert "tomtom-test" not in str(tomtom.payload)
-    assert geoapify.payload["featuresEndpoint"] == "/api/geospatial/layers/geoapify_amenities/features"
-    assert "geoapify-test" not in str(geoapify.payload)
-
-###############################################################################
-def test_geoapify_provider_normalizes_live_places() -> None:
-    calls: list[str] = []
-
-    async def fetcher(url: str, headers: dict[str, str] | None = None):
-        calls.append(url)
-        return {
-            "features": [
-                {
-                    "properties": {
-                        "place_id": "poi-1",
-                        "name": "Clinic",
-                        "categories": ["healthcare.clinic"],
-                        "formatted": "1 Test Street",
-                    },
-                    "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
-                }
-            ]
-        }
-
-    response = run_async_in_thread(
-        GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher).fetch(
-            ProviderRequest(
-                capability_id="geoapify_amenities",
-                bbox=(12.0, 41.0, 13.0, 42.0),
-                params={"live": True, "categories": "healthcare"},
-            )
-        )
-    )
-
-    assert "apiKey=geoapify-test" in calls[0]
-    assert "filter=rect%3A12.0%2C42.0%2C13.0%2C41.0" in calls[0]
-    assert response.payload["totalResults"] == 1
-    assert response.payload["features"][0]["source"] == "geoapify"
-
-###############################################################################
-def test_geoapify_provider_caches_live_places_by_bbox_and_category() -> None:
-    calls: list[str] = []
-
-    async def fetcher(url: str, headers: dict[str, str] | None = None):
-        calls.append(url)
-        return {
-            "features": [
-                {
-                    "properties": {
-                        "place_id": "poi-1",
-                        "name": "Clinic",
-                        "categories": ["healthcare.clinic"],
-                    },
-                    "geometry": {"type": "Point", "coordinates": [12.5, 41.9]},
-                }
-            ]
-        }
-
-    provider = GeoapifyProvider(api_key="geoapify-test", fetcher=fetcher)
-    request = ProviderRequest(
-        capability_id="geoapify_amenities",
-        bbox=(12.0, 41.0, 13.0, 42.0),
-        params={"live": True, "categories": "healthcare"},
-    )
-
-    first = run_async_in_thread(provider.fetch(request))
-    second = run_async_in_thread(provider.fetch(request))
-
-    assert first.payload == second.payload
-    assert len(calls) == 1
-
-###############################################################################
-def test_geoapify_provider_returns_empty_result_for_empty_or_malformed_payloads() -> None:
-    async def empty_fetcher(url: str, headers: dict[str, str] | None = None):
-        return {"features": []}
-
-    async def malformed_fetcher(url: str, headers: dict[str, str] | None = None):
-        return {"features": [{"properties": {"name": "Missing geometry"}}]}
-
-    empty = run_async_in_thread(
-        GeoapifyProvider(api_key="geoapify-test", fetcher=empty_fetcher).fetch(
-            ProviderRequest(
-                capability_id="geoapify_amenities",
-                bbox=(12.0, 41.0, 13.0, 42.0),
-                params={"live": True},
-            )
-        )
-    )
-    malformed = run_async_in_thread(
-        GeoapifyProvider(api_key="geoapify-test", fetcher=malformed_fetcher).fetch(
-            ProviderRequest(
-                capability_id="geoapify_amenities",
-                bbox=(12.0, 41.0, 13.0, 42.0),
-                params={"live": True},
-            )
-        )
-    )
-
-    assert empty.payload["features"] == []
-    assert empty.payload["totalResults"] == 0
-    assert malformed.payload["features"] == []
-    assert malformed.payload["totalResults"] == 0
-
 ###############################################################################
 def test_nasa_gibs_provider_returns_wms_descriptor() -> None:
     response = run_async_in_thread(

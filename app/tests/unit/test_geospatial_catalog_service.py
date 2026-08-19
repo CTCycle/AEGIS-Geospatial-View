@@ -14,7 +14,7 @@ class _CredentialRepo:
 
     # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str):  # noqa: ANN201
-        if self.present and provider in {"tomtom", "geoapify"} and label == "api_key":
+        if self.present and provider == "tomtom" and label == "api_key":
             return object()
         return None
 
@@ -44,7 +44,6 @@ def test_catalog_contains_grouped_capability_sections() -> None:
 ###############################################################################
 def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
 
     catalog = _service_with_credentials(False).list_catalog()
     lookup = {item["id"]: item for item in catalog["capabilities"]}
@@ -52,18 +51,15 @@ def test_catalog_marks_key_required_capabilities_unavailable_without_credentials
 
     assert lookup["tomtom_traffic_flow"]["requires_credentials"] is True
     assert lookup["tomtom_traffic_flow"]["is_available"] is False
-    assert lookup["geoapify_amenities"]["is_available"] is False
     assert providers["tomtom"]["is_available"] is False
 
 ###############################################################################
 def test_catalog_marks_key_required_capabilities_available_with_saved_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)
-    monkeypatch.delenv("GEOAPIFY_API_KEY", raising=False)
 
     catalog = _service_with_credentials(True).list_catalog()
     lookup = {item["id"]: item for item in catalog["capabilities"]}
     providers = {item["id"]: item for item in catalog["providers"]}
 
     assert lookup["tomtom_traffic_flow"]["is_available"] is True
-    assert lookup["geoapify_amenities"]["is_available"] is True
     assert providers["tomtom"]["is_available"] is True

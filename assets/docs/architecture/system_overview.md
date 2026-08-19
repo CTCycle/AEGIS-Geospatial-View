@@ -50,14 +50,13 @@ Implemented service integrations include:
 - Overpass
 - Overture Maps, OpenAddresses, OurAirports, Natural Earth, and local open-data snapshots
 - NASA GIBS
-- NASA FIRMS, NOAA, USGS, FEMA, Census, Eurostat, EEA, ESA, and FRED
+- NASA FIRMS, NOAA, USGS, FEMA, Census, Eurostat, EEA, and ESA
 - OpenAQ
 - Open-Meteo
 - PVGIS
 - RainViewer
 - TomTom
-- Geoapify
-- OpenChargeMap and NREL AFDC
+- OpenChargeMap
 - OpenFreeMap and other public basemap styles
 - GTFS, GTFS-Realtime, and Mobility Database feed catalogs
 - Windy Webcams and configured local camera networks

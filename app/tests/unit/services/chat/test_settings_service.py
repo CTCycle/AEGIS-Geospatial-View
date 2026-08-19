@@ -281,9 +281,9 @@ def test_updating_only_credentials_skips_unrelated_local_model_validation() -> N
         model_library_service=FakeModelLibraryService({"different-installed-model"}),
     )
 
-    service.update_settings(ModelSettingsUpdateRequest(credentials={"geoapify": {"api_key": " geo "}}))
+    service.update_settings(ModelSettingsUpdateRequest(credentials={"tomtom": {"api_key": " key "}}))
 
-    assert credentials_repo.upserts == [("geoapify", "api_key", "enc:geo", "v1")]
+    assert credentials_repo.upserts == [("tomtom", "api_key", "enc:key", "v1")]
     assert settings_repo.last_update is not None
     assert settings_repo.last_update["agent_model_name"] == "missing-agent"
 

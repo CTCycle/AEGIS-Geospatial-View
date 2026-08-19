@@ -4,7 +4,7 @@ Last updated: 2026-08-02
 
 ## Access Configuration
 
-The Access page is for optional geospatial provider keys such as Geoapify and TomTom. The default workflow remains usable without them.
+The Access page is for optional geospatial provider keys such as TomTom and OpenAQ. The default workflow remains usable without them.
 
 ## Model Settings Workflow
 

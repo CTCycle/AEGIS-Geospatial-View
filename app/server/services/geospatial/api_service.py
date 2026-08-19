@@ -567,7 +567,7 @@ class GeospatialApiService:
             "credential_label": "api_key",
             "key_format_hint": self._key_format_hint(provider_key),
             "validation_supported": provider_key
-            in {"tomtom", "windy_webcams", "openaq", "nrel", "nasa_firms"},
+            in {"tomtom", "windy_webcams", "openaq", "nasa_firms"},
         }
 
     # -------------------------------------------------------------------------
@@ -794,7 +794,6 @@ class GeospatialApiService:
     def _humanize_provider(provider: str) -> str:
         lookup = {
             "tomtom": "TomTom",
-            "geoapify": "Geoapify",
             "google_maps": "Google Maps",
             "openaq": "OpenAQ",
             "arcgis": "ArcGIS",

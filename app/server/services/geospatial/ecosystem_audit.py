@@ -37,18 +37,6 @@ PROVIDER_SOURCE_ALIASES = {
 
 REPLACEMENTS = [
     {
-        "old": ["geoapify_osm", "tomtom_basic"],
-        "new": ["openfreemap_liberty", "openfreemap_positron"],
-        "outcome": "partial",
-        "coverage": "Static global vector basemap styles replace raster basemap presentation only.",
-        "lost_or_degraded": [
-            "TomTom commercial road styling and traffic-oriented context are not equivalent.",
-            "Geoapify-specific tile availability and SLA are not retained.",
-            "OpenFreeMap public hosting has no contractual SLA.",
-        ],
-        "evidence": "commit da3f43b3",
-    },
-    {
         "old": ["transitland_feeds"],
         "new": ["mobility_database_feeds"],
         "outcome": "functional_for_metadata_discovery",
@@ -60,21 +48,10 @@ REPLACEMENTS = [
         ],
         "evidence": "commit da3f43b3 and mobility_database provider contract",
     },
-    {
-        "old": ["geoapify_amenities", "opentripmap_tourism_pois"],
-        "new": ["overture_maps_places", "overpass_poi_amenities"],
-        "outcome": "not_equivalent_without_parity_benchmark",
-        "coverage": "Bulk/local Overture places plus bounded OSM Overpass augmentation.",
-        "lost_or_degraded": [
-            "Geoapify and OpenTripMap hosted ranking and tourism metadata are not guaranteed.",
-            "Overture requires a local ingested index before interactive results are available.",
-        ],
-        "evidence": "public_and_optional_sources.md and poi_benchmark.py",
-    },
 ]
 
 OVERLAP_GROUPS = {
-    "poi": {"geoapify", "google_maps", "opentripmap", "openaddresses", "overpass", "overture"},
+    "poi": {"google_maps", "opentripmap", "openaddresses", "overpass", "overture"},
     "air_quality": {"openaq", "openmeteo"},
     "imagery": {"arcgis", "gibs", "esa"},
     "transit": {"gtfs_static", "gtfs_realtime", "mobility_database"},

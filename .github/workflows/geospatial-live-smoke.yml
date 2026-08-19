@@ -9,9 +9,7 @@ jobs:
   optional-live-smoke:
     runs-on: ubuntu-latest
     env:
-      GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
       NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
-      NREL_API_KEY: ${{ secrets.NREL_API_KEY }}
       OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
       OPENCHARGEMAP_API_KEY: ${{ secrets.OPENCHARGEMAP_API_KEY }}
       OPENTRIPMAP_API_KEY: ${{ secrets.OPENTRIPMAP_API_KEY }}
