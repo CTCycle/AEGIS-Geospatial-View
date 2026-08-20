@@ -7,7 +7,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, Protocol
 
-from server.domain.geographics import ProviderCredentialValidationResult
+from server.contracts.geospatial import ProviderCredentialValidationResult
 from server.domain.geospatial.providers import (
     FeatureRequest,
     ProviderRequest,

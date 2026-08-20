@@ -7,7 +7,7 @@ from collections.abc import Callable
 from time import monotonic
 from typing import Any, cast
 
-from server.domain.geographics import GeospatialProviderLayerDescriptor
+from server.contracts.geospatial import GeospatialProviderLayerDescriptor
 from server.domain.geospatial.providers import ProviderExecutionPolicy
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader

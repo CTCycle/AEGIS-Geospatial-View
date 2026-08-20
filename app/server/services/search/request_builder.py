@@ -7,8 +7,8 @@ from typing import Any
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.domain.extraction.models import NormalizedAction, TurnParseResult, ViewportIntent
-from server.domain.geographics import (
+from server.contracts.extraction import NormalizedAction, TurnParseResult, ViewportIntent
+from server.contracts.geospatial import (
     LocationSearchRequest,
     PresentationPolicy,
     ProviderLayerSelection,

@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from server.api.chat import get_models, pull_ollama_model
-from server.domain.chat import OllamaPullRequest
+from server.contracts.chat import OllamaPullRequest
 
 ###############################################################################
 class _FailingModelLibrary:

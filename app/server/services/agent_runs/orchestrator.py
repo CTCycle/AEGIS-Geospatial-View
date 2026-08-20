@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from server.domain.agent_runs import AgentRunSnapshot
+from server.contracts.runs import AgentRunSnapshot
 from server.domain.agent.trace import AgentCheckpoint, AgentTraceEvent
-from server.domain.chat import ChatTurnRequest, ChatTurnResponse
-from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
+from server.contracts.chat import ChatTurnRequest, ChatTurnResponse
+from server.contracts.events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage, RunEventVisibility
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.conversations import ConversationRepository

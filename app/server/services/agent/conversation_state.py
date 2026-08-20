@@ -23,8 +23,8 @@ from server.domain.agent.runtime import (
     apply_steering_delta as apply_runtime_steering_delta,
     validate_task_graph,
 )
-from server.domain.extraction.models import TurnParseResult
-from server.domain.geographics import MapSession
+from server.contracts.extraction import TurnParseResult
+from server.contracts.geospatial import MapSession
 
 ###############################################################################
 @dataclass

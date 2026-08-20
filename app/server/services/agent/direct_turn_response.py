@@ -6,7 +6,7 @@ from typing import Any
 
 from server.domain.agent.decision import PolicyDecision
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
-from server.domain.chat import ChatOperationResult, ChatTurnResponse
+from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer

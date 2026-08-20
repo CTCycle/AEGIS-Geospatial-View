@@ -12,14 +12,14 @@ from server.domain.agent.decision import (
     PolicyDecision,
     ResolvedLocation,
 )
-from server.domain.chat import ChatTurnRequest
-from server.domain.extraction.models import (
+from server.contracts.chat import ChatTurnRequest
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,
     TurnParseResult,
 )
-from server.domain.geographics import MapSession
+from server.contracts.geospatial import MapSession
 from server.domain.agent.pipeline import ToolPlan
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from server.domain.geographics import CameraFeature, PoiFeature
+from server.contracts.geospatial import CameraFeature, PoiFeature
 
 ###############################################################################
 class NormalizationError(ValueError):

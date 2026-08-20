@@ -12,7 +12,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from server.common.paths import PROJECT_DIR
-from server.domain.geographics import (
+from server.contracts.geospatial import (
     CapabilityImplementationStatus,
     CapabilityKind,
     CapabilityManifestV2,

@@ -8,7 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from server.common.logger import logger as LOGGER
-from server.domain.chat import ChatTurnRequest, ChatTurnResponse, ContextUsageResponse
+from server.contracts.chat import ChatTurnRequest, ChatTurnResponse, ContextUsageResponse
 from server.repositories.model_settings import ModelSettingsRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService

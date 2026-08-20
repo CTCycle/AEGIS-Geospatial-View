@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object
 
-from server.domain.geographics import LayerHealthStatus
+from server.contracts.geospatial import LayerHealthStatus
 from server.domain.geospatial.health import SourceHealthRecord
 
 ###############################################################################

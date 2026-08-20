@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from server.api.chat import get_models, refresh_ollama_models
-from server.domain.chat import OllamaRefreshResponse
+from server.contracts.chat import OllamaRefreshResponse
 
 ###############################################################################
 class _ModelLibraryService:

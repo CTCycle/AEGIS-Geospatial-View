@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from server.domain.agent.pipeline import SpecialistGroup
-from server.domain.extraction.models import TurnParseResult
+from server.contracts.extraction import TurnParseResult
 
 ###############################################################################
 class DeterministicAgentRouter:

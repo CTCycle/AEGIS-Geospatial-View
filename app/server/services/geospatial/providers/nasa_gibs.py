@@ -5,7 +5,7 @@ from typing import Literal
 from xml.etree import ElementTree
 
 from server.common.constants import NASA_ATTRIBUTION
-from server.domain.geographics import (
+from server.contracts.geospatial import (
     GeospatialLayerRenderDescriptor,
     GeospatialProviderLayerDescriptor,
 )

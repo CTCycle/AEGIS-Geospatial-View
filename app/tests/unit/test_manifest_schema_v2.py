@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from server.domain.geographics import CapabilityKind, CapabilityManifestV2
+from server.contracts.geospatial import CapabilityKind, CapabilityManifestV2
 from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 

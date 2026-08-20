@@ -19,7 +19,7 @@ from server.common.paths import (
     CHAT_STREAM_ROUTE,
     CHAT_TURN_ROUTE,
 )
-from server.domain.chat import (
+from server.contracts.chat import (
     ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,

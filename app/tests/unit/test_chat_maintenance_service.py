@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.domain.chat import (
+from server.contracts.chat import (
     OllamaPullRequest,
     OllamaPullResponse,
     OllamaRefreshResponse,

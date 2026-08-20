@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from server.domain.chat import ModelSettingsUpdateRequest
+from server.contracts.chat import ModelSettingsUpdateRequest
 from server.services.chat.settings_service import (
     ChatSettingsService,
     ChatSettingsValidationError,

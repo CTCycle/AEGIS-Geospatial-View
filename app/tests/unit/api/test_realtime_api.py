@@ -16,7 +16,7 @@ from server.api.realtime import metrics_router as realtime_metrics_router
 from server.api.realtime import router as realtime_router
 from server.api.conversations import router as conversations_router
 from server.common.paths import FASTAPI_API_PREFIX
-from server.domain.run_events import RunEventType
+from server.contracts.events import RunEventType
 from server.domain.realtime import REALTIME_SUBPROTOCOL
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository

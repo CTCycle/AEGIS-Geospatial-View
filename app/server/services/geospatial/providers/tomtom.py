@@ -5,7 +5,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 from collections.abc import Mapping
 from urllib.parse import urlencode
 
-from server.domain.geographics import ProviderCredentialValidationResult
+from server.contracts.geospatial import ProviderCredentialValidationResult
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
     ProviderAuthError,

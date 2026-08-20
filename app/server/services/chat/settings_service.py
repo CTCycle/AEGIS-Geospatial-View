@@ -7,7 +7,7 @@ from server.common.typing import is_json_object, json_array
 from server.common.constants import (
     DEFAULT_MODEL_PROVIDER_MODE,
 )
-from server.domain.chat import (
+from server.contracts.chat import (
     ModelProviderMode,
     ModelSettingsResponse,
     ModelSettingsSnapshot,

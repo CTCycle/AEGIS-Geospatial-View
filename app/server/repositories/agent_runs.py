@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import uuid4
 
-from server.domain.agent_runs import AgentRunSnapshot, AgentRunState
+from server.contracts.runs import AgentRunSnapshot, AgentRunState
 from server.repositories.database.contracts import DatabaseBackend
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError

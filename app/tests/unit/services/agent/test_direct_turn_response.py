@@ -5,8 +5,8 @@ from typing import Any
 
 from server.domain.agent.decision import ClarificationRequest, DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
-from server.domain.chat import ChatOperationResult
-from server.domain.extraction.models import (
+from server.contracts.chat import ChatOperationResult
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     NormalizedAction,
     TurnParseResult,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from server.domain.geographics import MapSession
+from server.contracts.geospatial import MapSession
 from server.domain.llm.types import LLMToolCall, LLMToolDefinition, LLMToolResult
 
 ###############################################################################

@@ -4,7 +4,7 @@ from typing import Any
 
 from server.common.typing import json_array, json_object
 
-from server.domain.extraction.models import TurnParseResult
+from server.contracts.extraction import TurnParseResult
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 

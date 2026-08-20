@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
 
-from server.domain.geographics import LocationSearchRequest
+from server.contracts.geospatial import LocationSearchRequest
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.provider_registry import ProviderRegistry

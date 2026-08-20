@@ -3,7 +3,7 @@ from __future__ import annotations
 from tests.conftest import run_async_in_thread
 
 from server.services.agent.location_resolver import LocationResolver
-from server.domain.extraction.models import LocationSignal
+from server.contracts.extraction import LocationSignal
 
 ###############################################################################
 def test_location_resolver_uses_coordinates_without_geocoder() -> None:

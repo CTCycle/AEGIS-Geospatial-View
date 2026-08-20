@@ -5,7 +5,7 @@ from typing import Any, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 
-from server.domain.geographics import (
+from server.contracts.geospatial import (
     GeospatialCameraDetailResponse,
     GeospatialCatalogResponse,
     GeospatialCredentialStatusResponse,

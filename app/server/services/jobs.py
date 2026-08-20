@@ -17,7 +17,7 @@ from server.common.constants import (
     JOB_STATUS_RUNNING,
     JOB_STATUS_SUCCEEDED,
 )
-from server.domain.chat import ChatTurnRequest
+from server.contracts.chat import ChatTurnRequest
 from server.domain.jobs import (
     BackgroundJob, BackgroundJobEventType, BackgroundJobStatus, BackgroundJobType,
     BackgroundJobCreateResponse,

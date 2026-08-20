@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
-from server.domain.geographics import (
+from server.contracts.geospatial import (
     GeospatialProviderLayerResponse,
     GeospatialProviderLayersResponse,
     LayerAuditReport,

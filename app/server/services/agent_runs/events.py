@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator
 
-from server.domain.run_events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
+from server.contracts.events import RunEvent, RunEventCreate, RunEventType, RunEventVisibility
 from server.repositories.agent_run_events import AgentRunEventRepository
 
 ###############################################################################

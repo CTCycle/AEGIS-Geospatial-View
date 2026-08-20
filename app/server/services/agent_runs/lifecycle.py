@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import asyncio
 
-from server.domain.agent_runs import (
+from server.contracts.runs import (
     AgentRunCancelResponse,
     AgentRunCreateRequest,
     AgentRunCreateResult,
     AgentRunState,
     ConversationCreateResponse,
 )
-from server.domain.run_events import RunEventType
+from server.contracts.events import RunEventType
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository
 from server.services.agent_runs.aggregation import AggregatedRequestService

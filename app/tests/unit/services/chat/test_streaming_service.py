@@ -7,19 +7,19 @@ from typing import Any
 from pathlib import Path
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
-from server.domain.chat import (
+from server.contracts.chat import (
     ChatOperationResult,
     ChatStreamEvent,
     ChatTurnRequest,
     ChatTurnResponse,
 )
-from server.domain.extraction.models import (
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,
     TurnParseResult,
 )
-from server.domain.geographics import MapSession
+from server.contracts.geospatial import MapSession
 from server.services.chat.streaming import ChatStreamingService
 from server.services.llm.errors import LLMConfigurationError
 

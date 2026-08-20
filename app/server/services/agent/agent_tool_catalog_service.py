@@ -11,8 +11,8 @@ from server.domain.agent.catalog import (
 )
 from server.domain.agent.decision import ClarificationRequest, ExecutionPlan, ResolvedLocation
 from server.domain.agent.execution import AgentExecutionContext
-from server.domain.extraction.models import LocationSignal, TurnParseResult
-from server.domain.geographics import MapSession, ProviderLayerSelection
+from server.contracts.extraction import LocationSignal, TurnParseResult
+from server.contracts.geospatial import MapSession, ProviderLayerSelection
 from server.domain.agent.policies import ToolAuthorizationResult
 from server.services.agent.location_resolver import LocationResolver
 from server.services.agent.policy_engine import PolicyEngine

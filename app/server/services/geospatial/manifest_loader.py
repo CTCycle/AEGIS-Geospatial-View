@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from server.common.paths import PROJECT_DIR, ROOT_DIR
-from server.domain.geographics import CapabilityManifestV2
+from server.contracts.geospatial import CapabilityManifestV2
 
 type JsonDict = dict[str, Any]
 

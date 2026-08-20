@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy import func, select, update
 
-from server.domain.run_events import (
+from server.contracts.events import (
     RunEvent,
     RunEventCreate,
     RunEventType,

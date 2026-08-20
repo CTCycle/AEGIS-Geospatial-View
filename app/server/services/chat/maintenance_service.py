@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from server.domain.chat import (
+from server.contracts.chat import (
     ModelCardDescriptor,
     OllamaHealthResponse,
     OllamaPullRequest,

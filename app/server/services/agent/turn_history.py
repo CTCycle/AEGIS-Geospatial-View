@@ -4,8 +4,8 @@ from server.common.typing import is_json_object, json_object
 
 from typing import Any
 
-from server.domain.chat import ChatTurnResponse
-from server.domain.extraction.models import LocationSignal
+from server.contracts.chat import ChatTurnResponse
+from server.contracts.extraction import LocationSignal
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.chat.history_service import ChatHistoryService
 
