@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from server.repositories.credential_material import seed_credential_encryption_material
 from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.composition import (
     GeospatialRuntime,
@@ -8,6 +9,7 @@ from server.services.geospatial.composition import (
 
 ###############################################################################
 def test_build_geospatial_runtime_reuses_shared_services(sqlite_backend) -> None:
+    seed_credential_encryption_material(sqlite_backend)
     runtime = build_geospatial_runtime(sqlite_backend)
 
     assert isinstance(runtime, GeospatialRuntime)

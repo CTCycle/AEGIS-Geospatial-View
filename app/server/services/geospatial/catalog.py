@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from server.common.typing import json_array, json_object
@@ -74,16 +73,7 @@ class GeospatialCatalogService:
         requires_credentials = bool(auth.get("required", False))
         is_available = True
         if requires_credentials:
-            env_name = self.runtime_registry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
-            has_saved_key = False
-            try:
-                has_saved_key = self.runtime_registry.credentials_repo.get_active(
-                    provider=provider_id,
-                    label="api_key",
-                ) is not None
-            except Exception:
-                has_saved_key = False
-            is_available = has_saved_key or bool(env_name and os.getenv(env_name, "").strip())
+            is_available = self.runtime_registry.provider_credentials_present(provider_id)
         return {
             "id": provider_id,
             "name": str(item.get("name") or provider_id),

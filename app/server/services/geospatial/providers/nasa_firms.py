@@ -4,7 +4,6 @@ import asyncio
 import inspect
 import csv
 import io
-import os
 import urllib.request
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -33,7 +32,7 @@ class NASAFIRMSProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        api_key = (self.api_key or os.getenv("NASA_API_KEY") or "").strip()
+        api_key = (self.api_key or "").strip()
         if not api_key:
             raise ProviderAuthError("NASA_API_KEY is required for NASA FIRMS active fire access.")
         west, south, east, north = request.bbox or (-180.0, -90.0, 180.0, 90.0)

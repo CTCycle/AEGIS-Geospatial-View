@@ -32,6 +32,7 @@ from server.services.cryptography import CredentialEncryptionService
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
@@ -51,6 +52,8 @@ class ChatRuntime:
 def build_chat_runtime(
     search_orchestrator: LocationSearchOrchestrator,
     database: DatabaseBackend,
+    *,
+    credential_resolver: GeospatialCredentialResolver | None = None,
 ) -> ChatRuntime:
     settings_repo = ModelSettingsRepository(database)
     credentials_repo = CredentialRepository(database)
@@ -64,6 +67,10 @@ def build_chat_runtime(
         credentials_repo=credentials_repo,
         crypto_service=crypto_service,
         ollama_tool_capability_cache=ollama_tool_capability_cache,
+    )
+    resolved_credential_resolver = credential_resolver or GeospatialCredentialResolver(
+        credentials_repo=credentials_repo,
+        crypto_service=crypto_service,
     )
     model_library_service = ChatModelLibraryService(
         ollama_tool_capability_cache=ollama_tool_capability_cache,
@@ -79,6 +86,7 @@ def build_chat_runtime(
     runtime_registry = RuntimeRegistry(
         manifest_loader=search_orchestrator.capability_registry.manifest_loader,
         credentials_repo=credentials_repo,
+        credential_resolver=resolved_credential_resolver,
     )
     manifest_loader = runtime_registry.manifest_loader
     geospatial_api_service = GeospatialApiService(
@@ -88,7 +96,11 @@ def build_chat_runtime(
         ),
         manifest_loader=manifest_loader,
         runtime_registry=runtime_registry,
-        provider_registry=ProviderRegistry(manifest_loader=manifest_loader),
+        provider_registry=ProviderRegistry(
+            manifest_loader=manifest_loader,
+            credential_resolver=resolved_credential_resolver,
+        ),
+        credential_resolver=resolved_credential_resolver,
     )
     parser_service = ParserService(
         llm_factory=llm_factory,

@@ -3,13 +3,13 @@ from __future__ import annotations
 from server.common.typing import json_array, json_object
 
 import asyncio
-import os
 from collections.abc import Callable
 from time import monotonic
 from typing import Any, cast
 
 from server.domain.geographics import GeospatialProviderLayerDescriptor
 from server.domain.geospatial.providers import ProviderExecutionPolicy
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.providers.arcgis_rest import ArcGISRestProvider
 from server.services.geospatial.providers.base import (
@@ -52,47 +52,39 @@ from server.services.geospatial.providers.mobility_database import MobilityDatab
 from server.services.geospatial.providers.usgs import USGSProvider
 from server.services.geospatial.providers.windy_webcams import WindyWebcamsProvider
 
-ProviderFactory = Callable[[], Any]
+ProviderFactory = Callable[[str | None], Any]
 
 
 PROVIDER_FACTORIES: dict[str, ProviderFactory] = {
-    "arcgis": ArcGISRestProvider,
-    "census": CensusProvider,
-    "gibs": NASAGIBSProvider,
-    "eea": EEAProvider,
-    "esa": ESAProvider,
-    "eurostat": EurostatProvider,
-    "rainviewer": RainViewerProvider,
-    "openmeteo": OpenMeteoProvider,
-    "overpass": OverpassProvider,
-    "openaq": lambda: OpenAQProvider(api_key=os.getenv("OPENAQ_API_KEY")),
-    "pvgis": PVGISProvider,
-    "tomtom": lambda: TomTomProvider(api_key=os.getenv("TOMTOM_API_KEY")),
-    "windy_webcams": lambda: WindyWebcamsProvider(
-        api_key=os.getenv("WINDY_WEBCAMS_API_KEY")
-    ),
-    "usgs": USGSProvider,
-    "noaa": NOAAProvider,
-    "fema": FEMAProvider,
-    "nasa_firms": lambda: NASAFIRMSProvider(api_key=os.getenv("NASA_API_KEY")),
-    "opentripmap": lambda: OpenTripMapProvider(
-        api_key=os.getenv("OPENTRIPMAP_API_KEY")
-    ),
-    "openchargemap": lambda: OpenChargeMapProvider(
-        api_key=os.getenv("OPENCHARGEMAP_API_KEY")
-    ),
-    "ourairports": OurAirportsProvider,
-    "gtfs_static": GTFSStaticProvider,
-    "gtfs_realtime": GTFSRealtimeProvider,
-    "natural_earth": NaturalEarthProvider,
-    "overture": OvertureProvider,
-    "openaddresses": OpenAddressesProvider,
-    "local_open_data": LocalOpenDataProvider,
-    "mobility_database": MobilityDatabaseProvider,
-    "nominatim": NominatimProvider,
-    "mapillary": lambda: MapillaryProvider(
-        access_token=os.getenv("MAPILLARY_ACCESS_TOKEN")
-    ),
+    "arcgis": lambda _credential: ArcGISRestProvider(),
+    "census": lambda _credential: CensusProvider(),
+    "gibs": lambda _credential: NASAGIBSProvider(),
+    "eea": lambda _credential: EEAProvider(),
+    "esa": lambda _credential: ESAProvider(),
+    "eurostat": lambda _credential: EurostatProvider(),
+    "rainviewer": lambda _credential: RainViewerProvider(),
+    "openmeteo": lambda _credential: OpenMeteoProvider(),
+    "overpass": lambda _credential: OverpassProvider(),
+    "openaq": lambda credential: OpenAQProvider(api_key=credential),
+    "pvgis": lambda _credential: PVGISProvider(),
+    "tomtom": lambda credential: TomTomProvider(api_key=credential),
+    "windy_webcams": lambda credential: WindyWebcamsProvider(api_key=credential),
+    "usgs": lambda _credential: USGSProvider(),
+    "noaa": lambda _credential: NOAAProvider(),
+    "fema": lambda _credential: FEMAProvider(),
+    "nasa_firms": lambda credential: NASAFIRMSProvider(api_key=credential),
+    "opentripmap": lambda credential: OpenTripMapProvider(api_key=credential),
+    "openchargemap": lambda credential: OpenChargeMapProvider(api_key=credential),
+    "ourairports": lambda _credential: OurAirportsProvider(),
+    "gtfs_static": lambda _credential: GTFSStaticProvider(),
+    "gtfs_realtime": lambda _credential: GTFSRealtimeProvider(),
+    "natural_earth": lambda _credential: NaturalEarthProvider(),
+    "overture": lambda _credential: OvertureProvider(),
+    "openaddresses": lambda _credential: OpenAddressesProvider(),
+    "local_open_data": lambda _credential: LocalOpenDataProvider(),
+    "mobility_database": lambda _credential: MobilityDatabaseProvider(),
+    "nominatim": lambda _credential: NominatimProvider(),
+    "mapillary": lambda credential: MapillaryProvider(access_token=credential),
 }
 
 ###############################################################################
@@ -113,9 +105,11 @@ class ProviderRegistry:
         manifest_loader: GeospatialManifestLoader | None = None,
         providers: list[GeospatialProvider] | None = None,
         execution_policy: ProviderExecutionPolicy | None = None,
+        credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
         self.manifest_loader = manifest_loader or GeospatialManifestLoader()
         self.execution_policy = execution_policy or ProviderExecutionPolicy()
+        self.credential_resolver = credential_resolver or GeospatialCredentialResolver()
         self._providers: dict[str, GeospatialProvider] = {}
         self._failures: dict[str, int] = {}
         self._last_call_at: dict[str, float] = {}
@@ -299,7 +293,8 @@ class ProviderRegistry:
     ) -> GeospatialProvider:
         factory = PROVIDER_FACTORIES.get(provider_id)
         if factory is not None:
-            return factory()
+            credential = self.credential_resolver.resolve(provider_id, mark_used=True)
+            return factory(credential)
         capability_id = str(manifest.get("id") or "").strip()
         raise ProviderNotRegisteredError(
             f"Provider '{provider_id}' is not registered for manifest '{capability_id}'."

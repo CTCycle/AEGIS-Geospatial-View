@@ -57,7 +57,7 @@ class OpenChargeMapProvider(GeospatialProvider):
             "distanceunit": "KM",
             "maxresults": str(int(request.params.get("maxresults") or 100)),
         }
-        api_key = (self.api_key or os.getenv("OPENCHARGEMAP_API_KEY") or "").strip()
+        api_key = (self.api_key or "").strip()
         snapshot = request.params.get("snapshot_path") or self.snapshot_path
         if snapshot:
             snapshot_path = Path(str(snapshot)).expanduser()

@@ -2,47 +2,44 @@ from __future__ import annotations
 
 from server.common.typing import is_json_object, json_object
 
-import os
 from typing import Any
 
 from server.domain.geospatial.registry import RuntimeRegistrySnapshot
-from server.repositories.credentials import CredentialRepository
+from server.services.geospatial.credential_resolver import (
+    GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER,
+    CredentialStore,
+    GeospatialCredentialResolver,
+)
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 
 ###############################################################################
 class RuntimeRegistry:
-    CREDENTIAL_ENV_BY_PROVIDER = {
-        "arcgis": "ARCGIS_API_KEY",
-        "census": "CENSUS_API_KEY",
-        "google": "GOOGLE_API_KEY",
-        "google_maps": "GOOGLE_MAPS_API_KEY",
-        "nasa": "NASA_API_KEY",
-        "nasa_firms": "NASA_API_KEY",
-        "openaq": "OPENAQ_API_KEY",
-        "openchargemap": "OPENCHARGEMAP_API_KEY",
-        "openaip": "OPENAIP_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "opentripmap": "OPENTRIPMAP_API_KEY",
-        "sentinel_hub": "SENTINEL_HUB_CLIENT_ID",
-        "tomtom": "TOMTOM_API_KEY",
-        "windy_webcams": "WINDY_WEBCAMS_API_KEY",
-    }
+    CREDENTIAL_ENV_BY_PROVIDER = GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER
 
     # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
         manifest_loader: GeospatialManifestLoader,
-        credentials_repo: CredentialRepository,
+        credentials_repo: CredentialStore | None = None,
+        credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
         self.manifest_loader = manifest_loader
         self._credentials_repo = credentials_repo
+        self._credential_resolver = credential_resolver or GeospatialCredentialResolver(
+            credentials_repo=credentials_repo,
+        )
         self._snapshot: RuntimeRegistrySnapshot | None = None
 
     # -------------------------------------------------------------------------
     @property
-    def credentials_repo(self) -> CredentialRepository:
+    def credentials_repo(self) -> CredentialStore | None:
         return self._credentials_repo
+
+    # -------------------------------------------------------------------------
+    @property
+    def credential_resolver(self) -> GeospatialCredentialResolver:
+        return self._credential_resolver
 
     # -------------------------------------------------------------------------
     def build_snapshot(self) -> RuntimeRegistrySnapshot:
@@ -89,15 +86,11 @@ class RuntimeRegistry:
         provider = str(auth_payload.get("providerKey") or "").strip().lower()
         if not provider:
             return False
-        env_name = self.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
-        if not env_name:
-            return False
-        if os.getenv(env_name, "").strip():
-            return True
-        try:
-            return self.credentials_repo.get_active(provider=provider, label="api_key") is not None
-        except Exception:
-            return False
+        return self._credential_resolver.is_configured(provider)
+
+    # -------------------------------------------------------------------------
+    def provider_credentials_present(self, provider_id: str) -> bool:
+        return self._credential_resolver.is_configured(provider_id)
 
     # -------------------------------------------------------------------------
     def supports_mode(self, capability_id: str, mode: str) -> bool:
