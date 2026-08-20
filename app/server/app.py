@@ -102,11 +102,15 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         raise
 
     geospatial_runtime = build_geospatial_runtime(database)
-    search_runtime = build_search_runtime()
+    search_runtime = build_search_runtime(
+        capability_registry=geospatial_runtime.capability_registry,
+        provider_registry=geospatial_runtime.provider_registry,
+        credential_resolver=geospatial_runtime.credential_resolver,
+    )
     chat_runtime = build_chat_runtime(
         search_runtime.search_orchestrator,
         database,
-        credential_resolver=geospatial_runtime.credential_resolver,
+        geospatial_runtime=geospatial_runtime,
     )
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
     run_event_publisher = RunEventPublisher(AgentRunEventRepository(database))

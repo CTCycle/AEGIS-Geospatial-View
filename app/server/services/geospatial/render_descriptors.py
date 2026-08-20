@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 
 from server.domain.geographics import LocationSearchRequest
 from server.services.geospatial.capability_registry import CapabilityRegistry
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.provider_registry import ProviderRegistry
 from server.services.geospatial.rainviewer import RainViewerRequestError, RainViewerService
 from server.services.geospatial.overpass import OverpassService
@@ -25,10 +26,12 @@ class RenderDescriptorService:
         capability_registry: CapabilityRegistry | None = None,
         provider_registry: ProviderRegistry | None = None,
         rainviewer_service: RainViewerService | None = None,
+        credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
         self.capability_registry = capability_registry or CapabilityRegistry()
         self.provider_registry = provider_registry or ProviderRegistry()
         self.rainviewer_service = rainviewer_service or RainViewerService()
+        self.credential_resolver = credential_resolver or self.provider_registry.credential_resolver
 
     # -------------------------------------------------------------------------
     async def build_basemap_descriptor(self, basemap_id: str) -> dict[str, object] | None:
@@ -74,10 +77,11 @@ class RenderDescriptorService:
         capability_kind = str(capability.get("capabilityKind") or "")
         if capability_kind == "camera-network":
             auth = json_object(capability.get("auth"))
-            credential_env = self._credential_env_for_provider(
-                str(auth.get("providerKey") or capability.get("provider") or "")
+            provider_id = str(auth.get("providerKey") or capability.get("provider") or "")
+            credential_env = self.credential_resolver.environment_name(
+                provider_id
             )
-            if bool(auth.get("required")) and credential_env and not os.getenv(credential_env, "").strip():
+            if bool(auth.get("required")) and credential_env and not self.credential_resolver.is_configured(provider_id):
                 warnings.append(f"{overlay_id}: {credential_env} is required for live camera metadata.")
             camera_params = {
                 "provider": str(capability.get("provider") or "unknown"),
@@ -468,9 +472,8 @@ class RenderDescriptorService:
         return template.replace("{time}", str(rounded_timestamp)), "RainViewer metadata could not be fetched; using a timestamp fallback."
 
     # -------------------------------------------------------------------------
-    @classmethod
     def _resolve_credential_placeholders(
-        cls,
+        self,
         template: str,
         capability: dict[str, Any] | None,
     ) -> tuple[str, str | None]:
@@ -478,18 +481,10 @@ class RenderDescriptorService:
             return template, None
         provider = str((capability or {}).get("provider") or "").strip().lower()
         capability_id = str((capability or {}).get("id") or "").strip()
-        env_by_provider = {
-            "arcgis": "ARCGIS_API_KEY",
-            "census": "CENSUS_API_KEY",
-            "tomtom": "TOMTOM_API_KEY",
-            "google_maps": "GOOGLE_MAPS_API_KEY",
-            "openaq": "OPENAQ_API_KEY",
-        }
-        env_name = env_by_provider.get(provider)
+        env_name = self.credential_resolver.environment_name(provider)
         if env_name is None:
             return template, f"No credential mapping is configured for provider '{provider}'."
-        api_key = os.getenv(env_name, "").strip()
-        if not api_key:
+        if not self.credential_resolver.is_configured(provider):
             return template, f"{env_name} is required to render this provider tile layer."
         if capability_id:
             return f"/api/geospatial/tiles/{capability_id}/{{z}}/{{x}}/{{y}}.png", None
@@ -519,11 +514,6 @@ class RenderDescriptorService:
             return None
         stripped = value.strip()
         return stripped or None
-
-    # -------------------------------------------------------------------------
-    @staticmethod
-    def _credential_env_for_provider(provider: str) -> str | None:
-        return {"windy_webcams": "WINDY_WEBCAMS_API_KEY"}.get(provider.strip().lower())
 
     # -------------------------------------------------------------------------
     async def _resolve_rainviewer_tile_url(self) -> str | None:

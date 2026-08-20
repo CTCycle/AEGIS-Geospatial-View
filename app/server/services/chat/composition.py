@@ -4,8 +4,6 @@ from dataclasses import dataclass
 
 from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
-from server.repositories.credential_material import CredentialEncryptionMaterialRepository
-from server.repositories.credentials import CredentialRepository
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
@@ -28,12 +26,7 @@ from server.services.chat.model_library import ChatModelLibraryService
 from server.services.chat.settings_service import ChatSettingsService
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 from server.services.chat.history_service import ChatHistoryService
-from server.services.cryptography import CredentialEncryptionService
-from server.services.geospatial.runtime_registry import RuntimeRegistry
-from server.services.geospatial.api_service import GeospatialApiService
-from server.services.geospatial.catalog import GeospatialCatalogService
-from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
-from server.services.geospatial.provider_registry import ProviderRegistry
+from server.services.geospatial.composition import GeospatialRuntime
 from server.services.llm.factory import LLMFactory
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.search.orchestrator import LocationSearchOrchestrator
@@ -53,12 +46,11 @@ def build_chat_runtime(
     search_orchestrator: LocationSearchOrchestrator,
     database: DatabaseBackend,
     *,
-    credential_resolver: GeospatialCredentialResolver | None = None,
+    geospatial_runtime: GeospatialRuntime,
 ) -> ChatRuntime:
     settings_repo = ModelSettingsRepository(database)
-    credentials_repo = CredentialRepository(database)
-    material_repo = CredentialEncryptionMaterialRepository(database)
-    crypto_service = CredentialEncryptionService(material_repo=material_repo)
+    credentials_repo = geospatial_runtime.credentials_repo
+    crypto_service = geospatial_runtime.crypto_service
     history_repository = ChatHistoryRepository(database)
     conversation_repository = ConversationRepository(database)
     ollama_tool_capability_cache = OllamaToolCapabilityCache()
@@ -67,10 +59,6 @@ def build_chat_runtime(
         credentials_repo=credentials_repo,
         crypto_service=crypto_service,
         ollama_tool_capability_cache=ollama_tool_capability_cache,
-    )
-    resolved_credential_resolver = credential_resolver or GeospatialCredentialResolver(
-        credentials_repo=credentials_repo,
-        crypto_service=crypto_service,
     )
     model_library_service = ChatModelLibraryService(
         ollama_tool_capability_cache=ollama_tool_capability_cache,
@@ -83,25 +71,10 @@ def build_chat_runtime(
         model_library_service=model_library_service,
     )
 
-    runtime_registry = RuntimeRegistry(
-        manifest_loader=search_orchestrator.capability_registry.manifest_loader,
-        credentials_repo=credentials_repo,
-        credential_resolver=resolved_credential_resolver,
-    )
-    manifest_loader = runtime_registry.manifest_loader
-    geospatial_api_service = GeospatialApiService(
-        catalog_service=GeospatialCatalogService(
-            capability_registry=search_orchestrator.capability_registry,
-            runtime_registry=runtime_registry,
-        ),
-        manifest_loader=manifest_loader,
-        runtime_registry=runtime_registry,
-        provider_registry=ProviderRegistry(
-            manifest_loader=manifest_loader,
-            credential_resolver=resolved_credential_resolver,
-        ),
-        credential_resolver=resolved_credential_resolver,
-    )
+    capability_registry = geospatial_runtime.capability_registry
+    runtime_registry = geospatial_runtime.runtime_registry
+    manifest_loader = geospatial_runtime.manifest_loader
+    geospatial_api_service = geospatial_runtime.api_service
     parser_service = ParserService(
         llm_factory=llm_factory,
         settings_repo=settings_repo,
@@ -110,13 +83,13 @@ def build_chat_runtime(
     location_resolver = LocationResolver()
     policy_engine = PolicyEngine(
         location_resolver=location_resolver,
-        capability_registry=search_orchestrator.capability_registry,
+        capability_registry=capability_registry,
         runtime_registry=runtime_registry,
     )
     tool_registry = ToolRegistry(runtime_registry=runtime_registry)
     request_builder = RequestBuilder()
     agent_tool_catalog_service = AgentToolCatalogService(
-        capability_registry=search_orchestrator.capability_registry,
+        capability_registry=capability_registry,
         runtime_registry=runtime_registry,
         manifest_loader=manifest_loader,
         search_orchestrator=search_orchestrator,
@@ -172,11 +145,11 @@ def build_chat_runtime(
             tool_plan_executor=tool_plan_executor,
             direct_turn_response_service=direct_turn_response_service,
             overlay_inference_service=OverlayInferenceService(
-                capability_registry=search_orchestrator.capability_registry,
+                capability_registry=capability_registry,
                 runtime_registry=runtime_registry,
             ),
             capability_resolver=CapabilityResolver(
-                capability_registry=search_orchestrator.capability_registry,
+                capability_registry=capability_registry,
                 runtime_registry=runtime_registry,
             ),
         ),
