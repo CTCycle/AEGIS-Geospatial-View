@@ -11,6 +11,7 @@ from server.common.constants import (
     OLLAMA_DEFAULT_HOST,
 )
 from server.common.time import utc_now_naive
+from server.domain.chat import ModelSettingsSnapshot
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
@@ -22,14 +23,14 @@ class ModelSettingsRepository:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------
-    def get_or_create(self) -> ModelProviderSettingsRecord:
+    def get_or_create(self) -> ModelSettingsSnapshot:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
                 ModelProviderSettingsRecord.id.asc()
             )
             record = session.execute(statement).scalars().first()
             if record is not None:
-                return record
+                return self._to_snapshot(record)
 
             record = ModelProviderSettingsRecord(
                 active_provider_mode=DEFAULT_MODEL_PROVIDER_MODE,
@@ -44,7 +45,7 @@ class ModelSettingsRepository:
             session.add(record)
             session.commit()
             session.refresh(record)
-            return record
+            return self._to_snapshot(record)
 
     # -------------------------------------------------------------------------
     def update(
@@ -57,7 +58,7 @@ class ModelSettingsRepository:
         openai_base_url: str | None,
         google_base_url: str | None,
         deepseek_base_url: str | None,
-    ) -> ModelProviderSettingsRecord:
+    ) -> ModelSettingsSnapshot:
         with self._session_factory() as session:
             statement = select(ModelProviderSettingsRecord).order_by(
                 ModelProviderSettingsRecord.id.asc()
@@ -77,4 +78,22 @@ class ModelSettingsRepository:
             record.updated_at = utc_now_naive()
             session.commit()
             session.refresh(record)
-            return record
+            return self._to_snapshot(record)
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _to_snapshot(record: ModelProviderSettingsRecord) -> ModelSettingsSnapshot:
+        return ModelSettingsSnapshot(
+            id=record.id,
+            active_provider_mode=record.active_provider_mode,
+            agent_model_provider=record.agent_model_provider,
+            agent_model_name=record.agent_model_name,
+            ollama_url=record.ollama_url,
+            openai_base_url=record.openai_base_url,
+            google_base_url=record.google_base_url,
+            deepseek_base_url=record.deepseek_base_url,
+            capabilities_json=record.capabilities_json,
+            supports_tools=record.supports_tools,
+            supports_structured_output=record.supports_structured_output,
+            tool_support_source=record.tool_support_source,
+        )

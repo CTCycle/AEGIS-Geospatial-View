@@ -6,6 +6,7 @@ from server.common.logger import logger
 from server.configurations import get_server_settings
 from server.repositories.database import build_database_backend
 from server.repositories.database.initializer import initialize_database
+from server.services.catalog.startup import seed_reference_catalog
 
 
 ###############################################################################
@@ -15,7 +16,10 @@ if __name__ == "__main__":
     settings = get_server_settings()
     database = build_database_backend(settings.database)
     try:
-        initialize_database(database)
+        initialize_database(
+            database,
+            on_ready=lambda: seed_reference_catalog(database),
+        )
         elapsed = time.perf_counter() - start
         logger.info("Database initialization completed in %.2f seconds", elapsed)
     finally:

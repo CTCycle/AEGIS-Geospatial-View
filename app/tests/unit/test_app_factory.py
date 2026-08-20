@@ -117,7 +117,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
 
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
-    monkeypatch.setattr(app_module, "initialize_database", lambda backend: call_order.append("initialize_database"))
+    monkeypatch.setattr(app_module, "initialize_database", lambda backend, **kwargs: call_order.append("initialize_database"))
     monkeypatch.setattr(app_module, "build_search_runtime", lambda **kwargs: call_order.append("build_search_runtime") or search_runtime)
     monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database, **kwargs: call_order.append("build_chat_runtime") or chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: call_order.append("build_geospatial_runtime") or geospatial_runtime)
@@ -173,7 +173,7 @@ def test_postgres_startup_initializes_database(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module,
         "initialize_database",
-        lambda _database: call_order.append("initialize_database"),
+        lambda _database, **_kwargs: call_order.append("initialize_database"),
     )
     monkeypatch.setattr(app_module, "build_search_runtime", lambda **_kwargs: search_runtime)
     monkeypatch.setattr(
@@ -218,7 +218,7 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
 
     monkeypatch.setattr(app_module, "get_server_settings", _settings)
     monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
-    monkeypatch.setattr(app_module, "initialize_database", lambda backend: None)
+    monkeypatch.setattr(app_module, "initialize_database", lambda backend, **kwargs: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda **_kwargs: search_runtime)
     monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database, **kwargs: chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: geospatial_runtime)

@@ -10,11 +10,11 @@ from server.common.constants import (
 from server.domain.chat import (
     ModelProviderMode,
     ModelSettingsResponse,
+    ModelSettingsSnapshot,
     ModelSettingsUpdateRequest,
 )
 from server.repositories.credentials import CredentialRepository
 from server.repositories.model_settings import ModelSettingsRepository
-from server.repositories.schemas.models import ModelProviderSettingsRecord
 from server.services.chat.model_library import (
     ChatModelLibraryService,
     DYNAMIC_CLOUD_PROVIDERS,
@@ -227,8 +227,8 @@ class ChatSettingsService:
 
     # -------------------------------------------------------------------------
     def _repair_incomplete_agent_assignment(
-        self, record: ModelProviderSettingsRecord
-    ) -> ModelProviderSettingsRecord:
+        self, record: ModelSettingsSnapshot
+    ) -> ModelSettingsSnapshot:
         assignment = self._normalized_agent_assignment(record)
         if assignment["provider"] and assignment["model"]:
             return record
@@ -267,11 +267,11 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     def _persist_agent_assignment(
         self,
-        record: ModelProviderSettingsRecord,
+        record: ModelSettingsSnapshot,
         *,
         provider: str,
         model: str,
-    ) -> ModelProviderSettingsRecord:
+    ) -> ModelSettingsSnapshot:
         return self.settings_repo.update(
             active_provider_mode=(
                 getattr(record, "active_provider_mode", "")

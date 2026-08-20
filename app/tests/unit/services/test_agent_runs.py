@@ -136,6 +136,35 @@ def test_event_repository_replay_orders_and_filters_visibility(
     assert all(event.visibility == RunEventVisibility.USER for event in replay)
 
 ###############################################################################
+def test_event_repository_rejects_run_and_conversation_mismatch(run_repositories) -> None:
+    repo = run_repositories["events"]
+    with run_repositories["runs"]._session_factory() as session:  # noqa: SLF001
+        session.add(ConversationRecord(id="conv_1", title="Events"))
+        session.add(ConversationRecord(id="conv_2", title="Other events"))
+        session.add(
+            AgentRunRecord(
+                id="run_1",
+                conversation_id="conv_1",
+                original_request="events",
+                aggregated_request="events",
+                active_slot=1,
+            )
+        )
+        session.commit()
+
+    with pytest.raises(ValueError, match="Run not found"):
+        repo.append_event(
+            RunEventCreate(
+                conversation_id="conv_2",
+                run_id="run_1",
+                run_version=1,
+                type=RunEventType.PROGRESS,
+            )
+        )
+
+    assert repo.get_last_sequence("run_1") == 0
+
+###############################################################################
 def test_create_run_rejects_second_active_run(run_repositories) -> None:
     lifecycle, _, _, _ = _services(run_repositories)
     conversation = lifecycle.create_conversation(title="Rome")

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
 from server.common.logger import logger
-from server.repositories.catalog.reference_seeder import (
-    ReferenceCatalogSeeder,
-    ReferenceSeedResult,
-)
 from server.repositories.credential_material import seed_credential_encryption_material
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.database.migration_runner import (
@@ -17,16 +15,20 @@ from server.repositories.database.migration_runner import (
     release_postgres_lock,
     synchronize_database,
 )
-from server.services.catalog.loader import load_reference_catalog
 
 ###############################################################################
-def initialize_database(database: DatabaseBackend) -> MigrationResult:
+def initialize_database(
+    database: DatabaseBackend,
+    *,
+    on_ready: Callable[[], None] | None = None,
+) -> MigrationResult:
     if database.db_path is None:
         _ensure_postgres_database_exists(database)
 
     def seed_required_data() -> None:
         seed_credential_encryption_material(database)
-        seed_reference_catalog(database)
+        if on_ready is not None:
+            on_ready()
 
     result = synchronize_database(database, on_ready=seed_required_data)
     logger.info(
@@ -77,6 +79,3 @@ def _ensure_postgres_database_exists_locked(
     logger.info("Created PostgreSQL database: %s", target_name)
 
 ###############################################################################
-def seed_reference_catalog(database: DatabaseBackend) -> ReferenceSeedResult:
-    catalog = load_reference_catalog()
-    return ReferenceCatalogSeeder(database).seed_if_needed(catalog)
