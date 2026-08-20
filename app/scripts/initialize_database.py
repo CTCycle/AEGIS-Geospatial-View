@@ -14,6 +14,9 @@ if __name__ == "__main__":
     logger.info("Starting database initialization")
     settings = get_server_settings()
     database = build_database_backend(settings.database)
-    initialize_database(database)
-    elapsed = time.perf_counter() - start
-    logger.info("Database initialization completed in %.2f seconds", elapsed)
+    try:
+        initialize_database(database)
+        elapsed = time.perf_counter() - start
+        logger.info("Database initialization completed in %.2f seconds", elapsed)
+    finally:
+        database.engine.dispose()

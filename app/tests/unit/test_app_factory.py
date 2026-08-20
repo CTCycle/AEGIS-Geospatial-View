@@ -145,7 +145,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     ]
 
 ###############################################################################
-def test_postgres_startup_does_not_initialize_database(monkeypatch) -> None:
+def test_postgres_startup_initializes_database(monkeypatch) -> None:
     call_order: list[str] = []
     search_runtime = SimpleNamespace(search_orchestrator=SimpleNamespace())
     chat_runtime = _build_chat_runtime(call_order)
@@ -168,9 +168,7 @@ def test_postgres_startup_does_not_initialize_database(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module,
         "initialize_database",
-        lambda _database: (_ for _ in ()).throw(
-            AssertionError("PostgreSQL startup initialized the database")
-        ),
+        lambda _database: call_order.append("initialize_database"),
     )
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
     monkeypatch.setattr(
@@ -199,7 +197,7 @@ def test_postgres_startup_does_not_initialize_database(monkeypatch) -> None:
     with TestClient(app_module.create_app()):
         pass
 
-    assert "initialize_database" not in call_order
+    assert call_order[0] == "initialize_database"
 
 ###############################################################################
 def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:

@@ -39,6 +39,16 @@ jobs:
           ruff check app/server app/tests
           pyright --project app/server/pyproject.toml
 
+      - name: Verify Alembic migration metadata
+        env:
+          PYTHONPATH: app
+          AEGIS_RUNTIME_DATA_DIR: ${{ github.workspace }}/assets/cache/alembic-check-runtime
+        run: |
+          mkdir -p "$AEGIS_RUNTIME_DATA_DIR"
+          python -m alembic -c app/server/alembic.ini upgrade head
+          python -m alembic -c app/server/alembic.ini check
+          python -m alembic -c app/server/alembic.ini current --check-heads
+
       - name: Run backend unit suites
         run: |
           python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_openapi_schema.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py

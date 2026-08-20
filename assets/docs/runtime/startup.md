@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Local Development Via Launcher
 
@@ -19,10 +19,18 @@ The menu provides: launch application, install/update dependencies, rebuild the
 frontend independently, initialize the database explicitly, run the test suite,
 remove logs, clear caches, uninstall local dependencies, and exit.
 
-SQLite is created and seeded automatically only when its configured database
-file is missing. An existing SQLite file is left untouched. PostgreSQL is never
-created or initialized during application launch; select the database mode in
-`settings/.env`, then run menu option 4 once before launching the application.
+Database synchronization runs before backend repositories and background jobs
+are constructed. A missing SQLite file is created, migrated, and seeded.
+Existing SQLite and PostgreSQL databases are checked on every startup and
+upgraded to the Alembic head when required. PostgreSQL provisioning creates the
+configured database when the operator has `CREATEDB` access. Menu option 4
+invokes the same idempotent workflow.
+
+If a populated database predates Alembic, startup verifies it against the
+initial baseline before stamping. Unknown or structurally different schemas
+fail with an actionable error and are never silently stamped. SQLite creates a
+temporary backup while a migration or first-start seed is in progress and
+restores it if that operation fails.
 
 Launch option 1 stops listeners on the configured backend/UI ports, starts the
 backend, waits for `/api/health`, starts the frontend preview, waits for the UI
@@ -77,6 +85,23 @@ npm run start -- --host 127.0.0.1 --port 5000
 
 These ports match the values in `settings/.env.example`; if `settings/.env`
 uses different `FASTAPI_PORT` or `UI_PORT` values, use those values instead.
+
+## Alembic Development Workflow
+
+Run these commands from `app/server` with the configured environment:
+
+```powershell
+uv run alembic current --check-heads
+uv run alembic check
+uv run alembic upgrade head
+```
+
+New migrations are reviewed Python modules under `app/server/migrations/versions`;
+keep each revision's `down_revision` connected to the single current head and
+review it before applying. The optional Alembic Mako template is intentionally
+not tracked because the runtime and CI workflow do not generate revisions.
+Production startup only upgrades to `head`; it never autogenerates or
+downgrades schema.
 
 ## Codex And Sandbox Note
 

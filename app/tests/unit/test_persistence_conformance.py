@@ -9,6 +9,7 @@ from sqlalchemy import inspect, select
 from server.configurations import DatabaseSettings
 from server.repositories.database.postgres import PostgresRepository
 from server.repositories.database.sqlite import SQLiteRepository
+from server.repositories.database.initializer import initialize_database
 from server.repositories.schemas.models import (
     AgentRunRecord,
     Base,
@@ -59,14 +60,19 @@ def backend(request: pytest.FixtureRequest, tmp_path: Path):
             )
         )
     Base.metadata.drop_all(repository.engine)
-    Base.metadata.create_all(repository.engine)
+    with repository.engine.begin() as connection:
+        connection.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+    initialize_database(repository)
     yield repository
     Base.metadata.drop_all(repository.engine)
+    with repository.engine.begin() as connection:
+        connection.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
 
 ###############################################################################
-def test_canonical_schema_has_fifteen_tables_and_no_legacy_tables(backend) -> None:
+def test_canonical_schema_has_fifteen_application_tables_and_version_table(backend) -> None:
     tables = set(inspect(backend.engine).get_table_names())
-    assert len(tables) == 15
+    assert "alembic_version" in tables
+    assert len(tables - {"alembic_version"}) == 15
     assert {"chat_sessions", "conversation_contexts"}.isdisjoint(tables)
     assert "active_run_id" not in {
         column["name"]

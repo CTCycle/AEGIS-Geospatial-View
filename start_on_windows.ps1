@@ -293,9 +293,6 @@ function Sync-Dependencies {
 
     Write-Status STEP 'Installing Python dependencies with uv'
     $uvArguments = @('sync', '--python', $PythonExe, '--no-install-project')
-    if (Test-Path -LiteralPath (Join-Path $ServerDir 'uv.lock')) {
-        $uvArguments += '--locked'
-    }
     if ($InstallationType -eq 'Development') {
         $uvArguments += '--all-extras'
     }
@@ -368,7 +365,7 @@ function Test-DependenciesReady {
     if ($LASTEXITCODE -ne 0) { return $false }
     & $NodeExe --version *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
-    & $venvPython -c 'import fastapi, uvicorn' *> $null
+    & $venvPython -c 'import alembic, fastapi, filelock, uvicorn' *> $null
     if ($LASTEXITCODE -ne 0) { return $false }
 
     return $true
@@ -649,7 +646,7 @@ function Show-LauncherMenu {
     Write-MenuOption -Number '1' -Label 'Launch application' -Description 'Start local services'
     Write-MenuOption -Number '2' -Label 'Install / update dependencies' -Description 'Sync and build'
     Write-MenuOption -Number '3' -Label 'Rebuild frontend' -Description 'Run frontend production build'
-    Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create schema and seed data'
+    Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create, adopt, upgrade, and seed schema'
     Write-Host ''
     Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
     Write-MenuOption -Number '5' -Label 'Run test suite' -Description 'Validate installation'

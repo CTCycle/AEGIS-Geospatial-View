@@ -54,6 +54,13 @@ def health_check() -> dict[str, str]:
 def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
 
+
+def _dispose_database_engine(database: object) -> None:
+    engine = getattr(database, "engine", None)
+    dispose = getattr(engine, "dispose", None)
+    if callable(dispose):
+        dispose()
+
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
     client_root = CLIENT_DIST_PATH.resolve()
@@ -88,8 +95,11 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_server_settings()
     database = build_database_backend(settings.database)
 
-    if settings.database.embedded_database:
+    try:
         initialize_database(database)
+    except BaseException:
+        _dispose_database_engine(database)
+        raise
 
     search_runtime = build_search_runtime()
     chat_runtime = build_chat_runtime(search_runtime.search_orchestrator, database)
@@ -153,6 +163,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         await realtime_connections.close_all()
         job_service.stop()
         await run_lifecycle_service.shutdown()
+        _dispose_database_engine(database)
 
 ###############################################################################
 def create_app() -> FastAPI:

@@ -47,6 +47,7 @@ class DatabaseSettings:
     database_pool_recycle_seconds: int = 1800
     sqlite_busy_timeout_ms: int = 5000
     sqlite_wal_enabled: bool = True
+    database_migration_lock_timeout_seconds: int = 60
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -169,6 +170,7 @@ class JsonDatabaseSettings(BaseModel):
     database_pool_recycle_seconds: int = Field(default=1800, ge=0)
     sqlite_busy_timeout_ms: int = Field(default=5000, ge=1)
     sqlite_wal_enabled: bool = True
+    database_migration_lock_timeout_seconds: int = Field(default=60, ge=1)
 
     # -------------------------------------------------------------------------
     @field_validator(
@@ -381,6 +383,11 @@ def build_database_payload_from_env() -> dict[str, Any]:
             "insert_batch_size",
             _read_env_int("DATABASE_INSERT_BATCH_SIZE"),
         ),
+        (
+            "DATABASE_MIGRATION_LOCK_TIMEOUT_SECONDS",
+            "database_migration_lock_timeout_seconds",
+            _read_env_int("DATABASE_MIGRATION_LOCK_TIMEOUT_SECONDS"),
+        ),
     )
 
     for _env_name, key, value in explicit_values:
@@ -542,6 +549,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
             database_pool_recycle_seconds=db.database_pool_recycle_seconds,
             sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
             sqlite_wal_enabled=db.sqlite_wal_enabled,
+            database_migration_lock_timeout_seconds=db.database_migration_lock_timeout_seconds,
         )
 
     return DatabaseSettings(
@@ -562,6 +570,7 @@ def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
         database_pool_recycle_seconds=db.database_pool_recycle_seconds,
         sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
         sqlite_wal_enabled=db.sqlite_wal_enabled,
+        database_migration_lock_timeout_seconds=db.database_migration_lock_timeout_seconds,
     )
 
 ###############################################################################

@@ -1,6 +1,6 @@
 # Repository Structure
 
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Purpose
 
@@ -24,10 +24,12 @@ AEGIS Geospatial View/
       generate_openapi.py
       initialize_database.py
     server/
+      alembic.ini
       api/
       common/
       configurations/
       domain/
+      migrations/
       repositories/
       services/
       app.py
@@ -59,7 +61,9 @@ Key backend directories under `app/server`:
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `repositories/database/`
   Canonical `DatabaseBackend` contract, SQLite/PostgreSQL implementations, and
-  the explicit database initializer.
+  the explicit database initializer and migration runner.
+- `migrations/`
+  Alembic environment and reviewed schema revisions.
 - `services/`
   Runtime orchestration for agent, chat, geospatial, LLM, and search workflows.
   The agent orchestration area includes focused helpers such as

@@ -11,6 +11,10 @@ Last updated: 2026-08-20
 - Maintain Pylance-compatible typing discipline without suppressing newly
   exposed backend diagnostics.
 - Test backend behavior with pytest.
+- Validate database changes through Alembic; use `Base.metadata.create_all()`
+  only in isolated tests that explicitly exercise ORM fixture construction.
+- Keep one migration head and run `alembic current --check-heads` and
+  `alembic check` before release.
 
 The bounded backend validation sequence is:
 
