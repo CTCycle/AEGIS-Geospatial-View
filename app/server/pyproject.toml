@@ -52,6 +52,10 @@ packages = ["server", "scripts"]
 [tool.pytest.ini_options]
 pythonpath = [".", ".."]
 asyncio_mode = "auto"
+cache_dir = "../../assets/cache/pytest"
+
+[tool.ruff]
+cache-dir = "../../assets/cache/ruff"
 
 [tool.pyright]
 include = ["."]

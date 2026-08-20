@@ -89,7 +89,12 @@
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "cache": {
+      "enabled": true,
+      "environment": "local",
+      "path": "../../assets/cache/angular"
+    }
   },
   "schematics": {
     "@schematics/angular:component": {
