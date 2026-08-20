@@ -376,21 +376,6 @@ class AgentOrchestrator:
                 context_usage=context_usage,
             )
 
-        direct_response = await self.direct_turn_response_service.handle(
-            request_id=request_id,
-            conversation_id=conversation_id,
-            conversation_key=conversation_key,
-            task=task,
-            turn_contract=turn_contract,
-            latest_memory=latest_memory,
-            latest_contract=latest_contract,
-            recent_messages=recent_messages,
-            context_usage=context_usage,
-            preflight_decision=preflight_decision,
-        )
-        if direct_response is not None:
-            return direct_response
-
         settings = self.settings_repo.get_or_create()
         tool_plan = self.tool_planner.build_plan(
             turn_contract,
