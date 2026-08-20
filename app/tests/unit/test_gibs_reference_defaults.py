@@ -6,6 +6,7 @@ from server.configurations import DatabaseSettings
 from server.repositories.database.initializer import initialize_database
 from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
+from server.services.catalog.startup import seed_reference_catalog
 
 ###############################################################################
 def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
@@ -25,7 +26,10 @@ def _seeded_repository(tmp_path: Path) -> SQLiteRepository:
             insert_batch_size=100,
         )
     )
-    initialize_database(repository)
+    initialize_database(
+        repository,
+        on_ready=lambda: seed_reference_catalog(repository),
+    )
     return repository
 
 ###############################################################################

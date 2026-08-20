@@ -44,6 +44,7 @@ from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.agent_steering import AgentSteeringRepository
 from server.repositories.credentials import CredentialRepository
 from server.services.search.composition import build_search_runtime
+from server.services.catalog.startup import seed_reference_catalog
 from server.services.startup_validation import run_startup_validations
 
 ###############################################################################
@@ -60,6 +61,7 @@ def _dispose_database_engine(database: object) -> None:
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
         dispose()
+
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:
@@ -96,7 +98,10 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     database = build_database_backend(settings.database)
 
     try:
-        initialize_database(database)
+        initialize_database(
+            database,
+            on_ready=lambda: seed_reference_catalog(database),
+        )
     except BaseException:
         _dispose_database_engine(database)
         raise

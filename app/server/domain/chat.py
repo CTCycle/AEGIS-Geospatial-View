@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
@@ -151,6 +152,24 @@ class ModelSettingsResponse(BaseModel):
     deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
     credential_health: dict[str, dict[str, str]] = Field(default_factory=lambda: dict[str, dict[str, str]]())
+
+###############################################################################
+@dataclass(frozen=True)
+class ModelSettingsSnapshot:
+    """Persistence-neutral model settings returned by the repository boundary."""
+
+    id: int
+    active_provider_mode: str
+    agent_model_provider: str
+    agent_model_name: str
+    ollama_url: str
+    openai_base_url: str | None
+    google_base_url: str | None
+    deepseek_base_url: str | None
+    capabilities_json: str | None
+    supports_tools: bool
+    supports_structured_output: bool
+    tool_support_source: str
 
 ###############################################################################
 class ModelSettingsUpdateRequest(BaseModel):

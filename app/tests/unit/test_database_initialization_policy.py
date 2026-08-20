@@ -17,6 +17,7 @@ from server.repositories.schemas import (
 )
 from server.repositories.schemas.models import ConversationRecord
 from server.repositories.database.sqlite import SQLiteRepository
+from server.services.catalog.startup import seed_reference_catalog
 
 ###############################################################################
 def _settings(*, embedded_database: bool, database_path: str) -> DatabaseSettings:
@@ -36,11 +37,19 @@ def _settings(*, embedded_database: bool, database_path: str) -> DatabaseSetting
     )
 
 ###############################################################################
+###############################################################################
+def _initialize(repository):  # noqa: ANN001
+    return initialize_database(
+        repository,
+        on_ready=lambda: seed_reference_catalog(repository),
+    )
+
+###############################################################################
 def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
 
-    initialize_database(repository)
+    _initialize(repository)
 
     assert database_path.is_file()
     assert "alembic_version" in inspect(repository.engine).get_table_names()
@@ -51,7 +60,7 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
 def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
-    initialize_database(repository)
+    _initialize(repository)
     first_counts = (
         repository.count_records(CredentialEncryptionMaterial),
         repository.count_records(ReferenceCountryRecord),
@@ -60,7 +69,7 @@ def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     second_repository = SQLiteRepository(
         _settings(embedded_database=True, database_path=str(database_path))
     )
-    result = initialize_database(second_repository)
+    result = _initialize(second_repository)
 
     assert result.migrations_applied is False
     assert (
@@ -82,7 +91,7 @@ def test_unversioned_legacy_sqlite_database_is_adopted_without_data_loss(
     legacy_repository.engine.dispose()
 
     repository = SQLiteRepository(settings)
-    result = initialize_database(repository)
+    result = _initialize(repository)
 
     assert result.adopted_legacy_schema is True
     assert repository.count_records(ConversationRecord) == 1
@@ -101,7 +110,7 @@ def test_unversioned_legacy_sqlite_schema_mismatch_fails_without_stamping(
     legacy_repository.engine.dispose()
 
     with pytest.raises(RuntimeError, match="does not match the pre-Alembic baseline"):
-        initialize_database(SQLiteRepository(settings))
+        _initialize(SQLiteRepository(settings))
 
     verification_repository = SQLiteRepository(settings)
     assert "alembic_version" not in inspect(verification_repository.engine).get_table_names()
@@ -125,7 +134,7 @@ def test_sqlite_migration_failure_restores_unversioned_database(
         lambda _database: (_ for _ in ()).throw(RuntimeError("seed failure")),
     )
     with pytest.raises(RuntimeError, match="seed failure"):
-        initialize_database(SQLiteRepository(settings))
+        _initialize(SQLiteRepository(settings))
 
     verification_repository = SQLiteRepository(settings)
     assert "alembic_version" not in inspect(verification_repository.engine).get_table_names()
@@ -161,12 +170,7 @@ def test_explicit_postgres_initialization_runs_provisioning_schema_and_seeding(
         "server.repositories.database.initializer.seed_credential_encryption_material",
         lambda _database: calls.append("credential"),
     )
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.seed_reference_catalog",
-        lambda _database: calls.append("catalog"),
-    )
-
-    initialize_database(backend)  # type: ignore[arg-type]
+    initialize_database(backend, on_ready=lambda: calls.append("catalog"))  # type: ignore[arg-type]
 
     assert calls == ["provision", "schema", "credential", "catalog"]
 

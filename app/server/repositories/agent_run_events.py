@@ -27,7 +27,10 @@ class AgentRunEventRepository:
         with self._session_factory() as session:
             sequence = session.scalar(
                 update(AgentRunRecord)
-                .where(AgentRunRecord.id == event.run_id)
+                .where(
+                    AgentRunRecord.id == event.run_id,
+                    AgentRunRecord.conversation_id == event.conversation_id,
+                )
                 .values(next_event_sequence=AgentRunRecord.next_event_sequence + 1)
                 .returning(AgentRunRecord.next_event_sequence)
             )
