@@ -1,9 +1,11 @@
 # Troubleshooting
 
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Basics
 
+- If the application asks you to resize the browser, use a desktop window at
+  least `1024px` wide. AEGIS does not provide a mobile layout.
 - No response or failed request: verify backend and frontend are running.
 - Local model issues: confirm the Ollama URL and run connection check in Settings.
 - Missing expected model: refresh the model list or pull the model in Ollama settings.

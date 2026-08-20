@@ -20,6 +20,14 @@ The app is most useful when you want to:
 - manage access for external map-related services
 - adjust which models or assistants the app should use
 
+## Desktop Browser Requirement
+
+AEGIS is a desktop workbench delivered through web technologies. Use a desktop
+or laptop browser window at least `1024px` wide. Windows tablet devices are
+supported only when they behave like a normal desktop browser and can display
+the full desktop interface. Smaller windows show a minimum-size notice instead
+of a mobile layout.
+
 ## What You Can Do
 
 The app is intentionally broad, but the everyday workflow is simple.

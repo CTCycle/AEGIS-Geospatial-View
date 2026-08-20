@@ -1,4 +1,29 @@
-<div class="app-shell">
+<div
+  #desktopViewportGate
+  class="desktop-viewport-gate"
+  [class.desktop-viewport-gate--visible]="!isDesktopViewport"
+  [attr.aria-hidden]="isDesktopViewport ? 'true' : null"
+  role="alertdialog"
+  aria-modal="true"
+  aria-labelledby="desktop-viewport-gate-title"
+  aria-describedby="desktop-viewport-gate-description"
+  tabindex="-1"
+>
+  <section class="desktop-viewport-gate__panel">
+    <p class="desktop-viewport-gate__eyebrow">Desktop workspace</p>
+    <h1 id="desktop-viewport-gate-title">Resize the browser window to continue</h1>
+    <p id="desktop-viewport-gate-description">
+      AEGIS is designed for desktop browser windows and requires at least
+      <strong>{{ minimumDesktopViewportWidth }}px</strong> of viewport width.
+    </p>
+  </section>
+</div>
+
+<div
+  class="app-shell"
+  [attr.inert]="isDesktopViewport ? null : ''"
+  [attr.aria-hidden]="isDesktopViewport ? null : 'true'"
+>
   <header class="operations-bar" aria-label="Primary navigation">
     <a class="operations-bar__brand" routerLink="/" aria-label="AEGIS workspace">
       <svg class="operations-bar__mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -14,8 +39,7 @@
       <a routerLink="/geodata" routerLinkActive="active">Geodata</a>
       <a routerLink="/access-configurations" routerLinkActive="active">Access</a>
       <a routerLink="/settings" routerLinkActive="active">
-        <span class="nav-label nav-label--full">Model Settings</span>
-        <span class="nav-label nav-label--compact">Settings</span>
+        <span>Model Settings</span>
       </a>
     </nav>
     <div class="operations-bar__spacer" aria-hidden="true"></div>

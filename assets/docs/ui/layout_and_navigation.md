@@ -1,6 +1,15 @@
 # Layout And Navigation
 
-Last updated: 2026-08-02
+Last updated: 2026-08-20
+
+## Desktop Viewport Contract
+
+AEGIS is a desktop application delivered through web technologies. The minimum
+supported browser viewport is `1024px` wide. Smaller windows show a blocking
+minimum-size notice rather than switching to a mobile layout.
+
+Windows tablet devices are supported when they operate as a desktop browser and
+can display the full desktop interface at the supported width.
 
 ## Workspace Layout
 
@@ -16,14 +25,12 @@ Toolbar width constraints:
 - maximum: `760px`
 - map minimum width guard: `320px`
 
-On screens at or below `960px`, the workspace stacks chat above the map and
-removes the resize handle. At or below `700px`, the chat and map minimum heights
-are reduced for narrow-screen scrolling. The operations bar compresses at
-`900px` and `460px`.
+The chat rail and map remain side by side at all supported widths. The divider
+is mouse-resizable and the chat rail can be collapsed when map focus is useful.
 
 ## Other Page Layouts
 
-- Settings page uses a two-column `7fr/3fr` layout with responsive fallback rules.
+- Settings page uses a two-column `7fr/3fr` desktop layout.
 - The app shell uses an Operations Bar for top-level navigation and status.
 
 ## Primary Screens

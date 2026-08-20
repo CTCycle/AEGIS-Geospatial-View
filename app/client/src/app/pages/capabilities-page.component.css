@@ -84,7 +84,6 @@
     overflow-x: auto;
     overflow-y: hidden;
     max-width: 100%;
-    -webkit-overflow-scrolling: touch;
     border: 1px solid #263a45;
     background: #101c23;
 }
@@ -190,16 +189,4 @@
     background: #101c23;
     padding: 1rem;
     color: #a9bac2;
-}
-
-@media (max-width: 760px) {
-    .capabilities-page__content,
-    .capabilities-page__header {
-        padding-left: 0.85rem;
-        padding-right: 0.85rem;
-    }
-
-    .capability-table {
-        min-width: 56rem;
-    }
 }
