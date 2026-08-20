@@ -34,6 +34,7 @@ class CredentialStore(Protocol):
 class CredentialDecryptor(Protocol):
     def decrypt(self, encrypted_value: str) -> str:
         """Decrypt a stored credential value."""
+        ...
 
 ###############################################################################
 class GeospatialCredentialResolutionError(RuntimeError):
