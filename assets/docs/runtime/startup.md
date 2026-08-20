@@ -55,10 +55,12 @@ An existing `app\server\.venv` is reused. The launcher recreates it only when
 repository or runtime folder is moved. An unrelated dependency-sync failure
 does not delete the environment.
 
-The launcher stores uv, npm, pip, Python bytecode, Ruff, pytest, Playwright,
-and coverage state under `assets/cache`. Launching preserves the uv cache. Use
-menu option 2 to install or update dependencies and prune it, or menu option 7
-to clear all disposable development caches without reinstalling.
+The launcher stores uv, npm, pip, Python bytecode, and Playwright state under
+`runtimes/cache`. Ruff, pytest, Angular, coverage, and other test-tool state is
+stored under `app/tests/cache`. Launching preserves the uv cache. Use menu option
+2 to install or update dependencies and prune it, or menu option 7 to clear all
+disposable development caches without reinstalling. Locked or administrator-only
+files are reported and skipped so cleanup can continue.
 
 ## Local Development Manual
 
@@ -66,15 +68,16 @@ Run the backend and frontend commands in separate PowerShell terminals.
 
 ```powershell
 Set-Location <repository-root>
-$cacheRoot = (Resolve-Path 'assets\cache').Path
-$env:UV_CACHE_DIR = Join-Path $cacheRoot 'uv'
-$env:PIP_CACHE_DIR = Join-Path $cacheRoot 'pip'
-$env:NPM_CONFIG_CACHE = Join-Path $cacheRoot 'npm'
-$env:RUFF_CACHE_DIR = Join-Path $cacheRoot 'ruff'
-$env:PYTHONPYCACHEPREFIX = Join-Path $cacheRoot 'python'
-$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $cacheRoot 'playwright-browsers'
-$env:COVERAGE_FILE = Join-Path $cacheRoot 'coverage\.coverage'
-$env:PYTEST_ADDOPTS = '--basetemp="' + (Join-Path $cacheRoot 'pytest-tmp') + '"'
+$runtimeCacheRoot = (Resolve-Path 'runtimes\cache').Path
+$testCacheRoot = (Resolve-Path 'app\tests\cache').Path
+$env:UV_CACHE_DIR = Join-Path $runtimeCacheRoot 'uv'
+$env:PIP_CACHE_DIR = Join-Path $runtimeCacheRoot 'pip'
+$env:NPM_CONFIG_CACHE = Join-Path $runtimeCacheRoot 'npm'
+$env:PYTHONPYCACHEPREFIX = Join-Path $runtimeCacheRoot 'python'
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $runtimeCacheRoot 'playwright-browsers'
+$env:RUFF_CACHE_DIR = Join-Path $testCacheRoot 'ruff'
+$env:COVERAGE_FILE = Join-Path $testCacheRoot 'coverage\.coverage'
+$env:PYTEST_ADDOPTS = '--basetemp="' + (Join-Path $testCacheRoot 'pytest-tmp') + '"'
 Set-Location app/server
 uv sync
 uv run python -m uvicorn server.app:app --host 127.0.0.1 --port 5002 --ws-max-size 65536 --ws-ping-interval 15 --ws-ping-timeout 10

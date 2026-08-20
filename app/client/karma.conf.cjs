@@ -15,7 +15,7 @@ module.exports = function configureKarma(config) {
     },
     reporters: ['progress', 'kjhtml'],
     coverageReporter: {
-      dir: require('path').join(__dirname, '../../assets/cache/coverage/aegis-client'),
+      dir: require('path').join(__dirname, '../tests/cache/coverage/aegis-client'),
       subdir: '.',
       reporters: [{ type: 'html' }, { type: 'text-summary' }],
     },

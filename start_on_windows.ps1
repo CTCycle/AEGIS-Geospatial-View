@@ -8,9 +8,12 @@ $RootDir = $PSScriptRoot
 $AppDir = Join-Path $RootDir 'app'
 $ServerDir = Join-Path $AppDir 'server'
 $ClientDir = Join-Path $AppDir 'client'
+$TestsDir = Join-Path $AppDir 'tests'
 $SettingsDir = Join-Path $RootDir 'settings'
-$CacheDir = Join-Path $RootDir 'assets\cache'
 $RuntimesDir = Join-Path $RootDir 'runtimes'
+$RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
+$ToolCacheDir = Join-Path $TestsDir 'cache'
+$LegacyCacheDir = Join-Path $RootDir 'assets\cache'
 $PythonDir = Join-Path $RuntimesDir 'python'
 $PythonExe = Join-Path $PythonDir 'python.exe'
 $PythonPth = Join-Path $PythonDir 'python314._pth'
@@ -19,20 +22,28 @@ $UvExe = Join-Path $UvDir 'uv.exe'
 $NodeDir = Join-Path $RuntimesDir 'nodejs'
 $NodeExe = Join-Path $NodeDir 'node.exe'
 $NpmCmd = Join-Path $NodeDir 'npm.cmd'
-$UvCacheDir = Join-Path $CacheDir 'uv'
-$NpmCacheDir = Join-Path $CacheDir 'npm'
-$PipCacheDir = Join-Path $CacheDir 'pip'
-$PythonBytecodeCacheDir = Join-Path $CacheDir 'python'
-$PytestCacheDir = Join-Path $CacheDir 'pytest'
-$PytestTempDir = Join-Path $CacheDir 'pytest-tmp'
-$RuffCacheDir = Join-Path $CacheDir 'ruff'
-$CoverageDir = Join-Path $CacheDir 'coverage'
-$PlaywrightBrowsersDir = Join-Path $CacheDir 'playwright-browsers'
+$UvCacheDir = Join-Path $RuntimeCacheDir 'uv'
+$NpmCacheDir = Join-Path $RuntimeCacheDir 'npm'
+$PipCacheDir = Join-Path $RuntimeCacheDir 'pip'
+$PythonBytecodeCacheDir = Join-Path $RuntimeCacheDir 'python'
+$PlaywrightBrowsersDir = Join-Path $RuntimeCacheDir 'playwright-browsers'
+$PytestCacheDir = Join-Path $ToolCacheDir 'pytest'
+$PytestTempDir = Join-Path $ToolCacheDir 'pytest-tmp'
+$RuffCacheDir = Join-Path $ToolCacheDir 'ruff'
+$CoverageDir = Join-Path $ToolCacheDir 'coverage'
+$AngularCacheDir = Join-Path $ToolCacheDir 'angular'
 $VenvDir = Join-Path $ServerDir '.venv'
 $DotEnvPath = Join-Path $SettingsDir '.env'
 $DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
 $LogsDir = Join-Path $AppDir 'resources\logs'
 $TestScript = Join-Path $AppDir 'tests\run_tests.bat'
+$LegacyCachePaths = @(
+    $LegacyCacheDir,
+    (Join-Path $RootDir '.pytest_cache'),
+    (Join-Path $RootDir '.ruff_cache'),
+    (Join-Path $RootDir '.tmp_pytest'),
+    (Join-Path $ClientDir '.angular')
+)
 $InitializeDatabaseScript = Join-Path $AppDir 'scripts\initialize_database.py'
 $PythonVersion = '3.14.2'
 $PythonArchiveName = "python-$PythonVersion-embed-amd64.zip"
@@ -194,7 +205,7 @@ function Import-EnvironmentFile {
 }
 
 function Set-LauncherEnvironment {
-    New-Item -ItemType Directory -Path $CacheDir, $UvCacheDir, $NpmCacheDir, $PipCacheDir, $PythonBytecodeCacheDir, $PytestCacheDir, $PytestTempDir, $RuffCacheDir, $CoverageDir, $PlaywrightBrowsersDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $RuntimeCacheDir, $ToolCacheDir, $UvCacheDir, $NpmCacheDir, $PipCacheDir, $PythonBytecodeCacheDir, $PytestCacheDir, $PytestTempDir, $RuffCacheDir, $CoverageDir, $AngularCacheDir, $PlaywrightBrowsersDir -Force | Out-Null
     $env:UV_CACHE_DIR = $UvCacheDir
     $env:UV_PROJECT_ENVIRONMENT = $VenvDir
     $env:UV_LINK_MODE = 'copy'
@@ -204,6 +215,7 @@ function Set-LauncherEnvironment {
     $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
     $env:RUFF_CACHE_DIR = $RuffCacheDir
     $env:COVERAGE_FILE = Join-Path $CoverageDir '.coverage'
+    $env:PYTEST_ADDOPTS = '--basetemp="' + $PytestTempDir + '"'
     Remove-Item Env:\PYTHONHOME -ErrorAction SilentlyContinue
     Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
     Remove-Item Env:\PYTHONNOUSERSITE -ErrorAction SilentlyContinue
@@ -494,9 +506,9 @@ function Invoke-InstallOrUpdate {
     $installationType = Read-InstallationType
     Sync-Dependencies -BuildFrontend $true -InstallationType $installationType
     if (Test-Path -LiteralPath $UvCacheDir) {
-        Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
+        [void](Remove-PathBestEffort -Path $UvCacheDir -Recurse)
     }
-    Write-Status SUCCESS 'Dependencies installed, frontend built, and uv cache pruned.'
+    Write-Status SUCCESS 'Dependencies installed, frontend built, and uv cache pruning attempted.'
 }
 
 function Read-InstallationType {
@@ -553,40 +565,154 @@ function Remove-ApplicationLogs {
         Write-Status INFO 'No log files found.'
         return
     }
-    $logs | Remove-Item -Force
-    Write-Status SUCCESS "Removed $($logs.Count) log file(s)."
+    $removed = 0
+    $skipped = 0
+    foreach ($log in $logs) {
+        if (Remove-PathBestEffort -Path $log.FullName) {
+            $removed++
+        }
+        else {
+            $skipped++
+        }
+    }
+    Write-Status SUCCESS "Removed $removed log file(s); skipped $skipped locked or inaccessible file(s)."
+}
+
+function Remove-PathBestEffort {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [switch]$Recurse
+    )
+
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    }
+    catch {
+        Write-Status WARN "Skipped inaccessible path: $Path ($($_.Exception.Message))"
+        return $false
+    }
+
+    if ($Recurse -and $item.PSIsContainer) {
+        try {
+            $children = @(Get-ChildItem -LiteralPath $item.FullName -Force -ErrorAction Stop)
+        }
+        catch {
+            Write-Status WARN "Skipped inaccessible directory: $Path ($($_.Exception.Message))"
+            return $false
+        }
+
+        $childFailure = $false
+        foreach ($child in $children) {
+            if (-not (Remove-PathBestEffort -Path $child.FullName -Recurse)) {
+                $childFailure = $true
+            }
+        }
+        if ($childFailure) {
+            return $false
+        }
+    }
+
+    try {
+        $removeParameters = @{
+            LiteralPath = $item.FullName
+            Force = $true
+            ErrorAction = 'Stop'
+        }
+        if ($Recurse) {
+            $removeParameters.Recurse = $true
+        }
+        Remove-Item @removeParameters
+        return $true
+    }
+    catch {
+        Write-Status WARN "Skipped locked or protected path: $($item.FullName) ($($_.Exception.Message))"
+        return $false
+    }
 }
 
 function Remove-PythonCaches {
-    Get-ChildItem -LiteralPath $RootDir -Directory -Filter '__pycache__' -Recurse -Force -ErrorAction SilentlyContinue |
-        Sort-Object FullName -Descending |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    $scriptsDir = Join-Path $AppDir 'scripts'
+    $searchRoots = @(
+        Get-ChildItem -LiteralPath $ServerDir -Directory -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne '.venv' } |
+            Select-Object -ExpandProperty FullName
+        $TestsDir
+        $scriptsDir
+    )
+    $cacheDirectories = @(
+        Get-ChildItem -LiteralPath $ServerDir -Directory -Filter '__pycache__' -Force -ErrorAction SilentlyContinue
+        foreach ($searchRoot in $searchRoots) {
+            if (Test-Path -LiteralPath $searchRoot) {
+                Get-ChildItem -LiteralPath $searchRoot -Directory -Filter '__pycache__' -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    ) | Sort-Object FullName -Descending
+    foreach ($cacheDirectory in $cacheDirectories) {
+        [void](Remove-PathBestEffort -Path $cacheDirectory.FullName -Recurse)
+    }
 }
 
 function Clear-ApplicationCache {
     Remove-PythonCaches
-    if (Test-Path -LiteralPath $CacheDir) {
-        Get-ChildItem -LiteralPath $CacheDir -Force -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ne '.gitkeep' } |
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    $cacheRoots = @($RuntimeCacheDir, $ToolCacheDir) + $LegacyCachePaths
+    $skipped = 0
+    foreach ($cacheRoot in ($cacheRoots | Select-Object -Unique)) {
+        try {
+            $cacheRootExists = Test-Path -LiteralPath $cacheRoot -ErrorAction Stop
+        }
+        catch {
+            Write-Status WARN "Skipped inaccessible cache directory: $cacheRoot ($($_.Exception.Message))"
+            $skipped++
+            continue
+        }
+        if (-not $cacheRootExists) {
+            continue
+        }
+        try {
+            $children = @(Get-ChildItem -LiteralPath $cacheRoot -Force -ErrorAction Stop)
+        }
+        catch {
+            Write-Status WARN "Skipped inaccessible cache directory: $cacheRoot ($($_.Exception.Message))"
+            $skipped++
+            continue
+        }
+        foreach ($child in $children) {
+            if ($child.Name -eq '.gitkeep') {
+                continue
+            }
+            if (-not (Remove-PathBestEffort -Path $child.FullName -Recurse)) {
+                $skipped++
+            }
+        }
     }
-    New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
-    Write-Status SUCCESS 'Development caches and disposable artifacts cleared from assets/cache.'
+    New-Item -ItemType Directory -Path $RuntimeCacheDir, $ToolCacheDir -Force | Out-Null
+    Write-Status SUCCESS "Development caches cleared where permitted; skipped $skipped locked or inaccessible item(s)."
 }
 
 function Uninstall-Application {
     $targets = @(
         $RuntimesDir,
-        $CacheDir,
+        $LegacyCacheDir,
         $VenvDir,
         (Join-Path $RootDir '.venv'),
         (Join-Path $ClientDir 'node_modules'),
         (Join-Path $ClientDir '.angular'),
         (Join-Path $ClientDir 'dist')
     )
+    $skipped = 0
     foreach ($target in $targets) {
-        if (Test-Path -LiteralPath $target) {
-            Remove-Item -LiteralPath $target -Recurse -Force
+        try {
+            $targetExists = Test-Path -LiteralPath $target -ErrorAction Stop
+        }
+        catch {
+            Write-Status WARN "Skipped inaccessible uninstall target: $target ($($_.Exception.Message))"
+            $skipped++
+            continue
+        }
+        if ($targetExists -and -not (Remove-PathBestEffort -Path $target -Recurse)) {
+            $skipped++
         }
     }
 
@@ -597,7 +723,7 @@ function Uninstall-Application {
         New-Item -ItemType File -Path $runtimeKeepFile -Force | Out-Null
     }
     Remove-PythonCaches
-    Write-Status SUCCESS 'Application dependencies and generated caches uninstalled. Settings and user data were preserved.'
+    Write-Status SUCCESS "Application dependencies and generated caches uninstalled where permitted; skipped $skipped locked or inaccessible item(s). Settings and user data were preserved."
 }
 
 function Wait-ForMenuReturn {
@@ -651,7 +777,7 @@ function Show-LauncherMenu {
     Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
     Write-MenuOption -Number '5' -Label 'Run test suite' -Description 'Validate installation'
     Write-MenuOption -Number '6' -Label 'Remove logs' -Description 'Clear application logs'
-    Write-MenuOption -Number '7' -Label 'Clear cache' -Description 'Remove Python and uv caches'
+    Write-MenuOption -Number '7' -Label 'Clear cache' -Description 'Remove runtime and test caches'
     Write-MenuOption -Number '8' -Label 'Uninstall application' -Description 'Remove local dependencies' -Destructive
     Write-Host ''
     Write-MenuRule

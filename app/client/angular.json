@@ -93,7 +93,7 @@
     "cache": {
       "enabled": true,
       "environment": "local",
-      "path": "../../assets/cache/angular"
+      "path": "../tests/cache/angular"
     }
   },
   "schematics": {
