@@ -229,38 +229,6 @@
     cursor: not-allowed;
 }
 
-@media (max-width: 980px) {
-    .access-provider {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 850px) {
-    .access-page__header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-}
-
-@media (max-width: 620px) {
-    .access-page__content,
-    .access-page__header {
-        padding-left: 0.85rem;
-        padding-right: 0.85rem;
-    }
-
-    .access-provider header,
-    .access-provider footer,
-    .access-provider__key-input-row {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .access-provider__key-actions {
-        justify-content: flex-start;
-    }
-}
-
 
 .access-signup-trigger {
     border: 1px solid #2f9bd7;

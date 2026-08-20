@@ -1,6 +1,6 @@
 # Experience And Accessibility
 
-Last updated: 2026-08-12
+Last updated: 2026-08-20
 
 ## Core User Journeys
 
@@ -21,12 +21,15 @@ Last updated: 2026-08-12
 - Workspace shows welcome or idle content before the first successful turn.
 - Settings shows explicit empty-state UI when no filtered model results exist.
 
-## Responsiveness
+## Desktop Usability
 
-- The app must remain usable on desktop and narrow widths.
-- Workspace supports collapsing toolbar and constrained resize behavior.
-- Settings adapts from multi-column to narrow layouts.
-- Avoid fixed heights that break small-screen scrolling.
+- The supported viewport is a standard desktop or laptop browser window at
+  least `1024px` wide.
+- Below that width, the application shows a blocking minimum-size notice and
+  preserves the desktop interface behind an inert shell.
+- Workspace collapsing and constrained mouse resizing remain available.
+- Prefer information density, horizontal space, and stable desktop navigation
+  over mobile-specific stacking or touch-first interactions.
 
 ## Accessibility
 

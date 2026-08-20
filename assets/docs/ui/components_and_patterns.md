@@ -1,6 +1,6 @@
 # Components And Patterns
 
-Last updated: 2026-08-12
+Last updated: 2026-08-20
 
 ## Reusable Components
 
@@ -43,4 +43,6 @@ All interactive components must provide:
 - Keep chat input within the realtime contract's 12,000-character message limit before sending.
 - Treat normalized backend render descriptors as the only source for raster and
   provider-native map layers; component code must not reconstruct provider URLs.
-- Validate Operations Bar navigation, routed layouts, map controls, and text wrapping at desktop and mobile widths after significant UI edits.
+- Validate Operations Bar navigation, routed layouts, map controls, and text
+  wrapping at supported desktop widths after significant UI edits. Validate the
+  minimum-size gate below `1024px` instead of a mobile layout.
