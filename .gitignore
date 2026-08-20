@@ -55,7 +55,14 @@ Thumbs.db
 .tmp_logs/
 *.lock
 *.log
+
+# Alembic and migration runtime artifacts
+*.mako
+*.migration-backup-*.db
+*.migration.lock
 *.db
+*.db-shm
+*.db-wal
 *.sqlite*
 *.exe
 

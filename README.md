@@ -175,6 +175,12 @@ example as a temporary first-run fallback until the application creates the
 local file. The technical documentation under `assets/docs` covers manual
 setup and deeper runtime behavior.
 
+Database schema changes are managed by Alembic. Startup and launcher option 4
+create or provision the configured database when needed, verify or adopt a
+pre-Alembic schema, apply migrations to the current head, and seed required
+reference data idempotently. See [the startup and Alembic workflow](./assets/docs/runtime/startup.md)
+for operator and development commands.
+
 ## Project Contents
 
 The repository is split into a few broad areas:

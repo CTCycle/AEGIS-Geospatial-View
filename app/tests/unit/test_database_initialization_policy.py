@@ -3,13 +3,19 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+from sqlalchemy import inspect
+
 from server.configurations import DatabaseSettings
 from server.repositories.database.backend import build_database_backend
 from server.repositories.database.initializer import initialize_database
+from server.repositories.database.migration_runner import MigrationResult
 from server.repositories.schemas import (
+    Base,
     CredentialEncryptionMaterial,
     ReferenceCountryRecord,
 )
+from server.repositories.schemas.models import ConversationRecord
 from server.repositories.database.sqlite import SQLiteRepository
 
 ###############################################################################
@@ -30,41 +36,100 @@ def _settings(*, embedded_database: bool, database_path: str) -> DatabaseSetting
     )
 
 ###############################################################################
-def test_missing_sqlite_database_creates_schema_and_seeds(monkeypatch, tmp_path: Path) -> None:
+def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
 
     initialize_database(repository)
 
     assert database_path.is_file()
+    assert "alembic_version" in inspect(repository.engine).get_table_names()
     assert repository.count_records(CredentialEncryptionMaterial) == 1
     assert repository.count_records(ReferenceCountryRecord) > 0
 
 ###############################################################################
-def test_existing_sqlite_database_skips_schema_and_seeding(monkeypatch, tmp_path: Path) -> None:
+def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
     initialize_database(repository)
-    before = database_path.read_bytes()
-
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.Base.metadata.create_all",
-        lambda _engine: (_ for _ in ()).throw(AssertionError("schema was recreated")),
+    first_counts = (
+        repository.count_records(CredentialEncryptionMaterial),
+        repository.count_records(ReferenceCountryRecord),
     )
+
+    second_repository = SQLiteRepository(
+        _settings(embedded_database=True, database_path=str(database_path))
+    )
+    result = initialize_database(second_repository)
+
+    assert result.migrations_applied is False
+    assert (
+        second_repository.count_records(CredentialEncryptionMaterial),
+        second_repository.count_records(ReferenceCountryRecord),
+    ) == first_counts
+
+###############################################################################
+def test_unversioned_legacy_sqlite_database_is_adopted_without_data_loss(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "database.db"
+    settings = _settings(embedded_database=True, database_path=str(database_path))
+    legacy_repository = SQLiteRepository(settings)
+    Base.metadata.create_all(legacy_repository.engine)
+    with legacy_repository.session() as session:
+        session.add(ConversationRecord(id="legacy-conversation", title="Preserve me"))
+        session.commit()
+    legacy_repository.engine.dispose()
+
+    repository = SQLiteRepository(settings)
+    result = initialize_database(repository)
+
+    assert result.adopted_legacy_schema is True
+    assert repository.count_records(ConversationRecord) == 1
+    assert "alembic_version" in inspect(repository.engine).get_table_names()
+
+###############################################################################
+def test_unversioned_legacy_sqlite_schema_mismatch_fails_without_stamping(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "database.db"
+    settings = _settings(embedded_database=True, database_path=str(database_path))
+    legacy_repository = SQLiteRepository(settings)
+    Base.metadata.create_all(legacy_repository.engine)
+    with legacy_repository.engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE conversations ADD COLUMN unexpected TEXT")
+    legacy_repository.engine.dispose()
+
+    with pytest.raises(RuntimeError, match="does not match the pre-Alembic baseline"):
+        initialize_database(SQLiteRepository(settings))
+
+    verification_repository = SQLiteRepository(settings)
+    assert "alembic_version" not in inspect(verification_repository.engine).get_table_names()
+
+###############################################################################
+def test_sqlite_migration_failure_restores_unversioned_database(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "database.db"
+    settings = _settings(embedded_database=True, database_path=str(database_path))
+    legacy_repository = SQLiteRepository(settings)
+    Base.metadata.create_all(legacy_repository.engine)
+    with legacy_repository.session() as session:
+        session.add(ConversationRecord(id="rollback-conversation", title="Keep me"))
+        session.commit()
+    legacy_repository.engine.dispose()
+
     monkeypatch.setattr(
         "server.repositories.database.initializer.seed_credential_encryption_material",
-        lambda _database: (_ for _ in ()).throw(AssertionError("credential seed reran")),
+        lambda _database: (_ for _ in ()).throw(RuntimeError("seed failure")),
     )
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.seed_reference_catalog",
-        lambda _database: (_ for _ in ()).throw(AssertionError("catalog seed reran")),
-    )
+    with pytest.raises(RuntimeError, match="seed failure"):
+        initialize_database(SQLiteRepository(settings))
 
-    initialize_database(
-        SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
-    )
-
-    assert database_path.read_bytes() == before
+    verification_repository = SQLiteRepository(settings)
+    assert "alembic_version" not in inspect(verification_repository.engine).get_table_names()
+    assert verification_repository.count_records(ConversationRecord) == 1
 
 ###############################################################################
 def test_explicit_postgres_initialization_runs_provisioning_schema_and_seeding(
@@ -76,9 +141,21 @@ def test_explicit_postgres_initialization_runs_provisioning_schema_and_seeding(
         "server.repositories.database.initializer._ensure_postgres_database_exists",
         lambda _database: calls.append("provision"),
     )
+    def fake_migrate(_database, *, on_ready):
+        calls.append("schema")
+        on_ready()
+        return MigrationResult(
+            current_revisions=(),
+            head_revisions=("head",),
+            final_revisions=("head",),
+            fresh_database=True,
+            adopted_legacy_schema=False,
+            migrations_applied=True,
+        )
+
     monkeypatch.setattr(
-        "server.repositories.database.initializer.Base.metadata.create_all",
-        lambda _engine: calls.append("schema"),
+        "server.repositories.database.initializer.synchronize_database",
+        fake_migrate,
     )
     monkeypatch.setattr(
         "server.repositories.database.initializer.seed_credential_encryption_material",

@@ -1,6 +1,6 @@
 # Configuration
 
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Environment File
 
@@ -31,6 +31,7 @@ Common keys include:
 - `DATABASE_SSL_CA`
 - `DATABASE_CONNECT_TIMEOUT`
 - `DATABASE_INSERT_BATCH_SIZE`
+- `DATABASE_MIGRATION_LOCK_TIMEOUT_SECONDS` (default `60`)
 
 ## Structured Configuration
 

@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Relational Storage
 
@@ -23,13 +23,23 @@ Override this location with `AEGIS_RUNTIME_DATA_DIR` when an explicit runtime
 storage directory is required.
 
 The full initialization workflow lives in
-`app/server/repositories/database/initializer.py` and is invoked by
-`app/scripts/initialize_database.py` for the explicit launcher command. During
-normal application startup, only a missing SQLite file invokes that workflow.
-Existing SQLite files and all PostgreSQL databases are not initialized or
-reseeded during startup. Repositories receive the already-built
-`DatabaseBackend`; they never create tables, infer schema, or resolve a database
-singleton themselves.
+`app/server/repositories/database/initializer.py` and
+`migration_runner.py`. It is invoked by `app/scripts/initialize_database.py`
+for the explicit launcher command and by every application startup. Alembic
+under `app/server/migrations` is the authoritative schema mechanism; runtime
+code never calls `Base.metadata.create_all()`.
+
+Fresh databases are migrated to the current Alembic head and seeded. Existing
+SQLite and PostgreSQL databases are checked on every startup and upgraded when
+behind. A populated database without an Alembic version table is adopted only
+after comparison proves that it matches the initial baseline. A mismatch fails
+without stamping or changing the schema. Repositories receive the already-built
+`DatabaseBackend`; they never create tables, infer schema, or resolve a
+database singleton themselves.
+
+SQLite migration work is serialized by an adjacent file lock and protected by
+a temporary backup that is restored if migration or first-start seeding fails.
+PostgreSQL provisioning and migrations use advisory locks.
 
 The shared SQLAlchemy engine configuration is implemented in
 `app/server/repositories/database/engine.py`. SQLite connections enable foreign
@@ -37,7 +47,8 @@ keys, WAL mode, `busy_timeout`, and `synchronous=NORMAL`; external databases use
 pre-ping and bounded pooling. Schema creation is identical across SQLite and
 PostgreSQL and is covered by the persistence conformance suite.
 
-The canonical schema contains 15 tables. Conversations own their context
+The canonical schema contains 15 application tables plus `alembic_version`.
+Conversations own their context
 state, message history, message sequence, and active-run relationship directly;
 there are no `chat_sessions` or `conversation_contexts` tables.
 

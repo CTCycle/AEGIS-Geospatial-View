@@ -29,6 +29,7 @@ class PostgresRepository(SqlAlchemyTableOperationsMixin):
         if settings.engine != "postgresql+psycopg":
             raise ValueError(f"Unsupported database engine: {settings.engine}")
         self.db_path: str | None = None
+        self.settings = settings
         self.engine: Engine = build_engine(settings)
         self.session_factory = build_session_factory(self.engine)
         self.session = self.session_factory

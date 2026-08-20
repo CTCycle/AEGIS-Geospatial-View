@@ -1,6 +1,6 @@
 # Deployment
 
-Last updated: 2026-08-18
+Last updated: 2026-08-20
 
 ## Backend Persistence
 
@@ -10,9 +10,14 @@ Last updated: 2026-08-18
 - Embedded SQLite resolves to `<repo>/app/resources/runtime/database.db` by
   default in every environment.
 - Set `AEGIS_RUNTIME_DATA_DIR` to override the embedded database directory.
-- Missing SQLite files are created and seeded on first application startup.
-- PostgreSQL requires the explicit database initialization command from
-  `start_on_windows.ps1`; normal application startup never creates or resets it.
+- Missing SQLite files are created, migrated to the Alembic head, and seeded on
+  first application startup.
+- Every startup checks SQLite and PostgreSQL against the Alembic head and
+  applies pending migrations before serving requests.
+- PostgreSQL provisioning creates the configured database when permitted; the
+  explicit `start_on_windows.ps1` initialization option uses the same workflow.
+- Startup never autogenerates or downgrades migrations. A failed migration
+  prevents readiness; SQLite restores its pre-migration backup.
 
 ## Interoperability
 
