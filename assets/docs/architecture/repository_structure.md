@@ -28,6 +28,7 @@ AEGIS Geospatial View/
       api/
       common/
       configurations/
+      contracts/
       domain/
       migrations/
       repositories/
@@ -55,8 +56,12 @@ Key backend directories under `app/server`:
   Shared constants, logging, time, and common types.
 - `configurations/`
   Environment loading, settings composition, and startup config.
+- `contracts/`
+  Canonical transport, extraction, run-event, normalized-provider, and
+  persistence-neutral application models.
 - `domain/`
-  Request/response contracts and domain models.
+  Domain behavior, policies, and agent decision/runtime models. Older contract
+  modules export the canonical `contracts/` definitions for compatibility.
 - `repositories/`
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `repositories/database/`
@@ -70,6 +75,9 @@ Key backend directories under `app/server`:
   `direct_turn_response.py`, `turn_history.py`, `turn_state_assembler.py`, and
   `turn_support.py` to keep `AgentOrchestrator` under the repository Python
   size constraint without changing the public chat-turn contract.
+- `services/catalog/startup.py`
+  Startup callback that loads static reference files and delegates database
+  writes to the catalog repository.
 - `services/agent_runs/`
   Durable conversation-run lifecycle, steering, event publication, WebSocket
   lifecycle/replay services, and bounded realtime metrics.

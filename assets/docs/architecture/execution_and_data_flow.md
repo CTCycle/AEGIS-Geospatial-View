@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Layering
 
@@ -9,7 +9,8 @@ AEGIS uses these main backend layers:
 - API routes: `app/server/api/*.py`
 - Services and orchestration: `app/server/services/**`
 - Persistence: `app/server/repositories/**`
-- Domain contracts: `app/server/domain/**`
+- Application contracts: `app/server/contracts/**`
+- Domain behavior and policies: `app/server/domain/**`
 - Configuration models: `app/server/configurations/**`
 
 ## Layering Rules
@@ -23,12 +24,28 @@ AEGIS uses these main backend layers:
 - Stateful dependencies are explicit constructor arguments. The shared
   conversation repository is passed to both chat and run-lifecycle services.
 - `app/server/repositories/database/contracts.py` defines the shared database backend contract.
-- `domain/` holds request, response, and domain contracts.
+- `contracts/` holds transport, normalized-provider, extraction, run-event,
+  and persistence-neutral application models.
+- `domain/` holds domain behavior and policies; compatibility exports may
+  remain at older contract paths while callers migrate to `contracts/`.
 - Provider adapters normalize JSON objects and provider failures at the LLM
   boundary; API and agent layers consume provider-neutral contracts.
 - Runtime job state is owned by `app/server/services/jobs.py`.
 - Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
+
+The startup composition boundary is intentionally explicit:
+
+```mermaid
+flowchart LR
+    API[API routes] --> SERVICES[Services]
+    SERVICES --> CONTRACTS[contracts/]
+    SERVICES --> REPOS[Repositories]
+    REPOS --> DB[(DatabaseBackend)]
+    START[app_lifespan] --> INIT[database initializer]
+    INIT --> SEED[services/catalog/startup.py]
+    SEED --> REPOS
+```
 
 Run-service errors are classified by the realtime protocol boundary. The
 realtime service verifies the conversation-to-run relationship before starting,
@@ -109,6 +126,9 @@ and policy constraints. The current user message is supplied exactly once.
 - `runtime_registry.py` applies runtime and credential availability.
 - `catalog.py` and `search/orchestrator.py` consume resolved capabilities.
 - `provider_registry.py` binds fetchable manifests to concrete provider adapters.
+- `GeospatialRuntime` is composed once and shared with search and chat.
+- `GeospatialCredentialResolver` resolves encrypted database credentials first,
+  then environment fallbacks, for API, agent, and rendering paths.
 
 The native agent catalog also exposes provider-native discovery and rendering:
 `fetch_geospatial_provider_layers` returns normalized descriptors and
