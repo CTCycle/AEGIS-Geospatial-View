@@ -6,14 +6,14 @@ on:
     - cron: "17 4 * * *"
 
 env:
-  UV_CACHE_DIR: ${{ github.workspace }}/assets/cache/uv
-  PIP_CACHE_DIR: ${{ github.workspace }}/assets/cache/pip
-  NPM_CONFIG_CACHE: ${{ github.workspace }}/assets/cache/npm
-  RUFF_CACHE_DIR: ${{ github.workspace }}/assets/cache/ruff
-  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/assets/cache/python
-  PYTEST_ADDOPTS: --basetemp=${{ github.workspace }}/assets/cache/pytest-tmp
-  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/assets/cache/playwright-browsers
-  COVERAGE_FILE: ${{ github.workspace }}/assets/cache/coverage/.coverage
+  UV_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/uv
+  PIP_CACHE_DIR: ${{ github.workspace }}/runtimes/cache/pip
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/runtimes/cache/npm
+  RUFF_CACHE_DIR: ${{ github.workspace }}/app/tests/cache/ruff
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/runtimes/cache/python
+  PYTEST_ADDOPTS: --basetemp=${{ github.workspace }}/app/tests/cache/pytest-tmp
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/runtimes/cache/playwright-browsers
+  COVERAGE_FILE: ${{ github.workspace }}/app/tests/cache/coverage/.coverage
 
 jobs:
   optional-live-smoke:

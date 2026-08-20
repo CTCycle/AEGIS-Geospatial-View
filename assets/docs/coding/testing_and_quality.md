@@ -30,20 +30,21 @@ depend on the UI runtime.
 
 ## Development Cache And Artifact Locations
 
-Disposable development-tool state is centralized under `assets/cache`:
+Disposable development state is split between runtime and test-tool cache roots:
 
-- pytest cache: `assets/cache/pytest`
-- pytest temporary directories: `assets/cache/pytest-tmp`
-- Ruff cache: `assets/cache/ruff`
-- Python bytecode, uv, pip, npm, Playwright, and coverage state: their named
-  subdirectories under `assets/cache`
-- Angular CLI cache and Karma coverage: `assets/cache/angular` and
-  `assets/cache/coverage`
+- uv, pip, npm, Python bytecode, and Playwright state: named subdirectories
+  under `runtimes/cache`
+- pytest cache: `app/tests/cache/pytest`
+- pytest temporary directories: `app/tests/cache/pytest-tmp`
+- Ruff cache: `app/tests/cache/ruff`
+- Angular CLI cache and Karma coverage: `app/tests/cache/angular` and
+  `app/tests/cache/coverage`
+- Other test and migration-tool state belongs under `app/tests/cache`
 
 Run quality commands from the repository root so the configured relative paths
-resolve to this shared cache root. `app/tests/run_tests.bat`, the Windows
-launcher, and CI also set absolute cache environment variables. Retained QA
-evidence remains under `assets/QA`.
+resolve to these roots. `app/tests/run_tests.bat`, the Windows launcher, and CI
+also set absolute cache environment variables. Retained QA evidence remains
+under `assets/QA`.
 
 ## Frontend Quality Gates
 
