@@ -8,6 +8,8 @@ app/client/dist-ssr/
 app/client/logs/
 app/client/.angular/
 assets/QA/**
+assets/cache/**
+!assets/cache/.gitkeep
 .playwright-mcp/
 
 # Environment files (keep templates)

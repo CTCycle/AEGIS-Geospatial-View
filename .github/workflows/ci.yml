@@ -7,6 +7,16 @@ on:
       - develop
   pull_request:
 
+env:
+  UV_CACHE_DIR: ${{ github.workspace }}/assets/cache/uv
+  PIP_CACHE_DIR: ${{ github.workspace }}/assets/cache/pip
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/assets/cache/npm
+  RUFF_CACHE_DIR: ${{ github.workspace }}/assets/cache/ruff
+  PYTHONPYCACHEPREFIX: ${{ github.workspace }}/assets/cache/python
+  PYTEST_ADDOPTS: --basetemp=${{ github.workspace }}/assets/cache/pytest-tmp
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/assets/cache/playwright-browsers
+  COVERAGE_FILE: ${{ github.workspace }}/assets/cache/coverage/.coverage
+
 jobs:
   backend-unit-tests:
     runs-on: ubuntu-latest

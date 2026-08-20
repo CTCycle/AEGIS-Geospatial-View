@@ -9,6 +9,7 @@ $AppDir = Join-Path $RootDir 'app'
 $ServerDir = Join-Path $AppDir 'server'
 $ClientDir = Join-Path $AppDir 'client'
 $SettingsDir = Join-Path $RootDir 'settings'
+$CacheDir = Join-Path $RootDir 'assets\cache'
 $RuntimesDir = Join-Path $RootDir 'runtimes'
 $PythonDir = Join-Path $RuntimesDir 'python'
 $PythonExe = Join-Path $PythonDir 'python.exe'
@@ -18,7 +19,15 @@ $UvExe = Join-Path $UvDir 'uv.exe'
 $NodeDir = Join-Path $RuntimesDir 'nodejs'
 $NodeExe = Join-Path $NodeDir 'node.exe'
 $NpmCmd = Join-Path $NodeDir 'npm.cmd'
-$UvCacheDir = Join-Path $RuntimesDir '.uv-cache'
+$UvCacheDir = Join-Path $CacheDir 'uv'
+$NpmCacheDir = Join-Path $CacheDir 'npm'
+$PipCacheDir = Join-Path $CacheDir 'pip'
+$PythonBytecodeCacheDir = Join-Path $CacheDir 'python'
+$PytestCacheDir = Join-Path $CacheDir 'pytest'
+$PytestTempDir = Join-Path $CacheDir 'pytest-tmp'
+$RuffCacheDir = Join-Path $CacheDir 'ruff'
+$CoverageDir = Join-Path $CacheDir 'coverage'
+$PlaywrightBrowsersDir = Join-Path $CacheDir 'playwright-browsers'
 $VenvDir = Join-Path $ServerDir '.venv'
 $DotEnvPath = Join-Path $SettingsDir '.env'
 $DotEnvExamplePath = Join-Path $SettingsDir '.env.example'
@@ -185,9 +194,16 @@ function Import-EnvironmentFile {
 }
 
 function Set-LauncherEnvironment {
+    New-Item -ItemType Directory -Path $CacheDir, $UvCacheDir, $NpmCacheDir, $PipCacheDir, $PythonBytecodeCacheDir, $PytestCacheDir, $PytestTempDir, $RuffCacheDir, $CoverageDir, $PlaywrightBrowsersDir -Force | Out-Null
     $env:UV_CACHE_DIR = $UvCacheDir
     $env:UV_PROJECT_ENVIRONMENT = $VenvDir
     $env:UV_LINK_MODE = 'copy'
+    $env:NPM_CONFIG_CACHE = $NpmCacheDir
+    $env:PIP_CACHE_DIR = $PipCacheDir
+    $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightBrowsersDir
+    $env:PYTHONPYCACHEPREFIX = $PythonBytecodeCacheDir
+    $env:RUFF_CACHE_DIR = $RuffCacheDir
+    $env:COVERAGE_FILE = Join-Path $CoverageDir '.coverage'
     Remove-Item Env:\PYTHONHOME -ErrorAction SilentlyContinue
     Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
     Remove-Item Env:\PYTHONNOUSERSITE -ErrorAction SilentlyContinue
@@ -552,15 +568,19 @@ function Remove-PythonCaches {
 
 function Clear-ApplicationCache {
     Remove-PythonCaches
-    if (Test-Path -LiteralPath $UvCacheDir) {
-        Remove-Item -LiteralPath $UvCacheDir -Recurse -Force
+    if (Test-Path -LiteralPath $CacheDir) {
+        Get-ChildItem -LiteralPath $CacheDir -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne '.gitkeep' } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
-    Write-Status SUCCESS 'Python and uv caches cleared.'
+    New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
+    Write-Status SUCCESS 'Development caches and disposable artifacts cleared from assets/cache.'
 }
 
 function Uninstall-Application {
     $targets = @(
         $RuntimesDir,
+        $CacheDir,
         $VenvDir,
         (Join-Path $RootDir '.venv'),
         (Join-Path $ClientDir 'node_modules'),

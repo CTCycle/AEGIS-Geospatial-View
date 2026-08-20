@@ -1,6 +1,6 @@
 # Testing And Quality
 
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Python Quality Gates
 
@@ -23,6 +23,23 @@ python -m pytest -c app/server/pyproject.toml app/tests/unit -q
 `app/tests/run_tests.bat` does not start the frontend for a bounded backend
 target. Full-suite and E2E targets retain frontend startup because those tests
 depend on the UI runtime.
+
+## Development Cache And Artifact Locations
+
+Disposable development-tool state is centralized under `assets/cache`:
+
+- pytest cache: `assets/cache/pytest`
+- pytest temporary directories: `assets/cache/pytest-tmp`
+- Ruff cache: `assets/cache/ruff`
+- Python bytecode, uv, pip, npm, Playwright, and coverage state: their named
+  subdirectories under `assets/cache`
+- Angular CLI cache and Karma coverage: `assets/cache/angular` and
+  `assets/cache/coverage`
+
+Run quality commands from the repository root so the configured relative paths
+resolve to this shared cache root. `app/tests/run_tests.bat`, the Windows
+launcher, and CI also set absolute cache environment variables. Retained QA
+evidence remains under `assets/QA`.
 
 ## Frontend Quality Gates
 
