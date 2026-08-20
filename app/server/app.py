@@ -101,9 +101,13 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         _dispose_database_engine(database)
         raise
 
-    search_runtime = build_search_runtime()
-    chat_runtime = build_chat_runtime(search_runtime.search_orchestrator, database)
     geospatial_runtime = build_geospatial_runtime(database)
+    search_runtime = build_search_runtime()
+    chat_runtime = build_chat_runtime(
+        search_runtime.search_orchestrator,
+        database,
+        credential_resolver=geospatial_runtime.credential_resolver,
+    )
     chat_streaming_service = ChatStreamingService(chat_runtime.agent_orchestrator)
     run_event_publisher = RunEventPublisher(AgentRunEventRepository(database))
     run_repository = AgentRunRepository(database)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
-import os
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
@@ -14,6 +13,10 @@ from server.domain.geographics import (
     LayerAuditReport,
 )
 from server.services.geospatial.catalog import GeospatialCatalogService
+from server.services.geospatial.credential_resolver import (
+    GeospatialCredentialResolutionError,
+    GeospatialCredentialResolver,
+)
 from server.services.geospatial.layer_auditor import audit_all_manifests
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.provider_registry import (
@@ -92,11 +95,13 @@ class GeospatialApiService:
         manifest_loader: GeospatialManifestLoader,
         runtime_registry: RuntimeRegistry,
         provider_registry: ProviderRegistry,
+        credential_resolver: GeospatialCredentialResolver | None = None,
     ) -> None:
         self.catalog_service = catalog_service
         self.manifest_loader = manifest_loader
         self.runtime_registry = runtime_registry
         self.provider_registry = provider_registry
+        self.credential_resolver = credential_resolver or runtime_registry.credential_resolver
 
     # -------------------------------------------------------------------------
     def list_capabilities(self) -> dict[str, list[dict[str, Any]]]:
@@ -221,7 +226,12 @@ class GeospatialApiService:
     async def fetch_tomtom_tile(self, kind: str, z: int, x: int, y: int) -> bytes:
         if kind != "traffic-flow":
             raise GeospatialUnsupportedTileError("Unsupported TomTom tile type.")
-        api_key = os.getenv("TOMTOM_API_KEY", "").strip()
+        try:
+            api_key = self.credential_resolver.resolve("tomtom", mark_used=True)
+        except GeospatialCredentialResolutionError as exc:
+            raise GeospatialTileCredentialError(
+                "TomTom credentials are saved but cannot be used."
+            ) from exc
         if not api_key:
             raise GeospatialTileCredentialError("TomTom API key is required.")
         url = build_tomtom_tile_url(kind, z, x, y, api_key)
@@ -352,8 +362,8 @@ class GeospatialApiService:
 
     # -------------------------------------------------------------------------
     def get_credential_status(self, provider_id: str) -> dict[str, Any]:
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_id)
-        configured = bool(env_name and os.getenv(env_name, "").strip())
+        env_name = self.credential_resolver.environment_name(provider_id)
+        configured = self.credential_resolver.is_configured(provider_id)
         return {
             "provider": provider_id,
             "required": self._provider_requires_credentials(provider_id),
@@ -501,7 +511,7 @@ class GeospatialApiService:
             provider_key = str(auth.get("providerKey") or "")
             if provider_id in {manifest_provider, access_id, provider_key}:
                 return bool(auth.get("required"))
-        return provider_id in RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER
+        return self.credential_resolver.environment_name(provider_id) is not None
 
     # -------------------------------------------------------------------------
     def _iter_manifest_payloads_for_account_setup(self) -> Iterator[dict[str, Any]]:
@@ -537,7 +547,7 @@ class GeospatialApiService:
         if provider_key in {"census", "openaip", "sentinel_hub"}:
             return None
 
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider_key)
+        env_name = self.credential_resolver.environment_name(provider_key)
         docs_url = self._extract_docs_url(payload)
         automation = self._build_account_setup_automation(
             provider_key=provider_key,
@@ -560,7 +570,7 @@ class GeospatialApiService:
             "auth_mode": str(auth.get("type") or "api-key"),
             "docs_url": docs_url,
             "environment_variable": env_name,
-            "configured": bool(env_name and os.getenv(env_name, "").strip()),
+            "configured": self.credential_resolver.is_configured(provider_key),
             "instructions": instructions,
             "automation": automation,
             "credential_storage_key": provider_key,
@@ -766,13 +776,17 @@ class GeospatialApiService:
         x: int,
         y: int,
     ) -> str:
-        env_name = RuntimeRegistry.CREDENTIAL_ENV_BY_PROVIDER.get(provider)
         if "{api_key}" in template:
-            if not env_name:
+            if self.credential_resolver.environment_name(provider) is None:
                 raise GeospatialUnsupportedTileError(
                     f"No credential mapping is configured for provider '{provider}'."
                 )
-            api_key = os.getenv(env_name, "").strip()
+            try:
+                api_key = self.credential_resolver.resolve(provider, mark_used=True)
+            except GeospatialCredentialResolutionError as exc:
+                raise GeospatialTileCredentialError(
+                    f"{self._humanize_provider(provider)} credentials cannot be used."
+                ) from exc
             if not api_key:
                 raise GeospatialTileCredentialError(
                     f"{self._humanize_provider(provider)} credentials are required."

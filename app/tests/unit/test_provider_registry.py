@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from tests.conftest import run_async_in_thread
 
 from server.services.geospatial.provider_registry import (
@@ -8,6 +9,7 @@ from server.services.geospatial.provider_registry import (
     ProviderNotRegisteredError,
     ProviderRegistry,
 )
+from server.services.geospatial.credential_resolver import GeospatialCredentialResolver
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderCircuitOpenError,
@@ -75,6 +77,31 @@ class _AuthProvider:
         raise ProviderAuthError("missing key")
 
 ###############################################################################
+class _SavedCredentialRepository:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.mark_used_calls: list[tuple[str, str]] = []
+
+    # -------------------------------------------------------------------------
+    def get_active(self, *, provider: str, label: str):  # noqa: ANN201
+        if provider == "tomtom" and label == "api_key":
+            return SimpleNamespace(encrypted_value="encrypted-tomtom-key")
+        return None
+
+    # -------------------------------------------------------------------------
+    def mark_used(self, *, provider: str, label: str) -> None:
+        self.mark_used_calls.append((provider, label))
+
+###############################################################################
+class _CredentialDecryptor:
+
+    # -------------------------------------------------------------------------
+    def decrypt(self, encrypted_value: str) -> str:
+        assert encrypted_value == "encrypted-tomtom-key"
+        return "database-only-tomtom-key"
+
+###############################################################################
 def test_provider_registry_registers_and_fetches_provider() -> None:
     registry = ProviderRegistry(providers=[_Provider()])
 
@@ -107,6 +134,21 @@ def test_provider_registry_builds_manifest_backed_providers() -> None:
     assert "fallback" not in registry.list_provider_ids()
     assert "osm" not in registry.list_provider_ids()
     assert "gibs" in registry.list_provider_ids()
+
+###############################################################################
+def test_provider_registry_passes_database_only_credentials_to_provider() -> None:
+    repository = _SavedCredentialRepository()
+    resolver = GeospatialCredentialResolver(
+        credentials_repo=repository,  # type: ignore[arg-type]
+        crypto_service=_CredentialDecryptor(),
+    )
+    registry = ProviderRegistry(credential_resolver=resolver)
+
+    registry.build_from_manifests()
+
+    provider = registry.get("tomtom")
+    assert getattr(provider, "api_key") == "database-only-tomtom-key"
+    assert repository.mark_used_calls == [("tomtom", "api_key")]
 
 ###############################################################################
 def test_provider_registry_skips_basemap_and_metadata_only_manifests() -> None:

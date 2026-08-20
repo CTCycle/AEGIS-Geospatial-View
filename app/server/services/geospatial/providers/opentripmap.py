@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from server.common.typing import is_json_array, is_json_object
 
-import os
 from urllib.parse import urlencode
 
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
@@ -43,7 +42,7 @@ class OpenTripMapProvider(GeospatialProvider):
 
     # -------------------------------------------------------------------------
     async def fetch(self, request: ProviderRequest) -> ProviderResponse:
-        api_key = (self.api_key or os.getenv("OPENTRIPMAP_API_KEY") or "").strip()
+        api_key = (self.api_key or "").strip()
         if not api_key:
             raise ProviderAuthError("OPENTRIPMAP_API_KEY is required for OpenTripMap tourism POIs.")
         latitude, longitude = request_center(request)

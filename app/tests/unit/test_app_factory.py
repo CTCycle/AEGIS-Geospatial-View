@@ -35,7 +35,7 @@ def _build_chat_runtime(call_order: list[str]) -> SimpleNamespace:
 
 ###############################################################################
 def _build_geospatial_runtime() -> SimpleNamespace:
-    return SimpleNamespace(api_service=object())
+    return SimpleNamespace(api_service=object(), credential_resolver=object())
 
 ###############################################################################
 class _LifecycleStub:
@@ -114,7 +114,7 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
     monkeypatch.setattr(app_module, "initialize_database", lambda backend: call_order.append("initialize_database"))
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: call_order.append("build_search_runtime") or search_runtime)
-    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database: call_order.append("build_chat_runtime") or chat_runtime)
+    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database, **kwargs: call_order.append("build_chat_runtime") or chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: call_order.append("build_geospatial_runtime") or geospatial_runtime)
     monkeypatch.setattr(app_module, "AgentRunEventRepository", lambda database: object())
     monkeypatch.setattr(app_module, "AgentRunRepository", lambda database: object())
@@ -135,9 +135,9 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
 
     assert call_order == [
         "initialize_database",
+        "build_geospatial_runtime",
         "build_search_runtime",
         "build_chat_runtime",
-        "build_geospatial_runtime",
         "job_service.start",
         "settings_service.get_settings",
         "run_startup_validations",
@@ -174,7 +174,7 @@ def test_postgres_startup_initializes_database(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module,
         "build_chat_runtime",
-        lambda _orchestrator, _database: chat_runtime,
+        lambda _orchestrator, _database, **_kwargs: chat_runtime,
     )
     monkeypatch.setattr(
         app_module,
@@ -215,7 +215,7 @@ def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> Non
     monkeypatch.setattr(app_module, "build_database_backend", lambda settings: object())
     monkeypatch.setattr(app_module, "initialize_database", lambda backend: None)
     monkeypatch.setattr(app_module, "build_search_runtime", lambda: search_runtime)
-    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database: chat_runtime)
+    monkeypatch.setattr(app_module, "build_chat_runtime", lambda orchestrator, database, **kwargs: chat_runtime)
     monkeypatch.setattr(app_module, "build_geospatial_runtime", lambda database: geospatial_runtime)
     monkeypatch.setattr(app_module, "AgentRunEventRepository", lambda database: object())
     monkeypatch.setattr(app_module, "AgentRunRepository", lambda database: object())
