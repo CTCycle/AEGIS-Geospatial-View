@@ -7,7 +7,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 import re
 
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.extraction.models import LocationSignal, NormalizedAction
+from server.contracts.extraction import LocationSignal, NormalizedAction
 
 ###############################################################################
 class LocationMemoryService:

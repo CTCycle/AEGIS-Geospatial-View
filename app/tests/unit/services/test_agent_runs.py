@@ -8,8 +8,8 @@ import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from server.domain.agent_runs import AgentRunCreateRequest
-from server.domain.run_events import RunEventCreate, RunEventType, RunEventVisibility
+from server.contracts.runs import AgentRunCreateRequest
+from server.contracts.events import RunEventCreate, RunEventType, RunEventVisibility
 from server.domain.steering import SteeringMessageRequest
 from server.repositories.agent_run_events import AgentRunEventRepository
 from server.repositories.agent_runs import AgentRunRepository

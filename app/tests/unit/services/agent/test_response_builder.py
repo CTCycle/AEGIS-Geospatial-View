@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.domain.chat import ChatOperationResult
+from server.contracts.chat import ChatOperationResult
 from server.services.agent.response_builder import AgentResponseBuilder
 
 ###############################################################################

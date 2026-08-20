@@ -6,7 +6,7 @@ import threading
 from typing import TypeVar
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
-from server.domain.geographics import ProviderLayerSelection
+from server.contracts.geospatial import ProviderLayerSelection
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 

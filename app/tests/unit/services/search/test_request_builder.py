@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.extraction.models import NormalizedAction, ViewportIntent
+from server.contracts.extraction import NormalizedAction, ViewportIntent
 from server.services.search.request_builder import RequestBuilder
 
 ###############################################################################

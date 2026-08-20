@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from http import HTTPStatus
 from typing import Any, Literal, cast
 
-from server.domain.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResponse
+from server.contracts.chat import ChatStreamEvent, ChatTurnRequest, ChatTurnResponse
 from server.services.agent.orchestrator import AgentOrchestrator
 from server.services.llm.errors import LLMConfigurationError
 

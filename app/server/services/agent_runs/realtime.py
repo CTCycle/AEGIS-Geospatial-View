@@ -13,7 +13,7 @@ from uuid import uuid4
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
-from server.domain.agent_runs import AgentRunCreateRequest
+from server.contracts.runs import AgentRunCreateRequest
 from server.domain.realtime import (
     MAX_REALTIME_MESSAGE_BYTES,
     REALTIME_PROTOCOL_VERSION,
@@ -25,7 +25,7 @@ from server.domain.realtime import (
     RealtimeStartPayload,
     RealtimeSteerPayload,
 )
-from server.domain.run_events import RunEventType
+from server.contracts.events import RunEventType
 from server.domain.steering import SteeringMessageRequest
 from server.repositories.agent_runs import AgentRunRepository
 from server.repositories.conversations import ConversationRepository

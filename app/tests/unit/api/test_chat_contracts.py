@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from server.api.chat import get_chat_runtime, router
 from server.common.paths import CHAT_TURN_ROUTE
-from server.domain.chat import ChatTurnRequest
+from server.contracts.chat import ChatTurnRequest
 
 ###############################################################################
 def _app() -> FastAPI:

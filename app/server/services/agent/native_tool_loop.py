@@ -8,7 +8,7 @@ import logging
 import time
 from typing import Any
 
-from server.domain.geographics import MapSession
+from server.contracts.geospatial import MapSession
 
 from server.domain.agent.execution import (
     AgentExecutionContext,

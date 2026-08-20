@@ -9,8 +9,8 @@ from server.common.logger import logger as LOGGER
 from server.domain.agent.context import ConversationDirective
 from server.domain.agent.execution import AgentExecutionContext
 from server.domain.agent.pipeline import ConversationTaskRecord, ToolPlan, VisualizationUpdate
-from server.domain.chat import ChatOperationResult, ChatTurnResponse
-from server.domain.extraction.models import TurnParseResult
+from server.contracts.chat import ChatOperationResult, ChatTurnResponse
+from server.contracts.extraction import TurnParseResult
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.agent.response_builder import AgentResponseBuilder

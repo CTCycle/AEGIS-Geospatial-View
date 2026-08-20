@@ -11,8 +11,8 @@ from server.domain.agent.pipeline import (
     TaskFailureDetail,
     VisualizationUpdate,
 )
-from server.domain.chat import ChatOperationResult, ChatTurnResponse
-from server.domain.geographics import MapSession
+from server.contracts.chat import ChatOperationResult, ChatTurnResponse
+from server.contracts.geospatial import MapSession
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.overlay_inference import OverlayInferenceService

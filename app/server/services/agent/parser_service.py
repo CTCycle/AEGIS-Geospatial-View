@@ -16,7 +16,7 @@ from server.domain.agent.extraction_schemas import (
     LLMParserExtraction,
     LLMViewportIntent,
 )
-from server.domain.extraction.models import (
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     DisallowedPattern,
     LocationSignal,

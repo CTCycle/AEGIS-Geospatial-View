@@ -6,8 +6,8 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 from server.domain.agent.decision import DecisionTrace, ExecutionPlan, PolicyDecision
-from server.domain.chat import ChatOperationResult
-from server.domain.geographics import MapSession
+from server.contracts.chat import ChatOperationResult
+from server.contracts.geospatial import MapSession
 
 ###############################################################################
 class AgentResponseBuilder:

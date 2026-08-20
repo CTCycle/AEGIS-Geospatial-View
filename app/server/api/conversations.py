@@ -6,7 +6,7 @@ from server.common.paths import (
     CONVERSATIONS_ROOT_ROUTE,
     CONVERSATIONS_ROUTER_PREFIX,
 )
-from server.domain.agent_runs import (
+from server.contracts.runs import (
     ConversationCreateRequest,
     ConversationCreateResponse,
 )

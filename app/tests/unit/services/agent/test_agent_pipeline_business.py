@@ -13,15 +13,15 @@ from server.domain.agent.pipeline import (
     ToolPlan,
     ToolPlanStep,
 )
-from server.domain.chat import ChatTurnRequest
-from server.domain.extraction.models import (
+from server.contracts.chat import ChatTurnRequest
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,
     TurnParseResult,
     ViewportIntent,
 )
-from server.domain.geographics import MapSession
+from server.contracts.geospatial import MapSession
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.capability_resolver import CapabilityResolver

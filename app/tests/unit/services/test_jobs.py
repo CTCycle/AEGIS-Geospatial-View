@@ -8,7 +8,7 @@ from server.common.constants import (
     JOB_STATUS_QUEUED,
     JOB_STATUS_SUCCEEDED,
 )
-from server.domain.chat import ChatStreamEvent, ChatTurnRequest
+from server.contracts.chat import ChatStreamEvent, ChatTurnRequest
 from server.services.jobs import BackgroundJobService
 
 ###############################################################################

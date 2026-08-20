@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from server.domain.geographics import LocationSearchRequest
+from server.contracts.geospatial import LocationSearchRequest
 
 ###############################################################################
 def _base_payload() -> dict[str, object]:

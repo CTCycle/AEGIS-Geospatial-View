@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from server.domain.extraction.models import (
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,

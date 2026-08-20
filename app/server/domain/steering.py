@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from server.domain.agent_runs import AgentRunState
+from server.contracts.runs import AgentRunState
 
 MAX_STEERING_MESSAGE_LENGTH = 4000
 MAX_CLIENT_MUTATION_ID_LENGTH = 160

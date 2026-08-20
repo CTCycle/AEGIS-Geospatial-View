@@ -9,8 +9,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from server.domain.chat import ChatOperationResult
-from server.domain.geographics import MapSession
+from server.contracts.chat import ChatOperationResult
+from server.contracts.geospatial import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_agent_response_prompt

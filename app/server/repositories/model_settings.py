@@ -11,7 +11,7 @@ from server.common.constants import (
     OLLAMA_DEFAULT_HOST,
 )
 from server.common.time import utc_now_naive
-from server.domain.chat import ModelSettingsSnapshot
+from server.contracts.chat import ModelSettingsSnapshot
 from server.repositories.database.contracts import DatabaseBackend
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 

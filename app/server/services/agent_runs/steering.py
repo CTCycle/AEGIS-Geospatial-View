@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from server.domain.agent_runs import TERMINAL_RUN_STATES
-from server.domain.run_events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
+from server.contracts.runs import TERMINAL_RUN_STATES
+from server.contracts.events import RUN_PROGRESS_LABELS, RunEventType, RunProgressStage
 from server.domain.steering import (
     SteeringMessageRequest,
     SteeringMessageResponse,

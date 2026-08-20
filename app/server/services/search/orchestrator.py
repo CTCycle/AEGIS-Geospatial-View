@@ -6,7 +6,7 @@ import math
 from datetime import UTC, datetime
 from typing import Any
 
-from server.domain.geographics import LocationSearchRequest, MapSession
+from server.contracts.geospatial import LocationSearchRequest, MapSession
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.geospatial.rainviewer import RainViewerService

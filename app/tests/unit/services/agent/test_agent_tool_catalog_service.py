@@ -5,13 +5,13 @@ from types import SimpleNamespace
 from typing import Any
 
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.extraction.models import (
+from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,
     TurnParseResult,
 )
-from server.domain.geographics import MapSession
+from server.contracts.geospatial import MapSession
 from server.services.agent.agent_tool_catalog_service import (
     AgentToolCatalogService,
     CapabilityCatalogFilter,

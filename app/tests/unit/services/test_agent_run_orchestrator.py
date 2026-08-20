@@ -4,9 +4,9 @@ from tests.conftest import run_async_in_thread
 from datetime import UTC, datetime
 
 from server.domain.agent.decision import PolicyDecision
-from server.domain.agent_runs import AgentRunSnapshot, AgentRunState
-from server.domain.chat import ChatOperationResult, ChatTurnResponse
-from server.domain.run_events import RunEventType
+from server.contracts.runs import AgentRunSnapshot, AgentRunState
+from server.contracts.chat import ChatOperationResult, ChatTurnResponse
+from server.contracts.events import RunEventType
 from server.services.agent_runs.orchestrator import AgentRunOrchestrator
 
 ###############################################################################

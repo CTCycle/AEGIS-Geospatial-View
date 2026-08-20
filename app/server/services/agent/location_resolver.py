@@ -8,7 +8,7 @@ from typing import Sequence
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.decision import ClarificationRequest, ResolvedLocation
-from server.domain.extraction.models import LocationSignal
+from server.contracts.extraction import LocationSignal
 from server.services.geospatial.nominatim import NominatimService
 
 ###############################################################################

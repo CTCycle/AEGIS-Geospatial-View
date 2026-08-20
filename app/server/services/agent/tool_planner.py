@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from server.domain.agent.pipeline import SpecialistGroup, ToolPlan, ToolPlanStep
-from server.domain.extraction.models import TurnParseResult
+from server.contracts.extraction import TurnParseResult
 from server.services.agent.tool_argument_builder import ToolArgumentBuilder
 
 ###############################################################################

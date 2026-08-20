@@ -4,7 +4,7 @@ from server.common.typing import is_json_array, is_json_object, json_object
 
 from typing import Any
 
-from server.domain.extraction.models import TurnParseResult
+from server.contracts.extraction import TurnParseResult
 
 ###############################################################################
 class ToolArgumentBuilder:

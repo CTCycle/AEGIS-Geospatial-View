@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from server.domain.chat import ChatOperationResult
+from server.contracts.chat import ChatOperationResult
 from server.domain.agent.decision import ResolvedLocation
-from server.domain.geographics import MapSession, ViewportPolicy
+from server.contracts.geospatial import MapSession, ViewportPolicy
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 
 ###############################################################################
