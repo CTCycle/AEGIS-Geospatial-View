@@ -1,6 +1,6 @@
 # Access Overview
 
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Purpose
 
@@ -17,6 +17,24 @@ Preferred flow:
 
 Model-provider credentials are managed separately in Model Settings. Geospatial
 agent visibility is catalog-based and does not require rebuilding embeddings.
+
+## Resolution Semantics
+
+`app/server/services/geospatial/credential_resolver.py` is the single
+credential-resolution boundary used by provider adapters, the geospatial API,
+agent discovery/rendering, and runtime status reporting.
+
+Resolution order is strict:
+
+1. Look up the active encrypted database credential for the provider and label.
+2. Decrypt and validate the saved value; mark it used when the caller requests
+   usage tracking.
+3. Consult the mapped environment variable only when no saved credential exists.
+
+A saved credential that is empty or cannot be decrypted is an error condition;
+the resolver does not silently fall back to a second secret source. Credential
+values never enter manifests, API responses, provider payloads, browser logs,
+or map snapshots.
 
 Environment fallback variables include:
 

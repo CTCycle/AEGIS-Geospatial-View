@@ -1,6 +1,6 @@
 # System Overview
 
-Last updated: 2026-08-02
+Last updated: 2026-08-20
 
 ## Scope
 
@@ -14,6 +14,30 @@ AEGIS Geospatial View is a two-tier application:
 - Backend: FastAPI application in `app/server`
 
 The backend exposes `/api` routes for chat orchestration, geospatial capability access, and map search. The frontend consumes those routes and renders the chat-and-map workspace. The primary UI path uses a versioned WebSocket at `/api/conversations/{conversation_id}/realtime`; durable run events are replayed by sequence after reconnect. Direct chat-turn, NDJSON stream, and in-process job routes remain available for API clients and bounded test flows, but are not used by the interactive UI.
+
+## Runtime Composition
+
+```mermaid
+flowchart TD
+    A[app_lifespan] --> G[GeospatialRuntime]
+    G --> C[CapabilityRegistry]
+    G --> P[ProviderRegistry]
+    G --> R[RuntimeRegistry]
+    G --> K[CredentialResolver]
+    G --> X[GeospatialApiService]
+    A --> S[SearchRuntime]
+    A --> H[ChatRuntime]
+    S -->|shared| C
+    S -->|shared| P
+    S -->|shared| K
+    H -->|shared| G
+    X --> K
+```
+
+The composition root builds one shared geospatial runtime per process. Search,
+chat, provider discovery, rendering, and credential status receive the same
+capability registry, provider registry, runtime registry, API service, and
+database-backed credential resolver.
 
 ## Entry Points
 

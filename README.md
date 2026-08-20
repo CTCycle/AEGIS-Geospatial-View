@@ -1,10 +1,10 @@
 # AEGIS Geospatial View
-[![Release](https://img.shields.io/github/v/release/CTCycle/AEGIS-geographics?display_name=tag)](https://github.com/CTCycle/AEGIS-geographics/releases)
+[![Release](https://img.shields.io/github/v/release/CTCycle/AEGIS-Geospatial-View?display_name=tag)](https://github.com/CTCycle/AEGIS-Geospatial-View/releases)
 [![Python](https://img.shields.io/badge/Python-3.14%2B-3776AB?logo=python&logoColor=white)](./app/server/pyproject.toml)
 [![Angular](https://img.shields.io/badge/Angular-22-red?logo=angular&logoColor=white)](./app/client/package.json)
-[![License](https://img.shields.io/github/license/CTCycle/AEGIS-geographics)](./LICENSE)
+[![License](https://img.shields.io/github/license/CTCycle/AEGIS-Geospatial-View)](./LICENSE)
 [![CTCycle Portfolio](https://img.shields.io/badge/CTCycle-Portfolio-58a6ff?style=flat-square)](https://ctcycle.github.io/CTCycle/)
-[![CI](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-geographics/actions/workflows/ci.yml?query=branch%3Adevelop)
+[![CI](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/CTCycle/AEGIS-Geospatial-View/actions/workflows/ci.yml?query=branch%3Adevelop)
 
 
 AEGIS Geospatial View is a place-focused workspace built around conversation.
@@ -166,6 +166,7 @@ For more help, see:
 - [Quick Start](./assets/docs/user/quick_start.md)
 - [Workflows](./assets/docs/user/workflows.md)
 - [Troubleshooting](./assets/docs/user/troubleshooting.md)
+- [Architecture overview](./assets/docs/architecture/system_overview.md)
 
 ## For Local Setup
 

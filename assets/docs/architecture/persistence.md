@@ -52,6 +52,21 @@ Conversations own their context
 state, message history, message sequence, and active-run relationship directly;
 there are no `chat_sessions` or `conversation_contexts` tables.
 
+Repositories expose persistence-neutral snapshots and contracts. ORM records do
+not cross into services: model settings are mapped to `ModelSettingsSnapshot`,
+and run-event appends require both `run_id` and `conversation_id` to match
+the owning run.
+
+```mermaid
+erDiagram
+    CONVERSATIONS ||--o{ AGENT_RUNS : owns
+    CONVERSATIONS ||--o{ MESSAGES : contains
+    AGENT_RUNS ||--o{ RUN_EVENTS : emits
+    CONVERSATIONS ||--o{ STEERING_MESSAGES : receives
+    MODEL_PROVIDER_SETTINGS ||--o{ MODEL_CREDENTIALS : configures
+    CREDENTIAL_ENCRYPTION_MATERIALS ||--o{ MODEL_CREDENTIALS : encrypts
+```
+
 ## Core Stored Domains
 
 Core relational storage covers:
@@ -82,6 +97,10 @@ repositories and startup services. There is no database facade, cached
 database accessor, or compatibility import path.
 
 ## Reference Catalog Policy
+
+Startup orchestration belongs under
+`app/server/services/catalog/startup.py`; it invokes the repository seeder
+after migrations complete.
 
 - Static reference data belongs under `app/resources/catalog/reference`.
 - Reference catalog file loading and parsing belongs under `app/server/services/catalog/loader.py`.
