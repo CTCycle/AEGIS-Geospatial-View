@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from server.domain.llm.types import (
+    CapabilityState,
     ContextUsage,
+    FailureCategory,
     LLMAssistantToolCallMessage,
     LLMRequest,
     LLMResult,
@@ -14,7 +16,9 @@ from server.domain.llm.types import (
 )
 
 __all__ = [
+    "CapabilityState",
     "ContextUsage",
+    "FailureCategory",
     "LLMAssistantToolCallMessage",
     "LLMRequest",
     "LLMResult",

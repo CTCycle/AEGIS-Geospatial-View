@@ -122,3 +122,10 @@ class TurnParseResult(BaseModel):
     clarification_plan: dict[str, Any] | None = None
     viewport_intent: ViewportIntent | None = None
     provider_error: dict[str, Any] | None = None
+    failure_category: Literal[
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    ] | None = None

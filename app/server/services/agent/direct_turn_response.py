@@ -17,6 +17,44 @@ from server.services.chat.history_service import ChatHistoryService
 class DirectTurnResponseService:
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _parser_failure_message(
+        turn_contract: Any,
+        provider_error: dict[str, Any] | None,
+    ) -> tuple[str, str]:
+        category = str(
+            getattr(turn_contract, "failure_category", None)
+            or (provider_error or {}).get("category")
+            or "provider_api"
+        )
+        details = str((provider_error or {}).get("detail") or "").strip()
+        suffix = f" Detail: {details}" if details else ""
+        messages = {
+            "model_capability": (
+                "The selected provider explicitly rejected the requested model capability "
+                "during structured extraction. Verify that structured output is enabled for "
+                "this model or provider."
+            ),
+            "provider_api": (
+                "The agent provider failed while processing structured extraction. Check the "
+                "provider connection, credentials, rate limits, or transient service status."
+            ),
+            "schema_definition": (
+                "AEGIS rejected an invalid structured-output schema or tool definition before "
+                "sending the request. This is an application schema issue, not a model choice issue."
+            ),
+            "response_parsing": (
+                "The selected model responded, but its structured payload did not match the "
+                "AEGIS extraction schema. A same-model schema-correction retry was attempted."
+            ),
+            "context_limit": (
+                "The request exceeded the selected model's usable context budget. Shorten the "
+                "current turn or let AEGIS compact older conversation context."
+            ),
+        }
+        return messages.get(category, messages["provider_api"]) + suffix, category
+
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -61,6 +99,7 @@ class DirectTurnResponseService:
                 recovery_suggestion="Replace the saved agent API key in Model Settings.",
                 user_explanation=assistant_message,
                 provider_error=getattr(turn_contract, "provider_error", None),
+                failure_category="provider_api",
             )
             return self._persist_failure_response(
                 request_id=request_id,
@@ -81,23 +120,23 @@ class DirectTurnResponseService:
             and not deterministic_context_question
         ):
             provider_error = getattr(turn_contract, "provider_error", None)
-            if is_json_object(provider_error) and provider_error.get("code") == "provider_model_incompatible":
-                assistant_message = (
-                    f"OpenCode Go rejected the selected model during structured intent extraction "
-                    f"(HTTP {provider_error.get('http_status') or 400}). Choose a compatible structured-output model and retry."
-                )
-            else:
-                assistant_message = (
-                    "I could not process this request because the configured agent model could not perform structured extraction. "
-                    "Open Model Settings, choose an agent model that supports structured output and tool calling, or retry when the provider is available."
-                )
+            provider_error_object = provider_error if is_json_object(provider_error) else None
+            assistant_message, failure_category = self._parser_failure_message(
+                turn_contract,
+                provider_error_object,
+            )
             failure = TaskFailureDetail(
                 stage="structured_intent_extraction",
                 component="agent_model",
-                sanitized_error="The configured agent model could not perform structured extraction.",
-                recovery_suggestion="Open Model Settings, choose an agent model that supports structured output and tool calling, or refresh/pull the configured Ollama model.",
+                sanitized_error=(
+                    str((provider_error_object or {}).get("detail") or "Structured extraction failed.")
+                ),
+                recovery_suggestion=(
+                    "Review the categorized diagnostic and retry the same model after correcting the provider, schema, or context issue."
+                ),
                 user_explanation=assistant_message,
                 provider_error=getattr(turn_contract, "provider_error", None),
+                failure_category=failure_category,  # type: ignore[arg-type]
             )
             return self._persist_failure_response(
                 request_id=request_id,
@@ -331,6 +370,8 @@ class DirectTurnResponseService:
             kind="error",
             status="failed",
             message=assistant_message,
+            failure_category=failure.failure_category,
+            provider_error=failure.provider_error,
         )
         self.task_state_service.update_task(
             conversation_key,

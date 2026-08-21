@@ -21,6 +21,7 @@ from server.services.chat.model_library import (
     ModelLibrarySourceError,
 )
 from server.services.cryptography import CredentialEncryptionService
+from server.services.llm.context_budget import resolve_model_context_profile
 
 ###############################################################################
 class ChatSettingsValidationError(ValueError):
@@ -69,6 +70,43 @@ class ChatSettingsService:
                     if item.provider in {"openai", "google", *DYNAMIC_CLOUD_PROVIDERS}
                     else "stored"
                 )
+        selected_model_context: dict[str, object] = {
+            "provider": record.agent_model_provider,
+            "model": record.agent_model_name,
+            "context_window_tokens": None,
+            "maximum_output_tokens": None,
+            "context_profile_source": "unknown",
+        }
+        profile = resolve_model_context_profile(
+            record.agent_model_provider,
+            record.agent_model_name,
+        )
+        if profile is not None:
+            selected_model_context.update(
+                {
+                    "context_window_tokens": profile.context_window_tokens,
+                    "maximum_output_tokens": profile.maximum_output_tokens,
+                    "context_profile_source": profile.metadata_source,
+                }
+            )
+        try:
+            selected = self.model_library_service.find_model(
+                provider=record.agent_model_provider,
+                model_name=record.agent_model_name,
+                ollama_url=self.model_library_service.normalize_ollama_url(record.ollama_url),
+            )
+            if selected is not None:
+                for key in (
+                    "context_window_tokens",
+                    "maximum_output_tokens",
+                    "context_profile_source",
+                ):
+                    value = selected.get(key)
+                    if value is not None:
+                        selected_model_context[key] = value
+        except Exception:
+            # Settings must remain readable when a live model catalog is down.
+            pass
         return ModelSettingsResponse(
             active_provider_mode=active_provider_mode,
             agent_model_provider=record.agent_model_provider,
@@ -81,6 +119,7 @@ class ChatSettingsService:
             deepseek_base_url=record.deepseek_base_url,
             credentials=credential_presence,
             credential_health=credential_health,
+            selected_model_context=selected_model_context,
         )
 
     # -------------------------------------------------------------------------
@@ -328,16 +367,15 @@ class ChatSettingsService:
                 require_provider_availability=True,
             )
         except ModelLibrarySourceError as exc:
-            raise ChatSettingsValidationError(
-                f"Could not validate {agent_model_provider} model selection: {exc}"
-            ) from exc
-        if agent_model is not None and not bool(agent_model.get("supports_tools")):
+            # A provider catalog outage must not turn missing capability
+            # metadata into an explicit capability rejection.  The selected
+            # model remains executable; the first request is authoritative.
+            return
+        if agent_model is not None and agent_model.get("supports_tools") is False:
             raise ChatSettingsValidationError(
                 "Selected agent model does not support native tool calling."
             )
-        if agent_model is not None and not bool(
-            agent_model.get("supports_structured_output")
-        ):
+        if agent_model is not None and agent_model.get("supports_structured_output") is False:
             raise ChatSettingsValidationError(
                 "Selected agent model does not support structured output."
             )
@@ -433,8 +471,9 @@ class ChatSettingsService:
     # -------------------------------------------------------------------------
     @staticmethod
     def _agent_requirements_met(*, model: dict[str, object]) -> bool:
-        return bool(model.get("supports_tools")) and bool(
-            model.get("supports_structured_output")
+        return (
+            model.get("supports_tools") is not False
+            and model.get("supports_structured_output") is not False
         )
 
     # -------------------------------------------------------------------------

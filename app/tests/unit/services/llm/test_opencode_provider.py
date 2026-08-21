@@ -58,7 +58,7 @@ class _Client:
         self.chat = SimpleNamespace(completions=self.completions)
 
 ###############################################################################
-def test_zen_catalog_filters_models_to_openai_compatible_subset(monkeypatch) -> None:
+def test_zen_catalog_keeps_live_models_even_when_static_capabilities_are_unknown(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     def fake_get(url: str, **kwargs):  # noqa: ANN003, ANN202
@@ -78,9 +78,10 @@ def test_zen_catalog_filters_models_to_openai_compatible_subset(monkeypatch) -> 
 
     models = provider.list_models()
 
-    assert [model.name for model in models] == ["deepseek-v4-flash"]
+    assert [model.name for model in models] == ["deepseek-v4-flash", "claude-opus-5"]
     assert models[0].provider == OPENCODE_PROVIDER
     assert models[0].metadata["protocol"] == "openai-chat-completions"
+    assert models[1].capabilities == ["chat", "stream"]
     assert captured["url"] == "https://opencode.ai/zen/v1/models"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer test-key"
 
@@ -91,7 +92,7 @@ def test_go_uses_go_endpoint_and_exposes_tool_capabilities() -> None:
     assert provider.base_url == "https://opencode.ai/zen/go/v1"
     assert provider.supports_tools("deepseek-v4-flash") is True
     assert provider.supports_structured_output("deepseek-v4-flash") is True
-    assert provider.supports_tools("claude-opus-5") is False
+    assert provider.supports_tools("claude-opus-5") is None
 
 ###############################################################################
 def test_structured_output_uses_chat_completions_json_object_mode(monkeypatch) -> None:

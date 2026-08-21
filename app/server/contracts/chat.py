@@ -45,7 +45,7 @@ class ContextUsageResponse(BaseModel):
     estimated_input_tokens: int
     selected_context_window: int | None = None
     model_context_limit: int | None = None
-    usage_percent: float
+    usage_percent: float | None
     provider: str
     model: str
     reserved_output_tokens: int = 0
@@ -53,6 +53,11 @@ class ContextUsageResponse(BaseModel):
     response_schema_tokens: int = 0
     safety_margin_tokens: int = 512
     usage_source: str = "estimated"
+    usable_prompt_budget_tokens: int | None = None
+    current_conversation_tokens: int | None = None
+    expected_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+    compaction_applied: bool = False
     phases: dict[str, dict[str, Any]] = Field(default_factory=lambda: dict[str, dict[str, Any]]())
     peak_request_tokens: int | None = None
     total_input_tokens: int | None = None
@@ -77,6 +82,13 @@ class ChatOperationResult(BaseModel):
     map_session: MapSession | None = None
     direct_result: dict[str, Any] | None = None
     provider_error: dict[str, Any] | None = None
+    failure_category: Literal[
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    ] | None = None
 
 ###############################################################################
 class ChatTurnResponse(BaseModel):
@@ -123,11 +135,14 @@ class ModelCardDescriptor(BaseModel):
     description: str
     provider: str
     capabilities: list[str] = Field(default_factory=lambda: list[str]())
-    supports_tools: bool = False
-    supports_structured_output: bool = False
-    supports_vision: bool = False
-    supports_embeddings: bool = False
+    supports_tools: bool | None = None
+    supports_structured_output: bool | None = None
+    supports_vision: bool | None = None
+    supports_embeddings: bool | None = None
     tool_support_source: str = "unknown"
+    context_window_tokens: int | None = None
+    maximum_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
@@ -152,6 +167,7 @@ class ModelSettingsResponse(BaseModel):
     deepseek_base_url: str | None = None
     credentials: dict[str, dict[str, bool]]
     credential_health: dict[str, dict[str, str]] = Field(default_factory=lambda: dict[str, dict[str, str]]())
+    selected_model_context: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
 
 ###############################################################################
 @dataclass(frozen=True)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from server.services.llm.errors import LLMRequestSchemaError
 from server.services.llm.google_provider import GoogleProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
@@ -82,12 +83,14 @@ def test_google_converts_tool_results_to_function_responses() -> None:
     ]
 
 ###############################################################################
-def test_google_rejects_tools_plus_response_schema() -> None:
-    with pytest.raises(ValueError, match="cannot combine native tools"):
-        LLMRequest(
-            model="gemini-2.5-flash",
-            messages=[{"role": "user", "content": "x"}],
-            tools=[_tool()],
-            response_json_schema={"type": "object", "properties": {}},
-        )
+def test_google_classifies_tools_plus_response_schema_at_provider_boundary() -> None:
+    request = LLMRequest(
+        model="gemini-2.5-flash",
+        messages=[{"role": "user", "content": "x"}],
+        tools=[_tool()],
+        response_json_schema={"type": "object", "properties": {}},
+    )
+    with pytest.raises(LLMRequestSchemaError) as error:
+        GoogleProvider(api_key="test")._validate_request_capabilities(request)
+    assert error.value.category == "schema_definition"
 

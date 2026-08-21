@@ -25,7 +25,12 @@
     @if (model.supports_embeddings) {
       <span>Embeddings</span>
     }
-    <span>Tool support: {{ model.supports_tools ? (model.tool_support_source === 'ollama_probe' ? 'probed' : 'detected') : 'unavailable' }}</span>
+    <span>Tool support: {{ model.supports_tools === true ? (model.tool_support_source === 'ollama_probe' ? 'probed' : 'detected') : (model.supports_tools === false ? 'unavailable' : 'not verified') }}</span>
+    @if (model.context_window_tokens) {
+      <span>Context: {{ model.context_window_tokens | number }} tokens</span>
+    } @else {
+      <span>Context: provider limit not reported</span>
+    }
   </div>
 
   <footer class="model-card__selection-status" aria-live="polite">

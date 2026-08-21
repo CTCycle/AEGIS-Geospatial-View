@@ -6,11 +6,11 @@ def _messages(count: int) -> list[dict]:
     return [{"id": i, "turn_index": i, "role": "user" if i % 2 else "assistant", "content": f"message {i} " + "x" * 500} for i in range(1, count + 1)]
 
 ###############################################################################
-def test_small_model_compacts_more_than_long_context_model() -> None:
+def test_known_model_profiles_drive_compaction_without_unknown_fallback() -> None:
     assembler = AgentContextAssembler()
     messages = _messages(80)
     kwargs = {"current_user_message": "Current request", "messages": messages, "directives": [], "task_state": {"current_task_id": "task-1"}, "map_memory": {}}
-    small = assembler.assemble(provider="ollama", model="unknown-local", **kwargs)
+    small = assembler.assemble(provider="ollama", model="4k-local", **kwargs)
     large = assembler.assemble(provider="google", model="gemini-2.5-flash", **kwargs)
     assert len(small.recent_messages) < len(large.recent_messages)
     assert small.current_user_message == "Current request"

@@ -190,7 +190,24 @@ class PlannedTurnExecutionService:
                 ],
                 task_snapshot=self.task_state_service.serialize(conversation_key),
             )
-            operation = operation.model_copy(update={"message": assistant_message})
+            synthesis_category = getattr(self.response_synthesizer, "last_failure_category", None)
+            operation = operation.model_copy(
+                update={
+                    "message": assistant_message,
+                    "warnings": [
+                        *operation.warnings,
+                        *(
+                            [
+                                "Grounded response synthesis failed; the verified response was retained. "
+                                f"Category: {synthesis_category}."
+                            ]
+                            if synthesis_category
+                            else []
+                        ),
+                    ],
+                    "failure_category": synthesis_category or operation.failure_category,
+                }
+            )
         decision = AgentResponseBuilder.build_final_decision(
             action_id=turn_contract.normalized_action.action_id,
             operation=operation,

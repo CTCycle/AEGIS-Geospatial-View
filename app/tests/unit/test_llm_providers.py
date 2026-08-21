@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from pydantic import BaseModel
 
 from server.services.llm.google_provider import GoogleProvider
+from server.services.llm.errors import LLMStructuredOutputError
 from server.services.llm.ollama import OllamaProvider
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMResult
@@ -232,7 +233,8 @@ def test_openai_structured_output_rejects_unsupported_model_before_api_call(monk
     request = LLMRequest(model="chat-only", messages=_request().messages)
     try:
         provider.structured_output(request, schema=_StructuredPayload)
-    except ValueError as exc:
+    except LLMStructuredOutputError as exc:
+        assert exc.category == "model_capability"
         assert "does not support structured output" in str(exc)
     else:
         raise AssertionError("structured_output should reject unsupported models")
@@ -323,9 +325,10 @@ def test_ollama_provider_http_paths(monkeypatch) -> None:
         0.2,
         0.3,
     ]
-    assert post_calls[0][0] == "/api/chat"
+    assert post_calls[0][0] == "/api/show"
+    chat_payload = next(payload for path, payload in post_calls if path == "/api/chat")
     assert stream_calls[0][0] == "/api/chat"
-    assert post_calls[0][1]["options"]["num_ctx"] >= 2048
+    assert "num_ctx" not in chat_payload.get("options", {})
     structured_payload = next(payload for _, payload in post_calls if payload.get("format"))
     assert structured_payload["think"] is False
     assert provider.last_context_usage is not None

@@ -5,7 +5,6 @@ from typing import Any
 
 from server.domain.agent.decision import ClarificationRequest, DecisionTrace, ExecutionPlan, PolicyDecision
 from server.domain.agent.pipeline import ConversationTaskRecord, TaskFailureDetail
-from server.contracts.chat import ChatOperationResult
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     NormalizedAction,
@@ -89,11 +88,11 @@ def test_parser_authentication_failure_persists_stable_failure_response() -> Non
         )
 
         assert response is not None
-        assert response.operation == ChatOperationResult(
-            kind="error",
-            status="failed",
-            message=response.assistant_message,
-        )
+        assert response.operation is not None
+        assert response.operation.kind == "error"
+        assert response.operation.status == "failed"
+        assert response.operation.message == response.assistant_message
+        assert response.operation.failure_category == "provider_api"
         assert response.failure_diagnostic is not None
         assert history.messages[-1]["content"] == response.assistant_message
         assert response.task_snapshot is not None
@@ -123,11 +122,11 @@ def test_provider_authentication_failure_persists_stable_failure_response() -> N
         )
 
         assert response is not None
-        assert response.operation == ChatOperationResult(
-            kind="error",
-            status="failed",
-            message=response.assistant_message,
-        )
+        assert response.operation is not None
+        assert response.operation.kind == "error"
+        assert response.operation.status == "failed"
+        assert response.operation.message == response.assistant_message
+        assert response.operation.failure_category == "provider_api"
         assert "saved API key was rejected" in response.assistant_message
         assert response.failure_diagnostic is not None
         assert history.messages[-1]["content"] == response.assistant_message

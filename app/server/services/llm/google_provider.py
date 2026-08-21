@@ -12,7 +12,12 @@ from google.genai import types as genai_types
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.context_budget import compute_context_usage
+from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.response_serialization import dump_response_payload
 from server.services.llm.types import (
     LLMRequest,
@@ -54,20 +59,25 @@ class GoogleProvider(LLMProvider):
         ]
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
-        return "tools" in self._capabilities_for_model(model)
+    def supports_tools(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return "tools" in entry.capabilities
+        return None
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
-        capabilities = self._capabilities_for_model(model)
-        return "structured" in capabilities or "structured_output" in capabilities
+    def supports_structured_output(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return bool({"structured", "structured_output"} & set(entry.capabilities))
+        return None
 
     # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
         for entry in self.list_models():
             if entry.name == model:
                 return set(entry.capabilities)
-        return {"chat", "stream", "structured", "structured_output", "tools"}
+        return {"chat", "stream"}
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -115,6 +125,7 @@ class GoogleProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -137,11 +148,18 @@ class GoogleProvider(LLMProvider):
         if schema and not native_tools:
             config["response_mime_type"] = "application/json"
             config["response_json_schema"] = schema
-        response = self._client().models.generate_content(
-            model=request.model,
-            contents=self._contents_from_messages(request.messages),
-            config=config,
-        )
+        try:
+            response = self._client().models.generate_content(
+                model=request.model,
+                contents=self._contents_from_messages(request.messages),
+                config=config,
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc, provider=self.provider_name, model=request.model, stage="chat"
+            ) from exc
         raw = dump_response_payload(response)
         return LLMResult(
             content=str(getattr(response, "text", "") or ""),
@@ -152,6 +170,7 @@ class GoogleProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -169,6 +188,7 @@ class GoogleProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -177,16 +197,41 @@ class GoogleProvider(LLMProvider):
         self._validate_request_capabilities(
             replace(request, response_json_schema=json_schema)
         )
-        response = self._client().models.generate_content(
-            model=request.model,
-            contents=self._contents_from_messages(request.messages),
-            config={
-                **self._config_from_request(request),
-                "response_mime_type": "application/json",
-                "response_json_schema": json_schema,
-            },
-        )
-        loaded = json.loads(str(getattr(response, "text", "") or "{}"))
+        try:
+            response = self._client().models.generate_content(
+                model=request.model,
+                contents=self._contents_from_messages(request.messages),
+                config={
+                    **self._config_from_request(request),
+                    "response_mime_type": "application/json",
+                    "response_json_schema": json_schema,
+                },
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+            ) from exc
+        try:
+            loaded = json.loads(str(getattr(response, "text", "") or "{}"))
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider returned invalid JSON for structured extraction.",
+            ) from exc
+        if not is_json_object(loaded):
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider returned a JSON value instead of an object.",
+            )
         return json_object(loaded)
 
     # -------------------------------------------------------------------------

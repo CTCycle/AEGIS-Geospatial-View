@@ -56,6 +56,13 @@ export interface CapabilityDescriptor {
   reliability?: LayerReliability;
   auth?: ProviderAuthPolicy;
   metadata?: Record<string, JsonValue>;
+  render?: {
+    status?: 'available' | 'unavailable' | 'checking' | string;
+    tile_url?: string | null;
+    style_url?: string | null;
+    attribution?: string;
+    reason?: string;
+  };
 }
 
 export interface CatalogResponse {
@@ -246,6 +253,8 @@ export interface MapSession {
     tile_url?: string | null;
     style_url?: string | null;
     attribution?: string;
+    render_status?: 'available' | 'unavailable' | 'checking' | string;
+    unavailable_reason?: string | null;
   };
   overlays?: Array<{
     id: string;
@@ -389,7 +398,7 @@ export interface ContextUsage {
   estimated_input_tokens: number;
   selected_context_window?: number | null;
   model_context_limit?: number | null;
-  usage_percent: number;
+  usage_percent: number | null;
   provider: string;
   model: string;
   reserved_output_tokens?: number;
@@ -401,6 +410,11 @@ export interface ContextUsage {
   peak_request_tokens?: number | null;
   total_input_tokens?: number | null;
   total_output_tokens?: number | null;
+  usable_prompt_budget_tokens?: number | null;
+  current_conversation_tokens?: number | null;
+  expected_output_tokens?: number | null;
+  context_profile_source?: string;
+  compaction_applied?: boolean;
 }
 
 export interface NormalizedAction {
@@ -487,6 +501,8 @@ export interface TurnParseResult {
     preserve_valid_results: boolean;
     apply_visualization_changes: boolean;
   } | null;
+  provider_error?: Record<string, JsonValue> | null;
+  failure_category?: 'model_capability' | 'provider_api' | 'schema_definition' | 'response_parsing' | 'context_limit' | null;
 }
 
 export interface ClarificationRequest {
@@ -528,14 +544,8 @@ export interface ChatOperationResult {
   warnings?: string[];
   map_session?: MapSession | null;
   direct_result?: Record<string, JsonValue> | null;
-  provider_error?: {
-    code: string;
-    provider: string;
-    model: string;
-    stage: string;
-    http_status?: number | null;
-    retryable: boolean;
-  } | null;
+  provider_error?: Record<string, JsonValue> | null;
+  failure_category?: 'model_capability' | 'provider_api' | 'schema_definition' | 'response_parsing' | 'context_limit' | null;
 }
 
 export interface TaskFailureDetail {
@@ -549,6 +559,7 @@ export interface TaskFailureDetail {
   recovery_suggestion?: string | null;
   user_explanation: string;
   provider_error?: ChatOperationResult['provider_error'];
+  failure_category?: ChatOperationResult['failure_category'];
 }
 
 export type RealtimeConnectionState =
@@ -665,11 +676,14 @@ export interface ModelCardDescriptor {
   description: string;
   provider: string;
   capabilities: string[];
-  supports_tools?: boolean;
-  supports_structured_output?: boolean;
-  supports_vision?: boolean;
-  supports_embeddings?: boolean;
+  supports_tools?: boolean | null;
+  supports_structured_output?: boolean | null;
+  supports_vision?: boolean | null;
+  supports_embeddings?: boolean | null;
   tool_support_source?: string;
+  context_window_tokens?: number | null;
+  maximum_output_tokens?: number | null;
+  context_profile_source?: string;
   metadata: Record<string, JsonValue>;
 }
 
@@ -696,6 +710,7 @@ export interface ModelSettingsResponse {
   deepseek_base_url?: string | null;
   credentials: Record<string, Record<string, boolean>>;
   credential_health?: Record<string, Record<string, 'healthy' | 'unreadable' | string>>;
+  selected_model_context?: Record<string, JsonValue>;
 }
 
 export interface ModelSettingsUpdateRequest {

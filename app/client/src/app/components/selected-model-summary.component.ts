@@ -18,7 +18,10 @@ export class SelectedModelSummaryComponent {
   @Input() summary: SelectedAgentModelSummary | null = null;
   @Input() isLoading = false;
 
-  boolLabel(value: boolean): string {
+  boolLabel(value: boolean | null): string {
+    if (value === null) {
+      return 'Unknown';
+    }
     return value ? 'Yes' : 'No';
   }
 }

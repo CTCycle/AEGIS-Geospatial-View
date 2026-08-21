@@ -1993,6 +1993,24 @@
               }
             ],
             "title": "Provider Error"
+          },
+          "failure_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "model_capability",
+                  "provider_api",
+                  "schema_definition",
+                  "response_parsing",
+                  "context_limit"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Category"
           }
         },
         "additionalProperties": false,
@@ -2241,7 +2259,14 @@
             "title": "Model Context Limit"
           },
           "usage_percent": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Usage Percent"
           },
           "provider": {
@@ -2276,6 +2301,49 @@
             "type": "string",
             "title": "Usage Source",
             "default": "estimated"
+          },
+          "usable_prompt_budget_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usable Prompt Budget Tokens"
+          },
+          "current_conversation_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Conversation Tokens"
+          },
+          "expected_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Output Tokens"
+          },
+          "context_profile_source": {
+            "type": "string",
+            "title": "Context Profile Source",
+            "default": "unknown"
+          },
+          "compaction_applied": {
+            "type": "boolean",
+            "title": "Compaction Applied",
+            "default": false
           },
           "phases": {
             "additionalProperties": {
@@ -4006,28 +4074,79 @@
             "title": "Capabilities"
           },
           "supports_tools": {
-            "type": "boolean",
-            "title": "Supports Tools",
-            "default": false
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Tools"
           },
           "supports_structured_output": {
-            "type": "boolean",
-            "title": "Supports Structured Output",
-            "default": false
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Structured Output"
           },
           "supports_vision": {
-            "type": "boolean",
-            "title": "Supports Vision",
-            "default": false
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Vision"
           },
           "supports_embeddings": {
-            "type": "boolean",
-            "title": "Supports Embeddings",
-            "default": false
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Embeddings"
           },
           "tool_support_source": {
             "type": "string",
             "title": "Tool Support Source",
+            "default": "unknown"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "maximum_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Output Tokens"
+          },
+          "context_profile_source": {
+            "type": "string",
+            "title": "Context Profile Source",
             "default": "unknown"
           },
           "metadata": {
@@ -4195,6 +4314,11 @@
             },
             "type": "object",
             "title": "Credential Health"
+          },
+          "selected_model_context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Selected Model Context"
           }
         },
         "additionalProperties": false,
@@ -4679,6 +4803,24 @@
               }
             ],
             "title": "Provider Error"
+          },
+          "failure_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "model_capability",
+                  "provider_api",
+                  "schema_definition",
+                  "response_parsing",
+                  "context_limit"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Category"
           }
         },
         "additionalProperties": false,
@@ -5115,6 +5257,24 @@
               }
             ],
             "title": "Provider Error"
+          },
+          "failure_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "model_capability",
+                  "provider_api",
+                  "schema_definition",
+                  "response_parsing",
+                  "context_limit"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Category"
           }
         },
         "additionalProperties": false,

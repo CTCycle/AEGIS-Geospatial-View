@@ -148,8 +148,32 @@ class NativeToolLoop:
                     self.last_context_usages.append(dict(usage))
             except Exception as exc:
                 LOGGER.exception("tool_loop_failed provider=%s model=%s", request.provider, request.model)
+                category = getattr(exc, "category", None)
+                detail = str(getattr(exc, "detail", None) or exc)
+                if category == "context_limit":
+                    final_text = (
+                        "The agent stopped because the selected model context limit was reached. "
+                        "Older context was compacted where possible, but the required tool state still did not fit."
+                    )
+                elif category == "model_capability":
+                    final_text = (
+                        "The selected model explicitly rejected native tool calling. "
+                        "Choose a model/provider with tool support or retry after checking its live capabilities."
+                    )
+                elif category == "schema_definition":
+                    final_text = (
+                        "The agent tool definition was invalid before the provider request was sent. "
+                        "This is an application schema issue."
+                    )
+                elif category == "provider_api":
+                    final_text = (
+                        "The agent provider failed while executing the tool loop. "
+                        "Check the provider response, credentials, rate limit, or network and retry."
+                    )
+                else:
+                    final_text = "The agent tool loop failed before it could complete the request."
                 return AgentToolLoopResult(
-                    final_text=str(exc),
+                    final_text=final_text,
                     tool_calls=all_calls,
                     tool_results=all_results,
                     iterations=iteration,
@@ -158,6 +182,8 @@ class NativeToolLoop:
                     model_calls=iteration,
                     duplicate_tool_calls=duplicate_tool_calls,
                     no_progress_steps=no_progress_steps,
+                    failure_category=category,
+                    failure_detail=detail,
                 )
 
             if not response.tool_calls:

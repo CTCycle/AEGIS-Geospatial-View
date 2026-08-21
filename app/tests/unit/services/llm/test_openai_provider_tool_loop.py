@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from server.services.llm.errors import LLMRequestSchemaError
 from server.services.llm.openai_provider import OpenAIProvider
 from server.services.llm.types import LLMRequest, LLMToolDefinition
 
@@ -63,12 +64,14 @@ def test_openai_converts_assistant_tool_calls_and_tool_results() -> None:
     }
 
 ###############################################################################
-def test_openai_rejects_tools_plus_response_schema() -> None:
-    with pytest.raises(ValueError, match="cannot combine native tools"):
-        LLMRequest(
-            model="gpt-4.1",
-            messages=[{"role": "user", "content": "x"}],
-            tools=[_tool()],
-            response_json_schema={"type": "object", "properties": {}},
-        )
+def test_openai_classifies_tools_plus_response_schema_at_provider_boundary() -> None:
+    request = LLMRequest(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": "x"}],
+        tools=[_tool()],
+        response_json_schema={"type": "object", "properties": {}},
+    )
+    with pytest.raises(LLMRequestSchemaError) as error:
+        OpenAIProvider(api_key="test")._validate_request_capabilities(request)
+    assert error.value.category == "schema_definition"
 
