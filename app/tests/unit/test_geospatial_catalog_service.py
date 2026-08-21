@@ -41,7 +41,6 @@ def test_catalog_contains_grouped_capability_sections() -> None:
     assert any(item["id"] == "openaq_air_quality" for item in catalog["overlays"])
     assert any(item["id"] == "get_weather_forecast" for item in catalog["tools"])
 
-
 ###############################################################################
 def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
     catalog = _service_with_credentials(False).list_catalog()

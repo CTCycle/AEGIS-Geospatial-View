@@ -48,6 +48,7 @@ def test_sqlite_connection_listener_applies_expected_pragmas() -> None:
     ]
 
 
+###############################################################################
 def test_sqlite_engine_applies_pragmas_to_live_connections(tmp_path: Path) -> None:
     repository = SQLiteRepository(
         DatabaseSettings(database_path=str(tmp_path / "database.db"))

@@ -56,12 +56,12 @@ def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
 
 
+###############################################################################
 def _dispose_sqlite_engine(database: object) -> None:
     engine = getattr(database, "engine", None)
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
         dispose()
-
 
 ###############################################################################
 def _resolve_client_file(full_path: str) -> Path | None:

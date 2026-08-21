@@ -23,10 +23,12 @@ ALEMBIC_CONFIG_PATH = Path(__file__).resolve().parents[2] / "alembic.ini"
 ALEMBIC_VERSION_TABLE = "alembic_version"
 
 
+###############################################################################
 class DatabaseMigrationError(RuntimeError):
     """Raised when the application cannot safely synchronize its schema."""
 
 
+###############################################################################
 @dataclass(frozen=True)
 class MigrationResult:
     current_revisions: tuple[str, ...]
@@ -36,6 +38,7 @@ class MigrationResult:
     migrations_applied: bool
 
 
+###############################################################################
 def synchronize_database(
     database: SQLiteRepository,
     *,
@@ -78,6 +81,7 @@ def synchronize_database(
         ) from exc
 
 
+###############################################################################
 def _synchronize_locked(engine: Engine) -> MigrationResult:
     with engine.connect() as connection:
         config = _alembic_config()
@@ -132,6 +136,7 @@ def _synchronize_locked(engine: Engine) -> MigrationResult:
         )
 
 
+###############################################################################
 def _alembic_config() -> Config:
     if not ALEMBIC_CONFIG_PATH.is_file():
         raise DatabaseMigrationError(
@@ -140,6 +145,7 @@ def _alembic_config() -> Config:
     return Config(str(ALEMBIC_CONFIG_PATH))
 
 
+###############################################################################
 def _run_alembic_command(
     config: Config,
     connection: Connection,
@@ -152,11 +158,13 @@ def _run_alembic_command(
     connection.commit()
 
 
+###############################################################################
 def _current_revisions(connection: Connection) -> tuple[str, ...]:
     context = MigrationContext.configure(connection)
     return tuple(context.get_current_heads())
 
 
+###############################################################################
 def _validate_current_revisions(
     script: ScriptDirectory,
     current: tuple[str, ...],
@@ -170,10 +178,12 @@ def _validate_current_revisions(
             ) from exc
 
 
+###############################################################################
 def migration_lock_timeout(database: SQLiteRepository) -> int:
     return max(1, int(database.settings.sqlite_lock_timeout_seconds))
 
 
+###############################################################################
 def _create_sqlite_backup(
     database: SQLiteRepository,
     database_path: Path,
@@ -204,6 +214,7 @@ def _create_sqlite_backup(
             target.close()
 
 
+###############################################################################
 def _restore_sqlite_backup(
     database: SQLiteRepository,
     database_path: Path,

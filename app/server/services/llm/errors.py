@@ -9,9 +9,11 @@ class LLMConfigurationError(ValueError):
     """Raised when a selected LLM provider cannot be used due to local settings."""
 
 
+###############################################################################
 class LLMStructuredOutputError(RuntimeError):
     """Safe structured-output failure with a user-actionable category."""
 
+    # -------------------------------------------------------------------------
     def __init__(
         self,
         *,
@@ -37,9 +39,11 @@ class LLMStructuredOutputError(RuntimeError):
         super().__init__(detail)
 
 
+###############################################################################
 class LLMContextLimitError(LLMStructuredOutputError):
     """Raised when the selected model cannot accept the prepared context."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, provider: str, model: str, stage: str, detail: str) -> None:
         super().__init__(
             category="context_limit",
@@ -51,9 +55,11 @@ class LLMContextLimitError(LLMStructuredOutputError):
         )
 
 
+###############################################################################
 class LLMRequestSchemaError(LLMStructuredOutputError):
     """Raised for invalid local response schemas or native tool definitions."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, provider: str, model: str, stage: str, detail: str) -> None:
         super().__init__(
             category="schema_definition",
@@ -65,9 +71,11 @@ class LLMRequestSchemaError(LLMStructuredOutputError):
         )
 
 
+###############################################################################
 class LLMResponseParsingError(LLMStructuredOutputError):
     """Raised when a provider response cannot satisfy the requested schema."""
 
+    # -------------------------------------------------------------------------
     def __init__(self, *, provider: str, model: str, stage: str, detail: str) -> None:
         super().__init__(
             category="response_parsing",

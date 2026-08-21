@@ -7,6 +7,7 @@ from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import Base, ReferenceCountryRecord
 
 
+###############################################################################
 def test_repository_creates_parent_directory_for_database_path(tmp_path: Path) -> None:
     database_path = tmp_path / "nested" / "data" / "database.db"
 
@@ -16,6 +17,7 @@ def test_repository_creates_parent_directory_for_database_path(tmp_path: Path) -
     repository.engine.dispose()
 
 
+###############################################################################
 def test_repository_counts_records_using_short_lived_sessions(tmp_path: Path) -> None:
     repository = SQLiteRepository(
         DatabaseSettings(database_path=str(tmp_path / "database.db"))

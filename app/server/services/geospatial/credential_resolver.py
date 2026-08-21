@@ -24,14 +24,19 @@ GEOSPATIAL_CREDENTIAL_ENV_BY_PROVIDER: dict[str, str] = {
 
 ###############################################################################
 class CredentialStore(Protocol):
+
+    # -------------------------------------------------------------------------
     def get_active(self, *, provider: str, label: str) -> Any:
         """Return the active encrypted credential record, if present."""
 
+    # -------------------------------------------------------------------------
     def mark_used(self, *, provider: str, label: str) -> None:
         """Record that a stored credential was used."""
 
 ###############################################################################
 class CredentialDecryptor(Protocol):
+
+    # -------------------------------------------------------------------------
     def decrypt(self, encrypted_value: str) -> str:
         """Decrypt a stored credential value."""
         ...

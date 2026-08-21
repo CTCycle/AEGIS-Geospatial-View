@@ -17,6 +17,7 @@ from server.repositories.schemas.models import (
 )
 
 
+###############################################################################
 @pytest.fixture
 def backend(tmp_path: Path):
     repository = SQLiteRepository(
@@ -28,6 +29,7 @@ def backend(tmp_path: Path):
     repository.engine.dispose()
 
 
+###############################################################################
 def test_canonical_schema_has_fifteen_application_tables_and_version_table(backend) -> None:
     tables = set(inspect(backend.engine).get_table_names())
     assert "alembic_version" in tables
@@ -39,6 +41,7 @@ def test_canonical_schema_has_fifteen_application_tables_and_version_table(backe
     }
 
 
+###############################################################################
 def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_conformance", title="Conformance"))
@@ -70,6 +73,7 @@ def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> N
         assert conversation.next_message_sequence == 1
 
 
+###############################################################################
 def test_conversation_allows_one_active_run_by_constraint(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_run", title="Runs"))
