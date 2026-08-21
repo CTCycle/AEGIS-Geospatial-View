@@ -32,6 +32,8 @@ import {
   ChatTurnResponse,
   ContextUsage,
   ConversationTaskSnapshot,
+  CapabilityDescriptor,
+  CatalogResponse,
   RealtimeServerMessage,
   RunEvent,
 } from '../core/types';
@@ -48,6 +50,7 @@ import { ViewStateSyncService } from '../core/view-state-sync.service';
 })
 export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('transcript', { static: false }) transcriptRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('composerInput', { static: false }) composerInputRef?: ElementRef<HTMLTextAreaElement>;
   @ViewChild(MapPreviewComponent) mapPreview?: MapPreviewComponent;
 
   readonly maxChatMessageLength = MAX_CHAT_MESSAGE_LENGTH;
@@ -78,6 +81,8 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   composerDraft = '';
   transcriptScrollTop = 0;
   agentReadiness = INITIAL_AGENT_READINESS_STATE;
+  catalog?: CatalogResponse;
+  mapRenderState: 'preparing' | 'ready' | 'failed' = 'preparing';
 
   isLoading = false;
   progressPercent = 0;
@@ -99,6 +104,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   private pendingRun?: PersistedChatPageState['chatPanel']['pendingRun'];
   private removeRealtimeMessageListener?: () => void;
   private removeRealtimeStateListener?: () => void;
+  private cancelRequested = false;
 
   constructor(
     private readonly router: Router,
@@ -166,11 +172,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       }
     }
     void this.loadAgentStatus();
+    void this.loadCatalog();
+    void this.loadModelContext();
   }
 
   ngAfterViewInit(): void {
     this.viewStateSync.restoreWindowScroll(this.chatPageState.scrollY);
     this.viewStateSync.restoreElementScroll(this.transcriptRef?.nativeElement, this.transcriptScrollTop);
+    this.resizeComposer();
   }
 
   ngOnDestroy(): void {
@@ -230,15 +239,34 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   get capabilityStatusItems(): CapabilityStatusItem[] {
+    const satellite = this.catalog?.basemaps?.find((item) => item.id === 'esri_world_imagery');
+    const satelliteStatus = !this.catalog
+      ? { statusLabel: 'Checking', tone: 'none' as CapabilityStatusTone, detail: 'Loading the live basemap catalog.' }
+      : this.mapSession?.basemap_id === 'esri_world_imagery' && this.mapRenderState === 'ready'
+        ? { statusLabel: 'Active', tone: 'ok' as CapabilityStatusTone, detail: 'Esri World Imagery is rendering on the active map.' }
+        : this.mapSession?.basemap_id === 'esri_world_imagery' && this.mapRenderState === 'failed'
+          ? { statusLabel: 'Unavailable', tone: 'error' as CapabilityStatusTone, detail: 'Satellite imagery was selected but the map renderer reported a failure.' }
+        : satellite?.is_available && satellite.render?.status === 'available'
+          ? { statusLabel: 'Available', tone: 'ok' as CapabilityStatusTone, detail: 'Select Satellite from the map basemap control.' }
+          : { statusLabel: 'Unavailable', tone: 'error' as CapabilityStatusTone, detail: 'No usable public satellite render descriptor is available.' };
+    const weather = this.catalog?.capabilities?.find((item) => (
+      item.id.toLowerCase().includes('weather') || item.task_tags.some((tag) => tag.toLowerCase().includes('weather'))
+    ));
     return [
       {
         label: 'Agent model',
         statusLabel: this.agentReadiness.label,
         tone: this.agentStatusTone,
       },
-      { label: 'Satellite Imagery', statusLabel: 'Active', tone: 'ok' },
-      { label: 'Weather Intel', statusLabel: 'Active', tone: 'ok' },
-      { label: 'Optional Keys', statusLabel: 'Disabled', tone: 'warn' },
+      { label: 'Satellite', ...satelliteStatus },
+      {
+        label: 'Weather',
+        statusLabel: !this.catalog ? 'Checking' : weather?.is_available ? 'Available' : 'Unavailable',
+        tone: !this.catalog ? 'none' : weather?.is_available ? 'ok' : 'warn',
+        detail: weather?.description || 'Weather intelligence is derived from the live capability catalog.',
+      },
+      { label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn', detail: 'Optional provider credentials are configured in Model Settings.' },
+      { label: 'Context', statusLabel: this.contextUsageLabel, tone: 'none', detail: this.contextUsageDetail },
     ];
   }
 
@@ -248,26 +276,19 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   get contextUsageLabel(): string {
     if (!this.contextUsage) {
-      return '0%';
+      return '—';
     }
-    return `${this.contextUsagePercent}%`;
+    return this.contextUsage.usage_percent === null ? 'Unknown' : `${this.contextUsagePercent}%`;
   }
 
   get contextUsageDetail(): string {
     if (!this.contextUsage) {
       return 'Context window awaiting first request';
     }
-    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit ?? 0;
+    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit;
     const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
-    return `${this.contextUsage.estimated_input_tokens} / ${selected} tokens${model ? ` - ${model}` : ''}`;
-  }
-
-  get contextTrackerText(): string {
-    if (!this.contextUsage) {
-      return 'Context window';
-    }
-    const selected = this.contextUsage.selected_context_window ?? this.contextUsage.model_context_limit ?? 0;
-    return `${this.contextUsage.estimated_input_tokens} / ${selected}`;
+    const limitText = selected ? `${selected.toLocaleString()} token cap` : 'provider limit not reported';
+    return `${this.contextUsage.estimated_input_tokens.toLocaleString()} tokens / ${limitText}${model ? ` - ${model}` : ''}`;
   }
 
   startNewChat(): void {
@@ -299,6 +320,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.mapState = { overlayVisibility: {}, overlayOpacity: {} };
     this.progressPercent = 0;
     this.isAlertsOpen = false;
+    this.cancelRequested = false;
     this.appStateStore.resetChatPage();
     this.syncState();
     this.queueTranscriptScroll();
@@ -349,6 +371,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   onComposerInput(event: Event): void {
     const target = event.target as HTMLTextAreaElement | null;
     this.onComposerChange(target?.value ?? '');
+    this.resizeComposer(target);
   }
 
   onComposerKeydown(event: KeyboardEvent): void {
@@ -361,6 +384,14 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   onOverlayStateChange(state: OverlayStateChange): void {
     this.mapState = state;
     this.syncState();
+  }
+
+  onComposerAction(): void {
+    if (this.isLoading) {
+      void this.cancelActiveRun();
+      return;
+    }
+    void this.sendMessage();
   }
 
   async sendMessage(): Promise<void> {
@@ -471,17 +502,23 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   async cancelActiveRun(): Promise<void> {
+    this.cancelRequested = true;
+    this.status = 'Stopping…';
+    this.progressLabel = 'Stopping…';
     if (!this.conversationId || !this.activeRunId) {
+      this.syncState();
       return;
     }
     try {
       this.realtimeService.sendRunCancel(this.activeRunId);
+      this.cancelRequested = false;
     } catch (error: unknown) {
       const fallback = this.userFacingErrorService.toUserFacingError(
         error,
         'Could not cancel the active run.',
       );
       this.messages = [...this.messages, { role: 'assistant', content: fallback }];
+      this.cancelRequested = false;
     } finally {
       this.syncState();
     }
@@ -498,6 +535,16 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.activeRunVersion = this.readNumber(message.payload['run_version']);
         this.isLoading = true;
         this.realtimeService.setResumeCursor(runId, this.lastRunSequence);
+        if (this.cancelRequested) {
+          this.cancelRequested = false;
+          this.realtimeService.sendRunCancel(runId);
+          // Test transports and some socket implementations can acknowledge
+          // the cancel synchronously inside sendRunCancel. Do not let the
+          // enclosing start acknowledgement put the UI back into generating.
+          if (this.activeRunId !== runId) {
+            this.isLoading = false;
+          }
+        }
       }
       if (message.payload['command'] === 'run.cancel') {
         this.status = 'Agent ready';
@@ -505,6 +552,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.isLoading = false;
         this.activeRunId = undefined;
         this.pendingRun = undefined;
+        this.cancelRequested = false;
       }
       this.syncState();
       this.changeDetectorRef.detectChanges();
@@ -518,6 +566,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.status = 'Agent ready';
         this.progressLabel = undefined;
         this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.syncState();
         this.changeDetectorRef.detectChanges();
       }
@@ -605,6 +654,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.isLoading = false;
         this.activeRunId = undefined;
         this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
         break;
       case 'completed':
@@ -614,6 +664,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressPercent = 100;
         this.activeRunId = undefined;
         this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
         this.agentReadiness = {
@@ -628,6 +679,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressLabel = undefined;
         this.activeRunId = undefined;
         this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
         break;
       case 'clarification_needed':
@@ -637,6 +689,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.progressLabel = undefined;
         this.activeRunId = undefined;
         this.pendingRun = undefined;
+        this.cancelRequested = false;
         this.streamState = 'closed';
         this.applyRunCompletionPayload(event.payload);
         break;
@@ -749,6 +802,7 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   onMapRenderStateChange(change: MapRenderStateChange): void {
+    this.mapRenderState = change.state;
     if (this.pendingMapSession?.session_id !== change.sessionId) {
       return;
     }
@@ -846,8 +900,132 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.changeDetectorRef.detectChanges();
   }
 
+  private async loadCatalog(): Promise<void> {
+    try {
+      const catalog = await this.apiClient.fetchCatalog();
+      if (this.isDestroyed) {
+        return;
+      }
+      this.catalog = catalog;
+      const currentSession = this.pendingMapSession || this.mapSession || this.payload?.map_session;
+      if (currentSession) {
+        const enrichedSession = this.enrichMapSessionBasemap(currentSession);
+        this.mapSession = enrichedSession;
+        this.payload = {
+          map_session: enrichedSession,
+          compliance_warnings: enrichedSession.compliance_warnings,
+        };
+      }
+      this.changeDetectorRef.detectChanges();
+    } catch {
+      if (!this.isDestroyed) {
+        this.catalog = { capabilities: [], basemaps: [], overlays: [], tools: [] };
+        this.changeDetectorRef.detectChanges();
+      }
+    }
+  }
+
+  private async loadModelContext(): Promise<void> {
+    try {
+      const settings = await this.apiClient.fetchChatSettings();
+      if (this.isDestroyed) {
+        return;
+      }
+      const profile = settings.selected_model_context || {};
+      const contextLimit = typeof profile.context_window_tokens === 'number'
+        ? profile.context_window_tokens
+        : null;
+      const maximumOutput = typeof profile.maximum_output_tokens === 'number'
+        ? profile.maximum_output_tokens
+        : null;
+      this.contextUsage = {
+        estimated_input_tokens: 0,
+        selected_context_window: contextLimit,
+        model_context_limit: contextLimit,
+        usage_percent: contextLimit ? 0 : null,
+        provider: settings.agent_model_provider,
+        model: settings.agent_model_name,
+        expected_output_tokens: maximumOutput,
+        context_profile_source: typeof profile.context_profile_source === 'string'
+          ? profile.context_profile_source
+          : 'unknown',
+      };
+      this.changeDetectorRef.detectChanges();
+    } catch {
+      // The chat remains usable; unknown limits are shown explicitly.
+    }
+  }
+
+  get availableBasemaps(): CapabilityDescriptor[] {
+    return (this.catalog?.basemaps || []).filter((item) => item.is_available && item.render?.status === 'available');
+  }
+
+  private enrichMapSessionBasemap(session: MapSession): MapSession {
+    const current = session.basemap;
+    const descriptor = this.catalog?.basemaps?.find((item) => item.id === session.basemap_id);
+    if (!descriptor && current) {
+      return session;
+    }
+    const render = descriptor?.render;
+    const available = render?.status === 'available';
+    return {
+      ...session,
+      basemap: {
+        id: session.basemap_id,
+        label: descriptor?.name || current?.label || session.basemap_id,
+        provider: descriptor?.provider || current?.provider || 'unknown',
+        tile_url: render?.tile_url ?? current?.tile_url ?? null,
+        style_url: render?.style_url ?? current?.style_url ?? null,
+        attribution: render?.attribution || current?.attribution || '',
+        render_status: available ? 'available' : 'unavailable',
+        unavailable_reason: available ? null : (render?.reason || 'render_descriptor_missing'),
+      },
+    };
+  }
+
+  onBasemapChange(basemapId: string): void {
+    const current = this.mapSession || this.payload?.map_session;
+    const descriptor = this.catalog?.basemaps?.find((item) => item.id === basemapId);
+    if (!current || !descriptor || descriptor.render?.status !== 'available') {
+      this.status = 'Basemap unavailable';
+      this.changeDetectorRef.detectChanges();
+      return;
+    }
+    const render = descriptor.render;
+    const next: MapSession = {
+      ...current,
+      basemap_id: descriptor.id,
+      basemap: {
+        id: descriptor.id,
+        label: descriptor.name,
+        provider: descriptor.provider,
+        tile_url: render?.tile_url ?? null,
+        style_url: render?.style_url ?? null,
+        attribution: render?.attribution || '',
+        render_status: 'available',
+      },
+    };
+    this.pendingMapSession = next;
+    this.payload = { map_session: next, compliance_warnings: next.compliance_warnings };
+    this.mapRenderState = 'preparing';
+    this.status = `Switching to ${descriptor.name}`;
+    this.syncState();
+    this.changeDetectorRef.detectChanges();
+  }
+
+  private resizeComposer(target?: HTMLTextAreaElement | null): void {
+    const resolvedTarget: HTMLTextAreaElement | null = target ?? this.composerInputRef?.nativeElement ?? null;
+    if (!resolvedTarget) {
+      return;
+    }
+    resolvedTarget.style.height = 'auto';
+    const maxHeight = 144;
+    resolvedTarget.style.height = `${Math.min(resolvedTarget.scrollHeight, maxHeight)}px`;
+    resolvedTarget.style.overflowY = resolvedTarget.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }
+
   private get agentStatusTone(): CapabilityStatusTone {
-    return this.agentReadiness.status === 'active' ? 'none' : 'warn';
+    return this.agentReadiness.status === 'active' ? 'ok' : 'warn';
   }
 
   private scrollTranscriptToBottom(): void {

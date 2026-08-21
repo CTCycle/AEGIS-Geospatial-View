@@ -32,6 +32,7 @@
 
           <div class="chat-composer">
             <textarea
+              #composerInput
               aria-label="Chat message"
               [value]="composerDraft"
               [attr.maxlength]="maxChatMessageLength"
@@ -42,48 +43,34 @@
             <button
               type="button"
               class="primary-button"
-              [attr.aria-label]="isLoading ? 'Send steering update' : 'Send message'"
-              (click)="sendMessage()"
-              [disabled]="!composerDraft.trim()"
+              [attr.aria-label]="isLoading ? 'Stop generating' : 'Send message'"
+              [attr.title]="isLoading ? 'Stop generating' : 'Send message'"
+              (click)="onComposerAction()"
+              [disabled]="!isLoading && !composerDraft.trim()"
             >
-              <span class="sr-only">Send message</span>
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                <path
-                  d="M21.7 3.3a1 1 0 0 0-1-.2L3.6 9.7a1 1 0 0 0 0 1.9l7.8 2.6 2.6 7.8a1 1 0 0 0 .9.7h.1a1 1 0 0 0 .9-.6l6.8-17.8a1 1 0 0 0-.2-1zM15 18.8l-1.8-5.5 4.6-4.6-5.9 3.6-5.5-1.8L19.2 5 15 18.8z"
-                  fill="currentColor"
-                />
-              </svg>
+              @if (isLoading) {
+                <span class="composer-stop-icon" aria-hidden="true"></span>
+                <span class="sr-only">Stop generating</span>
+              } @else {
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <path
+                    d="M21.7 3.3a1 1 0 0 0-1-.2L3.6 9.7a1 1 0 0 0 0 1.9l7.8 2.6 2.6 7.8a1 1 0 0 0 .9.7h.1a.9 0 0 0 .9-.6l6.8-17.8a1 1 0 0 0-.2-1zM15 18.8l-1.8-5.5 4.6-4.6-5.9 3.6-5.5-1.8L19.2 5 15 18.8z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span class="sr-only">Send message</span>
+              }
             </button>
-            @if (isLoading && conversationId && activeRunId) {
-              <button
-                type="button"
-                class="secondary-button"
-                aria-label="Cancel active run"
-                (click)="cancelActiveRun()"
-              >
-                Cancel
-              </button>
-            }
+          </div>
+          <div class="chat-status-strip" aria-label="Chat and capability status">
+            <app-capability-status-list [items]="capabilityStatusItems"></app-capability-status-list>
+            <button type="button" class="chat-status-settings" (click)="navigateToSettings()">Model Settings</button>
           </div>
           @if (composerError) {
             <p class="chat-composer-error" role="alert">{{ composerError }}</p>
           }
         </section>
 
-        <section class="rail-context-strip" aria-label="Context window utilization">
-          <div class="context-window-tracker__meta">
-            <span>{{ contextTrackerText }}</span>
-            <strong>{{ contextUsageLabel }}</strong>
-          </div>
-          <span class="sr-only">{{ contextUsageDetail }}</span>
-          <div class="context-window-tracker__bar" aria-hidden="true">
-            <span [style.width.%]="contextUsagePercent"></span>
-          </div>
-        </section>
-
-        <section class="rail-capability-card" aria-label="Capability status">
-          <app-capability-status-list [items]="capabilityStatusItems"></app-capability-status-list>
-        </section>
       </div>
     </aside>
 
@@ -139,7 +126,9 @@
           [emptyMessage]="''"
           [initialOverlayVisibility]="mapState.overlayVisibility"
           [initialOverlayOpacity]="mapState.overlayOpacity"
+          [availableBasemaps]="availableBasemaps"
           (overlayStateChange)="onOverlayStateChange($event)"
+          (basemapChange)="onBasemapChange($event)"
           (renderStateChange)="onMapRenderStateChange($event)"
         ></app-map-preview>
       </div>
