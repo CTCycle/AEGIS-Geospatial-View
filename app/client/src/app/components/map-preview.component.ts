@@ -17,6 +17,7 @@ import maplibregl, { Map } from 'maplibre-gl';
 import { DEFAULT_MAP_FIT_MAX_ZOOM, DEFAULT_OVERLAY_OPACITY } from '../core/constants';
 import {
   MapSession,
+  CapabilityDescriptor,
   OverlayRenderStatus,
   OverlayOpacityChange,
   OverlayStateChange,
@@ -57,8 +58,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() emptyMessage = 'Run a search to display the map.';
   @Input() initialOverlayVisibility: Record<string, boolean> = {};
   @Input() initialOverlayOpacity: Record<string, number> = {};
+  @Input() availableBasemaps: CapabilityDescriptor[] = [];
   @Output() overlayStateChange = new EventEmitter<OverlayStateChange>();
   @Output() renderStateChange = new EventEmitter<MapRenderStateChange>();
+  @Output() basemapChange = new EventEmitter<string>();
 
   @ViewChild('mapContainer', { static: false })
   private set mapContainer(value: ElementRef<HTMLDivElement> | undefined) {
@@ -195,6 +198,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.setOverlayOpacity(change.overlayId, change.percentValue);
   }
 
+  onBasemapSelection(value: string): void {
+    const basemapId = String(value || '').trim();
+    if (basemapId && basemapId !== this.mapSession?.basemap_id) {
+      this.basemapChange.emit(basemapId);
+    }
+  }
+
   zoomIn(): boolean {
     if (!this.mapRef) {
       return false;
@@ -237,6 +247,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         id: next.basemap_id,
         label: next.basemap_id,
         provider: 'manifest',
+        render_status: next.basemap_id === 'osm_default' ? 'available' : 'unavailable',
+        unavailable_reason: next.basemap_id === 'osm_default'
+          ? null
+          : 'render_descriptor_missing',
       },
       overlays,
     };

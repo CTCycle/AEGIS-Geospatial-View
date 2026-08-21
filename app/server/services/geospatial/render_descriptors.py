@@ -47,6 +47,7 @@ class RenderDescriptorService:
             capability=capability,
         )
         style_url = self._resolve_openfreemap_style_url(metadata.get("style_url"))
+        render_status = "available" if tile_url or style_url else "unavailable"
         return {
             "id": str(capability.get("id") or basemap_id),
             "label": str(metadata.get("label") or capability.get("name") or basemap_id),
@@ -54,6 +55,8 @@ class RenderDescriptorService:
             "tile_url": tile_url,
             "style_url": style_url,
             "attribution": str(metadata.get("attribution") or ""),
+            "render_status": render_status,
+            "unavailable_reason": None if render_status == "available" else "render_descriptor_missing",
         }
 
     # -------------------------------------------------------------------------

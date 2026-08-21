@@ -41,6 +41,19 @@ def test_catalog_contains_grouped_capability_sections() -> None:
     assert any(item["id"] == "openaq_air_quality" for item in catalog["overlays"])
     assert any(item["id"] == "get_weather_forecast" for item in catalog["tools"])
 
+
+###############################################################################
+def test_catalog_exposes_a_renderable_public_satellite_basemap() -> None:
+    catalog = _service_with_credentials(False).list_catalog()
+    satellite = next(
+        item for item in catalog["basemaps"] if item["id"] == "esri_world_imagery"
+    )
+
+    render = satellite["render"]
+    assert render["status"] == "available"
+    assert "World_Imagery/MapServer/tile" in render["tile_url"]
+    assert render["attribution"]
+
 ###############################################################################
 def test_catalog_marks_key_required_capabilities_unavailable_without_credentials(monkeypatch) -> None:
     monkeypatch.delenv("TOMTOM_API_KEY", raising=False)

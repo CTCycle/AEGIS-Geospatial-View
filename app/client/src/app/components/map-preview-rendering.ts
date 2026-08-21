@@ -138,9 +138,13 @@ const buildWmtsTileUrl = (
   return appendQuery(descriptor.url, query);
 };
 
-const buildBasemapTileUrl = (mapSession?: MapSession): string => {
+const buildBasemapTileUrl = (mapSession?: MapSession): string | null => {
   const basemap = mapSession?.basemap;
-  const tileUrl = basemap?.tile_url || DEFAULT_BASE_TILE_URL;
+  const basemapId = mapSession?.basemap_id || basemap?.id || 'osm_default';
+  const tileUrl = basemap?.tile_url || (basemapId === 'osm_default' ? DEFAULT_BASE_TILE_URL : null);
+  if (!tileUrl) {
+    return null;
+  }
   if (tileUrl === DEFAULT_BASE_TILE_URL) {
     return DEFAULT_BASE_TILE_PROXY_URL;
   }
@@ -170,7 +174,7 @@ export const buildStyle = (mapSession?: MapSession): StyleSpecification => {
     sources: {
       basemap: {
         type: 'raster',
-        tiles: [baseTileUrl],
+        tiles: baseTileUrl ? [baseTileUrl] : [],
         tileSize: 256,
         maxzoom: DEFAULT_BASE_TILE_MAX_ZOOM,
         attribution: basemap?.attribution || DEFAULT_BASE_ATTRIBUTION,
