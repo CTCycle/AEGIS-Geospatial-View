@@ -1,6 +1,6 @@
 # Startup
 
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 ## Local Development Via Launcher
 
@@ -15,9 +15,14 @@ frontend services. If `settings/.env` is missing, the launcher reads
 `settings/.env.example` for its first-run process settings and the application
 creates the local file without overwriting an existing file.
 
-The menu provides: launch application, install/update dependencies, rebuild the
-frontend independently, initialize the database explicitly, run the test suite,
-remove logs, clear caches, uninstall local dependencies, and exit.
+The menu is grouped into clear sections. Application options launch the
+application, install or update dependencies, rebuild the frontend independently,
+and initialize the database explicitly. Maintenance options run the test suite,
+remove logs, clear caches, and uninstall local dependencies. Update options pull
+the latest `main` branch with `git pull` or check `origin/main` status without
+downloading or applying changes. Data management can remove the SQLite database,
+runtime/provider data, ingested files, generated vectors, and logs while
+preserving application source files. The final option exits the launcher.
 
 Database synchronization runs before backend repositories and background jobs
 are constructed. A missing SQLite file is created, migrated, and seeded.

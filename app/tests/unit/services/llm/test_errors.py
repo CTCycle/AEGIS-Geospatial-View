@@ -29,9 +29,10 @@ def test_non_transient_provider_errors_are_not_retryable() -> None:
 
     assert error.retryable is False
 
-
 ###############################################################################
 def test_provider_context_overflow_is_not_misclassified_as_capability_failure() -> None:
+
+    ###############################################################################
     class _ProviderContextError(Exception):
         response = SimpleNamespace(status_code=413)
 
@@ -46,7 +47,10 @@ def test_provider_context_overflow_is_not_misclassified_as_capability_failure() 
     assert error.code == "context_limit_exceeded"
 
 
+###############################################################################
 def test_provider_bad_request_without_capability_evidence_stays_provider_api() -> None:
+
+    ###############################################################################
     class _ProviderBadRequest(Exception):
         response = SimpleNamespace(status_code=400)
 
@@ -61,7 +65,10 @@ def test_provider_bad_request_without_capability_evidence_stays_provider_api() -
     assert error.code == "provider_bad_request"
 
 
+###############################################################################
 def test_explicit_provider_capability_rejection_is_classified_as_model_capability() -> None:
+
+    ###############################################################################
     class _ProviderCapabilityError(Exception):
         response = SimpleNamespace(status_code=400)
 
@@ -74,7 +81,6 @@ def test_explicit_provider_capability_rejection_is_classified_as_model_capabilit
 
     assert error.category == "model_capability"
     assert error.code == "provider_model_incompatible"
-
 
 ###############################################################################
 def test_malformed_tool_definition_is_classified_at_provider_boundary() -> None:

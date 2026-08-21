@@ -16,6 +16,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+###############################################################################
 def upgrade() -> None:
     op.create_table(
         "reference_countries",
@@ -356,6 +357,7 @@ def upgrade() -> None:
     )
 
 
+###############################################################################
 def downgrade() -> None:
     op.drop_index("ix_agent_run_events_run_id_sequence", table_name="agent_run_events")
     op.drop_index("ix_agent_steering_messages_run_id", table_name="agent_steering_messages")

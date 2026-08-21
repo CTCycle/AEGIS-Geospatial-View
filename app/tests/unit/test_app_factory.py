@@ -148,7 +148,6 @@ def test_runtime_objects_are_attached_only_after_startup(monkeypatch) -> None:
     ]
 
 ###############################################################################
-###############################################################################
 def test_lifespan_cleanup_runs_when_startup_validation_fails(monkeypatch) -> None:
     call_order: list[str] = []
     search_runtime = SimpleNamespace(search_orchestrator=SimpleNamespace())

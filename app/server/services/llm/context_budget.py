@@ -24,7 +24,6 @@ def _positive_int(value: object) -> int | None:
         return None
     return number if number > 0 else None
 
-
 ###############################################################################
 def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
     total = 0
@@ -37,13 +36,11 @@ def estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
         total += estimate_json_tokens(message.get("tool_calls"))
     return max(total, 1)
 
-
 ###############################################################################
 def estimate_json_tokens(value: object) -> int:
     if value is None:
         return 0
     return max(1, math.ceil(len(json.dumps(value, default=str, separators=(",", ":"))) / 4))
-
 
 ###############################################################################
 def resolve_model_context_limit(model: str) -> int | None:
@@ -70,11 +67,9 @@ def resolve_model_context_limit(model: str) -> int | None:
             return limit
     return None
 
-
 ###############################################################################
 def _request_metadata(request: LLMRequest) -> dict[str, Any]:
     return request.metadata if isinstance(request.metadata, dict) else {}
-
 
 ###############################################################################
 def _profile_for_request(provider: str, request: LLMRequest) -> ModelContextProfile | None:
@@ -118,7 +113,6 @@ def _profile_for_request(provider: str, request: LLMRequest) -> ModelContextProf
         metadata_source=str(metadata.get("context_profile_source") or "provider_metadata"),
     )
 
-
 ###############################################################################
 def resolve_model_context_profile(
     provider: str,
@@ -138,7 +132,6 @@ def resolve_model_context_profile(
         LLMRequest(model=model, messages=[], metadata=dict(metadata or {})),
     )
 
-
 ###############################################################################
 def _expected_output_tokens(request: LLMRequest, profile: ModelContextProfile | None) -> int:
     metadata = _request_metadata(request)
@@ -155,7 +148,6 @@ def _expected_output_tokens(request: LLMRequest, profile: ModelContextProfile | 
         return profile.maximum_output_tokens or profile.default_output_reserve
     return UNKNOWN_OUTPUT_ALLOWANCE_TOKENS
 
-
 ###############################################################################
 def _context_components(
     request: LLMRequest,
@@ -171,7 +163,6 @@ def _context_components(
         else None
     )
     return expected_output, tool_tokens, schema_tokens, CONTEXT_HEADROOM_TOKENS, usable
-
 
 ###############################################################################
 def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage:
@@ -205,7 +196,6 @@ def compute_context_usage(request: LLMRequest, *, provider: str) -> ContextUsage
         compaction_applied=bool(_request_metadata(request).get("_context_compaction_applied")),
     )
 
-
 ###############################################################################
 def compute_ollama_context_usage(
     request: LLMRequest,
@@ -218,7 +208,6 @@ def compute_ollama_context_usage(
         else request
     )
     return compute_context_usage(effective, provider="ollama")
-
 
 ###############################################################################
 def _message_blocks(messages: list[dict[str, Any]]) -> list[tuple[list[int], list[dict[str, Any]]]]:
@@ -239,7 +228,6 @@ def _message_blocks(messages: list[dict[str, Any]]) -> list[tuple[list[int], lis
         blocks.append(([index], [message]))
         index += 1
     return blocks
-
 
 ###############################################################################
 def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list[dict[str, Any]], bool]:
@@ -323,7 +311,6 @@ def _compact_messages(messages: list[dict[str, Any]], budget: int) -> tuple[list
     if estimate_message_tokens(selected) > budget:
         return [], True
     return selected, True
-
 
 ###############################################################################
 def prepare_request(request: LLMRequest, *, provider: str) -> LLMRequest:

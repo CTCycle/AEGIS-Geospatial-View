@@ -142,7 +142,6 @@ class _RetryFactoryStub:
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
 
-
 ###############################################################################
 class _SchemaCorrectionProviderStub(_ProviderStub):
 
@@ -161,7 +160,6 @@ class _SchemaCorrectionProviderStub(_ProviderStub):
                 detail="The structured payload did not match the extraction schema.",
             )
         return super().structured_output(request, schema)
-
 
 ###############################################################################
 class _SchemaCorrectionFactoryStub:
@@ -203,7 +201,6 @@ def test_parser_service_retries_transient_provider_failure() -> None:
 
     assert result.task_class == "general_question"
     assert factory.provider.calls == 2
-
 
 ###############################################################################
 def test_parser_service_retries_schema_correction_on_the_same_model() -> None:

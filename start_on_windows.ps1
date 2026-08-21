@@ -11,6 +11,10 @@ $ClientDir = Join-Path $AppDir 'client'
 $TestsDir = Join-Path $AppDir 'tests'
 $SettingsDir = Join-Path $RootDir 'settings'
 $RuntimesDir = Join-Path $RootDir 'runtimes'
+$ResourcesDir = Join-Path $AppDir 'resources'
+$DefaultRuntimeDataDir = Join-Path $ResourcesDir 'runtime'
+$IngestionDataDir = Join-Path $RootDir 'data'
+$VectorsDir = Join-Path $ResourcesDir 'vectors'
 $RuntimeCacheDir = Join-Path $RuntimesDir 'cache'
 $ToolCacheDir = Join-Path $TestsDir 'cache'
 $LegacyCacheDir = Join-Path $RootDir 'assets\cache'
@@ -54,6 +58,9 @@ $NodeVersion = '22.23.1'
 $NodeArchiveName = "node-v$NodeVersion-win-x64.zip"
 $NodeArchiveUri = "https://nodejs.org/dist/v$NodeVersion/$NodeArchiveName"
 
+# -----------------------------------------------------------------------------
+# RUNTIME AND DOWNLOAD HELPERS
+# -----------------------------------------------------------------------------
 function Invoke-DownloadAndExtract {
     [CmdletBinding()]
     param(
@@ -163,6 +170,9 @@ function Write-Status {
     Write-Host "[$Level] $Message" -ForegroundColor $color
 }
 
+# -----------------------------------------------------------------------------
+# ENVIRONMENT AND CACHE CONFIGURATION
+# -----------------------------------------------------------------------------
 function Import-EnvironmentFile {
     $environmentSourcePath = $DotEnvPath
     if (-not (Test-Path -LiteralPath $environmentSourcePath)) {
@@ -222,6 +232,9 @@ function Set-LauncherEnvironment {
     $env:PATH = "$NodeDir;$($env:PATH)"
 }
 
+# -----------------------------------------------------------------------------
+# PORTABLE RUNTIMES AND DEPENDENCIES
+# -----------------------------------------------------------------------------
 function Ensure-NodeRuntime {
     New-Item -ItemType Directory -Path $RuntimesDir, $NodeDir -Force | Out-Null
 
@@ -341,6 +354,9 @@ function Sync-Dependencies {
     }
 }
 
+# -----------------------------------------------------------------------------
+# APPLICATION ACTIONS
+# -----------------------------------------------------------------------------
 function Invoke-RebuildFrontend {
     Import-EnvironmentFile
     Set-LauncherEnvironment
@@ -543,6 +559,215 @@ function Invoke-InitializeDatabase {
     Write-Status SUCCESS 'Database initialization completed.'
 }
 
+# -----------------------------------------------------------------------------
+# SOURCE CONTROL ACTIONS
+# -----------------------------------------------------------------------------
+function Get-GitExecutable {
+    $gitCommand = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $gitCommand) {
+        throw 'Git was not found on PATH. Install Git before using source-control options.'
+    }
+    return $gitCommand.Path
+}
+
+function Invoke-GitCommand {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Arguments
+    )
+
+    $gitExecutable = Get-GitExecutable
+    $output = @(& $gitExecutable -C $RootDir @Arguments)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git command failed: git $($Arguments -join ' ') (exit code $LASTEXITCODE)."
+    }
+    return $output
+}
+
+function Invoke-ApplicationUpdate {
+    $statusLines = @(Invoke-GitCommand -Arguments @('status', '--porcelain'))
+    if ($statusLines.Count -gt 0) {
+        throw 'The working tree contains local changes. Commit or stash them before updating from main.'
+    }
+
+    $currentBranch = ((Invoke-GitCommand -Arguments @('branch', '--show-current')) | Select-Object -First 1).Trim()
+    if (-not $currentBranch) {
+        throw 'The repository is in a detached HEAD state. Switch to a local branch before updating.'
+    }
+
+    if ($currentBranch -ne 'main') {
+        Write-Status INFO "Switching from '$currentBranch' to the main branch."
+        Invoke-GitCommand -Arguments @('switch', 'main') | ForEach-Object { Write-Host "  $_" }
+    }
+
+    Write-Status RUN 'Updating the application from origin/main with git pull.'
+    Invoke-GitCommand -Arguments @('pull', '--ff-only', 'origin', 'main') |
+        ForEach-Object { Write-Host "  $_" }
+    Write-Status SUCCESS 'Application update completed. The launcher is now on the main branch.'
+}
+
+function Invoke-CheckForUpdates {
+    $localMainCommit = ((Invoke-GitCommand -Arguments @('rev-parse', 'main')) | Select-Object -First 1).Trim()
+    if (-not $localMainCommit) {
+        throw 'The local main branch could not be resolved.'
+    }
+
+    Write-Status RUN 'Checking origin/main for a newer application version (read-only).'
+    $gitExecutable = Get-GitExecutable
+    $remoteLines = @(& $gitExecutable -C $RootDir ls-remote origin refs/heads/main)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to check origin/main. Verify the Git remote and network connection.'
+    }
+    $remoteLine = $remoteLines | Select-Object -First 1
+    $remoteCommit = if ($remoteLine) { ($remoteLine -split "`t", 2)[0].Trim() } else { '' }
+    if (-not $remoteCommit) {
+        throw 'The origin/main branch could not be resolved.'
+    }
+
+    if ($remoteCommit -eq $localMainCommit) {
+        Write-Status SUCCESS 'The local main branch is up to date with origin/main.'
+        return
+    }
+
+    Write-Status WARN 'A newer or different main branch revision is available on origin.'
+    Write-Host "  Local main:  $localMainCommit" -ForegroundColor DarkGray
+    Write-Host "  Origin main: $remoteCommit" -ForegroundColor DarkGray
+    Write-Status INFO 'No files were downloaded or changed. Use Update application to apply the revision.'
+}
+
+# -----------------------------------------------------------------------------
+# DATABASE, DATA, AND MAINTENANCE ACTIONS
+# -----------------------------------------------------------------------------
+function Get-ConfiguredDataDirectory {
+    $configuredDataDir = if ($null -eq $env:AEGIS_DATA_DIR) { '' } else { $env:AEGIS_DATA_DIR.Trim() }
+    if (-not $configuredDataDir) {
+        return $DefaultRuntimeDataDir
+    }
+
+    if ($configuredDataDir.StartsWith('~')) {
+        $userProfileDir = [Environment]::GetFolderPath('UserProfile')
+        $configuredDataDir = Join-Path $userProfileDir $configuredDataDir.TrimStart([char]'~', [char]'\', [char]'/')
+    }
+    if ([IO.Path]::IsPathRooted($configuredDataDir)) {
+        return [IO.Path]::GetFullPath($configuredDataDir)
+    }
+    return [IO.Path]::GetFullPath((Join-Path $RootDir $configuredDataDir))
+}
+
+function Get-NormalizedPath {
+    param([Parameter(Mandatory)][string]$Path)
+
+    return ([IO.Path]::GetFullPath($Path)).TrimEnd([char]'\', [char]'/')
+}
+
+function Test-SafeDataDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $candidate = Get-NormalizedPath -Path $Path
+    $root = Get-NormalizedPath -Path $RootDir
+    $protectedPaths = @(
+        $root,
+        (Get-NormalizedPath -Path $AppDir),
+        (Get-NormalizedPath -Path $ResourcesDir),
+        (Get-NormalizedPath -Path $ServerDir),
+        (Get-NormalizedPath -Path $ClientDir),
+        (Get-NormalizedPath -Path $SettingsDir),
+        (Get-NormalizedPath -Path $RuntimesDir)
+    )
+
+    if ($candidate -eq (Get-NormalizedPath -Path $DefaultRuntimeDataDir)) {
+        return
+    }
+    if ($candidate -in $protectedPaths) {
+        throw "Refusing to remove application files from the configured data path: $Path"
+    }
+    if ($root.StartsWith("$candidate\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove a data path that contains the application checkout: $Path"
+    }
+}
+
+function Remove-DirectoryContents {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [string[]]$PreserveNames = @('.gitkeep')
+    )
+
+    $result = [ordered]@{
+        Path = $Path
+        Removed = 0
+        Skipped = 0
+    }
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return [pscustomobject]$result
+    }
+
+    try {
+        $children = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop)
+    }
+    catch {
+        Write-Status WARN "Skipped inaccessible data directory: $Path ($($_.Exception.Message))"
+        $result.Skipped++
+        return [pscustomobject]$result
+    }
+
+    foreach ($child in $children) {
+        if ($child.Name -in $PreserveNames) {
+            continue
+        }
+        if (Remove-PathBestEffort -Path $child.FullName -Recurse) {
+            $result.Removed++
+        }
+        else {
+            $result.Skipped++
+        }
+    }
+    return [pscustomobject]$result
+}
+
+function Invoke-RemoveAllData {
+    Import-EnvironmentFile
+    $configuredDataDir = Get-ConfiguredDataDirectory
+    Test-SafeDataDirectory -Path $configuredDataDir
+
+    $targets = @(
+        $configuredDataDir,
+        $IngestionDataDir,
+        $VectorsDir,
+        $LogsDir
+    ) | ForEach-Object { Get-NormalizedPath -Path $_ } | Select-Object -Unique
+
+    Write-Host ''
+    Write-Host '  Remove all user-generated application data?' -ForegroundColor Yellow
+    Write-Host '  This permanently deletes the SQLite database, runtime data, ingested files, generated vectors, and logs.' -ForegroundColor Yellow
+    Write-Host '  Application source files, catalogs, settings templates, dependencies, and lockfiles are preserved.' -ForegroundColor DarkGray
+    Write-Host "  Runtime data path: $configuredDataDir" -ForegroundColor DarkGray
+    $confirmation = (Read-Host '  Type REMOVE ALL DATA to continue').Trim()
+    if ($confirmation -cne 'REMOVE ALL DATA') {
+        Write-Status INFO 'Remove all data cancelled.'
+        return
+    }
+
+    Write-Status INFO 'Stopping configured local application services before removing data.'
+    $applicationPorts = @([int]$env:FASTAPI_PORT, [int]$env:UI_PORT) | Select-Object -Unique
+    foreach ($port in $applicationPorts) {
+        Stop-PortListeners -Port $port
+    }
+
+    $removed = 0
+    $skipped = 0
+    foreach ($target in $targets) {
+        $result = Remove-DirectoryContents -Path $target
+        $removed += $result.Removed
+        $skipped += $result.Skipped
+    }
+    $statusLevel = if ($skipped -gt 0) { 'WARN' } else { 'SUCCESS' }
+    Write-Status $statusLevel "User-generated data removal completed where permitted; removed $removed item(s), skipped $skipped locked or inaccessible item(s)."
+}
+
 function Invoke-TestSuite {
     if (-not (Test-Path -LiteralPath $TestScript)) {
         throw "Missing test runner: $TestScript"
@@ -741,6 +966,12 @@ function Write-MenuRule {
     Write-Host "  $($Character * 57)" -ForegroundColor DarkCyan
 }
 
+function Write-MenuSection {
+    param([Parameter(Mandatory)][string]$Title)
+
+    Write-Host "  $Title" -ForegroundColor DarkCyan
+}
+
 function Write-MenuOption {
     param(
         [Parameter(Mandatory)][string]$Number,
@@ -768,35 +999,43 @@ function Show-LauncherMenu {
     Write-Host '  Local application control center' -ForegroundColor DarkGray
     Write-MenuRule
     Write-Host ''
-    Write-Host '  APPLICATION' -ForegroundColor DarkCyan
+    Write-MenuSection -Title 'APPLICATION'
     Write-MenuOption -Number '1' -Label 'Launch application' -Description 'Start local services'
     Write-MenuOption -Number '2' -Label 'Install / update dependencies' -Description 'Sync and build'
     Write-MenuOption -Number '3' -Label 'Rebuild frontend' -Description 'Run frontend production build'
-      Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create, upgrade, and seed SQLite schema'
+    Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create, upgrade, and seed SQLite schema'
     Write-Host ''
-    Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
+    Write-MenuSection -Title 'MAINTENANCE'
     Write-MenuOption -Number '5' -Label 'Run test suite' -Description 'Validate installation'
     Write-MenuOption -Number '6' -Label 'Remove logs' -Description 'Clear application logs'
     Write-MenuOption -Number '7' -Label 'Clear cache' -Description 'Remove runtime and test caches'
     Write-MenuOption -Number '8' -Label 'Uninstall application' -Description 'Remove local dependencies' -Destructive
     Write-Host ''
+    Write-MenuSection -Title 'UPDATES'
+    Write-MenuOption -Number '9' -Label 'Update application' -Description 'Pull the latest main branch'
+    Write-MenuOption -Number '10' -Label 'Check for updates' -Description 'Report main branch status only'
+    Write-Host ''
+    Write-MenuSection -Title 'DATA MANAGEMENT'
+    Write-MenuOption -Number '11' -Label 'Remove all data' -Description 'Delete user-generated data' -Destructive
+    Write-Host ''
     Write-MenuRule
-    Write-MenuOption -Number '9' -Label 'Exit' -Description 'Close launcher' -Exit
+    Write-MenuSection -Title 'EXIT'
+    Write-MenuOption -Number '12' -Label 'Exit' -Description 'Close launcher' -Exit
     Write-MenuRule
     Write-Host ''
 }
 
 while ($true) {
     Show-LauncherMenu
-    $selection = (Read-Host '  Select an option (1-9)').Trim()
+    $selection = (Read-Host '  Select an option (1-12)').Trim()
 
-    if ($selection -notmatch '^[1-9]$') {
-        Write-Status WARN 'Invalid option. Enter a number from 1 to 9.'
+    if ($selection -notmatch '^(?:[1-9]|1[0-2])$') {
+        Write-Status WARN 'Invalid option. Enter a number from 1 to 12.'
         Wait-ForMenuReturn
         continue
     }
 
-    if ($selection -eq '9') {
+    if ($selection -eq '12') {
         break
     }
 
@@ -813,6 +1052,9 @@ while ($true) {
             '6' { Remove-ApplicationLogs }
             '7' { Clear-ApplicationCache }
             '8' { Uninstall-Application }
+            '9' { Invoke-ApplicationUpdate }
+            '10' { Invoke-CheckForUpdates }
+            '11' { Invoke-RemoveAllData }
         }
     }
     catch {

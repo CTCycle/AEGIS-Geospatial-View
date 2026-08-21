@@ -20,6 +20,7 @@ from server.repositories.schemas.models import ConversationRecord
 from server.services.catalog.loader import load_reference_catalog
 
 
+###############################################################################
 def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
     return DatabaseSettings(
         database_path=str(database_path),
@@ -27,6 +28,7 @@ def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
     )
 
 
+###############################################################################
 def _initialize(repository: SQLiteRepository):
     return initialize_database(
         repository,
@@ -36,6 +38,7 @@ def _initialize(repository: SQLiteRepository):
     )
 
 
+###############################################################################
 def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(database_path))
@@ -50,6 +53,7 @@ def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> No
     assert repository.count_records(ReferenceCountryRecord) > 0
 
 
+###############################################################################
 def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     repository = SQLiteRepository(_settings(database_path))
@@ -70,6 +74,7 @@ def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     ) == first_counts
 
 
+###############################################################################
 def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
     tmp_path: Path,
 ) -> None:
@@ -90,6 +95,7 @@ def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
     assert verification_repository.count_records(ConversationRecord) == 1
 
 
+###############################################################################
 def test_unknown_revision_is_rejected_and_original_file_is_restored(
     tmp_path: Path,
 ) -> None:
@@ -118,6 +124,7 @@ def test_unknown_revision_is_rejected_and_original_file_is_restored(
     verification_repository.engine.dispose()
 
 
+###############################################################################
 def test_seeding_failure_restores_existing_sqlite_database(
     monkeypatch,
     tmp_path: Path,
@@ -140,6 +147,7 @@ def test_seeding_failure_restores_existing_sqlite_database(
     assert verification_repository.count_records(ReferenceCountryRecord) > 0
 
 
+###############################################################################
 def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
     original = b"not a SQLite database"
@@ -151,10 +159,14 @@ def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
     assert database_path.read_bytes() == original
 
 
+###############################################################################
 def test_sqlite_migration_lock_timeout_is_reported(monkeypatch, tmp_path: Path) -> None:
+
+    ###############################################################################
     class _TimedOutLock:
         lock_file = str(tmp_path / "database.db.migration.lock")
 
+        # -------------------------------------------------------------------------
         def acquire(self, *, timeout: int):
             del timeout
             raise Timeout(self.lock_file)

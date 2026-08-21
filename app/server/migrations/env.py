@@ -12,6 +12,7 @@ config = context.config
 target_metadata = Base.metadata
 
 
+###############################################################################
 def _run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
@@ -26,6 +27,7 @@ def _run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
+###############################################################################
 def _include_object(
     object_: object,
     name: str | None,
@@ -37,6 +39,7 @@ def _include_object(
     return not (object_type == "table" and name == "alembic_version")
 
 
+###############################################################################
 def run_migrations_offline() -> None:
     settings = get_server_settings()
     engine = build_engine(settings.database)
@@ -56,6 +59,7 @@ def run_migrations_offline() -> None:
         engine.dispose()
 
 
+###############################################################################
 def run_migrations_online() -> None:
     connection = config.attributes.get("connection")
     if connection is not None:
