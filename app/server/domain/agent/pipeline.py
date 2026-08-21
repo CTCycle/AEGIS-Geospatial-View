@@ -54,6 +54,13 @@ class TaskFailureDetail(BaseModel):
     recovery_suggestion: str | None = None
     user_explanation: str
     provider_error: dict[str, object] | None = None
+    failure_category: Literal[
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    ] | None = None
 
 ###############################################################################
 class ToolRetryPolicy(BaseModel):

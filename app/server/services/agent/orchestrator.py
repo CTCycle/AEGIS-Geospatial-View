@@ -529,6 +529,8 @@ class AgentOrchestrator:
             ],
             "iterations": tool_loop_result.iterations,
             "stopped_reason": tool_loop_result.stopped_reason,
+            "failure_category": tool_loop_result.failure_category,
+            "failure_detail": tool_loop_result.failure_detail,
         }
         map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
             tool_payload=tool_payload,
@@ -575,6 +577,19 @@ class AgentOrchestrator:
                 turn_contract.user_text
             ),
         )
+        if tool_loop_result.failure_category is not None:
+            operation = operation.model_copy(
+                update={
+                    "kind": "error",
+                    "status": "failed",
+                    "failure_category": tool_loop_result.failure_category,
+                    "provider_error": {
+                        "category": tool_loop_result.failure_category,
+                        "detail": tool_loop_result.failure_detail,
+                        "stage": "native_tool_loop",
+                    },
+                }
+            )
         assistant_message = self.response_synthesizer.synthesize(
             user_text=turn_contract.user_text,
             fallback_text=assistant_message,
@@ -590,7 +605,24 @@ class AgentOrchestrator:
             ],
             task_snapshot=self.task_state_service.serialize(conversation_key),
         )
-        operation = operation.model_copy(update={"message": assistant_message})
+        synthesis_category = getattr(self.response_synthesizer, "last_failure_category", None)
+        operation = operation.model_copy(
+            update={
+                "message": assistant_message,
+                "warnings": [
+                    *operation.warnings,
+                    *(
+                        [
+                            "Grounded response synthesis failed; the verified response was retained. "
+                            f"Category: {synthesis_category}."
+                        ]
+                        if synthesis_category
+                        else []
+                    ),
+                ],
+                "failure_category": synthesis_category or operation.failure_category,
+            }
+        )
         decision = AgentResponseBuilder.build_final_decision(
             action_id=turn_contract.normalized_action.action_id,
             operation=operation,

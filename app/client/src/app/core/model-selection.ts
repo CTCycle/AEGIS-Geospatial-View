@@ -23,10 +23,10 @@ export interface SelectedAgentModelSummary {
   provider: string;
   runtimeMode: ModelProviderMode;
   installedLocally: boolean;
-  supportsTools: boolean;
-  supportsStructuredOutput: boolean;
-  supportsVision: boolean;
-  supportsEmbeddings: boolean;
+  supportsTools: boolean | null;
+  supportsStructuredOutput: boolean | null;
+  supportsVision: boolean | null;
+  supportsEmbeddings: boolean | null;
   toolSupportSource: string;
   capabilities: string[];
 }
@@ -70,10 +70,10 @@ export const isSelectedAgentModel = (
 };
 
 export const agentSelectionDisabledReason = (model: ModelCardDescriptor): string | null => {
-  if (!model.supports_tools) {
+  if (model.supports_tools === false) {
     return 'Agent model requires native tool calling.';
   }
-  if (!model.supports_structured_output) {
+  if (model.supports_structured_output === false) {
     return 'Agent model requires structured output.';
   }
   return null;
@@ -201,8 +201,8 @@ export const buildSelectedAgentModelSummary = (
     provider,
     runtimeMode: provider === 'ollama' ? 'local' : 'cloud',
     installedLocally: provider === 'ollama' && localModelIds.has(name),
-    supportsTools: Boolean(model?.supports_tools),
-    supportsStructuredOutput: Boolean(model?.supports_structured_output),
+    supportsTools: model?.supports_tools ?? null,
+    supportsStructuredOutput: model?.supports_structured_output ?? null,
     supportsVision: Boolean(model?.supports_vision),
     supportsEmbeddings: Boolean(model?.supports_embeddings),
     toolSupportSource: model?.tool_support_source || 'unknown',

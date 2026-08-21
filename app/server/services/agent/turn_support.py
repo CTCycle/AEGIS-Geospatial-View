@@ -181,9 +181,18 @@ class AgentTurnSupport:
     def has_parser_runtime_failure(turn_contract: Any) -> bool:
         ambiguities = set(turn_contract.ambiguities or [])
         return (
-            "parser_unavailable" in ambiguities
+            getattr(turn_contract, "failure_category", None) is not None
+            or "parser_unavailable" in ambiguities
             or "parser_timeout" in ambiguities
             or "parser_authentication_failed" in ambiguities
+            or any(
+                item in ambiguities
+                for item in (
+                    "response_parsing_failed",
+                    "invalid_schema_definition",
+                    "context_limit_exceeded",
+                )
+            )
             or any(item.startswith("provider_") for item in ambiguities)
         )
 

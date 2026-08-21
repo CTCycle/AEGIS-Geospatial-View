@@ -11,7 +11,12 @@ from openai import OpenAI
 
 from server.services.llm.base import LLMProvider
 from server.services.llm.cloud_catalog import get_cloud_model_catalog
-from server.services.llm.context_budget import compute_context_usage
+from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.response_serialization import dump_response_payload
 from server.services.llm.types import (
     LLMRequest,
@@ -47,20 +52,25 @@ class OpenAIProvider(LLMProvider):
         ]
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
-        return "tools" in self._capabilities_for_model(model)
+    def supports_tools(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return "tools" in entry.capabilities
+        return None
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
-        capabilities = self._capabilities_for_model(model)
-        return "structured" in capabilities or "structured_output" in capabilities
+    def supports_structured_output(self, model: str) -> bool | None:
+        for entry in self.list_models():
+            if entry.name == model:
+                return bool({"structured", "structured_output"} & set(entry.capabilities))
+        return None
 
     # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
         for entry in self.list_models():
             if entry.name == model:
                 return set(entry.capabilities)
-        return {"chat", "stream", "structured", "structured_output", "tools"}
+        return {"chat", "stream"}
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -187,6 +197,7 @@ class OpenAIProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -211,12 +222,19 @@ class OpenAIProvider(LLMProvider):
                     "strict": True,
                 }
             }
-        response = self._client().responses.create(
-            model=request.model,
-            input=self.normalize_tool_messages(request.messages),
-            temperature=request.temperature,
-            **kwargs,
-        )
+        try:
+            response = self._client().responses.create(
+                model=request.model,
+                input=self.normalize_tool_messages(request.messages),
+                temperature=request.temperature,
+                **kwargs,
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc, provider=self.provider_name, model=request.model, stage="chat"
+            ) from exc
         raw = dump_response_payload(response)
         return LLMResult(
             content=str(getattr(response, "output_text", "") or ""),
@@ -227,6 +245,7 @@ class OpenAIProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -247,6 +266,7 @@ class OpenAIProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[object]
     ) -> dict[str, Any]:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -255,12 +275,22 @@ class OpenAIProvider(LLMProvider):
         self._validate_request_capabilities(
             replace(request, response_json_schema=request_schema)
         )
-        response = self._client().responses.parse(
-            model=request.model,
-            input=request.messages,
-            temperature=request.temperature,
-            text_format=schema,
-        )
+        try:
+            response = self._client().responses.parse(
+                model=request.model,
+                input=request.messages,
+                temperature=request.temperature,
+                text_format=schema,
+            )
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+            ) from exc
         parsed = getattr(response, "output_parsed", None)
         if is_json_object(parsed):
             return parsed
@@ -270,7 +300,22 @@ class OpenAIProvider(LLMProvider):
             return json_object(dumped)
         output_text = str(getattr(response, "output_text", "") or "")
         if output_text:
-            loaded = json.loads(output_text)
+            try:
+                loaded = json.loads(output_text)
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    detail="The provider returned invalid JSON for structured extraction.",
+                ) from exc
+            if not is_json_object(loaded):
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=request.model,
+                    stage="structured_output",
+                    detail="The provider returned a JSON value instead of an object.",
+                )
             return json_object(loaded)
         return {}
 

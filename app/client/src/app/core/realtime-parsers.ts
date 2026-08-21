@@ -102,31 +102,10 @@ const parseProviderError = (
   }
 
   const code = value['code'];
-  const provider = value['provider'];
-  const model = value['model'];
-  const stage = value['stage'];
-  const retryable = value['retryable'];
-  const httpStatus = value['http_status'];
-
-  if (
-    !isNonEmptyString(code) ||
-    !isNonEmptyString(provider) ||
-    !isNonEmptyString(model) ||
-    !isNonEmptyString(stage) ||
-    typeof retryable !== 'boolean' ||
-    (httpStatus !== undefined && httpStatus !== null && !isFiniteNumber(httpStatus))
-  ) {
+  if (!isNonEmptyString(code) && !isNonEmptyString(String(value['category'] ?? ''))) {
     return undefined;
   }
-
-  return {
-    code,
-    provider,
-    model,
-    stage,
-    retryable,
-    http_status: httpStatus,
-  };
+  return value as NonNullable<ChatOperationResult['provider_error']>;
 };
 
 const parseOperation = (value: unknown): ChatOperationResult | undefined => {
@@ -175,6 +154,12 @@ const parseOperation = (value: unknown): ChatOperationResult | undefined => {
     result.provider_error = value['provider_error'] === null
       ? null
       : parseProviderError(value['provider_error']) ?? null;
+  }
+
+  const category = value['failure_category'];
+  if (category === 'model_capability' || category === 'provider_api' || category === 'schema_definition'
+    || category === 'response_parsing' || category === 'context_limit') {
+    result.failure_category = category;
   }
 
   return result;

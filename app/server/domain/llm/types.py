@@ -3,6 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+CapabilityState = Literal["supported", "unsupported", "unknown"]
+FailureCategory = Literal[
+    "model_capability",
+    "provider_api",
+    "schema_definition",
+    "response_parsing",
+    "context_limit",
+]
+
 ###############################################################################
 @dataclass(frozen=True)
 class ModelDescriptor:
@@ -17,8 +26,8 @@ class ModelDescriptor:
 class ModelContextProfile:
     provider: str
     model: str
-    context_window_tokens: int
-    maximum_output_tokens: int
+    context_window_tokens: int | None
+    maximum_output_tokens: int | None
     default_output_reserve: int
     tokenizer_strategy: str = "chars_per_token_4"
     supports_context_caching: bool = False
@@ -39,8 +48,9 @@ class LLMRequest:
 
     # -------------------------------------------------------------------------
     def __post_init__(self) -> None:
-        if self.tools and self.response_json_schema is not None:
-            raise ValueError("LLMRequest cannot combine native tools with structured response_schema")
+        # Providers perform final request validation so malformed combinations
+        # can be reported with a categorized diagnostic at the LLM boundary.
+        return None
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -96,7 +106,7 @@ class ContextUsage:
     estimated_input_tokens: int
     selected_context_window: int | None
     model_context_limit: int | None
-    usage_percent: float
+    usage_percent: float | None
     provider: str
     model: str
     reserved_output_tokens: int = 0
@@ -104,6 +114,11 @@ class ContextUsage:
     response_schema_tokens: int = 0
     safety_margin_tokens: int = 512
     usage_source: str = "estimated"
+    usable_prompt_budget_tokens: int | None = None
+    current_conversation_tokens: int | None = None
+    expected_output_tokens: int | None = None
+    context_profile_source: str = "unknown"
+    compaction_applied: bool = False
 
     # -------------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
@@ -119,4 +134,9 @@ class ContextUsage:
             "response_schema_tokens": self.response_schema_tokens,
             "safety_margin_tokens": self.safety_margin_tokens,
             "usage_source": self.usage_source,
+            "usable_prompt_budget_tokens": self.usable_prompt_budget_tokens,
+            "current_conversation_tokens": self.current_conversation_tokens,
+            "expected_output_tokens": self.expected_output_tokens,
+            "context_profile_source": self.context_profile_source,
+            "compaction_applied": self.compaction_applied,
         }

@@ -14,6 +14,7 @@ from server.contracts.geospatial import MapSession
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_agent_response_prompt
+from server.services.llm.errors import LLMProviderRequestError, LLMStructuredOutputError
 from server.services.llm.types import LLMRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -50,6 +51,8 @@ class GroundedResponseSynthesizer:
         self.llm_factory = llm_factory
         self.enabled = True if enabled is None else enabled
         self.last_context_usage: dict[str, Any] | None = None
+        self.last_failure_category: str | None = None
+        self.last_failure_detail: str | None = None
 
     # -------------------------------------------------------------------------
     def synthesize(
@@ -88,6 +91,8 @@ class GroundedResponseSynthesizer:
             "task_snapshot": self._bounded_value(task_snapshot),
         }
         self.last_context_usage = None
+        self.last_failure_category = None
+        self.last_failure_detail = None
         try:
             provider = self.llm_factory.get_provider(
                 settings.agent_model_provider
@@ -131,8 +136,20 @@ class GroundedResponseSynthesizer:
                 map_session=map_session,
             ):
                 raise ValueError("Synthesis contradicted the verified operation state.")
-        except Exception:
-            LOGGER.warning("Grounded response synthesis failed", exc_info=True)
+        except LLMStructuredOutputError as exc:
+            self.last_failure_category = exc.category
+            self.last_failure_detail = exc.detail
+            LOGGER.warning("Grounded response synthesis failed category=%s", exc.category, exc_info=True)
+            return fallback_text
+        except LLMProviderRequestError as exc:
+            self.last_failure_category = exc.category
+            self.last_failure_detail = f"Provider request failed with code {exc.code}."
+            LOGGER.warning("Grounded response synthesis failed category=%s", exc.category, exc_info=True)
+            return fallback_text
+        except Exception as exc:
+            self.last_failure_category = "response_parsing"
+            self.last_failure_detail = "The grounded response did not match verified evidence."
+            LOGGER.warning("Grounded response synthesis failed category=response_parsing", exc_info=True)
             return fallback_text
         return result.content.strip() or fallback_text
 

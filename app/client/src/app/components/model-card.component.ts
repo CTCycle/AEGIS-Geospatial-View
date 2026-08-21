@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 
 import { ModelCardDescriptor } from '../core/types';
@@ -5,6 +6,7 @@ import { ModelCardDescriptor } from '../core/types';
 @Component({
   selector: 'article[appModelCard]',
   standalone: true,
+  imports: [DecimalPipe],
   templateUrl: './model-card.component.html',
   styleUrl: './model-card.component.css',
   changeDetection: ChangeDetectionStrategy.Eager,

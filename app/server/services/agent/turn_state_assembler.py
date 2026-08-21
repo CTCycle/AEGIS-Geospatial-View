@@ -251,6 +251,8 @@ class AgentTurnStateAssembler:
             partial_results_available=operation.status == "partial",
             recovery_suggestion="Clarify the request or retry after the provider is available.",
             user_explanation=operation.message,
+            provider_error=operation.provider_error,
+            failure_category=operation.failure_category,
         )
 
     # -------------------------------------------------------------------------

@@ -7,7 +7,11 @@ import pytest
 from server.domain.agent.extraction_schemas import LLMParserExtraction
 from server.services.agent.parser_service import ParserService
 from server.services.llm.prompts import PARSER_SYSTEM_PROMPT
-from server.services.llm.errors import LLMConfigurationError, LLMProviderRequestError
+from server.services.llm.errors import (
+    LLMConfigurationError,
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+)
 
 ###############################################################################
 class _ProviderStub:
@@ -138,6 +142,38 @@ class _RetryFactoryStub:
     def get_provider(self, provider: str):  # noqa: ARG002
         return self.provider
 
+
+###############################################################################
+class _SchemaCorrectionProviderStub(_ProviderStub):
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.calls = 0
+
+    # -------------------------------------------------------------------------
+    def structured_output(self, request, schema):  # noqa: ANN001
+        self.calls += 1
+        if self.calls == 1:
+            raise LLMResponseParsingError(
+                provider="opencode-go",
+                model="deepseek-v4-flash",
+                stage="structured_output",
+                detail="The structured payload did not match the extraction schema.",
+            )
+        return super().structured_output(request, schema)
+
+
+###############################################################################
+class _SchemaCorrectionFactoryStub:
+
+    # -------------------------------------------------------------------------
+    def __init__(self) -> None:
+        self.provider = _SchemaCorrectionProviderStub()
+
+    # -------------------------------------------------------------------------
+    def get_provider(self, provider: str):  # noqa: ARG002
+        return self.provider
+
 ###############################################################################
 def test_parser_service_classifies_direct_query() -> None:
     parser = ParserService(llm_factory=_FactoryStub(), settings_repo=object(), provider="openai", model="gpt-4.1-mini")
@@ -166,6 +202,26 @@ def test_parser_service_retries_transient_provider_failure() -> None:
     )
 
     assert result.task_class == "general_question"
+    assert factory.provider.calls == 2
+
+
+###############################################################################
+def test_parser_service_retries_schema_correction_on_the_same_model() -> None:
+    factory = _SchemaCorrectionFactoryStub()
+    parser = ParserService(
+        llm_factory=factory,
+        settings_repo=object(),
+        provider="opencode-go",
+        model="deepseek-v4-flash",
+    )
+
+    result = parser.parse_turn(
+        user_message="Switch to satellite imagery",
+        memory_snapshot={},
+        conversation_messages=[],
+    )
+
+    assert result.failure_category is None
     assert factory.provider.calls == 2
 
 ###############################################################################

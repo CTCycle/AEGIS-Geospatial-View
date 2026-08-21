@@ -14,6 +14,7 @@ from server.services.llm.opencode_provider import (
     OPENCODE_GO_PROVIDER,
     OPENCODE_PROVIDER,
 )
+from server.services.llm.context_budget import resolve_model_context_profile
 from server.services.llm.types import ModelDescriptor
 
 ###############################################################################
@@ -52,12 +53,30 @@ class ChatModelLibraryService:
     def model_payload(item: ModelDescriptor) -> dict[str, object]:
         capabilities = list(item.capabilities)
         metadata = dict(item.metadata)
-        supports_tools = "tools" in capabilities
-        supports_structured_output = (
-            "structured" in capabilities or "structured_output" in capabilities
+        supports_tools = ChatModelLibraryService._capability_state(
+            metadata,
+            capabilities,
+            "supports_tools",
+            ("tools",),
         )
-        supports_vision = "vision" in capabilities
-        supports_embeddings = "embeddings" in capabilities
+        supports_structured_output = ChatModelLibraryService._capability_state(
+            metadata,
+            capabilities,
+            "supports_structured_output",
+            ("structured", "structured_output"),
+        )
+        supports_vision = ChatModelLibraryService._capability_state(
+            metadata,
+            capabilities,
+            "supports_vision",
+            ("vision",),
+        )
+        supports_embeddings = ChatModelLibraryService._capability_state(
+            metadata,
+            capabilities,
+            "supports_embeddings",
+            ("embeddings",),
+        )
         tool_support_source = str(
             metadata.get(
                 "tool_support_source",
@@ -67,6 +86,25 @@ class ChatModelLibraryService:
                 if item.provider in DYNAMIC_CLOUD_PROVIDERS
                 else "unknown",
             )
+        )
+        profile = resolve_model_context_profile(
+            item.provider,
+            item.name,
+            metadata=metadata,
+        )
+        context_window_tokens = ChatModelLibraryService._positive_int(
+            metadata.get("context_window_tokens")
+            or metadata.get("context_length")
+            or metadata.get("context_window")
+        ) or (profile.context_window_tokens if profile is not None else None)
+        maximum_output_tokens = ChatModelLibraryService._positive_int(
+            metadata.get("maximum_output_tokens")
+            or metadata.get("max_output_tokens")
+            or metadata.get("max_tokens")
+        ) or (profile.maximum_output_tokens if profile is not None else None)
+        context_profile_source = str(
+            metadata.get("context_profile_source")
+            or (profile.metadata_source if profile is not None else "unknown")
         )
         return {
             "id": item.name,
@@ -79,8 +117,36 @@ class ChatModelLibraryService:
             "supports_vision": supports_vision,
             "supports_embeddings": supports_embeddings,
             "tool_support_source": tool_support_source,
+            "context_window_tokens": context_window_tokens,
+            "maximum_output_tokens": maximum_output_tokens,
+            "context_profile_source": context_profile_source,
             "metadata": metadata,
         }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _capability_state(
+        metadata: dict[str, object],
+        capabilities: list[str],
+        metadata_key: str,
+        capability_names: tuple[str, ...],
+    ) -> bool | None:
+        explicit = metadata.get(metadata_key)
+        if isinstance(explicit, bool):
+            return explicit
+        normalized = {str(value).strip().lower() for value in capabilities}
+        if any(name in normalized for name in capability_names):
+            return True
+        return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _positive_int(value: object) -> int | None:
+        try:
+            parsed = int(value) if value is not None else 0
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed > 0 else None
 
     # -------------------------------------------------------------------------
     def list_models(

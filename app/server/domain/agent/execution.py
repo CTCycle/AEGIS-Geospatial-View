@@ -46,3 +46,11 @@ class AgentToolLoopResult:
     model_calls: int = 0
     duplicate_tool_calls: int = 0
     no_progress_steps: int = 0
+    failure_category: Literal[
+        "model_capability",
+        "provider_api",
+        "schema_definition",
+        "response_parsing",
+        "context_limit",
+    ] | None = None
+    failure_detail: str | None = None

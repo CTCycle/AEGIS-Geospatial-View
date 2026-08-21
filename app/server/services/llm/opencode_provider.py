@@ -70,14 +70,22 @@ class OpenCodeProvider(DeepSeekProvider):
             return []
         raw_entries = payload.get("data", [])
         entries = raw_entries if is_json_array(raw_entries) else []
-        compatible = OPENCODE_COMPATIBLE_MODELS[self.provider_name]
         models: list[ModelDescriptor] = []
         for raw_item in entries:
             if not is_json_object(raw_item):
                 continue
             item = raw_item
-            if str(item.get("id") or "").strip() in compatible:
+            if str(item.get("id") or "").strip():
                 models.append(self._model_descriptor(item))
+        for model in models:
+            declared = {
+                key: value
+                for key, value in model.metadata.items()
+                if key in {"supports_tools", "supports_structured_output"}
+                and isinstance(value, bool)
+            }
+            if declared:
+                self._declared_model_capabilities[model.name] = declared
         return models
 
     # -------------------------------------------------------------------------
@@ -89,17 +97,40 @@ class OpenCodeProvider(DeepSeekProvider):
     # -------------------------------------------------------------------------
     def _model_descriptor(self, item: dict[str, Any]) -> ModelDescriptor:
         model_id = str(item.get("id") or "").strip()
+        metadata: dict[str, Any] = {
+            "family": model_id.split("-")[0] if "-" in model_id else model_id,
+            "owned_by": str(item.get("owned_by") or "opencode"),
+            "protocol": "openai-chat-completions",
+            "tool_support_source": "provider",
+        }
+        for key in (
+            "context_window_tokens",
+            "context_length",
+            "maximum_output_tokens",
+            "max_output_tokens",
+        ):
+            if item.get(key) is not None:
+                metadata[key] = item[key]
+        raw_capabilities = item.get("capabilities")
+        if isinstance(raw_capabilities, list):
+            normalized = {
+                str(value).strip().lower()
+                for value in raw_capabilities
+                if str(value).strip()
+            }
+            metadata["supports_tools"] = "tools" in normalized
+            metadata["supports_structured_output"] = bool(
+                {"structured", "structured_output"} & normalized
+            )
+            capabilities = sorted(normalized)
+        else:
+            capabilities = sorted(self._capabilities_for_model(model_id))
         return ModelDescriptor(
             name=model_id,
             description=self._description_for_model(model_id),
             provider=self.provider_name,
-            capabilities=sorted(self._capabilities_for_model(model_id)),
-            metadata={
-                "family": model_id.split("-")[0] if "-" in model_id else model_id,
-                "owned_by": str(item.get("owned_by") or "opencode"),
-                "protocol": "openai-chat-completions",
-                "tool_support_source": "provider",
-            },
+            capabilities=capabilities,
+            metadata=metadata,
         )
 
     # -------------------------------------------------------------------------

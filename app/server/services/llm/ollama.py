@@ -11,7 +11,12 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from server.services.llm.base import LLMProvider
-from server.services.llm.context_budget import compute_ollama_context_usage
+from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.ollama_capability_cache import OllamaToolCapabilityCache
 from server.services.llm.types import (
     LLMRequest,
@@ -204,7 +209,11 @@ class OllamaProvider(LLMProvider):
                 capabilities.add("embeddings")
         else:
             capabilities = self.get_model_capabilities(model_name)
-        supports_tools = "tools" in capabilities
+        supports_tools: bool | None = (
+            "tools" in capabilities if tag_capabilities is not None else self.supports_tools(model_name)
+        )
+        if supports_tools is True:
+            capabilities.add("tools")
         source = (
             "ollama_tags"
             if tag_capabilities is not None
@@ -248,11 +257,21 @@ class OllamaProvider(LLMProvider):
         return capabilities
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
-        return "tools" in self.get_model_capabilities(model)
+    def supports_tools(self, model: str) -> bool | None:
+        show_capabilities = self._show_capabilities(model)
+        if show_capabilities is not None:
+            supported = "tools" in show_capabilities
+            self.tool_capability_cache.set(
+                self.base_url,
+                model,
+                supported,
+                source="ollama_show",
+            )
+            return supported
+        return self._probe_tool_support(model)
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
+    def supports_structured_output(self, model: str) -> bool | None:
         _ = model
         return True
 
@@ -268,7 +287,7 @@ class OllamaProvider(LLMProvider):
         return {str(item).strip().lower() for item in raw if str(item).strip()}
 
     # -------------------------------------------------------------------------
-    def _probe_tool_support(self, model: str) -> bool:
+    def _probe_tool_support(self, model: str) -> bool | None:
         cached = self.tool_capability_cache.get(self.base_url, model)
         if cached is not None:
             return cached
@@ -289,7 +308,7 @@ class OllamaProvider(LLMProvider):
             "tools": [self.tool_to_ollama_schema(tool)],
             "options": {"temperature": 0},
         }
-        supported = False
+        supported: bool | None = None
         try:
             response = self._post_json("/api/chat", payload)
             message = response.get("message") if is_json_object(response) else None
@@ -298,21 +317,20 @@ class OllamaProvider(LLMProvider):
             if is_json_object(message) and self._parse_tool_calls(message):
                 source = "ollama_probe"
         except HTTPError as exc:
-            supported = False
-            source = (
-                "ollama_tool_request_rejected"
-                if self._is_explicit_tool_unsupported_error(exc)
-                else "ollama_probe"
-            )
+            if self._is_explicit_tool_unsupported_error(exc):
+                supported = False
+                source = "ollama_tool_request_rejected"
+            else:
+                source = "ollama_probe"
         except Exception:
-            supported = False
             source = "ollama_probe"
-        self.tool_capability_cache.set(
-            self.base_url,
-            model,
-            supported,
-            source=source,
-        )
+        if supported is not None:
+            self.tool_capability_cache.set(
+                self.base_url,
+                model,
+                supported,
+                source=source,
+            )
         return supported
 
     # -------------------------------------------------------------------------
@@ -402,7 +420,8 @@ class OllamaProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
-        usage = compute_ollama_context_usage(request)
+        request = prepare_request(request, provider=self.provider_name)
+        usage = compute_context_usage(request, provider=self.provider_name)
         self.last_context_usage = usage.to_dict()
         native_tools = list(tools or request.tools or [])
         schema = response_json_schema or request.response_json_schema
@@ -416,13 +435,22 @@ class OllamaProvider(LLMProvider):
             "model": request.model,
             "messages": request.messages,
             "stream": False,
-            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            "options": {"temperature": request.temperature},
         }
+        if usage.selected_context_window is not None:
+            payload["options"]["num_ctx"] = usage.selected_context_window
         if native_tools:
             payload["tools"] = [self.tool_to_ollama_schema(tool) for tool in native_tools]
         if schema:
             payload["format"] = schema
-        response = self._post_json("/api/chat", payload)
+        try:
+            response = self._post_json("/api/chat", payload)
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc, provider=self.provider_name, model=request.model, stage="chat"
+            ) from exc
         message = json_object(response.get("message"))
         return LLMResult(
             content=str(message.get("content") or ""),
@@ -433,14 +461,17 @@ class OllamaProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
-        usage = compute_ollama_context_usage(request)
+        request = prepare_request(request, provider=self.provider_name)
+        usage = compute_context_usage(request, provider=self.provider_name)
         self.last_context_usage = usage.to_dict()
         payload: dict[str, Any] = {
             "model": request.model,
             "messages": request.messages,
             "stream": True,
-            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            "options": {"temperature": request.temperature},
         }
+        if usage.selected_context_window is not None:
+            payload["options"]["num_ctx"] = usage.selected_context_window
         for event in self._stream_post("/api/chat", payload):
             message = event.get("message") if is_json_object(event.get("message")) else None
             if message is not None:
@@ -456,23 +487,67 @@ class OllamaProvider(LLMProvider):
     ) -> dict[str, Any]:
         model_json_schema = getattr(schema, "model_json_schema", None)
         schema_json = json_object(model_json_schema()) if callable(model_json_schema) else {}
-        usage = compute_ollama_context_usage(request, response_schema=schema_json)
+        effective_request = prepare_request(
+            replace(request, response_json_schema=schema_json),
+            provider=self.provider_name,
+        )
+        self._validate_request_capabilities(effective_request)
+        usage = compute_context_usage(effective_request, provider=self.provider_name)
         self.last_context_usage = usage.to_dict()
         payload: dict[str, Any] = {
-            "model": request.model,
-            "messages": request.messages,
+            "model": effective_request.model,
+            "messages": effective_request.messages,
             "stream": False,
             "format": schema_json,
             "think": False,
-            "options": {"temperature": request.temperature, "num_ctx": usage.selected_context_window},
+            "options": {"temperature": effective_request.temperature},
         }
-        response = self._post_json("/api/chat", payload)
+        if usage.selected_context_window is not None:
+            payload["options"]["num_ctx"] = usage.selected_context_window
+        try:
+            response = self._post_json("/api/chat", payload)
+        except LLMStructuredOutputError:
+            raise
+        except Exception as exc:
+            raise LLMProviderRequestError.from_exception(
+                exc,
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="structured_output",
+            ) from exc
         message = json_object(response.get("message"))
         content = str(message.get("content") or "{}")
         try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            return {}
+            loaded = json.loads(content)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="structured_output",
+                detail="The provider returned invalid JSON for structured extraction.",
+            ) from exc
+        if not is_json_object(loaded):
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=effective_request.model,
+                stage="structured_output",
+                detail="The provider returned a JSON value instead of an object.",
+            )
+        validator = getattr(schema, "model_validate", None)
+        if callable(validator):
+            try:
+                validated = validator(loaded)
+            except Exception as exc:  # noqa: BLE001
+                raise LLMResponseParsingError(
+                    provider=self.provider_name,
+                    model=effective_request.model,
+                    stage="structured_output",
+                    detail="The provider response did not match the requested extraction schema.",
+                ) from exc
+            dumper = getattr(validated, "model_dump", None)
+            if callable(dumper):
+                return json_object(dumper(mode="json"))
+        return json_object(loaded)
 
     # -------------------------------------------------------------------------
     def embeddings(self, *, model: str, input_text: str) -> list[float]:

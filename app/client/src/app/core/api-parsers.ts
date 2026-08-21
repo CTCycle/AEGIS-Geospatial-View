@@ -110,6 +110,15 @@ export const normalizeCapabilities = (input: unknown): CatalogResponse['capabili
       ? item.task_tags.filter((v): v is string => typeof v === 'string')
       : [],
     metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
+    render: isRecord(item.render)
+      ? {
+        status: typeof item.render.status === 'string' ? item.render.status : undefined,
+        tile_url: stringOrNull(item.render.tile_url),
+        style_url: stringOrNull(item.render.style_url),
+        attribution: typeof item.render.attribution === 'string' ? item.render.attribution : undefined,
+        reason: typeof item.render.reason === 'string' ? item.render.reason : undefined,
+      }
+      : undefined,
   }));
 
 interface GeospatialProviderSignupFieldDto {
@@ -363,7 +372,7 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
   }
   const estimatedInputTokens = input.estimated_input_tokens;
   const usagePercent = input.usage_percent;
-  if (!isFiniteNumber(estimatedInputTokens) || !isFiniteNumber(usagePercent)) {
+  if (!isFiniteNumber(estimatedInputTokens) || (usagePercent !== null && !isFiniteNumber(usagePercent))) {
     return undefined;
   }
   return {
@@ -373,6 +382,15 @@ export const parseContextUsage = (input: unknown): ChatTurnResponse['context_usa
     usage_percent: usagePercent,
     provider: typeof input.provider === 'string' ? input.provider : '',
     model: typeof input.model === 'string' ? input.model : '',
+    reserved_output_tokens: isFiniteNumber(input.reserved_output_tokens) ? input.reserved_output_tokens : undefined,
+    tool_schema_tokens: isFiniteNumber(input.tool_schema_tokens) ? input.tool_schema_tokens : undefined,
+    response_schema_tokens: isFiniteNumber(input.response_schema_tokens) ? input.response_schema_tokens : undefined,
+    safety_margin_tokens: isFiniteNumber(input.safety_margin_tokens) ? input.safety_margin_tokens : undefined,
+    usable_prompt_budget_tokens: isFiniteNumber(input.usable_prompt_budget_tokens) ? input.usable_prompt_budget_tokens : null,
+    current_conversation_tokens: isFiniteNumber(input.current_conversation_tokens) ? input.current_conversation_tokens : null,
+    expected_output_tokens: isFiniteNumber(input.expected_output_tokens) ? input.expected_output_tokens : null,
+    context_profile_source: typeof input.context_profile_source === 'string' ? input.context_profile_source : 'unknown',
+    compaction_applied: Boolean(input.compaction_applied),
   };
 };
 
@@ -410,15 +428,18 @@ export const normalizeModelCards = (input: unknown): ModelCardDescriptor[] => {
         description: buildModelDescription(item),
         provider: String(item.provider ?? ''),
         capabilities,
-        supports_tools: typeof item.supports_tools === 'boolean' ? item.supports_tools : capabilities.includes('tools'),
+        supports_tools: typeof item.supports_tools === 'boolean' ? item.supports_tools : (capabilities.includes('tools') ? true : null),
         supports_structured_output: typeof item.supports_structured_output === 'boolean'
           ? item.supports_structured_output
-          : capabilities.includes('structured') || capabilities.includes('structured_output'),
-        supports_vision: typeof item.supports_vision === 'boolean' ? item.supports_vision : capabilities.includes('vision'),
+          : (capabilities.includes('structured') || capabilities.includes('structured_output') ? true : null),
+        supports_vision: typeof item.supports_vision === 'boolean' ? item.supports_vision : (capabilities.includes('vision') ? true : null),
         supports_embeddings: typeof item.supports_embeddings === 'boolean'
           ? item.supports_embeddings
-          : capabilities.includes('embeddings'),
+          : (capabilities.includes('embeddings') ? true : null),
         tool_support_source: typeof item.tool_support_source === 'string' ? item.tool_support_source : 'unknown',
+        context_window_tokens: isFiniteNumber(item.context_window_tokens) ? item.context_window_tokens : null,
+        maximum_output_tokens: isFiniteNumber(item.maximum_output_tokens) ? item.maximum_output_tokens : null,
+        context_profile_source: typeof item.context_profile_source === 'string' ? item.context_profile_source : 'unknown',
         metadata: isRecord(item.metadata) ? item.metadata as Record<string, JsonValue> : {},
       };
     });
@@ -482,6 +503,9 @@ export const parseModelSettingsResponse = (value: unknown): ModelSettingsRespons
     credentials: parseBooleanCredentialMap(value.credentials),
     credential_health: isRecord(value.credential_health)
       ? value.credential_health as ModelSettingsResponse['credential_health']
+      : {},
+    selected_model_context: isRecord(value.selected_model_context)
+      ? value.selected_model_context as Record<string, JsonValue>
       : {},
   };
 };

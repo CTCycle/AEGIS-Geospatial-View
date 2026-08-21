@@ -137,7 +137,7 @@ def test_ollama_rejects_explicit_unsupported_tool_error() -> None:
     assert provider._tool_support_source("plain") == "ollama_tool_request_rejected"
 
 ###############################################################################
-def test_ollama_marks_transport_probe_failure_false() -> None:
+def test_ollama_keeps_transport_probe_failure_unknown() -> None:
 
     ###############################################################################
     class _Provider(OllamaProvider):
@@ -150,7 +150,7 @@ def test_ollama_marks_transport_probe_failure_false() -> None:
 
     provider = _Provider(base_url="http://ollama-timeout.test")
 
-    assert provider.supports_tools("plain") is False
+    assert provider.supports_tools("plain") is None
     assert "tools" not in provider.get_model_capabilities("plain")
 
 ###############################################################################

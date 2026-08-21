@@ -11,8 +11,11 @@ import httpx
 from openai import OpenAI
 
 from server.services.llm.base import LLMProvider
-from server.services.llm.context_budget import compute_context_usage
-from server.services.llm.errors import LLMProviderRequestError
+from server.services.llm.context_budget import compute_context_usage, prepare_request
+from server.services.llm.errors import (
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+)
 from server.services.llm.types import (
     LLMRequest,
     LLMResult,
@@ -32,6 +35,7 @@ class DeepSeekProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = (base_url or DEFAULT_DEEPSEEK_BASE_URL).rstrip("/")
         self.last_context_usage: dict[str, Any] | None = None
+        self._declared_model_capabilities: dict[str, dict[str, bool]] = {}
 
     # -------------------------------------------------------------------------
     def _client(self) -> Any:
@@ -55,20 +59,35 @@ class DeepSeekProvider(LLMProvider):
         response.raise_for_status()
         payload = response.json()
         entries = json_array(json_object(payload).get("data"))
-        return [
+        models = [
             self._model_descriptor(item)
             for item in entries
             if is_json_object(item) and str(item.get("id") or "").strip()
         ]
+        for model in models:
+            declared = {
+                key: value
+                for key, value in model.metadata.items()
+                if key in {"supports_tools", "supports_structured_output"}
+                and isinstance(value, bool)
+            }
+            if declared:
+                self._declared_model_capabilities[model.name] = declared
+        return models
 
     # -------------------------------------------------------------------------
-    def supports_tools(self, model: str) -> bool:
-        return "tools" in self._capabilities_for_model(model)
+    def supports_tools(self, model: str) -> bool | None:
+        declared = self._declared_model_capabilities.get(model, {}).get("supports_tools")
+        if isinstance(declared, bool):
+            return declared
+        return True if model.strip().lower().startswith("deepseek-") else None
 
     # -------------------------------------------------------------------------
-    def supports_structured_output(self, model: str) -> bool:
-        capabilities = self._capabilities_for_model(model)
-        return "structured" in capabilities or "structured_output" in capabilities
+    def supports_structured_output(self, model: str) -> bool | None:
+        declared = self._declared_model_capabilities.get(model, {}).get("supports_structured_output")
+        if isinstance(declared, bool):
+            return declared
+        return True if model.strip().lower().startswith("deepseek-") else None
 
     # -------------------------------------------------------------------------
     def _capabilities_for_model(self, model: str) -> set[str]:
@@ -98,6 +117,7 @@ class DeepSeekProvider(LLMProvider):
         tool_choice: str | None = "auto",
         response_json_schema: dict[str, Any] | None = None,
     ) -> LLMResult:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -144,6 +164,7 @@ class DeepSeekProvider(LLMProvider):
 
     # -------------------------------------------------------------------------
     def stream_chat(self, request: LLMRequest) -> Iterable[str]:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -163,6 +184,7 @@ class DeepSeekProvider(LLMProvider):
     def structured_output(
         self, request: LLMRequest, schema: type[Any]
     ) -> dict[str, Any]:
+        request = prepare_request(request, provider=self.provider_name)
         self.last_context_usage = compute_context_usage(
             request, provider=self.provider_name
         ).to_dict()
@@ -185,13 +207,34 @@ class DeepSeekProvider(LLMProvider):
                 exc, provider=self.provider_name, model=request.model, stage="structured_output"
             ) from exc
         content, _ = self._parse_choice(response)
-        loaded = json.loads(content or "{}")
+        try:
+            loaded = json.loads(content or "{}")
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider returned invalid JSON for structured extraction.",
+            ) from exc
         if not is_json_object(loaded):
-            return {}
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider returned a JSON value instead of an object.",
+            )
         validator = getattr(schema, "model_validate", None)
         if not callable(validator):
             return loaded
-        validated = validator(loaded)
+        try:
+            validated = validator(loaded)
+        except Exception as exc:  # noqa: BLE001
+            raise LLMResponseParsingError(
+                provider=self.provider_name,
+                model=request.model,
+                stage="structured_output",
+                detail="The provider response did not match the requested extraction schema.",
+            ) from exc
         dumper = getattr(validated, "model_dump", None)
         return json_object(dumper(mode="json")) if callable(dumper) else loaded
 
@@ -261,16 +304,39 @@ class DeepSeekProvider(LLMProvider):
     # -------------------------------------------------------------------------
     def _model_descriptor(self, item: dict[str, Any]) -> ModelDescriptor:
         model_id = str(item.get("id") or "").strip()
+        metadata: dict[str, Any] = {
+            "family": model_id.split("-")[0] if "-" in model_id else model_id,
+            "owned_by": str(item.get("owned_by") or "deepseek"),
+            "tool_support_source": "provider",
+        }
+        for key in (
+            "context_window_tokens",
+            "context_length",
+            "maximum_output_tokens",
+            "max_output_tokens",
+        ):
+            if item.get(key) is not None:
+                metadata[key] = item[key]
+        raw_capabilities = item.get("capabilities")
+        if isinstance(raw_capabilities, list):
+            normalized = {
+                str(value).strip().lower()
+                for value in raw_capabilities
+                if str(value).strip()
+            }
+            metadata["supports_tools"] = "tools" in normalized
+            metadata["supports_structured_output"] = bool(
+                {"structured", "structured_output"} & normalized
+            )
+            capabilities = sorted(normalized)
+        else:
+            capabilities = sorted(self._capabilities_for_model(model_id))
         return ModelDescriptor(
             name=model_id,
             description=self._description_for_model(model_id),
             provider="deepseek",
-            capabilities=sorted(self._capabilities_for_model(model_id)),
-            metadata={
-                "family": model_id.split("-")[0] if "-" in model_id else model_id,
-                "owned_by": str(item.get("owned_by") or "deepseek"),
-                "tool_support_source": "provider",
-            },
+            capabilities=capabilities,
+            metadata=metadata,
         )
 
     # -------------------------------------------------------------------------

@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from server.domain.agent.context import AgentContextPackage, ConversationDirective
-from server.services.llm.cloud_catalog import get_model_context_profile
-from server.services.llm.context_budget import estimate_json_tokens
+from server.services.llm.context_budget import estimate_json_tokens, resolve_model_context_profile
+from server.services.llm.errors import LLMContextLimitError
 from server.domain.agent.runtime import compact_task_context
 
 ###############################################################################
@@ -23,10 +23,13 @@ class AgentContextAssembler:
         map_memory: dict[str, Any],
         prior_summary: dict[str, Any] | None = None,
     ) -> AgentContextPackage:
-        profile = get_model_context_profile(provider, model)
-        context_window = profile.context_window_tokens if profile else 8192
-        output_reserve = profile.default_output_reserve if profile else 2048
-        usable = max(1024, context_window - output_reserve - 512)
+        profile = resolve_model_context_profile(provider, model)
+        context_window = profile.context_window_tokens if profile else None
+        output_reserve = (
+            (profile.maximum_output_tokens or profile.default_output_reserve)
+            if profile
+            else None
+        )
         mandatory = {
             "current_user_message": current_user_message,
             "active_instructions": [item.model_dump(mode="json") for item in directives],
@@ -34,14 +37,26 @@ class AgentContextAssembler:
             "map_memory": map_memory,
         }
         mandatory_tokens = estimate_json_tokens(mandatory)
-        if mandatory_tokens > usable:
-            raise ValueError("Mandatory conversation state exceeds the selected model limit.")
-        raw_budget = max(0, int(usable * 0.6) - mandatory_tokens)
+        if context_window is None:
+            raw_budget: int | None = None
+        else:
+            usable = max(0, context_window - (output_reserve or 0) - 512)
+            if mandatory_tokens > usable:
+                raise LLMContextLimitError(
+                    provider=provider,
+                    model=model,
+                    stage="context_assembly",
+                    detail=(
+                        "The mandatory agent state exceeds the usable prompt budget "
+                        f"of {usable:,} tokens for {model}."
+                    ),
+                )
+            raw_budget = max(0, usable - mandatory_tokens)
         included: list[dict[str, Any]] = []
         included_tokens = 0
         for message in reversed(messages):
             cost = estimate_json_tokens(message)
-            if included and included_tokens + cost > raw_budget:
+            if raw_budget is not None and included and included_tokens + cost > raw_budget:
                 break
             included.append(message)
             included_tokens += cost

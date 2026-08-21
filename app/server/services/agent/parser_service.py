@@ -26,7 +26,12 @@ from server.contracts.extraction import (
     ViewportIntent,
 )
 from server.repositories.model_settings import ModelSettingsRepository
-from server.services.llm.errors import LLMConfigurationError, LLMProviderRequestError
+from server.services.llm.errors import (
+    LLMConfigurationError,
+    LLMProviderRequestError,
+    LLMResponseParsingError,
+    LLMStructuredOutputError,
+)
 from server.services.llm.factory import LLMFactory
 from server.services.llm.prompts import get_parser_system_prompt
 from server.services.llm.types import LLMRequest
@@ -128,6 +133,7 @@ class ParserService:
         recent_messages: list[dict[str, str]],
         active_instructions: list[dict[str, Any]] | None = None,
         task_snapshot: dict[str, Any] | None = None,
+        schema_correction: bool = False,
     ) -> LLMParserExtraction:
         settings = None
         if self.provider is None or self.model is None:
@@ -149,6 +155,13 @@ class ParserService:
             "active_instructions": active_instructions or [],
             "task_snapshot": task_snapshot,
         }
+        parser_prompt = get_parser_system_prompt(provider_name, model_name)
+        if schema_correction:
+            parser_prompt += (
+                "\n\nSCHEMA CORRECTION: The previous response did not validate. "
+                "Return only one JSON object matching every enum and field in the schema. "
+                "Do not place relationship values such as failure_inquiry or follow_up in task_class."
+            )
         request = LLMRequest(
             model=model_name,
             temperature=0.0,
@@ -158,7 +171,7 @@ class ParserService:
             messages=[
                 {
                     "role": "system",
-                    "content": get_parser_system_prompt(provider_name, model_name),
+                    "content": parser_prompt,
                 },
                 {
                     "role": "user",
@@ -171,7 +184,15 @@ class ParserService:
         )
         usage = getattr(parser_provider, "last_context_usage", None)
         self.last_context_usage = dict(usage) if is_json_object(usage) else None
-        extracted = LLMParserExtraction.model_validate(payload)
+        try:
+            extracted = LLMParserExtraction.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            raise LLMResponseParsingError(
+                provider=provider_name,
+                model=model_name,
+                stage="structured_intent_extraction",
+                detail="The provider response did not match the AEGIS extraction schema.",
+            ) from exc
         LOGGER.debug(
             "Parser LLM extraction: provider=%s model=%s task=%s action=%s",
             provider_name,
@@ -405,6 +426,11 @@ class ParserService:
                 else None
             ),
             provider_error=provider_error,
+            failure_category=(
+                str(provider_error.get("category"))
+                if is_json_object(provider_error) and provider_error.get("category")
+                else None
+            ),
         )
 
     # -------------------------------------------------------------------------
@@ -419,6 +445,7 @@ class ParserService:
         normalized_recent = self._normalize_recent_messages(conversation_messages)
         parser_failure_ambiguity: str | None = None
         parser_provider_error: dict[str, object] | None = None
+        parser_failure_category: str | None = None
         try:
             extracted = self._extract_turn_with_retry(
                 user_message=user_message,
@@ -431,10 +458,25 @@ class ParserService:
             raise
         except Exception as exc:
             LOGGER.exception("Parser LLM extraction failed: %s", exc)
-            if isinstance(exc, LLMProviderRequestError):
+            if isinstance(exc, LLMStructuredOutputError):
                 failure_ambiguity = exc.code
+                parser_failure_category = exc.category
                 parser_provider_error = {
                     "code": exc.code,
+                    "category": exc.category,
+                    "provider": exc.provider,
+                    "model": exc.model,
+                    "stage": exc.stage,
+                    "http_status": exc.http_status,
+                    "retryable": exc.retryable,
+                    "detail": exc.detail,
+                }
+            elif isinstance(exc, LLMProviderRequestError):
+                failure_ambiguity = exc.code
+                parser_failure_category = exc.category
+                parser_provider_error = {
+                    "code": exc.code,
+                    "category": exc.category,
                     "provider": exc.provider,
                     "model": exc.model,
                     "stage": exc.stage,
@@ -589,6 +631,7 @@ class ParserService:
                 else None
             ),
             provider_error=parser_provider_error,
+            failure_category=parser_failure_category,
         )
         LOGGER.info(
             "parser_normalized task=%s action=%s relationship=%s locations=%d basemap=%s layers=%d viewport_scope=%s tighten=%s ambiguities=%s",
@@ -612,6 +655,14 @@ class ParserService:
     def _extract_turn_with_retry(self, **kwargs: Any) -> LLMParserExtraction:
         try:
             return self._extract_turn(**kwargs)
+        except LLMResponseParsingError as exc:
+            LOGGER.warning(
+                "Retrying parser schema correction provider=%s model=%s code=%s",
+                exc.provider,
+                exc.model,
+                exc.code,
+            )
+            return self._extract_turn(**kwargs, schema_correction=True)
         except LLMProviderRequestError as exc:
             if not exc.retryable:
                 raise
