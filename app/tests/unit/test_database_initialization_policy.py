@@ -1,74 +1,66 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
+from filelock import Timeout
 from sqlalchemy import inspect
 
 from server.configurations import DatabaseSettings
-from server.repositories.database.backend import build_database_backend
+from server.repositories.catalog.reference_seeder import ReferenceCatalogSeeder
 from server.repositories.database.initializer import initialize_database
-from server.repositories.database.migration_runner import MigrationResult
+from server.repositories.database.migration_runner import DatabaseMigrationError
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import (
     Base,
     CredentialEncryptionMaterial,
     ReferenceCountryRecord,
 )
 from server.repositories.schemas.models import ConversationRecord
-from server.repositories.database.sqlite import SQLiteRepository
-from server.services.catalog.startup import seed_reference_catalog
+from server.services.catalog.loader import load_reference_catalog
 
-###############################################################################
-def _settings(*, embedded_database: bool, database_path: str) -> DatabaseSettings:
+
+def _settings(database_path: Path, *, timeout: int = 60) -> DatabaseSettings:
     return DatabaseSettings(
-        database_path=database_path,
-        embedded_database=embedded_database,
-        engine=None if embedded_database else "postgresql+psycopg",
-        host=None if embedded_database else "localhost",
-        port=None if embedded_database else 5432,
-        database_name=None if embedded_database else "aegis",
-        username=None if embedded_database else "postgres",
-        password=None if embedded_database else "postgres",
-        ssl=False,
-        ssl_ca=None,
-        connect_timeout=10,
-        insert_batch_size=100,
+        database_path=str(database_path),
+        sqlite_lock_timeout_seconds=timeout,
     )
 
-###############################################################################
-###############################################################################
-def _initialize(repository):  # noqa: ANN001
+
+def _initialize(repository: SQLiteRepository):
     return initialize_database(
         repository,
-        on_ready=lambda: seed_reference_catalog(repository),
+        on_ready=lambda: ReferenceCatalogSeeder(repository).seed_if_needed(
+            load_reference_catalog()
+        ),
     )
 
-###############################################################################
+
 def test_missing_sqlite_database_migrates_schema_and_seeds(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
-    repository = SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
+    repository = SQLiteRepository(_settings(database_path))
 
-    _initialize(repository)
+    result = _initialize(repository)
 
+    assert result.fresh_database is True
+    assert result.migrations_applied is True
     assert database_path.is_file()
     assert "alembic_version" in inspect(repository.engine).get_table_names()
     assert repository.count_records(CredentialEncryptionMaterial) == 1
     assert repository.count_records(ReferenceCountryRecord) > 0
 
-###############################################################################
+
 def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
     database_path = tmp_path / "database.db"
-    repository = SQLiteRepository(_settings(embedded_database=True, database_path=str(database_path)))
+    repository = SQLiteRepository(_settings(database_path))
     _initialize(repository)
     first_counts = (
         repository.count_records(CredentialEncryptionMaterial),
         repository.count_records(ReferenceCountryRecord),
     )
+    repository.engine.dispose()
 
-    second_repository = SQLiteRepository(
-        _settings(embedded_database=True, database_path=str(database_path))
-    )
+    second_repository = SQLiteRepository(_settings(database_path))
     result = _initialize(second_repository)
 
     assert result.migrations_applied is False
@@ -77,57 +69,64 @@ def test_existing_sqlite_database_is_idempotent(tmp_path: Path) -> None:
         second_repository.count_records(ReferenceCountryRecord),
     ) == first_counts
 
-###############################################################################
-def test_unversioned_legacy_sqlite_database_is_adopted_without_data_loss(
+
+def test_populated_unversioned_sqlite_database_is_rejected_without_stamping(
     tmp_path: Path,
 ) -> None:
     database_path = tmp_path / "database.db"
-    settings = _settings(embedded_database=True, database_path=str(database_path))
+    settings = _settings(database_path)
     legacy_repository = SQLiteRepository(settings)
     Base.metadata.create_all(legacy_repository.engine)
     with legacy_repository.session() as session:
-        session.add(ConversationRecord(id="legacy-conversation", title="Preserve me"))
+        session.add(ConversationRecord(id="unversioned-conversation", title="Keep me"))
         session.commit()
     legacy_repository.engine.dispose()
 
-    repository = SQLiteRepository(settings)
-    result = _initialize(repository)
-
-    assert result.adopted_legacy_schema is True
-    assert repository.count_records(ConversationRecord) == 1
-    assert "alembic_version" in inspect(repository.engine).get_table_names()
-
-###############################################################################
-def test_unversioned_legacy_sqlite_schema_mismatch_fails_without_stamping(
-    tmp_path: Path,
-) -> None:
-    database_path = tmp_path / "database.db"
-    settings = _settings(embedded_database=True, database_path=str(database_path))
-    legacy_repository = SQLiteRepository(settings)
-    Base.metadata.create_all(legacy_repository.engine)
-    with legacy_repository.engine.begin() as connection:
-        connection.exec_driver_sql("ALTER TABLE conversations ADD COLUMN unexpected TEXT")
-    legacy_repository.engine.dispose()
-
-    with pytest.raises(RuntimeError, match="does not match the pre-Alembic baseline"):
+    with pytest.raises(DatabaseMigrationError, match="no alembic_version"):
         _initialize(SQLiteRepository(settings))
 
     verification_repository = SQLiteRepository(settings)
     assert "alembic_version" not in inspect(verification_repository.engine).get_table_names()
+    assert verification_repository.count_records(ConversationRecord) == 1
 
-###############################################################################
-def test_sqlite_migration_failure_restores_unversioned_database(
+
+def test_unknown_revision_is_rejected_and_original_file_is_restored(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "database.db"
+    settings = _settings(database_path)
+    repository = SQLiteRepository(settings)
+    _initialize(repository)
+    repository.engine.dispose()
+
+    corrupt_repository = SQLiteRepository(settings)
+    with corrupt_repository.engine.begin() as connection:
+        connection.exec_driver_sql(
+            "UPDATE alembic_version SET version_num = 'unknown-revision'"
+        )
+    corrupt_repository.engine.dispose()
+
+    with pytest.raises(DatabaseMigrationError, match="unknown Alembic revision"):
+        _initialize(SQLiteRepository(settings))
+
+    verification_repository = SQLiteRepository(settings)
+    with verification_repository.engine.connect() as connection:
+        version = connection.exec_driver_sql(
+            "SELECT version_num FROM alembic_version"
+        ).scalar_one()
+    assert version == "unknown-revision"
+    verification_repository.engine.dispose()
+
+
+def test_seeding_failure_restores_existing_sqlite_database(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     database_path = tmp_path / "database.db"
-    settings = _settings(embedded_database=True, database_path=str(database_path))
-    legacy_repository = SQLiteRepository(settings)
-    Base.metadata.create_all(legacy_repository.engine)
-    with legacy_repository.session() as session:
-        session.add(ConversationRecord(id="rollback-conversation", title="Keep me"))
-        session.commit()
-    legacy_repository.engine.dispose()
+    settings = _settings(database_path)
+    repository = SQLiteRepository(settings)
+    _initialize(repository)
+    repository.engine.dispose()
 
     monkeypatch.setattr(
         "server.repositories.database.initializer.seed_credential_encryption_material",
@@ -137,65 +136,37 @@ def test_sqlite_migration_failure_restores_unversioned_database(
         _initialize(SQLiteRepository(settings))
 
     verification_repository = SQLiteRepository(settings)
-    assert "alembic_version" not in inspect(verification_repository.engine).get_table_names()
-    assert verification_repository.count_records(ConversationRecord) == 1
+    assert verification_repository.count_records(CredentialEncryptionMaterial) == 1
+    assert verification_repository.count_records(ReferenceCountryRecord) > 0
 
-###############################################################################
-def test_explicit_postgres_initialization_runs_provisioning_schema_and_seeding(
-    monkeypatch,
-) -> None:
-    calls: list[str] = []
-    backend = SimpleNamespace(db_path=None, engine=object())
+
+def test_corrupt_sqlite_file_is_not_replaced(tmp_path: Path) -> None:
+    database_path = tmp_path / "database.db"
+    original = b"not a SQLite database"
+    database_path.write_bytes(original)
+
+    with pytest.raises(Exception):
+        _initialize(SQLiteRepository(_settings(database_path)))
+
+    assert database_path.read_bytes() == original
+
+
+def test_sqlite_migration_lock_timeout_is_reported(monkeypatch, tmp_path: Path) -> None:
+    class _TimedOutLock:
+        lock_file = str(tmp_path / "database.db.migration.lock")
+
+        def acquire(self, *, timeout: int):
+            del timeout
+            raise Timeout(self.lock_file)
+
     monkeypatch.setattr(
-        "server.repositories.database.initializer._ensure_postgres_database_exists",
-        lambda _database: calls.append("provision"),
+        "server.repositories.database.migration_runner.FileLock",
+        lambda _path: _TimedOutLock(),
     )
-    def fake_migrate(_database, *, on_ready):
-        calls.append("schema")
-        on_ready()
-        return MigrationResult(
-            current_revisions=(),
-            head_revisions=("head",),
-            final_revisions=("head",),
-            fresh_database=True,
-            adopted_legacy_schema=False,
-            migrations_applied=True,
+
+    with pytest.raises(DatabaseMigrationError, match="Timed out after 2s"):
+        _initialize(
+            SQLiteRepository(
+                _settings(tmp_path / "database.db", timeout=2),
+            )
         )
-
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.synchronize_database",
-        fake_migrate,
-    )
-    monkeypatch.setattr(
-        "server.repositories.database.initializer.seed_credential_encryption_material",
-        lambda _database: calls.append("credential"),
-    )
-    initialize_database(backend, on_ready=lambda: calls.append("catalog"))  # type: ignore[arg-type]
-
-    assert calls == ["provision", "schema", "credential", "catalog"]
-
-###############################################################################
-def test_database_factory_selects_sqlite_without_initializing_schema(monkeypatch) -> None:
-    settings = _settings(embedded_database=True, database_path="test.db")
-    created: list[DatabaseSettings] = []
-    repository = SimpleNamespace(engine=object(), session=object(), db_path="test.db")
-    monkeypatch.setattr(
-        "server.repositories.database.backend.SQLiteRepository",
-        lambda received: created.append(received) or repository,
-    )
-
-    result = build_database_backend(settings)
-
-    assert result is repository
-    assert created == [settings]
-
-###############################################################################
-def test_database_factory_selects_postgres_without_initializing_schema(monkeypatch) -> None:
-    settings = _settings(embedded_database=False, database_path="unused.db")
-    repository = SimpleNamespace(engine=object(), session=object(), db_path=None)
-    monkeypatch.setattr(
-        "server.repositories.database.backend.PostgresRepository",
-        lambda received: repository,
-    )
-
-    assert build_database_backend(settings) is repository

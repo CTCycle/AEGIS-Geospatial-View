@@ -6,7 +6,7 @@ from cryptography.fernet import Fernet
 from sqlalchemy import select
 from sqlalchemy import update as sqlalchemy_update
 
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import CredentialEncryptionMaterial
 
 DEFAULT_KEY_PURPOSE = "credential_encryption"
@@ -15,7 +15,7 @@ DEFAULT_KEY_PURPOSE = "credential_encryption"
 class CredentialEncryptionMaterialRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------
@@ -98,6 +98,6 @@ class CredentialEncryptionMaterialRepository:
 
 ###############################################################################
 def seed_credential_encryption_material(
-    database: DatabaseBackend,
+    database: SQLiteRepository,
 ) -> CredentialEncryptionMaterial:
     return CredentialEncryptionMaterialRepository(database).ensure_seeded()

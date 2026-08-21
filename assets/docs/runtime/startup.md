@@ -21,16 +21,12 @@ remove logs, clear caches, uninstall local dependencies, and exit.
 
 Database synchronization runs before backend repositories and background jobs
 are constructed. A missing SQLite file is created, migrated, and seeded.
-Existing SQLite and PostgreSQL databases are checked on every startup and
-upgraded to the Alembic head when required. PostgreSQL provisioning creates the
-configured database when the operator has `CREATEDB` access. Menu option 4
-invokes the same idempotent workflow.
-
-If a populated database predates Alembic, startup verifies it against the
-initial baseline before stamping. Unknown or structurally different schemas
-fail with an actionable error and are never silently stamped. SQLite creates a
-temporary backup while a migration or first-start seed is in progress and
-restores it if that operation fails.
+Versioned SQLite files receive pending migrations and menu option 4 invokes the
+same idempotent workflow. A populated database without an Alembic revision,
+unknown revisions, and structurally invalid files fail with an actionable
+error and are never silently stamped or replaced. SQLite creates a temporary
+backup while a migration or first-start seed is in progress and restores it if
+that operation fails.
 
 Launch option 1 stops listeners on the configured backend/UI ports, starts the
 backend, waits for `/api/health`, starts the frontend preview, waits for the UI

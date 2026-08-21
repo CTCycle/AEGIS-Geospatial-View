@@ -1,8 +1,6 @@
-"""Create the initial AEGIS relational schema.
+"""Create the initial SQLite schema.
 
-This revision is also the adoption point for databases created before Alembic
-was introduced.  The application stamps that revision only after validating
-the existing schema against the ORM metadata.
+This revision is the authoritative baseline for the SQLite database layout.
 """
 
 from __future__ import annotations

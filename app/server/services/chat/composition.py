@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from server.repositories.chat_history import ChatHistoryRepository
 from server.repositories.conversations import ConversationRepository
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.model_settings import ModelSettingsRepository
 from server.services.agent.agent_tool_catalog_service import AgentToolCatalogService
 from server.services.agent.capability_resolver import CapabilityResolver
@@ -44,7 +44,7 @@ class ChatRuntime:
 ###############################################################################
 def build_chat_runtime(
     search_orchestrator: LocationSearchOrchestrator,
-    database: DatabaseBackend,
+    database: SQLiteRepository,
     *,
     geospatial_runtime: GeospatialRuntime,
 ) -> ChatRuntime:

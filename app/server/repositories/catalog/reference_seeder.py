@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from server.domain.catalog import ReferenceCatalog
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import (
     ReferenceCountryAliasRecord,
     ReferenceCountryRecord,
@@ -26,7 +26,7 @@ class ReferenceSeedResult:
 class ReferenceCatalogSeeder:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self.database = database
 
     # -------------------------------------------------------------------------

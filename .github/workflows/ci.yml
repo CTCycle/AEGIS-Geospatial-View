@@ -42,16 +42,16 @@ jobs:
       - name: Verify Alembic migration metadata
         env:
           PYTHONPATH: app
-          AEGIS_RUNTIME_DATA_DIR: ${{ github.workspace }}/app/tests/cache/alembic-check-runtime
+          AEGIS_DATA_DIR: ${{ github.workspace }}/app/tests/cache/alembic-check-runtime
         run: |
-          mkdir -p "$AEGIS_RUNTIME_DATA_DIR"
+          mkdir -p "$AEGIS_DATA_DIR"
           python -m alembic -c app/server/alembic.ini upgrade head
           python -m alembic -c app/server/alembic.ini check
           python -m alembic -c app/server/alembic.ini current --check-heads
 
       - name: Run backend unit suites
         run: |
-          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_openapi_schema.py app/tests/unit/test_sqlite_repository_orm.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
+          python -m pytest -c app/server/pyproject.toml app/tests/unit/test_app_factory.py app/tests/unit/test_openapi_schema.py app/tests/unit/test_sqlite_repository.py app/tests/unit/test_sqlite_application_startup.py app/tests/unit/test_database_configuration.py app/tests/unit/test_database_initialization_policy.py app/tests/unit/services/chat app/tests/unit/services/agent app/tests/unit/services/geospatial app/tests/unit/services/search app/tests/unit/test_runtime_env_loading.py app/tests/unit/test_chat_domain_contract.py
 
       - name: Verify shared OpenAPI schema
         run: |
@@ -60,22 +60,6 @@ jobs:
 
   persistence-conformance:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: aegis
-          POSTGRES_PASSWORD: aegis
-          POSTGRES_DB: aegis_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U aegis -d aegis_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      AEGIS_TEST_POSTGRES_URL: postgresql://aegis:aegis@localhost:5432/aegis_test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,7 +74,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e "app/server[test]"
 
-      - name: Run SQLite and PostgreSQL persistence conformance
+      - name: Run SQLite persistence conformance
         run: python -m pytest -c app/server/pyproject.toml app/tests/unit/test_persistence_conformance.py -q
 
   frontend-build-and-tests:

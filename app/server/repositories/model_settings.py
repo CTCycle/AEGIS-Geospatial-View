@@ -12,14 +12,14 @@ from server.common.constants import (
 )
 from server.common.time import utc_now_naive
 from server.contracts.chat import ModelSettingsSnapshot
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import ModelProviderSettingsRecord
 
 ###############################################################################
 class ModelSettingsRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------

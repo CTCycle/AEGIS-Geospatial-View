@@ -6,14 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from server.domain.steering import SteeringMessageRecord
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import AgentRunRecord, AgentSteeringMessageRecord
 
 ###############################################################################
 class AgentSteeringRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------
@@ -57,7 +57,6 @@ class AgentSteeringRepository:
             run = session.scalar(
                 select(AgentRunRecord)
                 .where(AgentRunRecord.id == run_id)
-                .with_for_update()
             )
             if run is None:
                 raise ValueError("Run not found.")

@@ -21,6 +21,14 @@ Last updated: 2026-08-20
 ## Operational Notes
 
 - External data sources affect response quality and availability.
+- SQLite database locked: wait for another startup or write operation to finish;
+  the application uses WAL and a five-second busy timeout. Do not delete the
+  database to clear a lock.
+- SQLite database corrupt or unversioned: stop the application, copy the file
+  for safekeeping, and either restore a known-good backup or set `AEGIS_DATA_DIR`
+  to a new directory. Startup will not stamp or replace an existing file.
+- SQLite database unwritable: verify that `AEGIS_DATA_DIR` exists or that its
+  parent is writable by the launcher account.
 - State persistence is session-based and tab-aware.
 - During an active run, additional messages are steering updates. Reconnects
   resume the realtime WebSocket from the persisted sequence and suppress

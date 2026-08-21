@@ -26,8 +26,8 @@ from server.common.paths import (
     FASTAPI_SPA_FALLBACK_ENDPOINT,
 )
 from server.configurations import get_server_settings
-from server.repositories.database import build_database_backend
 from server.repositories.database.initializer import initialize_database
+from server.repositories.database.sqlite import SQLiteRepository
 from server.services.chat.composition import build_chat_runtime
 from server.services.chat.streaming import ChatStreamingService
 from server.services.agent_runs.aggregation import AggregatedRequestService
@@ -56,7 +56,7 @@ def _client_build_available() -> bool:
     return CLIENT_INDEX_FILE_PATH.is_file()
 
 
-def _dispose_database_engine(database: object) -> None:
+def _dispose_sqlite_engine(database: object) -> None:
     engine = getattr(database, "engine", None)
     dispose = getattr(engine, "dispose", None)
     if callable(dispose):
@@ -95,7 +95,7 @@ def redirect_root_to_docs() -> RedirectResponse:
 @asynccontextmanager
 async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_server_settings()
-    database = build_database_backend(settings.database)
+    database = SQLiteRepository(settings.database)
 
     try:
         initialize_database(
@@ -103,7 +103,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
             on_ready=lambda: seed_reference_catalog(database),
         )
     except BaseException:
-        _dispose_database_engine(database)
+        _dispose_sqlite_engine(database)
         raise
 
     geospatial_runtime = build_geospatial_runtime(database)
@@ -176,7 +176,7 @@ async def app_lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         await realtime_connections.close_all()
         job_service.stop()
         await run_lifecycle_service.shutdown()
-        _dispose_database_engine(database)
+        _dispose_sqlite_engine(database)
 
 ###############################################################################
 def create_app() -> FastAPI:

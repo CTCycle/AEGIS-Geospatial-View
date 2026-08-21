@@ -2,132 +2,104 @@
 
 Last updated: 2026-08-20
 
-## Relational Storage
+## SQLite-only relational storage
 
-- Runtime selector: `app/server/repositories/database/backend.py` (`build_database_backend`)
-- SQLite mode: `EMBEDDED_DATABASE=true`
-- PostgreSQL mode: `EMBEDDED_DATABASE=false`
-- SQLite implementation: `sqlite.py`
-- PostgreSQL implementation: `postgres.py`
+AEGIS uses one local SQLite database. The application resolves the database
+file through `server.common.paths.resolve_database_file_path()`:
 
-Database mode and connection settings come from `settings/.env` or runtime
-environment variables. SQLite resolves through
-`server.common.paths.DATABASE_FILE_PATH`.
+- default: `<repo>/app/resources/runtime/database.db`
+- optional data-root override: `AEGIS_DATA_DIR`
 
-Embedded SQLite storage defaults to the application resources runtime
-directory:
-
-- all environments: `<repo>/app/resources/runtime/database.db`
-
-Override this location with `AEGIS_RUNTIME_DATA_DIR` when an explicit runtime
-storage directory is required.
-
-The full initialization workflow lives in
-`app/server/repositories/database/initializer.py` and
-`migration_runner.py`. It is invoked by `app/scripts/initialize_database.py`
-for the explicit launcher command and by every application startup. Alembic
-under `app/server/migrations` is the authoritative schema mechanism; runtime
-code never calls `Base.metadata.create_all()`.
-
-Fresh databases are migrated to the current Alembic head and seeded. Existing
-SQLite and PostgreSQL databases are checked on every startup and upgraded when
-behind. A populated database without an Alembic version table is adopted only
-after comparison proves that it matches the initial baseline. A mismatch fails
-without stamping or changing the schema. Repositories receive the already-built
-`DatabaseBackend`; they never create tables, infer schema, or resolve a
-database singleton themselves.
-
-SQLite migration work is serialized by an adjacent file lock and protected by
-a temporary backup that is restored if migration or first-start seeding fails.
-PostgreSQL provisioning and migrations use advisory locks.
-
-The shared SQLAlchemy engine configuration is implemented in
-`app/server/repositories/database/engine.py`. SQLite connections enable foreign
-keys, WAL mode, `busy_timeout`, and `synchronous=NORMAL`; external databases use
-pre-ping and bounded pooling. Schema creation is identical across SQLite and
-PostgreSQL and is covered by the persistence conformance suite.
-
-The canonical schema contains 15 application tables plus `alembic_version`.
-Conversations own their context
-state, message history, message sequence, and active-run relationship directly;
-there are no `chat_sessions` or `conversation_contexts` tables.
-
-Repositories expose persistence-neutral snapshots and contracts. ORM records do
-not cross into services: model settings are mapped to `ModelSettingsSnapshot`,
-and run-event appends require both `run_id` and `conversation_id` to match
-the owning run.
+`app/server/app.py` and `app/scripts/initialize_database.py` construct one
+`SQLiteRepository` directly from `DatabaseSettings`. That concrete object owns
+the SQLAlchemy engine and session factory and is passed to domain repositories.
+There is no backend selector, provider registry, or generic database contract.
 
 ```mermaid
-erDiagram
-    CONVERSATIONS ||--o{ AGENT_RUNS : owns
-    CONVERSATIONS ||--o{ MESSAGES : contains
-    AGENT_RUNS ||--o{ RUN_EVENTS : emits
-    CONVERSATIONS ||--o{ STEERING_MESSAGES : receives
-    MODEL_PROVIDER_SETTINGS ||--o{ MODEL_CREDENTIALS : configures
-    CREDENTIAL_ENCRYPTION_MATERIALS ||--o{ MODEL_CREDENTIALS : encrypts
+flowchart TD
+    ENV[settings/.env or process environment]
+    CONFIG[ConfigurationManager]
+    SETTINGS[DatabaseSettings]
+    DB[SQLiteRepository]
+    ENGINE[SQLite engine and sessionmaker]
+    MIG[SQLite FileLock and Alembic]
+    SEED[Credential and reference seeding]
+    REPOS[Domain repositories]
+    SERVICES[Services and application runtimes]
+
+    ENV --> CONFIG
+    CONFIG --> SETTINGS
+    SETTINGS --> DB
+    DB --> ENGINE
+    DB --> MIG
+    MIG --> SEED
+    DB --> REPOS
+    REPOS --> SERVICES
 ```
 
-## Core Stored Domains
+## Engine and sessions
 
-Core relational storage covers:
+`app/server/repositories/database/engine.py` is a concrete SQLite helper. Each
+connection enables foreign keys, WAL mode, a five-second busy timeout, and
+`synchronous=NORMAL`. `check_same_thread=False` is retained because the
+application uses a background worker and `asyncio.to_thread`; repositories
+still create a short-lived session per operation and never share a session
+between requests or threads.
 
-- conversations and messages
-- conversations, agent runs, steering messages, and ordered run events
-- model provider settings
-- encrypted model credentials (backed by auto-seeded Fernet key material)
-- seeded geospatial reference data
+Repository methods own their transaction boundaries. Successful writes commit;
+integrity failures roll back before the operation returns an error. SQLite
+serializes writers, so transactions remain short and the busy timeout absorbs
+normal transient contention. Row-lock APIs that SQLite cannot implement are
+not used.
 
-Message and run-event sequencing is allocated atomically from the owning row,
-and request/mutation identity, active-run slots, credential logical keys, and
-encryption-material versions are protected by database constraints. Conversation
-context revision writes use a conditional update and fail on stale revisions.
-Payload columns use portable SQLAlchemy JSON values on both backends.
+## Initialization and migrations
 
-## Encryption Material
+`app/server/repositories/database/initializer.py` invokes
+`migration_runner.py`, then runs the credential and reference-catalog seeders.
+Alembic under `app/server/migrations` is the production schema mechanism;
+runtime code never calls `Base.metadata.create_all()`.
 
-- Credential encryption uses Fernet symmetric keys stored in `credential_encryption_materials` table.
-- Keys are auto-generated via `Fernet.generate_key()` during first-time database
-  initialization (idempotent).
-- Key material is managed by `app/server/repositories/credential_material.py` (`CredentialEncryptionMaterialRepository`).
-- Encryption/decryption is handled by `app/server/services/cryptography.py` (`CredentialEncryptionService`).
-- No encryption key lives in source code, `.env`, or settings files.
+- an empty file is upgraded to the single Alembic head and seeded;
+- a versioned file receives pending migrations and idempotent seeds;
+- an unknown revision fails without changing the file;
+- a populated file without `alembic_version` fails without stamping or deleting
+  data;
+- migration and first-start seeding run under a neighboring file lock;
+- an existing file is backed up and restored if migration or seeding fails.
 
-The application creates one database backend per process and injects it into
-repositories and startup services. There is no database facade, cached
-database accessor, or compatibility import path.
+Operators must back up a database before deployment. A failed startup never
+silently replaces an existing database file.
 
-## Reference Catalog Policy
+The canonical schema contains 15 application tables plus `alembic_version`.
+Conversations own their context state, message history, message sequence, and
+active-run relationship directly; there are no `chat_sessions` or
+`conversation_contexts` tables.
 
-Startup orchestration belongs under
-`app/server/services/catalog/startup.py`; it invokes the repository seeder
-after migrations complete.
+## Stored domains
 
-- Static reference data belongs under `app/resources/catalog/reference`.
-- Reference catalog file loading and parsing belongs under `app/server/services/catalog/loader.py`.
-- Reference catalog seeding (DB write) belongs under `app/server/repositories/catalog/`.
-- New catalog/reference constants should not be hardcoded in `app/server/common/constants.py`.
-- First-time SQLite initialization and explicit PostgreSQL initialization seed
-  empty reference tables from catalog files exactly once per table group.
+Core relational storage covers conversations and messages, agent runs and
+events, steering messages, model settings, encrypted model credentials, and
+seeded geospatial reference data. Sequencing, identity, active-run slots,
+credential keys, and encryption-material versions are protected by database
+constraints. Payload columns use SQLAlchemy `JSON` directly.
 
-## Vector Persistence
+The repository/service boundary remains intentional: repositories translate
+SQLite/ORM records into domain snapshots, while services own orchestration and
+business behavior. Persistence construction remains explicit at the
+application composition root.
 
-- Agent tool visibility does not depend on embeddings or vector ranking.
+## Reference catalog policy
 
-## Model Capability Persistence
+Startup orchestration belongs under `app/server/services/catalog/startup.py`.
+It invokes the repository seeder after migrations complete.
 
-- Cloud model capabilities are declared in `app/server/services/llm/cloud_catalog.py`.
-- DeepSeek, OpenCode Zen, and OpenCode Go catalogs are fetched on explicit
-  provider requests using encrypted credentials; source health is returned to
-  Settings and a failed refresh is not represented as a valid empty catalog.
-- Ollama tool support is detected from provider capabilities or a cached probe.
-- Agent assignment requires tool support.
-- Parser assignment requires structured-output support.
+- static reference data belongs under `app/resources/catalog/reference`;
+- loading and parsing belongs under `app/server/services/catalog/loader.py`;
+- relational writes belong under `app/server/repositories/catalog/`.
 
-## Frontend Persistence
+## Frontend persistence
 
-- Storage key: `aegis:webapp-state:v4`
-- Storage type: `sessionStorage`
+- storage key: `aegis:webapp-state:v4`
+- storage type: `sessionStorage`
 - TTL: 6 hours
-- Tab ownership guard: `localStorage` heartbeat keys
-- Implementation: `app/client/src/app/core/app-state.ts`
-- Chat state persists the conversation ID, context revision, task snapshot, active run IDs, and stream diagnostics. Internal numeric chat-session IDs are not frontend state.
+- implementation: `app/client/src/app/core/app-state.ts`

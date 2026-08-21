@@ -14,7 +14,6 @@ dependencies = [
     "uvicorn[standard]>=0.40.0",
     "tqdm==4.67.3",
     "SQLAlchemy==2.0.50",
-    "psycopg[binary]==3.3.4",
     "python-dotenv==1.2.2",
     "pydantic-settings>=2.0.0,<3",
     "folium==0.17.0",

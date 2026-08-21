@@ -172,17 +172,6 @@ def sqlite_backend(tmp_path: Path) -> SQLiteRepository:
     backend = SQLiteRepository(
         DatabaseSettings(
             database_path=str(tmp_path / "database.db"),
-            embedded_database=True,
-            engine=None,
-            host=None,
-            port=None,
-            database_name=None,
-            username=None,
-            password=None,
-            ssl=False,
-            ssl_ca=None,
-            connect_timeout=10,
-            insert_batch_size=100,
         )
     )
     Base.metadata.create_all(backend.engine)

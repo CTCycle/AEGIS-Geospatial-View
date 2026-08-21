@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -26,7 +27,6 @@ from server.common.constants import (
     REFERENCE_GIBS_LAYER_DEFAULTS_TABLE_NAME,
     REFERENCE_GIBS_TILE_MATRIX_SETS_TABLE_NAME,
 )
-from server.repositories.database.types import PortableJSON
 
 ###############################################################################
 class Base(DeclarativeBase):
@@ -234,9 +234,9 @@ class ChatMessageRecord(Base):
     request_id: Mapped[str | None] = mapped_column(String(160))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    structured_payload: Mapped[object | None] = mapped_column(PortableJSON)
-    tool_payload: Mapped[object | None] = mapped_column(PortableJSON)
-    map_session: Mapped[object | None] = mapped_column(PortableJSON)
+    structured_payload: Mapped[object | None] = mapped_column(JSON)
+    tool_payload: Mapped[object | None] = mapped_column(JSON)
+    map_session: Mapped[object | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
@@ -261,10 +261,10 @@ class ConversationRecord(Base):
     owner_user_id: Mapped[str | None] = mapped_column(String(120))
     title: Mapped[str | None] = mapped_column(String(200))
     context_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    active_instructions: Mapped[object | None] = mapped_column(PortableJSON)
-    task_snapshot: Mapped[object | None] = mapped_column(PortableJSON)
-    memory_snapshot: Mapped[object | None] = mapped_column(PortableJSON)
-    conversation_summary: Mapped[object | None] = mapped_column(PortableJSON)
+    active_instructions: Mapped[object | None] = mapped_column(JSON)
+    task_snapshot: Mapped[object | None] = mapped_column(JSON)
+    memory_snapshot: Mapped[object | None] = mapped_column(JSON)
+    conversation_summary: Mapped[object | None] = mapped_column(JSON)
     summary_through_turn_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     next_message_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
@@ -353,7 +353,7 @@ class AgentRunEventRecord(Base):
     run_version: Mapped[int] = mapped_column(Integer, nullable=False)
     type: Mapped[str] = mapped_column(String(60), nullable=False)
     visibility: Mapped[str] = mapped_column(String(20), nullable=False)
-    payload_json: Mapped[object] = mapped_column(PortableJSON, nullable=False)
+    payload_json: Mapped[object] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

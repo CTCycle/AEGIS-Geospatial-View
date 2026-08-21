@@ -12,14 +12,14 @@ from server.contracts.events import (
     RunEventType,
     RunEventVisibility,
 )
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import AgentRunEventRecord, AgentRunRecord
 
 ###############################################################################
 class AgentRunEventRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------
