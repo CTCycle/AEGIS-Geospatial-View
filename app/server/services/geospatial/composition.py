@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from server.repositories.credential_material import CredentialEncryptionMaterialRepository
 from server.repositories.credentials import CredentialRepository
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.services.geospatial.api_service import GeospatialApiService
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.catalog import GeospatialCatalogService
@@ -28,7 +28,7 @@ class GeospatialRuntime:
     crypto_service: CredentialEncryptionService
 
 ###############################################################################
-def build_geospatial_runtime(database: DatabaseBackend) -> GeospatialRuntime:
+def build_geospatial_runtime(database: SQLiteRepository) -> GeospatialRuntime:
     manifest_loader = GeospatialManifestLoader()
     credentials_repo = CredentialRepository(database)
     crypto_service = CredentialEncryptionService(

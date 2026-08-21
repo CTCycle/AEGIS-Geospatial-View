@@ -47,7 +47,9 @@ def ensure_environment_loaded(*, force: bool = False) -> Path | None:
 
         if not path.exists():
             _create_environment_file(path)
-        load_dotenv(dotenv_path=path, override=True)
+        # Explicit process values, including AEGIS_DATA_DIR, take precedence
+        # over the checked-in local template.
+        load_dotenv(dotenv_path=path, override=False)
 
         state.bootstrapped = True
         return path

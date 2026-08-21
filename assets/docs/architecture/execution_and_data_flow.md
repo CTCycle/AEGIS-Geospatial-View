@@ -23,7 +23,7 @@ AEGIS uses these main backend layers:
   on `app.state`.
 - Stateful dependencies are explicit constructor arguments. The shared
   conversation repository is passed to both chat and run-lifecycle services.
-- `app/server/repositories/database/contracts.py` defines the shared database backend contract.
+- `app/server/repositories/database/sqlite.py` defines the concrete SQLite database holder.
 - `contracts/` holds transport, normalized-provider, extraction, run-event,
   and persistence-neutral application models.
 - `domain/` holds domain behavior and policies; compatibility exports may
@@ -31,7 +31,7 @@ AEGIS uses these main backend layers:
 - Provider adapters normalize JSON objects and provider failures at the LLM
   boundary; API and agent layers consume provider-neutral contracts.
 - Runtime job state is owned by `app/server/services/jobs.py`.
-- Shared SQLAlchemy table operations are centralized in `app/server/repositories/database/orm_table_operations.py`.
+- SQLite engine/session construction is centralized in `app/server/repositories/database/engine.py`.
 - Static reference catalog file loading lives under `app/server/services/catalog/loader.py`; lookup and seeding live under `app/server/repositories/catalog/`.
 
 The startup composition boundary is intentionally explicit:
@@ -41,7 +41,7 @@ flowchart LR
     API[API routes] --> SERVICES[Services]
     SERVICES --> CONTRACTS[contracts/]
     SERVICES --> REPOS[Repositories]
-    REPOS --> DB[(DatabaseBackend)]
+    REPOS --> DB[(SQLiteRepository)]
     START[app_lifespan] --> INIT[database initializer]
     INIT --> SEED[services/catalog/startup.py]
     SEED --> REPOS

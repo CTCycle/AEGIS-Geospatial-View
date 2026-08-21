@@ -12,7 +12,6 @@ from server.common.paths import CONFIGURATIONS_FILE
 from server.configurations.settings import (
     AppSettings,
     ServerSettings,
-    build_database_payload_from_env,
 )
 
 ###############################################################################
@@ -24,7 +23,6 @@ def _ensure_mapping(value: Any) -> dict[str, Any]:
 ###############################################################################
 def _build_settings_payload(raw_payload: dict[str, Any]) -> dict[str, Any]:
     return {
-        "database": build_database_payload_from_env(),
         "nominatim": _ensure_mapping(raw_payload.get("nominatim")),
         "geospatial": _ensure_mapping(raw_payload.get("geospatial")),
         "map": _ensure_mapping(raw_payload.get("map")),
@@ -68,7 +66,8 @@ class ConfigurationManager:
     def load(self) -> "ConfigurationManager":
         payload = self._read_payload()
         configuration = self._validate_configuration(payload)
-        self._payload = payload
+        self._payload = dict(payload)
+        self._payload.pop("database", None)
         self._configuration = configuration
         self._server_settings = configuration.to_server_settings()
         self._loaded = True

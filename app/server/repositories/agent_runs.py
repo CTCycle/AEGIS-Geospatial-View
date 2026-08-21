@@ -5,7 +5,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 from server.contracts.runs import AgentRunSnapshot, AgentRunState
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import CursorResult
@@ -17,7 +17,7 @@ from server.repositories.schemas.models import AgentRunRecord, ConversationRecor
 class AgentRunRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self._session_factory = database.session
 
     # -------------------------------------------------------------------------

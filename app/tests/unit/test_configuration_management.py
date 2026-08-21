@@ -69,7 +69,7 @@ def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -
 
     manager.update(
         {
-            "database": {"embedded_database": False, "host": "should-not-persist"},
+            "database": {"path": "should-not-persist"},
             "jobs": {"polling_interval": 1.5},
         }
     )
@@ -77,6 +77,16 @@ def test_configuration_manager_does_not_persist_database_block(tmp_path: Path) -
     persisted = json.loads(config_file.read_text(encoding="utf-8"))
     assert "database" not in persisted
     assert persisted["jobs"]["polling_interval"] == 1.5
+
+###############################################################################
+def test_configuration_manager_does_not_expose_database_block(tmp_path: Path) -> None:
+    config_file = tmp_path / "configurations.json"
+    _write_json(config_file, {"database": {"path": "ignored"}})
+
+    manager = ConfigurationManager(config_path=config_file)
+    manager.load()
+
+    assert manager.get_block("database") == {}
 
 ###############################################################################
 def test_configuration_manager_fails_on_missing_file(tmp_path: Path) -> None:

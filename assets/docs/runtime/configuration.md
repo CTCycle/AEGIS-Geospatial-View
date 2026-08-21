@@ -2,15 +2,16 @@
 
 Last updated: 2026-08-20
 
-## Environment File
+## Environment file
 
-Primary runtime environment file: `settings/.env`. If it is missing, startup
-creates it from `settings/.env.example`; an existing file is never overwritten.
-The generated file is ignored by Git and must remain local.
+The primary runtime environment file is `settings/.env`. If it is missing,
+startup creates it from `settings/.env.example`; an existing file is never
+overwritten. The generated file remains local.
 
 Common keys include:
 
-- `AEGIS_RUNTIME_DATA_DIR`
+- `AEGIS_DATA_DIR` (optional; defaults to `app/resources/runtime`)
+- `SQLITE_LOCK_TIMEOUT` (positive seconds; defaults to `60`)
 - `FASTAPI_HOST`
 - `FASTAPI_PORT`
 - `UI_HOST`
@@ -19,55 +20,30 @@ Common keys include:
 - `BACKEND_LOGS_VISIBLE`
 - `REALTIME_ALLOW_MISSING_ORIGIN` (default `false`; test-only exception for
   non-browser clients)
-- `EMBEDDED_DATABASE`
-- `DATABASE_URL`
-- `DATABASE_ENGINE`
-- `DATABASE_HOST`
-- `DATABASE_PORT`
-- `DATABASE_NAME`
-- `DATABASE_USERNAME`
-- `DATABASE_PASSWORD`
-- `DATABASE_SSL`
-- `DATABASE_SSL_CA`
-- `DATABASE_CONNECT_TIMEOUT`
-- `DATABASE_INSERT_BATCH_SIZE`
-- `DATABASE_MIGRATION_LOCK_TIMEOUT_SECONDS` (default `60`)
 
-## Structured Configuration
+The SQLite database path is always derived as:
 
-`settings/configurations.json` supplies the runtime JSON blocks for:
+```text
+<AEGIS_DATA_DIR or app/resources/runtime>/database.db
+```
 
-- Nominatim settings
-- geospatial bounds
-- map defaults
-- job polling interval
-- chat defaults
-- Open-Meteo, Overpass, RainViewer, and NASA GIBS request tuning
+`SQLITE_LOCK_TIMEOUT` controls how long startup and the explicit launcher
+initialization action wait for the adjacent SQLite migration lock. It does not
+change SQL transaction timeouts or database durability settings.
 
-Database mode and all database connection/security/performance settings come only
-from `settings/.env` (or process environment variables). The JSON settings file
-does not provide database configuration.
+## Structured configuration
 
-The JSON loader maps the blocks used by `ConfigurationManager`; only typed
-settings fields have runtime effect.
+`settings/configurations.json` supplies JSON blocks for Nominatim, geospatial
+bounds, map defaults, job polling, chat defaults, Open-Meteo, Overpass,
+RainViewer, and NASA GIBS request tuning. It intentionally contains no
+database block. Database location and migration-lock settings come from the
+environment only.
 
-Model provider API keys are not environment settings in the default flow. They
-are entered through Settings and stored as encrypted credential records. The
-selected provider/model and provider base URLs are persisted model settings;
-DeepSeek, OpenCode Zen, and OpenCode Go use on-demand catalogs when requested.
+Model provider API keys are entered through Settings and stored as encrypted
+database records. They are not database connection settings.
 
-`AEGIS_RUNTIME_DATA_DIR` optionally overrides the runtime storage root used for
-the embedded SQLite database. When unset, the embedded database defaults to
-`<repo>/app/resources/runtime/database.db` in every environment.
+## Local profile
 
-## Local Profile
-
-Source template: `settings/.env.example`
-
-- `BACKEND_LOGS_VISIBLE=true` shows backend logs in a dedicated terminal; when absent, the launcher defaults to `true`
-- intended for the local web workflow
-
-The realtime WebSocket is deliberately restricted to loopback backend hosts and
-the configured UI origin. The launcher configures a 64 KiB frame limit and
-15-second native ping/10-second timeout values; the application protocol adds
-its own heartbeat and sequence replay.
+The source template is `settings/.env.example`. The Windows launcher uses the
+configured hosts and ports for the local web workflow. `BACKEND_LOGS_VISIBLE`
+controls whether backend logs use a visible terminal.

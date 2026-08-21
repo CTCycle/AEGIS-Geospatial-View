@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 from sqlalchemy import inspect, select
+from sqlalchemy.exc import IntegrityError
 
 from server.configurations import DatabaseSettings
-from server.repositories.database.postgres import PostgresRepository
-from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.database.initializer import initialize_database
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas.models import (
     AgentRunRecord,
     Base,
@@ -17,58 +16,18 @@ from server.repositories.schemas.models import (
     ConversationRecord,
 )
 
-###############################################################################
-def _sqlite_settings(path: Path) -> DatabaseSettings:
-    return DatabaseSettings(
-        database_path=str(path),
-        embedded_database=True,
-        engine=None,
-        host=None,
-        port=None,
-        database_name=None,
-        username=None,
-        password=None,
-        ssl=False,
-        ssl_ca=None,
-        connect_timeout=10,
-        insert_batch_size=100,
-    )
 
-###############################################################################
-@pytest.fixture(params=["sqlite", "postgres"])
-def backend(request: pytest.FixtureRequest, tmp_path: Path):
-    if request.param == "sqlite":
-        repository = SQLiteRepository(_sqlite_settings(tmp_path / "conformance.db"))
-    else:
-        url = os.getenv("AEGIS_TEST_POSTGRES_URL")
-        if not url:
-            pytest.skip("AEGIS_TEST_POSTGRES_URL is not configured")
-        repository = PostgresRepository(
-            DatabaseSettings(
-                database_path=str(tmp_path / "unused.db"),
-                embedded_database=False,
-                engine="postgresql+psycopg",
-                host=url.split("@")[1].split(":")[0],
-                port=5432,
-                database_name="aegis_test",
-                username="aegis",
-                password="aegis",
-                ssl=False,
-                ssl_ca=None,
-                connect_timeout=10,
-                insert_batch_size=100,
-            )
-        )
-    Base.metadata.drop_all(repository.engine)
-    with repository.engine.begin() as connection:
-        connection.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+@pytest.fixture
+def backend(tmp_path: Path):
+    repository = SQLiteRepository(
+        DatabaseSettings(database_path=str(tmp_path / "conformance.db"))
+    )
     initialize_database(repository)
     yield repository
     Base.metadata.drop_all(repository.engine)
-    with repository.engine.begin() as connection:
-        connection.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+    repository.engine.dispose()
 
-###############################################################################
+
 def test_canonical_schema_has_fifteen_application_tables_and_version_table(backend) -> None:
     tables = set(inspect(backend.engine).get_table_names())
     assert "alembic_version" in tables
@@ -79,7 +38,7 @@ def test_canonical_schema_has_fifteen_application_tables_and_version_table(backe
         for column in inspect(backend.engine).get_columns("conversations")
     }
 
-###############################################################################
+
 def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_conformance", title="Conformance"))
@@ -110,7 +69,7 @@ def test_conversation_messages_use_atomic_sequence_and_native_json(backend) -> N
         assert conversation is not None
         assert conversation.next_message_sequence == 1
 
-###############################################################################
+
 def test_conversation_allows_one_active_run_by_constraint(backend) -> None:
     with backend.session() as session:
         session.add(ConversationRecord(id="conv_run", title="Runs"))
@@ -136,5 +95,10 @@ def test_conversation_allows_one_active_run_by_constraint(backend) -> None:
                 active_slot=1,
             )
         )
-        with pytest.raises(Exception):
+        with pytest.raises(IntegrityError):
             session.commit()
+        session.rollback()
+
+    with backend.session() as session:
+        assert session.get(AgentRunRecord, "run-1") is not None
+        assert session.get(AgentRunRecord, "run-2") is None

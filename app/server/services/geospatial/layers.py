@@ -6,7 +6,7 @@ from typing import Any
 from server.domain.catalog import GeospatialLayerReferenceEntry
 from server.domain.layers import LayerProviderEntry
 from server.repositories.catalog.reference_repository import ReferenceCatalogRepository
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 
 type LayerDefinition = dict[str, Any]
 type ResolutionProvider = Callable[[str], tuple[float, ...] | list[float]]
@@ -162,7 +162,7 @@ class LayerProviderService:
         return entry.label
 
 ###############################################################################
-def build_geospatial_layer_catalog(database: DatabaseBackend) -> LayerProviderService:
+def build_geospatial_layer_catalog(database: SQLiteRepository) -> LayerProviderService:
     repository = ReferenceCatalogRepository(database)
     return LayerProviderService(
         layer_catalog=repository.load_geospatial_layer_catalog()

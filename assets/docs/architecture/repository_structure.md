@@ -65,8 +65,8 @@ Key backend directories under `app/server`:
 - `repositories/`
   Persistence, serialization, database helpers, credential encryption material, and reference catalog seeding.
 - `repositories/database/`
-  Canonical `DatabaseBackend` contract, SQLite/PostgreSQL implementations, and
-  the explicit database initializer and migration runner.
+  Concrete SQLite engine/session setup, repository holder, initializer, and
+  Alembic migration runner.
 - `migrations/`
   Alembic environment and reviewed schema revisions.
 - `services/`
@@ -85,7 +85,7 @@ Key backend directories under `app/server`:
   Provider adapters, model catalogs, structured-output handling, request
   normalization, and safe provider error classification.
 - `app.py`
-  Sole composition root. It constructs the database backend, initializes the
+  Sole composition root. It constructs the SQLite repository, initializes the
   schema, wires explicit repository/service dependencies, and owns lifecycle
   shutdown.
 

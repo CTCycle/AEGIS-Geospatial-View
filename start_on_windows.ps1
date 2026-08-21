@@ -772,7 +772,7 @@ function Show-LauncherMenu {
     Write-MenuOption -Number '1' -Label 'Launch application' -Description 'Start local services'
     Write-MenuOption -Number '2' -Label 'Install / update dependencies' -Description 'Sync and build'
     Write-MenuOption -Number '3' -Label 'Rebuild frontend' -Description 'Run frontend production build'
-    Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create, adopt, upgrade, and seed schema'
+      Write-MenuOption -Number '4' -Label 'Initialize database' -Description 'Create, upgrade, and seed SQLite schema'
     Write-Host ''
     Write-Host '  MAINTENANCE' -ForegroundColor DarkCyan
     Write-MenuOption -Number '5' -Label 'Run test suite' -Description 'Validate installation'

@@ -19,7 +19,7 @@ CONFIGURATIONS_FILE = SETTING_PATH / "configurations.json"
 
 ###############################################################################
 def resolve_runtime_data_root() -> Path:
-    override = os.getenv("AEGIS_RUNTIME_DATA_DIR", "").strip()
+    override = os.getenv("AEGIS_DATA_DIR", "").strip()
     if override:
         return Path(override).expanduser()
 

@@ -51,16 +51,33 @@ def test_runtime_env_is_loaded_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     assert os.getenv("MPLBACKEND") == "Agg"
 
 ###############################################################################
+def test_process_environment_values_are_not_overwritten(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("AEGIS_DATA_DIR=from-file\n", encoding="utf-8")
+    monkeypatch.setenv("AEGIS_DATA_DIR", "from-process")
+    monkeypatch.setattr(
+        "server.configurations.environment.ENV_FILE_PATH", str(env_file)
+    )
+    reset_environment_bootstrap_for_tests()
+
+    ensure_environment_loaded()
+
+    assert os.getenv("AEGIS_DATA_DIR") == "from-process"
+
+###############################################################################
 def test_missing_runtime_env_is_created_from_example(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     env_file = tmp_path / "settings" / ".env"
     example_file = tmp_path / "settings" / ".env.example"
     example_file.parent.mkdir()
-    example_file.write_bytes(b"FASTAPI_PORT=6101\r\nEMBEDDED_DATABASE=true\r\n")
+    example_file.write_bytes(b"FASTAPI_PORT=6101\r\nSQLITE_LOCK_TIMEOUT=9\r\n")
 
     monkeypatch.delenv("FASTAPI_PORT", raising=False)
-    monkeypatch.delenv("EMBEDDED_DATABASE", raising=False)
+    monkeypatch.delenv("SQLITE_LOCK_TIMEOUT", raising=False)
     monkeypatch.setattr(
         "server.configurations.environment.ENV_FILE_PATH", str(env_file)
     )
@@ -74,7 +91,7 @@ def test_missing_runtime_env_is_created_from_example(
     assert loaded_path == env_file
     assert env_file.read_bytes() == example_file.read_bytes()
     assert os.getenv("FASTAPI_PORT") == "6101"
-    assert os.getenv("EMBEDDED_DATABASE") == "true"
+    assert os.getenv("SQLITE_LOCK_TIMEOUT") == "9"
 
 ###############################################################################
 def test_existing_runtime_env_is_not_overwritten(

@@ -5,7 +5,7 @@ from collections import defaultdict
 from sqlalchemy import select
 
 from server.domain.catalog import GeospatialLayerReferenceEntry
-from server.repositories.database.contracts import DatabaseBackend
+from server.repositories.database.sqlite import SQLiteRepository
 from server.repositories.schemas import (
     ReferenceCountryAliasRecord,
     ReferenceGeospatialLayerAliasRecord,
@@ -19,7 +19,7 @@ from server.repositories.schemas import (
 class ReferenceCatalogRepository:
 
     # -------------------------------------------------------------------------
-    def __init__(self, database: DatabaseBackend) -> None:
+    def __init__(self, database: SQLiteRepository) -> None:
         self.database = database
         self._country_alias_to_iso2: dict[str, str] | None = None
         self._geospatial_layer_catalog: (

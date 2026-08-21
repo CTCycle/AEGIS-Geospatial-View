@@ -3,16 +3,14 @@ from __future__ import annotations
 from server.common.typing import is_json_object
 
 import os
-import urllib.parse
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.common.constants import (
-    DEFAULT_DB_CONNECT_TIMEOUT,
-    DEFAULT_DB_INSERT_BATCH_SIZE,
+    DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS,
     DEFAULT_GIBS_DEFAULT_LAYER,
     DEFAULT_GIBS_LAYER_SYNC_USER_AGENT,
     DEFAULT_GIBS_USER_AGENT,
@@ -31,23 +29,7 @@ from server.common.paths import resolve_database_file_path
 @dataclass(frozen=True)
 class DatabaseSettings:
     database_path: str
-    embedded_database: bool
-    engine: str | None
-    host: str | None
-    port: int | None
-    database_name: str | None
-    username: str | None
-    password: str | None
-    ssl: bool
-    ssl_ca: str | None
-    connect_timeout: int
-    insert_batch_size: int
-    database_pool_size: int = 5
-    database_max_overflow: int = 10
-    database_pool_recycle_seconds: int = 1800
-    sqlite_busy_timeout_ms: int = 5000
-    sqlite_wal_enabled: bool = True
-    database_migration_lock_timeout_seconds: int = 60
+    sqlite_lock_timeout_seconds: int = DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS
 
 ###############################################################################
 @dataclass(frozen=True)
@@ -151,44 +133,6 @@ class ServerSettings:
     overpass: OverpassSettings
     rainviewer: RainViewerSettings
     gibs: GIBSSettings
-
-###############################################################################
-class JsonDatabaseSettings(BaseModel):
-    embedded_database: bool = True
-    engine: str = "postgresql+psycopg"
-    host: str | None = None
-    port: int = Field(default=5432, ge=1, le=65535)
-    database_name: str | None = None
-    username: str | None = None
-    password: str | None = None
-    ssl: bool = False
-    ssl_ca: str | None = None
-    connect_timeout: int = Field(default=DEFAULT_DB_CONNECT_TIMEOUT, ge=1)
-    insert_batch_size: int = Field(default=DEFAULT_DB_INSERT_BATCH_SIZE, ge=1)
-    database_pool_size: int = Field(default=5, ge=1)
-    database_max_overflow: int = Field(default=10, ge=0)
-    database_pool_recycle_seconds: int = Field(default=1800, ge=0)
-    sqlite_busy_timeout_ms: int = Field(default=5000, ge=1)
-    sqlite_wal_enabled: bool = True
-    database_migration_lock_timeout_seconds: int = Field(default=60, ge=1)
-
-    # -------------------------------------------------------------------------
-    @field_validator(
-        "host", "database_name", "username", "password", "ssl_ca", mode="before"
-    )
-    @classmethod
-    def normalize_optional_strings(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        text = str(value).strip()
-        return text or None
-
-    # -------------------------------------------------------------------------
-    @field_validator("engine", mode="before")
-    @classmethod
-    def normalize_engine(cls, value: Any) -> str:
-        text = str(value).strip() if value is not None else ""
-        return text or "postgresql+psycopg"
 
 ###############################################################################
 class JsonNominatimSettings(BaseModel):
@@ -318,91 +262,16 @@ def _read_env_int(name: str) -> int | None:
         raise RuntimeError(f"Invalid integer value for {name}: {value}") from exc
 
 ###############################################################################
-def _read_env_bool(name: str) -> bool | None:
-    value = _read_env_text(name)
-    if value is None:
-        return None
-
-    normalized = value.lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise RuntimeError(f"Invalid boolean value for {name}: {value}")
-
-###############################################################################
-def _database_payload_from_url(database_url: str) -> dict[str, Any]:
-    parsed = urllib.parse.urlparse(database_url)
-    scheme = (parsed.scheme or "").strip().lower()
-    if not scheme:
-        raise RuntimeError("DATABASE_URL must include a URL scheme.")
-    if not scheme.startswith("postgresql"):
-        raise RuntimeError(
-            f"Unsupported DATABASE_URL scheme: {parsed.scheme}. Expected PostgreSQL."
-        )
-
-    database_name = parsed.path.lstrip("/") or None
-    return {
-        "engine": "postgresql+psycopg",
-        "host": parsed.hostname,
-        "port": parsed.port,
-        "database_name": database_name,
-        "username": urllib.parse.unquote(parsed.username)
-        if parsed.username is not None
-        else None,
-        "password": urllib.parse.unquote(parsed.password)
-        if parsed.password is not None
-        else None,
-    }
-
-###############################################################################
-def build_database_payload_from_env() -> dict[str, Any]:
-    payload: dict[str, Any] = {}
-
-    database_url = _read_env_text("DATABASE_URL")
-    if database_url is not None:
-        payload.update(_database_payload_from_url(database_url))
-
-    explicit_values: tuple[tuple[str, str, Any], ...] = (
-        ("EMBEDDED_DATABASE", "embedded_database", _read_env_bool("EMBEDDED_DATABASE")),
-        ("DATABASE_ENGINE", "engine", _read_env_text("DATABASE_ENGINE")),
-        ("DATABASE_HOST", "host", _read_env_text("DATABASE_HOST")),
-        ("DATABASE_PORT", "port", _read_env_int("DATABASE_PORT")),
-        ("DATABASE_NAME", "database_name", _read_env_text("DATABASE_NAME")),
-        ("DATABASE_USERNAME", "username", _read_env_text("DATABASE_USERNAME")),
-        ("DATABASE_PASSWORD", "password", _read_env_text("DATABASE_PASSWORD")),
-        ("DATABASE_SSL", "ssl", _read_env_bool("DATABASE_SSL")),
-        ("DATABASE_SSL_CA", "ssl_ca", _read_env_text("DATABASE_SSL_CA")),
-        (
-            "DATABASE_CONNECT_TIMEOUT",
-            "connect_timeout",
-            _read_env_int("DATABASE_CONNECT_TIMEOUT"),
-        ),
-        (
-            "DATABASE_INSERT_BATCH_SIZE",
-            "insert_batch_size",
-            _read_env_int("DATABASE_INSERT_BATCH_SIZE"),
-        ),
-        (
-            "DATABASE_MIGRATION_LOCK_TIMEOUT_SECONDS",
-            "database_migration_lock_timeout_seconds",
-            _read_env_int("DATABASE_MIGRATION_LOCK_TIMEOUT_SECONDS"),
-        ),
-    )
-
-    for _env_name, key, value in explicit_values:
-        if value is not None:
-            payload[key] = value
-
-    return payload
-
-###############################################################################
 def build_database_settings() -> DatabaseSettings:
-    try:
-        db = JsonDatabaseSettings.model_validate(build_database_payload_from_env())
-    except ValidationError as exc:
-        raise RuntimeError(f"Invalid database settings: {exc}") from exc
-    return _to_database_settings(db)
+    timeout_seconds = _read_env_int("SQLITE_LOCK_TIMEOUT")
+    if timeout_seconds is None:
+        timeout_seconds = DEFAULT_SQLITE_LOCK_TIMEOUT_SECONDS
+    if timeout_seconds < 1:
+        raise RuntimeError("SQLITE_LOCK_TIMEOUT must be a positive integer.")
+    return DatabaseSettings(
+        database_path=str(resolve_database_file_path()),
+        sqlite_lock_timeout_seconds=timeout_seconds,
+    )
 
 ###############################################################################
 class AppSettings(BaseSettings):
@@ -412,7 +281,6 @@ class AppSettings(BaseSettings):
         extra="ignore",
     )
 
-    database: JsonDatabaseSettings = Field(default_factory=JsonDatabaseSettings)
     nominatim: JsonNominatimSettings = Field(default_factory=JsonNominatimSettings)
     geospatial: JsonGeospatialSettings = Field(default_factory=JsonGeospatialSettings)
     map: JsonMapSettings = Field(default_factory=JsonMapSettings)
@@ -453,7 +321,7 @@ class AppSettings(BaseSettings):
         )
 
         return ServerSettings(
-            database=_to_database_settings(self.database),
+            database=build_database_settings(),
             nominatim=NominatimSettings(
                 base_url=self.nominatim.base_url,
                 user_agent=self.nominatim.user_agent,
@@ -526,52 +394,6 @@ class AppSettings(BaseSettings):
                 layer_sync_timeout=self.gibs.layer_sync_timeout,
             ),
         )
-
-###############################################################################
-def _to_database_settings(db: JsonDatabaseSettings) -> DatabaseSettings:
-    database_file_path = resolve_database_file_path()
-    if db.embedded_database:
-        return DatabaseSettings(
-            database_path=str(database_file_path),
-            embedded_database=True,
-            engine=None,
-            host=None,
-            port=None,
-            database_name=None,
-            username=None,
-            password=None,
-            ssl=False,
-            ssl_ca=None,
-            connect_timeout=DEFAULT_DB_CONNECT_TIMEOUT,
-            insert_batch_size=db.insert_batch_size,
-            database_pool_size=db.database_pool_size,
-            database_max_overflow=db.database_max_overflow,
-            database_pool_recycle_seconds=db.database_pool_recycle_seconds,
-            sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
-            sqlite_wal_enabled=db.sqlite_wal_enabled,
-            database_migration_lock_timeout_seconds=db.database_migration_lock_timeout_seconds,
-        )
-
-    return DatabaseSettings(
-        database_path=str(database_file_path),
-        embedded_database=False,
-        engine=db.engine.strip().lower(),
-        host=db.host,
-        port=db.port,
-        database_name=db.database_name,
-        username=db.username,
-        password=db.password,
-        ssl=db.ssl,
-        ssl_ca=db.ssl_ca,
-        connect_timeout=db.connect_timeout,
-        insert_batch_size=db.insert_batch_size,
-        database_pool_size=db.database_pool_size,
-        database_max_overflow=db.database_max_overflow,
-        database_pool_recycle_seconds=db.database_pool_recycle_seconds,
-        sqlite_busy_timeout_ms=db.sqlite_busy_timeout_ms,
-        sqlite_wal_enabled=db.sqlite_wal_enabled,
-        database_migration_lock_timeout_seconds=db.database_migration_lock_timeout_seconds,
-    )
 
 ###############################################################################
 def _normalize_upper_key_mapping(
