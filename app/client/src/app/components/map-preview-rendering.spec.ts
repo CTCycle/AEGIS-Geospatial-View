@@ -37,6 +37,21 @@ describe('map-preview-rendering', () => {
     expect(basemapSource.tiles?.[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
   });
 
+  it('does not silently substitute OSM when a non-OSM descriptor is unavailable', () => {
+    const style = buildStyle({
+      basemap_id: 'esri_world_imagery',
+      basemap: {
+        id: 'esri_world_imagery',
+        label: 'Satellite Imagery',
+        provider: 'arcgis',
+        render_status: 'unavailable',
+        unavailable_reason: 'render_descriptor_missing',
+      },
+    } as never);
+    const basemapSource = style.sources['basemap'] as { tiles?: string[] };
+    expect(basemapSource.tiles).toEqual([]);
+  });
+
   it('treats GeoJSON rendering modes as GeoJSON when descriptor metadata is sparse', () => {
     const baseOverlay = {
       id: 'mode-only',

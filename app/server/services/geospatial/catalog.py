@@ -32,7 +32,7 @@ class GeospatialCatalogService:
             self.runtime_registry.is_enabled(capability_id)
             and self.runtime_registry.credentials_present(capability_id)
         )
-        return {
+        descriptor = {
             "id": capability_id,
             "name": str(item.get("name") or capability_id),
             "kind": capability_kind,
@@ -62,6 +62,50 @@ class GeospatialCatalogService:
             "reliability": reliability,
             "auth": auth,
             "metadata": metadata,
+        }
+        if kind == "basemap":
+            descriptor["render"] = self._safe_basemap_render_descriptor(
+                metadata=metadata,
+                auth=auth,
+            )
+        return descriptor
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _safe_basemap_render_descriptor(
+        *, metadata: dict[str, Any], auth: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Expose only public render data needed by the map selector."""
+
+        if bool(auth.get("required")):
+            return {
+                "status": "unavailable",
+                "reason": "credentials_required",
+            }
+        tile_url = next(
+            (
+                str(metadata.get(key)).strip()
+                for key in ("tile_url", "tile_url_template", "url_template")
+                if isinstance(metadata.get(key), str) and str(metadata.get(key)).strip()
+            ),
+            None,
+        )
+        style_url = (
+            str(metadata.get("style_url")).strip()
+            if isinstance(metadata.get("style_url"), str)
+            and str(metadata.get("style_url")).strip()
+            else None
+        )
+        if tile_url is None and style_url is None:
+            return {
+                "status": "unavailable",
+                "reason": "render_descriptor_missing",
+            }
+        return {
+            "status": "available",
+            "tile_url": tile_url,
+            "style_url": style_url,
+            "attribution": str(metadata.get("attribution") or ""),
         }
 
     # -------------------------------------------------------------------------

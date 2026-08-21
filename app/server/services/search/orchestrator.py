@@ -38,6 +38,20 @@ class LocationSearchOrchestrator:
         overlays: list[dict[str, object]] = []
         failed_overlays: list[dict[str, str]] = []
         warnings: list[str] = []
+        if basemap is None:
+            basemap = {
+                "id": payload.basemap_id,
+                "label": payload.basemap_id,
+                "provider": "unknown",
+                "tile_url": None,
+                "style_url": None,
+                "attribution": "",
+                "render_status": "unavailable",
+                "unavailable_reason": "basemap_not_in_catalog",
+            }
+            warnings.append(
+                f"Basemap '{payload.basemap_id}' is unavailable because no render descriptor was generated."
+            )
         effective_basemap_id = (
             str(basemap.get("id"))
             if is_json_object(basemap) and basemap.get("id")

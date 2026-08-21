@@ -20,6 +20,23 @@
       <div class="maplibre-wrap">
         <div #mapContainer class="maplibre-container"></div>
 
+        @if (availableBasemaps.length) {
+          <label class="basemap-selector">
+            <span>Basemap</span>
+            <select
+              [value]="mapSession?.basemap_id || ''"
+              aria-label="Select map basemap"
+              (change)="onBasemapSelection($any($event.target).value)"
+            >
+              @for (basemap of availableBasemaps; track basemap.id) {
+                <option [value]="basemap.id" [disabled]="basemap.render?.status === 'unavailable'">
+                  {{ basemap.name }}
+                </option>
+              }
+            </select>
+          </label>
+        }
+
         @if (isLoading) {
           <div class="map-render-progress" role="status" aria-live="polite">
             <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
