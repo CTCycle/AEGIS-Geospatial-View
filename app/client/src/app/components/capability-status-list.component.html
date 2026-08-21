@@ -1,10 +1,18 @@
 <ul>
   @for (item of items; track trackStatusItem($index, item)) {
-    <li>
+    <li
+      [class.status-item--ok]="item.tone === 'ok'"
+      [class.status-item--warn]="item.tone === 'warn'"
+      [class.status-item--error]="item.tone === 'error'"
+      [class.status-item--neutral]="item.tone === 'none'"
+      [attr.title]="item.detail || null"
+      [attr.aria-label]="item.label + ': ' + item.statusLabel + (item.detail ? '. ' + item.detail : '')"
+    >
       <span
         class="state-dot"
         [class.state-dot--ok]="item.tone === 'ok'"
         [class.state-dot--warn]="item.tone === 'warn'"
+        [class.state-dot--error]="item.tone === 'error'"
         [class.state-dot--neutral]="item.tone === 'none'"
       ></span>
       {{ item.label }}

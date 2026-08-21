@@ -37,120 +37,13 @@
     border-right: none;
 }
 
-.rail-context-strip {
-    width: 100%;
-    display: grid;
-    gap: 0.28rem;
-    min-width: 0;
-    padding: 0.15rem 0.2rem 0.05rem;
-    background: transparent;
-}
-
-.context-window-tracker__meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.7rem;
-    min-width: 0;
-    color: #8fa3ad;
-    font-size: 0.62rem;
-    line-height: 1.2;
-}
-
-.context-window-tracker__meta span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.context-window-tracker__meta strong {
-    flex: 0 0 auto;
-    color: #dce8ed;
-    font-size: 0.66rem;
-}
-
-.context-window-tracker__bar {
-    height: 0.2rem;
-    overflow: hidden;
-    border-radius: 999px;
-    background: #1b2b34;
-}
-
-.context-window-tracker__bar span {
-    display: block;
-    height: 100%;
-    width: 0;
-    border-radius: inherit;
-    background: linear-gradient(90deg, #1b9a75, #2f9bd7);
-    transition: width 180ms ease;
-}
-
 .toolbar-panel__content {
-    padding: 0.8rem;
+    padding: 0.45rem;
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto auto;
-    gap: 0.55rem;
-}
-
-.rail-capability-card {
-    border: 1px solid #263a45;
-    border-radius: 0.35rem;
-    background: #122029;
-    color: #dce8ed;
-}
-
-.rail-capability-card h2,
-.rail-capability-card ul {
-    margin: 0;
-}
-
-.state-dot {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 999px;
-    background: #56c878;
-}
-
-.rail-capability-card {
-    padding: 0.7rem;
-}
-
-.rail-capability-card h2 {
-    color: #e5f0f4;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.rail-capability-card ul {
-    display: grid;
-    gap: 0.45rem;
-    list-style: none;
-}
-
-.rail-capability-card li {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 0.45rem;
-    align-items: center;
-    color: #c5d3d8;
-    font-size: 0.72rem;
-}
-
-.rail-capability-card strong {
-    color: #56c878;
-    font-size: 0.68rem;
-}
-
-.state-dot--warn {
-    background: #e6a620;
-}
-
-.state-dot--warn + * + strong {
-    color: #e6a620;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
 }
 
 .toolbar-resize-handle {
@@ -255,7 +148,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
-    padding: 0.95rem 3.55rem 6.5rem 0.95rem;
+    padding: 0.85rem 3.25rem 0.85rem 0.85rem;
     border: none;
     border-radius: 0;
     background: transparent;
@@ -321,8 +214,9 @@
 .chat-composer textarea {
     width: 100%;
     min-height: 3.35rem;
-    max-height: 12rem;
-    resize: vertical;
+    max-height: 9rem;
+    height: 3.35rem;
+    resize: none;
     border: 1px solid #324753;
     border-right: none;
     border-radius: 0.45rem 0 0 0.45rem;
@@ -331,6 +225,44 @@
     color: #dce8ed;
     font-size: 0.84rem;
     line-height: 1.42;
+}
+
+.chat-status-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    min-height: 1.7rem;
+    padding: 0.2rem 0.72rem 0.28rem;
+    border-top: 1px solid rgb(38 58 69 / 70%);
+    background: #0f1a21;
+}
+
+.chat-status-strip app-capability-status-list {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.chat-status-settings {
+    flex: 0 0 auto;
+    border: 0;
+    padding: 0.18rem 0;
+    background: transparent;
+    color: #8fc7e5;
+    font-size: 0.66rem;
+    white-space: nowrap;
+}
+
+.chat-status-settings:hover {
+    color: #e5f5ff;
+    text-decoration: underline;
+}
+
+.composer-stop-icon {
+    width: 0.82rem;
+    height: 0.82rem;
+    border-radius: 0.12rem;
+    background: currentColor;
 }
 
 .chat-composer textarea::placeholder {

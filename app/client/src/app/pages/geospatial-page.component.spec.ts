@@ -44,10 +44,28 @@ describe('pages/geospatial-page.component', () => {
     errors = jasmine.createSpyObj<UserFacingErrorService>('UserFacingErrorService', ['toUserFacingError']);
     errors.toUserFacingError.and.returnValue('fallback error');
 
-    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', ['createConversation', 'sendChatTurn']);
+    apiClient = jasmine.createSpyObj<ApiClientService>('ApiClientService', [
+      'createConversation',
+      'sendChatTurn',
+      'fetchCatalog',
+      'fetchChatSettings',
+    ]);
     apiClient.createConversation.and.resolveTo({ conversation_id: 'conv-1', title: 'test' });
     sendChatTurnMock = jasmine.createSpy('sendChatTurn').and.resolveTo(makeTurnResponse());
     apiClient.sendChatTurn.and.callFake((payload) => sendChatTurnMock(payload));
+    apiClient.fetchCatalog.and.resolveTo({ capabilities: [], basemaps: [], overlays: [], tools: [] });
+    apiClient.fetchChatSettings.and.resolveTo({
+      active_provider_mode: 'cloud',
+      agent_model_provider: 'openai',
+      agent_model_name: 'gpt-4.1',
+      ollama_url: 'http://127.0.0.1:11434',
+      credentials: {},
+      selected_model_context: {
+        context_window_tokens: 1_047_576,
+        maximum_output_tokens: 32_768,
+        context_profile_source: 'openai_model_catalog',
+      },
+    });
     realtime = new FakeRealtimeService((payload) => apiClient.sendChatTurn(payload));
     agentReadiness = jasmine.createSpyObj<AgentReadinessService>('AgentReadinessService', ['loadReadiness']);
     agentReadiness.loadReadiness.and.resolveTo({
@@ -478,6 +496,145 @@ describe('pages/geospatial-page.component', () => {
 
     expect(sendChatTurnMock).toHaveBeenCalled();
     expect(component.messages.at(-1)?.content).toContain('**Capabilities**');
+  });
+
+  it('keeps send and stop in one composer action cell', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const sendMessage = spyOn(component, 'sendMessage').and.resolveTo();
+    const cancelActiveRun = spyOn(component, 'cancelActiveRun').and.resolveTo();
+    const button = (): HTMLButtonElement => fixture.nativeElement.querySelector('.chat-composer .primary-button');
+
+    component.composerDraft = 'show Rome';
+    fixture.detectChanges();
+    expect(button().getAttribute('aria-label')).toBe('Send message');
+    expect(fixture.nativeElement.querySelector('[aria-label="Cancel active run"]')).toBeNull();
+    button().click();
+    expect(sendMessage).toHaveBeenCalled();
+
+    component.isLoading = true;
+    fixture.detectChanges();
+    expect(button().getAttribute('aria-label')).toBe('Stop generating');
+    expect(button().querySelector('.composer-stop-icon')).not.toBeNull();
+    button().click();
+    expect(cancelActiveRun).toHaveBeenCalled();
+  });
+
+  it('honors a stop request made before the run acknowledgement arrives', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.conversationId = 'conv-1';
+    component.isLoading = true;
+
+    await component.cancelActiveRun();
+    expect(component['cancelRequested']).toBeTrue();
+    realtime.connect('conv-1');
+
+    component['handleRealtimeMessage']({
+      protocol_version: 1,
+      type: 'run.ack',
+      message_id: 'ack-start',
+      conversation_id: 'conv-1',
+      payload: { command: 'run.start', run_id: 'run-1', run_version: 1, duplicate: false },
+    } as never);
+
+    expect(component['cancelRequested']).toBeFalse();
+    expect(component.isLoading).toBeFalse();
+    expect(component.status).toBe('Agent ready');
+  });
+
+  it('shows the selected model context cap and exposes a compact live status strip', async () => {
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+
+    expect(component.contextUsage?.selected_context_window).toBe(1_047_576);
+    expect(component.contextUsageDetail).toMatch(/1[,.]047[,.]576 token cap/);
+    expect(fixture.nativeElement.querySelector('.chat-status-strip')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.rail-capability-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.rail-context-strip')).toBeNull();
+  });
+
+  it('refreshes a persisted context indicator after the selected model changes', async () => {
+    const seeded = defaultAppState().chatPage;
+    seeded.chatPanel.contextUsage = {
+      estimated_input_tokens: 120,
+      selected_context_window: 2048,
+      model_context_limit: 2048,
+      usage_percent: 5.9,
+      provider: 'ollama',
+      model: 'llama3.2',
+    };
+    store.getChatPage.and.returnValue(seeded);
+    apiClient.fetchChatSettings.and.resolveTo({
+      active_provider_mode: 'local',
+      agent_model_provider: 'ollama',
+      agent_model_name: 'qwen3.5:2b',
+      ollama_url: 'http://127.0.0.1:11434',
+      credentials: {},
+      selected_model_context: {
+        context_window_tokens: 40_960,
+        maximum_output_tokens: null,
+        context_profile_source: 'provider_metadata',
+      },
+    });
+
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.contextUsage?.selected_context_window).toBe(40_960);
+    expect(fixture.componentInstance.contextUsage?.provider).toBe('ollama');
+    expect(fixture.componentInstance.contextUsage?.model).toBe('qwen3.5:2b');
+  });
+
+  it('switches the active session to a catalog-provided satellite descriptor', async () => {
+    apiClient.fetchCatalog.and.resolveTo({
+      capabilities: [],
+      basemaps: [
+        {
+          id: 'esri_world_imagery',
+          name: 'Satellite Imagery Basemap',
+          provider: 'arcgis',
+          kind: 'basemap',
+          type: 'tile',
+          description: 'Public satellite imagery',
+          requires_credentials: false,
+          is_available: true,
+          supports_map: true,
+          supports_direct_text: false,
+          coverage: 'global',
+          render: {
+            status: 'available',
+            tile_url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri',
+          },
+          action_tags: [],
+          task_tags: [],
+          metadata: {},
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(GeospatialPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    component.mapSession = {
+      session_id: 'map-1',
+      resolved_location: { label: 'Rome', latitude: 41.9, longitude: 12.5 },
+      basemap_id: 'osm_default',
+      overlay_ids: [],
+      viewport: { center_latitude: 41.9, center_longitude: 12.5, radius_m: 2500 },
+      overlays: [],
+    } as never;
+    component.onBasemapChange('esri_world_imagery');
+
+    expect(component.payload?.map_session?.basemap_id).toBe('esri_world_imagery');
+    expect(component.payload?.map_session?.basemap?.tile_url).toContain('World_Imagery');
+    expect(component.availableBasemaps.map((item) => item.id)).toEqual(['esri_world_imagery']);
   });
 
 });
