@@ -36,7 +36,7 @@ jobs:
 
       - name: Run backend static analysis
         run: |
-          ruff check app/server app/tests
+          ruff check --config app/server/pyproject.toml app/server app/tests
           pyright --project app/server/pyproject.toml
 
       - name: Verify Alembic migration metadata
@@ -90,7 +90,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: app/client
-        run: npm install
+        run: npm install --no-package-lock
 
       - name: Frontend build
         working-directory: app/client
