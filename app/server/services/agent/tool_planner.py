@@ -130,12 +130,21 @@ class DeterministicToolPlanner:
     @staticmethod
     def _build_visualization_update(turn: TurnParseResult) -> dict[str, object]:
         basemap = turn.requested_basemap
-        if not basemap and turn.task_class == "map_search" and not turn.requested_layers:
+        if (
+            not basemap
+            and turn.task_class == "map_search"
+            and not turn.requested_layers
+            and not turn.overlay_commands
+        ):
             basemap = "osm_default"
         update: dict[str, object] = {}
         if basemap:
             update["basemap_replacement"] = basemap
-        if turn.requested_layers:
+        has_fetching_command = any(
+            command.action in {"add", "show", "update"}
+            for command in turn.overlay_commands
+        )
+        if turn.requested_layers and (not turn.overlay_commands or has_fetching_command):
             update["add_layer_ids"] = list(dict.fromkeys(turn.requested_layers))
         if turn.overlay_commands:
             update["overlay_commands"] = [

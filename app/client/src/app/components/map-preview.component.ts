@@ -321,7 +321,13 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     const nextVisibility: Record<string, boolean> = {};
     overlays.forEach((overlay) => {
-      nextVisibility[overlay.id] = this.overlayVisibility[overlay.id] ?? this.initialOverlayVisibility[overlay.id] ?? true;
+      // The backend collection is authoritative. Local/session storage
+      // preferences are only fallbacks for payloads without an explicit
+      // visibility value.
+      nextVisibility[overlay.id] =
+        typeof overlay.visible === 'boolean'
+          ? overlay.visible
+          : this.overlayVisibility[overlay.id] ?? this.initialOverlayVisibility[overlay.id] ?? true;
     });
     this.overlayVisibility = recordBooleanEqual(this.overlayVisibility, nextVisibility) ? this.overlayVisibility : nextVisibility;
 
