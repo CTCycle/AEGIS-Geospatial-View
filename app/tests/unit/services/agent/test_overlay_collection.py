@@ -244,6 +244,31 @@ def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> Non
     assert updated.instances[0].capability_id == "openmeteo_weather_forecast"
 
 
+def test_unmatched_selector_that_targets_active_basemap_is_explained_without_mutation() -> None:
+    command = OverlayCommand(
+        action="hide",
+        selector=OverlaySelector(labels=["imagery"]),
+        state_reference=OverlayStateReference(revision=0),
+    )
+
+    updated, result = OverlayCollectionService.apply(
+        OverlayCollectionState(),
+        command,
+        basemap={
+            "id": "esri_world_imagery",
+            "label": "Satellite Imagery",
+            "provider": "arcgis",
+            "type": "tile",
+            "capabilities": ["tile", "imagery"],
+        },
+    )
+
+    assert updated == OverlayCollectionState()
+    assert result.unmatched_selectors == ["imagery"]
+    assert result.clarification is not None
+    assert "active map basemap, not an overlay" in result.clarification
+
+
 def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
     ambiguous = OverlayCommand(
         action="add",
