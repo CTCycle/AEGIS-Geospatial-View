@@ -157,11 +157,12 @@ class CapabilityResolver:
             # commands must carry the same canonical identity as additions;
             # otherwise a valid alias can bypass the active-instance resolver
             # and appear as an unavailable capability.
-            for value in [
-                *selector.capability_ids,
-                *selector.concepts,
-                *selector.labels,
-            ]:
+            for value in selector.capability_ids:
+                capability_id = self._resolve_one(value, turn)
+                normalized = capability_id or value
+                if normalized not in capability_ids:
+                    capability_ids.append(normalized)
+            for value in [*selector.concepts, *selector.labels]:
                 capability_id = self._resolve_one(value, turn)
                 if capability_id is not None and capability_id not in capability_ids:
                     capability_ids.append(capability_id)

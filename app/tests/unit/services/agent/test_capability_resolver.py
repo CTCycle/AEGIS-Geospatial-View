@@ -117,6 +117,26 @@ def test_canonicalizes_alias_capability_ids_inside_overlay_commands() -> None:
         "openmeteo_weather_forecast"
     ]
 
+
+def test_preserves_unmatched_capability_ids_for_focused_clarification() -> None:
+    turn = _turn("Hide the fictional overlay", "fictional")
+    turn = turn.model_copy(
+        update={
+            "overlay_commands": [
+                OverlayCommand(
+                    action="hide",
+                    selector=OverlaySelector(capability_ids=["fictional_overlay"]),
+                )
+            ]
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.overlay_commands[0].selector.capability_ids == [
+        "fictional_overlay"
+    ]
+
 ###############################################################################
 def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> None:
     resolved = _resolver().resolve(
