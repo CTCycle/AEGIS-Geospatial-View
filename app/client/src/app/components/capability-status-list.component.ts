@@ -20,6 +20,7 @@ export interface CapabilityStatusItem {
 })
 export class CapabilityStatusListComponent {
   @Input({ required: true }) items: CapabilityStatusItem[] = [];
+  @Input() nowrap = false;
 
   trackStatusItem(_: number, item: CapabilityStatusItem): string {
     return `${item.label}:${item.statusLabel}`;

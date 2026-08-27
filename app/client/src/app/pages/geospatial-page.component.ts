@@ -266,7 +266,6 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
         detail: weather?.description || 'Weather intelligence is derived from the live capability catalog.',
       },
       { label: 'Optional Keys', statusLabel: 'Optional', tone: 'warn', detail: 'Optional provider credentials are configured in Model Settings.' },
-      { label: 'Context', statusLabel: this.contextUsageLabel, tone: 'none', detail: this.contextUsageDetail },
     ];
   }
 
@@ -289,6 +288,19 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
     const model = [this.contextUsage.provider, this.contextUsage.model].filter(Boolean).join(' / ');
     const limitText = selected ? `${selected.toLocaleString()} token cap` : 'provider limit not reported';
     return `${this.contextUsage.estimated_input_tokens.toLocaleString()} tokens / ${limitText}${model ? ` - ${model}` : ''}`;
+  }
+
+  get contextUsageTone(): 'neutral' | 'warning' | 'critical' {
+    if (!this.contextUsage || this.contextUsage.usage_percent === null) {
+      return 'neutral';
+    }
+    if (this.contextUsagePercent >= 95) {
+      return 'critical';
+    }
+    if (this.contextUsagePercent >= 80) {
+      return 'warning';
+    }
+    return 'neutral';
   }
 
   startNewChat(): void {
@@ -795,10 +807,31 @@ export class GeospatialPageComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     this.pendingMapSession = mapSession;
+    this.synchronizeOverlayState(mapSession);
     this.payload = {
       map_session: mapSession,
       compliance_warnings: mapSession.compliance_warnings,
     };
+  }
+
+  private synchronizeOverlayState(session: MapSession): void {
+    const overlays = session.overlays || [];
+    const ids = new Set(overlays.map((overlay) => overlay.id));
+    const visibility = Object.fromEntries(
+      Object.entries(this.mapState.overlayVisibility).filter(([id]) => ids.has(id)),
+    );
+    const opacity = Object.fromEntries(
+      Object.entries(this.mapState.overlayOpacity).filter(([id]) => ids.has(id)),
+    );
+    overlays.forEach((overlay) => {
+      if (typeof overlay.visible === 'boolean') {
+        visibility[overlay.id] = overlay.visible;
+      }
+      if (typeof overlay.default_opacity === 'number') {
+        opacity[overlay.id] = overlay.default_opacity;
+      }
+    });
+    this.mapState = { overlayVisibility: visibility, overlayOpacity: opacity };
   }
 
   onMapRenderStateChange(change: MapRenderStateChange): void {

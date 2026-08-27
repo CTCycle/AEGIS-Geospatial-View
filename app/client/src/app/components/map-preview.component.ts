@@ -18,6 +18,8 @@ import { DEFAULT_MAP_FIT_MAX_ZOOM, DEFAULT_OVERLAY_OPACITY } from '../core/const
 import {
   MapSession,
   CapabilityDescriptor,
+  MapInspection,
+  MapOverlayEntry,
   OverlayRenderStatus,
   OverlayOpacityChange,
   OverlayStateChange,
@@ -76,11 +78,15 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
   }
 
+  @ViewChild('inspectionPanel', { static: false })
+  private inspectionPanelRef?: ElementRef<HTMLElement>;
+
   mapSession?: MapSession;
   overlayVisibility: Record<string, boolean> = {};
   overlayOpacity: Record<string, number> = {};
   overlayRenderStatuses: OverlayRenderStatus[] = [];
   restoreNotice = '';
+  selectedInspection?: MapInspection;
 
   private mapRef: Map | null = null;
   private activeMapContainer: HTMLDivElement | null = null;
@@ -97,6 +103,11 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     originalContainer: HTMLDivElement;
     generation: number;
   };
+  private inspectionListeners: Array<{
+    map: Map;
+    layerId: string;
+    handler: (event: unknown) => void;
+  }> = [];
 
   constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
@@ -174,6 +185,16 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.destroyMap();
   }
 
+  get inspectionEntries(): MapInspection[] {
+    const entries = [
+      ...(this.mapSession?.inspections || []),
+      ...this.overlays.flatMap((overlay) => overlay.inspections || []),
+    ];
+    return entries.filter((entry, index, all) => (
+      all.findIndex((candidate) => candidate.inspection_id === entry.inspection_id) === index
+    ));
+  }
+
   setOverlayVisibility(overlayId: string, checked: boolean): void {
     this.overlayVisibility = { ...this.overlayVisibility, [overlayId]: checked };
     this.emitOverlayState();
@@ -197,6 +218,32 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   onOverlayOpacityChange(change: OverlayOpacityChange): void {
     this.setOverlayOpacity(change.overlayId, change.percentValue);
+  }
+
+  openInspection(inspection: MapInspection): void {
+    this.selectedInspection = inspection;
+    this.changeDetector.detectChanges();
+    queueMicrotask(() => this.inspectionPanelRef?.nativeElement.focus());
+  }
+
+  inspectionForOverlayId(overlayId: string): MapInspection | undefined {
+    return this.overlays.find((overlay) => overlay.id === overlayId)?.inspections?.[0];
+  }
+
+  closeInspection(): void {
+    this.selectedInspection = undefined;
+  }
+
+  isSafeInspectionUrl(value: string | null | undefined): boolean {
+    if (!value) {
+      return false;
+    }
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
   }
 
   onBasemapSelection(value: string): void {
@@ -317,8 +364,10 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const nextCenterKey = `${latitude.toFixed(5)}:${longitude.toFixed(5)}`;
     if (this.mapRef && this.activeBasemapId === nextBasemapId && this.activeCenterKey === nextCenterKey) {
       // Overlay and metadata updates are applied to the known-good map in place.
+      this.unbindInspectionListeners();
       removeOverlayLayers(this.mapRef, this.mapSession);
       this.overlayRenderStatuses = addOverlayLayers(this.mapRef, this.mapSession);
+      this.bindInspectionListeners(this.mapRef);
       this.applyOverlayStateToMap();
       this.emitRenderState('ready');
       this.changeDetector.detectChanges();
@@ -377,6 +426,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
         candidateSettled = true;
         this.mapPreparing = false;
         clearCandidate();
+        this.unbindInspectionListenersForMap(candidate);
         candidate.remove();
         this.removeCandidateContainer(candidateContainer, originalContainer);
         if (!this.destroyed) {
@@ -391,6 +441,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       }
       candidate.resize();
       this.overlayRenderStatuses = addOverlayLayers(candidate, this.mapSession);
+      this.bindInspectionListeners(candidate);
       const bounds = normalizeBounds(this.mapSession?.bounds);
       if (bounds) {
         candidate.fitBounds(bounds, { padding: 30, duration: 0, maxZoom: DEFAULT_MAP_FIT_MAX_ZOOM });
@@ -480,7 +531,7 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
       if (!layerIds.some((layerId) => map.getLayer(layerId))) {
         return;
       }
-      const visible = this.overlayVisibility[overlay.id] ?? true;
+      const visible = this.overlayVisibility[overlay.id] ?? overlay.visible ?? true;
       const opacityValue = this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY;
       layerIds.forEach((layerId) => {
         if (map.getLayer(layerId)) {
@@ -524,10 +575,12 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     const pendingCandidate = this.pendingCandidate;
     this.pendingCandidate = undefined;
     if (pendingCandidate) {
+      this.unbindInspectionListenersForMap(pendingCandidate.map);
       pendingCandidate.map.remove();
       this.removeCandidateContainer(pendingCandidate.container, pendingCandidate.originalContainer);
     }
     if (this.mapRef) {
+      this.unbindInspectionListeners();
       this.mapRef.remove();
       this.mapRef = null;
     }
@@ -537,5 +590,150 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.activeMapContainer = null;
     this.activeBasemapId = null;
     this.activeCenterKey = null;
+  }
+
+  private bindInspectionListeners(map: Map): void {
+    this.unbindInspectionListeners();
+    this.overlays.forEach((overlay) => {
+      const renderingMode = String(overlay.rendering_mode || overlay.type || '').toLowerCase();
+      if (!['geojson', 'arcgis-geojson', 'clustered-points', 'choropleth', 'camera-points'].includes(renderingMode)) {
+        return;
+      }
+      const layerIds = getOverlayLayerIds(overlay).filter((layerId) => !layerId.endsWith('-clusters') && !layerId.endsWith('-cluster-count'));
+      layerIds.forEach((layerId) => {
+        if (!map.getLayer(layerId) || typeof map.on !== 'function') {
+          return;
+        }
+        const handler = (event: unknown): void => {
+          const point = (event as { point?: unknown } | null)?.point;
+          const lngLat = (event as { lngLat?: { lng: number; lat: number } } | null)?.lngLat;
+          if (!point || !lngLat || typeof map.queryRenderedFeatures !== 'function') {
+            return;
+          }
+          const features = map.queryRenderedFeatures(point as Parameters<Map['queryRenderedFeatures']>[0], { layers: [layerId] });
+          const feature = features[0] as { id?: string | number; properties?: Record<string, unknown> } | undefined;
+          if (!feature) {
+            return;
+          }
+          const inspection = this.inspectionForFeature(overlay, feature);
+          if (!inspection) {
+            return;
+          }
+          this.openInspection(inspection);
+          const popupContent = this.buildPopupContent(inspection);
+          new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' })
+            .setLngLat([lngLat.lng, lngLat.lat])
+            .setDOMContent(popupContent)
+            .addTo(map);
+        };
+        this.registerLayerClickListener(map, layerId, handler);
+        this.inspectionListeners.push({ map, layerId, handler });
+      });
+    });
+  }
+
+  private unbindInspectionListeners(): void {
+    this.inspectionListeners.forEach(({ map, layerId, handler }) => {
+      this.unregisterLayerClickListener(map, layerId, handler);
+    });
+    this.inspectionListeners = [];
+  }
+
+  private unbindInspectionListenersForMap(target: Map): void {
+    const remaining: typeof this.inspectionListeners = [];
+    this.inspectionListeners.forEach((entry) => {
+      if (entry.map === target) {
+        this.unregisterLayerClickListener(entry.map, entry.layerId, entry.handler);
+      } else {
+        remaining.push(entry);
+      }
+    });
+    this.inspectionListeners = remaining;
+  }
+
+  private registerLayerClickListener(map: Map, layerId: string, handler: (event: unknown) => void): void {
+    if (typeof map.on !== 'function') {
+      return;
+    }
+    // MapLibre exposes a three-argument layer overload. Keep a small fallback
+    // for lightweight map doubles used by the component tests and integrations.
+    if (map.on.length >= 3) {
+      map.on('click', layerId, handler as never);
+    } else {
+      map.on('click', handler as never);
+    }
+  }
+
+  private unregisterLayerClickListener(map: Map, layerId: string, handler: (event: unknown) => void): void {
+    if (typeof map.off !== 'function') {
+      return;
+    }
+    if (map.off.length >= 3) {
+      map.off('click', layerId, handler as never);
+    } else {
+      map.off('click', handler as never);
+    }
+  }
+
+  private inspectionForFeature(
+    overlay: MapOverlayEntry,
+    feature: { id?: string | number; properties?: Record<string, unknown> },
+  ): MapInspection | undefined {
+    const featureId = String(feature.id ?? feature.properties?.['id'] ?? '');
+    const existing = (overlay.inspections || []).find((entry) => (
+      !featureId || entry.feature_id === featureId
+    ));
+    if (existing) {
+      return existing;
+    }
+    const properties = feature.properties || {};
+    const allowedKeys = new Set([
+      'metric', 'value', 'unit', 'units', 'observation_time', 'observationTime',
+      'forecast_time', 'forecastTime', 'time', 'freshness', 'name', 'label',
+      'category', 'address', 'status', 'provider', 'event', 'severity',
+      'effective', 'effective_time', 'expiry', 'expiry_time', 'feed', 'feed_id',
+      'station', 'station_id', 'camera', 'camera_id', 'period', 'geography',
+      'source', 'license', 'update_time', 'updated_at', 'updatedAt',
+    ]);
+    const fields = Object.entries(properties)
+      .filter(([key]) => allowedKeys.has(key))
+      .flatMap(([key, value], order) => {
+        if (value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+          return [];
+        }
+        return [{
+          key,
+          label: key.replace(/([A-Z])/g, ' $1').replaceAll('_', ' ').replace(/^./, (value) => value.toUpperCase()),
+          value: typeof value === 'string' ? value.slice(0, 240) : value,
+          order,
+        }];
+      })
+      .slice(0, 14);
+    if (!fields.length) {
+      return undefined;
+    }
+    return {
+      inspection_id: `${overlay.id}:feature:${featureId || 'selected'}`,
+      title: String(properties['name'] || properties['label'] || overlay.label).slice(0, 240),
+      association: 'feature',
+      provider: overlay.provider,
+      feature_id: featureId || null,
+      fields,
+      warnings: [],
+    };
+  }
+
+  private buildPopupContent(inspection: MapInspection): HTMLElement {
+    const root = document.createElement('div');
+    root.className = 'map-inspection-popup';
+    const heading = document.createElement('strong');
+    heading.textContent = inspection.title;
+    root.appendChild(heading);
+    inspection.fields.slice(0, 5).forEach((field) => {
+      const row = document.createElement('div');
+      row.textContent = `${field.label}: ${field.value ?? '—'}${field.unit ? ` ${field.unit}` : ''}`;
+      root.appendChild(row);
+    });
+    return root;
   }
 }

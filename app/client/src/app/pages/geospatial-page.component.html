@@ -62,9 +62,24 @@
               }
             </button>
           </div>
-          <div class="chat-status-strip" aria-label="Chat and capability status">
-            <app-capability-status-list [items]="capabilityStatusItems"></app-capability-status-list>
-            <button type="button" class="chat-status-settings" (click)="navigateToSettings()">Model Settings</button>
+          <div
+            class="context-window-row"
+            [class.context-window-row--warning]="contextUsageTone === 'warning'"
+            [class.context-window-row--critical]="contextUsageTone === 'critical'"
+            aria-label="Context window usage"
+            [attr.title]="contextUsageDetail"
+          >
+            <span class="context-window-row__label">Context</span>
+            <progress
+              class="context-window-row__progress"
+              max="100"
+              [attr.value]="contextUsage ? contextUsagePercent : null"
+              [attr.aria-valuenow]="contextUsage ? contextUsagePercent : null"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              [attr.aria-valuetext]="contextUsageDetail"
+            ></progress>
+            <span class="context-window-row__value">{{ contextUsageLabel }}</span>
           </div>
           @if (composerError) {
             <p class="chat-composer-error" role="alert">{{ composerError }}</p>
@@ -133,6 +148,10 @@
         ></app-map-preview>
       </div>
     </section>
+
+    <footer class="workspace-status-bar" aria-label="Workspace status">
+      <app-capability-status-list [items]="capabilityStatusItems" [nowrap]="true"></app-capability-status-list>
+    </footer>
 
     @if (showProgressIndicator) {
     <div class="chat-progress-indicator" aria-live="polite">

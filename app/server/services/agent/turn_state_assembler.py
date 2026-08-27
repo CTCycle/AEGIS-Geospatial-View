@@ -12,6 +12,7 @@ from server.domain.agent.pipeline import (
     VisualizationUpdate,
 )
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
+from server.contracts.extraction import OverlayCommand
 from server.contracts.geospatial import MapSession, OverlayMutationResult
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.location_memory import LocationMemoryService
@@ -53,7 +54,7 @@ class AgentTurnStateAssembler:
     @staticmethod
     def apply_overlay_commands(
         session: MapSession,
-        commands: list[Any],
+        commands: list[OverlayCommand],
     ) -> tuple[MapSession, list[OverlayMutationResult]]:
         """Apply typed overlay mutations to a native-loop map result.
 
@@ -62,7 +63,7 @@ class AgentTurnStateAssembler:
         stale follow-up from silently replacing a newer map state.
         """
         collection = OverlayCollectionService.from_map_session(session)
-        bound_commands = []
+        bound_commands: list[OverlayCommand] = []
         for command in commands:
             if command.state_reference.revision == 0 and collection.revision > 0:
                 command = command.model_copy(
@@ -362,7 +363,7 @@ class AgentTurnStateAssembler:
                 *active_overlay_ids,
                 *[
                     item
-                    for item in capability_selection.get("overlay_ids") or []
+                    for item in json_array(capability_selection.get("overlay_ids"))
                     if isinstance(item, str)
                 ],
             ])),

@@ -171,6 +171,63 @@ export interface CameraFeature {
   metadata: Record<string, JsonValue>;
 }
 
+export interface InspectionField {
+  key: string;
+  label: string;
+  value: string | number | boolean | null;
+  unit?: string | null;
+  category?: string;
+  source_url?: string | null;
+  order?: number;
+}
+
+export interface MapInspection {
+  inspection_id: string;
+  title: string;
+  association: 'feature' | 'location' | 'overlay' | 'non_spatial' | string;
+  provider?: string | null;
+  feature_id?: string | null;
+  fields: InspectionField[];
+  source_url?: string | null;
+  freshness?: string | null;
+  stale?: boolean;
+  warnings?: string[];
+  geometry?: Record<string, JsonValue> | null;
+}
+
+export interface OverlayInstance {
+  instance_id: string;
+  capability_id: string;
+  label: string;
+  provider: string;
+  overlay_type: string;
+  rendering_mode: string;
+  scope_key: string;
+  scope: Record<string, JsonValue>;
+  visible: boolean;
+  opacity: number;
+  render_variant: Record<string, string | null>;
+  descriptor: Record<string, JsonValue>;
+  inspections: MapInspection[];
+}
+
+export interface OverlayCollectionState {
+  collection_id: string;
+  revision: number;
+  instances: OverlayInstance[];
+}
+
+export interface OverlayMutationResult {
+  collection_id: string;
+  revision: number;
+  added_instance_ids: string[];
+  removed_instance_ids: string[];
+  updated_instance_ids: string[];
+  unmatched_selectors: string[];
+  ambiguous_selectors: string[];
+  clarification?: string | null;
+}
+
 
 export type GeospatialProviderAutomationSupport =
   | 'manual_only'
@@ -258,11 +315,14 @@ export interface MapSession {
   };
   overlays?: Array<{
     id: string;
+    instance_id?: string;
+    capability_id?: string;
     label: string;
     provider: string;
     type: string;
     rendering_mode?: RenderingMode | string;
     default_opacity?: number;
+    visible?: boolean;
     url?: string | null;
     tile_url_template?: string;
     layers?: string;
@@ -285,11 +345,15 @@ export interface MapSession {
     warnings?: string[];
     render?: GeospatialLayerRenderDescriptor | null;
     data?: GeoJsonFeatureCollection;
+    inspections?: MapInspection[];
   }>;
   requested_overlay_ids?: string[];
   rendered_overlay_ids?: string[];
   failed_overlays?: Array<{ id: string; reason: string; code?: string }>;
   compliance_warnings?: string[];
+  overlay_collection_revision?: number;
+  overlay_collection?: OverlayCollectionState | null;
+  inspections?: MapInspection[];
 }
 
 export interface GeoJsonFeatureCollection {
@@ -483,6 +547,27 @@ export interface TurnParseResult {
   map_target?: string | null;
   entity_target?: string | null;
   requested_layers?: string[];
+  overlay_commands?: Array<{
+    action: 'add' | 'remove' | 'keep_only' | 'show' | 'hide' | 'update';
+    selector: {
+      instance_ids: string[];
+      capability_ids: string[];
+      concepts: string[];
+      labels: string[];
+      providers: string[];
+      overlay_types: string[];
+      rendering_modes: string[];
+      tags: string[];
+      visibility: 'any' | 'visible' | 'hidden';
+    };
+    scope: {
+      kind: 'global' | 'current_view' | 'location';
+      location?: Record<string, JsonValue> | null;
+      label?: string | null;
+    };
+    patch: { opacity?: number | null; time?: string | null; style?: string | null; format?: string | null };
+    state_reference: { collection_id: string; revision: number };
+  }>;
   requested_basemap?: string | null;
   requested_attributes?: string[];
   required_data_sources?: string[];
@@ -633,6 +718,14 @@ export interface VisualizationUpdate {
   add_layer_ids: string[];
   remove_layer_ids: string[];
   replace_layer_ids: Record<string, string>;
+  collection_id?: string;
+  collection_revision?: number | null;
+  added_instance_ids?: string[];
+  removed_instance_ids?: string[];
+  updated_instance_ids?: string[];
+  unmatched_selectors?: string[];
+  ambiguous_selectors?: string[];
+  clarification?: string | null;
 }
 
 export interface ChatTurnResponse {

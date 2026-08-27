@@ -71,7 +71,12 @@
         @if (metadataOnlyOverlays.length) {
           <div class="metadata-panel" aria-label="Metadata-only layers">
             @for (overlay of metadataOnlyOverlays; track overlay.id) {
-              <p><strong>{{ overlay.label }}</strong> is available as metadata or setup context only.</p>
+              <p>
+                <strong>{{ overlay.label }}</strong> is available as metadata or setup context only.
+                @if (overlay.inspections?.[0]; as inspection) {
+                  <button type="button" class="metadata-panel__action" (click)="openInspection(inspection)">Inspect</button>
+                }
+              </p>
             }
           </div>
         }
@@ -87,7 +92,12 @@
         @if (legendEntries.length) {
           <div class="legend-panel" aria-label="Layer legend">
             @for (entry of legendEntries; track entry.id) {
-              <p><span class="legend-swatch"></span>{{ entry.label }} <span>{{ entry.mode }}</span></p>
+              <p>
+                <span class="legend-swatch"></span>{{ entry.label }} <span>{{ entry.mode }}</span>
+                @if (inspectionForOverlayId(entry.id); as inspection) {
+                  <button type="button" class="metadata-panel__action" (click)="openInspection(inspection)">Inspect</button>
+                }
+              </p>
             }
           </div>
         }
@@ -104,6 +114,42 @@
           <div class="compliance-panel" role="status" aria-live="polite">
             <p>{{ restoreNotice }}</p>
           </div>
+        }
+
+        @if (selectedInspection) {
+          <aside
+            #inspectionPanel
+            class="map-inspection-panel"
+            role="dialog"
+            aria-label="Map feature details"
+            tabindex="-1"
+            (keydown.escape)="closeInspection()"
+          >
+            <header class="map-inspection-panel__header">
+              <div>
+                <p class="map-inspection-panel__eyebrow">{{ selectedInspection.association }}</p>
+                <h2>{{ selectedInspection.title }}</h2>
+              </div>
+              <button type="button" class="map-inspection-panel__close" aria-label="Close details" title="Close details" (click)="closeInspection()">×</button>
+            </header>
+            @if (selectedInspection.stale) {
+              <p class="map-inspection-panel__stale">Stale provider metadata</p>
+            }
+            <dl>
+              @for (field of selectedInspection.fields; track field.key) {
+                <div>
+                  <dt>{{ field.label }}</dt>
+                  <dd>{{ field.value ?? '—' }}{{ field.unit ? ' ' + field.unit : '' }}</dd>
+                </div>
+              }
+            </dl>
+            @if (selectedInspection.source_url && isSafeInspectionUrl(selectedInspection.source_url)) {
+              <a class="map-inspection-panel__source" [href]="selectedInspection.source_url" target="_blank" rel="noopener noreferrer">Open approved source</a>
+            }
+            @for (warning of selectedInspection.warnings || []; track warning) {
+              <p class="map-inspection-panel__warning">{{ warning }}</p>
+            }
+          </aside>
         }
       </div>
     }

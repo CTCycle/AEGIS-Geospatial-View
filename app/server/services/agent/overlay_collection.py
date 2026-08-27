@@ -1,13 +1,14 @@
-from __future__ import annotations
-
 """Deterministic operations over the active map's overlay collection."""
 
+from __future__ import annotations
+
 from hashlib import sha256
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 from server.contracts.extraction import OverlayCommand, OverlaySelector
 from server.contracts.geospatial import (
     MapSession,
+    MapInspection,
     OverlayCollectionState,
     OverlayInstance,
     OverlayMutationResult,
@@ -73,7 +74,9 @@ class OverlayCollectionService:
     @classmethod
     def _concept_matches(cls, concepts: set[str], value: str) -> bool:
         aliases = cls._aliases_for(value)
-        concept_tokens = set().union(*(cls._tokens(item) for item in concepts))
+        concept_tokens: set[str] = set()
+        for concept in concepts:
+            concept_tokens.update(cls._tokens(concept))
         return any(
             alias in concepts
             or any(alias in concept or concept in alias for concept in concepts)
@@ -90,16 +93,16 @@ class OverlayCollectionService:
             instance.label,
             instance.overlay_type,
             instance.rendering_mode,
-            *(
-                descriptor.get(key, [])
-                for key in ("concepts", "tags", "aliases")
-                if isinstance(descriptor.get(key), list)
-            ),
         ]
+        for key in ("concepts", "tags", "aliases"):
+            raw_values = descriptor.get(key)
+            if isinstance(raw_values, list):
+                raw_values = cast(list[Any], raw_values)
+                values.extend(item for item in raw_values if isinstance(item, str))
         flattened: list[object] = []
         for value in values:
             if isinstance(value, list):
-                flattened.extend(value)
+                flattened.extend(item for item in cast(list[Any], value) if isinstance(item, str))
             else:
                 flattened.append(value)
         return {cls._norm(item) for item in flattened if cls._norm(item)}
@@ -159,8 +162,9 @@ class OverlayCollectionService:
     def _location_point(cls, value: object) -> tuple[float, float] | None:
         if not isinstance(value, dict):
             return None
-        latitude = value.get("latitude")
-        longitude = value.get("longitude")
+        location = cast(dict[str, Any], value)
+        latitude = location.get("latitude")
+        longitude = location.get("longitude")
         if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
             return float(latitude), float(longitude)
         return None
@@ -168,14 +172,36 @@ class OverlayCollectionService:
     # ------------------------------------------------------------------
     @classmethod
     def _bbox_contains(cls, bbox: object, point: tuple[float, float] | None) -> bool:
-        if point is None or not isinstance(bbox, list) or len(bbox) != 4:
+        if point is None:
             return False
-        try:
-            min_lon, min_lat, max_lon, max_lat = (float(item) for item in bbox)
-        except (TypeError, ValueError):
+        values = cls._bbox_values(bbox)
+        if values is None:
             return False
+        min_lon, min_lat, max_lon, max_lat = values
         latitude, longitude = point
         return min_lat <= latitude <= max_lat and min_lon <= longitude <= max_lon
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _bbox_values(value: object) -> tuple[float, float, float, float] | None:
+        if not isinstance(value, list):
+            return None
+        values = cast(list[Any], value)
+        if len(values) != 4:
+            return None
+        numbers: list[float] = []
+        for item in values:
+            if isinstance(item, (int, float)):
+                numbers.append(float(item))
+                continue
+            if isinstance(item, str):
+                try:
+                    numbers.append(float(item))
+                except ValueError:
+                    return None
+                continue
+            return None
+        return tuple(numbers)  # type: ignore[return-value]
 
     # ------------------------------------------------------------------
     @classmethod
@@ -200,11 +226,11 @@ class OverlayCollectionService:
             if cls._bbox_contains(view_bbox, instance_point):
                 return True
             instance_bbox = instance.viewport.get("bbox") if instance.viewport else None
-            if isinstance(view_bbox, list) and isinstance(instance_bbox, list):
+            if view_bbox is not None and instance_bbox is not None:
                 return cls._bboxes_intersect(view_bbox, instance_bbox)
             return False
         target = scope.location or {}
-        target_bbox = target.get("bbox") if isinstance(target, dict) else None
+        target_bbox = target.get("bbox")
         if cls._bbox_contains(target_bbox, instance_point):
             return True
         target_point = cls._location_point(target)
@@ -213,7 +239,7 @@ class OverlayCollectionService:
                 target_point[1] - instance_point[1]
             ) < 0.25
         target_label_value = scope.label
-        if not target_label_value and isinstance(target, dict):
+        if not target_label_value:
             target_label_value = target.get("label") or target.get("raw_value")
         target_label = cls._norm(target_label_value)
         if not target_label:
@@ -229,14 +255,13 @@ class OverlayCollectionService:
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _bboxes_intersect(left: list[object], right: list[object]) -> bool:
-        if len(left) != 4 or len(right) != 4:
+    def _bboxes_intersect(left: object, right: object) -> bool:
+        left_values = OverlayCollectionService._bbox_values(left)
+        right_values = OverlayCollectionService._bbox_values(right)
+        if left_values is None or right_values is None:
             return False
-        try:
-            l_min_lon, l_min_lat, l_max_lon, l_max_lat = (float(item) for item in left)
-            r_min_lon, r_min_lat, r_max_lon, r_max_lat = (float(item) for item in right)
-        except (TypeError, ValueError):
-            return False
+        l_min_lon, l_min_lat, l_max_lon, l_max_lat = left_values
+        r_min_lon, r_min_lat, r_max_lon, r_max_lat = right_values
         return not (
             l_max_lon < r_min_lon
             or r_max_lon < l_min_lon
@@ -279,13 +304,11 @@ class OverlayCollectionService:
         if command.scope.kind == "current_view":
             return "current_view"
         location = command.scope.location or {}
-        if isinstance(location, dict):
-            label = location.get("label") or location.get("raw_value") or command.scope.label
-            point = cls._location_point(location)
-            if point is not None:
-                return f"location:{cls._norm(label)}:{point[0]:.4f}:{point[1]:.4f}"
-            return f"location:{cls._norm(label)}"
-        return f"location:{cls._norm(command.scope.label)}"
+        label = location.get("label") or location.get("raw_value") or command.scope.label
+        point = cls._location_point(location)
+        if point is not None:
+            return f"location:{cls._norm(label)}:{point[0]:.4f}:{point[1]:.4f}"
+        return f"location:{cls._norm(label)}"
 
     # ------------------------------------------------------------------
     @classmethod
@@ -309,13 +332,18 @@ class OverlayCollectionService:
             provider = str(item.get("provider") or "")
             overlay_type = str(item.get("overlay_type") or item.get("type") or item.get("kind") or "overlay")
             rendering_mode = str(item.get("rendering_mode") or item.get("renderingMode") or "metadata-only")
-            concepts = item.get("concepts") if isinstance(item.get("concepts"), list) else []
+            concepts_raw = item.get("concepts")
+            concepts = (
+                [value for value in cast(list[Any], concepts_raw) if isinstance(value, str)]
+                if isinstance(concepts_raw, list)
+                else []
+            )
             haystack = {
                 cls._norm(capability_id),
                 cls._norm(label),
                 cls._norm(provider),
                 cls._norm(overlay_type),
-                *[cls._norm(value) for value in concepts if isinstance(value, str)],
+                *[cls._norm(value) for value in concepts],
             }
             selector = command.selector
             if selector.capability_ids and capability_id not in selector.capability_ids:
@@ -330,6 +358,18 @@ class OverlayCollectionService:
                 cls._norm(value) for value in selector.rendering_modes
             }:
                 continue
+            if selector.tags:
+                candidate_tags = (
+                    {
+                        cls._norm(value)
+                        for value in cast(list[Any], item.get("tags"))
+                        if isinstance(value, str)
+                    }
+                    if isinstance(item.get("tags"), list)
+                    else set()
+                )
+                if not candidate_tags.intersection({cls._norm(value) for value in selector.tags}):
+                    continue
             if selector.concepts and not any(
                 cls._concept_matches(haystack, value) for value in selector.concepts
             ):
@@ -365,6 +405,9 @@ class OverlayCollectionService:
         descriptor.setdefault("provider", candidate["provider"])
         descriptor.setdefault("type", candidate["overlay_type"])
         descriptor.setdefault("rendering_mode", candidate["rendering_mode"])
+        for key in ("concepts", "tags", "aliases"):
+            if key in candidate:
+                descriptor.setdefault(key, candidate[key])
         descriptor.update({key: value for key, value in variant.items() if value is not None})
         resolved_location = candidate.get("resolved_location")
         return OverlayInstance(
@@ -561,6 +604,18 @@ class OverlayCollectionService:
 
     # ------------------------------------------------------------------
     @classmethod
+    def has_matching_instances(
+        cls,
+        collection: OverlayCollectionState,
+        command: OverlayCommand,
+        *,
+        current_view: dict[str, Any] | None = None,
+    ) -> bool:
+        """Return whether a command can be satisfied from active state alone."""
+        return bool(cls._matching_instances(collection, command, current_view=current_view))
+
+    # ------------------------------------------------------------------
+    @classmethod
     def from_map_session(cls, session: MapSession | dict[str, Any] | None) -> OverlayCollectionState:
         if session is None:
             return OverlayCollectionState()
@@ -582,6 +637,16 @@ class OverlayCollectionService:
                 "format": str(descriptor.get("format")) if descriptor.get("format") is not None else None,
             }
             instance_id = str(descriptor.get("instance_id") or cls._stable_id(capability_id, session_scope_key, variant))
+            raw_inspections = descriptor.get("inspections")
+            inspections: list[MapInspection] = []
+            if isinstance(raw_inspections, list):
+                for raw_inspection in cast(list[Any], raw_inspections):
+                    if not isinstance(raw_inspection, dict):
+                        continue
+                    try:
+                        inspections.append(MapInspection.model_validate(raw_inspection))
+                    except Exception:
+                        continue
             instances.append(
                 OverlayInstance(
                     instance_id=instance_id,
@@ -596,12 +661,13 @@ class OverlayCollectionService:
                     viewport=model.viewport.model_dump(mode="json"),
                     visible=descriptor.get("visible") is not False,
                     opacity=(
-                        float(descriptor["default_opacity"])
-                        if isinstance(descriptor.get("default_opacity"), (int, float))
+                        float(default_opacity)
+                        if isinstance(default_opacity := descriptor.get("default_opacity"), (int, float))
                         else 1.0
                     ),
                     render_variant=variant,
                     descriptor=dict(descriptor),
+                    inspections=inspections,
                 )
             )
         return OverlayCollectionState(
@@ -623,7 +689,7 @@ class OverlayCollectionService:
         show, or remove operation never causes unrelated providers to run.
         """
         overlays: list[dict[str, Any]] = []
-        inspections = []
+        inspections: list[Any] = []
         for instance in collection.instances:
             descriptor = dict(instance.descriptor)
             descriptor["id"] = instance.instance_id

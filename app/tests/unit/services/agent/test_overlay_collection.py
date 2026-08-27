@@ -172,3 +172,71 @@ def test_add_reuses_same_capability_and_scope_identity() -> None:
     assert len(second.instances) == 1
     assert second.instances[0].instance_id == first.instances[0].instance_id
     assert second_result.added_instance_ids == []
+
+
+def test_catalog_selector_filters_provider_type_and_tags() -> None:
+    command = OverlayCommand(
+        action="add",
+        selector=OverlaySelector(
+            concepts=["weather"],
+            providers=["official-feed"],
+            overlay_types=["raster"],
+            tags=["forecast"],
+        ),
+        state_reference=OverlayStateReference(revision=0),
+    )
+    catalog = [
+        {
+            "id": "weather-official",
+            "label": "Weather forecast",
+            "provider": "official-feed",
+            "type": "raster",
+            "rendering_mode": "raster-tile",
+            "concepts": ["weather"],
+            "tags": ["forecast"],
+        },
+        {
+            "id": "weather-community",
+            "label": "Weather forecast",
+            "provider": "community-feed",
+            "type": "raster",
+            "rendering_mode": "raster-tile",
+            "concepts": ["weather"],
+            "tags": ["forecast"],
+        },
+    ]
+
+    updated, result = OverlayCollectionService.apply(collection=OverlayCollectionState(), command=command, catalog=catalog)
+
+    assert result.added_instance_ids == [updated.instances[0].instance_id]
+    assert updated.instances[0].capability_id == "weather-official"
+    assert updated.instances[0].descriptor["tags"] == ["forecast"]
+
+
+def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
+    ambiguous = OverlayCommand(
+        action="add",
+        selector=OverlaySelector(concepts=["weather"]),
+        state_reference=OverlayStateReference(revision=0),
+    )
+    catalog = [
+        {"id": "weather-one", "label": "Weather", "concepts": ["weather"]},
+        {"id": "weather-two", "label": "Weather", "concepts": ["weather"]},
+    ]
+    unchanged, ambiguous_result = OverlayCollectionService.apply(
+        OverlayCollectionState(), ambiguous, catalog=catalog
+    )
+
+    assert unchanged.instances == []
+    assert unchanged.revision == 0
+    assert ambiguous_result.ambiguous_selectors == ["weather"]
+    assert ambiguous_result.clarification
+
+    no_match = OverlayCommand(
+        action="remove",
+        selector=OverlaySelector(instance_ids=["missing"]),
+        state_reference=OverlayStateReference(revision=0),
+    )
+    still_unchanged, no_match_result = OverlayCollectionService.apply(unchanged, no_match)
+    assert still_unchanged == unchanged
+    assert no_match_result.unmatched_selectors == ["missing"]
