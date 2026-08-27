@@ -440,3 +440,42 @@ def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None
     assert "map_session" not in result
     assert service.search_orchestrator is not None
     assert service.search_orchestrator.requests == []  # type: ignore[attr-defined]
+
+###############################################################################
+def test_provider_layer_rendering_surfaces_failed_provider_without_map_success() -> None:
+    service = _service()
+
+    class _FailedSearchOrchestrator:
+
+        # ---------------------------------------------------------------------
+        async def execute(self, payload):  # noqa: ANN001
+            return MapSession(
+                session_id="map-failed",
+                resolved_location=payload.resolved_location,
+                basemap_id=payload.basemap_id,
+                overlay_ids=[],
+                viewport=payload.viewport,
+                requested_overlay_ids=["test:layer-1"],
+                failed_overlays=[
+                    {
+                        "id": "test:layer-1",
+                        "reason": "provider rate limit reached",
+                        "code": "rate_limited",
+                    }
+                ],
+            )
+
+    service.search_orchestrator = _FailedSearchOrchestrator()  # type: ignore[assignment]
+    result = run_async_in_thread(
+        service._render_provider_layer(
+            {"provider_id": "test", "layer_id": "layer-1"}, _context()
+        )
+    )
+
+    assert result["ok"] is False
+    assert result["operation"] == "provider_error"
+    assert result["error"] == {
+        "code": "rate_limited",
+        "message": "Provider layer 'test:layer-1' failed: provider rate limit reached.",
+    }
+    assert result["map_session"] is None

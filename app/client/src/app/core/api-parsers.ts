@@ -332,9 +332,16 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
       ? value.rendered_overlay_ids
       : overlays.map((overlay) => overlay.id),
     failed_overlays: Array.isArray(value.failed_overlays)
-      ? value.failed_overlays.filter((item): item is { id: string; reason: string } => (
-        isRecord(item) && typeof item.id === 'string' && typeof item.reason === 'string'
-      ))
+      ? value.failed_overlays.flatMap((item): Array<{ id: string; reason: string; code?: string }> => {
+        if (!isRecord(item) || typeof item.id !== 'string' || typeof item.reason !== 'string') {
+          return [];
+        }
+        return [{
+          id: item.id,
+          reason: item.reason,
+          ...(typeof item.code === 'string' ? { code: item.code } : {}),
+        }];
+      })
       : [],
     compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
   };

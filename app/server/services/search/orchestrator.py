@@ -10,6 +10,24 @@ from server.contracts.geospatial import LocationSearchRequest, MapSession
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.geospatial.rainviewer import RainViewerService
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderInvalidQueryError,
+    ProviderMalformedPayloadError,
+    ProviderRateLimitError,
+)
+
+
+def _provider_failure_code(error: Exception) -> str:
+    if isinstance(error, ProviderAuthError):
+        return "auth_required"
+    if isinstance(error, ProviderRateLimitError):
+        return "rate_limited"
+    if isinstance(error, ProviderInvalidQueryError):
+        return "invalid_query"
+    if isinstance(error, ProviderMalformedPayloadError):
+        return "malformed_response"
+    return "provider_unavailable"
 
 ###############################################################################
 class LocationSearchOrchestrator:
@@ -82,7 +100,13 @@ class LocationSearchOrchestrator:
                 )
             except Exception as exc:  # noqa: BLE001
                 reason = str(exc) or "provider layer could not be rendered"
-                failed_overlays.append({"id": selection_id, "reason": reason})
+                failed_overlays.append(
+                    {
+                        "id": selection_id,
+                        "reason": reason,
+                        "code": _provider_failure_code(exc),
+                    }
+                )
                 warnings.append(f"Provider layer '{selection_id}' failed: {reason}.")
                 continue
             render = json_object(descriptor.get("render"))

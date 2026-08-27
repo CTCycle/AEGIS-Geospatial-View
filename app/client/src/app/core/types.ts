@@ -288,7 +288,7 @@ export interface MapSession {
   }>;
   requested_overlay_ids?: string[];
   rendered_overlay_ids?: string[];
-  failed_overlays?: Array<{ id: string; reason: string }>;
+  failed_overlays?: Array<{ id: string; reason: string; code?: string }>;
   compliance_warnings?: string[];
 }
 
