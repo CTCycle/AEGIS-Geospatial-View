@@ -416,8 +416,25 @@ class RenderDescriptorService:
         overlay_type: str,
         rendering_mode: str,
     ) -> dict[str, object]:
+        inspection_metadata = {
+            key: value
+            for key, value in metadata.items()
+            if key
+            in {
+                "metric", "value", "unit", "units", "observation_time", "observationTime",
+                "forecast_time", "forecastTime", "freshness", "name", "label", "category",
+                "address", "status", "event", "severity", "effective", "effective_time",
+                "expiry", "expiry_time", "feed", "feed_id", "station", "station_id",
+                "camera", "camera_id", "period", "geography", "source", "license",
+                "update_time", "updated_at", "updatedAt", "source_url", "sourceUrl",
+                "official_url", "officialUrl", "dataset_url", "datasetUrl", "license_url",
+                "licenseUrl", "latitude", "longitude",
+            }
+            and isinstance(value, str | int | float | bool)
+        }
         return {
             "id": str(capability.get("id") or overlay_id),
+            "capability_id": str(capability.get("id") or overlay_id),
             "label": str(metadata.get("label") or capability.get("name") or overlay_id),
             "provider": str(capability.get("provider") or "unknown"),
             "type": overlay_type,
@@ -426,6 +443,9 @@ class RenderDescriptorService:
             "source_protocol": metadata.get("source_protocol"),
             "data_format": metadata.get("data_format"),
             "geometry_type": metadata.get("geometry_type"),
+            "tags": list(metadata.get("tags") or []) if isinstance(metadata.get("tags"), list) else [],
+            "concepts": list(metadata.get("concepts") or []) if isinstance(metadata.get("concepts"), list) else [],
+            "inspection_metadata": inspection_metadata,
         }
 
     # -------------------------------------------------------------------------

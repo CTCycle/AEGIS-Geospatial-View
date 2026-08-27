@@ -16,6 +16,7 @@ from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
 from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 from server.services.agent.tool_plan_executor import ToolPlanExecutor
+from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.chat.history_service import ChatHistoryService
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
@@ -73,10 +74,23 @@ class PlannedTurnExecutionService:
         turn_contract: TurnParseResult,
         latest_memory: dict[str, Any],
     ) -> bool:
-        if not turn_contract.overlay_commands or PlannedTurnExecutionService._active_map_session(latest_memory) is None:
+        active_map = PlannedTurnExecutionService._active_map_session(latest_memory)
+        if not turn_contract.overlay_commands or active_map is None:
             return False
+        collection = OverlayCollectionService.from_map_session(active_map)
+        current_view = active_map.viewport.model_dump(mode="json")
         for command in turn_contract.overlay_commands:
-            if command.action in {"remove", "keep_only", "hide", "show"}:
+            if command.action in {"remove", "keep_only", "hide"}:
+                continue
+            if command.action in {"show", "update"} and not OverlayCollectionService.has_matching_instances(
+                collection,
+                command,
+                current_view=current_view,
+            ):
+                # An absent show/update target may need a catalog lookup or
+                # provider fetch. Let the normal plan build that map.
+                return False
+            if command.action == "show":
                 continue
             if command.action == "update" and command.patch.time is None and command.patch.style is None and command.patch.format is None:
                 continue
@@ -111,6 +125,7 @@ class PlannedTurnExecutionService:
             latest_memory,
         )
         overlay_mutation_results: list[OverlayMutationResult] = []
+        map_session: MapSession | None = None
         local_map_session = self._active_map_session(latest_memory)
         if local_overlay_mutation and local_map_session is not None:
             map_session, overlay_mutation_results = self._apply_overlay_commands(

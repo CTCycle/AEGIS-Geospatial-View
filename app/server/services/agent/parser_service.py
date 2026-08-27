@@ -6,7 +6,7 @@ from server.common.typing import is_json_object
 
 import json
 import re
-from typing import Literal
+from typing import Literal, cast
 
 from server.common.logger import logger as LOGGER
 from server.domain.agent.actions import AgentAction
@@ -22,6 +22,8 @@ from server.contracts.extraction import (
     LocationSignal,
     NormalizedAction,
     OverlayCommand,
+    OverlayScope,
+    OverlaySelector,
     TemporalSignal,
     TurnParseResult,
     ViewportIntent,
@@ -39,6 +41,10 @@ from server.services.llm.types import LLMRequest
 
 ###############################################################################
 class ParserService:
+
+    _FAILURE_CATEGORIES = frozenset(
+        {"model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"}
+    )
 
     # -------------------------------------------------------------------------
     def __init__(
@@ -96,6 +102,15 @@ class ParserService:
             seen.add(text)
             result.append(text)
         return result
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _normalize_failure_category(cls, value: object) -> Literal[
+        "model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"
+    ] | None:
+        return cast(Literal[
+            "model_capability", "provider_api", "schema_definition", "response_parsing", "context_limit"
+        ], value) if value in cls._FAILURE_CATEGORIES else None
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -172,8 +187,31 @@ class ParserService:
             )
             if named_layer is not None:
                 target = named_layer.group(1).strip()
-                if target.casefold() in {"the", "an", "a", "all"}:
+                if target and target.casefold() in {"the", "an", "a", "all"}:
                     target = None
+        if target is None:
+            selector_match = re.search(
+                r"(?i)\bexcept\s+(?:the\s+)?(?P<selector>[^.?!]+)|"
+                r"\bkeep\s+(?:only\s+)?(?:the\s+)?(?P<keep>.+?)\s+and\s+remove\b|"
+                r"\b(?:remove|delete|hide|show|add|enable|update|change)\s+(?:the\s+)?(?P<scoped>.+?)\s+only\s+(?:from|in|over|at)\b",
+                user_message,
+            )
+            if selector_match is not None:
+                target = next(
+                    (
+                        value.strip()
+                        for value in (
+                            selector_match.group("selector"),
+                            selector_match.group("keep"),
+                            selector_match.group("scoped"),
+                        )
+                        if value and value.strip()
+                    ),
+                    None,
+                )
+                if target:
+                    target = re.sub(r"(?i)\s+(?:overlay|layer)s?\s*$", "", target).strip()
+                    target = re.sub(r"(?i)^(?:all|only)\s+", "", target).strip()
         if not target and not any(marker in text for marker in ("overlay", "layer")):
             return []
 
@@ -184,7 +222,7 @@ class ParserService:
             location_signal = next(
                 (item for item in extracted.location_signals if item.raw_value.strip()),
                 None,
-            )
+            ) or cls._extract_text_location_signal(user_message)
             scope_kind = "location" if location_signal is not None else "global"
             location = (
                 {
@@ -196,14 +234,15 @@ class ParserService:
                 if location_signal is not None
                 else None
             )
-        selector = {
-            "concepts": [target] if target else [],
-            "labels": [target] if target and quoted is not None else [],
-        }
+        selector = OverlaySelector(
+            concepts=[target] if target else [],
+            labels=[target] if target and quoted is not None else [],
+        )
+        scope = OverlayScope(kind=scope_kind, location=location)
         command = OverlayCommand(
             action=action,
             selector=selector,
-            scope={"kind": scope_kind, "location": location},
+            scope=scope,
         )
         return [command]
 
@@ -351,7 +390,7 @@ class ParserService:
         text = user_message.casefold()
         render_verbs = (
             "show", "display", "render", "open", "view", "zoom", "locate",
-            "map", "satellite", "overlay", "basemap", "street map",
+            "remove", "delete", "hide", "keep", "map", "satellite", "overlay", "basemap", "street map",
             "mostrar", "muestra", "montre", "carte", "karte", "mappa", "mapa",
         )
         return any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in render_verbs)
@@ -378,7 +417,24 @@ class ParserService:
         if re.search(r"(?i)\b(?:this\s+area|current\s+view|viewport)\b", text):
             return None
 
-        cleaned = re.sub(r"(?i)\b(please|pls|could you|can you|show me|show|display|map|locate|find|open|create|make|muestra|mostrar|montre|carte|karte|mappa|mapa)\b", " ", text)
+        location_clause = re.search(
+            r"(?i)\b(?:over|in|at|from|near|around)\s+(?:the\s+)?(?:location\s+)?(?P<value>[^.?!]+)",
+            text,
+        )
+        if location_clause is not None:
+            value = " ".join(location_clause.group("value").split()).strip(" ,")
+            if value.casefold() not in {"the same map", "same map", "the map", "map"}:
+                value = re.sub(r"(?i)\s+only\s*$", "", value).strip()
+                if len(value) >= 1:
+                    signal_type: Literal["address", "city"] = "address" if re.search(r"\d", value) else "city"
+                    return LLMLocationSignal(
+                        signal_type=signal_type,
+                        raw_value=value,
+                        normalized_value=value,
+                        confidence=0.72 if signal_type == "address" else 0.68,
+                    )
+
+        cleaned = re.sub(r"(?i)\b(please|pls|could you|can you|show me|show|display|remove|delete|hide|conceal|disable|enable|add|update|change|turn off|map|locate|find|open|create|make|muestra|mostrar|montre|carte|karte|mappa|mapa)\b", " ", text)
         cleaned = re.sub(r"(?i)\b(a|an|the|of|for|near|around|over|on|in|to|with|using|me)\b", " ", cleaned)
         cleaned = re.sub(r"(?i)\b(weather|traffic|amenities|overlay|overlays|layer|layers|satellite|imagery|coordinates?)\b", " ", cleaned)
         cleaned = re.sub(r"[.?!]+$", "", cleaned)
@@ -540,10 +596,8 @@ class ParserService:
                 else None
             ),
             provider_error=provider_error,
-            failure_category=(
-                str(provider_error.get("category"))
-                if is_json_object(provider_error) and provider_error.get("category")
-                else None
+            failure_category=cls._normalize_failure_category(
+                provider_error.get("category") if is_json_object(provider_error) else None
             ),
         )
 
@@ -746,7 +800,7 @@ class ParserService:
                 else None
             ),
             provider_error=parser_provider_error,
-            failure_category=parser_failure_category,
+            failure_category=self._normalize_failure_category(parser_failure_category),
         )
         LOGGER.info(
             "parser_normalized task=%s action=%s relationship=%s locations=%d basemap=%s layers=%d viewport_scope=%s tighten=%s ambiguities=%s",

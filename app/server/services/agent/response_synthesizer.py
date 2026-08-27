@@ -146,7 +146,7 @@ class GroundedResponseSynthesizer:
             self.last_failure_detail = f"Provider request failed with code {exc.code}."
             LOGGER.warning("Grounded response synthesis failed category=%s", exc.category, exc_info=True)
             return fallback_text
-        except Exception as exc:
+        except Exception:
             self.last_failure_category = "response_parsing"
             self.last_failure_detail = "The grounded response did not match verified evidence."
             LOGGER.warning("Grounded response synthesis failed category=response_parsing", exc_info=True)

@@ -4,11 +4,12 @@ from server.common.typing import is_json_object, json_object
 
 import math
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
-from server.contracts.geospatial import LocationSearchRequest, MapSession
+from server.contracts.geospatial import LocationSearchRequest, MapInspection, MapSession
 from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
+from server.services.geospatial.inspection import MapInspectionService
 from server.services.geospatial.rainviewer import RainViewerService
 from server.services.geospatial.providers.base import (
     ProviderAuthError,
@@ -88,6 +89,7 @@ class LocationSearchOrchestrator:
                 )
                 continue
             descriptor, overlay_warnings = overlay_result
+            descriptor = MapInspectionService.attach_to_descriptor(descriptor)
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
         for selection in payload.provider_layer_selections:
@@ -121,6 +123,7 @@ class LocationSearchOrchestrator:
                 render["format"] = selection.format
             if render:
                 descriptor["render"] = render
+            descriptor = MapInspectionService.attach_to_descriptor(descriptor)
             overlays.append(descriptor)
             warnings.extend(overlay_warnings)
         rendered_overlay_ids = [
@@ -128,6 +131,18 @@ class LocationSearchOrchestrator:
             for overlay in overlays
             if isinstance(overlay.get("id"), str)
         ]
+        inspections: list[MapInspection] = []
+        for descriptor in overlays:
+            raw_inspections = descriptor.get("inspections")
+            if not isinstance(raw_inspections, list):
+                continue
+            for raw_inspection in cast(list[Any], raw_inspections):
+                if not isinstance(raw_inspection, dict):
+                    continue
+                try:
+                    inspections.append(MapInspection.model_validate(raw_inspection))
+                except Exception:  # noqa: BLE001
+                    continue
         return MapSession(
             session_id=f"map-{int(datetime.now(UTC).timestamp())}",
             resolved_location=payload.resolved_location,
@@ -151,6 +166,8 @@ class LocationSearchOrchestrator:
             rendered_overlay_ids=rendered_overlay_ids,
             failed_overlays=failed_overlays,
             compliance_warnings=warnings,
+            overlay_collection_revision=0,
+            inspections=inspections,
             payload={
                 "action_id": payload.action_id,
                 "time_mode": payload.time_mode,

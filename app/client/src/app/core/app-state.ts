@@ -12,7 +12,8 @@ import {
 } from './types';
 import { isRecord } from './type-guards';
 
-export const APP_STATE_STORAGE_KEY = 'aegis:webapp-state:v4';
+export const APP_STATE_STORAGE_KEY = 'aegis:webapp-state:v5';
+const LEGACY_APP_STATE_STORAGE_KEYS = ['aegis:webapp-state:v4', 'aegis:webapp-state:v3'];
 const STATE_TTL_MS = 6 * 60 * 60 * 1000;
 const TAB_ID_KEY = 'aegis:webapp-tab-id:v1';
 const TAB_HEARTBEAT_PREFIX = 'aegis:webapp-tab-heartbeat:v1:';
@@ -67,7 +68,7 @@ export interface PersistedSettingsPageState {
 }
 
 export interface PersistedAppState {
-  version: 3;
+  version: 5;
   savedAt: number;
   tabId: string;
   chatPage: PersistedChatPageState;
@@ -129,7 +130,7 @@ const parsePersistedMessages = (value: unknown): ChatMessage[] => {
 };
 
 export const defaultAppState = (): PersistedAppState => ({
-  version: 3,
+  version: 5,
   savedAt: Date.now(),
   tabId: '',
   chatPage: {
@@ -229,7 +230,10 @@ export const loadPersistedAppState = (): PersistedAppState => {
   if (typeof window === 'undefined') {
     return defaultAppState();
   }
-  const raw = window.sessionStorage.getItem(APP_STATE_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(APP_STATE_STORAGE_KEY)
+    ?? LEGACY_APP_STATE_STORAGE_KEYS
+      .map((key) => window.sessionStorage.getItem(key))
+      .find((value): value is string => typeof value === 'string');
   let currentTabId = ensureTabId();
   if (hasActiveOwner(currentTabId)) {
     currentTabId = rotateTabId();
@@ -244,7 +248,7 @@ export const loadPersistedAppState = (): PersistedAppState => {
   }
   try {
     const parsed = JSON.parse(raw);
-    if (!isRecord(parsed) || parsed.version !== 3) {
+    if (!isRecord(parsed) || (parsed.version !== 3 && parsed.version !== 4 && parsed.version !== 5)) {
       return {
         ...defaultAppState(),
         tabId: currentTabId,
@@ -265,6 +269,23 @@ export const loadPersistedAppState = (): PersistedAppState => {
         ...defaultAppState(),
         tabId: currentTabId,
       };
+    }
+
+    if (parsed.version !== 5) {
+      const migrated = defaultAppState();
+      migrated.tabId = currentTabId;
+      migrated.savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now();
+      if (isRecord(parsed.chatPage) && isRecord(parsed.chatPage.chatPanel)) {
+        migrated.chatPage.chatPanel.conversationId = typeof parsed.chatPage.chatPanel.conversationId === 'string'
+          ? parsed.chatPage.chatPanel.conversationId
+          : undefined;
+        migrated.chatPage.chatPanel.messages = parsePersistedMessages(parsed.chatPage.chatPanel.messages);
+      }
+      // Active map/task snapshots from the pre-collection schema are not
+      // compatible. Conversation messages remain available for continuity.
+      window.sessionStorage.removeItem(APP_STATE_STORAGE_KEY);
+      LEGACY_APP_STATE_STORAGE_KEYS.forEach((key) => window.sessionStorage.removeItem(key));
+      return migrated;
     }
 
     const defaults = defaultAppState();

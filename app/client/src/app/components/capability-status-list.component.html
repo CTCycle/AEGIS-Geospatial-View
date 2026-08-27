@@ -1,4 +1,4 @@
-<ul>
+<ul [class.status-list--nowrap]="nowrap">
   @for (item of items; track trackStatusItem($index, item)) {
     <li
       [class.status-item--ok]="item.tone === 'ok'"

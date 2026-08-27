@@ -18,7 +18,7 @@ describe('core/app-state', () => {
 
   it('creates default state', () => {
     const state = defaultAppState();
-    expect(state.version).toBe(3);
+    expect(state.version).toBe(5);
     expect(state.chatPage.chatPanel.messages).toEqual([]);
     expect(state.settingsPage.providerMode).toBe('local');
   });
@@ -104,7 +104,7 @@ describe('core/app-state', () => {
     const raw = window.sessionStorage.getItem(storageKey);
     expect(raw).toBeTruthy();
     const persisted = JSON.parse(String(raw));
-    expect(persisted.version).toBe(3);
+    expect(persisted.version).toBe(5);
     expect(typeof persisted.savedAt).toBe('number');
   });
 
@@ -125,7 +125,7 @@ describe('core/app-state', () => {
       },
     }));
     const loaded = loadPersistedAppState();
-    expect(loaded.version).toBe(3);
+    expect(loaded.version).toBe(5);
     expect(loaded.chatPage.chatPanel.composerDraft).toBe('');
   });
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from server.common.typing import json_array, json_object
 
@@ -25,11 +25,10 @@ class CapabilityResolver:
     def resolve(self, turn: TurnParseResult) -> TurnParseResult:
         requested = [item.strip() for item in turn.requested_layers if item.strip()]
         for task in turn.atomic_tasks:
-            if not isinstance(task, dict):
-                continue
             required_layers = task.get("required_layers")
             if not isinstance(required_layers, list):
                 continue
+            required_layers = cast(list[Any], required_layers)
             requested.extend(
                 str(item).strip()
                 for item in required_layers

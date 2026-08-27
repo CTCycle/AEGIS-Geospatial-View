@@ -2466,9 +2466,9 @@
         "properties": {
           "schema_version": {
             "type": "integer",
-            "const": 2,
+            "const": 3,
             "title": "Schema Version",
-            "default": 2
+            "default": 3
           },
           "conversation_key": {
             "type": "string",
@@ -3738,6 +3738,79 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "InspectionField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": "general"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value"
+        ],
+        "title": "InspectionField",
+        "description": "A bounded, allowlisted scalar exposed by the map inspection UI."
+      },
       "JobCancelResponse": {
         "properties": {
           "job_id": {
@@ -3951,6 +4024,111 @@
         ],
         "title": "LocationSignal"
       },
+      "MapInspection": {
+        "properties": {
+          "inspection_id": {
+            "type": "string",
+            "title": "Inspection Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "association": {
+            "type": "string",
+            "enum": [
+              "feature",
+              "location",
+              "overlay",
+              "non_spatial"
+            ],
+            "title": "Association"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "feature_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Id"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/InspectionField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "inspection_id",
+          "title",
+          "association"
+        ],
+        "title": "MapInspection"
+      },
       "MapSession": {
         "properties": {
           "session_id": {
@@ -4069,6 +4247,29 @@
             },
             "type": "array",
             "title": "Compliance Warnings"
+          },
+          "overlay_collection_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Overlay Collection Revision",
+            "default": 0
+          },
+          "overlay_collection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OverlayCollectionState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inspections": {
+            "items": {
+              "$ref": "#/components/schemas/MapInspection"
+            },
+            "type": "array",
+            "title": "Inspections"
           }
         },
         "additionalProperties": false,
@@ -4591,6 +4792,360 @@
           "status"
         ],
         "title": "OllamaRefreshResponse"
+      },
+      "OverlayCollectionState": {
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "default": "active-map"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision",
+            "default": 0
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/OverlayInstance"
+            },
+            "type": "array",
+            "title": "Instances"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverlayCollectionState"
+      },
+      "OverlayCommand": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove",
+              "keep_only",
+              "show",
+              "hide",
+              "update"
+            ],
+            "title": "Action"
+          },
+          "selector": {
+            "$ref": "#/components/schemas/OverlaySelector"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/OverlayScope"
+          },
+          "patch": {
+            "$ref": "#/components/schemas/OverlayPatch"
+          },
+          "state_reference": {
+            "$ref": "#/components/schemas/OverlayStateReference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "OverlayCommand"
+      },
+      "OverlayInstance": {
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "title": "Instance Id"
+          },
+          "capability_id": {
+            "type": "string",
+            "title": "Capability Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "overlay_type": {
+            "type": "string",
+            "title": "Overlay Type"
+          },
+          "rendering_mode": {
+            "type": "string",
+            "title": "Rendering Mode"
+          },
+          "scope_key": {
+            "type": "string",
+            "title": "Scope Key",
+            "default": "global"
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          },
+          "resolved_location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "viewport": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewport"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "opacity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Opacity",
+            "default": 1.0
+          },
+          "render_variant": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Render Variant"
+          },
+          "descriptor": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Descriptor"
+          },
+          "inspections": {
+            "items": {
+              "$ref": "#/components/schemas/MapInspection"
+            },
+            "type": "array",
+            "title": "Inspections"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instance_id",
+          "capability_id",
+          "label",
+          "provider",
+          "overlay_type",
+          "rendering_mode"
+        ],
+        "title": "OverlayInstance",
+        "description": "Stable capability instance rendered on a map at one scoped location."
+      },
+      "OverlayPatch": {
+        "properties": {
+          "opacity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opacity"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverlayPatch"
+      },
+      "OverlayScope": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "global",
+              "current_view",
+              "location"
+            ],
+            "title": "Kind",
+            "default": "global"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverlayScope"
+      },
+      "OverlaySelector": {
+        "properties": {
+          "instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Instance Ids"
+          },
+          "capability_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capability Ids"
+          },
+          "concepts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Concepts"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "providers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "overlay_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Overlay Types"
+          },
+          "rendering_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rendering Modes"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "any",
+              "visible",
+              "hidden"
+            ],
+            "title": "Visibility",
+            "default": "any"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverlaySelector",
+        "description": "Typed selector for overlay instances and catalog capabilities.\n\nSelectors deliberately keep the matching dimensions independent.  The\nresolver can therefore report an unmatched or ambiguous dimension without\nfalling back to scanning the user's prose for layer names."
+      },
+      "OverlayStateReference": {
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "default": "active-map"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OverlayStateReference"
       },
       "PolicyDecision": {
         "properties": {
@@ -5174,6 +5729,13 @@
             "type": "array",
             "title": "Requested Layers"
           },
+          "overlay_commands": {
+            "items": {
+              "$ref": "#/components/schemas/OverlayCommand"
+            },
+            "type": "array",
+            "title": "Overlay Commands"
+          },
           "poi_categories": {
             "items": {
               "type": "string",
@@ -5487,6 +6049,68 @@
             },
             "type": "object",
             "title": "Replace Layer Ids"
+          },
+          "collection_id": {
+            "type": "string",
+            "title": "Collection Id",
+            "default": "active-map"
+          },
+          "collection_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Revision"
+          },
+          "added_instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Added Instance Ids"
+          },
+          "removed_instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removed Instance Ids"
+          },
+          "updated_instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Updated Instance Ids"
+          },
+          "unmatched_selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unmatched Selectors"
+          },
+          "ambiguous_selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ambiguous Selectors"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification"
           }
         },
         "additionalProperties": false,

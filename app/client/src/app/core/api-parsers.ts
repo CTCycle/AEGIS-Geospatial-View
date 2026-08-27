@@ -11,6 +11,8 @@ import {
   ModelCardDescriptor,
   ModelLibraryResponse,
   ModelSettingsResponse,
+  MapInspection,
+  OverlayCollectionState,
 } from './types';
 import { isFiniteNumber, isRecord, isStringArray } from './type-guards';
 
@@ -229,6 +231,91 @@ const numberOrNull = (value: unknown): number | null => (
   typeof value === 'number' && Number.isFinite(value) ? value : null
 );
 
+const safeHttpUrl = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? value.slice(0, 500) : null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeInspection = (value: unknown): MapInspection | null => {
+  if (!isRecord(value) || typeof value.inspection_id !== 'string' || typeof value.title !== 'string') {
+    return null;
+  }
+  const fields = Array.isArray(value.fields)
+    ? value.fields.flatMap((field): MapInspection['fields'] => {
+      if (!isRecord(field) || typeof field.key !== 'string' || typeof field.label !== 'string') {
+        return [];
+      }
+      const scalar = field.value;
+      if (scalar !== null && typeof scalar !== 'string' && typeof scalar !== 'number' && typeof scalar !== 'boolean') {
+        return [];
+      }
+      return [{
+        key: field.key.slice(0, 80),
+        label: field.label.slice(0, 120),
+        value: scalar,
+        unit: typeof field.unit === 'string' ? field.unit.slice(0, 40) : null,
+        category: typeof field.category === 'string' ? field.category : 'general',
+        source_url: safeHttpUrl(field.source_url),
+        order: typeof field.order === 'number' ? field.order : 0,
+      }];
+    })
+    : [];
+  return {
+    inspection_id: value.inspection_id,
+    title: value.title.slice(0, 240),
+    association: typeof value.association === 'string' ? value.association : 'non_spatial',
+    provider: typeof value.provider === 'string' ? value.provider : null,
+    feature_id: typeof value.feature_id === 'string' ? value.feature_id : null,
+    fields,
+    source_url: safeHttpUrl(value.source_url),
+    freshness: typeof value.freshness === 'string' ? value.freshness : null,
+    stale: Boolean(value.stale),
+    warnings: isStringArray(value.warnings) ? value.warnings.slice(0, 5) : [],
+    geometry: isRecord(value.geometry) ? value.geometry as Record<string, JsonValue> : null,
+  };
+};
+
+const normalizeOverlayCollection = (value: unknown): OverlayCollectionState | null => {
+  if (!isRecord(value) || typeof value.collection_id !== 'string' || typeof value.revision !== 'number' || !Array.isArray(value.instances)) {
+    return null;
+  }
+  const instances = value.instances.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.instance_id !== 'string' || typeof entry.capability_id !== 'string') {
+      return [];
+    }
+    return [{
+      instance_id: entry.instance_id,
+      capability_id: entry.capability_id,
+      label: typeof entry.label === 'string' ? entry.label : entry.instance_id,
+      provider: typeof entry.provider === 'string' ? entry.provider : 'unknown',
+      overlay_type: typeof entry.overlay_type === 'string' ? entry.overlay_type : 'overlay',
+      rendering_mode: typeof entry.rendering_mode === 'string' ? entry.rendering_mode : 'metadata-only',
+      scope_key: typeof entry.scope_key === 'string' ? entry.scope_key : 'global',
+      scope: isRecord(entry.scope) ? entry.scope as Record<string, JsonValue> : {},
+      visible: entry.visible !== false,
+      opacity: typeof entry.opacity === 'number' ? Math.max(0, Math.min(1, entry.opacity)) : 1,
+      render_variant: isRecord(entry.render_variant)
+        ? Object.fromEntries(Object.entries(entry.render_variant).filter(([, item]) => item === null || typeof item === 'string')) as Record<string, string | null>
+        : {},
+      descriptor: isRecord(entry.descriptor) ? entry.descriptor as Record<string, JsonValue> : {},
+      inspections: Array.isArray(entry.inspections)
+        ? entry.inspections.flatMap((inspection) => {
+          const normalized = normalizeInspection(inspection);
+          return normalized ? [normalized] : [];
+        })
+        : [],
+    }];
+  });
+  return { collection_id: value.collection_id, revision: Math.max(0, value.revision), instances };
+};
+
 export const normalizeLayerRenderDescriptor = (
   value: unknown,
 ): GeospatialLayerRenderDescriptor | null => {
@@ -270,11 +357,14 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
   const render = normalizeLayerRenderDescriptor(value.render);
   return {
     id: String(value.id),
+    instance_id: typeof value.instance_id === 'string' ? value.instance_id : undefined,
+    capability_id: typeof value.capability_id === 'string' ? value.capability_id : undefined,
     label: String(value.label ?? value.id),
     provider: String(value.provider ?? render?.provider ?? 'unknown'),
     type: String(value.type ?? value.rendering_mode ?? render?.rendering_mode ?? 'metadata-only'),
     rendering_mode: typeof value.rendering_mode === 'string' ? value.rendering_mode : render?.rendering_mode,
     default_opacity: typeof value.default_opacity === 'number' ? value.default_opacity : undefined,
+    visible: typeof value.visible === 'boolean' ? value.visible : undefined,
     url: stringOrNull(value.url ?? render?.url),
     tile_url_template: stringOrNull(value.tile_url_template ?? render?.tile_url_template) ?? undefined,
     layers: stringOrNull(value.layers) ?? undefined,
@@ -300,6 +390,12 @@ export const normalizeMapOverlayEntry = (value: unknown): MapOverlayEntry | null
     data: isRecord(value.data) && value.data.type === 'FeatureCollection' && Array.isArray(value.data.features)
       ? value.data as unknown as MapOverlayEntry['data']
       : undefined,
+    inspections: Array.isArray(value.inspections)
+      ? value.inspections.flatMap((inspection) => {
+        const normalized = normalizeInspection(inspection);
+        return normalized ? [normalized] : [];
+      })
+      : [],
     render,
   };
 };
@@ -344,6 +440,16 @@ export const normalizeMapSession = (value: unknown): MapSession | null => {
       })
       : [],
     compliance_warnings: isStringArray(value.compliance_warnings) ? value.compliance_warnings : [],
+    overlay_collection_revision: isFiniteNumber(value.overlay_collection_revision)
+      ? value.overlay_collection_revision
+      : 0,
+    overlay_collection: normalizeOverlayCollection(value.overlay_collection),
+    inspections: Array.isArray(value.inspections)
+      ? value.inspections.flatMap((inspection) => {
+        const normalized = normalizeInspection(inspection);
+        return normalized ? [normalized] : [];
+      })
+      : [],
   };
 };
 

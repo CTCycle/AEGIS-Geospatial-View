@@ -193,6 +193,135 @@
     margin: 0;
 }
 
+.metadata-panel__action {
+    margin-left: 0.45rem;
+    border: 1px solid rgb(111 190 226 / 45%);
+    border-radius: 0.25rem;
+    padding: 0.12rem 0.35rem;
+    background: rgb(25 58 73 / 70%);
+    color: #dff5ff;
+    font-size: 0.66rem;
+}
+
+.metadata-panel__action:hover,
+.metadata-panel__action:focus-visible {
+    border-color: #74c8ed;
+    background: rgb(30 77 98 / 90%);
+}
+
+.map-inspection-panel {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 10;
+    width: min(22rem, calc(100% - 1.5rem));
+    max-height: min(32rem, calc(100% - 1.5rem));
+    overflow: auto;
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    border: 1px solid rgb(111 190 226 / 55%);
+    border-radius: 0.4rem;
+    background: rgb(12 22 28 / 97%);
+    color: #edf8fb;
+    box-shadow: 0 18px 34px rgb(0 0 0 / 38%);
+}
+
+.map-inspection-panel:focus-visible {
+    outline: 2px solid #73c7ed;
+    outline-offset: 2px;
+}
+
+.map-inspection-panel__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.map-inspection-panel__eyebrow {
+    margin: 0 0 0.2rem;
+    color: #91c9df;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.map-inspection-panel h2 {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.25;
+}
+
+.map-inspection-panel__close {
+    flex: 0 0 auto;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid transparent;
+    border-radius: 0.3rem;
+    background: transparent;
+    color: #c7dce4;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.map-inspection-panel__close:hover,
+.map-inspection-panel__close:focus-visible {
+    border-color: #46758a;
+    background: #1a3541;
+}
+
+.map-inspection-panel dl {
+    display: grid;
+    gap: 0.38rem;
+    margin: 0;
+}
+
+.map-inspection-panel dl > div {
+    display: grid;
+    grid-template-columns: minmax(5rem, 0.8fr) minmax(0, 1.2fr);
+    gap: 0.6rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgb(111 145 157 / 18%);
+}
+
+.map-inspection-panel dt,
+.map-inspection-panel dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 0.74rem;
+    line-height: 1.35;
+}
+
+.map-inspection-panel dt {
+    color: #9eb5be;
+}
+
+.map-inspection-panel dd {
+    color: #edf8fb;
+}
+
+.map-inspection-panel__source {
+    color: #8fd0ef;
+    font-size: 0.72rem;
+}
+
+.map-inspection-panel__stale,
+.map-inspection-panel__warning {
+    margin: 0;
+    color: #e6b14b;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.map-inspection-popup {
+    display: grid;
+    gap: 0.25rem;
+    color: #15252d;
+    font: 12px/1.35 system-ui, sans-serif;
+}
+
 .legend-panel {
     right: 0.75rem;
     top: 0.75rem;

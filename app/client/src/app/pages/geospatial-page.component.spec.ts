@@ -545,7 +545,7 @@ describe('pages/geospatial-page.component', () => {
     expect(component.status).toBe('Agent ready');
   });
 
-  it('shows the selected model context cap and exposes a compact live status strip', async () => {
+  it('shows the selected model context cap and exposes the compact workspace footer', async () => {
     const fixture = TestBed.createComponent(GeospatialPageComponent);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -553,7 +553,15 @@ describe('pages/geospatial-page.component', () => {
 
     expect(component.contextUsage?.selected_context_window).toBe(1_047_576);
     expect(component.contextUsageDetail).toMatch(/1[,.]047[,.]576 token cap/);
-    expect(fixture.nativeElement.querySelector('.chat-status-strip')).not.toBeNull();
+    const footer = fixture.nativeElement.querySelector('.workspace-status-bar') as HTMLElement | null;
+    expect(footer).not.toBeNull();
+    expect(footer?.textContent).toContain('Agent model');
+    expect(footer?.textContent).toContain('Satellite');
+    expect(footer?.textContent).toContain('Weather');
+    expect(footer?.textContent).toContain('Optional Keys');
+    expect(fixture.nativeElement.querySelector('.context-window-row')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.context-window-row progress')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.chat-status-strip')).toBeNull();
     expect(fixture.nativeElement.querySelector('.rail-capability-card')).toBeNull();
     expect(fixture.nativeElement.querySelector('.rail-context-strip')).toBeNull();
   });

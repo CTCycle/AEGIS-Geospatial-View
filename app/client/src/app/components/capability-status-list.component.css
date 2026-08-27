@@ -43,6 +43,11 @@ strong {
     background: #8fa6b0;
 }
 
+ul.status-list--nowrap {
+    flex-wrap: nowrap;
+    min-width: max-content;
+}
+
 .state-dot--error {
     background: #e76f76;
 }

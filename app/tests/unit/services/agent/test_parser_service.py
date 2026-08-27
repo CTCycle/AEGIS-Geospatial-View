@@ -434,6 +434,75 @@ def test_parser_domain_rules_route_weather_addition_to_map_layer() -> None:
     assert extracted.viewport_intent is not None
     assert extracted.viewport_intent.scope == "preserve_current"
 
+
+def test_parser_domain_rules_separate_global_overlay_remove_from_location_scope() -> None:
+    global_remove = ParserService._apply_domain_rules(
+        "Remove the weather overlay.",
+        LLMParserExtraction(),
+        {"active_visualization": {"basemap_id": "osm_default"}},
+    )
+    scoped_remove = ParserService._apply_domain_rules(
+        "Remove the overlay over Switzerland.",
+        LLMParserExtraction(),
+        {"active_visualization": {"basemap_id": "osm_default"}},
+    )
+
+    assert global_remove.overlay_commands[0].action == "remove"
+    assert global_remove.overlay_commands[0].selector.concepts == ["weather"]
+    assert global_remove.overlay_commands[0].scope.kind == "global"
+    assert global_remove.requires_location is False
+    assert scoped_remove.overlay_commands[0].scope.kind == "location"
+    assert scoped_remove.overlay_commands[0].scope.location is not None
+    assert scoped_remove.overlay_commands[0].scope.location["label"] == "Switzerland"
+
+
+def test_parser_domain_rules_use_current_view_for_local_overlay_commands() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Hide only the satellite layer in this area.",
+        LLMParserExtraction(),
+        {"active_visualization": {"basemap_id": "osm_default"}},
+    )
+
+    command = extracted.overlay_commands[0]
+    assert command.action == "hide"
+    assert command.selector.concepts == ["satellite"]
+    assert command.scope.kind == "current_view"
+    assert extracted.requires_location is False
+
+
+def test_parser_domain_rules_keep_only_and_location_scoped_show_are_independent() -> None:
+    keep_only = ParserService._apply_domain_rules(
+        "Keep only weather and remove the others.",
+        LLMParserExtraction(),
+        {"active_visualization": {"basemap_id": "osm_default"}},
+    )
+    show_local = ParserService._apply_domain_rules(
+        "Show weather over Zurich.",
+        LLMParserExtraction(),
+        {},
+    )
+
+    assert keep_only.overlay_commands[0].action == "keep_only"
+    assert keep_only.overlay_commands[0].selector.concepts == ["weather"]
+    assert show_local.overlay_commands[0].action == "show"
+    assert show_local.overlay_commands[0].scope.kind == "location"
+    assert show_local.requires_location is True
+
+
+def test_parser_domain_rules_capture_named_overlay_and_location_clause() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Remove X only from location Y.",
+        LLMParserExtraction(),
+        {},
+    )
+
+    command = extracted.overlay_commands[0]
+    assert command.action == "remove"
+    assert command.selector.concepts == ["X"]
+    assert command.scope.kind == "location"
+    assert command.scope.location is not None
+    assert command.scope.location["label"] == "Y"
+
 ###############################################################################
 def test_parser_domain_rules_infer_city_scale_viewport_intent() -> None:
     extracted = ParserService._apply_domain_rules(
