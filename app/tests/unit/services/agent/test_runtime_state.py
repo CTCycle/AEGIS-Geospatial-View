@@ -129,12 +129,12 @@ def test_steering_delta_supersedes_scope_work_and_appends_datasets() -> None:
     )
 
 ###############################################################################
-def test_hydration_accepts_v2_only_and_restores_active_task() -> None:
+def test_hydration_accepts_v3_only_and_restores_active_task() -> None:
     service = ConversationTaskStateService()
     service.hydrate(
         "conversation",
         {
-            "schema_version": 2,
+            "schema_version": 3,
             "conversation_key": "conversation",
             "current_task_id": "task-1",
             "goal": {"id": "task-1", "text": "Resolve Zurich"},
@@ -162,5 +162,5 @@ def test_hydration_accepts_v2_only_and_restores_active_task() -> None:
         },
     )
     assert service.snapshot("conversation").current_task_id == "task-1"
-    with pytest.raises(ValueError, match="schema_version"):
-        service.hydrate("conversation", {"conversation_key": "conversation", "tasks": []})
+    service.hydrate("conversation", {"schema_version": 2, "conversation_key": "conversation", "tasks": []})
+    assert service.snapshot("conversation").current_task_id is None

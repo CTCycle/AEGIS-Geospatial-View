@@ -165,12 +165,20 @@ class VisualizationUpdate(BaseModel):
     add_layer_ids: list[str] = Field(default_factory=lambda: list[str]())
     remove_layer_ids: list[str] = Field(default_factory=lambda: list[str]())
     replace_layer_ids: dict[str, str] = Field(default_factory=lambda: dict[str, str]())
+    collection_id: str = "active-map"
+    collection_revision: int | None = None
+    added_instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    removed_instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    updated_instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    unmatched_selectors: list[str] = Field(default_factory=lambda: list[str]())
+    ambiguous_selectors: list[str] = Field(default_factory=lambda: list[str]())
+    clarification: str | None = None
 
 ###############################################################################
 class ConversationTaskSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[2] = 2
+    schema_version: Literal[3] = 3
     conversation_key: str
     current_task_id: str | None = None
     goal: AgentGoal | None = None

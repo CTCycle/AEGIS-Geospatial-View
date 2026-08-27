@@ -92,6 +92,54 @@ class LLMViewportIntent(BaseModel):
     reason: str | None = None
 
 ###############################################################################
+class LLMOverlaySelector(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    capability_ids: list[str] = Field(default_factory=lambda: list[str]())
+    concepts: list[str] = Field(default_factory=lambda: list[str]())
+    labels: list[str] = Field(default_factory=lambda: list[str]())
+    providers: list[str] = Field(default_factory=lambda: list[str]())
+    overlay_types: list[str] = Field(default_factory=lambda: list[str]())
+    rendering_modes: list[str] = Field(default_factory=lambda: list[str]())
+    tags: list[str] = Field(default_factory=lambda: list[str]())
+    visibility: Literal["any", "visible", "hidden"] = "any"
+
+###############################################################################
+class LLMOverlayScope(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    kind: Literal["global", "current_view", "location"] = "global"
+    location: dict[str, Any] | None = None
+    label: str | None = None
+
+###############################################################################
+class LLMOverlayPatch(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    opacity: float | None = Field(default=None, ge=0.0, le=1.0)
+    time: str | None = None
+    style: str | None = None
+    format: str | None = None
+
+###############################################################################
+class LLMOverlayStateReference(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    collection_id: str = "active-map"
+    revision: int = Field(default=0, ge=0)
+
+###############################################################################
+class LLMOverlayCommand(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    action: Literal["add", "remove", "keep_only", "show", "hide", "update"]
+    selector: LLMOverlaySelector = Field(default_factory=LLMOverlaySelector)
+    scope: LLMOverlayScope = Field(default_factory=LLMOverlayScope)
+    patch: LLMOverlayPatch = Field(default_factory=LLMOverlayPatch)
+    state_reference: LLMOverlayStateReference = Field(default_factory=LLMOverlayStateReference)
+
+###############################################################################
 class LLMParserExtraction(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -119,6 +167,7 @@ class LLMParserExtraction(BaseModel):
     map_target: str | None = None
     entity_target: str | None = None
     requested_layers: list[str] = Field(default_factory=lambda: list[str]())
+    overlay_commands: list[LLMOverlayCommand] = Field(default_factory=lambda: list[LLMOverlayCommand]())
     poi_categories: list[Literal["bicycle_parking", "transit_stops", "rail_stations"]] = Field(default_factory=lambda: list[Literal["bicycle_parking", "transit_stops", "rail_stations"]]())
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=lambda: list[str]())

@@ -149,7 +149,7 @@ class AgentRunOrchestrator:
                     task_snapshot=(
                         response.task_snapshot.model_dump(mode="json")
                         if response.task_snapshot is not None
-                        else {"schema_version": 2, "tasks": []}
+                        else {"schema_version": 3, "tasks": []}
                     ),
                     state_hash=hashlib.sha256(
                         json.dumps(

@@ -21,6 +21,7 @@ from server.contracts.extraction import (
     DisallowedPattern,
     LocationSignal,
     NormalizedAction,
+    OverlayCommand,
     TemporalSignal,
     TurnParseResult,
     ViewportIntent,
@@ -95,6 +96,116 @@ class ParserService:
             seen.add(text)
             result.append(text)
         return result
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _overlay_commands(values: list[Any]) -> list[OverlayCommand]:
+        """Convert model extraction into the typed mutation contract."""
+        commands: list[OverlayCommand] = []
+        for value in values:
+            try:
+                payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+                commands.append(OverlayCommand.model_validate(payload))
+            except Exception:
+                LOGGER.warning("Ignoring invalid overlay command from parser extraction")
+        return commands
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _infer_overlay_commands(
+        cls,
+        text: str,
+        user_message: str,
+        extracted: LLMParserExtraction,
+    ) -> list[OverlayCommand]:
+        """Create a small structured fallback when the model omits commands.
+
+        This is intentionally a bounded command grammar, not a second layer
+        matcher.  It only identifies the independent action, overlay concept,
+        and geographic scope; capability resolution remains catalog-backed.
+        """
+        overlay_words = (
+            "weather",
+            "precipitation",
+            "rain",
+            "air quality",
+            "pollution",
+            "traffic",
+            "satellite",
+            "imagery",
+            "elevation",
+            "land cover",
+            "active fire",
+            "fires",
+            "aerosol",
+            "ozone",
+            "solar",
+            "noise",
+            "transit",
+            "camera",
+        )
+        if "keep all" in text and ("except" in text or "but" in text):
+            action = "remove"
+        elif "keep" in text and any(marker in text for marker in ("remove", "except", "others")):
+            action = "keep_only"
+        elif any(marker in text for marker in ("remove", "delete", "turn off", "disable")):
+            action = "remove"
+        elif any(marker in text for marker in ("hide", "conceal")):
+            action = "hide"
+        elif any(marker in text for marker in ("update", "change", "adjust", "set opacity", "set style")):
+            action = "update"
+        elif any(marker in text for marker in ("show", "display", "add", "enable", "turn on")):
+            action = "show"
+        else:
+            return []
+
+        target: str | None = next((word for word in overlay_words if word in text), None)
+        # A quoted selector is useful for catalog labels that are not in the
+        # bounded concept vocabulary.
+        quoted = re.search(r'["“](.+?)["”]', user_message)
+        if quoted is not None and any(marker in text for marker in ("overlay", "layer")):
+            target = quoted.group(1).strip()
+        if target is None:
+            named_layer = re.search(
+                r"(?i)\b(?:remove|delete|hide|show|add|enable|update|change)\s+(?:the\s+)?(.+?)\s+(?:overlay|layer)\b",
+                user_message,
+            )
+            if named_layer is not None:
+                target = named_layer.group(1).strip()
+                if target.casefold() in {"the", "an", "a", "all"}:
+                    target = None
+        if not target and not any(marker in text for marker in ("overlay", "layer")):
+            return []
+
+        if "this area" in text or "current view" in text or "viewport" in text:
+            scope_kind = "current_view"
+            location: dict[str, Any] | None = None
+        else:
+            location_signal = next(
+                (item for item in extracted.location_signals if item.raw_value.strip()),
+                None,
+            )
+            scope_kind = "location" if location_signal is not None else "global"
+            location = (
+                {
+                    "label": location_signal.normalized_value or location_signal.raw_value,
+                    "raw_value": location_signal.raw_value,
+                    "latitude": location_signal.latitude,
+                    "longitude": location_signal.longitude,
+                }
+                if location_signal is not None
+                else None
+            )
+        selector = {
+            "concepts": [target] if target else [],
+            "labels": [target] if target and quoted is not None else [],
+        }
+        command = OverlayCommand(
+            action=action,
+            selector=selector,
+            scope={"kind": scope_kind, "location": location},
+        )
+        return [command]
 
     # -------------------------------------------------------------------------
     @staticmethod
@@ -264,9 +375,11 @@ class ParserService:
         text = user_message.strip()
         if not text or not cls._looks_like_map_request(text):
             return None
+        if re.search(r"(?i)\b(?:this\s+area|current\s+view|viewport)\b", text):
+            return None
 
         cleaned = re.sub(r"(?i)\b(please|pls|could you|can you|show me|show|display|map|locate|find|open|create|make|muestra|mostrar|montre|carte|karte|mappa|mapa)\b", " ", text)
-        cleaned = re.sub(r"(?i)\b(a|an|the|of|for|near|around|on|in|to|with|using|me)\b", " ", cleaned)
+        cleaned = re.sub(r"(?i)\b(a|an|the|of|for|near|around|over|on|in|to|with|using|me)\b", " ", cleaned)
         cleaned = re.sub(r"(?i)\b(weather|traffic|amenities|overlay|overlays|layer|layers|satellite|imagery|coordinates?)\b", " ", cleaned)
         cleaned = re.sub(r"[.?!]+$", "", cleaned)
         cleaned = " ".join(cleaned.replace(":", " ").split())
@@ -404,6 +517,7 @@ class ParserService:
             map_target=extracted.map_target,
             entity_target=extracted.entity_target,
             requested_layers=cls._dedupe(extracted.requested_layers),
+            overlay_commands=cls._overlay_commands(extracted.overlay_commands),
             poi_categories=list(dict.fromkeys(extracted.poi_categories)),
             requested_basemap=extracted.requested_basemap,
             requested_attributes=cls._dedupe(extracted.requested_attributes),
@@ -607,6 +721,7 @@ class ParserService:
             map_target=extracted.map_target,
             entity_target=extracted.entity_target,
             requested_layers=self._dedupe(extracted.requested_layers),
+            overlay_commands=self._overlay_commands(extracted.overlay_commands),
             poi_categories=list(dict.fromkeys(extracted.poi_categories)),
             requested_basemap=extracted.requested_basemap,
             requested_attributes=self._dedupe(extracted.requested_attributes),
@@ -975,6 +1090,33 @@ class ParserService:
             updates["ambiguities"] = cls._dedupe(
                 [*extracted.ambiguities, "temperature_metric_underspecified"]
             )
+
+        overlay_commands = list(extracted.overlay_commands)
+        if not overlay_commands:
+            overlay_commands = cls._infer_overlay_commands(
+                text,
+                user_message,
+                extracted,
+            )
+        if overlay_commands:
+            updates["overlay_commands"] = overlay_commands
+            # Overlay-only mutations are map operations, but a global or
+            # current-view mutation does not need a place lookup before it
+            # can be resolved against the active collection.
+            updates.update(
+                task_class="map_search",
+                action_id=AgentAction.OVERLAY_CONTROL.value,
+                action_label="Overlay collection mutation",
+                tools_needed=True,
+                direct_response_sufficient=False,
+                expected_frontend_update="visualization_update",
+            )
+            if all(
+                command.scope.kind in {"global", "current_view"}
+                and command.action in {"remove", "keep_only", "hide", "show", "update"}
+                for command in overlay_commands
+            ):
+                updates["requires_location"] = False
 
         if inferred_viewport is not None:
             updates["viewport_intent"] = inferred_viewport

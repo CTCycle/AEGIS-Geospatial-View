@@ -68,7 +68,7 @@ class ConversationTaskStateService:
 
     # -------------------------------------------------------------------------
     def apply_steering_delta(self, conversation_key: str, delta: Any) -> ConversationTaskSnapshot:
-        """Apply a safe steering mutation to the live v2 state in place."""
+        """Apply a safe steering mutation to the live v3 state in place."""
 
         with self._lock:
             state = self._get_state(conversation_key)
@@ -271,8 +271,12 @@ class ConversationTaskStateService:
     def hydrate(self, conversation_key: str, payload: dict[str, Any] | None) -> None:
         if not payload:
             return
-        if payload.get("schema_version") != 2:
-            raise ValueError("Only task snapshot schema_version=2 is supported.")
+        if payload.get("schema_version") != 3:
+            # The overlay collection is authoritative in v3. Discard older
+            # task/map snapshots while leaving conversation history untouched.
+            with self._lock:
+                self._states.pop(conversation_key, None)
+            return
         snapshot = ConversationTaskSnapshot.model_validate(payload)
         validate_task_graph(snapshot.tasks)
         with self._lock:

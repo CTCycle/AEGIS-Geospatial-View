@@ -87,9 +87,18 @@ class DeterministicToolPlanner:
     def _select_capabilities(turn: TurnParseResult) -> list[str]:
         selected: list[str] = []
         text = turn.user_text.casefold()
-        selected.extend(
-            layer_id for layer_id in turn.requested_layers if ":" not in layer_id
+        commands = getattr(turn, "overlay_commands", [])
+        has_fetching_command = any(
+            command.action in {"add", "show", "update"} for command in commands
         )
+        if not commands or has_fetching_command:
+            selected.extend(
+                layer_id for layer_id in turn.requested_layers if ":" not in layer_id
+            )
+            for command in commands:
+                if command.action not in {"add", "show", "update"}:
+                    continue
+                selected.extend(command.selector.capability_ids)
         if not turn.requested_layers:
             if "air quality" in text and "forecast" in text:
                 selected.append("get_air_quality_forecast")
@@ -128,6 +137,10 @@ class DeterministicToolPlanner:
             update["basemap_replacement"] = basemap
         if turn.requested_layers:
             update["add_layer_ids"] = list(dict.fromkeys(turn.requested_layers))
+        if turn.overlay_commands:
+            update["overlay_commands"] = [
+                command.model_dump(mode="json") for command in turn.overlay_commands
+            ]
         return update
 
     # -------------------------------------------------------------------------
