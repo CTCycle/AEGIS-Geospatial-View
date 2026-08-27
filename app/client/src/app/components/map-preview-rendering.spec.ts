@@ -3,6 +3,7 @@ import { MapOverlayEntry, MapSession } from '../core/types';
 import {
   addOverlayLayers,
   buildStyle,
+  getOverlayLayerIds,
   isGeoJsonOverlay,
   normalizeBounds,
   recordBooleanEqual,
@@ -250,5 +251,46 @@ describe('map-preview-rendering', () => {
     expect(sources[0].type).toBe('geojson');
     expect((sources[0].data as { type: string }).type).toBe('FeatureCollection');
     expect(layers[0].type).toBe('circle');
+  });
+
+  it('clusters point overlays and creates expansion/count layers', () => {
+    const sources: Array<Record<string, unknown>> = [];
+    const layers: Array<Record<string, unknown>> = [];
+    const map = {
+      addSource: (_id: string, source: Record<string, unknown>) => sources.push(source),
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+    };
+    const overlay = {
+      id: 'clustered-pois',
+      label: 'POIs',
+      provider: 'fixture',
+      type: 'clustered-points',
+      rendering_mode: 'clustered-points',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    } as unknown as MapOverlayEntry;
+
+    expect(getOverlayLayerIds(overlay)).toEqual([
+      'overlay-layer-clustered-pois-clusters',
+      'overlay-layer-clustered-pois-cluster-count',
+      'overlay-layer-clustered-pois-points',
+    ]);
+    expect(addOverlayLayers(map as never, { overlays: [overlay] } as unknown as MapSession)[0].status)
+      .toBe('loaded');
+    expect(sources[0]).toEqual(jasmine.objectContaining({
+      type: 'geojson',
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+    }));
+    expect(layers.map((layer) => layer.id)).toEqual([
+      'overlay-layer-clustered-pois-clusters',
+      'overlay-layer-clustered-pois-cluster-count',
+      'overlay-layer-clustered-pois-points',
+    ]);
+    expect(layers[0]['filter']).toEqual(['has', 'point_count']);
+    expect(layers[2]['filter']).toEqual(['!', ['has', 'point_count']]);
   });
 });
