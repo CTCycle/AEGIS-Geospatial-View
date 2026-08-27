@@ -1,6 +1,6 @@
 # Backend API
 
-Last updated: 2026-08-20
+Last updated: 2026-08-27
 
 ## Mounting
 
@@ -108,6 +108,17 @@ High-level fields:
 - `map_session`
 - `memory_snapshot`
 - `context_usage`
+- `visualization_update`
+
+`map_session.overlay_collection` is the revisioned authoritative overlay
+collection. `turn_contract.overlay_commands` describes deterministic
+add/remove/keep-only/show/hide/update operations; `visualization_update`
+returns the resulting revision and stable added, removed, updated, unmatched,
+and ambiguous instance IDs/selectors.
+
+Map sessions may include bounded `inspections` at feature, location, overlay,
+or non-spatial association levels. Clients should render only the normalized
+inspection contract and must not expose raw provider metadata or unsafe links.
 
 `operation` is the stable frontend-facing summary of verified backend outcome.
 

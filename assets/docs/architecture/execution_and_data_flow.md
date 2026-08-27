@@ -1,6 +1,6 @@
 # Execution And Data Flow
 
-Last updated: 2026-08-20
+Last updated: 2026-08-27
 
 ## Layering
 
@@ -70,7 +70,7 @@ Geospatial API services are composed during application startup and accessed thr
 ## Chat Orchestration Pipeline
 
 1. `AgentOrchestrator` loads volatile conversation task and visualization state.
-2. `ParserService` produces structured intent, relationship, entities, layers, visualization changes, and ambiguities using the selected agent model.
+2. `ParserService` produces structured intent, relationship, entities, typed overlay commands, visualization changes, and ambiguities using the selected agent model.
 3. `ConversationTaskStateService` creates or updates the current task record.
 4. `CapabilityResolver` converts semantic layer concepts into enabled executable manifest IDs or returns a structured clarification when no temporally compatible capability exists.
 5. `DeterministicAgentRouter` selects one specialist group.
@@ -80,9 +80,12 @@ Geospatial API services are composed during application startup and accessed thr
 9. `NativeToolLoop` remains the bounded fallback when catalog discovery is required.
 10. Verified results become a map session, direct answer, clarification, or diagnostic response.
 11. Successful and partial outcomes are passed to the same selected agent model through a validated `GroundedSynthesisResult` structured-output schema; deterministic prose remains the fallback.
-12. Visualization changes are applied as a typed update: inferred overlays may
-    be added, explicit removal requests clear matching active overlays, and
-    clarification responses may carry a partial validated map update.
+12. Overlay changes are applied to the revisioned `OverlayCollectionState` by
+    deterministic selector resolution. Additions resolve against the catalog;
+    remove/keep-only/show/hide/update operate on active instances first, and
+    stale or ambiguous commands preserve the current collection with a focused
+    clarification. Clarification responses may carry a partial validated map
+    update.
 13. Task status, failure details, and active visualization are updated before persistence.
 
 Direct responses (parser failures, capability questions, failure inquiries, and
@@ -157,7 +160,12 @@ Live provider-native layer discovery flows through:
 - provider adapter such as `NASAGIBSProvider`
 - XML capability parsing and normalized provider layer descriptors
 
-Renderable map overlays are produced by `RenderDescriptorService` and then placed in `MapSession.overlays`. The frontend should consume those descriptors directly rather than constructing provider-specific WMS or WMTS defaults.
+Renderable map overlays are produced by `RenderDescriptorService` and then
+placed in `MapSession.overlays` and its authoritative revisioned collection.
+`MapInspectionService` translates verified provider metadata into bounded
+feature/location/overlay/non-spatial inspection contracts. The frontend should
+consume those descriptors directly rather than constructing provider-specific
+WMS or WMTS defaults.
 
 ## Async And Threaded Behavior
 

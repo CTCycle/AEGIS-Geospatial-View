@@ -1,6 +1,6 @@
 # Persistence
 
-Last updated: 2026-08-20
+Last updated: 2026-08-27
 
 ## SQLite-only relational storage
 
@@ -99,7 +99,13 @@ It invokes the repository seeder after migrations complete.
 
 ## Frontend persistence
 
-- storage key: `aegis:webapp-state:v4`
+- storage key: `aegis:webapp-state:v5`
 - storage type: `sessionStorage`
 - TTL: 6 hours
 - implementation: `app/client/src/app/core/app-state.ts`
+
+The v5 frontend boundary invalidates pre-collection active-map/task snapshots;
+conversation messages are retained during the one-time migration. The backend
+keeps the active overlay collection and revision in the map-session memory
+snapshot, while durable conversation messages retain the typed turn contract
+and mutation result for replay and audit.

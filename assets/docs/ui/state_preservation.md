@@ -1,10 +1,10 @@
 # State Preservation
 
-Last updated: 2026-08-17
+Last updated: 2026-08-27
 
 ## Overview
 
-The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v4` with a 6-hour TTL.
+The web app stores per-tab UI state in `sessionStorage` under `aegis:webapp-state:v5` with a 6-hour TTL.
 
 Older schema payloads are invalidated and discarded.
 
@@ -35,6 +35,13 @@ Persisted map UI state includes:
 
 - `overlayVisibility`
 - `overlayOpacity`
+- stable overlay instance IDs and the active collection revision carried by the
+  current `mapSession`
+
+The v5 boundary invalidates pre-collection active-map/task snapshots. A small
+one-time migration retains conversation ID and messages, while old map/task
+state is discarded; messages are never removed solely because the map schema
+changed.
 
 ## Restore Rules
 

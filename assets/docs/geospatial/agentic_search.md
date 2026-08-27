@@ -1,6 +1,6 @@
 # Agentic Search
 
-Last updated: 2026-08-02
+Last updated: 2026-08-27
 
 ## Summary
 
@@ -13,13 +13,17 @@ The chat workflow separates structured parsing from provider-native tool calling
 5. A typed tool plan fixes capability IDs, arguments, dependencies, timeouts, retries, validation, and merge behavior before execution.
 6. `PolicyEngine` restricts both tool names and executable capability IDs.
 7. Known capabilities execute through `ToolPlanExecutor`; catalog discovery uses the bounded native tool loop.
-8. Verified results update the map, task status, and structured diagnostics.
+8. Verified results update the revisioned overlay collection, task status, and structured diagnostics.
 9. The configured agent model converts only those verified results into concise Markdown, with deterministic text retained as fallback.
 
 Location ambiguity is explicit: similar-confidence city/address/country signals
-produce a clarification with candidate choices. Overlay intent is also
-state-aware: add requests preserve compatible active overlays, while explicit
-remove/hide/clear requests remove matching overlays from the next map session.
+produce a clarification with candidate choices. Overlay intent is represented
+as typed `OverlayCommand` values. Each command keeps action, selector,
+geographic scope, presentation patch, and collection revision independent.
+`OverlayCollectionService` resolves active instances before catalog
+capabilities, applies deterministic add/remove/keep-only/show/hide/update
+semantics, and rejects stale revisions or ambiguous selectors without changing
+the current map.
 
 Residential-building requests use `overpass_residential_buildings`; amenities
 remain separate. Satellite language selects the imagery basemap unless the user
@@ -48,6 +52,8 @@ model using declared input/output limits, schema overhead, and safety margin.
 - parser confidence
 - task relationship and atomic tasks
 - map/entity targets, requested layers, basemap, and attributes
+- typed `overlay_commands` with independent selectors, scopes, presentation
+  patches, and `state_reference`
 - tool requirement/category and expected frontend update
 - capability limitations and parser-recursion signal
 - an optional generic clarification plan describing blocking fields, choices, and whether valid visualization changes may be applied before clarification
@@ -155,6 +161,22 @@ errors. They do not create successful empty layers or overwrite the last-known-
 good visible map state.
 
 `tool_payload` remains available for raw tool trace and debugging, but it is not the primary source of truth for user-visible outcome.
+
+## Overlay Collection And Inspection
+
+`MapSession.overlay_collection` is the authoritative revisioned collection of
+stable overlay instances. An instance identity combines capability, resolved
+geographic scope, and render variant, so the same weather capability can exist
+independently for Zurich and Switzerland. Visibility and opacity changes update
+only the selected instances; unrelated descriptors and provider results are
+retained. The response `visualization_update` reports collection revision,
+added/removed/updated instance IDs, and unmatched or ambiguous selectors.
+
+Provider metadata is normalized into bounded `MapInspection` contracts. Feature
+and location associations can be inspected on the map; raster metadata remains
+overlay-level (time, units, legend/attribution, freshness, and warnings), and
+non-spatial dataset metadata is available from the details panel. Only
+allowlisted scalar fields and approved HTTP(S) source links cross into the UI.
 
 `assistant_message` is Markdown-capable user-facing text. The response model is
 grounded with the verified operation, map summary, direct result, warnings,
