@@ -35,8 +35,8 @@ def test_opentripmap_requires_key_and_builds_tourism_url() -> None:
         )
     )
     assert response.payload["renderingMode"] == "clustered-points"
-    assert "tourism-key" in response.payload["featuresUrl"]
-    assert "kinds=museums" in response.payload["featuresUrl"]
+    assert response.payload["status"] == "server-side-only"
+    assert "tourism-key" not in str(response.payload)
 
 ###############################################################################
 def test_openchargemap_supports_optional_key() -> None:
@@ -57,8 +57,10 @@ def test_openchargemap_supports_optional_key() -> None:
         )
     )
 
-    assert "openchargemap" in response.payload["featuresUrl"]
-    assert "charge-key" in keyed.payload["featuresUrl"]
+    assert response.payload["status"] == "server-side-only"
+    assert keyed.payload["status"] == "server-side-only"
+    assert "charge-key" not in str(response.payload)
+    assert "charge-key" not in str(keyed.payload)
 
 ###############################################################################
 def test_ourairports_returns_source_ready_descriptor() -> None:

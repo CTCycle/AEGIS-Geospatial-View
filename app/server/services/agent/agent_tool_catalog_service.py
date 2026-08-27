@@ -222,23 +222,6 @@ class AgentToolCatalogService:
             refresh=bool(arguments.get("refresh", False)),
         )
         payload = response.model_dump(mode="json")
-        if response.layers and self.search_orchestrator is not None:
-            selected = response.layers[0]
-            render_result = await self._render_provider_layer(
-                {
-                    "provider_id": selected.provider,
-                    "layer_id": selected.layer_id,
-                    "time": selected.default_time,
-                },
-                context,
-            )
-            if render_result.get("ok") is True:
-                payload["selected_layer"] = selected.model_dump(mode="json")
-                payload["map_session"] = render_result.get("map_session")
-                payload["warnings"] = [
-                    *list(payload.get("warnings") or []),
-                    *list(render_result.get("warnings") or []),
-                ]
         return payload
 
     # -------------------------------------------------------------------------

@@ -11,7 +11,11 @@ from server.contracts.extraction import (
     NormalizedAction,
     TurnParseResult,
 )
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import (
+    GeospatialProviderLayerDescriptor,
+    GeospatialProviderLayersResponse,
+    MapSession,
+)
 from server.services.agent.agent_tool_catalog_service import (
     AgentToolCatalogService,
     CapabilityCatalogFilter,
@@ -401,3 +405,38 @@ def test_catalog_tools_register_with_tool_registry() -> None:
     assert registry.has_native_tool("fetch_geospatial_provider_layers")
     assert registry.has_native_tool("render_geospatial_provider_layer")
     assert len(registry.list_native_tools()) == 5
+
+###############################################################################
+def test_provider_layer_listing_does_not_render_first_layer_implicitly() -> None:
+    service = _service()
+
+    async def list_provider_layers(provider_id, **kwargs):  # noqa: ANN001, ANN003
+        del provider_id, kwargs
+        return GeospatialProviderLayersResponse(
+            provider="test",
+            layers=[
+                GeospatialProviderLayerDescriptor(
+                    provider="test",
+                    layer_id="layer-1",
+                    title="Layer 1",
+                    rendering_mode="geojson",
+                    source_protocol="test",
+                    data_format="GeoJSON",
+                    geometry_type="Point",
+                )
+            ],
+        )
+
+    service.geospatial_api_service = SimpleNamespace(
+        list_provider_layers=list_provider_layers
+    )
+    result = run_async_in_thread(
+        service._provider_layers_tool_handler(
+            {"provider_id": "test", "limit": 10}, _context()
+        )
+    )
+
+    assert result["layers"][0]["layer_id"] == "layer-1"
+    assert "map_session" not in result
+    assert service.search_orchestrator is not None
+    assert service.search_orchestrator.requests == []  # type: ignore[attr-defined]

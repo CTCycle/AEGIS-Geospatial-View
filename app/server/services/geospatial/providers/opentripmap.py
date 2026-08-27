@@ -63,9 +63,11 @@ class OpenTripMapProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload={
                     "renderingMode": "clustered-points",
-                    "featuresUrl": url,
+                    "status": "server-side-only",
+                    "message": "OpenTripMap credentials are retained and used only by the server.",
                 },
                 attribution=["OpenTripMap"],
+                result_type="metadata",
             )
         cache_key = f"{self.provider_id}:{url}"
         try:
@@ -84,6 +86,8 @@ class OpenTripMapProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload=normalized,
                 attribution=["OpenTripMap"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
@@ -95,6 +99,8 @@ class OpenTripMapProvider(GeospatialProvider):
                     attribution=["OpenTripMap"],
                     warnings=["OpenTripMap request failed; serving stale cached POIs."],
                     stale=True,
+                    result_status="stale",
+                    result_type="features",
                 )
             if isinstance(exc, ProviderError):
                 raise

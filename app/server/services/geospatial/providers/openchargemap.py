@@ -81,6 +81,8 @@ class OpenChargeMapProvider(GeospatialProvider):
                         "radiusM": radius_m,
                     },
                     attribution=["Open Charge Map"],
+                    result_status="valid_empty" if not filtered else "ok",
+                    result_type="features",
                 )
             raise ProviderUnavailableError("Configured Open Charge Map snapshot does not exist.")
         if not api_key:
@@ -95,9 +97,11 @@ class OpenChargeMapProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload={
                     "renderingMode": "clustered-points",
-                    "featuresUrl": url,
+                    "status": "server-side-only",
+                    "message": "Open Charge Map credentials are retained and used only by the server.",
                 },
                 attribution=["Open Charge Map"],
+                result_type="metadata",
             )
         cache_key = f"{self.provider_id}:{url}"
         try:
@@ -116,6 +120,8 @@ class OpenChargeMapProvider(GeospatialProvider):
                 provider_id=self.provider_id,
                 payload=normalized,
                 attribution=["Open Charge Map"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         except (ProviderError, ValueError) as exc:
             cached = self.cache.get(cache_key)
@@ -127,6 +133,8 @@ class OpenChargeMapProvider(GeospatialProvider):
                     attribution=["Open Charge Map"],
                     warnings=["Open Charge Map request failed; serving stale cached stations."],
                     stale=True,
+                    result_status="stale",
+                    result_type="features",
                 )
             if isinstance(exc, ProviderError):
                 raise

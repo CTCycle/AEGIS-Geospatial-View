@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 import csv
 import io
-import urllib.request
 from collections.abc import Awaitable, Callable
 from typing import Any
-from urllib.parse import urlencode
 
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
@@ -16,6 +13,7 @@ from server.services.geospatial.providers.base import (
     ProviderResponse,
     ProviderUnavailableError,
 )
+from server.services.geospatial.providers.http import fetch_text_url
 
 TextFetcher = Callable[[str], Awaitable[str] | str]
 
@@ -36,7 +34,6 @@ class NASAFIRMSProvider(GeospatialProvider):
         if not api_key:
             raise ProviderAuthError("NASA_API_KEY is required for NASA FIRMS active fire access.")
         west, south, east, north = request.bbox or (-180.0, -90.0, 180.0, 90.0)
-        params = urlencode({"bbox": f"{west},{south},{east},{north}", "key": api_key})
         features_url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{api_key}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/1"
         if request.params.get("live"):
             csv_text = await _call_text_fetcher(self.fetcher, features_url)
@@ -48,23 +45,25 @@ class NASAFIRMSProvider(GeospatialProvider):
                     "renderingMode": "clustered-points",
                     "features": features,
                     "totalResults": len(features),
-                    "query": params,
                     "legend": {"type": "active-fire", "label": "Active fire detection"},
                     "freshnessLabel": "NASA FIRMS near-real-time detections",
                 },
                 attribution=["NASA FIRMS"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         return ProviderResponse(
             capability_id=request.capability_id,
             provider_id=self.provider_id,
             payload={
                 "renderingMode": "clustered-points",
-                "featuresUrl": features_url,
-                "query": params,
+                "status": "server-side-only",
+                "message": "NASA FIRMS credentials are retained and used only by the server.",
                 "legend": {"type": "active-fire", "label": "Active fire detection"},
                 "freshnessLabel": "NASA FIRMS near-real-time detections",
             },
             attribution=["NASA FIRMS"],
+            result_type="metadata",
         )
 
 ###############################################################################
@@ -76,12 +75,7 @@ async def _call_text_fetcher(fetcher: TextFetcher, url: str) -> str:
 
 ###############################################################################
 async def _fetch_text_url(url: str) -> str:
-    return await asyncio.to_thread(_fetch_text_url_sync, url)
-
-###############################################################################
-def _fetch_text_url_sync(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=20) as response:
-        return response.read().decode("utf-8")
+    return await fetch_text_url(url)
 
 ###############################################################################
 def _normalize_firms_csv(csv_text: str) -> list[dict[str, Any]]:

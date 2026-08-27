@@ -129,6 +129,9 @@ class GeospatialProviderPayloadResponse(BaseModel):
     attribution: list[str] = Field(default_factory=lambda: list[str]())
     warnings: list[str] = Field(default_factory=lambda: list[str]())
     stale: bool = False
+    result_status: str | None = None
+    result_type: str | None = None
+    error_code: str | None = None
 
 ###############################################################################
 class GeospatialLayerRenderDescriptor(BaseModel):

@@ -6,6 +6,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from typing import Any, Protocol
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from server.contracts.geospatial import ProviderCredentialValidationResult
 from server.domain.geospatial.providers import (
@@ -31,6 +32,12 @@ class ProviderCircuitOpenError(ProviderError):
 class ProviderRateLimitError(ProviderError):
     """Raised when a provider rejects or cannot satisfy rate limits."""
 
+    def __init__(
+        self, message: str, *, retry_after_seconds: float | None = None
+    ) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
 ###############################################################################
 class ProviderTimeoutError(ProviderError):
     """Raised when a provider request exceeds its timeout."""
@@ -42,6 +49,10 @@ class ProviderUnavailableError(ProviderError):
 ###############################################################################
 class ProviderMalformedPayloadError(ProviderError):
     """Raised when a provider returns a payload that cannot be normalized."""
+
+###############################################################################
+class ProviderInvalidQueryError(ProviderError):
+    """Raised when a provider rejects a deterministic or invalid query."""
 
 
 SENSITIVE_PARAM_MARKERS = ("key", "secret", "token", "password", "authorization")
@@ -81,6 +92,8 @@ def response_without_credentials(response: ProviderResponse) -> ProviderResponse
         warnings=list(response.warnings),
         stale=response.stale,
         fetched_at=response.fetched_at,
+        result_status="stale" if response.stale else response.result_status,
+        result_type=response.result_type,
     )
 
 ###############################################################################
@@ -96,7 +109,27 @@ def _redact_secrets(value: Any) -> Any:
         return redacted
     if is_json_array(value):
         return [_redact_secrets(item) for item in value]
+    if isinstance(value, str) and "://" in value:
+        return _redact_url_query(value)
     return value
+
+###############################################################################
+def _redact_url_query(value: str) -> str:
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return value
+    if not parsed.query:
+        return value
+    query: list[tuple[str, str]] = []
+    for key, nested in parse_qsl(parsed.query, keep_blank_values=True):
+        if any(marker in key.lower() for marker in SENSITIVE_PARAM_MARKERS):
+            query.append((key, "<redacted>"))
+        else:
+            query.append((key, nested))
+    return urlunsplit(
+        (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
+    )
 
 ###############################################################################
 class GeospatialProvider(Protocol):

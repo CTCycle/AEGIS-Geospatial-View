@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from server.common.typing import is_json_array, is_json_object, json_array, json_object
-
 from urllib.parse import urlencode
+
+from server.common.typing import is_json_array, is_json_object, json_object
 
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderMalformedPayloadError,
     ProviderRequest,
     ProviderResponse,
-    ProviderUnavailableError,
 )
 from server.services.geospatial.providers.http import (
     JsonFetcher,
@@ -19,6 +19,10 @@ from server.services.geospatial.providers.http import (
 ###############################################################################
 class USGSProvider(GeospatialProvider):
     provider_id = "usgs"
+    WATER_DATA_ITEMS_URL = (
+        "https://api.waterdata.usgs.gov/ogcapi/v0/collections/"
+        "latest-continuous/items"
+    )
 
     # -------------------------------------------------------------------------
     def __init__(self, *, fetcher: JsonFetcher | None = None) -> None:
@@ -49,6 +53,8 @@ class USGSProvider(GeospatialProvider):
                     "freshnessLabel": "USGS all-day earthquake feed",
                 },
                 attribution=["U.S. Geological Survey"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -61,19 +67,20 @@ class USGSProvider(GeospatialProvider):
                 "freshnessLabel": "USGS all-day earthquake feed",
             },
             attribution=["U.S. Geological Survey"],
+            result_type="metadata",
         )
 
     # -------------------------------------------------------------------------
     async def _water_services(self, request: ProviderRequest) -> ProviderResponse:
-        params = {
-            "format": "json",
-            "siteStatus": "active",
-            "parameterCd": request.params.get("parameterCd") or "00065",
+        params: dict[str, str | int] = {
+            "f": "json",
+            "limit": max(1, min(int(request.params.get("limit") or 1000), 10000)),
+            "parameter_code": str(request.params.get("parameterCd") or "00065"),
         }
         if request.bbox is not None:
             west, south, east, north = request.bbox
-            params["bBox"] = f"{west},{south},{east},{north}"
-        features_url = f"https://waterservices.usgs.gov/nwis/iv/?{urlencode(params)}"
+            params["bbox"] = f"{west},{south},{east},{north}"
+        features_url = f"{self.WATER_DATA_ITEMS_URL}?{urlencode(params)}"
         if request.params.get("live"):
             payload = await call_json_fetcher(self.fetcher, features_url)
             features = _normalize_water_gauge_features(payload)
@@ -84,11 +91,13 @@ class USGSProvider(GeospatialProvider):
                     "renderingMode": "clustered-points",
                     "features": features,
                     "totalResults": len(features),
-                    "format": "json",
+                    "format": "geojson",
                     "legend": {"type": "water-level", "label": "Latest gauge observation"},
-                    "freshnessLabel": "USGS instantaneous values feed",
+                    "freshnessLabel": "USGS latest-continuous observations",
                 },
                 attribution=["U.S. Geological Survey"],
+                result_status="valid_empty" if not features else "ok",
+                result_type="features",
             )
         return ProviderResponse(
             capability_id=request.capability_id,
@@ -96,20 +105,21 @@ class USGSProvider(GeospatialProvider):
             payload={
                 "renderingMode": "clustered-points",
                 "featuresUrl": features_url,
-                "format": "json",
+                "format": "geojson",
                 "legend": {"type": "water-level", "label": "Latest gauge observation"},
-                "freshnessLabel": "USGS instantaneous values feed",
+                "freshnessLabel": "USGS latest-continuous observations",
             },
             attribution=["U.S. Geological Survey"],
+            result_type="metadata",
         )
 
 ###############################################################################
 def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
     if not is_json_object(payload):
-        raise ProviderUnavailableError("USGS earthquake payload must be a GeoJSON object.")
+        raise ProviderMalformedPayloadError("USGS earthquake payload must be a GeoJSON object.")
     raw_features = payload.get("features")
     if not is_json_array(raw_features):
-        raise ProviderUnavailableError("USGS earthquake payload is missing features.")
+        raise ProviderMalformedPayloadError("USGS earthquake payload is missing features.")
     features: list[dict[str, object]] = []
     for item in raw_features:
         if not is_json_object(item):
@@ -143,58 +153,61 @@ def _normalize_earthquake_features(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
-    if not is_json_object(payload):
-        raise ProviderUnavailableError("USGS water-services payload must be an object.")
-    value = json_object(payload.get("value"))
-    raw_series = json_array(value.get("timeSeries"))
+    if not is_json_object(payload) or payload.get("type") != "FeatureCollection":
+        raise ProviderMalformedPayloadError(
+            "USGS latest-continuous payload must be a GeoJSON FeatureCollection."
+        )
+    raw_features = payload.get("features")
+    if not is_json_array(raw_features):
+        raise ProviderMalformedPayloadError(
+            "USGS latest-continuous payload is missing features."
+        )
     features: list[dict[str, object]] = []
-    for series in raw_series:
-        if not is_json_object(series):
+    for raw_feature in raw_features:
+        feature = json_object(raw_feature)
+        geometry = json_object(feature.get("geometry"))
+        properties = json_object(feature.get("properties"))
+        coordinates = geometry.get("coordinates")
+        if not is_json_array(coordinates) or len(coordinates) < 2:
             continue
-        source_info = json_object(series.get("sourceInfo"))
-        geo = json_object(source_info.get("geoLocation"))
-        geog = json_object(geo.get("geogLocation"))
-        latitude = geog.get("latitude")
-        longitude = geog.get("longitude")
-        if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        longitude, latitude = coordinates[0], coordinates[1]
+        value = _float_or_none(properties.get("value"))
+        if (
+            not isinstance(latitude, int | float)
+            or not isinstance(longitude, int | float)
+            or value is None
+        ):
             continue
-        values = json_array(series.get("values"))
-        latest_value = _latest_usgs_value(values)
-        site_codes = json_array(source_info.get("siteCode"))
-        first_site_code = json_object(site_codes[0]) if site_codes else {}
+        station_id = (
+            properties.get("monitoring_location_id")
+            or properties.get("monitoringLocationId")
+            or feature.get("id")
+        )
         features.append(
             {
-                "id": first_site_code.get("value") or source_info.get("siteName"),
-                "name": source_info.get("siteName"),
+                "id": str(station_id or ""),
+                "name": properties.get("monitoring_location_name")
+                or properties.get("name")
+                or station_id,
                 "category": "water_gauge",
                 "latitude": float(latitude),
                 "longitude": float(longitude),
-                "value": latest_value.get("value"),
-                "timestamp": latest_value.get("dateTime"),
+                "value": value,
+                "timestamp": properties.get("time"),
                 "metadata": {
-                    "variable": (
-                        series.get("variable", {}).get("variableName")
-                        if is_json_object(series.get("variable"))
-                        else None
-                    ),
-                    "unit": _unit_code(series),
+                    "parameterCode": properties.get("parameter_code"),
+                    "unit": properties.get("unit_of_measure"),
+                    "observedProperty": properties.get("observed_property"),
+                    "verticalDatum": properties.get("vertical_datum"),
+                    "huc": properties.get("huc"),
                 },
             }
         )
     return features
 
 ###############################################################################
-def _latest_usgs_value(values: list[object]) -> dict[str, object]:
-    if not values or not is_json_object(values[0]):
-        return {}
-    entries = values[0].get("value")
-    if not is_json_array(entries) or not entries:
-        return {}
-    latest = entries[-1]
-    return json_object(latest)
-
-###############################################################################
-def _unit_code(series: dict[str, object]) -> object:
-    variable = json_object(series.get("variable"))
-    unit = json_object(variable.get("unit"))
-    return unit.get("unitCode")
+def _float_or_none(value: object) -> float | None:
+    try:
+        return None if value is None else float(value)
+    except (TypeError, ValueError):
+        return None
