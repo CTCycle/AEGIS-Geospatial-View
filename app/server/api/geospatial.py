@@ -23,6 +23,7 @@ from server.services.geospatial.api_service import (
     GeospatialApiServiceError,
     GeospatialCapabilityNotFoundError,
     GeospatialInvalidRequestError,
+    GeospatialProviderResponseError,
     GeospatialTileCredentialError,
     GeospatialTileRequestError,
     GeospatialUnsupportedTileError,
@@ -50,6 +51,14 @@ def get_geospatial_api_service(request: Request) -> GeospatialApiService:
 
 ###############################################################################
 def raise_service_http_error(error: GeospatialApiServiceError) -> NoReturn:
+    if isinstance(error, GeospatialProviderResponseError):
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "error_code": error.error_code,
+                "message": str(error),
+            },
+        ) from error
     status_code = next(
         (
             mapped_status

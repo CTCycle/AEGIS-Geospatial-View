@@ -182,6 +182,53 @@ def test_geospatial_geojson_render_endpoint_wraps_single_feature() -> None:
     assert payload["features"][0]["id"] == "quake-1"
 
 ###############################################################################
+def test_geospatial_geojson_render_endpoint_converts_normalized_point_records() -> None:
+
+    ###############################################################################
+    class NormalizedPointRegistry:
+
+        # -------------------------------------------------------------------------
+        def build_from_manifests(self) -> None:
+            return None
+
+        # -------------------------------------------------------------------------
+        async def fetch(self, provider_id, request):
+            del provider_id, request
+            return type(
+                "Response",
+                (),
+                {
+                    "payload": {
+                        "renderingMode": "clustered-points",
+                        "features": [
+                            {
+                                "id": "gauge-1",
+                                "name": "Gauge 1",
+                                "latitude": 41.9,
+                                "longitude": 12.5,
+                                "value": 1.25,
+                            }
+                        ],
+                    },
+                    "attribution": ["USGS"],
+                    "warnings": [],
+                    "stale": False,
+                },
+            )()
+
+    client = create_started_client()
+    client.app.dependency_overrides[geospatial.get_geospatial_api_service] = lambda: (
+        _build_api_service(NormalizedPointRegistry())
+    )
+
+    response = client.get("/api/geospatial/layers/usgs_water_gauges/geojson?live=true")
+
+    assert response.status_code == 200
+    feature = response.json()["features"][0]
+    assert feature["geometry"] == {"type": "Point", "coordinates": [12.5, 41.9]}
+    assert feature["properties"] == {"name": "Gauge 1", "value": 1.25}
+
+###############################################################################
 def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collection() -> None:
 
     ###############################################################################
@@ -231,7 +278,7 @@ def test_geospatial_cameras_geojson_render_endpoint_returns_raw_feature_collecti
     assert payload["features"][0]["id"] == "cam-1"
 
 ###############################################################################
-def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_collection() -> None:
+def test_geospatial_geojson_render_endpoint_rejects_malformed_payload() -> None:
 
     ###############################################################################
     class MalformedRegistry:
@@ -261,8 +308,8 @@ def test_geospatial_geojson_render_endpoint_degrades_malformed_payload_to_empty_
 
     response = client.get("/api/geospatial/layers/usgs_earthquakes/geojson?live=true")
 
-    assert response.status_code == 200
-    assert response.json() == {"type": "FeatureCollection", "features": []}
+    assert response.status_code == 502
+    assert response.json()["detail"]["error_code"] == "malformed_response"
 
 ###############################################################################
 def test_geospatial_tile_proxy_rejects_missing_credentials_without_leaking_secret(monkeypatch) -> None:

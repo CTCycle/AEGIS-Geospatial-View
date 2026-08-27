@@ -67,24 +67,97 @@ class GeospatialUnsupportedTileError(GeospatialApiServiceError):
     """Raised when a tile kind is not supported."""
 
 ###############################################################################
+class GeospatialProviderResponseError(GeospatialApiServiceError):
+    """Raised when a provider result cannot be exposed as GeoJSON."""
+
+    def __init__(self, message: str, *, error_code: str, status_code: int) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.status_code = status_code
+
+###############################################################################
 def normalize_geojson_feature_collection(value: Any) -> dict[str, Any]:
-    if is_json_object(value) and value.get("type") == "FeatureCollection":
+    if not is_json_object(value):
+        raise GeospatialProviderResponseError(
+            "Provider returned a non-object GeoJSON payload.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    if value.get("type") == "FeatureCollection":
         features = value.get("features")
-        return {
-            "type": "FeatureCollection",
-            "features": json_array(features),
-        }
-    if is_json_object(value) and value.get("type") == "Feature":
-        return {
-            "type": "FeatureCollection",
-            "features": [value],
-        }
-    if is_json_object(value) and is_json_array(value.get("features")):
-        return {
-            "type": "FeatureCollection",
-            "features": value["features"],
-        }
-    return {"type": "FeatureCollection", "features": []}
+    elif value.get("type") == "Feature":
+        features = [value]
+    else:
+        features = value.get("features")
+    if not is_json_array(features):
+        raise GeospatialProviderResponseError(
+            "Provider returned a GeoJSON payload without a features array.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    return {
+        "type": "FeatureCollection",
+        "features": [_normalize_geojson_feature(item) for item in json_array(features)],
+    }
+
+###############################################################################
+def _normalize_geojson_feature(value: Any) -> dict[str, Any]:
+    if not is_json_object(value):
+        raise GeospatialProviderResponseError(
+            "Provider returned a non-object feature.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    if value.get("type") == "Feature":
+        geometry = value.get("geometry")
+        if geometry is None or is_json_object(geometry):
+            return dict(value)
+        raise GeospatialProviderResponseError(
+            "Provider returned a feature with invalid geometry.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    latitude = value.get("latitude")
+    longitude = value.get("longitude")
+    if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        raise GeospatialProviderResponseError(
+            "Provider feature is missing GeoJSON geometry or numeric coordinates.",
+            error_code="malformed_response",
+            status_code=502,
+        )
+    properties = dict(value)
+    properties.pop("id", None)
+    properties.pop("latitude", None)
+    properties.pop("longitude", None)
+    properties.pop("geometry", None)
+    properties.pop("type", None)
+    return {
+        "type": "Feature",
+        **({"id": value["id"]} if value.get("id") is not None else {}),
+        "geometry": {
+            "type": "Point",
+            "coordinates": [float(longitude), float(latitude)],
+        },
+        "properties": properties,
+    }
+
+###############################################################################
+def _provider_response_error(payload: dict[str, Any]) -> GeospatialProviderResponseError:
+    error_code = str(payload.get("error_code") or "provider_unavailable")
+    error_status = {
+        "auth_required": 401,
+        "rate_limited": 429,
+        "invalid_query": 400,
+        "malformed_response": 502,
+        "provider_unavailable": 502,
+    }
+    if error_code not in error_status:
+        error_code = "provider_unavailable"
+    return GeospatialProviderResponseError(
+        str(payload.get("message") or "Provider did not return a renderable response."),
+        error_code=error_code,
+        status_code=error_status[error_code],
+    )
 
 ###############################################################################
 class GeospatialApiService:
@@ -221,7 +294,7 @@ class GeospatialApiService:
             incidents=incidents,
         )
         if payload.get("status") != "ok":
-            return {"type": "FeatureCollection", "features": []}
+            raise _provider_response_error(payload)
         return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
@@ -318,7 +391,7 @@ class GeospatialApiService:
             camera_type=camera_type,
         )
         if payload.get("status") != "ok":
-            return {"type": "FeatureCollection", "features": []}
+            raise _provider_response_error(payload)
         return normalize_geojson_feature_collection(payload.get("payload"))
 
     # -------------------------------------------------------------------------
