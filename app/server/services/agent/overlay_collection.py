@@ -338,11 +338,36 @@ class OverlayCollectionService:
                 if isinstance(concepts_raw, list)
                 else []
             )
+            descriptor = item.get("descriptor")
+            descriptor_values = descriptor if isinstance(descriptor, dict) else {}
+            tag_values: list[str] = []
+            for key in ("tags", "action_tags", "map_type_tags"):
+                raw_values = item.get(key)
+                if isinstance(raw_values, list):
+                    tag_values.extend(value for value in cast(list[Any], raw_values) if isinstance(value, str))
+                raw_descriptor_values = descriptor_values.get(key)
+                if isinstance(raw_descriptor_values, list):
+                    tag_values.extend(
+                        value
+                        for value in cast(list[Any], raw_descriptor_values)
+                        if isinstance(value, str)
+                    )
+            descriptor_concepts = descriptor_values.get("concepts")
+            if isinstance(descriptor_concepts, list):
+                concepts.extend(
+                    value for value in cast(list[Any], descriptor_concepts) if isinstance(value, str)
+                )
+            concepts = list(dict.fromkeys(concepts))
             haystack = {
                 cls._norm(capability_id),
                 cls._norm(label),
                 cls._norm(provider),
                 cls._norm(overlay_type),
+                *[cls._norm(value) for value in concepts],
+            }
+            label_haystack = {
+                cls._norm(capability_id),
+                cls._norm(label),
                 *[cls._norm(value) for value in concepts],
             }
             selector = command.selector
@@ -359,22 +384,22 @@ class OverlayCollectionService:
             }:
                 continue
             if selector.tags:
-                candidate_tags = (
-                    {
-                        cls._norm(value)
-                        for value in cast(list[Any], item.get("tags"))
-                        if isinstance(value, str)
-                    }
-                    if isinstance(item.get("tags"), list)
-                    else set()
-                )
-                if not candidate_tags.intersection({cls._norm(value) for value in selector.tags}):
+                candidate_tags = {
+                    cls._norm(value)
+                    for value in (*tag_values, *concepts, label)
+                    if cls._norm(value)
+                }
+                if not any(
+                    cls._concept_matches(candidate_tags, value) for value in selector.tags
+                ):
                     continue
             if selector.concepts and not any(
                 cls._concept_matches(haystack, value) for value in selector.concepts
             ):
                 continue
-            if selector.labels and cls._norm(label) not in {cls._norm(value) for value in selector.labels}:
+            if selector.labels and not any(
+                cls._concept_matches(label_haystack, value) for value in selector.labels
+            ):
                 continue
             candidates.append(
                 {

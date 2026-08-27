@@ -62,10 +62,13 @@ class PlannedTurnExecutionService:
         cls,
         session: MapSession,
         turn_contract: TurnParseResult,
+        *,
+        state_session: MapSession | None = None,
     ) -> tuple[MapSession, list[OverlayMutationResult]]:
         return AgentTurnStateAssembler.apply_overlay_commands(
             session,
             list(turn_contract.overlay_commands),
+            state_session=state_session,
         )
 
     # -------------------------------------------------------------------------
@@ -217,9 +220,11 @@ class PlannedTurnExecutionService:
                     turn_contract, latest_memory
                 )
             if map_session is not None and turn_contract.overlay_commands:
+                active_state_session = self._active_map_session(latest_memory)
                 map_session, overlay_mutation_results = self._apply_overlay_commands(
                     map_session,
                     turn_contract,
+                    state_session=active_state_session,
                 )
         mutation_clarification = next(
             (

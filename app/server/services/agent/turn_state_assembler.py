@@ -55,14 +55,22 @@ class AgentTurnStateAssembler:
     def apply_overlay_commands(
         session: MapSession,
         commands: list[OverlayCommand],
+        *,
+        state_session: MapSession | None = None,
     ) -> tuple[MapSession, list[OverlayMutationResult]]:
         """Apply typed overlay mutations to a native-loop map result.
 
         Native tool adapters and the deterministic planner share the same
         collection authority.  Binding an omitted revision here prevents a
         stale follow-up from silently replacing a newer map state.
+
+        ``state_session`` is used when a provider fetch produced a fresh map
+        session for an absent ``show``/``update`` target.  The fetched session
+        supplies the candidate descriptor, while the active session remains
+        authoritative for existing instances and its revision.
         """
-        collection = OverlayCollectionService.from_map_session(session)
+        collection_session = state_session or session
+        collection = OverlayCollectionService.from_map_session(collection_session)
         bound_commands: list[OverlayCommand] = []
         for command in commands:
             if command.state_reference.revision == 0 and collection.revision > 0:

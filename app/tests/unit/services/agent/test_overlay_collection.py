@@ -6,8 +6,10 @@ from server.contracts.extraction import (
     OverlayScope,
     OverlayStateReference,
 )
-from server.contracts.geospatial import OverlayCollectionState, OverlayInstance
+from server.contracts.geospatial import MapSession, OverlayCollectionState, OverlayInstance, ViewportPolicy
+from server.domain.agent.decision import ResolvedLocation
 from server.services.agent.overlay_collection import OverlayCollectionService
+from server.services.agent.turn_state_assembler import AgentTurnStateAssembler
 
 
 def _instance(
@@ -213,6 +215,35 @@ def test_catalog_selector_filters_provider_type_and_tags() -> None:
     assert updated.instances[0].descriptor["tags"] == ["forecast"]
 
 
+def test_catalog_selector_accepts_redundant_alias_fields_for_capability() -> None:
+    command = OverlayCommand(
+        action="show",
+        selector=OverlaySelector(
+            capability_ids=["openmeteo_weather_forecast"],
+            concepts=["weather"],
+            labels=["weather"],
+            tags=["weather"],
+        ),
+        state_reference=OverlayStateReference(revision=0),
+    )
+    catalog = [
+        {
+            "id": "openmeteo_weather_forecast",
+            "label": "Open-Meteo Weather Forecast",
+            "provider": "openmeteo",
+            "type": "point-insight",
+            "rendering_mode": "metadata-only",
+        }
+    ]
+
+    updated, result = OverlayCollectionService.apply(
+        OverlayCollectionState(), command, catalog=catalog
+    )
+
+    assert result.added_instance_ids == [updated.instances[0].instance_id]
+    assert updated.instances[0].capability_id == "openmeteo_weather_forecast"
+
+
 def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
     ambiguous = OverlayCommand(
         action="add",
@@ -240,3 +271,47 @@ def test_ambiguous_catalog_selector_and_no_match_preserve_state() -> None:
     still_unchanged, no_match_result = OverlayCollectionService.apply(unchanged, no_match)
     assert still_unchanged == unchanged
     assert no_match_result.unmatched_selectors == ["missing"]
+
+
+def test_provider_candidate_is_committed_against_active_revision_without_dropping_state() -> None:
+    location = ResolvedLocation(label="Zurich", latitude=47.37, longitude=8.54, country="Switzerland")
+    viewport = ViewportPolicy(center_latitude=47.37, center_longitude=8.54)
+    active = MapSession(
+        session_id="active",
+        resolved_location=location,
+        basemap_id="osm_default",
+        viewport=viewport,
+        overlay_collection=OverlayCollectionState(revision=1),
+        overlay_collection_revision=1,
+    )
+    fetched = active.model_copy(
+        update={
+            "session_id": "fetched",
+            "overlays": [
+                {
+                    "id": "catalog-weather",
+                    "capability_id": "openmeteo_weather_forecast",
+                    "label": "Weather",
+                    "provider": "openmeteo",
+                    "type": "raster",
+                    "rendering_mode": "metadata-only",
+                }
+            ],
+        }
+    )
+    command = OverlayCommand(
+        action="show",
+        selector=OverlaySelector(capability_ids=["openmeteo_weather_forecast"]),
+        scope=OverlayScope(kind="location", location={"label": "Zurich", "latitude": 47.37, "longitude": 8.54}),
+        state_reference=OverlayStateReference(revision=1),
+    )
+
+    updated, results = AgentTurnStateAssembler.apply_overlay_commands(
+        fetched,
+        [command],
+        state_session=active,
+    )
+
+    assert updated.overlay_collection_revision == 2
+    assert len(updated.overlay_collection.instances) == 1
+    assert results[0].added_instance_ids == [updated.overlay_collection.instances[0].instance_id]
