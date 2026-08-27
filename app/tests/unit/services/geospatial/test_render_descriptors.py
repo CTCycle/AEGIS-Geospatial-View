@@ -5,6 +5,7 @@ from tests.conftest import run_async_in_thread
 import pytest
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
+from server.services.geospatial.capability_registry import CapabilityRegistry
 from server.services.geospatial.render_descriptors import RenderDescriptorService
 from server.services.search.request_builder import RequestBuilder
 
@@ -124,6 +125,26 @@ def test_render_descriptor_service_caps_rainviewer_at_supported_zoom() -> None:
     assert result is not None
     descriptor, _warnings = result
     assert descriptor["max_zoom"] == 7
+
+###############################################################################
+def test_census_demographic_render_uses_server_provider_endpoint() -> None:
+    service = RenderDescriptorService(capability_registry=CapabilityRegistry())
+
+    result = run_async_in_thread(
+        service.build_overlay_descriptor(
+            "census_tigerweb_demographics",
+            request=_request(),
+        )
+    )
+
+    assert result is not None
+    descriptor, warnings = result
+    assert str(descriptor["url"]).startswith(
+        "/api/geospatial/layers/census_tigerweb_demographics/geojson?"
+    )
+    assert "live=true" in str(descriptor["url"])
+    assert descriptor["rendering_mode"] == "choropleth"
+    assert warnings == []
 
 ###############################################################################
 @pytest.mark.parametrize(
