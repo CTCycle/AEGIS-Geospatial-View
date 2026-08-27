@@ -1,6 +1,6 @@
 # Provider Framework
 
-Last updated: 2026-08-02
+Last updated: 2026-08-27
 
 ## Provider Adapter Location
 
@@ -51,6 +51,8 @@ Adapters return normalized `ProviderResponse` objects with:
 - warnings
 - stale state
 - provider ID
+- result status: `ok`, `valid_empty`, or `stale`
+- result type: `features`, `raster`, `metadata`, or `unknown`
 
 Adapters that support live layer discovery additionally expose:
 
@@ -64,11 +66,12 @@ These methods return normalized provider layer descriptors. NASA GIBS parses WMS
 - Feature providers expose `fetch_features(request)` or an equivalent registry path.
 - Cache keys include safe request-shaping parameters such as provider, layer ID, bbox, zoom, time, category, variables, and credential-safe request parameters.
 - Provider results include attribution and source-health metadata when available.
-- 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced as safe payloads without leaking credentials.
+- 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced with stable semantics without leaking credentials. A valid empty result is emitted only after a successful semantic response; provider failures must not be converted into empty feature collections.
+- Shared HTTP retrieval does not follow redirects, bounds response bodies to the configured maximum, preserves `Retry-After` on rate-limit errors, and treats deterministic 4xx responses as non-retryable.
 - Hazard providers include legends and freshness labels where applicable.
-- Local open-data camera templates read configured JSON source URLs or files through `LOCAL_OPEN_DATA_SOURCES`.
+- Local open-data camera and dataset sources are selected by configured source IDs in `LOCAL_OPEN_DATA_SOURCES`; callers cannot supply arbitrary URLs, and private-network targets are rejected.
 - Mobility Database discovery reads a local CSV snapshot and refreshes it from the public catalog only when the snapshot is missing or explicitly requested; each feed's authentication and license metadata is preserved.
-- Provider adapters must not return credentials or raw capability XML to frontend API responses.
+- Provider adapters must not return credentials, credential-bearing URLs, or raw capability XML to frontend API responses.
 
 ## Dataset Processing Boundary
 

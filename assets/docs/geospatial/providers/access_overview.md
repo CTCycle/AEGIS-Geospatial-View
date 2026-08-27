@@ -1,6 +1,6 @@
 # Access Overview
 
-Last updated: 2026-08-20
+Last updated: 2026-08-27
 
 ## Purpose
 
@@ -36,6 +36,10 @@ the resolver does not silently fall back to a second secret source. Credential
 values never enter manifests, API responses, provider payloads, browser logs,
 or map snapshots.
 
+Credentialed provider requests remain server-mediated: credentials are sent in
+request headers or used to construct an internal proxy request, never exposed
+in a frontend URL, render descriptor, or public provider payload.
+
 Environment fallback variables include:
 
 - `ARCGIS_API_KEY`
@@ -52,6 +56,10 @@ Environment fallback variables include:
 - `WINDY_WEBCAMS_API_KEY`
 - `LOCAL_OPEN_DATA_SOURCES`
 - `AEGIS_MOBILITY_DATABASE_CATALOG_PATH` (optional local CSV snapshot override)
+
+`LOCAL_OPEN_DATA_SOURCES` maps trusted source IDs to HTTPS URLs or local files.
+The runtime accepts a configured source ID rather than an arbitrary caller URL,
+and rejects private or loopback network targets.
 
 ## Secret Safety Rules
 

@@ -79,9 +79,11 @@ Representative implemented layers include:
 - `nasa_firms_active_fires`
 - `noaa_radar`
 - `noaa_weather_alerts`
+- `noaa_coops_water_levels`
 - `openchargemap_ev_charging`
 - `opentripmap_tourism_pois`
 - `usgs_earthquakes`
+- `usgs_water_gauges`
 - `gtfs_static`
 - `gtfs_realtime`
 

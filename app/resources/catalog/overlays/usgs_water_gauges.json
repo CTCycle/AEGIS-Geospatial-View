@@ -3,7 +3,7 @@
   "name": "USGS Water Gauges",
   "provider": "usgs",
   "type": "vector-overlay",
-  "description": "USGS water services observations for active stream and water-level gauges.",
+  "description": "USGS latest-continuous OGC API observations for active stream and water-level gauges.",
   "capabilities": [
     "water",
     "stream",
@@ -32,23 +32,23 @@
       "stream gauge map",
       "flood context"
     ],
-    "source_protocol": "JSON API",
-    "data_format": "JSON",
+    "source_protocol": "OGC API - Features",
+    "data_format": "GeoJSON",
     "geometry_type": "Point",
     "queryable": true,
     "vectorizable": true,
-    "endpoint_health": "functional",
+    "endpoint_health": "partial",
     "auth_mode": "none",
-    "official_docs_url": "https://waterservices.usgs.gov/",
+    "official_docs_url": "https://api.waterdata.usgs.gov/docs/ogcapi/",
     "last_validated": "2026-05-11",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
-  "version": 1,
-  "last_modified": "2026-05-11T00:00:00+00:00",
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
   "sourceOfficialDocs": [
-    "https://waterservices.usgs.gov/"
+    "https://api.waterdata.usgs.gov/docs/ogcapi/"
   ],
   "license": {
     "name": "USGS public domain",
@@ -81,10 +81,11 @@
     ]
   },
   "reliability": {
-    "status": "functional",
-    "lastAudited": "2026-05-11",
+    "status": "partial",
+    "lastAudited": "2026-08-27",
     "knownLimitations": [
-      "Measurements and station density vary by parameter and region."
+      "Measurements and station density vary by parameter and region.",
+      "The provider uses the current latest-continuous OGC API during the Water Services migration."
     ]
   },
   "cachePolicy": {
@@ -93,9 +94,9 @@
     "staleWhileRevalidateSeconds": 3600
   },
   "normalization": {
-    "geometryPath": "value.timeSeries[].sourceInfo.geoLocation.geogLocation",
-    "idPath": "value.timeSeries[].sourceInfo.siteCode[].value",
-    "timestampPath": "value.timeSeries[].values[].value[].dateTime",
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": "features[].properties.timestamp",
     "fieldMap": {},
     "expectedGeometry": "Point"
   }

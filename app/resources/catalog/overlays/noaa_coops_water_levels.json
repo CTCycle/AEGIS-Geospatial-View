@@ -3,7 +3,7 @@
   "name": "NOAA CO-OPS Water Levels",
   "provider": "noaa",
   "type": "vector-overlay",
-  "description": "NOAA CO-OPS tide and water-level station observations.",
+  "description": "NOAA CO-OPS station metadata joined with the latest water-level observation available for each selected station.",
   "capabilities": [
     "water",
     "tide",
@@ -31,23 +31,23 @@
       "coastal condition",
       "water level stations"
     ],
-    "source_protocol": "JSON API",
+    "source_protocol": "NOAA CO-OPS station metadata + datagetter JSON API",
     "data_format": "JSON",
     "geometry_type": "Point",
     "queryable": true,
     "vectorizable": true,
     "endpoint_health": "partial",
     "auth_mode": "none",
-    "official_docs_url": "https://api.tidesandcurrents.noaa.gov/api/prod/",
+    "official_docs_url": "https://api.tidesandcurrents.noaa.gov/api/dev",
     "last_validated": "2026-05-11",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
-  "version": 1,
-  "last_modified": "2026-05-11T00:00:00+00:00",
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
   "sourceOfficialDocs": [
-    "https://api.tidesandcurrents.noaa.gov/api/prod/"
+    "https://api.tidesandcurrents.noaa.gov/api/dev"
   ],
   "license": {
     "name": "NOAA public data",
@@ -81,9 +81,10 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
+    "lastAudited": "2026-08-27",
     "knownLimitations": [
-      "Station discovery must be paired with observation requests for full rendering."
+      "Station discovery is paired with a station-specific observation request for full rendering.",
+      "Observation availability depends on the selected station, product, datum, and provider coverage."
     ]
   },
   "cachePolicy": {
@@ -92,9 +93,9 @@
     "staleWhileRevalidateSeconds": 3600
   },
   "normalization": {
-    "geometryPath": "stations[].lat,stations[].lng",
-    "idPath": "stations[].id",
-    "timestampPath": "data[].t",
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
+    "timestampPath": "features[].properties.timestamp",
     "fieldMap": {},
     "expectedGeometry": "Point"
   }

@@ -3,7 +3,7 @@
   "name": "OpenAQ Air Quality",
   "provider": "openaq",
   "type": "point-insight",
-  "description": "OpenAQ air-quality overlay based on available measurement and station data.",
+  "description": "OpenAQ v3 air-quality locations with their latest available measurements.",
   "capabilities": [
     "air-quality",
     "point-insight"
@@ -50,22 +50,22 @@
     ],
     "location_dependency": "Location-specific and dependent on station/data availability.",
     "integration_requirements": [
-      "No API key required for configured OpenAQ access"
+      "Configure an OpenAQ API key through encrypted settings or OPENAQ_API_KEY."
     ],
     "official_docs_url": "https://docs.openaq.org/using-the-api/api-key",
-    "source_protocol": "JSON point insight",
+    "source_protocol": "OpenAQ v3 JSON API",
     "data_format": "JSON",
     "geometry_type": "point",
     "queryable": true,
     "vectorizable": true,
-    "endpoint_health": "validated-by-sampled-health-check",
+    "endpoint_health": "partial",
     "auth_mode": "api_key",
     "rate_limit_notes": "verify provider availability and attribution requirements",
-    "retrieval_mode": "direct",
+    "retrieval_mode": "server-proxied",
     "last_validated": "2026-04-27"
   },
-  "version": 1,
-  "last_modified": "2026-04-06T15:08:00.882573+00:00",
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "clustered-points",
   "sourceOfficialDocs": [
@@ -101,8 +101,11 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
-    "knownLimitations": []
+    "lastAudited": "2026-08-27",
+    "knownLimitations": [
+      "A configured OpenAQ API key is required for v3 location and latest-measurement requests.",
+      "Station coverage and pollutant availability vary by location and source provider."
+    ]
   },
   "cachePolicy": {
     "mode": "memory",

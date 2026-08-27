@@ -3,7 +3,7 @@
   "name": "Census TIGERweb Demographic Boundaries",
   "provider": "census",
   "type": "arcgis-geojson",
-  "description": "U.S. Census tract boundary overlay for joining Census demographic attributes such as population, income, and age structure.",
+  "description": "U.S. Census TIGERweb boundary overlay used as the geometry source for later ACS demographic joins.",
   "capabilities": [
     "demographics",
     "boundaries",
@@ -15,7 +15,6 @@
     "label": "Census TIGERweb Demographic Boundaries",
     "default_opacity": 0.35,
     "requires_key": false,
-    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&geometryType=esriGeometryEnvelope&geometry={bbox}&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&f=geojson",
     "attribution": "U.S. Census Bureau TIGERweb",
     "keywords": [
       "census",
@@ -44,13 +43,13 @@
       "show census tracts around Chicago",
       "display demographic boundaries near Phoenix"
     ],
-    "official_docs_url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "official_docs_url": "https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html",
     "source_protocol": "ArcGIS REST GeoJSON",
     "data_format": "GeoJSON",
     "geometry_type": "polygon",
     "queryable": true,
     "vectorizable": true,
-    "endpoint_health": "validated-by-sampled-health-check",
+    "endpoint_health": "partial",
     "auth_mode": "none",
     "rate_limit_notes": "Respect provider usage policies and retry after transient failures.",
     "retrieval_mode": "bounded",
@@ -58,12 +57,12 @@
     "location_dependency": "Depends on selected map extent or requested location.",
     "constraints": "Validate coverage, attribution, quotas, and endpoint availability before production use."
   },
-  "version": 1,
-  "last_modified": "2026-04-27T00:00:00+00:00",
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
   "capabilityKind": "vector-overlay",
   "renderingMode": "choropleth",
   "sourceOfficialDocs": [
-    "https://www.census.gov/data/developers/guidance/api-user-guide.html"
+    "https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html"
   ],
   "license": {
     "name": "U.S. Census Bureau TIGERweb",
@@ -101,8 +100,11 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
-    "knownLimitations": []
+    "lastAudited": "2026-08-27",
+    "knownLimitations": [
+      "Boundary layer and vintage selection are discovered from live TIGERweb metadata.",
+      "This capability supplies geometry only; ACS values require the demographic-join capability."
+    ]
   },
   "cachePolicy": {
     "mode": "memory",

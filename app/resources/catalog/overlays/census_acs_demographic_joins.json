@@ -3,7 +3,7 @@
   "name": "Census ACS Demographic Joins",
   "provider": "census",
   "type": "dataset-ingestion",
-  "description": "ACS tabular demographic fields joined to Census boundary geometries for choropleth rendering.",
+  "description": "ACS tabular demographic fields joined at request time to Census boundary geometries for choropleth rendering.",
   "capabilities": [
     "acs",
     "demographics",
@@ -35,8 +35,8 @@
       "Map ACS demographics for Texas counties",
       "Display population distribution by county in the United States"
     ],
-    "source_protocol": "api",
-    "data_format": "json",
+    "source_protocol": "Census ACS JSON API + TIGERweb ArcGIS REST",
+    "data_format": "JSON + GeoJSON",
     "geometry_type": "Polygon",
     "queryable": true,
     "vectorizable": true,
@@ -46,12 +46,13 @@
     "last_validated": "2026-05-11",
     "rate_limit_notes": "Use bounded requests and cache responses according to the manifest cache policy."
   },
-  "version": 1,
-  "last_modified": "2026-05-11T00:00:00+00:00",
+  "version": 2,
+  "last_modified": "2026-08-27T00:00:00+00:00",
   "capabilityKind": "dataset-ingestion",
   "renderingMode": "choropleth",
   "sourceOfficialDocs": [
-    "https://www.census.gov/data/developers/data-sets/acs-5year.html"
+    "https://www.census.gov/data/developers/data-sets/acs-5year.html",
+    "https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html"
   ],
   "license": {
     "name": "US Census public data",
@@ -86,19 +87,20 @@
   },
   "reliability": {
     "status": "partial",
-    "lastAudited": "2026-05-11",
+    "lastAudited": "2026-08-27",
     "knownLimitations": [
-      "Rendering requires a completed boundary join artifact."
+      "Rendering requires live TIGERweb boundary metadata and Census ACS availability.",
+      "The default variable is total population; geography, vintage, and variable selection shape the joined result."
     ]
   },
   "cachePolicy": {
-    "mode": "preprocessed",
-    "ttlSeconds": 31536000,
-    "staleWhileRevalidateSeconds": 31536000
+    "mode": "memory",
+    "ttlSeconds": 3600,
+    "staleWhileRevalidateSeconds": 86400
   },
   "normalization": {
-    "geometryPath": "joined_boundary.geometry",
-    "idPath": "GEO_ID",
+    "geometryPath": "features[].geometry",
+    "idPath": "features[].id",
     "timestampPath": "vintage",
     "fieldMap": {
       "B01003_001E": "population"
