@@ -8,6 +8,7 @@ from server.common.typing import is_json_array, is_json_object, json_array, json
 from server.services.geospatial.cache import CacheLookupStatus, GeospatialCache
 from server.services.geospatial.providers.base import (
     GeospatialProvider,
+    ProviderError,
     ProviderMalformedPayloadError,
     ProviderRequest,
     ProviderResponse,
@@ -194,7 +195,7 @@ class NOAAProvider(GeospatialProvider):
                 stale_while_revalidate_seconds=self.station_stale_while_revalidate_seconds,
             )
             return stations, False, []
-        except (ProviderUnavailableError, ProviderMalformedPayloadError):
+        except ProviderError:
             if cached.status == CacheLookupStatus.STALE and is_json_array(cached.value):
                 return (
                     [json_object(item) for item in json_array(cached.value)],
