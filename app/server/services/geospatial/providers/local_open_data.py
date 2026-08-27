@@ -143,15 +143,17 @@ class LocalOpenDataProvider:
     # -------------------------------------------------------------------------
     def _requested_source_id(self, request: ProviderRequest) -> str:
         requested = request.params.get("source_id")
+        explicitly_selected = requested is not None
         if requested is None:
             for field in ("source", "source_url"):
                 if field in request.params:
                     requested = request.params[field]
+                    explicitly_selected = True
                     break
         source_id = str(requested or request.capability_id).strip()
         if not source_id:
             raise ProviderInvalidQueryError("A configured local open-data source id is required.")
-        if source_id not in self.source_map:
+        if explicitly_selected and source_id not in self.source_map:
             raise ProviderInvalidQueryError(
                 "Local open-data sources must be selected by a configured source id."
             )
