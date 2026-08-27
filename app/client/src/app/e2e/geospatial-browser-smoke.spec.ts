@@ -331,14 +331,22 @@ describe('e2e/geospatial browser smoke', () => {
     expect(mapOptions.style.sources.basemap.tiles[0]).toBe(DEFAULT_BASE_TILE_PROXY_URL);
 
     const geoJsonSource = fakeMap.addSource.calls.allArgs()
-      .map((args) => args[1] as { type?: string; data?: string; tiles?: string[] })
+      .map((args) => args[1] as { type?: string; data?: string; tiles?: string[]; cluster?: boolean })
       .find((source) => source.type === 'geojson');
     expect(geoJsonSource?.data).toContain('/api/geospatial/layers/mock_clustered_points/geojson');
+    expect(geoJsonSource?.cluster).toBeTrue();
 
     const clusteredLayer = fakeMap.addLayer.calls.allArgs()
-      .map((args) => args[0] as { type?: string; paint?: Record<string, unknown> })
-      .find((layer) => layer.type === 'circle');
-    expect(clusteredLayer?.paint?.['circle-color']).toBe('#0ea5e9');
+      .map((args) => args[0] as { id?: string; type?: string; paint?: Record<string, unknown> })
+      .find((layer) => layer.id?.endsWith('-clusters'));
+    expect(clusteredLayer?.type).toBe('circle');
+    expect(Array.isArray(clusteredLayer?.paint?.['circle-color'])).toBeTrue();
+
+    const unclusteredLayer = fakeMap.addLayer.calls.allArgs()
+      .map((args) => args[0] as { id?: string; type?: string; paint?: Record<string, unknown> })
+      .find((layer) => layer.id?.endsWith('-points'));
+    expect(unclusteredLayer?.type).toBe('circle');
+    expect(unclusteredLayer?.paint?.['circle-color']).toBe('#0ea5e9');
 
     expect(pageElement.textContent).toContain('Metadata setup layer');
     expect(pageElement.textContent).toContain('credentials are missing');

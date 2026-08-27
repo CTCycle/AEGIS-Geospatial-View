@@ -18,6 +18,13 @@ import { isFiniteNumber } from '../core/type-guards';
 
 export type OverlayEntry = MapOverlayEntry;
 type RasterOverlayKind = 'tile' | 'wms' | 'wmts';
+type ClusterGeoJsonSource = {
+  type: 'geojson';
+  getClusterExpansionZoom: (
+    clusterId: number,
+    callback: (error: Error | null, zoom: number) => void,
+  ) => void;
+};
 
 const toMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) {
@@ -200,13 +207,18 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
   overlays.forEach((overlay, index) => {
     const sourceId = `overlay-source-${overlay.id}`;
     const layerId = `overlay-layer-${overlay.id}`;
+    const layerIds = getOverlayLayerIds(overlay);
     const opacity = typeof overlay.default_opacity === 'number' ? overlay.default_opacity : DEFAULT_OVERLAY_OPACITY;
     const sourceBounds = normalizeOverlayBounds(overlay.bounds);
     const renderingMode = String(
       overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
     ).toLowerCase();
     try {
-      if (typeof map.getLayer === 'function' && typeof map.getSource === 'function' && map.getLayer(layerId)) {
+      if (
+        typeof map.getLayer === 'function'
+        && typeof map.getSource === 'function'
+        && layerIds.some((id) => map.getLayer(id))
+      ) {
         statuses.push({ overlayId: overlay.id, status: 'loaded' });
         return;
       }
@@ -291,7 +303,8 @@ export const addOverlayLayers = (map: Map, mapSession?: MapSession): OverlayRend
 };
 
 export const removeOverlayLayers = (map: Map, mapSession?: MapSession): void => {
-  const keep = new Set((mapSession?.overlays || []).map((overlay) => `overlay-layer-${overlay.id}`));
+  const keep = new Set((mapSession?.overlays || []).flatMap(getOverlayLayerIds));
+  const sourcesToRemove = new Set<string>();
   const styleLayers = typeof map.getStyle === 'function' ? map.getStyle()?.layers || [] : [];
   for (const layer of styleLayers) {
     if (!layer.id.startsWith('overlay-layer-') || keep.has(layer.id)) {
@@ -300,11 +313,33 @@ export const removeOverlayLayers = (map: Map, mapSession?: MapSession): void => 
     if (map.getLayer(layer.id)) {
       map.removeLayer(layer.id);
     }
-    const sourceId = `overlay-source-${layer.id.slice('overlay-layer-'.length)}`;
+    const source = (layer as unknown as { source?: unknown }).source;
+    sourcesToRemove.add(
+      typeof source === 'string'
+        ? source
+        : `overlay-source-${layer.id.slice('overlay-layer-'.length)}`,
+    );
+  }
+  for (const sourceId of sourcesToRemove) {
     if (map.getSource(sourceId)) {
       map.removeSource(sourceId);
     }
   }
+};
+
+export const getOverlayLayerIds = (overlay: OverlayEntry): string[] => {
+  const layerId = `overlay-layer-${overlay.id}`;
+  const renderingMode = String(
+    overlay.render?.rendering_mode || overlay.rendering_mode || overlay.type || '',
+  ).toLowerCase();
+  if (renderingMode === 'clustered-points') {
+    return [
+      `${layerId}-clusters`,
+      `${layerId}-cluster-count`,
+      `${layerId}-points`,
+    ];
+  }
+  return [layerId];
 };
 
 export const isGeoJsonOverlay = (overlay: OverlayEntry): boolean => {
@@ -339,11 +374,14 @@ const addGeoJsonOverlayLayer = (
   if (!isGeoJsonOverlay(overlay) || (!overlay.url && !overlay.data)) {
     return false;
   }
+  const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
   map.addSource(sourceId, {
     type: 'geojson',
     data: (overlay.data || overlay.url!) as unknown as GeoJSON,
+    ...(renderingMode === 'clustered-points'
+      ? { cluster: true, clusterMaxZoom: 14, clusterRadius: 50 }
+      : {}),
   });
-  const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
   const geometryType = overlay.geometry_type?.toLowerCase() || '';
   if (renderingMode === 'camera-points') {
     map.addLayer({
@@ -360,7 +398,94 @@ const addGeoJsonOverlayLayer = (
     });
     return true;
   }
-  if (geometryType.includes('point') || renderingMode === 'clustered-points') {
+  if (renderingMode === 'clustered-points') {
+    const baseLayerId = `overlay-layer-${overlay.id}`;
+    map.addLayer({
+      id: `${baseLayerId}-clusters`,
+      source: sourceId,
+      type: 'circle',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step',
+          ['get', 'point_count'],
+          '#51bbd6',
+          100,
+          '#f1f075',
+          750,
+          '#f28cb1',
+        ],
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          16,
+          100,
+          20,
+          750,
+          24,
+        ],
+        'circle-opacity': opacity,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#164e63',
+      },
+    });
+    map.addLayer({
+      id: `${baseLayerId}-cluster-count`,
+      source: sourceId,
+      type: 'symbol',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-size': 12,
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': '#164e63',
+        'text-halo-width': 1,
+        'text-opacity': opacity,
+      },
+    });
+    map.addLayer({
+      id: `${baseLayerId}-points`,
+      source: sourceId,
+      type: 'circle',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-radius': 5,
+        'circle-color': '#0ea5e9',
+        'circle-opacity': opacity,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#082f49',
+      },
+    });
+    if (typeof map.on === 'function') {
+      map.on('click', `${baseLayerId}-clusters`, (event) => {
+        const features = map.queryRenderedFeatures(event.point, {
+          layers: [`${baseLayerId}-clusters`],
+        });
+        const clusterId = features[0]?.properties?.['cluster_id'];
+        if (!isFiniteNumber(clusterId)) {
+          return;
+        }
+        const source = map.getSource(sourceId) as unknown as ClusterGeoJsonSource | undefined;
+        if (
+          !source
+          || source.type !== 'geojson'
+          || typeof source.getClusterExpansionZoom !== 'function'
+        ) {
+          return;
+        }
+        source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+          if (error || !isFiniteNumber(zoom)) {
+            return;
+          }
+          map.easeTo({ center: [event.lngLat.lng, event.lngLat.lat], zoom });
+        });
+      });
+    }
+    return true;
+  }
+  if (geometryType.includes('point')) {
     map.addLayer({
       id: layerId,
       source: sourceId,

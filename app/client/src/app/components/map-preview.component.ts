@@ -29,6 +29,7 @@ import {
   OverlayEntry,
   addOverlayLayers,
   buildStyle,
+  getOverlayLayerIds,
   isGeoJsonOverlay,
   normalizeBounds,
   recordBooleanEqual,
@@ -475,29 +476,44 @@ export class MapPreviewComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
 
     this.mapSession.overlays.forEach((overlay) => {
-      const layerId = `overlay-layer-${overlay.id}`;
-      if (!map.getLayer(layerId)) {
+      const layerIds = getOverlayLayerIds(overlay);
+      if (!layerIds.some((layerId) => map.getLayer(layerId))) {
         return;
       }
       const visible = this.overlayVisibility[overlay.id] ?? true;
-      map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
       const opacityValue = this.overlayOpacity[overlay.id] ?? overlay.default_opacity ?? DEFAULT_OVERLAY_OPACITY;
+      layerIds.forEach((layerId) => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+        }
+      });
       if (overlay.type === 'point-insight') {
-        map.setPaintProperty(layerId, 'circle-opacity', opacityValue);
+        map.setPaintProperty(layerIds[0], 'circle-opacity', opacityValue);
       } else if (isGeoJsonOverlay(overlay)) {
         const geometryType = overlay.geometry_type?.toLowerCase() || '';
         const renderingMode = String(overlay.rendering_mode || overlay.type).toLowerCase();
-        if (geometryType.includes('point') || renderingMode === 'camera-points' || renderingMode === 'clustered-points') {
-          map.setPaintProperty(layerId, 'circle-opacity', opacityValue);
+        if (renderingMode === 'clustered-points') {
+          const [clusterLayerId, countLayerId, pointLayerId] = layerIds;
+          if (map.getLayer(clusterLayerId)) {
+            map.setPaintProperty(clusterLayerId, 'circle-opacity', opacityValue);
+          }
+          if (map.getLayer(countLayerId)) {
+            map.setPaintProperty(countLayerId, 'text-opacity', opacityValue);
+          }
+          if (map.getLayer(pointLayerId)) {
+            map.setPaintProperty(pointLayerId, 'circle-opacity', opacityValue);
+          }
+        } else if (geometryType.includes('point') || renderingMode === 'camera-points') {
+          map.setPaintProperty(layerIds[0], 'circle-opacity', opacityValue);
         } else if (geometryType.includes('polygon') || renderingMode === 'choropleth') {
-          map.setPaintProperty(layerId, 'fill-opacity', Math.min(opacityValue, 0.55));
+          map.setPaintProperty(layerIds[0], 'fill-opacity', Math.min(opacityValue, 0.55));
         } else {
-          map.setPaintProperty(layerId, 'line-opacity', opacityValue);
+          map.setPaintProperty(layerIds[0], 'line-opacity', opacityValue);
         }
       } else if (String(overlay.rendering_mode || overlay.type).toLowerCase() === 'vector-tile') {
-        map.setPaintProperty(layerId, 'fill-opacity', Math.min(opacityValue, 0.45));
+        map.setPaintProperty(layerIds[0], 'fill-opacity', Math.min(opacityValue, 0.45));
       } else {
-        map.setPaintProperty(layerId, 'raster-opacity', opacityValue);
+        map.setPaintProperty(layerIds[0], 'raster-opacity', opacityValue);
       }
     });
   }
