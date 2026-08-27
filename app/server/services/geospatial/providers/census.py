@@ -361,8 +361,10 @@ def _acs_row_key(row: dict[str, str], geography: str) -> str:
 
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
+    if not isinstance(value, int | float | str):
+        return None
     try:
-        if value is None or value == "" or value == "-":
+        if value == "" or value == "-":
             return None
         return float(value)
     except (TypeError, ValueError):

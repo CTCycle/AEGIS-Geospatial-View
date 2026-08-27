@@ -207,7 +207,9 @@ def _normalize_water_gauge_features(payload: object) -> list[dict[str, object]]:
 
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
+    if not isinstance(value, int | float | str):
+        return None
     try:
-        return None if value is None else float(value)
+        return float(value)
     except (TypeError, ValueError):
         return None

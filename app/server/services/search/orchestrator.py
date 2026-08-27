@@ -50,7 +50,7 @@ class LocationSearchOrchestrator:
     # -------------------------------------------------------------------------
     async def execute(self, payload: LocationSearchRequest) -> MapSession:
         self.capability_registry.load_capabilities()
-        basemap = await self.render_descriptor_service.build_basemap_descriptor(
+        basemap: dict[str, object] | None = await self.render_descriptor_service.build_basemap_descriptor(
             payload.basemap_id
         )
         overlays: list[dict[str, object]] = []
