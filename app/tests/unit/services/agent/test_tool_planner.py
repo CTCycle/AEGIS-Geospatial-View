@@ -4,6 +4,7 @@ from server.contracts.extraction import (
     ConversationContextSnapshot,
     LocationSignal,
     NormalizedAction,
+    OverlayCommand,
     TurnParseResult,
 )
 from server.services.agent.tool_planner import DeterministicToolPlanner
@@ -15,6 +16,7 @@ def _turn(
     task_class: str = "map_search",
     layers: list[str] | None = None,
     basemap: str | None = None,
+    overlay_commands: list[OverlayCommand] | None = None,
 ) -> TurnParseResult:
     return TurnParseResult(
         user_text=text,
@@ -37,6 +39,7 @@ def _turn(
         ),
         parser_confidence=0.95,
         requested_layers=layers or [],
+        overlay_commands=overlay_commands or [],
         requested_basemap=basemap,
         tools_needed=True,
     )
@@ -85,3 +88,20 @@ def test_basemap_replacement_is_deterministic() -> None:
     )
     assert plan.steps == []
     assert plan.visualization_update == {"basemap_replacement": "esri_world_imagery"}
+
+
+def test_non_additive_overlay_command_does_not_emit_provider_layer_addition() -> None:
+    plan = DeterministicToolPlanner().build_plan(
+        _turn(
+            "Hide weather in this area",
+            layers=["openmeteo_weather_forecast"],
+            overlay_commands=[
+                OverlayCommand(action="hide", selector={"concepts": ["weather"]}),
+            ],
+        ),
+        "environmental_data",
+    )
+
+    assert plan.steps == []
+    assert "add_layer_ids" not in plan.visualization_update
+    assert "overlay_commands" in plan.visualization_update

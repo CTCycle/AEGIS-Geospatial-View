@@ -450,6 +450,7 @@ def test_parser_domain_rules_separate_global_overlay_remove_from_location_scope(
     assert global_remove.overlay_commands[0].action == "remove"
     assert global_remove.overlay_commands[0].selector.concepts == ["weather"]
     assert global_remove.overlay_commands[0].scope.kind == "global"
+    assert global_remove.requested_layers == []
     assert global_remove.requires_location is False
     assert scoped_remove.overlay_commands[0].scope.kind == "location"
     assert scoped_remove.overlay_commands[0].scope.location is not None

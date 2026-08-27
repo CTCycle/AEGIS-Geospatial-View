@@ -197,6 +197,26 @@ describe('components/map-preview.component', () => {
     expect(component.restoreNotice).toContain('could not be restored');
   });
 
+  it('keeps backend visibility authoritative over a stale local preference', () => {
+    component.initialOverlayVisibility = { weather: true };
+    component.payload = {
+      map_session: makeMapSession({
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: true }],
+      }) as never,
+    };
+    fixture.detectChanges();
+    expect(component.overlayVisibility['weather']).toBeTrue();
+
+    fixture.componentRef.setInput('payload', {
+      map_session: makeMapSession({
+        overlays: [{ id: 'weather', label: 'Weather', type: 'tile', provider: 'x', visible: false }],
+      }) as never,
+    });
+    fixture.detectChanges();
+
+    expect(component.overlayVisibility['weather']).toBeFalse();
+  });
+
   it('emits visibility and opacity updates', () => {
     const emitted: Array<{ overlayVisibility: Record<string, boolean>; overlayOpacity: Record<string, number> }> = [];
     component.overlayStateChange.subscribe((value) => emitted.push(value));

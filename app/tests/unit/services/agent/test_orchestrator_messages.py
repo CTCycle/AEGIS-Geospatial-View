@@ -56,6 +56,26 @@ def test_map_session_message_includes_readable_warnings() -> None:
     assert "TomTom Traffic Flow: TomTom API key is required to render this provider tile layer." in message
     assert "TOMTOM_API_KEY" not in message
 
+
+def test_map_session_message_reports_current_visibility_state() -> None:
+    message = AgentOrchestrator._compose_map_session_message(
+        {
+            "resolved_location": {"label": "Zurich"},
+            "basemap_id": "osm_default",
+            "basemap": {"id": "osm_default", "label": "OpenStreetMap"},
+            "overlay_ids": ["weather-zurich", "traffic-zurich"],
+            "overlays": [
+                {"id": "weather-zurich", "label": "Weather Forecast", "visible": False},
+                {"id": "traffic-zurich", "label": "Traffic", "visible": True},
+            ],
+            "compliance_warnings": [],
+        },
+    )
+
+    assert "Visible overlays: the Traffic overlay." in message
+    assert "Hidden overlays: the Weather Forecast overlay." in message
+    assert "I added" not in message
+
 ###############################################################################
 def test_direct_coordinate_message_includes_coordinates() -> None:
     message = AgentOrchestrator._compose_direct_tool_message(

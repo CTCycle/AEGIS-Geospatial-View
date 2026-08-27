@@ -1188,6 +1188,13 @@ class ParserService:
                 for command in overlay_commands
             ):
                 updates["requires_location"] = False
+            # Non-additive commands operate on the persisted collection. Do
+            # not let a domain rule's incidental layer hint turn a hide,
+            # remove, or keep-only request into a provider fetch. `show` and
+            # `add` remain eligible for catalog/provider resolution when the
+            # requested instance is absent.
+            if all(command.action in {"remove", "keep_only", "hide"} for command in overlay_commands):
+                updates["requested_layers"] = []
 
         if inferred_viewport is not None:
             updates["viewport_intent"] = inferred_viewport

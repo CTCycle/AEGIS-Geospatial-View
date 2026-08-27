@@ -327,7 +327,30 @@ class AgentResponseBuilder:
         ]
 
         parts = [f"Map ready for {location} using {basemap}."]
-        if overlay_labels:
+        overlays = [item for item in json_array(map_payload.get("overlays")) if is_json_object(item)]
+        has_explicit_visibility = any(isinstance(item.get("visible"), bool) for item in overlays)
+        if has_explicit_visibility:
+            visible_labels = [
+                label
+                for item in overlays
+                if item.get("visible") is not False
+                for label in [cls.extract_label(item)]
+                if label
+            ]
+            hidden_labels = [
+                label
+                for item in overlays
+                if item.get("visible") is False
+                for label in [cls.extract_label(item)]
+                if label
+            ]
+            if visible_labels:
+                parts.append(f"Visible overlays: {cls.format_label_list(visible_labels)}.")
+            if hidden_labels:
+                parts.append(f"Hidden overlays: {cls.format_label_list(hidden_labels)}.")
+            if not visible_labels and not hidden_labels:
+                parts.append("No overlays are currently active.")
+        elif overlay_labels:
             parts.append(f"I added {cls.format_label_list(overlay_labels)}.")
         else:
             parts.append("No overlays were added.")
