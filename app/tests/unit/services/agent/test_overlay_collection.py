@@ -367,3 +367,35 @@ def test_provider_candidate_is_committed_against_active_revision_without_droppin
     assert updated.overlay_collection_revision == 2
     assert len(updated.overlay_collection.instances) == 1
     assert results[0].added_instance_ids == [updated.overlay_collection.instances[0].instance_id]
+
+
+def test_merge_clears_failure_for_instance_resolved_in_authoritative_collection() -> None:
+    weather = _instance(
+        "weather-zurich",
+        "openmeteo_weather_forecast",
+        label="Weather",
+        scope_key="Zurich",
+        latitude=47.37,
+        longitude=8.54,
+    )
+    session = MapSession(
+        session_id="fetched",
+        resolved_location=ResolvedLocation(label="Zurich", latitude=47.37, longitude=8.54),
+        basemap_id="osm_default",
+        viewport=ViewportPolicy(center_latitude=47.37, center_longitude=8.54),
+        overlays=[dict(weather.descriptor)],
+        overlay_ids=[weather.instance_id],
+        failed_overlays=[
+            {"id": weather.instance_id, "reason": "not available in the capability catalog"},
+            {"id": "unrelated-layer", "reason": "provider unavailable"},
+        ],
+    )
+
+    merged = OverlayCollectionService.merge_into_map_session(
+        session,
+        OverlayCollectionState(instances=[weather]),
+    )
+
+    assert merged.failed_overlays == [
+        {"id": "unrelated-layer", "reason": "provider unavailable"}
+    ]
