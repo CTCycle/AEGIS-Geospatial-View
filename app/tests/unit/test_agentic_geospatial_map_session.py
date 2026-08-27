@@ -7,6 +7,7 @@ from typing import TypeVar
 
 from server.domain.agent.decision import ExecutionPlan, ResolvedLocation
 from server.contracts.geospatial import ProviderLayerSelection
+from server.services.geospatial.providers.base import ProviderRateLimitError
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
 
@@ -124,6 +125,21 @@ class _ProviderLayerRenderService:
             [],
         )
 
+
+class _FailedProviderLayerRenderService(_ProviderLayerRenderService):
+
+    # -------------------------------------------------------------------------
+    async def build_provider_layer_overlay(
+        self,
+        *,
+        provider_id: str,
+        layer_id: str,
+        request,  # noqa: ANN001
+        refresh: bool = False,
+    ) -> tuple[dict[str, object], list[str]]:
+        _ = provider_id, layer_id, request, refresh
+        raise ProviderRateLimitError("provider rate limit reached")
+
 ###############################################################################
 def test_agentic_geospatial_provider_layer_selection_flows_into_map_session() -> None:
     location = ResolvedLocation(
@@ -161,6 +177,43 @@ def test_agentic_geospatial_provider_layer_selection_flows_into_map_session() ->
     assert session.overlay_ids == ["gibs:MODIS_Terra_CorrectedReflectance_TrueColor"]
     assert session.overlays[0]["tile_url_template"] == "https://gibs.example/{z}/{x}/{y}.png"
     assert session.failed_overlays == []
+
+###############################################################################
+def test_agentic_geospatial_provider_layer_failure_preserves_error_code() -> None:
+    location = ResolvedLocation(
+        label="Rome",
+        latitude=41.9,
+        longitude=12.5,
+        confidence=1.0,
+    )
+    plan = ExecutionPlan(
+        state="map_search",
+        action_id="imagery",
+        basemap_id="osm_default",
+        overlay_ids=[],
+    )
+    request = RequestBuilder().build_location_search_request(
+        plan,
+        location,
+        provider_layer_selections=[
+            ProviderLayerSelection(provider_id="gibs", layer_id="broken-layer")
+        ],
+    )
+
+    session = _run_async(
+        LocationSearchOrchestrator(
+            render_descriptor_service=_FailedProviderLayerRenderService(),  # type: ignore[arg-type]
+        ).execute(request)
+    )
+
+    assert session.overlay_ids == []
+    assert session.failed_overlays == [
+        {
+            "id": "gibs:broken-layer",
+            "reason": "provider rate limit reached",
+            "code": "rate_limited",
+        }
+    ]
 
 ###############################################################################
 def test_agentic_geospatial_map_session_uses_public_openfreemap_basemap() -> None:
