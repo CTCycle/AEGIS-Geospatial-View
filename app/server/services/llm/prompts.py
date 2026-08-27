@@ -154,6 +154,12 @@ Return JSON only with this schema:
 - relationship: new_task|follow_up|correction|clarification|qa|simple_chat|failure_inquiry
 - map_target and entity_target
 - requested_layers, requested_basemap, requested_attributes, required_data_sources
+- overlay_commands: array of typed commands. Each item is
+  {action:add|remove|keep_only|show|hide|update, selector:{instance_ids,
+  capability_ids, concepts, labels, providers, overlay_types, rendering_modes,
+  tags, visibility}, scope:{kind:global|current_view|location, location,
+  label}, patch:{opacity,time,style,format}, state_reference:{collection_id,
+  revision}}. Keep overlay identity, geographic scope, and action separate.
 - required_tool_category, tools_needed, direct_response_sufficient, requires_reparse
 - capability_limitations and expected_frontend_update
 - atomic_tasks: array of independently actionable task summaries
@@ -179,6 +185,7 @@ Rules:
 15. Use viewport_intent.scope only from: preserve_current, building, street, neighborhood, district, city, region, country, auto.
 16. For basemap-only follow-ups, default viewport_intent.scope to preserve_current unless the user also asks to zoom or widen/narrow the area.
 17. For compound requests, include every independently requested operation in atomic_tasks and list each requested data concept; never drop a second data request merely because another layer is also requested.
+18. For overlay changes, emit overlay_commands instead of encoding removal or preservation in requested_layers. Use remove for "keep all except X", keep_only for "keep X and remove the others", current_view for "this area", and location for an explicit place. A satellite layer command targets an overlay instance; satellite basemap selection belongs in requested_basemap.
 """
 
 ###############################################################################

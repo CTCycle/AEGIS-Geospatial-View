@@ -17,6 +17,9 @@ LocationSignalType = Literal[
     "street",
 ]
 TemporalMode = Literal["current", "historical", "forecast", "none"]
+OverlayAction = Literal["add", "remove", "keep_only", "show", "hide", "update"]
+OverlayScopeKind = Literal["global", "current_view", "location"]
+OverlayVisibility = Literal["any", "visible", "hidden"]
 
 ###############################################################################
 class ConversationContextSnapshot(BaseModel):
@@ -84,6 +87,63 @@ class ViewportIntent(BaseModel):
     reason: str | None = None
 
 ###############################################################################
+class OverlaySelector(BaseModel):
+    """Typed selector for overlay instances and catalog capabilities.
+
+    Selectors deliberately keep the matching dimensions independent.  The
+    resolver can therefore report an unmatched or ambiguous dimension without
+    falling back to scanning the user's prose for layer names.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    capability_ids: list[str] = Field(default_factory=lambda: list[str]())
+    concepts: list[str] = Field(default_factory=lambda: list[str]())
+    labels: list[str] = Field(default_factory=lambda: list[str]())
+    providers: list[str] = Field(default_factory=lambda: list[str]())
+    overlay_types: list[str] = Field(default_factory=lambda: list[str]())
+    rendering_modes: list[str] = Field(default_factory=lambda: list[str]())
+    tags: list[str] = Field(default_factory=lambda: list[str]())
+    visibility: OverlayVisibility = "any"
+
+###############################################################################
+class OverlayScope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: OverlayScopeKind = "global"
+    # A resolved location is represented as a bounded JSON object here so the
+    # extraction contract does not depend on the geospatial domain module.
+    location: dict[str, Any] | None = None
+    label: str | None = None
+
+###############################################################################
+class OverlayPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    opacity: float | None = Field(default=None, ge=0.0, le=1.0)
+    time: str | None = None
+    style: str | None = None
+    format: str | None = None
+
+###############################################################################
+class OverlayStateReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    collection_id: str = "active-map"
+    revision: int = Field(default=0, ge=0)
+
+###############################################################################
+class OverlayCommand(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: OverlayAction
+    selector: OverlaySelector = Field(default_factory=OverlaySelector)
+    scope: OverlayScope = Field(default_factory=OverlayScope)
+    patch: OverlayPatch = Field(default_factory=OverlayPatch)
+    state_reference: OverlayStateReference = Field(default_factory=OverlayStateReference)
+
+###############################################################################
 class TurnParseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -108,6 +168,7 @@ class TurnParseResult(BaseModel):
     map_target: str | None = None
     entity_target: str | None = None
     requested_layers: list[str] = Field(default_factory=lambda: list[str]())
+    overlay_commands: list[OverlayCommand] = Field(default_factory=lambda: list[OverlayCommand]())
     poi_categories: list[PoiCategory] = Field(default_factory=lambda: list[PoiCategory]())
     requested_basemap: str | None = None
     requested_attributes: list[str] = Field(default_factory=lambda: list[str]())

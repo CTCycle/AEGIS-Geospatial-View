@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from server.common.typing import json_array, json_object
-
 from collections.abc import Callable
 from typing import Any
 
@@ -11,6 +9,7 @@ from server.domain.agent.execution import AgentExecutionContext
 from server.domain.agent.pipeline import ConversationTaskRecord, ToolPlan, VisualizationUpdate
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
 from server.contracts.extraction import TurnParseResult
+from server.contracts.geospatial import MapSession, OverlayMutationResult
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.agent.response_builder import AgentResponseBuilder
@@ -45,6 +44,46 @@ class PlannedTurnExecutionService:
         self.history_service = history_service
 
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _active_map_session(latest_memory: dict[str, Any]) -> MapSession | None:
+        raw = latest_memory.get("active_visualization")
+        if not isinstance(raw, dict):
+            return None
+        try:
+            return MapSession.model_validate(raw)
+        except Exception:
+            LOGGER.warning("Ignoring invalid active map session while applying overlay command")
+            return None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def _apply_overlay_commands(
+        cls,
+        session: MapSession,
+        turn_contract: TurnParseResult,
+    ) -> tuple[MapSession, list[OverlayMutationResult]]:
+        return AgentTurnStateAssembler.apply_overlay_commands(
+            session,
+            list(turn_contract.overlay_commands),
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_local_overlay_mutation(
+        turn_contract: TurnParseResult,
+        latest_memory: dict[str, Any],
+    ) -> bool:
+        if not turn_contract.overlay_commands or PlannedTurnExecutionService._active_map_session(latest_memory) is None:
+            return False
+        for command in turn_contract.overlay_commands:
+            if command.action in {"remove", "keep_only", "hide", "show"}:
+                continue
+            if command.action == "update" and command.patch.time is None and command.patch.style is None and command.patch.format is None:
+                continue
+            return False
+        return True
+
+    # -------------------------------------------------------------------------
     async def execute(
         self,
         *,
@@ -67,38 +106,51 @@ class PlannedTurnExecutionService:
             progress_summary="Executing validated tool plan.",
             tool_plan=tool_plan.model_dump(mode="json"),
         )
-        planned_results = await self.tool_plan_executor.execute(
-            tool_plan,
-            native_context,
-            on_tool_started=(
-                lambda step: progress_callback(
-                    "tool_call_started",
-                    {
-                        "request_id": request_id,
-                        "conversation_id": conversation_id,
-                        "tool_call_id": step.step_id,
-                        "name": step.tool_name,
-                    },
-                )
-                if progress_callback is not None
-                else None
-            ),
-            on_tool_completed=(
-                lambda result: progress_callback(
-                    "tool_call_completed",
-                    {
-                        "request_id": request_id,
-                        "conversation_id": conversation_id,
-                        "tool_call_id": result.step_id,
-                        "name": result.provenance.tool_name,
-                        "ok": result.ok,
-                        "error": result.error_message,
-                    },
-                )
-                if progress_callback is not None
-                else None
-            ),
+        local_overlay_mutation = self._is_local_overlay_mutation(
+            turn_contract,
+            latest_memory,
         )
+        overlay_mutation_results: list[OverlayMutationResult] = []
+        local_map_session = self._active_map_session(latest_memory)
+        if local_overlay_mutation and local_map_session is not None:
+            map_session, overlay_mutation_results = self._apply_overlay_commands(
+                local_map_session,
+                turn_contract,
+            )
+            planned_results = []
+        else:
+            planned_results = await self.tool_plan_executor.execute(
+                tool_plan,
+                native_context,
+                on_tool_started=(
+                    lambda step: progress_callback(
+                        "tool_call_started",
+                        {
+                            "request_id": request_id,
+                            "conversation_id": conversation_id,
+                            "tool_call_id": step.step_id,
+                            "name": step.tool_name,
+                        },
+                    )
+                    if progress_callback is not None
+                    else None
+                ),
+                on_tool_completed=(
+                    lambda result: progress_callback(
+                        "tool_call_completed",
+                        {
+                            "request_id": request_id,
+                            "conversation_id": conversation_id,
+                            "tool_call_id": result.step_id,
+                            "name": result.provenance.tool_name,
+                            "ok": result.ok,
+                            "error": result.error_message,
+                        },
+                    )
+                    if progress_callback is not None
+                    else None
+                ),
+            )
         tool_payload: dict[str, Any] = {
             "tool_plan": tool_plan.model_dump(mode="json"),
             "tool_calls": [
@@ -139,15 +191,29 @@ class PlannedTurnExecutionService:
             if not result.ok
             and next(step.required for step in tool_plan.steps if step.step_id == result.step_id)
         ]
-        map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
-            tool_payload=tool_payload,
-            turn_contract=turn_contract,
-            latest_memory=latest_memory,
-        )
-        if map_session is None and tool_plan.visualization_update:
-            map_session = await self.turn_state_assembler.build_map_session_from_turn_contract(
-                turn_contract, latest_memory
+        if not local_overlay_mutation:
+            map_session = await self.turn_state_assembler.build_combined_map_session_from_tool_results(
+                tool_payload=tool_payload,
+                turn_contract=turn_contract,
+                latest_memory=latest_memory,
             )
+            if map_session is None and tool_plan.visualization_update:
+                map_session = await self.turn_state_assembler.build_map_session_from_turn_contract(
+                    turn_contract, latest_memory
+                )
+            if map_session is not None and turn_contract.overlay_commands:
+                map_session, overlay_mutation_results = self._apply_overlay_commands(
+                    map_session,
+                    turn_contract,
+                )
+        mutation_clarification = next(
+            (
+                result.clarification
+                for result in overlay_mutation_results
+                if result.clarification
+            ),
+            None,
+        )
         direct_result = self.turn_state_assembler.extract_direct_result_from_tool_results(tool_payload)
         if required_failures and map_session is None and direct_result is None:
             assistant_message = required_failures[0].error_message or "The required geospatial tool failed."
@@ -174,6 +240,13 @@ class PlannedTurnExecutionService:
                 operation = operation.model_copy(update={"status": "partial"})
             if turn_contract.clarification_plan is not None:
                 operation = operation.model_copy(update={"status": "partial"})
+            if mutation_clarification:
+                operation = operation.model_copy(
+                    update={
+                        "status": "partial",
+                        "warnings": [*operation.warnings, mutation_clarification],
+                    }
+                )
             assistant_message = self.response_synthesizer.synthesize(
                 user_text=turn_contract.user_text,
                 fallback_text=assistant_message,
@@ -239,20 +312,38 @@ class PlannedTurnExecutionService:
             tool_result_refs=[result.step_id for result in planned_results],
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)
-        active_visualization = latest_memory.get("active_visualization")
-        active_visualization_object = json_object(active_visualization)
-        active_overlay_ids = (
-            [
-                item
-                for item in json_array(active_visualization_object.get("overlay_ids"))
-                if isinstance(item, str)
-            ]
-            if active_visualization_object
-            else []
-        )
-        removed_layer_ids = self.turn_state_assembler.overlay_inference_service.removed_overlay_ids(
-            turn_contract=turn_contract,
-            existing_overlay_ids=active_overlay_ids,
+        added_instance_ids = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.added_instance_ids
+        ]
+        removed_instance_ids = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.removed_instance_ids
+        ]
+        updated_instance_ids = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.updated_instance_ids
+        ]
+        unmatched_selectors = [
+            selector
+            for result in overlay_mutation_results
+            for selector in result.unmatched_selectors
+        ]
+        ambiguous_selectors = [
+            selector
+            for result in overlay_mutation_results
+            for selector in result.ambiguous_selectors
+        ]
+        mutation_clarification = next(
+            (
+                result.clarification
+                for result in overlay_mutation_results
+                if result.clarification
+            ),
+            None,
         )
         visualization_update = VisualizationUpdate(
             basemap_replacement=(
@@ -260,8 +351,21 @@ class PlannedTurnExecutionService:
                 if isinstance(tool_plan.visualization_update.get("basemap_replacement"), str)
                 else turn_contract.requested_basemap
             ),
-            add_layer_ids=list(turn_contract.requested_layers),
-            remove_layer_ids=removed_layer_ids,
+            add_layer_ids=(
+                added_instance_ids
+                if turn_contract.overlay_commands
+                else list(turn_contract.requested_layers)
+            ),
+            remove_layer_ids=removed_instance_ids,
+            collection_revision=(
+                map_session.overlay_collection_revision if map_session is not None else None
+            ),
+            added_instance_ids=added_instance_ids,
+            removed_instance_ids=removed_instance_ids,
+            updated_instance_ids=sorted(set(updated_instance_ids)),
+            unmatched_selectors=unmatched_selectors,
+            ambiguous_selectors=ambiguous_selectors,
+            clarification=mutation_clarification,
         )
         if progress_callback is not None and map_session is not None:
             progress_callback(

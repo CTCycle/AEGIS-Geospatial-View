@@ -11,6 +11,12 @@ from server.contracts.extraction import ViewportIntent
 from server.domain.agent.decision import ResolvedLocation
 
 TimeMode = Literal["current", "historical", "forecast"]
+InspectionAssociation = Literal[
+    "feature",
+    "location",
+    "overlay",
+    "non_spatial",
+]
 
 
 GeospatialProviderAutomationSupport = Literal[
@@ -451,6 +457,79 @@ class ProviderLayerSelection(BaseModel):
     render: dict[str, object] | None = None
 
 ###############################################################################
+class InspectionField(BaseModel):
+    """A bounded, allowlisted scalar exposed by the map inspection UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    value: str | int | float | bool | None
+    unit: str | None = None
+    category: str = "general"
+    source_url: str | None = None
+    order: int = 0
+
+###############################################################################
+class MapInspection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    inspection_id: str
+    title: str
+    association: InspectionAssociation
+    provider: str | None = None
+    feature_id: str | None = None
+    fields: list[InspectionField] = Field(default_factory=lambda: list[InspectionField]())
+    source_url: str | None = None
+    freshness: str | None = None
+    stale: bool = False
+    warnings: list[str] = Field(default_factory=lambda: list[str]())
+    geometry: dict[str, Any] | None = None
+
+###############################################################################
+class OverlayInstance(BaseModel):
+    """Stable capability instance rendered on a map at one scoped location."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    instance_id: str
+    capability_id: str
+    label: str
+    provider: str
+    overlay_type: str
+    rendering_mode: str
+    scope_key: str = "global"
+    scope: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    resolved_location: ResolvedLocation | None = None
+    viewport: dict[str, Any] | None = None
+    visible: bool = True
+    opacity: float = Field(default=1.0, ge=0.0, le=1.0)
+    render_variant: dict[str, str | None] = Field(default_factory=lambda: dict[str, str | None]())
+    descriptor: dict[str, Any] = Field(default_factory=lambda: dict[str, Any]())
+    inspections: list[MapInspection] = Field(default_factory=lambda: list[MapInspection]())
+
+###############################################################################
+class OverlayCollectionState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    collection_id: str = "active-map"
+    revision: int = Field(default=0, ge=0)
+    instances: list[OverlayInstance] = Field(default_factory=lambda: list[OverlayInstance]())
+
+###############################################################################
+class OverlayMutationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    collection_id: str = "active-map"
+    revision: int
+    added_instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    removed_instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    updated_instance_ids: list[str] = Field(default_factory=lambda: list[str]())
+    unmatched_selectors: list[str] = Field(default_factory=lambda: list[str]())
+    ambiguous_selectors: list[str] = Field(default_factory=lambda: list[str]())
+    clarification: str | None = None
+
+###############################################################################
 class LocationSearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -484,6 +563,9 @@ class MapSession(BaseModel):
     rendered_overlay_ids: list[str] = Field(default_factory=lambda: list[str]())
     failed_overlays: list[dict[str, str]] = Field(default_factory=lambda: list[dict[str, str]]())
     compliance_warnings: list[str] = Field(default_factory=lambda: list[str]())
+    overlay_collection_revision: int = Field(default=0, ge=0)
+    overlay_collection: OverlayCollectionState | None = None
+    inspections: list[MapInspection] = Field(default_factory=lambda: list[MapInspection]())
 
 ###############################################################################
 class GeospatialCatalogResponse(BaseModel):

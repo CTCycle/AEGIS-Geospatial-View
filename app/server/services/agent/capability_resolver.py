@@ -35,14 +35,25 @@ class CapabilityResolver:
                 for item in required_layers
                 if str(item).strip()
             )
+        overlay_commands = self._resolve_overlay_commands(turn.overlay_commands, turn)
+        # Existing-instance mutations are intentionally not converted into
+        # fetch requests.  Only commands that may need a catalog capability
+        # contribute to the executable layer set.
+        for command in overlay_commands:
+            if command.action not in {"add", "show", "update"}:
+                continue
+            requested.extend(command.selector.capability_ids)
+            requested.extend(command.selector.concepts)
+            requested.extend(command.selector.labels)
         requested = self._dedupe(requested)
         if not requested:
-            return turn
+            return turn.model_copy(update={"overlay_commands": overlay_commands})
 
         if self._requests_unsupported_precipitation_mean(turn, requested):
             return turn.model_copy(
                 update={
                     "requested_layers": [],
+                    "overlay_commands": overlay_commands,
                     "capability_limitations": self._dedupe(
                         [
                             *turn.capability_limitations,
@@ -99,12 +110,15 @@ class CapabilityResolver:
                 resolved.append(capability_id)
 
         if not unresolved:
-            return turn.model_copy(update={"requested_layers": resolved})
+            return turn.model_copy(
+                update={"requested_layers": resolved, "overlay_commands": overlay_commands}
+            )
 
         readable = ", ".join(unresolved)
         return turn.model_copy(
             update={
                 "requested_layers": resolved,
+                "overlay_commands": overlay_commands,
                 "capability_limitations": self._dedupe(
                     [
                         *turn.capability_limitations,
@@ -128,6 +142,32 @@ class CapabilityResolver:
                 "expected_frontend_update": "clarification",
             }
         )
+
+    # ------------------------------------------------------------------
+    def _resolve_overlay_commands(
+        self,
+        commands: list[Any],
+        turn: TurnParseResult,
+    ) -> list[Any]:
+        resolved_commands: list[Any] = []
+        for command in commands:
+            selector = command.selector
+            capability_ids = list(selector.capability_ids)
+            if command.action in {"add", "show", "update"} and not capability_ids:
+                for value in [*selector.concepts, *selector.labels]:
+                    capability_id = self._resolve_one(value, turn)
+                    if capability_id is not None and capability_id not in capability_ids:
+                        capability_ids.append(capability_id)
+            if capability_ids != selector.capability_ids:
+                command = command.model_copy(
+                    update={
+                        "selector": selector.model_copy(
+                            update={"capability_ids": capability_ids}
+                        )
+                    }
+                )
+            resolved_commands.append(command)
+        return resolved_commands
 
     # -------------------------------------------------------------------------
     def _resolve_one(self, layer: str, turn: TurnParseResult) -> str | None:

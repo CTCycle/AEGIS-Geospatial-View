@@ -21,6 +21,7 @@ from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.instruction_state import ConversationInstructionService
 from server.services.agent.context_assembler import AgentContextAssembler
 from server.domain.agent.context import ConversationDirective
+from server.domain.agent.pipeline import VisualizationUpdate
 from server.services.agent.native_tool_loop import (
     AgentExecutionContext,
     AgentToolLoopRequest,
@@ -42,6 +43,7 @@ from server.services.agent.tool_planner import DeterministicToolPlanner
 from server.services.chat.history_service import ChatHistoryService
 from server.services.search.orchestrator import LocationSearchOrchestrator
 from server.services.search.request_builder import RequestBuilder
+from server.contracts.geospatial import MapSession
 
 ###############################################################################
 class AgentOrchestrator:
@@ -539,6 +541,20 @@ class AgentOrchestrator:
         )
         if map_session is None:
             map_session = tool_loop_result.map_session
+        overlay_mutation_results = []
+        if map_session is None and turn_contract.overlay_commands:
+            # A visibility/removal follow-up can be resolved entirely against
+            # the active collection even when a native adapter did not return
+            # another map payload.
+            active_raw = latest_memory.get("active_visualization")
+            if is_json_object(active_raw):
+                try:
+                    map_session, overlay_mutation_results = self.turn_state_assembler.apply_overlay_commands(
+                        MapSession.model_validate(active_raw),
+                        list(turn_contract.overlay_commands),
+                    )
+                except Exception:
+                    LOGGER.warning("Could not apply native-loop overlay mutation to active map", exc_info=True)
         direct_result = self.turn_state_assembler.extract_direct_result_from_tool_results(tool_payload)
         capability_selection = self.turn_state_assembler.extract_capability_selection_from_tool_results(tool_payload)
         if map_session is None and capability_selection is not None:
@@ -554,6 +570,11 @@ class AgentOrchestrator:
             tool_payload=tool_payload,
         ):
             map_session = await self.turn_state_assembler.build_map_session_from_turn_contract(turn_contract, latest_memory)
+        if map_session is not None and turn_contract.overlay_commands and not overlay_mutation_results:
+            map_session, overlay_mutation_results = self.turn_state_assembler.apply_overlay_commands(
+                map_session,
+                list(turn_contract.overlay_commands),
+            )
         memory_snapshot = await self.turn_state_assembler.build_updated_memory_snapshot(
             turn_contract=turn_contract,
             latest_memory=latest_memory,
@@ -644,6 +665,48 @@ class AgentOrchestrator:
         )
         self.task_state_service.set_active_visualization(conversation_key, map_session)
 
+        mutation_added = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.added_instance_ids
+        ]
+        mutation_removed = [
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.removed_instance_ids
+        ]
+        mutation_updated = sorted({
+            instance_id
+            for result in overlay_mutation_results
+            for instance_id in result.updated_instance_ids
+        })
+        mutation_unmatched = [
+            selector
+            for result in overlay_mutation_results
+            for selector in result.unmatched_selectors
+        ]
+        mutation_ambiguous = [
+            selector
+            for result in overlay_mutation_results
+            for selector in result.ambiguous_selectors
+        ]
+        visualization_update = VisualizationUpdate(
+            add_layer_ids=mutation_added if turn_contract.overlay_commands else list(turn_contract.requested_layers),
+            remove_layer_ids=mutation_removed,
+            collection_revision=(
+                map_session.overlay_collection_revision if map_session is not None else None
+            ),
+            added_instance_ids=mutation_added,
+            removed_instance_ids=mutation_removed,
+            updated_instance_ids=mutation_updated,
+            unmatched_selectors=mutation_unmatched,
+            ambiguous_selectors=mutation_ambiguous,
+            clarification=next(
+                (result.clarification for result in overlay_mutation_results if result.clarification),
+                None,
+            ),
+        )
+
         self.history_service.append_message(
             conversation_id=conversation_id,
             role="assistant",
@@ -681,4 +744,5 @@ class AgentOrchestrator:
             task_snapshot=self.task_state_service.snapshot(conversation_key),
             tool_plan=tool_plan,
             failure_diagnostic=failure,
+            visualization_update=visualization_update,
         )

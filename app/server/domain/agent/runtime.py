@@ -90,7 +90,7 @@ class AgentTask(BaseModel):
 class AgentThreadState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[2] = 2
+    schema_version: Literal[3] = 3
     conversation_id: str
     revision: int = Field(default=0, ge=0)
     active_task_id: str | None = None

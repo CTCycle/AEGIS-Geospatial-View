@@ -12,10 +12,11 @@ from server.domain.agent.pipeline import (
     VisualizationUpdate,
 )
 from server.contracts.chat import ChatOperationResult, ChatTurnResponse
-from server.contracts.geospatial import MapSession
+from server.contracts.geospatial import MapSession, OverlayMutationResult
 from server.services.agent.conversation_state import ConversationTaskStateService
 from server.services.agent.location_memory import LocationMemoryService
 from server.services.agent.overlay_inference import OverlayInferenceService
+from server.services.agent.overlay_collection import OverlayCollectionService
 from server.services.agent.policy_engine import PolicyEngine
 from server.services.agent.response_builder import AgentResponseBuilder
 from server.services.agent.response_synthesizer import GroundedResponseSynthesizer
@@ -47,6 +48,38 @@ class AgentTurnStateAssembler:
         self.response_synthesizer = response_synthesizer
         self.history_service = history_service
         self.task_state_service = task_state_service
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def apply_overlay_commands(
+        session: MapSession,
+        commands: list[Any],
+    ) -> tuple[MapSession, list[OverlayMutationResult]]:
+        """Apply typed overlay mutations to a native-loop map result.
+
+        Native tool adapters and the deterministic planner share the same
+        collection authority.  Binding an omitted revision here prevents a
+        stale follow-up from silently replacing a newer map state.
+        """
+        collection = OverlayCollectionService.from_map_session(session)
+        bound_commands = []
+        for command in commands:
+            if command.state_reference.revision == 0 and collection.revision > 0:
+                command = command.model_copy(
+                    update={
+                        "state_reference": command.state_reference.model_copy(
+                            update={"revision": collection.revision}
+                        )
+                    }
+                )
+            bound_commands.append(command)
+        collection, results = OverlayCollectionService.apply_commands(
+            collection,
+            bound_commands,
+            catalog=[dict(item) for item in session.overlays],
+            current_view=session.viewport.model_dump(mode="json"),
+        )
+        return OverlayCollectionService.merge_into_map_session(session, collection), results
 
     # -------------------------------------------------------------------------
     async def build_partial_clarification_response(
@@ -547,24 +580,32 @@ class AgentTurnStateAssembler:
         resolved_location: Any,
         existing_overlay_ids: list[str],
     ) -> list[str]:
-        removed_overlay_ids = self.overlay_inference_service.removed_overlay_ids(
-            turn_contract=turn_contract,
-            existing_overlay_ids=existing_overlay_ids,
-        )
-        retained_overlay_ids = [
-            overlay_id
-            for overlay_id in existing_overlay_ids
-            if overlay_id not in removed_overlay_ids
+        _ = resolved_location
+        # Overlay mutations are resolved by OverlayCollectionService after
+        # the active state is loaded.  This method only builds the retrieval
+        # projection for a new search and never removes an existing layer by
+        # scanning user text.
+        requested = [
+            item
+            for item in getattr(turn_contract, "requested_layers", [])
+            if isinstance(item, str) and item.strip()
         ]
-        inferred = self.overlay_inference_service.infer_overlays(
-            turn_contract=turn_contract,
-            location=resolved_location,
-            existing_overlay_ids=retained_overlay_ids,
-        )
-        merged = list(retained_overlay_ids)
-        for overlay_id in inferred.overlay_ids:
-            if overlay_id not in merged:
-                merged.append(overlay_id)
+        for command in getattr(turn_contract, "overlay_commands", []):
+            if command.action not in {"add", "show", "update"}:
+                continue
+            requested.extend(command.selector.capability_ids)
+        if not requested and not getattr(turn_contract, "overlay_commands", []):
+            # Older tool-loop adapters can still provide only normalized
+            # action tags. Preserve their additive capability discovery while
+            # keeping all removal/preservation semantics in the typed
+            # collection resolver.
+            inferred = self.overlay_inference_service.infer_overlays(
+                turn_contract=turn_contract,
+                location=resolved_location,
+                existing_overlay_ids=existing_overlay_ids,
+            )
+            requested.extend(inferred.overlay_ids)
+        merged = list(dict.fromkeys([*existing_overlay_ids, *requested]))
         return merged
 
     # -------------------------------------------------------------------------

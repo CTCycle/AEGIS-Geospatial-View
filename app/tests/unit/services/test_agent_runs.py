@@ -286,7 +286,7 @@ def test_safe_steering_persists_a_v2_state_delta(run_repositories) -> None:
         conversation.conversation_id,
         expected_revision=initial["context_revision"],
         task_snapshot={
-            "schema_version": 2,
+            "schema_version": 3,
             "conversation_key": conversation.conversation_id,
             "current_task_id": "task-1",
             "goal": {"id": "task-1", "text": "Find Zurich"},
