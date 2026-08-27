@@ -3,6 +3,8 @@ from __future__ import annotations
 from server.contracts.extraction import (
     ConversationContextSnapshot,
     NormalizedAction,
+    OverlayCommand,
+    OverlaySelector,
     TemporalSignal,
     TurnParseResult,
 )
@@ -94,6 +96,26 @@ def test_resolves_forecast_semantics() -> None:
         )
     )
     assert resolved.requested_layers == ["openmeteo_weather_forecast"]
+
+
+def test_canonicalizes_alias_capability_ids_inside_overlay_commands() -> None:
+    turn = _turn("Show weather over Zurich", "weather_forecast")
+    turn = turn.model_copy(
+        update={
+            "overlay_commands": [
+                OverlayCommand(
+                    action="add",
+                    selector=OverlaySelector(capability_ids=["weather_forecast"]),
+                )
+            ]
+        }
+    )
+
+    resolved = _resolver().resolve(turn)
+
+    assert resolved.overlay_commands[0].selector.capability_ids == [
+        "openmeteo_weather_forecast"
+    ]
 
 ###############################################################################
 def test_resolves_air_quality_underscore_semantics_to_enabled_capability() -> None:
