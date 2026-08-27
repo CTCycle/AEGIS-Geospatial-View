@@ -467,6 +467,9 @@ def test_parser_domain_rules_use_current_view_for_local_overlay_commands() -> No
     assert command.action == "hide"
     assert command.selector.concepts == ["satellite"]
     assert command.scope.kind == "current_view"
+    assert extracted.requested_basemap is None
+    assert extracted.clarification_plan is not None
+    assert "basemap, not an active overlay" in str(extracted.clarification_plan["question"])
     assert extracted.requires_location is False
 
 

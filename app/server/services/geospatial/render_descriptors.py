@@ -416,6 +416,20 @@ class RenderDescriptorService:
         overlay_type: str,
         rendering_mode: str,
     ) -> dict[str, object]:
+        def string_list(value: object) -> list[str]:
+            if not isinstance(value, list):
+                return []
+            return list(dict.fromkeys(
+                item.strip()
+                for item in value
+                if isinstance(item, str) and item.strip()
+            ))
+
+        metadata_tags = string_list(metadata.get("tags"))
+        capability_tags = string_list(metadata.get("action_tags"))
+        capability_tags.extend(string_list(metadata.get("map_type_tags")))
+        tags = list(dict.fromkeys(metadata_tags or capability_tags))
+        concepts = string_list(metadata.get("concepts")) or string_list(capability.get("capabilities"))
         inspection_metadata = {
             key: value
             for key, value in metadata.items()
@@ -443,8 +457,8 @@ class RenderDescriptorService:
             "source_protocol": metadata.get("source_protocol"),
             "data_format": metadata.get("data_format"),
             "geometry_type": metadata.get("geometry_type"),
-            "tags": list(metadata.get("tags") or []) if isinstance(metadata.get("tags"), list) else [],
-            "concepts": list(metadata.get("concepts") or []) if isinstance(metadata.get("concepts"), list) else [],
+            "tags": tags,
+            "concepts": concepts,
             "inspection_metadata": inspection_metadata,
         }
 

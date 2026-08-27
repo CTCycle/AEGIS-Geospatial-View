@@ -1154,6 +1154,57 @@ class ParserService:
             )
         if overlay_commands:
             updates["overlay_commands"] = overlay_commands
+            # The word "layer" makes satellite/imagery an overlay target.
+            # Only an explicit satellite *view* or basemap request should
+            # change the basemap; otherwise a hide/remove command must leave
+            # the basemap untouched and let the collection resolver report a
+            # missing satellite overlay when none is active.
+            satellite_overlay_command = any(
+                command.action in {"remove", "keep_only", "show", "hide", "update"}
+                and any(
+                    "satellite" in str(value).casefold()
+                    or "imagery" in str(value).casefold()
+                    for value in (
+                        *command.selector.concepts,
+                        *command.selector.labels,
+                        *command.selector.capability_ids,
+                    )
+                )
+                for command in overlay_commands
+            ) and any(marker in text for marker in ("satellite layer", "satellite overlay", "imagery layer", "imagery overlay"))
+            if satellite_overlay_command:
+                updates["requested_basemap"] = None
+                active_visualization = memory_snapshot.get("active_visualization")
+                active_overlays = (
+                    active_visualization.get("overlays", [])
+                    if isinstance(active_visualization, dict)
+                    else []
+                )
+                has_satellite_overlay = any(
+                    "satellite" in str(value).casefold()
+                    or "imagery" in str(value).casefold()
+                    for overlay in active_overlays
+                    if isinstance(overlay, dict)
+                    for value in (
+                        overlay.get("id"),
+                        overlay.get("capability_id"),
+                        overlay.get("label"),
+                        overlay.get("type"),
+                    )
+                )
+                if not has_satellite_overlay:
+                    updates["clarification_plan"] = {
+                        "question": (
+                            "Satellite imagery is the map basemap, not an active overlay. "
+                            "There is no satellite overlay to hide in this area, so the "
+                            "basemap and other overlays were left unchanged."
+                        ),
+                        "reason": "No satellite overlay instance is active in the requested scope.",
+                        "blocking_fields": ["overlay_target"],
+                        "options": [],
+                        "preserve_valid_results": True,
+                        "apply_visualization_changes": False,
+                    }
             # Overlay-only mutations are map operations, but a global or
             # current-view mutation does not need a place lookup before it
             # can be resolved against the active collection.
