@@ -948,7 +948,7 @@ function Uninstall-Application {
         New-Item -ItemType File -Path $runtimeKeepFile -Force | Out-Null
     }
     Remove-PythonCaches
-    Write-Status SUCCESS "Application dependencies and generated caches uninstalled where permitted; skipped $skipped locked or inaccessible item(s). Settings and user data were preserved."
+    Write-Status SUCCESS "Application runtimes, dependencies, caches, and build outputs uninstalled where permitted; skipped $skipped locked or inaccessible item(s). Dependency lockfiles and user data were preserved."
 }
 
 function Wait-ForMenuReturn {
