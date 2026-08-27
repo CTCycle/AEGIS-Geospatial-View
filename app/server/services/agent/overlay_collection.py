@@ -375,11 +375,37 @@ class OverlayCollectionService:
         *,
         current_view: dict[str, Any] | None,
     ) -> list[OverlayInstance]:
+        selector = command.selector
+        identity_candidates = list(collection.instances)
+        # Resolve identity dimensions by priority, but only commit to a tier
+        # when it produces an active match. Model outputs can carry a
+        # capability ID in the instance slot; an unmatched stale instance ID
+        # must not prevent the valid capability/label tier from resolving.
+        for values, matcher in (
+            (
+                selector.instance_ids,
+                lambda instance: instance.instance_id in selector.instance_ids,
+            ),
+            (
+                selector.capability_ids,
+                lambda instance: instance.capability_id in selector.capability_ids,
+            ),
+            (
+                selector.labels,
+                lambda instance: cls._norm(instance.label)
+                in {cls._norm(value) for value in selector.labels},
+            ),
+        ):
+            if not values:
+                continue
+            matches = [instance for instance in identity_candidates if matcher(instance)]
+            if matches:
+                identity_candidates = matches
+                break
         return [
             instance
-            for instance in collection.instances
-            if cls._matches_identity(instance, command.selector)
-            and cls._matches_filters(instance, command.selector)
+            for instance in identity_candidates
+            if cls._matches_filters(instance, selector)
             and cls._scope_matches(instance, command, current_view=current_view)
         ]
 

@@ -74,6 +74,33 @@ def test_hide_one_instance_preserves_unrelated_descriptor() -> None:
     assert result.updated_instance_ids == ["weather-zurich"]
 
 
+def test_identity_resolution_falls_through_unmatched_instance_alias_to_capability() -> None:
+    weather = _instance(
+        "weather-zurich",
+        "openmeteo_weather_forecast",
+        label="Weather",
+        scope_key="Zurich",
+        latitude=47.37,
+        longitude=8.54,
+    )
+    command = OverlayCommand(
+        action="hide",
+        selector=OverlaySelector(
+            instance_ids=["openmeteo_weather_forecast"],
+            capability_ids=["openmeteo_weather_forecast"],
+            concepts=["weather"],
+        ),
+        state_reference=OverlayStateReference(revision=0),
+    )
+
+    updated, result = OverlayCollectionService.apply(
+        OverlayCollectionState(instances=[weather]), command
+    )
+
+    assert updated.instances[0].visible is False
+    assert result.updated_instance_ids == ["weather-zurich"]
+
+
 def test_location_scoped_remove_does_not_remove_other_scope() -> None:
     zurich = _instance(
         "weather-zurich",
