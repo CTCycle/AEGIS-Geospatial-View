@@ -151,12 +151,20 @@ class CapabilityResolver:
         resolved_commands: list[Any] = []
         for command in commands:
             selector = command.selector
-            capability_ids = list(selector.capability_ids)
-            if command.action in {"add", "show", "update"} and not capability_ids:
-                for value in [*selector.concepts, *selector.labels]:
-                    capability_id = self._resolve_one(value, turn)
-                    if capability_id is not None and capability_id not in capability_ids:
-                        capability_ids.append(capability_id)
+            capability_ids: list[str] = []
+            # Normalize model-emitted aliases and semantic selector values to
+            # executable catalog IDs for every command action.  Mutation
+            # commands must carry the same canonical identity as additions;
+            # otherwise a valid alias can bypass the active-instance resolver
+            # and appear as an unavailable capability.
+            for value in [
+                *selector.capability_ids,
+                *selector.concepts,
+                *selector.labels,
+            ]:
+                capability_id = self._resolve_one(value, turn)
+                if capability_id is not None and capability_id not in capability_ids:
+                    capability_ids.append(capability_id)
             if capability_ids != selector.capability_ids:
                 command = command.model_copy(
                     update={
