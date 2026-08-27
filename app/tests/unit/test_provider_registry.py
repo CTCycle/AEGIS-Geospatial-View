@@ -258,3 +258,30 @@ def test_provider_registry_opens_circuit_after_repeated_failures() -> None:
         pass
     else:
         raise AssertionError("Open circuit did not reject the provider.")
+
+###############################################################################
+def test_provider_registry_recovers_circuit_after_recovery_window() -> None:
+    provider = _FlakyProvider()
+    registry = ProviderRegistry(
+        providers=[provider],
+        execution_policy=ProviderExecutionPolicy(
+            max_attempts=1,
+            circuit_breaker_failures=1,
+            circuit_recovery_seconds=0,
+        ),
+    )
+
+    try:
+        run_async_in_thread(
+            registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
+        )
+    except ProviderUnavailableError:
+        pass
+    else:
+        raise AssertionError("Flaky provider unexpectedly succeeded on first call.")
+
+    response = run_async_in_thread(
+        registry.fetch("flaky", ProviderRequest(capability_id="flaky_layer"))
+    )
+
+    assert response.payload == {"attempts": 2}
