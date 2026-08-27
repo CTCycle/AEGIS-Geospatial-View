@@ -266,8 +266,13 @@ def _filter_stations(
         filtered = [
             station
             for station in stations
-            if south <= float(station["latitude"]) <= north
-            and west <= float(station["longitude"]) <= east
+            if _station_in_bbox(
+                station,
+                west=west,
+                south=south,
+                east=east,
+                north=north,
+            )
         ]
     limit = max(1, min(int(request.params.get("station_limit") or 25), 100))
     return filtered[:limit]
@@ -312,10 +317,27 @@ def _normalize_coops_observation(
 
 ###############################################################################
 def _float_or_none(value: object) -> float | None:
+    if not isinstance(value, int | float | str):
+        return None
     try:
-        return None if value is None else float(value)
+        return float(value)
     except (TypeError, ValueError):
         return None
+
+###############################################################################
+def _station_in_bbox(
+    station: dict[str, object],
+    *,
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+) -> bool:
+    latitude = station.get("latitude")
+    longitude = station.get("longitude")
+    if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
+        return False
+    return south <= latitude <= north and west <= longitude <= east
 
 ###############################################################################
 def _normalize_noaa_alerts(payload: object) -> list[dict[str, object]]:
