@@ -1,6 +1,6 @@
 # Layout And Navigation
 
-Last updated: 2026-08-20
+Last updated: 2026-08-27
 
 ## Desktop Viewport Contract
 
@@ -13,11 +13,17 @@ can display the full desktop interface at the supported width.
 
 ## Workspace Layout
 
-The main workspace uses a two-pane grid:
+The main workspace uses a two-pane content grid with a thin footer row:
 
 - chat and toolbar pane
 - resize handle
 - map pane
+- 24px full-width workspace status footer spanning chat and map
+
+The composer owns a separate 20px context-window progress row directly below
+the send controls. It is not part of the footer. The progress indicator is
+neutral below 80% usage, warning from 80% through 94%, and critical at 95% or
+above; its label and title expose token details.
 
 Toolbar width constraints:
 
@@ -36,7 +42,8 @@ is mouse-resizable and the chat rail can be collapsed when map focus is useful.
 ## Primary Screens
 
 - `/`
-  chat workspace, map pane, resizable divider, inline alerts, progress indicators
+  chat workspace, map pane, resizable divider, inline alerts, context progress,
+  and full-width status footer
 - `/settings`
   sticky header, search/filter controls, model cards, API key and Ollama management modals
 - `/geodata`

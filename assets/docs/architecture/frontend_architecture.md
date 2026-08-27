@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Last updated: 2026-08-17
+Last updated: 2026-08-27
 
 ## Route-Level Pages
 
@@ -27,6 +27,9 @@ Last updated: 2026-08-17
 - Selected agent readiness checks: `core/agent-readiness.service.ts`
 - Credential settings update orchestration: `core/credential-settings.service.ts` and `core/chat-settings-update.ts`
 - Map rendering surface: `components/map-preview.component.*` and `components/map-preview-rendering.ts`
+- Map inspection normalization and display: `MapInspection` contracts in
+  `core/types.ts`, feature popups, and the keyboard-dismissible details panel
+  in `components/map-preview.component.*`
 
 ## Agent Run Interaction
 
@@ -63,6 +66,13 @@ remain escaped plain text.
 
 `MapPreviewComponent` renders only normalized `MapSession` payloads through MapLibre. It does not render embedded HTML map payloads. Raster overlays should prefer `overlay.render` descriptors from the backend, including WMS/WMTS time, format, CRS, style, and tile matrix metadata.
 
+The backend collection is authoritative for overlay identity and revisions.
+The component uses stable instance IDs for visibility/opacity state and drops
+stale presentation entries when instances disappear. Feature-backed layers bind
+click listeners only for the current map instance; listeners are removed when
+the map or overlay set changes. Safe text nodes, bounded fields, approved
+HTTP(S) links, focus handoff, and Escape dismissal protect the inspection UI.
+
 Basemap changes are prepared in candidate containers. A generation token and
 destroyed guard dispose pending candidates and ignore late load/error or queued
 callbacks, preserving the active last-known-good map when a replacement fails.
@@ -87,6 +97,11 @@ Reusable component examples include:
 - `capability-status-list.component.*`
 
 Settings uses card-level model selection for one selected agent model.
+
+The Search workspace keeps context usage in a separate compact progress row
+below the composer. A 24px, non-wrapping workspace footer spans the chat and
+map panes and exposes Agent model, Satellite, Weather, and Optional Keys; model
+settings remain in the top navigation.
 
 ## Routing Rule
 

@@ -66,6 +66,13 @@ These methods return normalized provider layer descriptors. NASA GIBS parses WMS
 - Feature providers expose `fetch_features(request)` or an equivalent registry path.
 - Cache keys include safe request-shaping parameters such as provider, layer ID, bbox, zoom, time, category, variables, and credential-safe request parameters.
 - Provider results include attribution and source-health metadata when available.
+- Feature, location, raster, and dataset metadata is normalized by
+  `MapInspectionService` before it enters a map session. The inspection
+  contract keeps category-specific fields (measurements, places/assets,
+  hazards, transit/cameras, and statistical results) bounded and allowlisted;
+  only spatially associated data becomes a feature or scoped point inspection.
+  Raster metadata stays at overlay level and non-spatial metadata opens in the
+  details panel. Unsafe links and oversized/non-scalar values are omitted.
 - 401, 403, 429, timeout, malformed, empty, and stale-cache states are surfaced with stable semantics without leaking credentials. A valid empty result is emitted only after a successful semantic response; provider failures must not be converted into empty feature collections.
 - Shared HTTP retrieval does not follow redirects, bounds response bodies to the configured maximum, preserves `Retry-After` on rate-limit errors, and treats deterministic 4xx responses as non-retryable.
 - Hazard providers include legends and freshness labels where applicable.
