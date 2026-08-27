@@ -14,6 +14,15 @@ from server.domain.agent.tools import (
 )
 from server.services.agent.tool_handlers import air_quality, coordinates, poi, weather
 from server.services.geospatial.runtime_registry import RuntimeRegistry
+from server.services.geospatial.providers.base import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderInvalidQueryError,
+    ProviderMalformedPayloadError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 from server.services.llm.types import LLMToolDefinition
 
 ToolHandler = Callable[[ExecutionPlan, ResolvedLocation], Awaitable[dict[str, object]]]
@@ -76,6 +85,31 @@ class ToolRegistry:
             )
         try:
             result = await registered.handler(arguments, context)
+        except ProviderAuthError as exc:
+            return ToolExecutionEnvelope(
+                ok=False,
+                error=ToolError(code="auth_required", message=str(exc)),
+            )
+        except ProviderRateLimitError as exc:
+            return ToolExecutionEnvelope(
+                ok=False,
+                error=ToolError(code="rate_limited", message=str(exc)),
+            )
+        except ProviderInvalidQueryError as exc:
+            return ToolExecutionEnvelope(
+                ok=False,
+                error=ToolError(code="invalid_query", message=str(exc)),
+            )
+        except ProviderMalformedPayloadError as exc:
+            return ToolExecutionEnvelope(
+                ok=False,
+                error=ToolError(code="malformed_response", message=str(exc)),
+            )
+        except (ProviderTimeoutError, ProviderUnavailableError, ProviderError) as exc:
+            return ToolExecutionEnvelope(
+                ok=False,
+                error=ToolError(code="provider_unavailable", message=str(exc)),
+            )
         except Exception as exc:
             return ToolExecutionEnvelope(
                 ok=False,

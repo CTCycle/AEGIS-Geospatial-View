@@ -9,6 +9,9 @@ from server.services.agent.native_tool_loop import (
     NativeToolLoop,
 )
 from server.services.agent.tool_registry import ToolRegistry
+from server.contracts.geospatial import MapSession, ViewportPolicy
+from server.domain.agent.decision import ResolvedLocation
+from server.domain.llm.types import LLMToolResult
 from server.services.geospatial.manifest_loader import GeospatialManifestLoader
 from server.services.geospatial.runtime_registry import RuntimeRegistry
 from server.services.llm.types import LLMResult, LLMToolCall, LLMToolDefinition
@@ -206,3 +209,38 @@ def test_native_tool_loop_rejects_tools_disallowed_by_policy_constraints() -> No
         assert result.tool_results[0].content["error"]["code"] == "tool_rejected"
 
     run_async_in_thread(_run())
+
+###############################################################################
+def test_native_tool_loop_uses_the_latest_map_session_result() -> None:
+    location = ResolvedLocation(label="Rome", latitude=41.9, longitude=12.5)
+    viewport = ViewportPolicy(center_latitude=41.9, center_longitude=12.5)
+    first = MapSession(
+        session_id="first",
+        resolved_location=location,
+        basemap_id="osm",
+        viewport=viewport,
+    )
+    second = first.model_copy(update={"session_id": "second"})
+    result = NativeToolLoop._extract_map_session(
+        [
+            LLMToolResult(
+                content={
+                    "data": {
+                        "operation": "map_session_created",
+                        "map_session": first.model_dump(mode="json"),
+                    }
+                }
+            ),
+            LLMToolResult(
+                content={
+                    "data": {
+                        "operation": "map_session_created",
+                        "map_session": second.model_dump(mode="json"),
+                    }
+                }
+            ),
+        ]
+    )
+
+    assert result is not None
+    assert result.session_id == "second"

@@ -27,6 +27,8 @@ from server.services.geospatial.providers.base import (
     ProviderAuthError,
     ProviderCircuitOpenError,
     ProviderError,
+    ProviderInvalidQueryError,
+    ProviderMalformedPayloadError,
     ProviderRateLimitError,
     ProviderRequest,
     ProviderTimeoutError,
@@ -431,12 +433,28 @@ class GeospatialApiService:
                 "status": "missing-credential",
                 "provider": provider_id,
                 "message": str(exc),
+                "error_code": "auth_required",
             }
         except ProviderRateLimitError as exc:
             return {
                 "status": "rate-limited",
                 "provider": provider_id,
                 "message": str(exc),
+                "error_code": "rate_limited",
+            }
+        except ProviderInvalidQueryError as exc:
+            return {
+                "status": "invalid-query",
+                "provider": provider_id,
+                "message": str(exc),
+                "error_code": "invalid_query",
+            }
+        except ProviderMalformedPayloadError as exc:
+            return {
+                "status": "malformed-response",
+                "provider": provider_id,
+                "message": str(exc),
+                "error_code": "malformed_response",
             }
         except (
             ProviderNotRegisteredError,
@@ -449,6 +467,7 @@ class GeospatialApiService:
                 "status": "unavailable",
                 "provider": provider_id,
                 "message": str(exc),
+                "error_code": "provider_unavailable",
             }
         return {
             "status": "ok",
@@ -457,6 +476,8 @@ class GeospatialApiService:
             "attribution": response.attribution,
             "warnings": response.warnings,
             "stale": response.stale,
+            "result_status": getattr(response, "result_status", "ok"),
+            "result_type": getattr(response, "result_type", "unknown"),
         }
 
     # -------------------------------------------------------------------------

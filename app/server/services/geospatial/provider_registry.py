@@ -112,6 +112,7 @@ class ProviderRegistry:
         self.credential_resolver = credential_resolver or GeospatialCredentialResolver()
         self._providers: dict[str, GeospatialProvider] = {}
         self._failures: dict[str, int] = {}
+        self._circuit_opened_at: dict[str, float] = {}
         self._last_call_at: dict[str, float] = {}
         self._min_call_interval_s: dict[str, float] = {}
         for provider in providers or []:
@@ -218,6 +219,7 @@ class ProviderRegistry:
                 raise
             else:
                 self._failures[normalized] = 0
+                self._circuit_opened_at.pop(normalized, None)
                 return response_without_credentials(response)
         if last_error is not None:
             raise last_error
@@ -311,13 +313,25 @@ class ProviderRegistry:
     def _ensure_circuit_closed(self, provider_id: str) -> None:
         limit = max(1, int(self.execution_policy.circuit_breaker_failures))
         if self._failures.get(provider_id, 0) >= limit:
+            opened_at = self._circuit_opened_at.get(provider_id, monotonic())
+            recovery_seconds = max(
+                0.0, float(self.execution_policy.circuit_recovery_seconds)
+            )
+            if monotonic() - opened_at >= recovery_seconds:
+                self._failures[provider_id] = 0
+                self._circuit_opened_at.pop(provider_id, None)
+                return
             raise ProviderCircuitOpenError(
                 f"Provider '{provider_id}' circuit is open after repeated failures."
             )
 
     # -------------------------------------------------------------------------
     def _record_failure(self, provider_id: str) -> None:
-        self._failures[provider_id] = self._failures.get(provider_id, 0) + 1
+        failures = self._failures.get(provider_id, 0) + 1
+        self._failures[provider_id] = failures
+        limit = max(1, int(self.execution_policy.circuit_breaker_failures))
+        if failures >= limit:
+            self._circuit_opened_at.setdefault(provider_id, monotonic())
 
     # -------------------------------------------------------------------------
     async def _wait_for_rate_limit(self, provider_id: str) -> None:

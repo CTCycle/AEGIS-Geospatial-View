@@ -575,7 +575,8 @@ def test_census_provider_selects_demographic_choropleth() -> None:
 
     assert response.provider_id == "census"
     assert response.payload["renderingMode"] == "choropleth"
-    assert "tigerweb.geo.census.gov" in response.payload["featuresUrl"]
+    assert response.payload["status"] == "server-side-only"
+    assert "featuresUrl" not in response.payload
 
 ###############################################################################
 def test_windy_webcams_live_fetch_normalizes_camera_metadata() -> None:

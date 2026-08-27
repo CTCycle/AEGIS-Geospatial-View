@@ -295,7 +295,7 @@ class NativeToolLoop:
     def _extract_map_session(
         results: list[LLMToolResult],
     ) -> MapSession | None:
-        for result in results:
+        for result in reversed(results):
             content = result.content if is_json_object(result.content) else None
             if content is None:
                 continue

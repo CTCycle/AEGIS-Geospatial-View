@@ -27,7 +27,8 @@ def test_usgs_provider_builds_earthquake_and_water_urls() -> None:
     assert earthquake.payload["renderingMode"] == "clustered-points"
     assert "earthquake.usgs.gov" in earthquake.payload["featuresUrl"]
     assert earthquake.payload["legend"]["type"]
-    assert "bBox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
+    assert "api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items" in water.payload["featuresUrl"]
+    assert "bbox=-78.0%2C38.0%2C-77.0%2C39.0" in water.payload["featuresUrl"]
     assert water.payload["freshnessLabel"]
 
 ###############################################################################
@@ -63,35 +64,23 @@ def test_usgs_provider_normalizes_live_earthquake_geojson() -> None:
 ###############################################################################
 def test_usgs_provider_normalizes_live_water_gauges() -> None:
     async def fetcher(url: str, headers=None):  # noqa: ANN001
-        assert "waterservices.usgs.gov" in url
+        assert "api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items" in url
         return {
-            "value": {
-                "timeSeries": [
-                    {
-                        "sourceInfo": {
-                            "siteName": "Potomac River",
-                            "siteCode": [{"value": "01646500"}],
-                            "geoLocation": {
-                                "geogLocation": {
-                                    "latitude": 38.949,
-                                    "longitude": -77.127,
-                                }
-                            },
-                        },
-                        "variable": {
-                            "variableName": "Gage height",
-                            "unit": {"unitCode": "ft"},
-                        },
-                        "values": [
-                            {
-                                "value": [
-                                    {"value": "4.1", "dateTime": "2026-05-11T12:00:00Z"}
-                                ]
-                            }
-                        ],
-                    }
-                ]
-            }
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "id": "USGS-01646500",
+                    "geometry": {"type": "Point", "coordinates": [-77.127, 38.949]},
+                    "properties": {
+                        "monitoring_location_id": "01646500",
+                        "monitoring_location_name": "Potomac River",
+                        "parameter_code": "00065",
+                        "value": 4.1,
+                        "time": "2026-05-11T12:00:00Z",
+                        "unit_of_measure": "ft",
+                    },
+                }
+            ],
         }
 
     response = run_async_in_thread(
@@ -120,7 +109,8 @@ def test_noaa_provider_builds_alert_radar_and_coops_descriptors() -> None:
     assert alerts.payload["legend"]["label"]
     assert radar.payload["renderingMode"] == "raster-tile"
     assert radar.payload["legend"]["label"]
-    assert "tidesandcurrents.noaa.gov" in coops.payload["featuresUrl"]
+    assert coops.payload["status"] == "server-side-only"
+    assert "featuresUrl" not in coops.payload
     assert coops.payload["freshnessLabel"]
 
 ###############################################################################
@@ -195,7 +185,8 @@ def test_nasa_firms_requires_key_before_descriptor() -> None:
             )
         )
     )
-    assert "test-key" in response.payload["featuresUrl"]
+    assert response.payload["status"] == "server-side-only"
+    assert "test-key" not in str(response.payload)
     assert response.payload["freshnessLabel"]
 
 ###############################################################################

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -11,38 +12,56 @@ from urllib.request import Request, urlopen
 
 from server.common.constants import OPENAQ_API_BASE_URL
 from server.common.logger import logger
-from server.common.typing import json_array, json_object
+from server.common.typing import is_json_array, is_json_object, json_array, json_object
 
 __all__ = [
     "OpenAQService",
     "OpenAQServiceError",
     "OpenAQRequestError",
+    "OpenAQAuthError",
+    "OpenAQRateLimitError",
+    "OpenAQInvalidQueryError",
+    "OpenAQMalformedPayloadError",
 ]
 
 ###############################################################################
 class OpenAQServiceError(Exception):
     """Base exception for OpenAQ service failures."""
 
+
 ###############################################################################
 class OpenAQRequestError(OpenAQServiceError):
     """Raised when OpenAQ API cannot fulfill the request."""
 
+
+###############################################################################
+class OpenAQAuthError(OpenAQServiceError):
+    """Raised when OpenAQ rejects the configured API key."""
+
+
+###############################################################################
+class OpenAQRateLimitError(OpenAQServiceError):
+    """Raised when OpenAQ applies a rate limit."""
+
+
+###############################################################################
+class OpenAQInvalidQueryError(OpenAQServiceError):
+    """Raised when OpenAQ rejects a deterministic query."""
+
+
+###############################################################################
+class OpenAQMalformedPayloadError(OpenAQServiceError):
+    """Raised when OpenAQ returns an invalid response shape."""
+
+
+JsonRequester = Callable[[str, dict[str, str]], Any]
+
 ###############################################################################
 class OpenAQService:
-    """Fetches real-time air quality measurements from OpenAQ API.
-
-    OpenAQ provides free access to air quality data from monitoring stations
-    worldwide, including PM2.5, PM10, NO2, O3, SO2, CO measurements.
-
-    API Reference: https://docs.openaq.org/
-    """
+    """Fetch nearby OpenAQ locations and their latest sensor observations."""
 
     BASE_URL = OPENAQ_API_BASE_URL
-
-    # Pollutants supported by OpenAQ
     SUPPORTED_POLLUTANTS = ("pm25", "pm10", "no2", "o3", "so2", "co", "bc")
-
-    # Human-readable names for pollutants
     POLLUTANT_LABELS = {
         "pm25": "PM2.5 (Fine Particles)",
         "pm10": "PM10 (Coarse Particles)",
@@ -62,21 +81,14 @@ class OpenAQService:
         timeout_s: float = 15.0,
         max_locations: int = 10,
         default_radius_m: float = 25000.0,
+        requester: JsonRequester | None = None,
     ) -> None:
-        """Initialize OpenAQ service.
-
-        Args:
-            api_key: Optional OpenAQ API key
-            user_agent: User agent string for API requests
-            timeout_s: Request timeout in seconds
-            max_locations: Maximum number of nearby locations to fetch
-            default_radius_m: Default search radius in meters
-        """
         self.api_key = (api_key or "").strip()
         self.user_agent = user_agent or "AEGIS-OpenAQ/1.0"
         self.timeout_s = timeout_s
-        self.max_locations = max_locations
+        self.max_locations = max(1, min(int(max_locations), 100))
         self.default_radius_m = default_radius_m
+        self.requester = requester or self._request_json_from_network
 
     # -------------------------------------------------------------------------
     async def get_nearby_measurements(
@@ -85,39 +97,24 @@ class OpenAQService:
         lon: float,
         radius_m: float | None = None,
     ) -> dict[str, Any]:
-        """Fetch air quality measurements from nearby monitoring stations.
-
-        Args:
-            lat: Latitude of search center
-            lon: Longitude of search center
-            radius_m: Search radius in meters (default: 25km)
-
-        Returns:
-            Dictionary containing:
-                - locations: List of nearby monitoring stations with measurements
-                - summary: Aggregated values for each pollutant
-                - attribution: Data source attribution
-        """
-        search_radius = radius_m or self.default_radius_m
-        radius_km = search_radius / 1000.0
-
-        # Fetch nearby locations
+        search_radius = max(
+            1.0,
+            min(
+                float(radius_m if radius_m is not None else self.default_radius_m),
+                25000.0,
+            ),
+        )
         locations = await asyncio.to_thread(
             self._fetch_locations,
             lat=lat,
             lon=lon,
-            radius_km=radius_km,
+            radius_m=search_radius,
         )
-
         if not locations:
             return self._empty_response()
-
-        # Aggregate measurements
-        summary = self._aggregate_measurements(locations)
-
         return {
             "locations": locations,
-            "summary": summary,
+            "summary": self._aggregate_measurements(locations),
             "center": {"latitude": lat, "longitude": lon},
             "radius_m": search_radius,
             "attribution": "Data from OpenAQ (openaq.org)",
@@ -129,115 +126,213 @@ class OpenAQService:
         self,
         lat: float,
         lon: float,
-        radius_km: float,
+        radius_m: float,
     ) -> list[dict[str, Any]]:
-        """Fetch locations with measurements from OpenAQ API."""
-        # OpenAQ v3 uses coordinates parameter for nearby search
-        params = {
+        params: dict[str, str | int] = {
             "coordinates": f"{lat},{lon}",
-            "radius": int(radius_km * 1000),  # API expects meters
+            "radius": max(1, min(int(round(radius_m)), 25000)),
             "limit": self.max_locations,
-            "order_by": "distance",
+            "page": 1,
+            "order_by": "id",
         }
-
         url = f"{self.BASE_URL}/locations?{urlencode(params)}"
-        logger.debug("Fetching OpenAQ locations: url=%s", url)
-
-        headers = {"User-Agent": self.user_agent}
-        if self.api_key:
-            headers["X-API-Key"] = self.api_key
-        request = Request(url, headers=headers)
-
-        try:
-            with urlopen(request, timeout=self.timeout_s) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, TimeoutError) as exc:
-            logger.warning("OpenAQ request failed: %s", exc)
-            return []
-        except json.JSONDecodeError as exc:
-            logger.warning("OpenAQ response parse error: %s", exc)
-            return []
-
-        results = json_array(json_object(data).get("results"))
+        data = self.requester(url, self._headers())
+        results = self._response_results(data, endpoint="locations")
         locations: list[dict[str, Any]] = []
-
         for raw_location in results:
             location = json_object(raw_location)
             if not location:
                 continue
             parsed = self._parse_location(location)
-            if parsed:
+            if parsed is None:
+                continue
+            location_id = parsed["id"]
+            if not json_object(parsed.get("sensor_metadata")):
+                sensors_url = (
+                    f"{self.BASE_URL}/locations/{location_id}/sensors?"
+                    f"{urlencode({'limit': 100, 'page': 1})}"
+                )
+                parsed["sensor_metadata"] = self._sensor_metadata_from_response(
+                    self.requester(sensors_url, self._headers())
+                )
+            latest_url = (
+                f"{self.BASE_URL}/locations/{location_id}/latest?"
+                f"{urlencode({'limit': 100, 'page': 1})}"
+            )
+            latest_payload = self.requester(latest_url, self._headers())
+            self._attach_latest_measurements(parsed, latest_payload)
+            if parsed.get("measurements"):
                 locations.append(parsed)
-
         return locations
 
     # -------------------------------------------------------------------------
     def _parse_location(self, location: dict[str, Any]) -> dict[str, Any] | None:
-        """Parse a location response from OpenAQ API."""
         location_id = location.get("id")
-        name = location.get("name") or f"Station {location_id}"
-
+        if location_id is None:
+            return None
         coordinates = json_object(location.get("coordinates"))
-        lat = coordinates.get("latitude")
-        lon = coordinates.get("longitude")
-
-        if lat is None or lon is None:
-            return None
-
-        # Extract latest measurements from sensors
-        sensors = json_array(location.get("sensors"))
-        measurements: dict[str, dict[str, Any]] = {}
-
-        for sensor in sensors:
-            sensor_object = json_object(sensor)
-            parameter = json_object(sensor_object.get("parameter"))
-            param_name = (parameter.get("name") or "").lower().replace(".", "")
-
-            # Get latest value
-            latest = json_object(sensor_object.get("latest"))
-            value = latest.get("value")
-
-            if param_name and value is not None:
-                measurements[param_name] = {
-                    "value": float(value),
-                    "unit": parameter.get("units") or "µg/m³",
-                    "datetime": latest.get("datetime"),
-                }
-
-        if not measurements:
-            return None
-
+        sensors: dict[str, dict[str, Any]] = {}
+        for raw_instrument in json_array(location.get("instruments")):
+            instrument = json_object(raw_instrument)
+            for raw_sensor in json_array(instrument.get("sensors")):
+                sensor = json_object(raw_sensor)
+                sensor_id = sensor.get("id")
+                if sensor_id is not None:
+                    sensors[str(sensor_id)] = self._sensor_metadata(sensor)
+        if not sensors:
+            for raw_sensor in json_array(location.get("sensors")):
+                sensor = json_object(raw_sensor)
+                sensor_id = sensor.get("id")
+                if sensor_id is not None:
+                    sensors[str(sensor_id)] = self._sensor_metadata(sensor)
+        country = json_object(location.get("country"))
         return {
             "id": location_id,
-            "name": name,
-            "latitude": float(lat),
-            "longitude": float(lon),
-            "country": location.get("country", {}).get("name"),
+            "name": location.get("name") or f"Station {location_id}",
+            "latitude": self._float_or_none(coordinates.get("latitude")),
+            "longitude": self._float_or_none(coordinates.get("longitude")),
+            "country": country.get("name") or location.get("country"),
             "city": location.get("locality"),
-            "measurements": measurements,
-            "distance_m": location.get("distance"),
+            "measurements": {},
+            "distance_m": location.get("distance") or location.get("distance_m"),
+            "sensor_metadata": sensors,
         }
+
+    # -------------------------------------------------------------------------
+    def _sensor_metadata_from_response(self, payload: object) -> dict[str, dict[str, Any]]:
+        sensors: dict[str, dict[str, Any]] = {}
+        for raw_sensor in self._response_results(payload, endpoint="sensors"):
+            sensor = json_object(raw_sensor)
+            sensor_id = sensor.get("id")
+            if sensor_id is not None:
+                sensors[str(sensor_id)] = self._sensor_metadata(sensor)
+        return sensors
+
+    # -------------------------------------------------------------------------
+    def _attach_latest_measurements(
+        self, location: dict[str, Any], payload: object
+    ) -> None:
+        measurements: dict[str, dict[str, Any]] = {}
+        sensor_metadata = json_object(location.get("sensor_metadata"))
+        for raw_measurement in self._response_results(
+            payload, endpoint="latest measurements"
+        ):
+            measurement = json_object(raw_measurement)
+            if not measurement:
+                continue
+            sensor_id = str(
+                measurement.get("sensorsId")
+                or measurement.get("sensorId")
+                or ""
+            )
+            metadata = json_object(sensor_metadata.get(sensor_id))
+            raw_parameter = measurement.get("parameter")
+            parameter = json_object(raw_parameter)
+            parameter_name = (
+                metadata.get("parameter")
+                or parameter.get("name")
+                or (raw_parameter if isinstance(raw_parameter, str) else None)
+            )
+            normalized_name = self._normalize_parameter(parameter_name)
+            value = self._float_or_none(measurement.get("value"))
+            if not normalized_name or value is None:
+                continue
+            timestamp = json_object(measurement.get("datetime"))
+            coordinates = json_object(measurement.get("coordinates"))
+            if location.get("latitude") is None:
+                location["latitude"] = self._float_or_none(coordinates.get("latitude"))
+            if location.get("longitude") is None:
+                location["longitude"] = self._float_or_none(coordinates.get("longitude"))
+            measurements[normalized_name] = {
+                "value": value,
+                "unit": metadata.get("units") or parameter.get("units") or "µg/m³",
+                "datetime": timestamp.get("utc")
+                or timestamp.get("local")
+                or measurement.get("datetime"),
+                "sensor_id": sensor_id or None,
+            }
+        location["measurements"] = measurements
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _sensor_metadata(sensor: dict[str, Any]) -> dict[str, Any]:
+        parameter = json_object(sensor.get("parameter"))
+        return {
+            "parameter": parameter.get("name"),
+            "units": parameter.get("units"),
+        }
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _normalize_parameter(value: object) -> str:
+        return (
+            str(value or "")
+            .strip()
+            .lower()
+            .replace(".", "")
+            .replace("-", "")
+            .replace(" ", "")
+        )
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _float_or_none(value: object) -> float | None:
+        try:
+            return None if value is None else float(value)
+        except (TypeError, ValueError):
+            return None
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _response_results(payload: object, *, endpoint: str) -> list[object]:
+        if not is_json_object(payload) or not is_json_array(payload.get("results")):
+            raise OpenAQMalformedPayloadError(
+                f"OpenAQ {endpoint} response is missing a results array."
+            )
+        return json_array(payload.get("results"))
+
+    # -------------------------------------------------------------------------
+    def _headers(self) -> dict[str, str]:
+        headers = {"User-Agent": self.user_agent}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        return headers
+
+    # -------------------------------------------------------------------------
+    def _request_json_from_network(self, url: str, headers: dict[str, str]) -> Any:
+        logger.debug("Fetching OpenAQ endpoint: %s", url)
+        request = Request(url, headers=headers)
+        try:
+            with urlopen(request, timeout=self.timeout_s) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            if exc.code in {401, 403}:
+                raise OpenAQAuthError("OpenAQ rejected the configured API key.") from exc
+            if exc.code == 429:
+                raise OpenAQRateLimitError("OpenAQ rate limit exceeded.") from exc
+            if exc.code in {400, 404, 409, 410, 422}:
+                raise OpenAQInvalidQueryError("OpenAQ rejected the requested query.") from exc
+            raise OpenAQRequestError("OpenAQ request failed.") from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            logger.warning("OpenAQ request failed.")
+            raise OpenAQRequestError("OpenAQ request failed.") from exc
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.warning("OpenAQ response parse failed.")
+            raise OpenAQMalformedPayloadError("OpenAQ returned malformed JSON.") from exc
 
     # -------------------------------------------------------------------------
     def _aggregate_measurements(
         self, locations: list[dict[str, Any]]
     ) -> dict[str, dict[str, Any]]:
-        """Aggregate measurements across all locations."""
         aggregates: dict[str, list[float]] = {}
-
         for location in locations:
             measurements = json_object(location.get("measurements"))
             for param, data in measurements.items():
-                if param not in aggregates:
-                    aggregates[param] = []
-                value = json_object(data).get("value")
+                value = self._float_or_none(json_object(data).get("value"))
                 if value is not None:
-                    aggregates[param].append(float(value))
-
+                    aggregates.setdefault(param, []).append(value)
         summary: dict[str, dict[str, Any]] = {}
         for param, values in aggregates.items():
-            if not values:
-                continue
             summary[param] = {
                 "mean": sum(values) / len(values),
                 "min": min(values),
@@ -245,15 +340,15 @@ class OpenAQService:
                 "count": len(values),
                 "label": self.POLLUTANT_LABELS.get(param, param.upper()),
             }
-
         return summary
 
     # -------------------------------------------------------------------------
-    def _empty_response(self) -> dict[str, Any]:
-        """Return an empty response when no data is available."""
+    @staticmethod
+    def _empty_response() -> dict[str, Any]:
         return {
             "locations": [],
             "summary": {},
             "attribution": "No air quality data available for this location",
             "provider": "openaq",
+            "result_status": "valid_empty",
         }
