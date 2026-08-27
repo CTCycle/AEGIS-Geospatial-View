@@ -86,6 +86,103 @@ class OverlayCollectionService:
 
     # ------------------------------------------------------------------
     @classmethod
+    def _metadata_values(cls, metadata: dict[str, Any], *keys: str) -> list[str]:
+        values: list[str] = []
+        for key in keys:
+            value = metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                values.append(value)
+            elif isinstance(value, list):
+                values.extend(
+                    item.strip()
+                    for item in cast(list[Any], value)
+                    if isinstance(item, str) and item.strip()
+                )
+        return list(dict.fromkeys(values))
+
+    # ------------------------------------------------------------------
+    @classmethod
+    def _selector_matches_metadata(
+        cls,
+        selector: OverlaySelector,
+        metadata: dict[str, Any],
+    ) -> bool:
+        """Match a typed selector against a basemap or capability descriptor."""
+        if not cls._selector_values(selector):
+            return False
+        identifiers = {
+            cls._norm(value)
+            for value in cls._metadata_values(
+                metadata, "id", "instance_id", "capability_id", "layer_id"
+            )
+        }
+        if selector.instance_ids and not identifiers.intersection(
+            cls._norm(value) for value in selector.instance_ids
+        ):
+            return False
+        if selector.capability_ids and not identifiers.intersection(
+            cls._norm(value) for value in selector.capability_ids
+        ):
+            return False
+        semantic_values = cls._metadata_values(
+            metadata,
+            "id",
+            "instance_id",
+            "capability_id",
+            "layer_id",
+            "label",
+            "name",
+            "type",
+            "overlay_type",
+            "capabilityKind",
+            "capability_kind",
+            "concepts",
+            "capabilities",
+            "tags",
+            "aliases",
+            "keywords",
+        )
+        semantic_haystack = {cls._norm(value) for value in semantic_values if cls._norm(value)}
+        if selector.concepts and not any(
+            cls._concept_matches(semantic_haystack, value) for value in selector.concepts
+        ):
+            return False
+        if selector.labels and not any(
+            cls._concept_matches(semantic_haystack, value) for value in selector.labels
+        ):
+            return False
+        if selector.providers:
+            providers = {
+                cls._norm(value)
+                for value in cls._metadata_values(metadata, "provider", "provider_id")
+            }
+            if not providers.intersection(cls._norm(value) for value in selector.providers):
+                return False
+        if selector.overlay_types:
+            types = {
+                cls._norm(value)
+                for value in cls._metadata_values(metadata, "type", "overlay_type", "kind")
+            }
+            if not types.intersection(cls._norm(value) for value in selector.overlay_types):
+                return False
+        if selector.rendering_modes:
+            modes = {
+                cls._norm(value)
+                for value in cls._metadata_values(metadata, "rendering_mode", "renderingMode")
+            }
+            if not modes.intersection(cls._norm(value) for value in selector.rendering_modes):
+                return False
+        if selector.tags:
+            tags = {
+                cls._norm(value)
+                for value in cls._metadata_values(metadata, "tags", "map_type_tags", "action_tags")
+            }
+            if not any(cls._concept_matches(tags, value) for value in selector.tags):
+                return False
+        return True
+
+    # ------------------------------------------------------------------
+    @classmethod
     def _instance_concepts(cls, instance: OverlayInstance) -> set[str]:
         descriptor = instance.descriptor
         values: list[object] = [
@@ -467,6 +564,7 @@ class OverlayCollectionService:
         *,
         catalog: Iterable[dict[str, Any]] = (),
         current_view: dict[str, Any] | None = None,
+        basemap: dict[str, Any] | None = None,
     ) -> tuple[OverlayCollectionState, OverlayMutationResult]:
         expected = command.state_reference.revision
         if expected != collection.revision:
@@ -593,7 +691,17 @@ class OverlayCollectionService:
         if ambiguous:
             clarification = "More than one overlay matches the requested selector. Choose a specific overlay."
         elif unmatched:
-            clarification = "No existing overlay matches the requested selector; the map was left unchanged."
+            if (
+                basemap is not None
+                and command.action in {"remove", "keep_only", "hide", "update"}
+                and cls._selector_matches_metadata(command.selector, basemap)
+            ):
+                clarification = (
+                    "The requested item matches the active map basemap, not an overlay. "
+                    "The basemap and active overlays were left unchanged; choose an overlay to modify."
+                )
+            else:
+                clarification = "No existing overlay matches the requested selector; the map was left unchanged."
         return next_collection, OverlayMutationResult(
             collection_id=collection.collection_id,
             revision=next_revision,
@@ -614,6 +722,7 @@ class OverlayCollectionService:
         *,
         catalog: Iterable[dict[str, Any]] = (),
         current_view: dict[str, Any] | None = None,
+        basemap: dict[str, Any] | None = None,
     ) -> tuple[OverlayCollectionState, list[OverlayMutationResult]]:
         current = collection.model_copy(deep=True)
         results: list[OverlayMutationResult] = []
@@ -623,6 +732,7 @@ class OverlayCollectionService:
                 command,
                 catalog=catalog,
                 current_view=current_view,
+                basemap=basemap,
             )
             results.append(result)
         return current, results

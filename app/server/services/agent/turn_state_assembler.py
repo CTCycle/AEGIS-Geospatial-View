@@ -87,6 +87,7 @@ class AgentTurnStateAssembler:
             bound_commands,
             catalog=[dict(item) for item in session.overlays],
             current_view=session.viewport.model_dump(mode="json"),
+            basemap=collection_session.basemap,
         )
         return OverlayCollectionService.merge_into_map_session(session, collection), results
 

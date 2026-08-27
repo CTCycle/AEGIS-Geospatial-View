@@ -468,9 +468,27 @@ def test_parser_domain_rules_use_current_view_for_local_overlay_commands() -> No
     assert command.selector.concepts == ["satellite"]
     assert command.scope.kind == "current_view"
     assert extracted.requested_basemap is None
-    assert extracted.clarification_plan is not None
-    assert "basemap, not an active overlay" in str(extracted.clarification_plan["question"])
     assert extracted.requires_location is False
+
+
+def test_parser_domain_rules_preserve_explicit_basemap_in_compound_request() -> None:
+    extracted = ParserService._apply_domain_rules(
+        "Switch to satellite imagery and hide weather in this area.",
+        LLMParserExtraction(
+            requested_basemap="esri_world_imagery",
+            overlay_commands=[
+                {
+                    "action": "hide",
+                    "selector": {"concepts": ["weather"]},
+                    "scope": {"kind": "current_view"},
+                }
+            ],
+        ),
+        {"active_visualization": {"basemap_id": "osm_default"}},
+    )
+
+    assert extracted.requested_basemap == "esri_world_imagery"
+    assert extracted.overlay_commands[0].selector.concepts == ["weather"]
 
 
 def test_parser_domain_rules_keep_only_and_location_scoped_show_are_independent() -> None:
