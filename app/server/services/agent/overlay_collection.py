@@ -864,6 +864,26 @@ class OverlayCollectionService:
             descriptor.setdefault("rendering_mode", instance.rendering_mode)
             overlays.append(descriptor)
             inspections.extend(instance.inspections)
+        active_overlay_keys = {
+            key
+            for instance in collection.instances
+            for key in (
+                instance.instance_id,
+                instance.capability_id,
+                str(instance.descriptor.get("id") or ""),
+            )
+            if key
+        }
+        # A fresh provider projection can contain a failed request for an
+        # identifier that the authoritative collection has since resolved
+        # (for example, an instance ID carried as a catalog capability ID).
+        # Do not surface that stale failure alongside the now-renderable
+        # instance; retain failures for genuinely absent provider layers.
+        failed_overlays = [
+            failure
+            for failure in session.failed_overlays
+            if str(failure.get("id") or "") not in active_overlay_keys
+        ]
         return session.model_copy(
             update={
                 "overlay_ids": [instance.instance_id for instance in collection.instances],
@@ -875,6 +895,7 @@ class OverlayCollectionService:
                 "overlay_collection_revision": collection.revision,
                 "overlay_collection": collection,
                 "inspections": inspections,
+                "failed_overlays": failed_overlays,
             },
             deep=True,
         )
